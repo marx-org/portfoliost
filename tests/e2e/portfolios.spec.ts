@@ -53,6 +53,20 @@ test("portfolio detail shows metric strip, tabbed sections, and positions", asyn
   await expect(page.getByText("Equity Curve")).toBeVisible()
   await expect(page.getByText("Monthly Returns")).toBeVisible()
 
+  const sections: Array<[string, string]> = [
+    ["Allocation", /\/allocation/],
+    ["Dividends", /\/dividends/],
+    ["Calendar", /\/calendar/],
+    ["News", /\/news/],
+    ["Compare", /\/compare/],
+    ["Transactions", /\/transactions/],
+  ]
+  for (const [label, url] of sections) {
+    await tabs.getByRole("link", { name: label }).click()
+    await expect(page).toHaveURL(url)
+    await expect(tabs.getByRole("link", { name: label })).toHaveClass(/border-blue-600/)
+  }
+
   await tabs.getByRole("link", { name: "Holdings" }).click()
   await page.getByRole("link", { name: "META" }).click()
   await expect(page).toHaveURL(/\/en\/research\/META\/overview/)
