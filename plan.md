@@ -15,7 +15,7 @@ Legend: `[ ]` pending · `[x]` done
 - [x] Heading → "Portfolios"; add "Import from Broker" placeholder button.
 - [x] E2e tab-switching test passes. Commit. — `4204d7d` (+ router-tolerance fix `a506b0f`)
 
-## Step 2 — Portfolio detail with 9 tabs (complaint #2)
+## Step 2 — Portfolio detail with 9 tabs (complaint #2) ✅
 - [x] 2.1 Routing + layout shell: `/en/portfolios/:id` → layout (header: back, name, strategy, rename, Display currency/Share/Add Position/Delete + metric strip) + 9-tab nav + nested router-view; default child `/holdings`. — `f6889dd`
 - [x] 2.2 Mock endpoints + API client: `GET /api/portfolios/:id/{allocation,dividends,calendar,news,compare}` derived from holdings + research; `src/api/portfolios.ts` functions + types. — `6f6062a`
 - [x] 2.3 Holdings tab: move existing positions table into `PortfolioHoldingsTab.vue` (step 3 will add the three-dots column). — `f6889dd`
