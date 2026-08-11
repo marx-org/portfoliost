@@ -40,6 +40,11 @@ const router = createRouter({
           component: () => import("@/modules/wallets/WalletsView.vue"),
         },
         {
+          path: "charting",
+          name: "charting",
+          component: () => import("@/modules/charting/ChartingView.vue"),
+        },
+        {
           path: "portfolios/:id",
           name: "portfolio-detail",
           component: () => import("@/modules/portfolios/PortfolioDetailView.vue"),

@@ -44,7 +44,7 @@ Legend: `[ ]` pending · `[x]` done
 - [x] 4.9 Tests: e2e tab navigation + charts with clean console, unit coverage, lint/typecheck. Commit.
 
 ## Step 5 — Charting module (complaint #5)
-- [ ] New `/en/charting` route + `ChartingView.vue`.
-- [ ] Stocks selector (0/10), Add stock via search modal, Popular comparisons presets.
-- [ ] Fundamentals comparison charts from `/api/charting/compare` with metric picker.
-- [ ] E2e: add stocks → charts appear. Commit.
+- [x] New `/en/charting` route + `ChartingView.vue`.
+- [x] Stocks selector (0/10), Add stock via search modal, Popular comparisons presets.
+- [x] Fundamentals comparison charts from `/api/charting/compare` with metric picker.
+- [x] E2e: add stocks → charts appear. Commit.

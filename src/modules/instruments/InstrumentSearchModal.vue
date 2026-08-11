@@ -3,8 +3,8 @@ import { ref, watch } from "vue"
 import { useRouter } from "vue-router"
 import { useInstrumentsStore } from "@/stores/instruments"
 
-const props = defineProps<{ open: boolean }>()
-const emit = defineEmits<{ (e: "close"): void }>()
+const props = defineProps<{ open: boolean; mode?: "navigate" | "add" }>()
+const emit = defineEmits<{ (e: "close"): void; (e: "add", symbol: string, name: string): void }>()
 
 const store = useInstrumentsStore()
 const router = useRouter()
@@ -35,8 +35,12 @@ watch(query, (value) => {
 
 const popular = ["AAPL", "GOOGL", "MSFT", "AMZN", "TSLA", "SPY", "QQQ"]
 
-function openResult(symbol: string) {
+function openResult(symbol: string, name = "") {
   emit("close")
+  if (props.mode === "add") {
+    emit("add", symbol, name)
+    return
+  }
   router.push({ name: "research-overview", params: { symbol } })
 }
 
@@ -92,7 +96,7 @@ function onKeydown(e: KeyboardEvent) {
               <button
                 type="button"
                 class="flex w-full items-center gap-3 px-2 py-2.5 text-left hover:bg-slate-50"
-                @click="openResult(result.symbol)"
+                @click="openResult(result.symbol, result.name)"
               >
                 <img :src="`/api/logos/${result.symbol}`" alt="" class="h-8 w-8 rounded-full bg-slate-100" />
                 <span class="flex-1">

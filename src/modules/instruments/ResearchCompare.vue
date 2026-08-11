@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from "vue"
 import { useRoute } from "vue-router"
 import { getInstrumentPeers } from "@/api/instruments"
 import type { ResearchCompare } from "@/api/types"
-import { formatCompact, formatCurrency, formatNumber, formatPercent } from "@/utils/format"
+import { COMPARE_METRICS } from "./compareMetrics"
 
 const route = useRoute()
 const symbol = String(route.params.symbol).toUpperCase()
@@ -23,25 +23,7 @@ onMounted(async () => {
   }
 })
 
-const metrics: Array<{ key: keyof ResearchCompare; label: string; fmt: (r: ResearchCompare) => string }> = [
-  { key: "price", label: "Price", fmt: (r) => formatCurrency(r.price, r.currency ?? "USD") },
-  { key: "marketCap", label: "Market Cap", fmt: (r) => formatCompact(r.marketCap) },
-  { key: "peRatio", label: "P/E (TTM)", fmt: (r) => formatNumber(r.peRatio) },
-  { key: "forwardPe", label: "Forward P/E", fmt: (r) => formatNumber(r.forwardPe) },
-  { key: "pbRatio", label: "P/B", fmt: (r) => formatNumber(r.pbRatio) },
-  { key: "psRatio", label: "P/S", fmt: (r) => formatNumber(r.psRatio) },
-  { key: "dividendYield", label: "Dividend Yield", fmt: (r) => formatPercent(r.dividendYield) },
-  { key: "revenueGrowth", label: "Revenue Growth", fmt: (r) => formatPercent(r.revenueGrowth) },
-  { key: "netMargin", label: "Net Margin", fmt: (r) => formatPercent(r.netMargin) },
-  { key: "roe", label: "ROE", fmt: (r) => formatPercent(r.roe) },
-  { key: "grossMargin", label: "Gross Margin", fmt: (r) => formatPercent(r.grossMargin) },
-  { key: "operatingMargin", label: "Operating Margin", fmt: (r) => formatPercent(r.operatingMargin) },
-  { key: "evToEbitda", label: "EV/EBITDA", fmt: (r) => formatNumber(r.evToEbitda) },
-  { key: "evToSales", label: "EV/Sales", fmt: (r) => formatNumber(r.evToSales) },
-  { key: "fcfMargin", label: "FCF Margin", fmt: (r) => formatPercent(r.fcfMargin) },
-  { key: "netIncome", label: "Net Income", fmt: (r) => formatCompact(r.netIncome) },
-  { key: "revenue", label: "Revenue", fmt: (r) => formatCompact(r.revenue) },
-]
+const metrics = COMPARE_METRICS
 
 const rows = computed(() =>
   metrics.map((m) => ({ label: m.label, key: m.key, values: items.value.map((r) => m.fmt(r)) })),
