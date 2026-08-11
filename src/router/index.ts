@@ -43,6 +43,54 @@ const router = createRouter({
           path: "portfolios/:id",
           name: "portfolio-detail",
           component: () => import("@/modules/portfolios/PortfolioDetailView.vue"),
+          redirect: (to) => ({ name: "portfolio-holdings", params: to.params }),
+          children: [
+            {
+              path: "holdings",
+              name: "portfolio-holdings",
+              component: () => import("@/modules/portfolios/PortfolioHoldingsTab.vue"),
+            },
+            {
+              path: "transactions",
+              name: "portfolio-transactions",
+              component: () => import("@/modules/portfolios/PortfolioTransactionsTab.vue"),
+            },
+            {
+              path: "analytics",
+              name: "portfolio-analytics",
+              component: () => import("@/modules/portfolios/PortfolioAnalyticsTab.vue"),
+            },
+            {
+              path: "allocation",
+              name: "portfolio-allocation",
+              component: () => import("@/modules/portfolios/PortfolioAllocationTab.vue"),
+            },
+            {
+              path: "risk",
+              name: "portfolio-risk",
+              component: () => import("@/modules/portfolios/PortfolioRiskTab.vue"),
+            },
+            {
+              path: "dividends",
+              name: "portfolio-dividends",
+              component: () => import("@/modules/portfolios/PortfolioDividendsTab.vue"),
+            },
+            {
+              path: "calendar",
+              name: "portfolio-calendar",
+              component: () => import("@/modules/portfolios/PortfolioCalendarTab.vue"),
+            },
+            {
+              path: "news",
+              name: "portfolio-news",
+              component: () => import("@/modules/portfolios/PortfolioNewsTab.vue"),
+            },
+            {
+              path: "compare",
+              name: "portfolio-compare",
+              component: () => import("@/modules/portfolios/PortfolioCompareTab.vue"),
+            },
+          ],
         },
         {
           path: "research/:symbol",

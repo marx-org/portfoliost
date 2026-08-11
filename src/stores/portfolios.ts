@@ -1,11 +1,12 @@
 import { defineStore } from "pinia"
 import { ref } from "vue"
 import * as portfoliosApi from "@/api/portfolios"
-import type { PortfolioAnalytics1Y, PortfolioPositions, PortfolioSummaryMetrics, PortfoliosSummaries, PortfoliosTotalMetrics } from "@/api/types"
+import type { PortfolioAnalytics1Y, PortfolioDetail, PortfolioPositions, PortfolioSummaryMetrics, PortfoliosSummaries, PortfoliosTotalMetrics } from "@/api/types"
 
 export const usePortfolioStore = defineStore("portfolios", () => {
   const portfolios = ref<PortfoliosSummaries>([])
   const totalMetrics = ref<PortfoliosTotalMetrics | null>(null)
+  const detail = ref<PortfolioDetail | null>(null)
   const summaryMetrics = ref<PortfolioSummaryMetrics | null>(null)
   const positions = ref<PortfolioPositions>([])
   const analytics = ref<PortfolioAnalytics1Y | null>(null)
@@ -35,11 +36,13 @@ export const usePortfolioStore = defineStore("portfolios", () => {
     loading.value = true
     error.value = null
     try {
-      const [metrics, positionsData, analyticsData] = await Promise.all([
+      const [detailData, metrics, positionsData, analyticsData] = await Promise.all([
+        portfoliosApi.getPortfolioDetail(id),
         portfoliosApi.getPortfolioSummaryMetrics(id),
         portfoliosApi.getPortfolioPositions(id),
         portfoliosApi.getPortfolioAnalytics(id, analyticsTimeframe.value),
       ])
+      detail.value = detailData
       summaryMetrics.value = metrics
       positions.value = positionsData
       analytics.value = analyticsData
@@ -68,6 +71,7 @@ export const usePortfolioStore = defineStore("portfolios", () => {
   function reset(): void {
     portfolios.value = []
     totalMetrics.value = null
+    detail.value = null
     summaryMetrics.value = null
     positions.value = []
     analytics.value = null
@@ -77,6 +81,7 @@ export const usePortfolioStore = defineStore("portfolios", () => {
   return {
     portfolios,
     totalMetrics,
+    detail,
     summaryMetrics,
     positions,
     analytics,

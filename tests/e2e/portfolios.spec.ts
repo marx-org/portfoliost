@@ -32,20 +32,26 @@ test("investments tabs switch between portfolios, transactions, and watchlists",
   await expect(tabs.getByRole("link", { name: "Watchlists" })).toHaveClass(/border-blue-600/)
 })
 
-test("portfolio detail shows summary, analytics, and positions", async ({ page }) => {
+test("portfolio detail shows metric strip, tabbed sections, and positions", async ({ page }) => {
   await login(page)
   await page.getByRole("link", { name: /Top10/ }).click()
 
-  await expect(page).toHaveURL(/\/en\/portfolios\//)
+  await expect(page).toHaveURL(/\/en\/portfolios\/.*\/holdings/)
   await expect(page.getByRole("heading", { name: "Top10" })).toBeVisible()
-  await expect(page.getByText("Equity Curve")).toBeVisible()
-  await expect(page.getByText("Monthly Returns")).toBeVisible()
-  await expect(page.getByText("Positions")).toBeVisible()
+  await expect(page.getByText("Total Value")).toBeVisible()
+
+  const tabs = page.getByRole("navigation", { name: "Portfolio tabs" })
+  await expect(tabs.getByRole("link", { name: "Holdings" })).toHaveClass(/border-blue-600/)
 
   const rows = page.locator("tbody tr")
   await expect(rows.first()).toBeVisible()
   await expect(rows.first().getByText("META", { exact: true })).toBeVisible()
 
+  await tabs.getByRole("link", { name: "Analytics" }).click()
+  await expect(page).toHaveURL(/\/en\/portfolios\/.*\/analytics/)
+  await expect(tabs.getByRole("link", { name: "Analytics" })).toHaveClass(/border-blue-600/)
+
+  await tabs.getByRole("link", { name: "Holdings" }).click()
   await page.getByRole("link", { name: "META" }).click()
   await expect(page).toHaveURL(/\/en\/research\/META\/overview/)
 })
