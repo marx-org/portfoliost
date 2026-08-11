@@ -1,11 +1,15 @@
 import { defineStore } from "pinia"
 import { ref } from "vue"
-import { http } from "@/api/client"
-import type { PortfoliosSummaries, PortfoliosTotalMetrics } from "@/api/types"
+import * as portfoliosApi from "@/api/portfolios"
+import type { PortfolioAnalytics1Y, PortfolioPositions, PortfolioSummaryMetrics, PortfoliosSummaries, PortfoliosTotalMetrics } from "@/api/types"
 
 export const usePortfolioStore = defineStore("portfolios", () => {
   const portfolios = ref<PortfoliosSummaries>([])
   const totalMetrics = ref<PortfoliosTotalMetrics | null>(null)
+  const summaryMetrics = ref<PortfolioSummaryMetrics | null>(null)
+  const positions = ref<PortfolioPositions>([])
+  const analytics = ref<PortfolioAnalytics1Y | null>(null)
+  const analyticsTimeframe = ref<portfoliosApi.PortfolioAnalyticsTimeframe>("1Y")
   const loading = ref(false)
   const error = ref<string | null>(null)
 
@@ -14,8 +18,8 @@ export const usePortfolioStore = defineStore("portfolios", () => {
     error.value = null
     try {
       const [list, metrics] = await Promise.all([
-        http.get<PortfoliosSummaries>("/api/portfolios"),
-        http.get<PortfoliosTotalMetrics>("/api/portfolios/total-metrics"),
+        portfoliosApi.getPortfolios(),
+        portfoliosApi.getPortfolioTotalMetrics(),
       ])
       portfolios.value = list
       totalMetrics.value = metrics
@@ -27,5 +31,62 @@ export const usePortfolioStore = defineStore("portfolios", () => {
     }
   }
 
-  return { portfolios, totalMetrics, loading, error, fetchAll }
+  async function fetchDetail(id: string): Promise<void> {
+    loading.value = true
+    error.value = null
+    try {
+      const [metrics, positionsData, analyticsData] = await Promise.all([
+        portfoliosApi.getPortfolioSummaryMetrics(id),
+        portfoliosApi.getPortfolioPositions(id),
+        portfoliosApi.getPortfolioAnalytics(id, analyticsTimeframe.value),
+      ])
+      summaryMetrics.value = metrics
+      positions.value = positionsData
+      analytics.value = analyticsData
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : "Failed to load portfolio"
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function setTimeframe(timeframe: portfoliosApi.PortfolioAnalyticsTimeframe, id: string): Promise<void> {
+    analyticsTimeframe.value = timeframe
+    try {
+      analytics.value = await portfoliosApi.getPortfolioAnalytics(id, timeframe)
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : "Failed to load analytics"
+    }
+  }
+
+  async function createPortfolio(input: { name: string; description?: string; strategy?: string; currency?: string }): Promise<void> {
+    await portfoliosApi.createPortfolio(input)
+    await fetchAll()
+  }
+
+  function reset(): void {
+    portfolios.value = []
+    totalMetrics.value = null
+    summaryMetrics.value = null
+    positions.value = []
+    analytics.value = null
+    error.value = null
+  }
+
+  return {
+    portfolios,
+    totalMetrics,
+    summaryMetrics,
+    positions,
+    analytics,
+    analyticsTimeframe,
+    loading,
+    error,
+    fetchAll,
+    fetchDetail,
+    setTimeframe,
+    createPortfolio,
+    reset,
+  }
 })
