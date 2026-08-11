@@ -1,5 +1,5 @@
 import { requireAuth } from "../lib/auth.js"
-import { loadRaw, loadResearch } from "../lib/data.js"
+import { loadRaw, loadResearch, normalize } from "../lib/data.js"
 import { paginatePage, uuid, nowIso } from "../lib/http.js"
 
 const created = new Map()
@@ -35,6 +35,23 @@ function findPortfolio(id) {
 function withDataFile(id, baseName, emptyName) {
   if (created.has(id)) return loadRaw(emptyName)
   return findPortfolio(id) ? loadRaw(baseName) : loadRaw(emptyName)
+}
+
+function heldPositions(id) {
+  if (created.has(id)) return createdPositions.get(id) || []
+  const positions = loadRaw("portfolio_positions.json")
+  return Array.isArray(positions) ? positions : []
+}
+
+function sumBy(positions, field) {
+  const totals = new Map()
+  for (const p of positions) {
+    const key = p[field] || "Other"
+    totals.set(key, (totals.get(key) || 0) + (p.marketValue || 0))
+  }
+  return [...totals.entries()]
+    .map(([name, value]) => ({ name, value: round2(value) }))
+    .sort((a, b) => b.value - a.value)
 }
 
 export function register(app) {
@@ -273,6 +290,103 @@ export function register(app) {
   app.get("/api/portfolios/:id/risk-metrics", (ctx) => {
     if (!requireAuth(ctx)) return
     ctx.res.json(withDataFile(ctx.params.id, "portfolio_risk_metrics.json", "empty_portfolio_risk_metrics.json"))
+  })
+
+  app.get("/api/portfolios/:id/allocation", (ctx) => {
+    if (!requireAuth(ctx)) return
+    const positions = heldPositions(ctx.params.id)
+    ctx.res.json({
+      totalValue: round2(positions.reduce((s, p) => s + (p.marketValue || 0), 0)),
+      bySector: sumBy(positions, "sector"),
+      byAssetType: sumBy(positions, "assetType"),
+      byCurrency: sumBy(positions, "instrumentCurrency"),
+    })
+  })
+
+  app.get("/api/portfolios/:id/dividends", (ctx) => {
+    if (!requireAuth(ctx)) return
+    const positions = heldPositions(ctx.params.id)
+    const rows = []
+    for (const p of positions) {
+      const research = loadResearch(p.symbol)
+      const history = research?.dividends?.history ?? []
+      for (const d of history) {
+        rows.push({
+          symbol: p.symbol,
+          companyName: p.companyName,
+          date: d.date,
+          year: d.year,
+          amount: d.amount,
+          currency: d.currency || p.instrumentCurrency,
+          type: d.type || "dividend",
+        })
+      }
+    }
+    rows.sort((a, b) => (a.date < b.date ? 1 : -1))
+    const total = rows.reduce((s, r) => s + (r.amount || 0), 0)
+    ctx.res.json({
+      totalDividends: round2(total),
+      count: rows.length,
+      items: rows,
+    })
+  })
+
+  app.get("/api/portfolios/:id/calendar", (ctx) => {
+    if (!requireAuth(ctx)) return
+    const positions = heldPositions(ctx.params.id)
+    const events = []
+    for (const p of positions) {
+      const calendar = loadResearch(p.symbol)?.calendar
+      if (!calendar) continue
+      for (const kind of ["earnings", "exDividend", "dividend"]) {
+        for (const e of calendar[kind] || []) {
+          events.push({
+            symbol: p.symbol,
+            companyName: p.companyName,
+            type: kind,
+            date: String(e.date),
+            title: e.title || `${kind} ${e.date}`,
+            amount: e.amount ?? null,
+            quarter: e.quarter ?? null,
+          })
+        }
+      }
+    }
+    events.sort((a, b) => (a.date < b.date ? -1 : 1))
+    const today = new Date().toISOString().slice(0, 10)
+    ctx.res.json({
+      upcoming: events.filter((e) => e.date >= today),
+      past: events.filter((e) => e.date < today).slice(0, 50),
+      total: events.length,
+    })
+  })
+
+  app.get("/api/portfolios/:id/news", (ctx) => {
+    if (!requireAuth(ctx)) return
+    const positions = heldPositions(ctx.params.id)
+    const symbols = new Set(positions.map((p) => normalize(p.symbol)))
+    const all = loadRaw("news_articles_all.json")
+    const items = (all?.data ?? []).filter((a) => symbols.has(normalize(a.ticker)))
+    ctx.res.json({ data: items, total: items.length })
+  })
+
+  app.get("/api/portfolios/:id/compare", (ctx) => {
+    if (!requireAuth(ctx)) return
+    const positions = heldPositions(ctx.params.id)
+    const total = positions.reduce((s, p) => s + (p.marketValue || 0), 0)
+    const rows = positions.map((p) => {
+      const research = loadResearch(p.symbol)
+      const compare = research?.compare ?? {}
+      return {
+        symbol: p.symbol,
+        name: p.companyName,
+        quantity: p.quantity,
+        marketValue: round2(p.marketValue || 0),
+        weight: total ? round2(((p.marketValue || 0) / total) * 100) : 0,
+        ...compare,
+      }
+    })
+    ctx.res.json({ totalValue: round2(total), items: rows })
   })
 }
 

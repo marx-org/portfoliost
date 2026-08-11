@@ -1,7 +1,12 @@
 import { http } from "./client"
 import type {
+  PortfolioAllocation,
   PortfolioAnalytics1Y,
+  PortfolioCalendar,
+  PortfolioCompare,
   PortfolioDetail,
+  PortfolioDividends,
+  PortfolioNews,
   PortfolioPositions,
   PortfolioSummaryMetrics,
   PortfoliosSummaries,
@@ -54,6 +59,30 @@ export async function getPortfolioTransactions(
   return http.get<PaginatedResponse<PortfolioTransactionsPage["items"][number]>>(
     `/api/portfolios/${id}/transactions?page=${page}&limit=${limit}`,
   )
+}
+
+export async function getPortfolioAllocation(id: string): Promise<PortfolioAllocation> {
+  return http.get<PortfolioAllocation>(`/api/portfolios/${id}/allocation`)
+}
+
+export async function getPortfolioDividends(id: string): Promise<PortfolioDividends> {
+  return http.get<PortfolioDividends>(`/api/portfolios/${id}/dividends`)
+}
+
+export async function getPortfolioCalendar(id: string): Promise<PortfolioCalendar> {
+  return http.get<PortfolioCalendar>(`/api/portfolios/${id}/calendar`)
+}
+
+export async function getPortfolioNews(id: string): Promise<PortfolioNews> {
+  return http.get<PortfolioNews>(`/api/portfolios/${id}/news`)
+}
+
+export async function getPortfolioCompare(id: string): Promise<PortfolioCompare> {
+  return http.get<PortfolioCompare>(`/api/portfolios/${id}/compare`)
+}
+
+export async function getPortfolioRiskMetrics(id: string): Promise<unknown> {
+  return http.get<unknown>(`/api/portfolios/${id}/risk-metrics`)
 }
 
 export async function getAllTransactions(page = 1, limit = 20): Promise<PortfoliosTransactions> {
