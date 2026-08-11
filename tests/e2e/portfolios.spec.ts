@@ -50,6 +50,8 @@ test("portfolio detail shows metric strip, tabbed sections, and positions", asyn
   await tabs.getByRole("link", { name: "Analytics" }).click()
   await expect(page).toHaveURL(/\/en\/portfolios\/.*\/analytics/)
   await expect(tabs.getByRole("link", { name: "Analytics" })).toHaveClass(/border-blue-600/)
+  await expect(page.getByText("Equity Curve")).toBeVisible()
+  await expect(page.getByText("Monthly Returns")).toBeVisible()
 
   await tabs.getByRole("link", { name: "Holdings" }).click()
   await page.getByRole("link", { name: "META" }).click()
