@@ -141,13 +141,13 @@ function gainClass(value: number | undefined): string {
               </button>
             </div>
           </div>
-          <component :is="'apexchart'" v-if="equityOptions.series[0].data.length" :options="equityOptions" />
+          <component :is="'apexchart'" v-if="equityOptions.series[0].data.length" :options="equityOptions" :series="equityOptions.series" />
           <p v-else class="text-sm text-slate-500">No analytics available.</p>
         </div>
 
         <div class="card p-6">
           <h2 class="mb-3 text-base font-semibold">Monthly Returns</h2>
-          <component :is="'apexchart'" v-if="monthlyOptions.series[0].data.length" :options="monthlyOptions" />
+          <component :is="'apexchart'" v-if="monthlyOptions.series[0].data.length" :options="monthlyOptions" :series="monthlyOptions.series" />
           <p v-else class="text-sm text-slate-500">No monthly data available.</p>
           <dl v-if="store.analytics?.performance" class="mt-4 space-y-1.5 text-sm">
             <div class="flex justify-between">

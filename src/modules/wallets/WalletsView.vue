@@ -174,7 +174,7 @@ const historyChart = computed(() => ({
         <div v-if="showHistory && selectedWallet?.id === wallet.id" class="mt-4 border-t border-slate-100 pt-4">
           <h3 class="mb-2 text-sm font-semibold text-slate-700">Balance History</h3>
           <p v-if="historyError" class="text-sm text-red-600">{{ historyError }}</p>
-          <component :is="'apexchart'" v-else-if="history.length" :options="historyChart" />
+          <component :is="'apexchart'" v-else-if="history.length" :options="historyChart" :series="historyChart.series" />
           <p v-else class="text-sm text-slate-500">No balance history available.</p>
         </div>
 

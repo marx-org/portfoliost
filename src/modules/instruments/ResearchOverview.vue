@@ -189,7 +189,7 @@ const priceChartOptions = computed(() => ({
 
         <div class="card p-6 xl:col-span-2">
           <h2 class="mb-3 text-base font-semibold">EPS Surprises - {{ symbol }}</h2>
-          <component :is="'apexchart'" v-if="epsSurprises.length" :options="epsChartOptions" />
+          <component :is="'apexchart'" v-if="epsSurprises.length" :options="epsChartOptions" :series="epsChartOptions.series" />
           <p v-else class="text-sm text-slate-500">No earnings data available.</p>
         </div>
       </div>
@@ -208,7 +208,7 @@ const priceChartOptions = computed(() => ({
 
       <div class="card p-6">
         <h2 class="mb-3 text-base font-semibold">Price Chart</h2>
-        <component :is="'apexchart'" v-if="priceHistory.prices.length" :options="priceChartOptions" />
+        <component :is="'apexchart'" v-if="priceHistory.prices.length" :options="priceChartOptions" :series="priceChartOptions.series" />
         <p v-else class="text-sm text-slate-500">No price history available.</p>
       </div>
     </template>

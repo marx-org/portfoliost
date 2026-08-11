@@ -9,6 +9,11 @@ async function login(page: import("@playwright/test").Page) {
 }
 
 test("research overview shows company data", async ({ page }) => {
+  const consoleErrors: string[] = []
+  page.on("console", (msg) => {
+    if (msg.type() === "error") consoleErrors.push(msg.text())
+  })
+
   await login(page)
   await page.goto("/en/research/AAPL/overview")
 
@@ -17,6 +22,8 @@ test("research overview shows company data", async ({ page }) => {
   await expect(page.getByText("Company Statistics")).toBeVisible()
   await expect(page.getByText("Apple Inc").first()).toBeVisible()
   await expect(page.getByText("Price Chart")).toBeVisible()
+  await expect(page.locator(".apexcharts-canvas").first()).toBeVisible()
+  expect(consoleErrors).toEqual([])
 })
 
 test("research tabs switch between views", async ({ page }) => {

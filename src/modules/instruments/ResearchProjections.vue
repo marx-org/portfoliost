@@ -121,7 +121,7 @@ function targetPosition(pt: PriceTarget): { left: string; right: string } {
         <div class="card p-6">
           <h2 class="mb-2 text-base font-semibold">Recommendation</h2>
           <p v-if="totalRatings" class="text-xs text-slate-500">{{ totalRatings }} analysts &middot; period {{ data.recommendation.period }}</p>
-          <component :is="'apexchart'" :options="recommendationChart" />
+          <component :is="'apexchart'" :options="recommendationChart" :series="recommendationChart.series" />
         </div>
       </div>
 
