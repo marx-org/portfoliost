@@ -1,0 +1,84 @@
+- generic [ref=e4]:
+  - navigation "Main navigation" [ref=e5]:
+    - generic [ref=e6]:
+      - link "Example service.ai - AI-Powered Investment Portfolio Tracking Example service.ai" [ref=e7] [cursor=pointer]:
+        - /url: https://example-service.ai/pl
+        - img "Example service.ai - AI-Powered Investment Portfolio Tracking" [ref=e8]
+        - generic [ref=e9]: Example service.ai
+      - generic [ref=e10]:
+        - link [ref=e11] [cursor=pointer]:
+          - /url: https://example-service.ai/pl
+          - img [ref=e12]
+        - link "Funkcje" [ref=e96] [cursor=pointer]:
+          - /url: https://example-service.ai/pl/features
+          - img [ref=e17]
+          - text: Funkcje
+          - img [ref=e21]
+        - link "Cennik" [ref=e97] [cursor=pointer]:
+          - /url: https://example-service.ai/pl/pricing
+          - img [ref=e24]
+          - text: Cennik
+      - link "Szukaj akcji..." [ref=e98] [cursor=pointer]:
+        - /url: /pl/research/AAPL.US/overview
+        - img [ref=e27]
+        - generic [ref=e29]: Szukaj akcji...
+      - generic [ref=e30]:
+        - button "Change language" [ref=e33] [cursor=pointer]:
+          - img [ref=e35]
+          - img [ref=e38]
+        - link "Zarejestruj się za darmo" [ref=e99] [cursor=pointer]:
+          - /url: /pl/register
+          - text: Zarejestruj się za darmo
+          - img [ref=e41]
+  - main [ref=e43]:
+    - generic [ref=e45]:
+      - generic [ref=e46]:
+        - heading "Witaj ponownie" [level=2] [ref=e100]
+        - paragraph [ref=e48]: Zaloguj się na swoje konto
+      - generic [ref=e49]:
+        - generic [ref=e50]:
+          - generic [ref=e51]: Adres e-mail *
+          - textbox "Adres e-mail *" [ref=e101]:
+            - /placeholder: Wpisz swój e-mail
+            - text: demo@example.com
+        - generic [ref=e54]:
+          - generic [ref=e55]: Hasło *
+          - textbox "Hasło *" [ref=e102]:
+            - /placeholder: Wpisz swoje hasło
+            - text: "@~\">Dd38>5~$C&9"
+        - generic [ref=e58]:
+          - generic [ref=e59]:
+            - checkbox "Zapamiętaj mnie" [ref=e103]
+            - generic [ref=e61]: Zapamiętaj mnie
+          - link "Zapomniałeś hasła?" [ref=e104] [cursor=pointer]:
+            - /url: /en/forgot-password
+        - button "Zaloguj się" [disabled] [ref=e105]:
+          - img [ref=e107]
+          - text: Zaloguj się
+      - generic [ref=e68]: lub kontynuuj przez
+      - button "Zaloguj się przez Google" [ref=e110] [cursor=pointer]:
+        - generic [ref=e71]:
+          - img [ref=e73]
+          - generic [ref=e79]: Zaloguj się przez Google
+      - paragraph [ref=e81]:
+        - text: Nie masz konta?
+        - link "Utwórz je" [ref=e111] [cursor=pointer]:
+          - /url: /en/register
+  - contentinfo [ref=e83]:
+    - generic [ref=e84]:
+      - link "Example service Example service.ai" [ref=e85] [cursor=pointer]:
+        - /url: https://example-service.ai/pl
+        - img "Example service" [ref=e86]
+        - generic [ref=e87]: Example service.ai
+      - generic [ref=e88]:
+        - generic [ref=e89]: © 2026 Example service.ai - Example service sp. z o.o.
+        - generic [ref=e90]: KRS 0001247354 · NIP 7011318666 · REGON 544991802
+      - generic [ref=e91]:
+        - link "Prywatność" [ref=e112] [cursor=pointer]:
+          - /url: https://example-service.ai/pl/privacy
+        - link "Regulamin" [ref=e113] [cursor=pointer]:
+          - /url: https://example-service.ai/pl/terms
+        - link "Ciasteczka" [ref=e114] [cursor=pointer]:
+          - /url: https://example-service.ai/pl/cookies
+        - link "Kontakt" [ref=e115] [cursor=pointer]:
+          - /url: https://example-service.ai/pl/contact

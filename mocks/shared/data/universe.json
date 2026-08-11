@@ -1,0 +1,242 @@
+[
+  {
+    "symbol": "AAPL",
+    "name": "Apple Inc",
+    "type": "STOCK",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "Technology",
+    "industry": "Consumer Electronics",
+    "source": "FINNHUB"
+  },
+  {
+    "symbol": "MSFT",
+    "name": "Microsoft Corp",
+    "type": "STOCK",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "Technology",
+    "industry": "Software - Infrastructure",
+    "source": "FINNHUB"
+  },
+  {
+    "symbol": "NVDA",
+    "name": "NVIDIA Corp",
+    "type": "STOCK",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "Technology",
+    "industry": "Semiconductors",
+    "source": "FINNHUB"
+  },
+  {
+    "symbol": "META",
+    "name": "Meta Platforms Inc",
+    "type": "STOCK",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "Communication Services",
+    "industry": "Internet Content & Information",
+    "source": "FINNHUB"
+  },
+  {
+    "symbol": "PLTR",
+    "name": "Palantir Technologies Inc",
+    "type": "STOCK",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "Technology",
+    "industry": "Software - Infrastructure",
+    "source": "FINNHUB"
+  },
+  {
+    "symbol": "CART",
+    "name": "Maplebear Inc",
+    "type": "STOCK",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "Consumer Discretionary",
+    "industry": "Internet Content & Information",
+    "source": "FINNHUB"
+  },
+  {
+    "symbol": "INTU",
+    "name": "Intuit Inc",
+    "type": "STOCK",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "Technology",
+    "industry": "Software - Application",
+    "source": "FINNHUB"
+  },
+  {
+    "symbol": "LRCX",
+    "name": "Lam Research Corp",
+    "type": "STOCK",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "Technology",
+    "industry": "Semiconductors",
+    "source": "FINNHUB"
+  },
+  {
+    "symbol": "AMAT",
+    "name": "Applied Materials Inc",
+    "type": "STOCK",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "Technology",
+    "industry": "Semiconductors",
+    "source": "FINNHUB"
+  },
+  {
+    "symbol": "ORCL",
+    "name": "Oracle Corp",
+    "type": "STOCK",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "Technology",
+    "industry": "Software - Infrastructure",
+    "source": "FINNHUB"
+  },
+  {
+    "symbol": "KLAC",
+    "name": "KLA Corp",
+    "type": "STOCK",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "Technology",
+    "industry": "Semiconductors",
+    "source": "FINNHUB"
+  },
+  {
+    "symbol": "TSLA",
+    "name": "Tesla Inc",
+    "type": "STOCK",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "Consumer Discretionary",
+    "industry": "Auto Manufacturers",
+    "source": "FINNHUB"
+  },
+  {
+    "symbol": "AMZN",
+    "name": "Amazon.com Inc",
+    "type": "STOCK",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "Consumer Discretionary",
+    "industry": "Internet Content & Information",
+    "source": "FINNHUB"
+  },
+  {
+    "symbol": "GOOGL",
+    "name": "Alphabet Inc",
+    "type": "STOCK",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "Communication Services",
+    "industry": "Internet Content & Information",
+    "source": "FINNHUB"
+  },
+  {
+    "symbol": "NFLX",
+    "name": "Netflix Inc",
+    "type": "STOCK",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "Communication Services",
+    "industry": "Entertainment",
+    "source": "FINNHUB"
+  },
+  {
+    "symbol": "AMD",
+    "name": "Advanced Micro Devices Inc",
+    "type": "STOCK",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "Technology",
+    "industry": "Semiconductors",
+    "source": "FINNHUB"
+  },
+  {
+    "symbol": "QCOM",
+    "name": "QUALCOMM Inc",
+    "type": "STOCK",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "Technology",
+    "industry": "Semiconductors",
+    "source": "FINNHUB"
+  },
+  {
+    "symbol": "TSMC",
+    "name": "Taiwan Semiconductor Manufacturing",
+    "type": "STOCK",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "Technology",
+    "industry": "Semiconductors",
+    "source": "FINNHUB"
+  },
+  {
+    "symbol": "V",
+    "name": "Visa Inc",
+    "type": "STOCK",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "Financials",
+    "industry": "Credit Services",
+    "source": "FINNHUB"
+  },
+  {
+    "symbol": "KO",
+    "name": "Coca-Cola Co",
+    "type": "STOCK",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "Consumer Staples",
+    "industry": "Beverages - Non-Alcoholic",
+    "source": "FINNHUB"
+  },
+  {
+    "symbol": "JNJ",
+    "name": "Johnson & Johnson",
+    "type": "STOCK",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "Health Care",
+    "industry": "Drug Manufacturers",
+    "source": "FINNHUB"
+  },
+  {
+    "symbol": "SPY",
+    "name": "SPDR S&P 500 ETF Trust",
+    "type": "ETF",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "",
+    "industry": "Index Fund",
+    "source": "FINNHUB"
+  },
+  {
+    "symbol": "QQQ",
+    "name": "Invesco QQQ Trust",
+    "type": "ETF",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "",
+    "industry": "Index Fund",
+    "source": "FINNHUB"
+  },
+  {
+    "symbol": "IWM",
+    "name": "iShares Russell 2000 ETF",
+    "type": "ETF",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "",
+    "industry": "Index Fund",
+    "source": "FINNHUB"
+  }
+]

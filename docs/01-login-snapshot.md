@@ -1,0 +1,82 @@
+- generic [ref=e4]:
+  - navigation "Main navigation" [ref=e5]:
+    - generic [ref=e6]:
+      - link "Example service.ai - AI-Powered Investment Portfolio Tracking Example service.ai" [ref=e7] [cursor=pointer]:
+        - /url: https://example-service.ai
+        - img "Example service.ai - AI-Powered Investment Portfolio Tracking" [ref=e8]
+        - generic [ref=e9]: Example service.ai
+      - generic [ref=e10]:
+        - link [ref=e11] [cursor=pointer]:
+          - /url: https://example-service.ai
+          - img [ref=e12]
+        - link "Features" [ref=e16] [cursor=pointer]:
+          - /url: https://example-service.ai/features
+          - img [ref=e17]
+          - text: Features
+          - img [ref=e21]
+        - link "Pricing" [ref=e23] [cursor=pointer]:
+          - /url: https://example-service.ai/pricing
+          - img [ref=e24]
+          - text: Pricing
+      - link "Search for a stock..." [ref=e26] [cursor=pointer]:
+        - /url: /en/research/AAPL.US/overview
+        - img [ref=e27]
+        - generic [ref=e29]: Search for a stock...
+      - generic [ref=e30]:
+        - button "Change language" [ref=e33] [cursor=pointer]:
+          - img [ref=e35]
+          - img [ref=e38]
+        - link "Sign Up Free" [ref=e40] [cursor=pointer]:
+          - /url: /en/register
+          - text: Sign Up Free
+          - img [ref=e41]
+  - main [ref=e43]:
+    - generic [ref=e45]:
+      - generic [ref=e46]:
+        - heading "Welcome Back" [level=2] [ref=e47]
+        - paragraph [ref=e48]: Sign in to your account
+      - generic [ref=e49]:
+        - generic [ref=e50]:
+          - generic [ref=e51]: Email Address *
+          - textbox "Email Address *" [ref=e53]:
+            - /placeholder: Enter your email
+            - text: demo@example.com
+        - generic [ref=e54]:
+          - generic [ref=e55]: Password *
+          - textbox "Password *" [active] [ref=e57]:
+            - /placeholder: Enter your password
+            - text: "@~\">Dd38>5~$C&9"
+        - generic [ref=e58]:
+          - generic [ref=e59]:
+            - checkbox "Remember me" [ref=e60]
+            - generic [ref=e61]: Remember me
+          - link "Forgot password?" [ref=e62] [cursor=pointer]:
+            - /url: /en/forgot-password
+        - button "Sign In" [ref=e63] [cursor=pointer]
+      - generic [ref=e68]: or continue with
+      - button "Sign in with Google" [ref=e69] [cursor=pointer]:
+        - generic [ref=e71]:
+          - img [ref=e73]
+          - generic [ref=e79]: Sign in with Google
+      - paragraph [ref=e81]:
+        - text: Don't have an account?
+        - link "Create one" [ref=e82] [cursor=pointer]:
+          - /url: /en/register
+  - contentinfo [ref=e83]:
+    - generic [ref=e84]:
+      - link "Example service Example service.ai" [ref=e85] [cursor=pointer]:
+        - /url: https://example-service.ai
+        - img "Example service" [ref=e86]
+        - generic [ref=e87]: Example service.ai
+      - generic [ref=e88]:
+        - generic [ref=e89]: © 2026 Example service.ai - Example service sp. z o.o.
+        - generic [ref=e90]: KRS 0001247354 · NIP 7011318666 · REGON 544991802
+      - generic [ref=e91]:
+        - link "Privacy" [ref=e92] [cursor=pointer]:
+          - /url: https://example-service.ai/privacy
+        - link "Terms" [ref=e93] [cursor=pointer]:
+          - /url: https://example-service.ai/terms
+        - link "Cookies" [ref=e94] [cursor=pointer]:
+          - /url: https://example-service.ai/cookies
+        - link "Contact" [ref=e95] [cursor=pointer]:
+          - /url: https://example-service.ai/contact

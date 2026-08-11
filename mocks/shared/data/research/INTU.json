@@ -1,0 +1,970 @@
+{
+  "symbol": "INTU",
+  "basics": {
+    "symbol": "INTU",
+    "name": "Intuit Inc",
+    "sector": "Technology",
+    "industry": "Software - Application",
+    "country": "US",
+    "currency": "USD",
+    "price": 660,
+    "prevClose": 667.04,
+    "sharesOutstanding": 801260904,
+    "marketCap": 528832196640
+  },
+  "overview": {
+    "name": "Intuit Inc",
+    "sector": "Technology",
+    "industry": "Software - Application",
+    "country": "US",
+    "exchange": "US",
+    "type": "STOCK",
+    "currency": "USD",
+    "symbol": "INTU",
+    "price": 660,
+    "prevClose": 667.04,
+    "sharesOutstanding": 801260904,
+    "marketCap": 528832196640
+  },
+  "metrics": {
+    "roa": 22.36,
+    "roe": 61.26,
+    "cash": 17883870664,
+    "pFcf": 31.34,
+    "roic": 14.7,
+    "rota": 32.55,
+    "isBank": false,
+    "ttmEps": 35.68,
+    "isMiner": false,
+    "netDebt": 103751368086,
+    "pbRatio": 13.87,
+    "peRatio": 38.84,
+    "revenue": 72998843533,
+    "pegRatio": 2.13,
+    "employees": 133421,
+    "evToSales": 5.55,
+    "fcfMargin": 16.57,
+    "forwardPe": 15.35,
+    "marketCap": 528832196640,
+    "netIncome": 17656320628,
+    "netMargin": 20.93,
+    "evToEbitda": 35.22,
+    "grossMargin": 50.13,
+    "payoutRatio": 36.55,
+    "priceTarget": 751.62,
+    "dpsGrowth3yr": 6.13,
+    "dpsGrowth5yr": 1.64,
+    "ebitdaMargin": 32.85,
+    "epsGrowth3yr": 21.48,
+    "epsGrowth5yr": 5.42,
+    "epsGrowthFwd": 13.29,
+    "pretaxMargin": 18.66,
+    "dividendYield": 0.8,
+    "epsGrowth10yr": 17.08,
+    "epsLtGrowthEst": 17.52,
+    "forwardEvSales": 12,
+    "isConglomerate": false,
+    "ebitdaGrowthFwd": 22.37,
+    "enterpriseValue": 654984431094,
+    "evToGrossProfit": 8.86,
+    "isDepositLender": false,
+    "operatingMargin": 32.72,
+    "dividendPerShare": 0.9,
+    "reportingCadence": "quarterly",
+    "revenueGrowth3yr": 10.27,
+    "revenueGrowth5yr": 14.18,
+    "revenueGrowthFwd": 14.92,
+    "bookValuePerShare": 22.78,
+    "revenueGrowth10yr": 15.57,
+    "sharesOutstanding": 801260904,
+    "lifecycleStatus": "live",
+    "successorSymbol": null
+  },
+  "compare": {
+    "symbol": "INTU",
+    "name": "Intuit Inc",
+    "price": 660,
+    "marketCap": 528832196640,
+    "peRatio": 38.84,
+    "forwardPe": 15.35,
+    "pbRatio": 13.87,
+    "psRatio": 7.24,
+    "dividendYield": 0.8,
+    "revenueGrowth": 10.27,
+    "netMargin": 20.93,
+    "roe": 61.26,
+    "grossMargin": 50.13,
+    "operatingMargin": 32.72,
+    "evToEbitda": 35.22,
+    "evToSales": 5.55,
+    "fcfMargin": 16.57,
+    "netIncome": 17656320628,
+    "revenue": 72998843533,
+    "sharesOutstanding": 801260904,
+    "currency": "USD"
+  },
+  "fundamentals": {
+    "financialHighlights": {
+      "incomeStatement": [
+        {
+          "year": 2026,
+          "revenue": 78289671627.6,
+          "ebit": 18490465639.93,
+          "netIncome": 15260234025.38,
+          "netIncomeGrowth": null,
+          "netIncomeMargin": 23.09,
+          "earningsPerShare": 19.05,
+          "earningsPerShareGrowth": null,
+          "dilutedSharesOutstanding": 801260904,
+          "ebitda": 17245968427.82
+        },
+        {
+          "year": 2025,
+          "revenue": 87554910208.53,
+          "ebit": 12932691021.07,
+          "netIncome": 20136715832.08,
+          "netIncomeGrowth": 5.8,
+          "netIncomeMargin": 26.76,
+          "earningsPerShare": 25.13,
+          "earningsPerShareGrowth": 29.18,
+          "dilutedSharesOutstanding": 801260904,
+          "ebitda": 29459391720.66
+        },
+        {
+          "year": 2024,
+          "revenue": 96879558884.89,
+          "ebit": 12542366247.83,
+          "netIncome": 18992570329.9,
+          "netIncomeGrowth": 16.09,
+          "netIncomeMargin": 23.04,
+          "earningsPerShare": 23.7,
+          "earningsPerShareGrowth": 14.97,
+          "dilutedSharesOutstanding": 801260904,
+          "ebitda": 19152724906.97
+        },
+        {
+          "year": 2023,
+          "revenue": 107858255303.76,
+          "ebit": 13221024512.64,
+          "netIncome": 25389330539.27,
+          "netIncomeGrowth": 7.55,
+          "netIncomeMargin": 28.91,
+          "earningsPerShare": 31.69,
+          "earningsPerShareGrowth": 16.94,
+          "dilutedSharesOutstanding": 801260904,
+          "ebitda": 22100797683.05
+        }
+      ],
+      "balanceSheet": [
+        {
+          "year": 2026,
+          "totalAssets": 308596352884.48,
+          "totalLiabilities": 158219787679.34,
+          "shareholdersEquity": 150376565205.13998,
+          "cash": 17411053260.31,
+          "cashAndShortTermInvestments": 63015823542.41,
+          "totalDebt": 78100202643.34,
+          "netDebt": 45731835311.51,
+          "workingCapital": 19918831114.02,
+          "totalCapitalization": 228476767848.48,
+          "retainedEarnings": 120338702047.01,
+          "debtEquityRatio": 0.52,
+          "longTermDebtToCapitalization": 0.38,
+          "totalDebtToCapitalization": 0.27
+        },
+        {
+          "year": 2025,
+          "totalAssets": 315175078717.59,
+          "totalLiabilities": 164838336457.13,
+          "shareholdersEquity": 150336742260.46002,
+          "cash": 37778351365.38,
+          "cashAndShortTermInvestments": 66648860132.52,
+          "totalDebt": 70732889625.96,
+          "netDebt": 43581839365.34,
+          "workingCapital": 25615218870.9,
+          "totalCapitalization": 221069631886.42,
+          "retainedEarnings": 131897972494.83,
+          "debtEquityRatio": 0.47,
+          "longTermDebtToCapitalization": 0.18,
+          "totalDebtToCapitalization": 0.41
+        },
+        {
+          "year": 2024,
+          "totalAssets": 446350014763.48,
+          "totalLiabilities": 268491668266.01,
+          "shareholdersEquity": 177858346497.46997,
+          "cash": 58455055787.47,
+          "cashAndShortTermInvestments": 58268250559.11,
+          "totalDebt": 79218392890.56,
+          "netDebt": 20820298044.49,
+          "workingCapital": 42285100924.43,
+          "totalCapitalization": 257076739388.03,
+          "retainedEarnings": 108459657117.32,
+          "debtEquityRatio": 0.45,
+          "longTermDebtToCapitalization": 0.36,
+          "totalDebtToCapitalization": 0.41
+        },
+        {
+          "year": 2023,
+          "totalAssets": 468269434353.06,
+          "totalLiabilities": 280844917710.72,
+          "shareholdersEquity": 187424516642.34003,
+          "cash": 80296754632.09,
+          "cashAndShortTermInvestments": 47785559448.14,
+          "totalDebt": 76483740579.46,
+          "netDebt": 23915537390.65,
+          "workingCapital": 46366931220.23,
+          "totalCapitalization": 263908257221.8,
+          "retainedEarnings": 119788352879.87,
+          "debtEquityRatio": 0.41,
+          "longTermDebtToCapitalization": 0.23,
+          "totalDebtToCapitalization": 0.29
+        }
+      ],
+      "cashFlow": [
+        {
+          "year": 2026,
+          "cashFlowFromOperatingActivities": 75987587418.63,
+          "cashFlowFromFinancingActivities": -33143400999.24,
+          "cashFlowFromInvestingActivities": -30906205177.08,
+          "freeCashFlow": 48327064482.42,
+          "freeCashFlowGrowth": null,
+          "cashFlowFromOperatingActivitiesGrowth": null,
+          "freeCashFlowPerShare": 60.31,
+          "capitalExpenditures": 27660522936.21,
+          "depreciation": 18592235590.93,
+          "dividendPayment": -16098930033.04
+        },
+        {
+          "year": 2025,
+          "cashFlowFromOperatingActivities": 110171076893.44,
+          "cashFlowFromFinancingActivities": -33529692512.19,
+          "cashFlowFromInvestingActivities": -37294491840.93,
+          "freeCashFlow": 91279534107.27,
+          "freeCashFlowGrowth": 15.56,
+          "cashFlowFromOperatingActivitiesGrowth": 16.9,
+          "freeCashFlowPerShare": 113.92,
+          "capitalExpenditures": 18891542786.17,
+          "depreciation": 16434299244.89,
+          "dividendPayment": -31173008225.6
+        },
+        {
+          "year": 2024,
+          "cashFlowFromOperatingActivities": 86530808284,
+          "cashFlowFromFinancingActivities": -36071578596.95,
+          "cashFlowFromInvestingActivities": -18865210915.06,
+          "freeCashFlow": 58825438697.79,
+          "freeCashFlowGrowth": 23.81,
+          "cashFlowFromOperatingActivitiesGrowth": -3.2,
+          "freeCashFlowPerShare": 73.42,
+          "capitalExpenditures": 27705369586.21,
+          "depreciation": 18792574018.86,
+          "dividendPayment": -16503665513.04
+        },
+        {
+          "year": 2023,
+          "cashFlowFromOperatingActivities": 89582913144.56,
+          "cashFlowFromFinancingActivities": -48392578148.61,
+          "cashFlowFromInvestingActivities": -17917656624.63,
+          "freeCashFlow": 74387222421.25,
+          "freeCashFlowGrowth": 26.58,
+          "cashFlowFromOperatingActivitiesGrowth": 7.3,
+          "freeCashFlowPerShare": 92.84,
+          "capitalExpenditures": 15195690723.31,
+          "depreciation": 9657306650.37,
+          "dividendPayment": -23325779500.03
+        }
+      ]
+    }
+  },
+  "ownership": {
+    "institutional": [
+      {
+        "date": "2026-06-30",
+        "holdingPercentage": 20.17,
+        "holdersCount": 5962,
+        "sumOfCurrentPositions": 106665454062,
+        "sumOfCurrentPositionsValue": 63999272437
+      },
+      {
+        "date": "2026-03-31",
+        "holdingPercentage": 20.56,
+        "holdersCount": 5932,
+        "sumOfCurrentPositions": 106490889053,
+        "sumOfCurrentPositionsValue": 65331981596
+      }
+    ],
+    "mutualFund": [
+      {
+        "date": "2026-06-30",
+        "holdingPercentage": 43.06,
+        "holdersCount": 5374,
+        "sumOfCurrentPositions": 227715143873,
+        "sumOfCurrentPositionsValue": 136629086324
+      },
+      {
+        "date": "2026-03-31",
+        "holdingPercentage": 43.29,
+        "holdersCount": 5453,
+        "sumOfCurrentPositions": 226014146741,
+        "sumOfCurrentPositionsValue": 135443269096
+      }
+    ],
+    "insider": [
+      {
+        "date": "2026-06-30",
+        "holdingPercentage": 71.75,
+        "holdersCount": 5165,
+        "sumOfCurrentPositions": 379437101089,
+        "sumOfCurrentPositionsValue": 227662260654
+      },
+      {
+        "date": "2026-03-31",
+        "holdingPercentage": 73.46,
+        "holdersCount": 5104,
+        "sumOfCurrentPositions": 370155016958,
+        "sumOfCurrentPositionsValue": 222720270234
+      }
+    ],
+    "insiderTransactions": [
+      {
+        "title": "Chief Executive Officer",
+        "transactionDate": "2026-02-11",
+        "transactionCode": "S",
+        "transactionText": "Sale",
+        "transactionAmount": 121505,
+        "transactionValue": 80193300,
+        "filingDate": "2026-02-18"
+      },
+      {
+        "title": "Chief Executive Officer",
+        "transactionDate": "2026-07-21",
+        "transactionCode": "P",
+        "transactionText": "Purchase",
+        "transactionAmount": 84493,
+        "transactionValue": 55765380,
+        "filingDate": "2026-04-10"
+      },
+      {
+        "title": "Chief Executive Officer",
+        "transactionDate": "2026-02-15",
+        "transactionCode": "S",
+        "transactionText": "Sale",
+        "transactionAmount": 7427,
+        "transactionValue": 4901820,
+        "filingDate": "2026-07-27"
+      },
+      {
+        "title": "Chief Executive Officer",
+        "transactionDate": "2026-05-12",
+        "transactionCode": "M",
+        "transactionText": "Option Execute",
+        "transactionAmount": 185143,
+        "transactionValue": 122194380,
+        "filingDate": "2026-07-21"
+      },
+      {
+        "title": "Chief Executive Officer",
+        "transactionDate": "2026-03-27",
+        "transactionCode": "P",
+        "transactionText": "Purchase",
+        "transactionAmount": 197889,
+        "transactionValue": 130606740,
+        "filingDate": "2026-06-23"
+      },
+      {
+        "title": "Chief Executive Officer",
+        "transactionDate": "2026-03-09",
+        "transactionCode": "M",
+        "transactionText": "Option Execute",
+        "transactionAmount": 143378,
+        "transactionValue": 94629480,
+        "filingDate": "2026-06-17"
+      },
+      {
+        "title": "Chief Executive Officer",
+        "transactionDate": "2026-05-05",
+        "transactionCode": "P",
+        "transactionText": "Purchase",
+        "transactionAmount": 30045,
+        "transactionValue": 19829700,
+        "filingDate": "2026-05-25"
+      },
+      {
+        "title": "Chief Executive Officer",
+        "transactionDate": "2026-04-07",
+        "transactionCode": "M",
+        "transactionText": "Option Execute",
+        "transactionAmount": 37264,
+        "transactionValue": 24594240,
+        "filingDate": "2026-04-09"
+      },
+      {
+        "title": "Chief Executive Officer",
+        "transactionDate": "2026-02-07",
+        "transactionCode": "M",
+        "transactionText": "Option Execute",
+        "transactionAmount": 89057,
+        "transactionValue": 58777620,
+        "filingDate": "2026-07-10"
+      },
+      {
+        "title": "Chief Executive Officer",
+        "transactionDate": "2026-06-13",
+        "transactionCode": "P",
+        "transactionText": "Purchase",
+        "transactionAmount": 19770,
+        "transactionValue": 13048200,
+        "filingDate": "2026-02-06"
+      }
+    ]
+  },
+  "dividends": {
+    "history": [
+      {
+        "date": "2003-08-21",
+        "year": 2003,
+        "amount": 0.3204,
+        "currency": "USD",
+        "type": "annual"
+      },
+      {
+        "date": "2004-08-20",
+        "year": 2004,
+        "amount": 0.3574,
+        "currency": "USD",
+        "type": "annual"
+      },
+      {
+        "date": "2005-08-20",
+        "year": 2005,
+        "amount": 0.3551,
+        "currency": "USD",
+        "type": "annual"
+      },
+      {
+        "date": "2006-08-20",
+        "year": 2006,
+        "amount": 0.3914,
+        "currency": "USD",
+        "type": "annual"
+      },
+      {
+        "date": "2007-08-20",
+        "year": 2007,
+        "amount": 0.3286,
+        "currency": "USD",
+        "type": "annual"
+      },
+      {
+        "date": "2008-08-19",
+        "year": 2008,
+        "amount": 0.2833,
+        "currency": "USD",
+        "type": "annual"
+      },
+      {
+        "date": "2009-08-19",
+        "year": 2009,
+        "amount": 0.3562,
+        "currency": "USD",
+        "type": "annual"
+      },
+      {
+        "date": "2010-08-19",
+        "year": 2010,
+        "amount": 0.3533,
+        "currency": "USD",
+        "type": "annual"
+      },
+      {
+        "date": "2011-08-19",
+        "year": 2011,
+        "amount": 0.2562,
+        "currency": "USD",
+        "type": "annual"
+      },
+      {
+        "date": "2012-08-18",
+        "year": 2012,
+        "amount": 0.2558,
+        "currency": "USD",
+        "type": "annual"
+      },
+      {
+        "date": "2013-08-18",
+        "year": 2013,
+        "amount": 0.3506,
+        "currency": "USD",
+        "type": "annual"
+      },
+      {
+        "date": "2014-08-18",
+        "year": 2014,
+        "amount": 0.2987,
+        "currency": "USD",
+        "type": "annual"
+      },
+      {
+        "date": "2015-08-18",
+        "year": 2015,
+        "amount": 0.31,
+        "currency": "USD",
+        "type": "annual"
+      },
+      {
+        "date": "2016-08-17",
+        "year": 2016,
+        "amount": 0.3438,
+        "currency": "USD",
+        "type": "annual"
+      },
+      {
+        "date": "2017-08-17",
+        "year": 2017,
+        "amount": 0.3747,
+        "currency": "USD",
+        "type": "annual"
+      },
+      {
+        "date": "2018-08-17",
+        "year": 2018,
+        "amount": 0.2816,
+        "currency": "USD",
+        "type": "annual"
+      },
+      {
+        "date": "2019-08-17",
+        "year": 2019,
+        "amount": 0.3413,
+        "currency": "USD",
+        "type": "annual"
+      },
+      {
+        "date": "2020-08-16",
+        "year": 2020,
+        "amount": 0.3185,
+        "currency": "USD",
+        "type": "annual"
+      },
+      {
+        "date": "2021-08-16",
+        "year": 2021,
+        "amount": 0.2758,
+        "currency": "USD",
+        "type": "annual"
+      },
+      {
+        "date": "2022-08-16",
+        "year": 2022,
+        "amount": 0.2899,
+        "currency": "USD",
+        "type": "annual"
+      },
+      {
+        "date": "2023-08-16",
+        "year": 2023,
+        "amount": 0.3405,
+        "currency": "USD",
+        "type": "annual"
+      },
+      {
+        "date": "2024-08-15",
+        "year": 2024,
+        "amount": 0.3797,
+        "currency": "USD",
+        "type": "annual"
+      },
+      {
+        "date": "2025-08-15",
+        "year": 2025,
+        "amount": 0.3658,
+        "currency": "USD",
+        "type": "annual"
+      },
+      {
+        "date": "2026-08-15",
+        "year": 2026,
+        "amount": 0.2893,
+        "currency": "USD",
+        "type": "annual"
+      }
+    ]
+  },
+  "calendar": {
+    "earnings": [
+      {
+        "date": "2026-1-29",
+        "title": "Q1 2026 Earnings Call",
+        "year": 2026,
+        "quarter": 1
+      },
+      {
+        "date": "2026-4-29",
+        "title": "Q2 2026 Earnings Call",
+        "year": 2026,
+        "quarter": 2
+      },
+      {
+        "date": "2026-7-30",
+        "title": "Q3 2026 Earnings Call",
+        "year": 2026,
+        "quarter": 3
+      },
+      {
+        "date": "2026-10-28",
+        "title": "Q4 2026 Earnings Call",
+        "year": 2026,
+        "quarter": 4
+      }
+    ],
+    "exDividend": [
+      {
+        "date": "2026-02-10",
+        "title": "Ex-Dividend Feb 2026",
+        "year": 2026,
+        "amount": 0.3
+      },
+      {
+        "date": "2026-05-10",
+        "title": "Ex-Dividend May 2026",
+        "year": 2026,
+        "amount": 0.2639
+      },
+      {
+        "date": "2026-08-10",
+        "title": "Ex-Dividend Aug 2026",
+        "year": 2026,
+        "amount": 0.3392
+      },
+      {
+        "date": "2026-11-10",
+        "title": "Ex-Dividend Nov 2026",
+        "year": 2026,
+        "amount": 0.3241
+      }
+    ],
+    "dividend": [
+      {
+        "date": "2026-03-15",
+        "title": "Dividend Mar 2026",
+        "year": 2026,
+        "amount": 0.3237
+      },
+      {
+        "date": "2026-06-15",
+        "title": "Dividend Jun 2026",
+        "year": 2026,
+        "amount": 0.2903
+      },
+      {
+        "date": "2026-09-15",
+        "title": "Dividend Sep 2026",
+        "year": 2026,
+        "amount": 0.2541
+      },
+      {
+        "date": "2026-12-15",
+        "title": "Dividend Dec 2026",
+        "year": 2026,
+        "amount": 0.3067
+      }
+    ]
+  },
+  "projections": {
+    "priceTarget": {
+      "lastUpdated": "2026-08-01 00:00:00",
+      "low": 498.31,
+      "mean": 703.6,
+      "current": 660,
+      "high": 932.35
+    },
+    "recommendation": {
+      "period": "2026-08-01",
+      "strongBuy": 16,
+      "buy": 19,
+      "hold": 5,
+      "sell": 3,
+      "strongSell": 0
+    },
+    "earnings": {
+      "avg": 23.1,
+      "high": 39.6,
+      "low": 13.2,
+      "mean": 24.42,
+      "periods": [
+        "Q4 2026",
+        "Q1 2027",
+        "Q2 2027"
+      ]
+    },
+    "revenue": {
+      "avg": 68373922942,
+      "high": 62515622453,
+      "low": 50709353329,
+      "mean": 68690795166,
+      "periods": [
+        "Q4 2026",
+        "Q1 2027",
+        "Q2 2027"
+      ]
+    }
+  },
+  "seasonality": {
+    "symbol": "INTU",
+    "years": 5,
+    "metric": "avg",
+    "monthly_returns": [
+      {
+        "month": "Jan",
+        "return_pct": 0.2
+      },
+      {
+        "month": "Feb",
+        "return_pct": -1.36
+      },
+      {
+        "month": "Mar",
+        "return_pct": -0.35
+      },
+      {
+        "month": "Apr",
+        "return_pct": -0.39
+      },
+      {
+        "month": "May",
+        "return_pct": -0.56
+      },
+      {
+        "month": "Jun",
+        "return_pct": 0.12
+      },
+      {
+        "month": "Jul",
+        "return_pct": 0.85
+      },
+      {
+        "month": "Aug",
+        "return_pct": 0.44
+      },
+      {
+        "month": "Sep",
+        "return_pct": 0.31
+      },
+      {
+        "month": "Oct",
+        "return_pct": 0.19
+      },
+      {
+        "month": "Nov",
+        "return_pct": 1.4
+      },
+      {
+        "month": "Dec",
+        "return_pct": 1.25
+      }
+    ]
+  },
+  "epsSurprises": {
+    "annual": [
+      {
+        "date": "2026-12-31",
+        "year": 2026,
+        "quarter": 4,
+        "eps": 18.91,
+        "epsEstimate": 18.52,
+        "epsDifference": -0.1,
+        "revenue": 50477558082,
+        "revenueEstimate": 65879462170,
+        "revenueDifference": 0.48,
+        "surprise": 0.05,
+        "surprisePercent": 0.54,
+        "time": "after-hours"
+      },
+      {
+        "date": "2025-12-31",
+        "year": 2025,
+        "quarter": 4,
+        "eps": 22.61,
+        "epsEstimate": 20.85,
+        "epsDifference": 0.03,
+        "revenue": 49085222243,
+        "revenueEstimate": 59933674003,
+        "revenueDifference": 0.67,
+        "surprise": 0.17,
+        "surprisePercent": 0.9,
+        "time": "after-hours"
+      },
+      {
+        "date": "2024-12-31",
+        "year": 2024,
+        "quarter": 4,
+        "eps": 24.45,
+        "epsEstimate": 23.52,
+        "epsDifference": 0.06,
+        "revenue": 45985047319,
+        "revenueEstimate": 58529960913,
+        "revenueDifference": 0.55,
+        "surprise": 0.23,
+        "surprisePercent": 5.69,
+        "time": "after-hours"
+      },
+      {
+        "date": "2023-12-31",
+        "year": 2023,
+        "quarter": 4,
+        "eps": 20.61,
+        "epsEstimate": 21.89,
+        "epsDifference": -0.07,
+        "revenue": 66656205691,
+        "revenueEstimate": 64278878062,
+        "revenueDifference": 0.75,
+        "surprise": 0.12,
+        "surprisePercent": 3.59,
+        "time": "after-hours"
+      },
+      {
+        "date": "2022-12-31",
+        "year": 2022,
+        "quarter": 4,
+        "eps": 21.17,
+        "epsEstimate": 21.86,
+        "epsDifference": 0.2,
+        "revenue": 66209207467,
+        "revenueEstimate": 56382397093,
+        "revenueDifference": 0.5,
+        "surprise": 0.03,
+        "surprisePercent": 2.31,
+        "time": "after-hours"
+      }
+    ],
+    "quarterly": [
+      {
+        "date": "2026-9-30",
+        "year": 2026,
+        "quarter": 3,
+        "eps": 14.42,
+        "epsEstimate": 15.53,
+        "epsDifference": 0.01,
+        "revenue": 12450297450,
+        "revenueEstimate": 17720828544,
+        "revenueDifference": 0.86,
+        "surprise": 0.23,
+        "surprisePercent": 3.38,
+        "time": "after-hours"
+      },
+      {
+        "date": "2026-6-30",
+        "year": 2026,
+        "quarter": 2,
+        "eps": 18.13,
+        "epsEstimate": 16.89,
+        "epsDifference": 0.39,
+        "revenue": 14700256768,
+        "revenueEstimate": 14318738517,
+        "revenueDifference": -0.09,
+        "surprise": 0.41,
+        "surprisePercent": 6.17,
+        "time": "after-hours"
+      },
+      {
+        "date": "2026-3-30",
+        "year": 2026,
+        "quarter": 1,
+        "eps": 15.2,
+        "epsEstimate": 14.52,
+        "epsDifference": 0.17,
+        "revenue": 11430176471,
+        "revenueEstimate": 12897300157,
+        "revenueDifference": 0.81,
+        "surprise": 0.22,
+        "surprisePercent": 5.33,
+        "time": "after-hours"
+      },
+      {
+        "date": "2026-undefined-30",
+        "year": 2026,
+        "quarter": 0,
+        "eps": 22.64,
+        "epsEstimate": 22.98,
+        "epsDifference": -0.07,
+        "revenue": 12975199866,
+        "revenueEstimate": 15266585364,
+        "revenueDifference": 0.71,
+        "surprise": 0.4,
+        "surprisePercent": 7.87,
+        "time": "after-hours"
+      },
+      {
+        "date": "2025-9-30",
+        "year": 2025,
+        "quarter": 3,
+        "eps": 29.53,
+        "epsEstimate": 30.82,
+        "epsDifference": 0.32,
+        "revenue": 11861866173,
+        "revenueEstimate": 16609199693,
+        "revenueDifference": 0.03,
+        "surprise": 0.3,
+        "surprisePercent": 8.07,
+        "time": "after-hours"
+      },
+      {
+        "date": "2025-6-30",
+        "year": 2025,
+        "quarter": 2,
+        "eps": 17.62,
+        "epsEstimate": 17.12,
+        "epsDifference": 0.3,
+        "revenue": 17903094229,
+        "revenueEstimate": 15973118136,
+        "revenueDifference": 0.14,
+        "surprise": 0.23,
+        "surprisePercent": 4.68,
+        "time": "after-hours"
+      }
+    ]
+  },
+  "aiInsights": {
+    "symbol": "INTU",
+    "generatedAt": "2026-08-11T09:22:42.677Z",
+    "summary": "Intuit Inc trades at a 27.6x forward P/E with 16.3% expected EPS growth. Balance sheet remains healthy with net debt to equity at 0.13.",
+    "bullCase": [
+      "Revenue growth is expected to continue at 12.4%",
+      "Margins are expanding with gross margin near 59%",
+      "Analyst price targets imply 9.7% upside"
+    ],
+    "bearCase": [
+      "Valuation leaves little room for error at 58.3x P/E",
+      "Increased competition could pressure market share",
+      "Macro headwinds may compress multiple"
+    ],
+    "keyMetrics": [
+      {
+        "label": "P/E ratio",
+        "value": 37.28,
+        "assessment": "Neutral"
+      },
+      {
+        "label": "EPS growth",
+        "value": "8.6%",
+        "assessment": "Positive"
+      },
+      {
+        "label": "Free cash flow yield",
+        "value": "6.03%",
+        "assessment": "Neutral"
+      }
+    ],
+    "sentiment": "neutral"
+  },
+  "priceTarget": {
+    "symbol": "INTU",
+    "targetHigh": 1097.73,
+    "targetLow": 462,
+    "targetMean": 726,
+    "targetMedian": 712.8,
+    "numberAnalysts": 28,
+    "lastUpdated": "2026-08-01 00:00:00"
+  }
+}

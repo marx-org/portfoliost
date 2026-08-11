@@ -1,0 +1,504 @@
+- generic [ref=e4]:
+  - complementary [ref=e5]:
+    - link "Example service" [ref=e7] [cursor=pointer]:
+      - /url: /en/investments
+      - img "Example service" [ref=e9]
+    - navigation "Main navigation" [ref=e10]:
+      - link "Portfolios / Watchlists" [ref=e11] [cursor=pointer]:
+        - /url: /en/investments
+        - img [ref=e13]
+        - generic [ref=e16]:
+          - generic [ref=e17]: Portfolios
+          - generic [ref=e18]: Watchlists
+      - link "Research" [ref=e19] [cursor=pointer]:
+        - /url: /en/research
+        - img [ref=e21]
+        - generic [ref=e24]: Research
+      - link "Charting" [ref=e25] [cursor=pointer]:
+        - /url: /en/charting
+        - img [ref=e27]
+        - generic [ref=e30]: Charting
+      - link "News" [ref=e31] [cursor=pointer]:
+        - /url: /en/news-dashboard
+        - img [ref=e33]
+        - generic [ref=e36]: News
+    - button "Alerts" [ref=e37] [cursor=pointer]:
+      - img [ref=e39]
+      - generic [ref=e42]: Alerts
+    - button "Logout" [ref=e43] [cursor=pointer]:
+      - img [ref=e45]
+      - generic [ref=e48]: Logout
+    - link "Settings" [ref=e49] [cursor=pointer]:
+      - /url: /en/settings
+      - img [ref=e51]
+      - generic [ref=e54]: Settings
+    - button "Report bug" [ref=e55] [cursor=pointer]:
+      - img [ref=e57]
+      - generic [ref=e66]: Report bug
+  - main [ref=e67]:
+    - generic [ref=e68]:
+      - generic [ref=e71]:
+        - button "Go back" [ref=e72] [cursor=pointer]:
+          - img [ref=e73]
+        - generic [ref=e75]:
+          - button "Search for a stock... ⌘ K" [ref=e76] [cursor=pointer]:
+            - img [ref=e77]
+            - generic [ref=e79]: Search for a stock...
+            - generic [ref=e80]:
+              - generic [ref=e81]: ⌘
+              - generic [ref=e82]: K
+          - button "Add to Watchlist" [ref=e83] [cursor=pointer]:
+            - img [ref=e84]
+            - generic [ref=e87]: Add to Watchlist
+        - generic [ref=e89]:
+          - generic [ref=e90]:
+            - generic [ref=e91]:
+              - generic [ref=e92]: AAPL
+              - generic [ref=e310]: Apple Inc
+            - generic [ref=e312]: $313.20
+          - generic [ref=e313]:
+            - button "MSFT" [ref=e314] [cursor=pointer]:
+              - img "MSFT" [ref=e315]
+            - button "NVDA" [ref=e316] [cursor=pointer]:
+              - img "NVDA" [ref=e317]
+            - button "META" [ref=e318] [cursor=pointer]:
+              - img "META" [ref=e319]
+            - button "PLTR" [ref=e320] [cursor=pointer]:
+              - img "PLTR" [ref=e321]
+            - button "CART" [ref=e322] [cursor=pointer]:
+              - img "CART" [ref=e323]
+            - button "INTU" [ref=e324] [cursor=pointer]:
+              - img "INTU" [ref=e325]
+            - button "KLAC" [ref=e326] [cursor=pointer]:
+              - img "KLAC" [ref=e327]
+            - button "ORCL" [ref=e328] [cursor=pointer]:
+              - img "ORCL" [ref=e329]
+            - button "AMAT" [ref=e330] [cursor=pointer]:
+              - img "AMAT" [ref=e331]
+            - button "LRCX" [ref=e332] [cursor=pointer]:
+              - img "LRCX" [ref=e333]
+      - generic [ref=e96]:
+        - navigation [ref=e98]:
+          - link "Overview" [ref=e99] [cursor=pointer]:
+            - /url: /en/research/AAPL.US/overview
+          - link "News" [ref=e100] [cursor=pointer]:
+            - /url: /en/research/AAPL.US/news
+          - link "Fundamentals Premium feature - upgrade to unlock Company fundamentals" [ref=e334] [cursor=pointer]:
+            - /url: /en/research/AAPL.US/fundamentals
+            - text: Fundamentals
+            - button "Premium feature - upgrade to unlock Company fundamentals" [ref=e335]:
+              - img [ref=e336]
+          - link "Investor Relations" [ref=e102] [cursor=pointer]:
+            - /url: /en/research/AAPL.US/investor-relations
+          - link "Ownership Premium feature - upgrade to unlock Ownership data" [ref=e339] [cursor=pointer]:
+            - /url: /en/research/AAPL.US/ownership
+            - text: Ownership
+            - button "Premium feature - upgrade to unlock Ownership data" [ref=e340]:
+              - img [ref=e341]
+          - link "Projections" [ref=e104] [cursor=pointer]:
+            - /url: /en/research/AAPL.US/projections
+          - link "Compare Premium feature - upgrade to unlock AI peer analysis" [ref=e344] [cursor=pointer]:
+            - /url: /en/research/AAPL.US/compare
+            - text: Compare
+            - button "Premium feature - upgrade to unlock AI peer analysis" [ref=e345]:
+              - img [ref=e346]
+          - link "Calendar Premium feature - upgrade to unlock Investor calendar" [ref=e349] [cursor=pointer]:
+            - /url: /en/research/AAPL.US/calendar
+            - text: Calendar
+            - button "Premium feature - upgrade to unlock Investor calendar" [ref=e350]:
+              - img [ref=e351]
+          - link "Dividends Premium feature - upgrade to unlock Stock dividends" [ref=e354] [cursor=pointer]:
+            - /url: /en/research/AAPL.US/dividends
+            - text: Dividends
+            - button "Premium feature - upgrade to unlock Stock dividends" [ref=e355]:
+              - img [ref=e356]
+        - button "Scroll tabs right" [ref=e359] [cursor=pointer]:
+          - img [ref=e360]
+      - generic [ref=e109]:
+        - generic [ref=e110]:
+          - generic [ref=e111]:
+            - generic [ref=e112]:
+              - img "Apple Inc" [ref=e362]
+              - heading "Company Overview" [level=2] [ref=e114]
+            - generic [ref=e363]:
+              - paragraph [ref=e364]:
+                - generic [ref=e365]: Apple Inc. is an American multinational technology company headquartered in Cupertino, California, that designs, develops, and sells consumer electronics, computer software, and online services. It is considered one of the Big Four technology companies, alongside Amazon, Google, and Microsoft. The company's hardware products include the iPhone smartphone, the iPad tablet computer, the Mac personal computer, the iPod portable media player, the Apple Watch smartwatch, the Apple TV digital media player, the AirPods wireless earbuds and the HomePod smart speaker. Apple's software includes the macOS, iOS, iPadOS, watchOS, and tvOS operating systems, the iTunes media player, the Safari web browser, the Shazam acoustic fingerprint utility, and the iLife and iWork creativity and productivity suites, as well as professional applications like Final Cut Pro, Logic Pro, and Xcode. Its online services include the iTunes Store, the iOS App Store, Mac App Store, Apple Music, Apple TV+, iMessage, and iCloud. Other services include Apple Store, Genius Bar, AppleCare, Apple Pay, Apple Pay Cash, and Apple Card.
+              - button "Show more" [ref=e366] [cursor=pointer]
+            - generic [ref=e367]:
+              - generic [ref=e368]:
+                - generic [ref=e369]: Name
+                - generic [ref=e370]: Apple Inc
+              - generic [ref=e371]:
+                - generic [ref=e372]: CEO
+                - generic [ref=e373]: "-"
+              - generic [ref=e374]:
+                - generic [ref=e375]: Sector
+                - generic [ref=e376]: Technology
+              - generic [ref=e377]:
+                - generic [ref=e378]: Year Founded
+                - generic [ref=e379]: "1980"
+              - generic [ref=e380]:
+                - generic [ref=e381]: Employees
+                - generic [ref=e382]: 166,000
+              - generic [ref=e383]:
+                - generic [ref=e384]: Website
+                - link "www.apple.com" [ref=e385] [cursor=pointer]:
+                  - /url: https://www.apple.com/
+          - generic [ref=e157]:
+            - generic [ref=e158]:
+              - img [ref=e159]
+              - heading "EPS Surprises - AAPL" [level=2] [ref=e162]
+            - generic [ref=e163]:
+              - combobox [ref=e165] [cursor=pointer]:
+                - generic: 5Q
+                - img [ref=e167]
+              - combobox [ref=e169]
+          - generic [ref=e172]:
+            - heading "Company Statistics" [level=2] [ref=e173]
+            - generic [ref=e389]:
+              - generic [ref=e390]:
+                - generic [ref=e391]:
+                  - heading "Profile" [level=3] [ref=e392]
+                  - generic [ref=e393]:
+                    - generic [ref=e394]:
+                      - generic [ref=e395]:
+                        - text: Market Cap
+                        - img [ref=e397]
+                      - generic [ref=e399]: $4.60T
+                    - generic [ref=e400]:
+                      - generic [ref=e401]:
+                        - text: EV
+                        - img [ref=e403]
+                      - generic [ref=e405]: $4.62T
+                    - generic [ref=e406]:
+                      - generic [ref=e407]:
+                        - text: Shares Out
+                        - img [ref=e409]
+                      - generic [ref=e411]: 14.69B
+                    - generic [ref=e412]:
+                      - generic [ref=e413]:
+                        - text: Revenue
+                        - img [ref=e415]
+                      - generic [ref=e417]: $466.82B
+                    - generic [ref=e418]:
+                      - generic [ref=e419]:
+                        - text: Employees
+                        - img [ref=e421]
+                      - generic [ref=e423]: 166.0K
+                - generic [ref=e424]:
+                  - heading "Margins" [level=3] [ref=e425]
+                  - generic [ref=e426]:
+                    - generic [ref=e427]:
+                      - generic [ref=e428]:
+                        - text: Gross
+                        - img [ref=e430]
+                      - generic [ref=e432]: 48.6%
+                    - generic [ref=e433]:
+                      - generic [ref=e434]:
+                        - text: EBITDA
+                        - img [ref=e436]
+                      - generic [ref=e438]: 36.0%
+                    - generic [ref=e439]:
+                      - generic [ref=e440]:
+                        - text: Operating
+                        - img [ref=e442]
+                      - generic [ref=e444]: 33.2%
+                    - generic [ref=e445]:
+                      - generic [ref=e446]:
+                        - text: Pre-Tax
+                        - img [ref=e448]
+                      - generic [ref=e450]: 33.4%
+                    - generic [ref=e451]:
+                      - generic [ref=e452]:
+                        - text: Net
+                        - img [ref=e454]
+                      - generic [ref=e456]: 27.6%
+                    - generic [ref=e457]:
+                      - generic [ref=e458]:
+                        - text: FCF
+                        - img [ref=e460]
+                      - generic [ref=e462]: 29.3%
+                - generic [ref=e463]:
+                  - heading "Returns (TTM)" [level=3] [ref=e464]
+                  - generic [ref=e465]:
+                    - generic [ref=e466]:
+                      - generic [ref=e467]:
+                        - text: ROA
+                        - img [ref=e469]
+                      - generic [ref=e471]: 36.1%
+                    - generic [ref=e472]:
+                      - generic [ref=e473]:
+                        - text: ROTA
+                        - img [ref=e475]
+                      - generic [ref=e477]: 37.1%
+                    - generic [ref=e478]:
+                      - generic [ref=e479]:
+                        - text: ROE
+                        - img [ref=e481]
+                      - generic [ref=e483]: 148.8%
+              - generic [ref=e484]:
+                - generic [ref=e485]:
+                  - heading "Valuation (TTM)" [level=3] [ref=e486]
+                  - generic [ref=e487]:
+                    - generic [ref=e488]:
+                      - generic [ref=e489]:
+                        - text: P/E
+                        - img [ref=e491]
+                      - generic [ref=e493]: "36.0"
+                    - generic [ref=e494]:
+                      - generic [ref=e495]:
+                        - text: P/B
+                        - img [ref=e497]
+                      - generic [ref=e499]: "42.8"
+                    - generic [ref=e500]:
+                      - generic [ref=e501]:
+                        - text: EV/Sales
+                        - img [ref=e503]
+                      - generic [ref=e505]: "9.9"
+                    - generic [ref=e506]:
+                      - generic [ref=e507]:
+                        - text: EV/EBITDA
+                        - img [ref=e509]
+                      - generic [ref=e511]: "27.5"
+                    - generic [ref=e512]:
+                      - generic [ref=e513]:
+                        - text: P/FCF
+                        - img [ref=e515]
+                      - generic [ref=e517]: "33.6"
+                    - generic [ref=e518]:
+                      - generic [ref=e519]:
+                        - text: EV/Gross Profit
+                        - img [ref=e521]
+                      - generic [ref=e523]: "20.3"
+                - generic [ref=e524]:
+                  - heading "Valuation (NTM)" [level=3] [ref=e525]
+                  - generic [ref=e526]:
+                    - generic [ref=e527]:
+                      - generic [ref=e528]:
+                        - text: Price Target
+                        - img [ref=e530]
+                      - generic [ref=e532]: $329.27
+                    - generic [ref=e533]:
+                      - generic [ref=e534]:
+                        - text: P/E
+                        - img [ref=e536]
+                      - generic [ref=e538]: "32.0"
+                    - generic [ref=e539]:
+                      - generic [ref=e540]:
+                        - text: PEG
+                        - img [ref=e542]
+                      - generic [ref=e544]: "2.2"
+                    - generic [ref=e545]:
+                      - generic [ref=e546]:
+                        - text: EV/Sales
+                        - img [ref=e548]
+                      - generic [ref=e550]: "8.6"
+                    - generic [ref=e551]:
+                      - generic [ref=e552]:
+                        - text: EV/EBITDA
+                        - img [ref=e554]
+                      - generic [ref=e556]: "24.6"
+                    - generic [ref=e557]:
+                      - generic [ref=e558]:
+                        - text: P/FCF
+                        - img [ref=e560]
+                      - generic [ref=e562]: "-"
+                - generic [ref=e563]:
+                  - heading "Financial Health" [level=3] [ref=e564]
+                  - generic [ref=e565]:
+                    - generic [ref=e566]:
+                      - generic [ref=e567]:
+                        - text: Cash
+                        - img [ref=e569]
+                      - generic [ref=e571]: $68.51B
+                    - generic [ref=e572]:
+                      - generic [ref=e573]:
+                        - text: Net Debt
+                        - img [ref=e575]
+                      - generic [ref=e577]: $15.84B
+              - generic [ref=e578]:
+                - generic [ref=e579]:
+                  - heading "Growth (CAGR)" [level=3] [ref=e580]
+                  - generic [ref=e581]:
+                    - generic [ref=e582]:
+                      - generic [ref=e583]:
+                        - text: Rev 3Yr
+                        - img [ref=e585]
+                      - generic [ref=e587]: 1.8%
+                    - generic [ref=e588]:
+                      - generic [ref=e589]:
+                        - text: Rev 5Yr
+                        - img [ref=e591]
+                      - generic [ref=e593]: 8.7%
+                    - generic [ref=e594]:
+                      - generic [ref=e595]:
+                        - text: Rev 10Yr
+                        - img [ref=e597]
+                      - generic [ref=e599]: 5.9%
+                    - generic [ref=e600]:
+                      - generic [ref=e601]:
+                        - text: Dil EPS 3Yr
+                        - img [ref=e603]
+                      - generic [ref=e605]: 6.9%
+                    - generic [ref=e606]:
+                      - generic [ref=e607]:
+                        - text: Dil EPS 5Yr
+                        - img [ref=e609]
+                      - generic [ref=e611]: 17.9%
+                    - generic [ref=e612]:
+                      - generic [ref=e613]:
+                        - text: Dil EPS 10Yr
+                        - img [ref=e615]
+                      - generic [ref=e617]: 12.5%
+                    - generic [ref=e618]:
+                      - generic [ref=e619]:
+                        - text: Rev Fwd 2Yr
+                        - img [ref=e621]
+                      - generic [ref=e623]: 8.4%
+                    - generic [ref=e624]:
+                      - generic [ref=e625]:
+                        - text: EBITDA Fwd 2Yr
+                        - img [ref=e627]
+                      - generic [ref=e629]: 9.1%
+                    - generic [ref=e630]:
+                      - generic [ref=e631]:
+                        - text: EPS Fwd 2Yr
+                        - img [ref=e633]
+                      - generic [ref=e635]: 11.6%
+                    - generic [ref=e636]:
+                      - generic [ref=e637]:
+                        - text: EPS LT Growth Est
+                        - img [ref=e639]
+                      - generic [ref=e641]: 14.3%
+                - generic [ref=e642]:
+                  - heading "Dividends" [level=3] [ref=e643]
+                  - generic [ref=e644]:
+                    - generic [ref=e645]:
+                      - generic [ref=e646]:
+                        - text: Yield
+                        - img [ref=e648]
+                      - generic [ref=e650]: 0.3%
+                    - generic [ref=e651]:
+                      - generic [ref=e652]:
+                        - text: Payout
+                        - img [ref=e654]
+                      - generic [ref=e656]: 12.1%
+                    - generic [ref=e657]:
+                      - generic [ref=e658]:
+                        - text: DPS
+                        - img [ref=e660]
+                      - generic [ref=e662]: $1.03
+                    - generic [ref=e663]:
+                      - generic [ref=e664]:
+                        - text: DPS Growth 3Yr
+                        - img [ref=e666]
+                      - generic [ref=e668]: 2.8%
+                    - generic [ref=e669]:
+                      - generic [ref=e670]:
+                        - text: DPS Growth 5Yr
+                        - img [ref=e672]
+                      - generic [ref=e674]: 3.8%
+        - generic [ref=e256]:
+          - generic [ref=e676] [cursor=pointer]:
+            - img [ref=e678]
+            - generic [ref=e680]:
+              - generic [ref=e681]: Latest Earnings Call
+              - generic [ref=e682]: AAPL - Earnings call Q3 2026
+              - generic [ref=e683]: July 30, 2026
+            - img [ref=e685]
+          - generic [ref=e266]:
+            - generic [ref=e267]:
+              - heading "Price Chart" [level=2] [ref=e268]
+              - generic [ref=e269]:
+                - generic [ref=e270]:
+                  - generic [ref=e271] [cursor=pointer]:
+                    - img [ref=e272]
+                    - text: AAPL
+                  - button "Add comparison" [ref=e275] [cursor=pointer]:
+                    - img [ref=e276]
+                - button "Fullscreen" [ref=e277] [cursor=pointer]:
+                  - img [ref=e278]
+            - generic [ref=e283]:
+              - generic [ref=e284]:
+                - button "1D" [ref=e285] [cursor=pointer]
+                - button "5D" [ref=e286] [cursor=pointer]
+                - button "1M" [ref=e287] [cursor=pointer]
+                - button "3M" [ref=e288] [cursor=pointer]
+                - button "6M" [ref=e289] [cursor=pointer]
+                - button "YTD" [ref=e290] [cursor=pointer]
+                - button "1Y" [ref=e291] [cursor=pointer]
+                - button "3Y" [ref=e292] [cursor=pointer]
+                - button "5Y" [ref=e293] [cursor=pointer]
+                - button "10Y" [ref=e294] [cursor=pointer]
+                - button "MAX" [ref=e295] [cursor=pointer]
+              - generic [ref=e296]:
+                - button "Price" [ref=e297] [cursor=pointer]
+                - button "%" [ref=e298] [cursor=pointer]
+                - button "Drawdowns" [ref=e299] [cursor=pointer]
+            - generic [ref=e687]:
+              - generic [ref=e688]:
+                - generic [ref=e689]: $313.20
+                - generic [ref=e690]: +$83.98 (+36.6%)
+                - generic [ref=e691]: past 1 years
+              - button "Download" [ref=e692] [cursor=pointer]:
+                - img [ref=e693]
+                - text: Download
+            - generic [ref=e306]:
+              - generic [ref=e697]: Aug 08, 2025 - Aug 07, 2026 (12m)
+              - generic [ref=e307]: US:AAPL
+              - generic [ref=e698]: "Total Chg: 36.6%| CAGR: 36.7%"
+            - generic [ref=e309]: Powered by Example service
+          - generic [ref=e700]:
+            - generic [ref=e701]:
+              - heading "Seasonality" [level=3] [ref=e702]
+              - generic [ref=e703]:
+                - generic [ref=e704]:
+                  - button "3Y" [ref=e705] [cursor=pointer]
+                  - button "5Y" [ref=e706] [cursor=pointer]
+                  - button "10Y" [ref=e707] [cursor=pointer]
+                  - button "20Y" [ref=e708] [cursor=pointer]
+                - generic [ref=e710]:
+                  - button "Avg" [ref=e711] [cursor=pointer]
+                  - button "Med" [ref=e712] [cursor=pointer]
+                  - button "Min" [ref=e713] [cursor=pointer]
+                  - button "Max" [ref=e714] [cursor=pointer]
+            - generic [ref=e716]:
+              - generic [ref=e717]:
+                - generic [ref=e718]: Jan
+                - generic [ref=e719]: +0.9%
+              - generic [ref=e720]:
+                - generic [ref=e721]: Feb
+                - generic [ref=e722]: +0.2%
+              - generic [ref=e723]:
+                - generic [ref=e724]: Mar
+                - generic [ref=e725]: +0.3%
+              - generic [ref=e726]:
+                - generic [ref=e727]: Apr
+                - generic [ref=e728]: +2.2%
+              - generic [ref=e729]:
+                - generic [ref=e730]: May
+                - generic [ref=e731]: +3.1%
+              - generic [ref=e732]:
+                - generic [ref=e733]: Jun
+                - generic [ref=e734]: +3.7%
+              - generic [ref=e735]:
+                - generic [ref=e736]: Jul
+                - generic [ref=e737]: +7.0%
+              - generic [ref=e738]:
+                - generic [ref=e739]: Aug
+                - generic [ref=e740]: +6.2%
+              - generic [ref=e741]:
+                - generic [ref=e742]: Sep
+                - generic [ref=e743]: "-2.0%"
+              - generic [ref=e744]:
+                - generic [ref=e745]: Oct
+                - generic [ref=e746]: +3.2%
+              - generic [ref=e747]:
+                - generic [ref=e748]: Nov
+                - generic [ref=e749]: +2.4%
+              - generic [ref=e750]:
+                - generic [ref=e751]: Dec
+                - generic [ref=e752]: +1.2%
+  - button "Open Example service Copilot" [ref=e754] [cursor=pointer]:
+    - img [ref=e756]
+    - generic: Ask Copilot

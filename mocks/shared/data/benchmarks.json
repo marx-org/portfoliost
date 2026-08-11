@@ -1,0 +1,29 @@
+{
+  "SPY": {
+    "symbol": "SPY",
+    "name": "SPDR S&P 500 ETF Trust",
+    "type": "ETF",
+    "currency": "USD",
+    "price": 600,
+    "prevClose": 602.13,
+    "marketCap": 8189806677600
+  },
+  "QQQ": {
+    "symbol": "QQQ",
+    "name": "Invesco QQQ Trust",
+    "type": "ETF",
+    "currency": "USD",
+    "price": 530,
+    "prevClose": 528.09,
+    "marketCap": 4190300591430
+  },
+  "IWM": {
+    "symbol": "IWM",
+    "name": "iShares Russell 2000 ETF",
+    "type": "ETF",
+    "currency": "USD",
+    "price": 235,
+    "prevClose": 231.15,
+    "marketCap": 2270392719525
+  }
+}

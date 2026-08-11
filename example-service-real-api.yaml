@@ -1,0 +1,2329 @@
+openapi: 3.0.3
+info:
+  title: Example service Real API Contract
+  version: 1.0.0
+  description: |
+    REST contract reverse-engineered from the live Example service API (https://app.example-service.ai)
+    on 2026-08-11 against the authenticated account
+
+    Source of truth: responses captured to `discovery/raw/*.json` (mirrored to
+    `mocks/shared/data/raw/*.json`) plus the seed generator `scripts/regen-seed.mjs`.
+
+    Deviations from production (by design, for the local mock):
+      - Auth is a custom REST flow (`POST /api/auth/login` + bearer token) instead of Supabase.
+      - Premium endpoints (fundamentals, ownership, dividends, projections, news insights,
+        AI insights) return full data instead of 402/403.
+      - Realtime (socket.io) is not emulated; REST only.
+
+servers:
+  - url: http://localhost:4010/api
+    description: Local mock gateway
+  - url: http://localhost:4001/api
+    description: Local mock (single container)
+
+tags:
+  - name: Auth
+    description: Custom mock authentication (replaces Supabase)
+  - name: Users
+  - name: Billing
+  - name: Notifications
+  - name: News
+  - name: Instruments
+  - name: Charting
+  - name: Portfolios
+  - name: Wallets
+  - name: Watchlists
+  - name: Copilot
+  - name: Misc
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    symbol:
+      name: symbol
+      in: path
+      required: true
+      schema: { type: string }
+      description: Instrument symbol, e.g. AAPL or AAPL.US
+    portfolioId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    walletId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    watchlistId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    positionId:
+      name: positionId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    eventId:
+      name: eventId
+      in: path
+      required: true
+      schema: { type: string }
+    cursor:
+      name: cursor
+      in: query
+      schema: { type: string }
+      description: Opaque cursor for keyset pagination
+    limit:
+      name: limit
+      in: query
+      schema: { type: integer, default: 10 }
+    page:
+      name: page
+      in: query
+      schema: { type: integer, default: 1 }
+    perPage:
+      name: perPage
+      in: query
+      schema: { type: integer, default: 10 }
+    timeframe:
+      name: timeframe
+      in: query
+      schema:
+        type: string
+        enum: [1D, 5D, 1M, 3M, 6M, YTD, 1Y, 2Y, 3Y, 5Y, ALL]
+        default: 1Y
+    benchmark:
+      name: benchmark
+      in: query
+      schema: { type: string }
+      description: Benchmark symbol to overlay (e.g. SPY)
+
+  schemas:
+    # ─── Shared ────────────────────────────────────────────────
+    ErrorResponse:
+      type: object
+      properties:
+        error: { type: string }
+        message: { type: string }
+        statusCode: { type: integer }
+    Pagination:
+      type: object
+      properties:
+        count: { type: integer }
+        total_count: { type: integer }
+        has_next_page: { type: boolean }
+        has_previous_page: { type: boolean }
+        next_cursor: { type: string, nullable: true }
+        previous_cursor: { type: string, nullable: true }
+    PageResponse:
+      type: object
+      properties:
+        items: { type: array, items: { type: object } }
+        total: { type: integer }
+        page: { type: integer }
+        limit: { type: integer }
+        totalPages: { type: integer }
+        hasNext: { type: boolean }
+        hasPrevious: { type: boolean }
+
+    # ─── Auth ──────────────────────────────────────────────────
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }
+    AuthResponse:
+      type: object
+      properties:
+        access_token: { type: string }
+        token_type: { type: string, default: bearer }
+        expires_in: { type: integer }
+        user:
+          $ref: '#/components/schemas/AuthUser'
+    AuthUser:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string }
+        language: { type: string }
+        role: { type: string }
+        isDemoUser: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        lastLoginAt: { type: string, format: date-time, nullable: true }
+    MeResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/AuthUser'
+
+    # ─── Users ─────────────────────────────────────────────────
+    UserProfile:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string }
+        firstName: { type: string, nullable: true }
+        lastName: { type: string, nullable: true }
+        language: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        isDemoUser: { type: boolean }
+    UpdateProfileRequest:
+      type: object
+      properties:
+        firstName: { type: string, nullable: true }
+        lastName: { type: string, nullable: true }
+        language: { type: string }
+    UserPreferences:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        uiPreferences: { type: object, additionalProperties: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    CustomBenchmarksResponse:
+      type: object
+      properties:
+        items: { type: array, items: { type: object, additionalProperties: true } }
+    CustomTimeframesResponse:
+      type: object
+      properties:
+        items: { type: array, items: { type: object, additionalProperties: true } }
+    OnboardingStatus:
+      type: object
+      properties:
+        completed: { type: boolean }
+        currentStep: { type: string, nullable: true }
+    OnboardingDraft:
+      type: object
+      properties:
+        draft: { nullable: true }
+
+    # ─── Billing ───────────────────────────────────────────────
+    BillingPlans:
+      type: object
+      properties:
+        plans:
+          type: array
+          items:
+            type: object
+            properties:
+              tier: { type: string }
+              name: { type: string }
+              prices:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    priceId: { type: string }
+                    interval: { type: string }
+                    amount: { type: integer }
+                    currency: { type: string }
+              features: { type: array, items: { type: string } }
+    BillingSubscription:
+      type: object
+      properties:
+        planTier: { type: string }
+        status: { type: string }
+        billingInterval: { type: string, nullable: true }
+        currentPeriodStart: { type: string, nullable: true }
+        currentPeriodEnd: { type: string, nullable: true }
+        trialStart: { type: string, nullable: true }
+        trialEnd: { type: string, nullable: true }
+        cancelAtPeriodEnd: { type: boolean }
+        cancelAt: { type: string, nullable: true }
+        isTrialing: { type: boolean }
+    BillingEntitlements:
+      type: object
+      properties:
+        tier: { type: string }
+        isTrialing: { type: boolean }
+        features:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              enabled: { type: boolean }
+              limit: { nullable: true }
+              delayMinutes: { type: integer }
+
+    # ─── Notifications ─────────────────────────────────────────
+    NotificationsList:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Notification' } }
+        nextCursor: { type: string, nullable: true }
+        unreadCount: { type: integer }
+    Notification:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        type: { type: string }
+        title: { type: string }
+        message: { type: string }
+        isRead: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        metadata: { type: object, additionalProperties: true }
+    NotificationPreferences:
+      type: object
+      properties:
+        newsEnabled: { type: boolean }
+        newsMinActionability: { type: string, nullable: true }
+        newsMaterialOnly: { type: boolean }
+        earningsEnabled: { type: boolean }
+        insiderEnabled: { type: boolean }
+        insiderMinValueUsd: { type: number, nullable: true }
+        analystEnabled: { type: boolean }
+        analystDirection: { type: string, nullable: true }
+        channelsWeb: { type: boolean }
+        channelsPush: { type: boolean }
+        channelsEmail: { type: boolean }
+    NotificationSymbols:
+      type: object
+      properties:
+        items: { type: array, items: { type: object } }
+        totalEnabled: { type: integer }
+        totalMuted: { type: integer }
+    UnreadCount:
+      type: object
+      properties:
+        count: { type: integer }
+    # ─── News ──────────────────────────────────────────────────
+    NewsArticleList:
+      type: object
+      properties:
+        data: { type: array, items: { type: object, additionalProperties: true } }
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+    NewsTimeline:
+      type: object
+      properties:
+        data: { type: array, items: { type: object, additionalProperties: true } }
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+    MarketContexts:
+      type: object
+      properties:
+        error: { nullable: true }
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              scope: { type: string }
+              type: { type: string }
+              summary: { type: string }
+    NewsStats:
+      type: object
+      properties:
+        error: { nullable: true }
+        data:
+          type: object
+          additionalProperties: true
+    TrackedTickers:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            tickers:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  symbol: { type: string }
+                  createdAt: { type: string, format: date-time }
+                  totalArticleCount: { type: integer }
+                  totalAnalyzedArticleCount: { type: integer }
+                  lastFetchedAt: { type: string, format: date-time }
+                  isActive: { type: boolean }
+                  isDefault: { type: boolean }
+    LiveStreamChannel:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        handle: { type: string }
+        fallbackVideoId: { type: string, nullable: true }
+        hlsUrl: { type: string, nullable: true }
+        region: { type: string, nullable: true }
+        category: { type: string, nullable: true }
+    LiveStream:
+      type: object
+      properties:
+        videoId: { type: string, nullable: true }
+        isLive: { type: boolean }
+        hlsUrl: { type: string, nullable: true }
+    NewsInsights:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { type: object, additionalProperties: true }
+
+    # ─── Instruments ───────────────────────────────────────────
+    InstrumentDetail:
+      type: object
+      properties:
+        id: { type: string }
+        symbol: { type: string }
+        name: { type: string }
+        exchange: { type: string }
+        type: { type: string }
+        currency: { type: string }
+    InstrumentProfile:
+      type: object
+      properties:
+        ticker: { type: string }
+        name: { type: string }
+        country: { type: string }
+        currency: { type: string }
+        exchange: { type: string }
+        finnhubIndustry: { type: string, nullable: true }
+        ipo: { type: string, nullable: true }
+        logo: { type: string, nullable: true }
+        marketCapitalization: { type: number, nullable: true }
+        marketCapCurrency: { type: string, nullable: true }
+        marketcapUSD: { type: number, nullable: true }
+        phone: { type: string, nullable: true }
+        shareOutstanding: { type: number, nullable: true }
+        weburl: { type: string, nullable: true }
+    InstrumentMetrics:
+      type: object
+      properties:
+        metrics:
+          type: object
+          properties:
+            symbol: { type: string }
+            metricType: { type: string }
+            metric: { type: object, additionalProperties: true }
+        priceTarget:
+          type: object
+          properties:
+            symbol: { type: string }
+            targetHigh: { type: number }
+            targetLow: { type: number }
+            targetMean: { type: number }
+            targetMedian: { type: number }
+            numberAnalysts: { type: integer }
+            lastUpdated: { type: string }
+        trailingValuation: { type: object, additionalProperties: true }
+        margins: { type: object, additionalProperties: true }
+        capitalEfficiency: { type: object, additionalProperties: true }
+        financialHealth: { type: object, additionalProperties: true }
+        perShare: { type: object, additionalProperties: true }
+    InstrumentOverviewMetrics:
+      type: object
+      additionalProperties: true
+      description: Flat financial metrics keyed by metric name (roa, roe, peRatio, ...)
+    Quote:
+      type: object
+      properties:
+        symbol: { type: string }
+        currentPrice: { type: number }
+        highPrice: { type: number }
+        lowPrice: { type: number }
+        openPrice: { type: number }
+        previousClose: { type: number }
+        change: { type: number }
+        percentChange: { type: number }
+        timestamp: { type: integer }
+        marketSession: { type: string }
+        timezone: { type: string }
+        bid: { type: number }
+        ask: { type: number }
+        bidSize: { type: integer }
+        askSize: { type: integer }
+        currency: { type: string }
+        regularMarketPrice: { type: number }
+        extendedHoursChange: { type: number }
+        extendedHoursChangePercent: { type: number }
+    PriceHistory:
+      type: object
+      properties:
+        symbol: { type: string }
+        closePrices: { type: array, items: { type: number } }
+        highPrices: { type: array, items: { type: number } }
+        lowPrices: { type: array, items: { type: number } }
+        openPrices: { type: array, items: { type: number } }
+        volumes: { type: array, items: { type: number } }
+        timestamps: { type: array, items: { type: integer } }
+        status: { type: string }
+        currency: { type: string }
+    SearchResult:
+      type: object
+      properties:
+        symbol: { type: string }
+        name: { type: string }
+        type: { type: string }
+        exchange: { type: string }
+        source: { type: string }
+    InstrumentSearchResponse:
+      type: object
+      properties:
+        count: { type: integer }
+        results: { type: array, items: { $ref: '#/components/schemas/SearchResult' } }
+    FundamentalsData:
+      type: object
+      properties:
+        financialHighlights:
+          type: object
+          properties:
+            incomeStatement:
+              type: array
+              items:
+                type: object
+                properties:
+                  year: { type: integer }
+                  revenue: { type: number }
+                  ebit: { type: number }
+                  netIncome: { type: number }
+                  netIncomeGrowth: { type: number, nullable: true }
+                  netIncomeMargin: { type: number }
+                  earningsPerShare: { type: number }
+                  earningsPerShareGrowth: { type: number, nullable: true }
+                  dilutedSharesOutstanding: { type: number }
+                  ebitda: { type: number }
+            balanceSheet:
+              type: array
+              items:
+                type: object
+                properties:
+                  year: { type: integer }
+                  totalAssets: { type: number }
+                  totalLiabilities: { type: number }
+                  shareholdersEquity: { type: number }
+                  cash: { type: number }
+                  cashAndShortTermInvestments: { type: number }
+                  totalDebt: { type: number }
+                  netDebt: { type: number }
+                  workingCapital: { type: number }
+                  totalCapitalization: { type: number }
+                  retainedEarnings: { type: number }
+                  debtEquityRatio: { type: number }
+                  longTermDebtToCapitalization: { type: number }
+                  totalDebtToCapitalization: { type: number }
+            cashFlow:
+              type: array
+              items:
+                type: object
+                properties:
+                  year: { type: integer }
+                  cashFlowFromOperatingActivities: { type: number }
+                  cashFlowFromFinancingActivities: { type: number }
+                  cashFlowFromInvestingActivities: { type: number }
+                  freeCashFlow: { type: number }
+                  freeCashFlowGrowth: { type: number, nullable: true }
+                  cashFlowFromOperatingActivitiesGrowth: { type: number, nullable: true }
+                  freeCashFlowPerShare: { type: number }
+                  capitalExpenditures: { type: number }
+                  depreciation: { type: number }
+                  dividendPayment: { type: number }
+    OwnershipData:
+      type: object
+      properties:
+        institutional:
+          type: array
+          items: { $ref: '#/components/schemas/HoldingGroup' }
+        mutualFund:
+          type: array
+          items: { $ref: '#/components/schemas/HoldingGroup' }
+        insider:
+          type: array
+          items: { $ref: '#/components/schemas/HoldingGroup' }
+        insiderTransactions:
+          type: array
+          items:
+            type: object
+            properties:
+              title: { type: string }
+              transactionDate: { type: string }
+              transactionCode: { type: string }
+              transactionText: { type: string }
+              transactionAmount: { type: number }
+              transactionValue: { type: number }
+              filingDate: { type: string }
+    HoldingGroup:
+      type: object
+      properties:
+        date: { type: string }
+        holdingPercentage: { type: number }
+        holdersCount: { type: integer }
+        sumOfCurrentPositions: { type: number }
+        sumOfCurrentPositionsValue: { type: number }
+    DividendsData:
+      type: object
+      properties:
+        history:
+          type: array
+          items:
+            type: object
+            properties:
+              date: { type: string }
+              year: { type: integer }
+              amount: { type: number }
+              currency: { type: string }
+              type: { type: string }
+    CalendarData:
+      type: object
+      properties:
+        earnings:
+          type: array
+          items:
+            type: object
+            properties:
+              date: { type: string }
+              title: { type: string }
+              year: { type: integer }
+              quarter: { type: integer }
+        exDividend:
+          type: array
+          items:
+            type: object
+            properties:
+              date: { type: string }
+              title: { type: string }
+              year: { type: integer }
+              amount: { type: number }
+        dividend:
+          type: array
+          items:
+            type: object
+            properties:
+              date: { type: string }
+              title: { type: string }
+              year: { type: integer }
+              amount: { type: number }
+    SeasonalityData:
+      type: object
+      properties:
+        symbol: { type: string }
+        years: { type: integer }
+        metric: { type: string }
+        monthly_returns:
+          type: array
+          items:
+            type: object
+            properties:
+              month: { type: string }
+              return_pct: { type: number }
+    EPSSurprises:
+      type: object
+      properties:
+        annual:
+          type: array
+          items: { $ref: '#/components/schemas/EPSRow' }
+        quarterly:
+          type: array
+          items: { $ref: '#/components/schemas/EPSRow' }
+    EPSRow:
+      type: object
+      properties:
+        date: { type: string }
+        year: { type: integer }
+        quarter: { type: integer }
+        eps: { type: number }
+        epsEstimate: { type: number }
+        epsDifference: { type: number }
+        revenue: { type: number }
+        revenueEstimate: { type: number }
+        revenueDifference: { type: number }
+        surprise: { type: number }
+        surprisePercent: { type: number }
+        time: { type: string }
+    ProjectionsData:
+      type: object
+      properties:
+        priceTarget:
+          type: object
+          properties:
+            lastUpdated: { type: string }
+            low: { type: number }
+            mean: { type: number }
+            current: { type: number }
+            high: { type: number }
+        recommendation:
+          type: object
+          properties:
+            period: { type: string }
+            strongBuy: { type: integer }
+            buy: { type: integer }
+            hold: { type: integer }
+            sell: { type: integer }
+            strongSell: { type: integer }
+        earnings:
+          type: object
+          additionalProperties: true
+        revenue:
+          type: object
+          additionalProperties: true
+    HistoricalPrice:
+      type: object
+      properties:
+        symbol: { type: string }
+        date: { type: string, format: date }
+        price: { type: number }
+        currency: { type: string }
+    InvestorRelationEvent:
+      type: object
+      properties:
+        type: { type: string }
+        id: { type: string }
+        title: { type: string }
+        date: { type: string }
+        year: { type: integer }
+        quarter: { type: integer, nullable: true }
+        symbol: { type: string }
+        audioUrl: { type: string, nullable: true }
+    IRTranscript:
+      type: object
+      properties:
+        id: { type: string }
+        symbol: { type: string }
+        year: { type: integer }
+        quarter: { type: integer }
+        title: { type: string }
+        time: { type: string }
+        participant: { type: array, items: { type: object } }
+        audio: { type: string, nullable: true }
+        transcript: { type: array, items: { type: object } }
+    # ─── Charting ──────────────────────────────────────────────
+    CompareRow:
+      type: object
+      additionalProperties: true
+
+    # ─── Portfolios ────────────────────────────────────────────
+    Portfolio:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        strategy: { type: string }
+        type: { type: string }
+        currency: { type: string }
+        walletId: { type: string, format: uuid }
+        totalInvested: { type: number }
+        currentValue: { type: number }
+        isPublic: { type: boolean }
+        isMarginEnabled: { type: boolean }
+        marginRate: { type: number, nullable: true }
+        maintenanceMarginRate: { type: number, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    CreatePortfolioRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        description: { type: string, nullable: true }
+        strategy: { type: string }
+        currency: { type: string }
+        isPublic: { type: boolean }
+    PortfolioTotalMetrics:
+      type: object
+      properties:
+        totalValue: { type: number }
+        totalInvested: { type: number }
+        totalGainLoss: { type: number }
+        returnPercentage: { type: number }
+        baseCurrency: { type: string }
+        portfolioBreakdown:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              name: { type: string }
+              totalValue: { type: number }
+              totalInvested: { type: number }
+              returnPercentage: { type: number }
+              weight: { type: number }
+        externalCapitalReturnPercent: { type: number, nullable: true }
+        externalCapitalReturnAmount: { type: number, nullable: true }
+        externalCapitalBasis: { type: number, nullable: true }
+        externalCapitalBasisSource: { type: string, nullable: true }
+        externalCapitalSuppressedReason: { type: string, nullable: true }
+        externalCapitalReturnBasisKind: { type: string, nullable: true }
+    HeldStock:
+      type: object
+      properties:
+        symbol: { type: string }
+        name: { type: string }
+        logo: { type: string, nullable: true }
+        currentPrice: { type: number }
+        changePercent: { type: number }
+        assetType: { type: string }
+        totalQuantity: { type: number }
+        totalValue: { type: number }
+    HeldStocks:
+      type: object
+      properties:
+        stocks: { type: array, items: { $ref: '#/components/schemas/HeldStock' } }
+        totalCount: { type: integer }
+    PortfolioShare:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        portfolioId: { type: string, format: uuid }
+        portfolioName: { type: string }
+        displayName: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        expiresAt: { type: string, nullable: true }
+        viewCount: { type: integer }
+        privacySettings: { type: object }
+    Position:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        portfolioId: { type: string, format: uuid }
+        symbol: { type: string }
+        companyName: { type: string }
+        assetType: { type: string }
+        contractSize: { type: number, nullable: true }
+        purchaseCurrency: { type: string }
+        instrumentCurrency: { type: string }
+        quantity: { type: number }
+        averageCostBasis: { type: number }
+        avgCostBasis: { type: number }
+        instrumentAvgCostBasis: { type: number }
+        totalCostBasis: { type: number }
+        costBasis: { type: number }
+        realizedGainLoss: { type: number }
+        sector: { type: string }
+        industry: { type: string }
+        country: { type: string }
+        isOpen: { type: boolean }
+        openedAt: { type: string, format: date-time }
+        closedAt: { type: string, nullable: true }
+        currentPrice: { type: number }
+        priceSource: { type: string }
+        priceAsOf: { type: string, format: date-time }
+        marketValue: { type: number }
+        unrealizedGainLoss: { type: number }
+        percentageChange: { type: number }
+        percentOfPortfolio: { type: number }
+        dayChange: { type: number }
+        dayChangePercent: { type: number }
+        preMarketPrice: { type: number, nullable: true }
+        preMarketChangePercent: { type: number, nullable: true }
+        afterHoursPrice: { type: number, nullable: true }
+        afterHoursChangePercent: { type: number, nullable: true }
+        metrics: { type: object, additionalProperties: true }
+        displayCurrency: { type: string }
+        logo: { type: string, nullable: true }
+    PortfolioAnalytics:
+      type: object
+      properties:
+        performance:
+          type: object
+          properties:
+            totalValue: { type: number }
+            totalInvested: { type: number }
+            totalReturn: { type: number }
+            totalReturnPercent: { type: number }
+            simpleReturnPercent: { type: number }
+            investmentReturnPercent: { type: number }
+            currencyImpactPercent: { type: number }
+            realizedGains: { type: number }
+            unrealizedGains: { type: number }
+            annualizedReturn: { type: number, nullable: true }
+            moneyWeightedReturn: { type: number, nullable: true }
+            annualizedReturnWithheldReason: { type: string, nullable: true }
+            moneyWeightedReturnWithheldReason: { type: string, nullable: true }
+            timeWeightedReturn: { type: number, nullable: true }
+            sharpeRatio: { type: number }
+            sortinoRatio: { type: number }
+            calmarRatio: { type: number }
+            winRate: { type: number }
+            winCount: { type: integer }
+            lossCount: { type: integer }
+            volatility: { type: number }
+            maxDrawdown: { type: number }
+            monthlyReturns:
+              type: array
+              items: { type: object }
+            timeSeries:
+              type: object
+              additionalProperties: true
+              description: ISO date key → metric values
+        benchmarks:
+          type: array
+          items: { type: object, additionalProperties: true }
+        portfolioCurrency: { type: string }
+        realizedGain: { type: number }
+        monthlyReturns:
+          type: array
+          items: { type: object }
+    PortfolioSnapshot:
+      type: object
+      properties:
+        allocation:
+          type: object
+          properties:
+            byAsset: { type: array, items: { type: object } }
+            bySector: { type: array, items: { type: object } }
+            byGeography: { type: array, items: { type: object } }
+            byIndustry: { type: array, items: { type: object } }
+            byPosition: { type: array, items: { type: object } }
+        topPerformers: { type: array, items: { type: object } }
+        bottomPerformers: { type: array, items: { type: object } }
+        concentrationRisks: { type: array, items: { type: object } }
+        correlationMatrix: { type: array, items: { type: array, items: { type: number } } }
+    PortfolioRiskMetrics:
+      type: object
+      properties:
+        sharpeRatio: { type: number }
+        sortinoRatio: { type: number }
+        calmarRatio: { type: number }
+        volatility: { type: number }
+        maxDrawdown: { type: number }
+        winRate: { type: number }
+        moneyWeightedReturn: { type: number, nullable: true }
+        periodReturnPercent: { type: number }
+        annualizedReturn: { type: number, nullable: true }
+        annualizedReturnWithheldReason: { type: string, nullable: true }
+        moneyWeightedReturnWithheldReason: { type: string, nullable: true }
+
+    # ─── Wallets ───────────────────────────────────────────────
+    CashWallet:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        name: { type: string }
+        currency: { type: string }
+        balance: { type: number }
+        availableBalance: { type: number }
+        isDefault: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    WalletsTotalBalance:
+      type: object
+      properties:
+        totalBalance: { type: number }
+        totalAvailableBalance: { type: number }
+        baseCurrency: { type: string }
+        walletBreakdown:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              name: { type: string }
+              balance: { type: number }
+              availableBalance: { type: number }
+              currency: { type: string }
+              weight: { type: number }
+    BalanceHistory:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              date: { type: string, format: date-time }
+              balance: { type: number }
+              change: { type: number }
+              percentChange: { type: number, nullable: true }
+              high: { type: number }
+              low: { type: number }
+        meta:
+          type: object
+          properties:
+            period: { type: string }
+            resolution: { type: string }
+            high: { type: number }
+            low: { type: number }
+            average: { type: number }
+            startDate: { type: string, format: date-time }
+            endDate: { type: string, format: date-time }
+            change: { type: number }
+            percentChange: { type: number, nullable: true }
+    CashTransaction:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        walletId: { type: string, format: uuid }
+        type: { type: string }
+        amount: { type: number }
+        currency: { type: string }
+        status: { type: string }
+        createdAt: { type: string, format: date-time }
+        description: { type: string, nullable: true }
+
+    # ─── Watchlists ────────────────────────────────────────────
+    Watchlist:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        items: { type: array, items: { type: object } }
+
+    # ─── Copilot ───────────────────────────────────────────────
+    ConversationsResponse:
+      type: object
+      properties:
+        data: { type: array, items: { type: object } }
+        meta:
+          type: object
+          properties:
+            total: { type: integer }
+            page: { type: integer }
+            limit: { type: integer }
+            totalPages: { type: integer }
+    ChatbotModels:
+      type: object
+      properties:
+        models:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              label: { type: string }
+              capabilities:
+                type: object
+                properties:
+                  imageInput: { type: boolean }
+                  pdfInput: { type: boolean }
+        default: { type: string }
+        availableCapabilities: { type: array, items: { type: string } }
+
+    # ─── Misc ──────────────────────────────────────────────────
+    ExchangeRates:
+      type: object
+      properties:
+        result: { type: string }
+        base_code: { type: string }
+        conversion_rates: { type: object, additionalProperties: true }
+        time_last_update_unix: { type: integer }
+    SnapTradeStatus:
+      type: object
+      properties:
+        isRegistered: { type: boolean }
+        connectionsCount: { type: integer }
+paths:
+  # ─── Auth (custom mock) ──────────────────────────────────────
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login with email and password
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: Login success
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new account
+      operationId: register
+      responses:
+        '201':
+          description: Account created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Current authenticated user
+      operationId: getMe
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MeResponse' }
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout
+      operationId: logout
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204':
+          description: Logged out
+
+  # ─── Users ───────────────────────────────────────────────────
+  /users/profile:
+    get:
+      tags: [Users]
+      summary: User profile
+      operationId: getUserProfile
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserProfile' }
+    patch:
+      tags: [Users]
+      summary: Update user profile
+      operationId: updateUserProfile
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateProfileRequest' }
+      responses:
+        '200':
+          description: Updated profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserProfile' }
+  /users/preferences:
+    get:
+      tags: [Users]
+      summary: User UI preferences
+      operationId: getUserPreferences
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Preferences
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserPreferences' }
+    patch:
+      tags: [Users]
+      summary: Update UI preferences
+      operationId: updateUserPreferences
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Updated preferences
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserPreferences' }
+  /users/preferences/custom-benchmarks:
+    get:
+      tags: [Users]
+      summary: Custom benchmarks
+      operationId: getCustomBenchmarks
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Custom benchmarks
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomBenchmarksResponse' }
+  /users/preferences/custom-timeframes:
+    get:
+      tags: [Users]
+      summary: Custom timeframes
+      operationId: getCustomTimeframes
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Custom timeframes
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomTimeframesResponse' }
+  /users/onboarding/status:
+    get:
+      tags: [Users]
+      summary: Onboarding status
+      operationId: getOnboardingStatus
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Onboarding status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OnboardingStatus' }
+  /users/onboarding/draft:
+    get:
+      tags: [Users]
+      summary: Onboarding draft
+      operationId: getOnboardingDraft
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Onboarding draft
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OnboardingDraft' }
+
+  # ─── Billing ─────────────────────────────────────────────────
+  /billing/plans:
+    get:
+      tags: [Billing]
+      summary: Billing plans
+      operationId: getBillingPlans
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Plans
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BillingPlans' }
+  /billing/subscription:
+    get:
+      tags: [Billing]
+      summary: Current subscription
+      operationId: getSubscription
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Subscription
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BillingSubscription' }
+  /billing/entitlements:
+    get:
+      tags: [Billing]
+      summary: Feature entitlements
+      operationId: getEntitlements
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Entitlements
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BillingEntitlements' }
+
+  # ─── Notifications ───────────────────────────────────────────
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: List notifications
+      operationId: getNotifications
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/cursor'
+        - $ref: '#/components/parameters/limit'
+      responses:
+        '200':
+          description: Notifications
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationsList' }
+  /notifications/unread-count:
+    get:
+      tags: [Notifications]
+      summary: Unread notification count
+      operationId: getUnreadCount
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Unread count
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UnreadCount' }
+  /notifications/preferences:
+    get:
+      tags: [Notifications]
+      summary: Notification preferences
+      operationId: getNotificationPreferences
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Preferences
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationPreferences' }
+  /notifications/symbols:
+    get:
+      tags: [Notifications]
+      summary: Notification symbols
+      operationId: getNotificationSymbols
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Symbols
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationSymbols' }
+
+  # ─── News ────────────────────────────────────────────────────
+  /news/articles:
+    get:
+      tags: [News]
+      summary: News articles
+      operationId: getNewsArticles
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/cursor'
+        - $ref: '#/components/parameters/limit'
+        - name: ticker
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Articles
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NewsArticleList' }
+  /news/timeline:
+    get:
+      tags: [News]
+      summary: News timeline
+      operationId: getNewsTimeline
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/cursor'
+        - $ref: '#/components/parameters/limit'
+      responses:
+        '200':
+          description: Timeline
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NewsTimeline' }
+  /news/market-contexts:
+    get:
+      tags: [News]
+      summary: Market contexts
+      operationId: getMarketContexts
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Contexts
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MarketContexts' }
+  /news/stats:
+    get:
+      tags: [News]
+      summary: News stats for a ticker
+      operationId: getNewsStats
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: ticker
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Stats
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NewsStats' }
+  /news/tracked-tickers:
+    get:
+      tags: [News]
+      summary: Tracked tickers
+      operationId: getTrackedTickers
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Tracked tickers
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TrackedTickers' }
+  /news/livestreams/channels:
+    get:
+      tags: [News]
+      summary: Livestream channels
+      operationId: getLivestreamChannels
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Channels
+          content:
+            application/json:
+              type: array
+              items: { $ref: '#/components/schemas/LiveStreamChannel' }
+  /news/livestreams/live:
+    get:
+      tags: [News]
+      summary: Current livestream
+      operationId: getLiveStream
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Livestream
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LiveStream' }
+  /news/insights:
+    get:
+      tags: [News]
+      summary: AI news insights (premium — served in full by the mock)
+      operationId: getNewsInsights
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Insights
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NewsInsights' }
+  # ─── Instruments ─────────────────────────────────────────────
+  /instruments/search:
+    get:
+      tags: [Instruments]
+      summary: Unified instrument search
+      operationId: searchInstruments
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: query
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InstrumentSearchResponse' }
+  /instruments/{symbol}:
+    parameters:
+      - $ref: '#/components/parameters/symbol'
+    get:
+      tags: [Instruments]
+      summary: Instrument detail
+      operationId: getInstrumentDetail
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Instrument
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InstrumentDetail' }
+  /instruments/{symbol}/profile:
+    parameters:
+      - $ref: '#/components/parameters/symbol'
+    get:
+      tags: [Instruments]
+      summary: Company profile
+      operationId: getInstrumentProfile
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InstrumentProfile' }
+  /instruments/{symbol}/metrics:
+    parameters:
+      - $ref: '#/components/parameters/symbol'
+    get:
+      tags: [Instruments]
+      summary: Instrument metrics bundle
+      operationId: getInstrumentMetrics
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Metrics
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InstrumentMetrics' }
+  /instruments/{symbol}/overview-metrics:
+    parameters:
+      - $ref: '#/components/parameters/symbol'
+    get:
+      tags: [Instruments]
+      summary: Flat overview metrics
+      operationId: getInstrumentOverviewMetrics
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Overview metrics
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InstrumentOverviewMetrics' }
+  /instruments/{symbol}/quote:
+    parameters:
+      - $ref: '#/components/parameters/symbol'
+    get:
+      tags: [Instruments]
+      summary: Current quote
+      operationId: getQuote
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Quote
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Quote' }
+  /instruments/{symbol}/history:
+    parameters:
+      - $ref: '#/components/parameters/symbol'
+    get:
+      tags: [Instruments]
+      summary: Price history
+      operationId: getPriceHistory
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: resolution
+          in: query
+          schema: { type: string, enum: ['1', '5', '15', '30', '60', daily, weekly, monthly] }
+        - name: timeframe
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: History
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PriceHistory' }
+  /instruments/{symbol}/fundamentals:
+    parameters:
+      - $ref: '#/components/parameters/symbol'
+    get:
+      tags: [Instruments]
+      summary: Fundamentals (premium — served in full)
+      operationId: getFundamentals
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Fundamentals
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FundamentalsData' }
+  /instruments/{symbol}/ownership:
+    parameters:
+      - $ref: '#/components/parameters/symbol'
+    get:
+      tags: [Instruments]
+      summary: Ownership (premium — served in full)
+      operationId: getOwnership
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Ownership
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OwnershipData' }
+  /instruments/{symbol}/dividends:
+    parameters:
+      - $ref: '#/components/parameters/symbol'
+    get:
+      tags: [Instruments]
+      summary: Dividends (premium — served in full)
+      operationId: getDividends
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Dividends
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DividendsData' }
+  /instruments/{symbol}/calendar:
+    parameters:
+      - $ref: '#/components/parameters/symbol'
+    get:
+      tags: [Instruments]
+      summary: Earnings and dividend calendar
+      operationId: getCalendar
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Calendar
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CalendarData' }
+  /instruments/{symbol}/seasonality:
+    parameters:
+      - $ref: '#/components/parameters/symbol'
+    get:
+      tags: [Instruments]
+      summary: Monthly seasonality
+      operationId: getSeasonality
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: years
+          in: query
+          schema: { type: integer, enum: [3, 5, 10, 20], default: 5 }
+        - name: metric
+          in: query
+          schema: { type: string, enum: [avg, median, min, max], default: avg }
+      responses:
+        '200':
+          description: Seasonality
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SeasonalityData' }
+  /instruments/{symbol}/eps-surprises:
+    parameters:
+      - $ref: '#/components/parameters/symbol'
+    get:
+      tags: [Instruments]
+      summary: EPS surprise history
+      operationId: getEPSSurprises
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: EPS surprises
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EPSSurprises' }
+  /instruments/{symbol}/projections:
+    parameters:
+      - $ref: '#/components/parameters/symbol'
+    get:
+      tags: [Instruments]
+      summary: Analyst projections and price targets
+      operationId: getProjections
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Projections
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectionsData' }
+  /instruments/{symbol}/price:
+    parameters:
+      - $ref: '#/components/parameters/symbol'
+    get:
+      tags: [Instruments]
+      summary: Historical price for a specific date
+      operationId: getHistoricalPrice
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: date
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: exchange
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Historical price
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HistoricalPrice' }
+  /instruments/{symbol}/investor-relations:
+    parameters:
+      - $ref: '#/components/parameters/symbol'
+    get:
+      tags: [Instruments]
+      summary: Investor relations events (earnings calls, press releases)
+      operationId: getInvestorRelations
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Events
+          content:
+            application/json:
+              type: array
+              items: { $ref: '#/components/schemas/InvestorRelationEvent' }
+  /instruments/{symbol}/investor-relations/{eventId}/transcript:
+    parameters:
+      - $ref: '#/components/parameters/symbol'
+      - $ref: '#/components/parameters/eventId'
+    get:
+      tags: [Instruments]
+      summary: Transcript for an investor relations event
+      operationId: getIRTranscript
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Transcript
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IRTranscript' }
+
+  # ─── Charting ────────────────────────────────────────────────
+  /charting/presets:
+    get:
+      tags: [Charting]
+      summary: Charting presets
+      operationId: getChartingPresets
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Presets
+          content:
+            application/json:
+              type: array
+              items: { type: object }
+  /charting/compare:
+    get:
+      tags: [Charting]
+      summary: Compare fundamentals across instruments
+      operationId: compareInstruments
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: symbols
+          in: query
+          schema: { type: string }
+          description: Comma-separated symbols
+      responses:
+        '200':
+          description: Comparison rows
+          content:
+            application/json:
+              type: array
+              items: { $ref: '#/components/schemas/CompareRow' }
+  # ─── Portfolios ──────────────────────────────────────────────
+  /portfolios:
+    get:
+      tags: [Portfolios]
+      summary: List portfolios (summaries)
+      operationId: listPortfolios
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Portfolios
+          content:
+            application/json:
+              type: array
+              items: { $ref: '#/components/schemas/Portfolio' }
+    post:
+      tags: [Portfolios]
+      summary: Create portfolio
+      operationId: createPortfolio
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreatePortfolioRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Portfolio' }
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+  /portfolios/light:
+    get:
+      tags: [Portfolios]
+      summary: List portfolios (light, for selectors)
+      operationId: listPortfoliosLight
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Portfolios
+          content:
+            application/json:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  name: { type: string }
+                  currency: { type: string }
+                  totalValue: { type: number }
+                  totalInvested: { type: number }
+  /portfolios/merged:
+    get:
+      tags: [Portfolios]
+      summary: Merged (all-portfolios) data
+      operationId: getMergedPortfolios
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Merged data
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PortfolioAnalytics' }
+  /portfolios/merged/light:
+    get:
+      tags: [Portfolios]
+      summary: Merged portfolios light
+      operationId: getMergedPortfoliosLight
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Merged light
+          content:
+            application/json:
+              type: array
+              items: { type: object }
+  /portfolios/total-metrics:
+    get:
+      tags: [Portfolios]
+      summary: Aggregate portfolio metrics
+      operationId: getPortfolioTotalMetrics
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Total metrics
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PortfolioTotalMetrics' }
+  /portfolios/held-stocks:
+    get:
+      tags: [Portfolios]
+      summary: Held stocks across portfolios
+      operationId: getHeldStocks
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Held stocks
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HeldStocks' }
+  /portfolios/shares:
+    get:
+      tags: [Portfolios]
+      summary: Portfolio shares (public links)
+      operationId: getPortfolioShares
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Shares
+          content:
+            application/json:
+              type: array
+              items: { $ref: '#/components/schemas/PortfolioShare' }
+  /portfolios/transactions:
+    get:
+      tags: [Portfolios]
+      summary: All transactions across portfolios
+      operationId: getAllTransactions
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/limit'
+      responses:
+        '200':
+          description: Transactions
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageResponse' }
+  /portfolios/{id}:
+    parameters:
+      - $ref: '#/components/parameters/portfolioId'
+    get:
+      tags: [Portfolios]
+      summary: Portfolio detail
+      operationId: getPortfolio
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Portfolio
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Portfolio' }
+    patch:
+      tags: [Portfolios]
+      summary: Update portfolio
+      operationId: updatePortfolio
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreatePortfolioRequest' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Portfolio' }
+    delete:
+      tags: [Portfolios]
+      summary: Delete portfolio
+      operationId: deletePortfolio
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204':
+          description: Deleted
+  /portfolios/{id}/summary-metrics:
+    parameters:
+      - $ref: '#/components/parameters/portfolioId'
+    get:
+      tags: [Portfolios]
+      summary: Portfolio summary metrics
+      operationId: getPortfolioSummaryMetrics
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Summary metrics
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PortfolioTotalMetrics' }
+  /portfolios/{id}/analytics:
+    parameters:
+      - $ref: '#/components/parameters/portfolioId'
+    get:
+      tags: [Portfolios]
+      summary: Portfolio performance analytics
+      operationId: getPortfolioAnalytics
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/timeframe'
+        - $ref: '#/components/parameters/benchmark'
+      responses:
+        '200':
+          description: Analytics
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PortfolioAnalytics' }
+  /portfolios/{id}/positions:
+    parameters:
+      - $ref: '#/components/parameters/portfolioId'
+    get:
+      tags: [Portfolios]
+      summary: Portfolio positions
+      operationId: getPositions
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Positions
+          content:
+            application/json:
+              type: array
+              items: { $ref: '#/components/schemas/Position' }
+    post:
+      tags: [Portfolios]
+      summary: Add position
+      operationId: addPosition
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Position' }
+  /portfolios/{id}/positions/bare:
+    parameters:
+      - $ref: '#/components/parameters/portfolioId'
+    get:
+      tags: [Portfolios]
+      summary: Positions without derived fields
+      operationId: getPositionsBare
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Positions
+          content:
+            application/json:
+              type: array
+              items: { type: object }
+  /portfolios/{id}/positions/cfd-hints:
+    parameters:
+      - $ref: '#/components/parameters/portfolioId'
+    get:
+      tags: [Portfolios]
+      summary: CFD position hints
+      operationId: getPositionCfdHints
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Hints
+          content:
+            application/json:
+              type: array
+              items: { type: object }
+  /portfolios/{id}/positions/{positionId}:
+    parameters:
+      - $ref: '#/components/parameters/portfolioId'
+      - $ref: '#/components/parameters/positionId'
+    patch:
+      tags: [Portfolios]
+      summary: Update position (average cost, quantity)
+      operationId: updatePosition
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Position' }
+    delete:
+      tags: [Portfolios]
+      summary: Close / remove position
+      operationId: removePosition
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Closed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Position' }
+  /portfolios/{id}/transactions:
+    parameters:
+      - $ref: '#/components/parameters/portfolioId'
+    get:
+      tags: [Portfolios]
+      summary: Portfolio transactions
+      operationId: getPortfolioTransactions
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/limit'
+        - name: type
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Transactions
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageResponse' }
+    post:
+      tags: [Portfolios]
+      summary: Record transaction
+      operationId: createTransaction
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageResponse' }
+  /portfolios/{id}/transactions/export:
+    parameters:
+      - $ref: '#/components/parameters/portfolioId'
+    get:
+      tags: [Portfolios]
+      summary: Export transactions (CSV/PDF)
+      operationId: exportTransactions
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: format
+          in: query
+          schema: { type: string, enum: [csv, pdf] }
+      responses:
+        '200':
+          description: Transactions export
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageResponse' }
+  /portfolios/{id}/snapshot:
+    parameters:
+      - $ref: '#/components/parameters/portfolioId'
+    get:
+      tags: [Portfolios]
+      summary: Portfolio snapshot (allocation, performers)
+      operationId: getPortfolioSnapshot
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Snapshot
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PortfolioSnapshot' }
+  /portfolios/{id}/risk-metrics:
+    parameters:
+      - $ref: '#/components/parameters/portfolioId'
+    get:
+      tags: [Portfolios]
+      summary: Portfolio risk metrics
+      operationId: getPortfolioRiskMetrics
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/timeframe'
+      responses:
+        '200':
+          description: Risk metrics
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PortfolioRiskMetrics' }
+
+  # ─── Wallets ─────────────────────────────────────────────────
+  /wallets:
+    get:
+      tags: [Wallets]
+      summary: List cash wallets
+      operationId: listWallets
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Wallets
+          content:
+            application/json:
+              type: array
+              items: { $ref: '#/components/schemas/CashWallet' }
+    post:
+      tags: [Wallets]
+      summary: Create wallet
+      operationId: createWallet
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                currency: { type: string }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CashWallet' }
+  /wallets/total-balance:
+    get:
+      tags: [Wallets]
+      summary: Total wallet balance
+      operationId: getWalletsTotalBalance
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Total balance
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WalletsTotalBalance' }
+  /wallets/{id}/balance-history:
+    parameters:
+      - $ref: '#/components/parameters/walletId'
+    get:
+      tags: [Wallets]
+      summary: Wallet balance history
+      operationId: getWalletBalanceHistory
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: period
+          in: query
+          schema: { type: string }
+        - name: resolution
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Balance history
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BalanceHistory' }
+  /wallets/{id}/deposits:
+    parameters:
+      - $ref: '#/components/parameters/walletId'
+    post:
+      tags: [Wallets]
+      summary: Deposit cash
+      operationId: depositCash
+      security: [{ bearerAuth: [] }]
+      responses:
+        '201':
+          description: Deposited
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CashTransaction' }
+  /wallets/{id}/withdrawals:
+    parameters:
+      - $ref: '#/components/parameters/walletId'
+    post:
+      tags: [Wallets]
+      summary: Withdraw cash
+      operationId: withdrawCash
+      security: [{ bearerAuth: [] }]
+      responses:
+        '201':
+          description: Withdrawn
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CashTransaction' }
+  /wallets/{id}/transfers:
+    parameters:
+      - $ref: '#/components/parameters/walletId'
+    post:
+      tags: [Wallets]
+      summary: Transfer between wallets
+      operationId: transferCash
+      security: [{ bearerAuth: [] }]
+      responses:
+        '201':
+          description: Transferred
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CashTransaction' }
+  /wallets/{id}/transactions:
+    parameters:
+      - $ref: '#/components/parameters/walletId'
+    get:
+      tags: [Wallets]
+      summary: Cash transactions
+      operationId: getCashTransactions
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Transactions
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageResponse' }
+
+  # ─── Watchlists ──────────────────────────────────────────────
+  /watchlists:
+    get:
+      tags: [Watchlists]
+      summary: List watchlists
+      operationId: listWatchlists
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Watchlists
+          content:
+            application/json:
+              type: array
+              items: { $ref: '#/components/schemas/Watchlist' }
+    post:
+      tags: [Watchlists]
+      summary: Create watchlist
+      operationId: createWatchlist
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Watchlist' }
+  /watchlists/{id}:
+    parameters:
+      - $ref: '#/components/parameters/watchlistId'
+    get:
+      tags: [Watchlists]
+      summary: Watchlist detail
+      operationId: getWatchlist
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Watchlist
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Watchlist' }
+    delete:
+      tags: [Watchlists]
+      summary: Delete watchlist
+      operationId: deleteWatchlist
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204':
+          description: Deleted
+  /watchlists/{id}/items:
+    parameters:
+      - $ref: '#/components/parameters/watchlistId'
+    post:
+      tags: [Watchlists]
+      summary: Add instrument to watchlist
+      operationId: addWatchlistItem
+      security: [{ bearerAuth: [] }]
+      responses:
+        '201':
+          description: Added
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Watchlist' }
+  /watchlists/{id}/items/{symbol}:
+    parameters:
+      - $ref: '#/components/parameters/watchlistId'
+      - $ref: '#/components/parameters/symbol'
+    delete:
+      tags: [Watchlists]
+      summary: Remove instrument from watchlist
+      operationId: removeWatchlistItem
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Removed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Watchlist' }
+
+  # ─── Copilot ─────────────────────────────────────────────────
+  /conversations:
+    get:
+      tags: [Copilot]
+      summary: List conversations
+      operationId: listConversations
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Conversations
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConversationsResponse' }
+    post:
+      tags: [Copilot]
+      summary: Create conversation
+      operationId: createConversation
+      security: [{ bearerAuth: [] }]
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { type: object }
+  /chatbot/models:
+    get:
+      tags: [Copilot]
+      summary: Available chatbot models
+      operationId: getChatbotModels
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Models
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChatbotModels' }
+
+  # ─── Misc ────────────────────────────────────────────────────
+  /exchange-rates:
+    get:
+      tags: [Misc]
+      summary: Exchange rates
+      operationId: getExchangeRates
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Rates
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExchangeRates' }
+  /snaptrade/status:
+    get:
+      tags: [Misc]
+      summary: SnapTrade broker sync status
+      operationId: getSnapTradeStatus
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SnapTradeStatus' }

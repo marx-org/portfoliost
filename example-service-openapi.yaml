@@ -1,0 +1,3376 @@
+openapi: "3.0.3"
+info:
+  title: Example service.ai API
+  version: "1.0.0"
+  description: |
+    REST API for the Example service.ai AI-Powered Investment Portfolio Tracking platform.
+
+    All endpoints require authentication via Bearer token (JWT) or session cookie
+    obtained through the login or Google OAuth flow, unless otherwise noted.
+
+    **Base URL:** https://app.example-service.ai
+
+    **Notes:** API paths and schemas are inferred from UI analysis of application
+    snapshots and screenshots. Actual implementation details may vary.
+  contact:
+    name: Example service.ai
+    url: https://example-service.ai/contact
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://app.example-service.ai/api/v1
+    description: Production API
+  - url: https://app.example-service.ai/en/api
+    description: Production API (locale-prefixed variant)
+
+tags:
+  - name: Authentication
+    description: Login, logout, registration, password management
+  - name: User
+    description: User profile and account management
+  - name: Portfolios
+    description: Investment portfolio CRUD and analytics
+  - name: Positions
+    description: Portfolio position management (buy, sell, dividend, edit, remove)
+  - name: Transactions
+    description: Transaction history and management
+  - name: CashWallets
+    description: Cash wallet deposit, withdraw, transfer, and history
+  - name: Watchlists
+    description: Stock watchlist management
+  - name: Instruments
+    description: Stock/ETF/crypto research, price data, and fundamentals
+  - name: News
+    description: Market news aggregation
+  - name: Alerts
+    description: Notification alerts and settings
+  - name: Settings
+    description: User settings, billing, broker connections
+  - name: Copilot
+    description: AI Copilot chat assistant
+
+paths:
+
+  # ─────────────────────────────────────────────
+  # AUTHENTICATION
+  # ─────────────────────────────────────────────
+
+  /auth/login:
+    post:
+      tags: [Authentication]
+      summary: Login with email and password
+      operationId: loginWithEmailPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Logout current session
+      operationId: logout
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /auth/register:
+    post:
+      tags: [Authentication]
+      summary: Register a new user account
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Account created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /auth/forgot-password:
+    post:
+      tags: [Authentication]
+      summary: Request password reset email
+      operationId: forgotPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Reset email sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /auth/reset-password:
+    post:
+      tags: [Authentication]
+      summary: Reset password with token
+      operationId: resetPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '200':
+          description: Password reset successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /auth/google:
+    get:
+      tags: [Authentication]
+      summary: Initiate Google OAuth login
+      operationId: googleOAuthInitiate
+      responses:
+        '302':
+          description: Redirect to Google OAuth consent screen
+
+  # ─────────────────────────────────────────────
+  # USER / PROFILE
+  # ─────────────────────────────────────────────
+
+  /users/me:
+    get:
+      tags: [User]
+      summary: Get current user profile
+      operationId: getCurrentUser
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    patch:
+      tags: [User]
+      summary: Update user profile (first/last name)
+      operationId: updateUserProfile
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+    delete:
+      tags: [User]
+      summary: Delete user account permanently
+      operationId: deleteAccount
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '204':
+          description: Account deleted
+
+  /users/me/change-password:
+    post:
+      tags: [User]
+      summary: Change user password
+      operationId: changePassword
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '200':
+          description: Password changed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /users/me/language:
+    patch:
+      tags: [User]
+      summary: Update language preference
+      operationId: updateLanguage
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [language]
+              properties:
+                language:
+                  type: string
+                  example: en
+                  description: ISO 639-1 language code
+      responses:
+        '200':
+          description: Language updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  /users/me/data:
+    delete:
+      tags: [User]
+      summary: Clear all account data (portfolios, wallets, transactions)
+      operationId: clearAccountData
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Data cleared
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  # ─────────────────────────────────────────────
+  # PORTFOLIOS
+  # ─────────────────────────────────────────────
+
+  /portfolios:
+    get:
+      tags: [Portfolios]
+      summary: List all investment portfolios and cash wallets
+      operationId: listPortfolios
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: currency
+          in: query
+          schema:
+            type: string
+            example: USD
+          description: Display currency code
+      responses:
+        '200':
+          description: Portfolio list with summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PortfolioListResponse'
+
+    post:
+      tags: [Portfolios]
+      summary: Create a new investment portfolio
+      operationId: createPortfolio
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePortfolioRequest'
+      responses:
+        '201':
+          description: Portfolio created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Portfolio'
+
+  /portfolios/{portfolioId}:
+    parameters:
+      - $ref: '#/components/parameters/portfolioId'
+
+    get:
+      tags: [Portfolios]
+      summary: Get portfolio details with positions
+      operationId: getPortfolio
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: currency
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Portfolio detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PortfolioDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Portfolios]
+      summary: Update portfolio (rename)
+      operationId: updatePortfolio
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+      responses:
+        '200':
+          description: Portfolio updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Portfolio'
+
+    delete:
+      tags: [Portfolios]
+      summary: Delete portfolio and all its data
+      operationId: deletePortfolio
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '204':
+          description: Portfolio deleted
+
+  /portfolios/{portfolioId}/chart:
+    parameters:
+      - $ref: '#/components/parameters/portfolioId'
+    get:
+      tags: [Portfolios]
+      summary: Get portfolio value chart data
+      operationId: getPortfolioChart
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [1D, 1W, 1M, 3M, 6M, 1Y, ALL]
+            default: 1M
+        - name: currency
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Chart time-series data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChartData'
+
+  /portfolios/{portfolioId}/performance:
+    parameters:
+      - $ref: '#/components/parameters/portfolioId'
+    get:
+      tags: [Portfolios]
+      summary: Get portfolio performance metrics
+      operationId: getPortfolioPerformance
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [1D, 1W, 1M, 3M, 6M, 1Y, ALL]
+      responses:
+        '200':
+          description: Performance data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PerformanceData'
+
+  /portfolios/{portfolioId}/allocation:
+    parameters:
+      - $ref: '#/components/parameters/portfolioId'
+    get:
+      tags: [Portfolios]
+      summary: Get portfolio allocation breakdown
+      operationId: getPortfolioAllocation
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Allocation data by symbol, sector, type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AllocationData'
+
+  /portfolios/{portfolioId}/risk-analysis:
+    parameters:
+      - $ref: '#/components/parameters/portfolioId'
+    get:
+      tags: [Portfolios]
+      summary: Get portfolio risk analysis metrics
+      operationId: getPortfolioRiskAnalysis
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Risk metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskAnalysisData'
+
+  /portfolios/{portfolioId}/dividends:
+    parameters:
+      - $ref: '#/components/parameters/portfolioId'
+    get:
+      tags: [Portfolios]
+      summary: Get portfolio dividend history
+      operationId: getPortfolioDividends
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Dividend data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DividendData'
+
+  /portfolios/{portfolioId}/news:
+    parameters:
+      - $ref: '#/components/parameters/portfolioId'
+    get:
+      tags: [Portfolios]
+      summary: Get news relevant to portfolio holdings
+      operationId: getPortfolioNews
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/perPage'
+      responses:
+        '200':
+          description: News articles
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewsListResponse'
+
+  /portfolios/{portfolioId}/compare:
+    parameters:
+      - $ref: '#/components/parameters/portfolioId'
+    get:
+      tags: [Portfolios]
+      summary: Compare portfolio against benchmarks
+      operationId: getPortfolioCompare
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Comparison data
+
+  /portfolios/{portfolioId}/calendar:
+    parameters:
+      - $ref: '#/components/parameters/portfolioId'
+    get:
+      tags: [Portfolios]
+      summary: Get investor calendar events for portfolio (Premium)
+      operationId: getPortfolioCalendar
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Calendar events
+        '402':
+          description: Premium feature — upgrade required
+
+  /portfolios/{portfolioId}/share:
+    parameters:
+      - $ref: '#/components/parameters/portfolioId'
+    post:
+      tags: [Portfolios]
+      summary: Generate shareable portfolio link
+      operationId: sharePortfolio
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Share URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  share_url:
+                    type: string
+                    format: uri
+                  expires_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+
+  /portfolios/{portfolioId}/positions/export:
+    parameters:
+      - $ref: '#/components/parameters/portfolioId'
+    get:
+      tags: [Portfolios]
+      summary: Export positions as CSV or Excel
+      operationId: exportPositions
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [csv, xlsx]
+            default: csv
+      responses:
+        '200':
+          description: File download
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+
+  /portfolios/{portfolioId}/ai-insights:
+    parameters:
+      - $ref: '#/components/parameters/portfolioId'
+    get:
+      tags: [Portfolios]
+      summary: Get AI portfolio insights (Premium)
+      operationId: getPortfolioAIInsights
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: AI insights about portfolio performance drivers
+        '402':
+          description: Premium feature — upgrade required
+
+  # ─────────────────────────────────────────────
+  # POSITIONS
+  # ─────────────────────────────────────────────
+
+  /portfolios/{portfolioId}/positions:
+    parameters:
+      - $ref: '#/components/parameters/portfolioId'
+
+    get:
+      tags: [Positions]
+      summary: List all positions in a portfolio
+      operationId: listPositions
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Position list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PositionListResponse'
+
+    post:
+      tags: [Positions]
+      summary: Add a new position (buy transaction)
+      operationId: addPosition
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddPositionRequest'
+      responses:
+        '201':
+          description: Position created / updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AddPositionResponse'
+
+  /portfolios/{portfolioId}/positions/{positionId}:
+    parameters:
+      - $ref: '#/components/parameters/portfolioId'
+      - $ref: '#/components/parameters/positionId'
+
+    patch:
+      tags: [Positions]
+      summary: Edit position transactions inline
+      operationId: editPosition
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EditPositionRequest'
+      responses:
+        '200':
+          description: Position updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Position'
+
+    delete:
+      tags: [Positions]
+      summary: Remove position and all its transactions
+      operationId: removePosition
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '204':
+          description: Position removed
+
+  /portfolios/{portfolioId}/positions/{positionId}/sell:
+    parameters:
+      - $ref: '#/components/parameters/portfolioId'
+      - $ref: '#/components/parameters/positionId'
+
+    post:
+      tags: [Positions]
+      summary: Sell (partial or full) position
+      operationId: sellPosition
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SellPositionRequest'
+      responses:
+        '200':
+          description: Sell transaction recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SellPositionResponse'
+
+  /portfolios/{portfolioId}/positions/{positionId}/dividends:
+    parameters:
+      - $ref: '#/components/parameters/portfolioId'
+      - $ref: '#/components/parameters/positionId'
+
+    post:
+      tags: [Positions]
+      summary: Record dividend payment for position
+      operationId: recordDividend
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordDividendRequest'
+      responses:
+        '201':
+          description: Dividend recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DividendRecord'
+
+  # ─────────────────────────────────────────────
+  # TRANSACTIONS
+  # ─────────────────────────────────────────────
+
+  /investments/transactions:
+    get:
+      tags: [Transactions]
+      summary: List all transactions across all portfolios
+      operationId: listAllTransactions
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/dateFrom'
+        - $ref: '#/components/parameters/dateTo'
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [Buy, Sell, Dividend]
+        - name: symbol
+          in: query
+          schema:
+            type: string
+        - name: amount_min
+          in: query
+          schema:
+            type: number
+        - name: amount_max
+          in: query
+          schema:
+            type: number
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/perPage'
+        - $ref: '#/components/parameters/sortBy'
+        - $ref: '#/components/parameters/sortDir'
+      responses:
+        '200':
+          description: Transaction list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionListResponse'
+
+  /portfolios/{portfolioId}/transactions:
+    parameters:
+      - $ref: '#/components/parameters/portfolioId'
+
+    get:
+      tags: [Transactions]
+      summary: List transactions for a specific portfolio
+      operationId: listPortfolioTransactions
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/dateFrom'
+        - $ref: '#/components/parameters/dateTo'
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [Buy, Sell, Dividend]
+        - name: symbol
+          in: query
+          schema:
+            type: string
+        - name: amount_min
+          in: query
+          schema:
+            type: number
+        - name: amount_max
+          in: query
+          schema:
+            type: number
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/perPage'
+        - $ref: '#/components/parameters/sortBy'
+        - $ref: '#/components/parameters/sortDir'
+      responses:
+        '200':
+          description: Transaction list with summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionListResponse'
+
+  /portfolios/{portfolioId}/transactions/export:
+    parameters:
+      - $ref: '#/components/parameters/portfolioId'
+    get:
+      tags: [Transactions]
+      summary: Export transactions as CSV or Excel
+      operationId: exportTransactions
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [csv, xlsx]
+      responses:
+        '200':
+          description: File download
+
+  /portfolios/{portfolioId}/transactions/{transactionId}:
+    parameters:
+      - $ref: '#/components/parameters/portfolioId'
+      - $ref: '#/components/parameters/transactionId'
+
+    put:
+      tags: [Transactions]
+      summary: Edit a transaction
+      operationId: editTransaction
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EditTransactionRequest'
+      responses:
+        '200':
+          description: Transaction updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+
+    delete:
+      tags: [Transactions]
+      summary: Delete a transaction permanently
+      operationId: deleteTransaction
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '204':
+          description: Transaction deleted
+
+  # ─────────────────────────────────────────────
+  # CASH WALLETS
+  # ─────────────────────────────────────────────
+
+  /wallets:
+    get:
+      tags: [CashWallets]
+      summary: List all cash wallets
+      operationId: listWallets
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Wallet list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WalletListResponse'
+
+    post:
+      tags: [CashWallets]
+      summary: Create a new cash wallet
+      operationId: createWallet
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWalletRequest'
+      responses:
+        '201':
+          description: Wallet created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CashWallet'
+
+  /wallets/{walletId}:
+    parameters:
+      - $ref: '#/components/parameters/walletId'
+
+    get:
+      tags: [CashWallets]
+      summary: Get wallet details and chart data
+      operationId: getWallet
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [1D, 1W, 1M, 3M, 6M, 1Y, ALL]
+      responses:
+        '200':
+          description: Wallet detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CashWallet'
+
+    patch:
+      tags: [CashWallets]
+      summary: Update wallet (rename)
+      operationId: updateWallet
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+      responses:
+        '200':
+          description: Wallet updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CashWallet'
+
+    delete:
+      tags: [CashWallets]
+      summary: Delete cash wallet
+      operationId: deleteWallet
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '204':
+          description: Wallet deleted
+
+  /wallets/{walletId}/deposit:
+    parameters:
+      - $ref: '#/components/parameters/walletId'
+    post:
+      tags: [CashWallets]
+      summary: Deposit funds into wallet
+      operationId: depositFunds
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DepositRequest'
+      responses:
+        '201':
+          description: Deposit recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CashTransaction'
+
+  /wallets/{walletId}/withdraw:
+    parameters:
+      - $ref: '#/components/parameters/walletId'
+    post:
+      tags: [CashWallets]
+      summary: Withdraw funds from wallet
+      operationId: withdrawFunds
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WithdrawRequest'
+      responses:
+        '201':
+          description: Withdrawal recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CashTransaction'
+
+  /wallets/{walletId}/transfer:
+    parameters:
+      - $ref: '#/components/parameters/walletId'
+    post:
+      tags: [CashWallets]
+      summary: Transfer funds between wallets
+      operationId: transferFunds
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferRequest'
+      responses:
+        '201':
+          description: Transfer recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CashTransaction'
+
+  /wallets/{walletId}/history:
+    parameters:
+      - $ref: '#/components/parameters/walletId'
+    get:
+      tags: [CashWallets]
+      summary: Get wallet transaction history
+      operationId: getWalletHistory
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/perPage'
+        - $ref: '#/components/parameters/dateFrom'
+        - $ref: '#/components/parameters/dateTo'
+      responses:
+        '200':
+          description: Cash transaction history
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CashTransactionListResponse'
+
+  # ─────────────────────────────────────────────
+  # WATCHLISTS
+  # ─────────────────────────────────────────────
+
+  /watchlists:
+    get:
+      tags: [Watchlists]
+      summary: List all watchlists
+      operationId: listWatchlists
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Watchlist list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WatchlistListResponse'
+
+    post:
+      tags: [Watchlists]
+      summary: Create a new watchlist
+      operationId: createWatchlist
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+      responses:
+        '201':
+          description: Watchlist created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Watchlist'
+
+  /watchlists/{watchlistId}:
+    parameters:
+      - $ref: '#/components/parameters/watchlistId'
+
+    get:
+      tags: [Watchlists]
+      summary: Get watchlist details with items
+      operationId: getWatchlist
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Watchlist with items
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WatchlistDetail'
+
+    delete:
+      tags: [Watchlists]
+      summary: Delete watchlist
+      operationId: deleteWatchlist
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '204':
+          description: Watchlist deleted
+
+  /watchlists/{watchlistId}/items:
+    parameters:
+      - $ref: '#/components/parameters/watchlistId'
+    post:
+      tags: [Watchlists]
+      summary: Add instrument to watchlist
+      operationId: addToWatchlist
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [symbol]
+              properties:
+                symbol:
+                  type: string
+                  example: AAPL
+      responses:
+        '201':
+          description: Item added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WatchlistItem'
+
+  /watchlists/{watchlistId}/items/{itemId}:
+    parameters:
+      - $ref: '#/components/parameters/watchlistId'
+      - name: itemId
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      tags: [Watchlists]
+      summary: Remove instrument from watchlist
+      operationId: removeFromWatchlist
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '204':
+          description: Item removed
+
+  # ─────────────────────────────────────────────
+  # INSTRUMENTS / RESEARCH
+  # ─────────────────────────────────────────────
+
+  /instruments/search:
+    get:
+      tags: [Instruments]
+      summary: Search for instruments by ticker, name, or ISIN
+      operationId: searchInstruments
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query — ticker symbol, company name, or ISIN
+        - name: types
+          in: query
+          schema:
+            type: string
+          description: Comma-separated instrument types (Stock, ETF, Crypto, Index)
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstrumentSearchResponse'
+
+  /instruments/{symbol}/overview:
+    parameters:
+      - $ref: '#/components/parameters/symbol'
+    get:
+      tags: [Instruments]
+      summary: Get instrument overview (company profile, statistics)
+      operationId: getInstrumentOverview
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Instrument overview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstrumentOverview'
+
+  /instruments/{symbol}/chart:
+    parameters:
+      - $ref: '#/components/parameters/symbol'
+    get:
+      tags: [Instruments]
+      summary: Get instrument price chart data
+      operationId: getInstrumentChart
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [1D, 5D, 1M, 3M, 6M, YTD, 1Y, 3Y, 5Y, 10Y, MAX]
+            default: 1Y
+        - name: mode
+          in: query
+          schema:
+            type: string
+            enum: [price, pct, drawdowns]
+            default: price
+        - name: compare
+          in: query
+          schema:
+            type: string
+          description: Comma-separated symbols to overlay
+      responses:
+        '200':
+          description: Chart time-series data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstrumentChartData'
+
+  /instruments/{symbol}/seasonality:
+    parameters:
+      - $ref: '#/components/parameters/symbol'
+    get:
+      tags: [Instruments]
+      summary: Get monthly seasonality returns
+      operationId: getInstrumentSeasonality
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: years
+          in: query
+          schema:
+            type: integer
+            enum: [3, 5, 10, 20]
+            default: 5
+        - name: metric
+          in: query
+          schema:
+            type: string
+            enum: [avg, median, min, max]
+            default: avg
+      responses:
+        '200':
+          description: Monthly seasonality data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeasonalityData'
+
+  /instruments/{symbol}/eps-surprises:
+    parameters:
+      - $ref: '#/components/parameters/symbol'
+    get:
+      tags: [Instruments]
+      summary: Get EPS surprise history
+      operationId: getEPSSurprises
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: quarters
+          in: query
+          schema:
+            type: integer
+            default: 5
+      responses:
+        '200':
+          description: EPS surprise data per quarter
+
+  /instruments/{symbol}/news:
+    parameters:
+      - $ref: '#/components/parameters/symbol'
+    get:
+      tags: [Instruments]
+      summary: Get news for a specific instrument
+      operationId: getInstrumentNews
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/perPage'
+      responses:
+        '200':
+          description: News list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewsListResponse'
+
+  /instruments/{symbol}/price:
+    parameters:
+      - $ref: '#/components/parameters/symbol'
+    get:
+      tags: [Instruments]
+      summary: Get historical price for instrument on a specific date
+      operationId: getHistoricalPrice
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: exchange
+          in: query
+          schema:
+            type: string
+            example: US
+      responses:
+        '200':
+          description: Historical price
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistoricalPrice'
+
+  /instruments/{symbol}/fundamentals:
+    parameters:
+      - $ref: '#/components/parameters/symbol'
+    get:
+      tags: [Instruments]
+      summary: Get instrument fundamentals (Premium)
+      operationId: getInstrumentFundamentals
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Fundamentals data
+        '402':
+          description: Premium feature — upgrade required
+
+  /instruments/{symbol}/investor-relations:
+    parameters:
+      - $ref: '#/components/parameters/symbol'
+    get:
+      tags: [Instruments]
+      summary: Get investor relations documents
+      operationId: getInvestorRelations
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Investor relations content
+
+  /instruments/{symbol}/projections:
+    parameters:
+      - $ref: '#/components/parameters/symbol'
+    get:
+      tags: [Instruments]
+      summary: Get analyst projections and price targets
+      operationId: getInstrumentProjections
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Projection data
+
+  /instruments/{symbol}/ownership:
+    parameters:
+      - $ref: '#/components/parameters/symbol'
+    get:
+      tags: [Instruments]
+      summary: Get ownership data (Premium)
+      operationId: getInstrumentOwnership
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Ownership data
+        '402':
+          description: Premium feature
+
+  /instruments/{symbol}/dividends:
+    parameters:
+      - $ref: '#/components/parameters/symbol'
+    get:
+      tags: [Instruments]
+      summary: Get stock dividend history (Premium)
+      operationId: getInstrumentDividends
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Dividend history
+        '402':
+          description: Premium feature
+
+  /instruments/{symbol}/chart/download:
+    parameters:
+      - $ref: '#/components/parameters/symbol'
+    get:
+      tags: [Instruments]
+      summary: Download chart data
+      operationId: downloadChartData
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [csv, png]
+        - name: period
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: File download
+
+  /charting/compare:
+    get:
+      tags: [Instruments]
+      summary: Compare fundamentals across multiple stocks
+      operationId: compareInstruments
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: symbols
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Comma-separated symbols (max 10)
+        - name: metrics
+          in: query
+          schema:
+            type: string
+          description: Comma-separated metric keys
+      responses:
+        '200':
+          description: Comparative fundamentals data
+
+  # ─────────────────────────────────────────────
+  # NEWS
+  # ─────────────────────────────────────────────
+
+  /news:
+    get:
+      tags: [News]
+      summary: Get global news dashboard
+      operationId: getNewsDashboard
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/perPage'
+        - name: tickers
+          in: query
+          schema:
+            type: string
+          description: Comma-separated ticker filter
+        - name: importance
+          in: query
+          schema:
+            type: string
+            enum: [watch, important, urgent]
+      responses:
+        '200':
+          description: News feed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewsListResponse'
+
+  # ─────────────────────────────────────────────
+  # ALERTS / NOTIFICATIONS
+  # ─────────────────────────────────────────────
+
+  /alerts:
+    get:
+      tags: [Alerts]
+      summary: Get alerts inbox
+      operationId: getAlertsInbox
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: unread_only
+          in: query
+          schema:
+            type: boolean
+        - $ref: '#/components/parameters/page'
+      responses:
+        '200':
+          description: Alert notifications
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertListResponse'
+
+  /alerts/mark-all-read:
+    post:
+      tags: [Alerts]
+      summary: Mark all alerts as read
+      operationId: markAllAlertsRead
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: All alerts marked as read
+
+  /alerts/{alertId}/read:
+    parameters:
+      - name: alertId
+        in: path
+        required: true
+        schema:
+          type: string
+    patch:
+      tags: [Alerts]
+      summary: Mark single alert as read
+      operationId: markAlertRead
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Alert marked as read
+
+  /settings/alerts:
+    get:
+      tags: [Alerts]
+      summary: Get alert settings
+      operationId: getAlertSettings
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Alert configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertSettings'
+
+    patch:
+      tags: [Alerts]
+      summary: Update alert settings
+      operationId: updateAlertSettings
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertSettings'
+      responses:
+        '200':
+          description: Alert settings updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertSettings'
+
+  /settings/alerts/tickers:
+    post:
+      tags: [Alerts]
+      summary: Add ticker to alert tracking
+      operationId: addAlertTicker
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [symbol]
+              properties:
+                symbol:
+                  type: string
+      responses:
+        '201':
+          description: Ticker added
+
+  /settings/alerts/tickers/{symbol}:
+    parameters:
+      - name: symbol
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      tags: [Alerts]
+      summary: Remove ticker from alert tracking
+      operationId: removeAlertTicker
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '204':
+          description: Ticker removed
+
+  # ─────────────────────────────────────────────
+  # SETTINGS
+  # ─────────────────────────────────────────────
+
+  /settings/shared-portfolios:
+    get:
+      tags: [Settings]
+      summary: Get shared portfolio links
+      operationId: getSharedPortfolios
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Shared portfolios list
+
+  /settings/broker-connections:
+    get:
+      tags: [Settings]
+      summary: Get broker connections
+      operationId: getBrokerConnections
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Broker connections list
+
+  /settings/billing:
+    get:
+      tags: [Settings]
+      summary: Get billing and subscription info
+      operationId: getBillingInfo
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Billing information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingInfo'
+
+  /broker/import:
+    post:
+      tags: [Settings]
+      summary: Import portfolio from broker
+      operationId: importFromBroker
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BrokerImportRequest'
+      responses:
+        '202':
+          description: Import initiated
+
+  /feedback/bug-report:
+    post:
+      tags: [Settings]
+      summary: Submit bug report
+      operationId: submitBugReport
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BugReportRequest'
+      responses:
+        '201':
+          description: Bug report submitted
+
+  # ─────────────────────────────────────────────
+  # COPILOT (AI)
+  # ─────────────────────────────────────────────
+
+  /copilot/session:
+    post:
+      tags: [Copilot]
+      summary: Open a new AI Copilot session
+      operationId: openCopilotSession
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                context:
+                  type: object
+                  properties:
+                    current_page:
+                      type: string
+                    portfolio_id:
+                      type: string
+      responses:
+        '201':
+          description: Copilot session created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session_id:
+                    type: string
+
+  /copilot/session/{sessionId}/messages:
+    parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [Copilot]
+      summary: Send message to AI Copilot
+      operationId: sendCopilotMessage
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message:
+                  type: string
+      responses:
+        '200':
+          description: AI response (may be streamed)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  session_id:
+                    type: string
+
+# ─────────────────────────────────────────────
+# COMPONENTS
+# ─────────────────────────────────────────────
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained via /auth/login
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: example-service_session
+      description: Session cookie set after login
+
+  parameters:
+    portfolioId:
+      name: portfolioId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Portfolio UUID
+      example: 3cb589d8-f92d-428f-aeab-9ee5d4b9cef2
+
+    positionId:
+      name: positionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Position UUID
+
+    transactionId:
+      name: transactionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Transaction UUID
+
+    walletId:
+      name: walletId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Cash wallet UUID
+
+    watchlistId:
+      name: watchlistId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Watchlist UUID
+
+    symbol:
+      name: symbol
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Instrument symbol with optional exchange suffix (e.g., AAPL.US)
+      example: AAPL.US
+
+    page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 1
+        minimum: 1
+
+    perPage:
+      name: per_page
+      in: query
+      schema:
+        type: integer
+        default: 10
+        enum: [10, 20, 50, 100]
+
+    dateFrom:
+      name: date_from
+      in: query
+      schema:
+        type: string
+        format: date
+
+    dateTo:
+      name: date_to
+      in: query
+      schema:
+        type: string
+        format: date
+
+    sortBy:
+      name: sort_by
+      in: query
+      schema:
+        type: string
+
+    sortDir:
+      name: sort_dir
+      in: query
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: desc
+
+  responses:
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationErrorResponse'
+
+  schemas:
+
+    # ─── Auth ───────────────────────────────────
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+        remember_me:
+          type: boolean
+          default: false
+
+    RegisterRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+          minLength: 8
+        first_name:
+          type: string
+        last_name:
+          type: string
+
+    ResetPasswordRequest:
+      type: object
+      required: [token, password, password_confirmation]
+      properties:
+        token:
+          type: string
+        password:
+          type: string
+          format: password
+          minLength: 8
+        password_confirmation:
+          type: string
+          format: password
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+        redirect_url:
+          type: string
+
+    # ─── User ───────────────────────────────────
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        first_name:
+          type: string
+          nullable: true
+        last_name:
+          type: string
+          nullable: true
+        language:
+          type: string
+          example: en
+        plan:
+          type: string
+          enum: [free, premium]
+          default: free
+        created_at:
+          type: string
+          format: date-time
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        first_name:
+          type: string
+        last_name:
+          type: string
+
+    ChangePasswordRequest:
+      type: object
+      required: [new_password, confirm_password]
+      properties:
+        new_password:
+          type: string
+          format: password
+          minLength: 8
+          description: Must contain uppercase, lowercase, and a number
+        confirm_password:
+          type: string
+          format: password
+
+    # ─── Portfolio ──────────────────────────────
+
+    Portfolio:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: Top10
+        strategy:
+          type: string
+          example: Growth
+        description:
+          type: string
+          nullable: true
+        currency:
+          type: string
+          example: USD
+        total_value:
+          type: number
+          format: float
+          example: 109916.76
+        total_invested:
+          type: number
+          format: float
+          example: 98083.40
+        total_return_pct:
+          type: number
+          format: float
+          example: 12.06
+        unrealized_gain:
+          type: number
+          format: float
+          example: 11833.36
+        realized_gain:
+          type: number
+          format: float
+          example: 0.00
+        income:
+          type: number
+          format: float
+          example: 0.00
+        daily_change:
+          type: number
+          format: float
+          example: 3576.36
+        daily_change_pct:
+          type: number
+          format: float
+          example: 3.36
+        position_count:
+          type: integer
+          example: 10
+        created_at:
+          type: string
+          format: date-time
+
+    PortfolioDetail:
+      allOf:
+        - $ref: '#/components/schemas/Portfolio'
+        - type: object
+          properties:
+            positions:
+              type: array
+              items:
+                $ref: '#/components/schemas/Position'
+
+    CreatePortfolioRequest:
+      type: object
+      required: [name, currency]
+      properties:
+        name:
+          type: string
+        strategy:
+          type: string
+        description:
+          type: string
+        currency:
+          type: string
+          example: USD
+
+    PortfolioListResponse:
+      type: object
+      properties:
+        investment_portfolios:
+          type: array
+          items:
+            $ref: '#/components/schemas/Portfolio'
+        cash_wallets:
+          type: array
+          items:
+            $ref: '#/components/schemas/CashWallet'
+        summary:
+          type: object
+          properties:
+            total_investment_value:
+              type: number
+            total_invested:
+              type: number
+            total_return_pct:
+              type: number
+            total_cash_balance:
+              type: number
+            display_currency:
+              type: string
+
+    ChartData:
+      type: object
+      properties:
+        portfolio_id:
+          type: string
+          format: uuid
+        period:
+          type: string
+        data_points:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              value:
+                type: number
+              return_pct:
+                type: number
+
+    PerformanceData:
+      type: object
+      properties:
+        portfolio_id:
+          type: string
+          format: uuid
+        period:
+          type: string
+        data_points:
+          type: array
+          items:
+            type: object
+        metrics:
+          type: object
+          additionalProperties: true
+
+    AllocationData:
+      type: object
+      properties:
+        by_symbol:
+          type: array
+          items:
+            type: object
+            properties:
+              symbol:
+                type: string
+              weight_pct:
+                type: number
+              value:
+                type: number
+        by_sector:
+          type: array
+          items:
+            type: object
+        by_asset_type:
+          type: array
+          items:
+            type: object
+
+    RiskAnalysisData:
+      type: object
+      properties:
+        volatility:
+          type: number
+        sharpe_ratio:
+          type: number
+        beta:
+          type: number
+        max_drawdown:
+          type: number
+        var_95:
+          type: number
+
+    DividendData:
+      type: object
+      properties:
+        total_received:
+          type: number
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/DividendRecord'
+
+    # ─── Position ───────────────────────────────
+
+    Position:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        portfolio_id:
+          type: string
+          format: uuid
+        instrument:
+          $ref: '#/components/schemas/InstrumentReference'
+        quantity:
+          type: number
+          example: 15
+        avg_cost:
+          type: number
+          format: float
+          example: 505.97
+        current_price:
+          type: number
+          format: float
+          example: 539.14
+        market_value:
+          type: number
+          format: float
+          example: 8087.10
+        total_cost:
+          type: number
+          format: float
+          example: 7589.48
+        gain_loss:
+          type: number
+          format: float
+          example: 497.63
+        gain_loss_pct:
+          type: number
+          format: float
+          example: 6.56
+        weight_pct:
+          type: number
+          format: float
+          example: 7.36
+        linked_wallet_id:
+          type: string
+          format: uuid
+          nullable: true
+
+    PositionListResponse:
+      type: object
+      properties:
+        positions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Position'
+        total_gain_loss:
+          type: number
+        total_gain_loss_pct:
+          type: number
+        total_market_value:
+          type: number
+
+    AddPositionRequest:
+      type: object
+      required: [symbol, transaction_type, quantity, price_per_share, transaction_date]
+      properties:
+        instrument_id:
+          type: string
+          format: uuid
+        symbol:
+          type: string
+          example: AAPL
+        type:
+          type: string
+          enum: [Stock, ETF, Crypto, Option, CFD]
+          default: Stock
+        transaction_type:
+          type: string
+          enum: [Buy]
+          default: Buy
+        quantity:
+          type: number
+          minimum: 0
+        price_per_share:
+          type: number
+          format: float
+        transaction_date:
+          type: string
+          format: date
+        fees:
+          type: number
+          default: 0
+        fees_type:
+          type: string
+          enum: [fixed, pct]
+          default: fixed
+        currency:
+          type: string
+          example: USD
+        exchange_rate:
+          type: number
+          nullable: true
+        wallet_id:
+          type: string
+          format: uuid
+          nullable: true
+        notes:
+          type: string
+
+    AddPositionResponse:
+      type: object
+      properties:
+        position:
+          $ref: '#/components/schemas/Position'
+        transaction:
+          $ref: '#/components/schemas/Transaction'
+
+    EditPositionRequest:
+      type: object
+      properties:
+        transactions:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              date:
+                type: string
+                format: date
+              type:
+                type: string
+                enum: [Buy, Sell]
+              quantity:
+                type: number
+              price_per_share:
+                type: number
+              fees:
+                type: number
+              currency:
+                type: string
+
+    SellPositionRequest:
+      type: object
+      required: [quantity, sell_date, sell_price]
+      properties:
+        quantity:
+          type: number
+          minimum: 1
+        sell_date:
+          type: string
+          format: date
+        sell_price:
+          type: number
+          format: float
+        tax_lot_method:
+          type: string
+          enum: [FIFO, LIFO, specific]
+          default: FIFO
+        fees:
+          type: number
+          default: 0
+        fees_type:
+          type: string
+          enum: [fixed, pct]
+          default: fixed
+        wallet_id:
+          type: string
+          format: uuid
+          nullable: true
+
+    SellPositionResponse:
+      type: object
+      properties:
+        transaction:
+          $ref: '#/components/schemas/Transaction'
+        position:
+          $ref: '#/components/schemas/Position'
+
+    RecordDividendRequest:
+      type: object
+      required: [gross_amount, date_received]
+      properties:
+        entry_mode:
+          type: string
+          enum: [total, per_share]
+          default: total
+        gross_amount:
+          type: number
+          format: float
+          minimum: 0
+        withholding_tax:
+          type: number
+          format: float
+          default: 0
+        date_received:
+          type: string
+          format: date
+        wallet_id:
+          type: string
+          format: uuid
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+          example: "Q4 2024 dividend"
+
+    DividendRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        position_id:
+          type: string
+          format: uuid
+        gross_amount:
+          type: number
+        withholding_tax:
+          type: number
+        net_amount:
+          type: number
+        date_received:
+          type: string
+          format: date
+        notes:
+          type: string
+          nullable: true
+
+    # ─── Transaction ────────────────────────────
+
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        portfolio_id:
+          type: string
+          format: uuid
+        position_id:
+          type: string
+          format: uuid
+        instrument:
+          $ref: '#/components/schemas/InstrumentReference'
+        date:
+          type: string
+          format: date-time
+        type:
+          type: string
+          enum: [Buy, Sell, Dividend]
+        quantity:
+          type: number
+        price:
+          type: number
+          format: float
+        instrument_currency:
+          type: string
+        fees:
+          type: number
+          default: 0
+        exchange_rate:
+          type: number
+          nullable: true
+        total_cost:
+          type: number
+        amount:
+          type: number
+          description: Negative = cash out, positive = cash in
+        pnl:
+          type: number
+          nullable: true
+        wallet_id:
+          type: string
+          format: uuid
+          nullable: true
+
+    TransactionListResponse:
+      type: object
+      properties:
+        transactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Transaction'
+        summary:
+          type: object
+          properties:
+            total_bought:
+              type: number
+            total_bought_count:
+              type: integer
+            total_sold:
+              type: number
+            total_sold_count:
+              type: integer
+            dividends:
+              type: number
+            dividends_count:
+              type: integer
+            realized_gain_loss:
+              type: number
+            total_fees:
+              type: number
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    EditTransactionRequest:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        quantity:
+          type: number
+        price_per_share:
+          type: number
+        fees:
+          type: number
+        fees_type:
+          type: string
+          enum: [fixed, pct]
+        wallet_id:
+          type: string
+          format: uuid
+          nullable: true
+
+    # ─── Cash Wallet ────────────────────────────
+
+    CashWallet:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: "Portfel USD 1"
+        currency:
+          type: string
+          example: USD
+        balance:
+          type: number
+          format: float
+          example: 1916.60
+        available_balance:
+          type: number
+          format: float
+          example: 1916.60
+        linked_portfolio_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        created_at:
+          type: string
+          format: date-time
+
+    CreateWalletRequest:
+      type: object
+      required: [name, currency]
+      properties:
+        name:
+          type: string
+        currency:
+          type: string
+          example: USD
+
+    WalletListResponse:
+      type: object
+      properties:
+        wallets:
+          type: array
+          items:
+            $ref: '#/components/schemas/CashWallet'
+        summary:
+          type: object
+          properties:
+            total_balance:
+              type: number
+            by_currency:
+              type: array
+              items:
+                type: object
+                properties:
+                  currency:
+                    type: string
+                  balance:
+                    type: number
+                  pct:
+                    type: number
+
+    DepositRequest:
+      type: object
+      required: [amount, transaction_date]
+      properties:
+        amount:
+          type: number
+          format: float
+          minimum: 0.01
+        currency:
+          type: string
+          example: USD
+        description:
+          type: string
+          nullable: true
+          example: "Monthly savings"
+        transaction_date:
+          type: string
+          format: date
+
+    WithdrawRequest:
+      type: object
+      required: [amount, transaction_date]
+      properties:
+        amount:
+          type: number
+          format: float
+          minimum: 0.01
+        currency:
+          type: string
+          example: USD
+        transaction_date:
+          type: string
+          format: date
+        description:
+          type: string
+          nullable: true
+          example: "Bill payment"
+        payment_method:
+          type: string
+          nullable: true
+          example: bank_transfer
+
+    TransferRequest:
+      type: object
+      required: [from_wallet_id, to_wallet_id, amount, transfer_date]
+      properties:
+        from_wallet_id:
+          type: string
+          format: uuid
+        to_wallet_id:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          format: float
+          minimum: 0.01
+        transfer_date:
+          type: string
+          format: date
+        fees:
+          type: number
+          default: 0
+        fees_type:
+          type: string
+          enum: [fixed, pct]
+          default: fixed
+
+    CashTransaction:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        wallet_id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [Deposit, Withdrawal, Transfer]
+        amount:
+          type: number
+        currency:
+          type: string
+        transaction_date:
+          type: string
+          format: date
+        description:
+          type: string
+          nullable: true
+        payment_method:
+          type: string
+          nullable: true
+        from_wallet_id:
+          type: string
+          format: uuid
+          nullable: true
+        to_wallet_id:
+          type: string
+          format: uuid
+          nullable: true
+        fees:
+          type: number
+          default: 0
+        new_balance:
+          type: number
+        remaining_balance:
+          type: number
+
+    CashTransactionListResponse:
+      type: object
+      properties:
+        transactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/CashTransaction'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    # ─── Watchlist ──────────────────────────────
+
+    Watchlist:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        item_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    WatchlistDetail:
+      allOf:
+        - $ref: '#/components/schemas/Watchlist'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/WatchlistItem'
+
+    WatchlistItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        watchlist_id:
+          type: string
+          format: uuid
+        instrument:
+          $ref: '#/components/schemas/InstrumentReference'
+        added_at:
+          type: string
+          format: date-time
+
+    WatchlistListResponse:
+      type: object
+      properties:
+        watchlists:
+          type: array
+          items:
+            $ref: '#/components/schemas/Watchlist'
+
+    # ─── Instrument ─────────────────────────────
+
+    InstrumentReference:
+      type: object
+      properties:
+        symbol:
+          type: string
+          example: AMAT
+        isin:
+          type: string
+          example: US0382221051
+        name:
+          type: string
+          example: Applied Materials Inc
+        type:
+          type: string
+          enum: [Stock, ETF, Crypto, Option, CFD, Index]
+        exchange:
+          type: string
+          example: US
+        currency:
+          type: string
+          example: USD
+        logo_url:
+          type: string
+          format: uri
+          nullable: true
+
+    InstrumentSearchResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            allOf:
+              - $ref: '#/components/schemas/InstrumentReference'
+              - type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  current_price:
+                    type: number
+
+    InstrumentOverview:
+      type: object
+      properties:
+        symbol:
+          type: string
+        exchange:
+          type: string
+        name:
+          type: string
+        isin:
+          type: string
+        logo_url:
+          type: string
+          format: uri
+          nullable: true
+        current_price:
+          type: number
+        description:
+          type: string
+        profile:
+          type: object
+          properties:
+            ceo:
+              type: string
+              nullable: true
+            sector:
+              type: string
+            year_founded:
+              type: integer
+              nullable: true
+            employees:
+              type: integer
+              nullable: true
+            website:
+              type: string
+              format: uri
+              nullable: true
+        statistics:
+          type: object
+          properties:
+            market_cap:
+              type: number
+            enterprise_value:
+              type: number
+            shares_outstanding:
+              type: number
+            revenue_ttm:
+              type: number
+            margins:
+              type: object
+              properties:
+                gross:
+                  type: number
+                ebitda:
+                  type: number
+                operating:
+                  type: number
+                pre_tax:
+                  type: number
+                net:
+                  type: number
+                fcf:
+                  type: number
+            returns_ttm:
+              type: object
+              properties:
+                roa:
+                  type: number
+                rota:
+                  type: number
+                roe:
+                  type: number
+            valuation_ttm:
+              type: object
+              properties:
+                pe:
+                  type: number
+                pb:
+                  type: number
+                ev_sales:
+                  type: number
+                ev_ebitda:
+                  type: number
+                p_fcf:
+                  type: number
+                ev_gross_profit:
+                  type: number
+            valuation_ntm:
+              type: object
+              properties:
+                price_target:
+                  type: number
+                pe:
+                  type: number
+                peg:
+                  type: number
+                ev_sales:
+                  type: number
+                ev_ebitda:
+                  type: number
+            financial_health:
+              type: object
+              properties:
+                cash:
+                  type: number
+                net_debt:
+                  type: number
+            growth_cagr:
+              type: object
+              additionalProperties:
+                type: number
+            dividends:
+              type: object
+              properties:
+                yield_pct:
+                  type: number
+                payout_pct:
+                  type: number
+                dps:
+                  type: number
+                dps_growth_3yr:
+                  type: number
+                dps_growth_5yr:
+                  type: number
+        latest_earnings_call:
+          type: object
+          nullable: true
+          properties:
+            title:
+              type: string
+            date:
+              type: string
+              format: date
+
+    InstrumentChartData:
+      type: object
+      properties:
+        symbol:
+          type: string
+        period:
+          type: string
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              open:
+                type: number
+              high:
+                type: number
+              low:
+                type: number
+              close:
+                type: number
+              volume:
+                type: integer
+        summary:
+          type: object
+          properties:
+            change:
+              type: number
+            change_pct:
+              type: number
+            cagr:
+              type: number
+            period_label:
+              type: string
+
+    SeasonalityData:
+      type: object
+      properties:
+        symbol:
+          type: string
+        years:
+          type: integer
+        metric:
+          type: string
+        monthly_returns:
+          type: array
+          items:
+            type: object
+            properties:
+              month:
+                type: string
+                example: Jan
+              return_pct:
+                type: number
+
+    HistoricalPrice:
+      type: object
+      properties:
+        symbol:
+          type: string
+        date:
+          type: string
+          format: date
+        price:
+          type: number
+        currency:
+          type: string
+
+    # ─── News ───────────────────────────────────
+
+    NewsArticle:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        summary:
+          type: string
+          nullable: true
+        source:
+          type: string
+        published_at:
+          type: string
+          format: date-time
+        url:
+          type: string
+          format: uri
+        tickers:
+          type: array
+          items:
+            type: string
+        importance:
+          type: string
+          enum: [watch, important, urgent]
+        image_url:
+          type: string
+          format: uri
+          nullable: true
+
+    NewsListResponse:
+      type: object
+      properties:
+        articles:
+          type: array
+          items:
+            $ref: '#/components/schemas/NewsArticle'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    # ─── Alerts ─────────────────────────────────
+
+    AlertNotification:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [News, Earnings, InsiderTrade, AnalystRating]
+        ticker:
+          type: string
+        title:
+          type: string
+        body:
+          type: string
+        importance:
+          type: string
+          enum: [watch, important, urgent]
+        url:
+          type: string
+          format: uri
+          nullable: true
+        read:
+          type: boolean
+          default: false
+        created_at:
+          type: string
+          format: date-time
+
+    AlertListResponse:
+      type: object
+      properties:
+        alerts:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlertNotification'
+        unread_count:
+          type: integer
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    AlertSettings:
+      type: object
+      properties:
+        event_types:
+          type: object
+          properties:
+            news:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                minimum_importance:
+                  type: string
+                  enum: [watch, important, urgent]
+                material_only:
+                  type: boolean
+            earnings:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+            insider_trades:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                minimum_trade_value:
+                  type: string
+                  enum: [any, "10k", "100k", "1m"]
+            analyst_ratings:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                change_filter:
+                  type: string
+                  enum: [all, upgrades, downgrades]
+        tracked_tickers:
+          type: array
+          items:
+            type: object
+            properties:
+              symbol:
+                type: string
+              is_default:
+                type: boolean
+        tickers:
+          type: array
+          description: User's own tracked tickers from portfolio positions and watchlists
+          items:
+            type: object
+            properties:
+              symbol:
+                type: string
+              enabled:
+                type: boolean
+        show_default_tickers:
+          type: boolean
+        delivery:
+          type: object
+          properties:
+            in_app:
+              type: boolean
+            push:
+              type: boolean
+              description: Coming soon — native push on iOS and Android
+            email:
+              type: boolean
+              description: Coming soon — daily digest or per-event
+
+    # ─── Settings ───────────────────────────────
+
+    BillingInfo:
+      type: object
+      properties:
+        plan:
+          type: string
+          enum: [free, premium]
+        features:
+          type: object
+          properties:
+            ai_insights:
+              type: boolean
+            fundamentals:
+              type: boolean
+            ownership_data:
+              type: boolean
+            calendar:
+              type: boolean
+            ai_peer_analysis:
+              type: boolean
+            stock_dividends_research:
+              type: boolean
+        upgrade_price_from:
+          type: number
+          example: 9.99
+        billing_cycle:
+          type: string
+          nullable: true
+          enum: [monthly, annual]
+        next_billing_date:
+          type: string
+          format: date
+          nullable: true
+
+    BrokerImportRequest:
+      type: object
+      required: [broker]
+      properties:
+        broker:
+          type: string
+        connection_id:
+          type: string
+          format: uuid
+          nullable: true
+        portfolio_id:
+          type: string
+          format: uuid
+          nullable: true
+
+    BugReportRequest:
+      type: object
+      required: [description]
+      properties:
+        description:
+          type: string
+        current_url:
+          type: string
+        user_agent:
+          type: string
+        screenshot:
+          type: string
+          format: byte
+          description: Base64-encoded screenshot
+          nullable: true
+
+    # ─── Shared ─────────────────────────────────
+
+    Pagination:
+      type: object
+      properties:
+        total:
+          type: integer
+        page:
+          type: integer
+        per_page:
+          type: integer
+        total_pages:
+          type: integer
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        code:
+          type: integer
+
+    ValidationErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Validation failed
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string

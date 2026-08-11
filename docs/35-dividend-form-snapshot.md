@@ -1,0 +1,508 @@
+- generic [ref=e1]:
+  - generic [ref=e14]:
+    - complementary [ref=e15]:
+      - link "Example service" [ref=e17] [cursor=pointer]:
+        - /url: /en/investments
+        - img "Example service" [ref=e19]
+      - navigation "Main navigation" [ref=e20]:
+        - link "Portfolios / Watchlists" [ref=e21] [cursor=pointer]:
+          - /url: /en/investments
+          - img [ref=e23]
+          - generic [ref=e26]:
+            - generic [ref=e27]: Portfolios
+            - generic [ref=e28]: Watchlists
+        - link "Research" [ref=e29] [cursor=pointer]:
+          - /url: /en/research
+          - img [ref=e31]
+          - generic [ref=e34]: Research
+        - link "Charting" [ref=e35] [cursor=pointer]:
+          - /url: /en/charting
+          - img [ref=e37]
+          - generic [ref=e40]: Charting
+        - link "News" [ref=e41] [cursor=pointer]:
+          - /url: /en/news-dashboard
+          - img [ref=e43]
+          - generic [ref=e46]: News
+      - button "Alerts" [ref=e47] [cursor=pointer]:
+        - img [ref=e49]
+        - generic [ref=e52]: Alerts
+      - button "Logout" [ref=e53] [cursor=pointer]:
+        - img [ref=e55]
+        - generic [ref=e58]: Logout
+      - link "Settings" [ref=e59] [cursor=pointer]:
+        - /url: /en/settings
+        - img [ref=e61]
+        - generic [ref=e64]: Settings
+      - button "Report bug" [ref=e65] [cursor=pointer]:
+        - img [ref=e67]
+        - generic [ref=e76]: Report bug
+    - main [ref=e77]:
+      - generic [ref=e79]:
+        - generic [ref=e81]:
+          - button "Go back" [ref=e82] [cursor=pointer]:
+            - img [ref=e83]
+          - generic [ref=e85]:
+            - heading "Top10" [level=1] [ref=e86]
+            - button "Rename" [ref=e87] [cursor=pointer]:
+              - img [ref=e88]
+          - generic [ref=e93]:
+            - generic [ref=e94]: "Total Value:"
+            - generic [ref=e95]: $109,916.76
+          - generic [ref=e97]:
+            - generic [ref=e98]: "Invested:"
+            - generic [ref=e99]: $98,083.40
+          - generic [ref=e101]:
+            - generic [ref=e102]: "Return:"
+            - generic [ref=e105]: +12.06%
+          - generic [ref=e107]:
+            - generic [ref=e108]: "Unrealized:"
+            - generic [ref=e109]: +$11,833.36
+          - generic [ref=e111]:
+            - generic [ref=e112]: "Realized:"
+            - generic [ref=e113]: $0.00
+          - generic [ref=e115]:
+            - generic [ref=e116]: "Income:"
+            - generic [ref=e117]: +$0.00
+          - generic [ref=e118]:
+            - button "Display currency" [ref=e121] [cursor=pointer]:
+              - generic [ref=e122]: USD ($)
+              - img [ref=e123]
+            - button "Share" [ref=e125] [cursor=pointer]:
+              - img [ref=e126]
+              - text: Share
+            - button "Add Position" [ref=e132] [cursor=pointer]:
+              - img [ref=e133]
+              - generic [ref=e134]: Add Position
+            - button "Delete" [ref=e135] [cursor=pointer]:
+              - img [ref=e136]
+              - text: Delete
+        - navigation [ref=e140]:
+          - link "Holdings" [ref=e141] [cursor=pointer]:
+            - /url: /en/portfolios/3cb589d8-f92d-428f-aeab-9ee5d4b9cef2
+          - link "Transactions" [ref=e142] [cursor=pointer]:
+            - /url: /en/portfolios/3cb589d8-f92d-428f-aeab-9ee5d4b9cef2/transactions
+          - link "Performance" [ref=e143] [cursor=pointer]:
+            - /url: /en/portfolios/3cb589d8-f92d-428f-aeab-9ee5d4b9cef2/performance
+          - link "Allocation" [ref=e144] [cursor=pointer]:
+            - /url: /en/portfolios/3cb589d8-f92d-428f-aeab-9ee5d4b9cef2/allocation
+          - link "Risk Analysis" [ref=e145] [cursor=pointer]:
+            - /url: /en/portfolios/3cb589d8-f92d-428f-aeab-9ee5d4b9cef2/risk-analysis
+          - link "Dividends" [ref=e146] [cursor=pointer]:
+            - /url: /en/portfolios/3cb589d8-f92d-428f-aeab-9ee5d4b9cef2/dividends
+          - link "Calendar Premium feature - upgrade to unlock Investor calendar" [ref=e147] [cursor=pointer]:
+            - /url: /en/portfolios/3cb589d8-f92d-428f-aeab-9ee5d4b9cef2/calendar
+            - text: Calendar
+            - button "Premium feature - upgrade to unlock Investor calendar" [ref=e148]:
+              - img [ref=e149]
+          - link "News" [ref=e152] [cursor=pointer]:
+            - /url: /en/portfolios/3cb589d8-f92d-428f-aeab-9ee5d4b9cef2/news
+          - link "Compare" [ref=e153] [cursor=pointer]:
+            - /url: /en/portfolios/3cb589d8-f92d-428f-aeab-9ee5d4b9cef2/compare
+        - generic [ref=e154]:
+          - generic [ref=e155]:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - img
+            - generic [ref=e157]:
+              - generic [ref=e158]: Premium feature - upgrade to unlock AI portfolio insights
+              - generic [ref=e159]:
+                - generic [ref=e160]:
+                  - img [ref=e161]
+                  - generic [ref=e164]: AI Insight
+                - img [ref=e166]
+                - generic [ref=e169]:
+                  - paragraph [ref=e170]: See what moved your portfolio
+                  - paragraph [ref=e171]: Unlock AI insights to understand your portfolio's daily moves and biggest drivers.
+                - button "Upgrade to unlock" [ref=e172] [cursor=pointer]
+                - paragraph [ref=e173]: from $9.99/mo
+          - generic [ref=e175]:
+            - generic [ref=e176]:
+              - generic [ref=e177]:
+                - heading "Positions" [level=3] [ref=e179]
+                - button "Export" [ref=e181] [cursor=pointer]:
+                  - img [ref=e182]
+              - generic [ref=e185]:
+                - generic [ref=e186]:
+                  - combobox [ref=e188] [cursor=pointer]:
+                    - generic: None
+                    - img [ref=e190]
+                  - combobox [ref=e192]
+                - button "Customize 7" [ref=e194] [cursor=pointer]:
+                  - img [ref=e195]
+                  - generic [ref=e196]: Customize
+                  - generic [ref=e197]: "7"
+            - table [ref=e199]:
+              - rowgroup [ref=e200]:
+                - row "Symbol Qty Avg Cost Price Market Value Gain/Loss Gain/Loss % Weight" [ref=e201]:
+                  - columnheader "Symbol" [ref=e202] [cursor=pointer]:
+                    - generic [ref=e204]: Symbol
+                  - columnheader "Qty" [ref=e205]:
+                    - generic [ref=e206]:
+                      - generic [ref=e207]: Qty
+                      - button "Remove":
+                        - img
+                  - columnheader "Avg Cost" [ref=e208]:
+                    - generic [ref=e209]:
+                      - generic [ref=e210]: Avg Cost
+                      - button "Remove":
+                        - img
+                  - columnheader "Price" [ref=e211]:
+                    - generic [ref=e212]:
+                      - generic [ref=e213]: Price
+                      - button "Remove":
+                        - img
+                  - columnheader "Market Value" [ref=e214]:
+                    - generic [ref=e215]:
+                      - generic [ref=e216]: Market Value
+                      - button "Remove":
+                        - img
+                  - columnheader "Gain/Loss" [ref=e217]:
+                    - generic [ref=e218]:
+                      - generic [ref=e219]: Gain/Loss
+                      - button "Remove":
+                        - img
+                  - columnheader "Gain/Loss %" [ref=e220]:
+                    - generic [ref=e221]:
+                      - generic [ref=e222]: Gain/Loss %
+                      - button "Remove":
+                        - img
+                  - columnheader "Weight" [ref=e223]:
+                    - generic [ref=e224]:
+                      - generic [ref=e225]: Weight
+                      - button "Remove":
+                        - img
+                  - columnheader [ref=e226]
+              - rowgroup [ref=e227]:
+                - 'row "AMAT AMAT (US) Stock Applied Materials Inc 15 $505.97 $539.14 $8,087.10 Cost: $7,589.48 $497.63 +6.56% 7.36% Position actions" [ref=e228] [cursor=pointer]':
+                  - cell "AMAT AMAT (US) Stock Applied Materials Inc" [ref=e229]:
+                    - link "AMAT AMAT (US) Stock Applied Materials Inc" [ref=e230]:
+                      - img "AMAT" [ref=e233]
+                      - generic [ref=e234]:
+                        - generic [ref=e235]:
+                          - generic [ref=e236]:
+                            - text: AMAT
+                            - generic "US Markets" [ref=e237]: (US)
+                          - generic [ref=e238]: Stock
+                        - generic [ref=e239]: Applied Materials Inc
+                  - cell "15" [ref=e240]
+                  - cell "$505.97" [ref=e241]
+                  - cell "$539.14" [ref=e242]
+                  - 'cell "$8,087.10 Cost: $7,589.48" [ref=e243]':
+                    - generic [ref=e244]:
+                      - generic [ref=e245]: $8,087.10
+                      - generic [ref=e246]:
+                        - generic [ref=e247]: "Cost:"
+                        - generic [ref=e248]: $7,589.48
+                  - cell "$497.63" [ref=e249]
+                  - cell "+6.56%" [ref=e250]
+                  - cell "7.36%" [ref=e251]
+                  - cell "Position actions" [ref=e252]:
+                    - button "Position actions" [active] [ref=e254]:
+                      - img [ref=e255]
+                - 'row "CART CART (US) Stock Maplebear Inc 239 $43.31 $50.17 $11,990.63 Cost: $10,349.90 $1,640.74 +15.85% 10.91% Position actions" [ref=e259] [cursor=pointer]':
+                  - cell "CART CART (US) Stock Maplebear Inc" [ref=e260]:
+                    - link "CART CART (US) Stock Maplebear Inc" [ref=e261]:
+                      - img "CART" [ref=e264]
+                      - generic [ref=e265]:
+                        - generic [ref=e266]:
+                          - generic [ref=e267]:
+                            - text: CART
+                            - generic "US Markets" [ref=e268]: (US)
+                          - generic [ref=e269]: Stock
+                        - generic [ref=e270]: Maplebear Inc
+                  - cell "239" [ref=e271]
+                  - cell "$43.31" [ref=e272]
+                  - cell "$50.17" [ref=e273]
+                  - 'cell "$11,990.63 Cost: $10,349.90" [ref=e274]':
+                    - generic [ref=e275]:
+                      - generic [ref=e276]: $11,990.63
+                      - generic [ref=e277]:
+                        - generic [ref=e278]: "Cost:"
+                        - generic [ref=e279]: $10,349.90
+                  - cell "$1,640.74" [ref=e280]
+                  - cell "+15.85%" [ref=e281]
+                  - cell "10.91%" [ref=e282]
+                  - cell "Position actions" [ref=e283]:
+                    - button "Position actions" [ref=e285]:
+                      - img [ref=e286]
+                - 'row "INTU INTU (US) Stock Intuit Inc 30 $314.61 $325.25 $9,757.50 Cost: $9,438.15 $319.35 +3.38% 8.88% Position actions" [ref=e290] [cursor=pointer]':
+                  - cell "INTU INTU (US) Stock Intuit Inc" [ref=e291]:
+                    - link "INTU INTU (US) Stock Intuit Inc" [ref=e292]:
+                      - img "INTU" [ref=e295]
+                      - generic [ref=e296]:
+                        - generic [ref=e297]:
+                          - generic [ref=e298]:
+                            - text: INTU
+                            - generic "US Markets" [ref=e299]: (US)
+                          - generic [ref=e300]: Stock
+                        - generic [ref=e301]: Intuit Inc
+                  - cell "30" [ref=e302]
+                  - cell "$314.61" [ref=e303]
+                  - cell "$325.25" [ref=e304]
+                  - 'cell "$9,757.50 Cost: $9,438.15" [ref=e305]':
+                    - generic [ref=e306]:
+                      - generic [ref=e307]: $9,757.50
+                      - generic [ref=e308]:
+                        - generic [ref=e309]: "Cost:"
+                        - generic [ref=e310]: $9,438.15
+                  - cell "$319.35" [ref=e311]
+                  - cell "+3.38%" [ref=e312]
+                  - cell "8.88%" [ref=e313]
+                  - cell "Position actions" [ref=e314]:
+                    - button "Position actions" [ref=e316]:
+                      - img [ref=e317]
+                - 'row "KLAC KLAC (US) Stock KLA Corp 42 $181.77 $198.11 $8,320.62 Cost: $7,634.13 $686.49 +8.99% 7.57% Position actions" [ref=e321] [cursor=pointer]':
+                  - cell "KLAC KLAC (US) Stock KLA Corp" [ref=e322]:
+                    - link "KLAC KLAC (US) Stock KLA Corp" [ref=e323]:
+                      - img "KLAC" [ref=e326]
+                      - generic [ref=e327]:
+                        - generic [ref=e328]:
+                          - generic [ref=e329]:
+                            - text: KLAC
+                            - generic "US Markets" [ref=e330]: (US)
+                          - generic [ref=e331]: Stock
+                        - generic [ref=e332]: KLA Corp
+                  - cell "42" [ref=e333]
+                  - cell "$181.77" [ref=e334]
+                  - cell "$198.11" [ref=e335]
+                  - 'cell "$8,320.62 Cost: $7,634.13" [ref=e336]':
+                    - generic [ref=e337]:
+                      - generic [ref=e338]: $8,320.62
+                      - generic [ref=e339]:
+                        - generic [ref=e340]: "Cost:"
+                        - generic [ref=e341]: $7,634.13
+                  - cell "$686.49" [ref=e342]
+                  - cell "+8.99%" [ref=e343]
+                  - cell "7.57%" [ref=e344]
+                  - cell "Position actions" [ref=e345]:
+                    - button "Position actions" [ref=e347]:
+                      - img [ref=e348]
+                - 'row "LRCX LRCX (US) Stock Lam Research Corp 25 $292.13 $311.35 $7,783.75 Cost: $7,303.25 $480.50 +6.58% 7.08% Position actions" [ref=e352] [cursor=pointer]':
+                  - cell "LRCX LRCX (US) Stock Lam Research Corp" [ref=e353]:
+                    - link "LRCX LRCX (US) Stock Lam Research Corp" [ref=e354]:
+                      - img "LRCX" [ref=e357]
+                      - generic [ref=e358]:
+                        - generic [ref=e359]:
+                          - generic [ref=e360]:
+                            - text: LRCX
+                            - generic "US Markets" [ref=e361]: (US)
+                          - generic [ref=e362]: Stock
+                        - generic [ref=e363]: Lam Research Corp
+                  - cell "25" [ref=e364]
+                  - cell "$292.13" [ref=e365]
+                  - cell "$311.35" [ref=e366]
+                  - 'cell "$7,783.75 Cost: $7,303.25" [ref=e367]':
+                    - generic [ref=e368]:
+                      - generic [ref=e369]: $7,783.75
+                      - generic [ref=e370]:
+                        - generic [ref=e371]: "Cost:"
+                        - generic [ref=e372]: $7,303.25
+                  - cell "$480.50" [ref=e373]
+                  - cell "+6.58%" [ref=e374]
+                  - cell "7.08%" [ref=e375]
+                  - cell "Position actions" [ref=e376]:
+                    - button "Position actions" [ref=e378]:
+                      - img [ref=e379]
+                - 'row "META META (US) Stock Meta Platforms Inc 22 $553.91 $592.10 $13,026.20 Cost: $12,186.02 $840.18 +6.89% 11.85% Position actions" [ref=e383] [cursor=pointer]':
+                  - cell "META META (US) Stock Meta Platforms Inc" [ref=e384]:
+                    - link "META META (US) Stock Meta Platforms Inc" [ref=e385]:
+                      - img "META" [ref=e388]
+                      - generic [ref=e389]:
+                        - generic [ref=e390]:
+                          - generic [ref=e391]:
+                            - text: META
+                            - generic "US Markets" [ref=e392]: (US)
+                          - generic [ref=e393]: Stock
+                        - generic [ref=e394]: Meta Platforms Inc
+                  - cell "22" [ref=e395]
+                  - cell "$553.91" [ref=e396]
+                  - cell "$592.10" [ref=e397]
+                  - 'cell "$13,026.20 Cost: $12,186.02" [ref=e398]':
+                    - generic [ref=e399]:
+                      - generic [ref=e400]: $13,026.20
+                      - generic [ref=e401]:
+                        - generic [ref=e402]: "Cost:"
+                        - generic [ref=e403]: $12,186.02
+                  - cell "$840.18" [ref=e404]
+                  - cell "+6.89%" [ref=e405]
+                  - cell "11.85%" [ref=e406]
+                  - cell "Position actions" [ref=e407]:
+                    - button "Position actions" [ref=e409]:
+                      - img [ref=e410]
+                - 'row "MSFT MSFT (US) Stock Microsoft Corp 32 $461.91 $499.99 $15,999.68 Cost: $14,781.12 $1,218.56 +8.24% 14.56% Position actions" [ref=e414] [cursor=pointer]':
+                  - cell "MSFT MSFT (US) Stock Microsoft Corp" [ref=e415]:
+                    - link "MSFT MSFT (US) Stock Microsoft Corp" [ref=e416]:
+                      - img "MSFT" [ref=e419]
+                      - generic [ref=e420]:
+                        - generic [ref=e421]:
+                          - generic [ref=e422]:
+                            - text: MSFT
+                            - generic "US Markets" [ref=e423]: (US)
+                          - generic [ref=e424]: Stock
+                        - generic [ref=e425]: Microsoft Corp
+                  - cell "32" [ref=e426]
+                  - cell "$461.91" [ref=e427]
+                  - cell "$499.99" [ref=e428]
+                  - 'cell "$15,999.68 Cost: $14,781.12" [ref=e429]':
+                    - generic [ref=e430]:
+                      - generic [ref=e431]: $15,999.68
+                      - generic [ref=e432]:
+                        - generic [ref=e433]: "Cost:"
+                        - generic [ref=e434]: $14,781.12
+                  - cell "$1,218.56" [ref=e435]
+                  - cell "+8.24%" [ref=e436]
+                  - cell "14.56%" [ref=e437]
+                  - cell "Position actions" [ref=e438]:
+                    - button "Position actions" [ref=e440]:
+                      - img [ref=e441]
+                - 'row "NVDA NVDA (US) Stock NVIDIA Corp 64 $198.95 $223.96 $14,333.44 Cost: $12,732.80 $1,600.64 +12.57% 13.04% Position actions" [ref=e445] [cursor=pointer]':
+                  - cell "NVDA NVDA (US) Stock NVIDIA Corp" [ref=e446]:
+                    - link "NVDA NVDA (US) Stock NVIDIA Corp" [ref=e447]:
+                      - img "NVDA" [ref=e450]
+                      - generic [ref=e451]:
+                        - generic [ref=e452]:
+                          - generic [ref=e453]:
+                            - text: NVDA
+                            - generic "US Markets" [ref=e454]: (US)
+                          - generic [ref=e455]: Stock
+                        - generic [ref=e456]: NVIDIA Corp
+                  - cell "64" [ref=e457]
+                  - cell "$198.95" [ref=e458]
+                  - cell "$223.96" [ref=e459]
+                  - 'cell "$14,333.44 Cost: $12,732.80" [ref=e460]':
+                    - generic [ref=e461]:
+                      - generic [ref=e462]: $14,333.44
+                      - generic [ref=e463]:
+                        - generic [ref=e464]: "Cost:"
+                        - generic [ref=e465]: $12,732.80
+                  - cell "$1,600.64" [ref=e466]
+                  - cell "+12.57%" [ref=e467]
+                  - cell "13.04%" [ref=e468]
+                  - cell "Position actions" [ref=e469]:
+                    - button "Position actions" [ref=e471]:
+                      - img [ref=e472]
+                - 'row "ORCL ORCL (US) Stock Oracle Corp 56 $129.13 $147.02 $8,233.12 Cost: $7,231.28 $1,001.84 +13.85% 7.49% Position actions" [ref=e476] [cursor=pointer]':
+                  - cell "ORCL ORCL (US) Stock Oracle Corp" [ref=e477]:
+                    - link "ORCL ORCL (US) Stock Oracle Corp" [ref=e478]:
+                      - img "ORCL" [ref=e481]
+                      - generic [ref=e482]:
+                        - generic [ref=e483]:
+                          - generic [ref=e484]:
+                            - text: ORCL
+                            - generic "US Markets" [ref=e485]: (US)
+                          - generic [ref=e486]: Stock
+                        - generic [ref=e487]: Oracle Corp
+                  - cell "56" [ref=e488]
+                  - cell "$129.13" [ref=e489]
+                  - cell "$147.02" [ref=e490]
+                  - 'cell "$8,233.12 Cost: $7,231.28" [ref=e491]':
+                    - generic [ref=e492]:
+                      - generic [ref=e493]: $8,233.12
+                      - generic [ref=e494]:
+                        - generic [ref=e495]: "Cost:"
+                        - generic [ref=e496]: $7,231.28
+                  - cell "$1,001.84" [ref=e497]
+                  - cell "+13.85%" [ref=e498]
+                  - cell "7.49%" [ref=e499]
+                  - cell "Position actions" [ref=e500]:
+                    - button "Position actions" [ref=e502]:
+                      - img [ref=e503]
+                - 'row "PLTR PLTR (US) Stock Palantir Technologies Inc 72 $122.74 $172.01 $12,384.72 Cost: $8,837.28 $3,547.44 +40.14% 11.27% Position actions" [ref=e507] [cursor=pointer]':
+                  - cell "PLTR PLTR (US) Stock Palantir Technologies Inc" [ref=e508]:
+                    - link "PLTR PLTR (US) Stock Palantir Technologies Inc" [ref=e509]:
+                      - img "PLTR" [ref=e512]
+                      - generic [ref=e513]:
+                        - generic [ref=e514]:
+                          - generic [ref=e515]:
+                            - text: PLTR
+                            - generic "US Markets" [ref=e516]: (US)
+                          - generic [ref=e517]: Stock
+                        - generic [ref=e518]: Palantir Technologies Inc
+                  - cell "72" [ref=e519]
+                  - cell "$122.74" [ref=e520]
+                  - cell "$172.01" [ref=e521]
+                  - 'cell "$12,384.72 Cost: $8,837.28" [ref=e522]':
+                    - generic [ref=e523]:
+                      - generic [ref=e524]: $12,384.72
+                      - generic [ref=e525]:
+                        - generic [ref=e526]: "Cost:"
+                        - generic [ref=e527]: $8,837.28
+                  - cell "$3,547.44" [ref=e528]
+                  - cell "+40.14%" [ref=e529]
+                  - cell "11.27%" [ref=e530]
+                  - cell "Position actions" [ref=e531]:
+                    - button "Position actions" [ref=e533]:
+                      - img [ref=e534]
+            - generic [ref=e539]:
+              - generic [ref=e540]: Total (10)
+              - generic [ref=e541]: $11,833.36 (12.06%)
+              - generic [ref=e542]: $109,916.76
+    - button "Open Example service Copilot" [ref=e544] [cursor=pointer]:
+      - img [ref=e546]
+      - generic: Ask Copilot
+  - dialog "Record Dividend" [ref=e697]:
+    - generic [ref=e700]:
+      - generic [ref=e701]:
+        - heading "Record Dividend" [level=3] [ref=e703]
+        - button "Close modal" [ref=e705] [cursor=pointer]:
+          - img [ref=e706]
+      - generic [ref=e709]:
+        - generic [ref=e711]:
+          - generic [ref=e712]:
+            - img "AMAT" [ref=e714]
+            - generic [ref=e715]:
+              - generic [ref=e716]:
+                - generic [ref=e717]:
+                  - text: AMAT
+                  - generic "US Markets" [ref=e718]: (US)
+                - generic [ref=e719]: Stock
+              - generic [ref=e720]: Applied Materials Inc
+          - generic [ref=e722]:
+            - generic [ref=e723]: "Shares held:"
+            - generic [ref=e724]: "15"
+        - group [ref=e725]:
+          - button "Total Amount" [pressed] [ref=e726] [cursor=pointer]
+          - button "Per Share" [ref=e727] [cursor=pointer]
+        - generic [ref=e728]:
+          - generic [ref=e729]: Cash portfolio
+          - generic "Cash portfolio" [ref=e730]:
+            - generic [ref=e731]: Portfel USD 1
+            - generic [ref=e732]: ($1,916.60)
+        - generic [ref=e734]:
+          - generic [ref=e735]: Gross Dividend Amount
+          - generic [ref=e736]:
+            - generic [ref=e737]: $
+            - spinbutton "Gross Dividend Amount" [ref=e740]
+        - generic [ref=e741]:
+          - generic [ref=e742]:
+            - generic [ref=e743]:
+              - text: Withholding Tax
+              - generic [ref=e745]: i
+            - generic [ref=e746]:
+              - generic [ref=e747]: $
+              - spinbutton "Withholding Tax" [ref=e750]
+          - generic [ref=e751]:
+            - generic [ref=e752]: Date received
+            - button "Aug 8, 2026" [ref=e753] [cursor=pointer]:
+              - generic [ref=e754]: Aug 8, 2026
+              - generic:
+                - img
+        - generic [ref=e755]:
+          - generic [ref=e756]: Notes (optional)
+          - textbox "Notes (optional)" [ref=e758]:
+            - /placeholder: e.g., Q4 2024 dividend
+        - generic [ref=e759]:
+          - generic [ref=e760]:
+            - generic [ref=e761]: Gross Dividend
+            - generic [ref=e762]: $0.00
+          - generic [ref=e763]:
+            - generic [ref=e764]: Withholding Tax
+            - generic [ref=e765]: "-$0.00"
+          - generic [ref=e767]:
+            - generic [ref=e768]: Net Amount
+            - generic [ref=e769]: $0.00
+      - generic [ref=e771]:
+        - button "Cancel" [ref=e772] [cursor=pointer]
+        - button "Enter a dividend amount" [disabled] [ref=e774]

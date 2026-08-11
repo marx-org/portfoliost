@@ -1,0 +1,133 @@
+- generic [ref=e14]:
+  - complementary [ref=e15]:
+    - link "Example service" [ref=e17] [cursor=pointer]:
+      - /url: /en/investments
+      - img "Example service" [ref=e19]
+    - navigation "Main navigation" [ref=e20]:
+      - link "Portfolios / Watchlists" [ref=e21] [cursor=pointer]:
+        - /url: /en/investments
+        - img [ref=e23]
+        - generic [ref=e26]:
+          - generic [ref=e27]: Portfolios
+          - generic [ref=e28]: Watchlists
+      - link "Research" [ref=e29] [cursor=pointer]:
+        - /url: /en/research
+        - img [ref=e31]
+        - generic [ref=e34]: Research
+      - link "Charting" [ref=e35] [cursor=pointer]:
+        - /url: /en/charting
+        - img [ref=e37]
+        - generic [ref=e40]: Charting
+      - link "News" [ref=e41] [cursor=pointer]:
+        - /url: /en/news-dashboard
+        - img [ref=e43]
+        - generic [ref=e46]: News
+    - button "Alerts" [ref=e47] [cursor=pointer]:
+      - img [ref=e49]
+      - generic [ref=e52]: Alerts
+    - button "Logout" [ref=e53] [cursor=pointer]:
+      - img [ref=e55]
+      - generic [ref=e58]: Logout
+    - link "Settings" [ref=e59] [cursor=pointer]:
+      - /url: /en/settings
+      - img [ref=e61]
+      - generic [ref=e64]: Settings
+    - button "Report bug" [ref=e65] [cursor=pointer]:
+      - img [ref=e67]
+      - generic [ref=e76]: Report bug
+  - main [ref=e77]:
+    - generic [ref=e81]:
+      - heading "Settings" [level=1] [ref=e82]
+      - generic [ref=e83]:
+        - generic [ref=e84]:
+          - navigation [ref=e85]:
+            - link "Profile" [ref=e86] [cursor=pointer]:
+              - /url: /en/settings/profile
+              - img [ref=e87]
+              - text: Profile
+            - link "Shared Portfolios" [ref=e89] [cursor=pointer]:
+              - /url: /en/settings/shared-portfolios
+              - img [ref=e90]
+              - text: Shared Portfolios
+            - link "Broker Connections" [ref=e92] [cursor=pointer]:
+              - /url: /en/settings/broker-connections
+              - img [ref=e93]
+              - text: Broker Connections
+            - link "Alerts" [ref=e95] [cursor=pointer]:
+              - /url: /en/settings/notifications
+              - img [ref=e96]
+              - text: Alerts
+            - link "Billing" [ref=e98] [cursor=pointer]:
+              - /url: /en/settings/billing
+              - img [ref=e99]
+              - text: Billing
+          - generic [ref=e101]:
+            - link "Terms" [ref=e102] [cursor=pointer]:
+              - /url: https://example-service.ai/terms
+            - link "Privacy" [ref=e103] [cursor=pointer]:
+              - /url: https://example-service.ai/privacy
+            - link "Roadmap" [ref=e104] [cursor=pointer]:
+              - /url: https://example-service.ai/roadmap
+        - generic [ref=e105]:
+          - generic [ref=e106]:
+            - heading "Profile Settings" [level=2] [ref=e107]
+            - generic [ref=e108]:
+              - generic [ref=e109]:
+                - generic [ref=e110]: First Name
+                - textbox "First Name" [ref=e113]
+              - generic [ref=e114]:
+                - generic [ref=e115]: Last Name
+                - textbox "Last Name" [ref=e118]
+              - generic [ref=e119]:
+                - generic [ref=e120]: Email
+                - textbox "Email" [disabled] [ref=e123]: demo@example.com
+                - paragraph [ref=e124]: Email cannot be changed for security reasons
+              - button "Save Changes" [disabled] [ref=e126]:
+                - generic [ref=e127]: Save Changes
+          - generic [ref=e128]:
+            - heading "Language Preference" [level=3] [ref=e129]:
+              - img [ref=e130]
+              - text: Language Preference
+            - paragraph [ref=e133]: Select your preferred language. Changes are applied immediately.
+            - button "🇺🇸 English" [ref=e135] [cursor=pointer]:
+              - generic [ref=e136]:
+                - generic [ref=e137]: 🇺🇸
+                - generic [ref=e138]: English
+              - img [ref=e140]
+          - generic [ref=e143]:
+            - heading "Change password" [level=3] [ref=e144]:
+              - img [ref=e145]
+              - text: Change password
+            - paragraph [ref=e148]: Choose a new password for signing in with your email address.
+            - generic [ref=e149]:
+              - generic [ref=e150]:
+                - generic [ref=e151]: New password *
+                - textbox "New password *" [ref=e153]:
+                  - /placeholder: Enter a new password
+                - paragraph [ref=e154]: At least 8 characters with uppercase, lowercase, and number
+              - generic [ref=e155]:
+                - generic [ref=e156]: Confirm new password *
+                - textbox "Confirm new password *" [ref=e158]:
+                  - /placeholder: Re-enter the new password
+              - button "Update password" [disabled] [ref=e159]
+          - generic [ref=e160]:
+            - generic [ref=e161]:
+              - img [ref=e162]
+              - heading "Danger Zone" [level=3] [ref=e164]
+            - generic [ref=e166]:
+              - generic [ref=e167]:
+                - heading "Clear All Data" [level=4] [ref=e168]
+                - paragraph [ref=e169]: Permanently delete all wallets, portfolios, and transaction history.
+              - button "Clear Account" [ref=e170] [cursor=pointer]:
+                - img [ref=e171]
+                - text: Clear Account
+            - generic [ref=e175]:
+              - generic [ref=e176]:
+                - heading "Delete Account Permanently" [level=4] [ref=e177]
+                - paragraph [ref=e178]: Permanently delete your account, all of your data, and your login. This cannot be undone.
+              - button "Delete Account" [ref=e179] [cursor=pointer]:
+                - img [ref=e180]
+                - text: Delete Account
+  - button "Open Example service Copilot" [ref=e184] [cursor=pointer]:
+    - img [ref=e186]
+    - generic: Ask Copilot

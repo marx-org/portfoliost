@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+coverage/
+
+# Test output
+test-results/
+playwright-report/
+.blob-report/
+playwright/.cache/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE / OS
+.DS_Store
+.idea/
+*.iml
+.vscode/
+*.log
+
+# Tooling artifacts
+.playwright-mcp/
+.contract-parts/

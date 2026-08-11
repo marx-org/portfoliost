@@ -1,0 +1,15 @@
+{
+  "name": "example-service-mock",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Local mock of the Example service API, contract-faithful to captures from app.example-service.ai",
+  "scripts": {
+    "start": "node mocks/gateway/index.js",
+    "seed": "node scripts/regen-seed.mjs",
+    "test": "node mocks/tests/run.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
