@@ -22,9 +22,9 @@ Legend: `[ ]` pending · `[x]` done
 - [x] 2.4 Transactions tab: move existing transaction list into `PortfolioTransactionsTab.vue`. — `06b42f1`
 - [x] 2.5 Allocation tab: sector/asset-type/currency breakdown with donut chart + table. — `fc5d897`
 - [x] 2.6 Analytics tab: equity curve + monthly returns + benchmarks + risk stats (from analytics + risk-metrics). — `2edb619`
-- [ ] 2.7 Dividends + Calendar tabs: dividend history + upcoming earnings/dividend events for held symbols.
-- [ ] 2.8 News + Compare tabs: ticker-scoped news + research compare table.
-- [ ] 2.9 Tests: e2e detail-tab navigation, unit coverage, lint/typecheck. Commit.
+- [x] 2.7 Dividends + Calendar tabs: dividend history + upcoming earnings/dividend events for held symbols. — `221fe2f`
+- [x] 2.8 News + Compare tabs: ticker-scoped news + research compare table. — `0eeea0e`
+- [x] 2.9 Tests: e2e detail-tab navigation, unit coverage, lint/typecheck. Commit. — `0eeea0e`
 
 ## Step 3 — Position row actions (complaint #3)
 - [ ] Trailing three-dots "Position actions" column → menu: Buy, Sell, Dividend, Edit position, Research, Remove position.
