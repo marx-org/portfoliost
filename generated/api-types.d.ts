@@ -166,7 +166,7 @@ export interface BillingSubscription {
 }
 
 // from mocks/shared/data/raw/charting_presets.json
-export interface ChartingPresets unknown[]
+export type ChartingPresets = unknown[]
 
 // from mocks/shared/data/raw/chatbot_models.json
 export interface ChatbotModels {
@@ -339,7 +339,7 @@ export interface EmptyPortfolioDetail {
 }
 
 // from mocks/shared/data/raw/empty_portfolio_positions.json
-export interface EmptyPortfolioPositions unknown[]
+export type EmptyPortfolioPositions = unknown[]
 
 // from mocks/shared/data/raw/empty_portfolio_snapshot.json
 export interface EmptyPortfolioSnapshot {
@@ -570,7 +570,7 @@ export interface ExchangeRates {
 }
 
 // from mocks/shared/data/raw/finnhub_earnings.json
-export interface FinnhubEarnings ({
+export type FinnhubEarnings = ({
     actual: number
     estimate: number
     period: string
@@ -1149,7 +1149,7 @@ export interface InstrumentsProfile {
 }
 
 // from mocks/shared/data/raw/ir_events_aapl.json
-export interface IrEventsAapl ({
+export type IrEventsAapl = ({
     type: string
     id: string
     title: string
@@ -1177,7 +1177,7 @@ export interface IrEventsAapl ({
   })[]
 
 // from mocks/shared/data/raw/ir_events_aaplus.json
-export interface IrEventsAaplus ({
+export type IrEventsAaplus = ({
     type: string
     id: string
     title: string
@@ -1226,10 +1226,10 @@ export interface IrTranscript {
 }
 
 // from mocks/shared/data/raw/merged_portfolios.json
-export interface MergedPortfolios unknown[]
+export type MergedPortfolios = unknown[]
 
 // from mocks/shared/data/raw/merged_portfolios_light.json
-export interface MergedPortfoliosLight unknown[]
+export type MergedPortfoliosLight = unknown[]
 
 // from mocks/shared/data/raw/news_articles_all.json
 export interface NewsArticlesAll {
@@ -1411,7 +1411,7 @@ export interface NewsInsights403 {
 }
 
 // from mocks/shared/data/raw/news_livestreams_channels.json
-export interface NewsLivestreamsChannels ({
+export type NewsLivestreamsChannels = ({
     id: string
     name: string
     handle: string
@@ -2513,7 +2513,7 @@ export interface PortfolioDetail {
 }
 
 // from mocks/shared/data/raw/portfolio_positions.json
-export interface PortfolioPositions ({
+export type PortfolioPositions = ({
     id: string
     portfolioId: string
     symbol: string
@@ -4621,7 +4621,7 @@ export interface PortfolioPositions ({
   })[]
 
 // from mocks/shared/data/raw/portfolio_positions_bare.json
-export interface PortfolioPositionsBare ({
+export type PortfolioPositionsBare = ({
     id: string
     portfolioId: string
     symbol: string
@@ -6729,7 +6729,7 @@ export interface PortfolioPositionsBare ({
   })[]
 
 // from mocks/shared/data/raw/portfolio_positions_cfd_hints.json
-export interface PortfolioPositionsCfdHints unknown[]
+export type PortfolioPositionsCfdHints = unknown[]
 
 // from mocks/shared/data/raw/portfolio_risk_metrics.json
 export interface PortfolioRiskMetrics {
@@ -6969,7 +6969,7 @@ export interface PortfoliosHeldStocks {
 }
 
 // from mocks/shared/data/raw/portfolios_shares.json
-export interface PortfoliosShares ({
+export type PortfoliosShares = ({
     id: string
     portfolioId: string
     portfolioName: string
@@ -6997,7 +6997,7 @@ export interface PortfoliosShares ({
   })[]
 
 // from mocks/shared/data/raw/portfolios_summaries.json
-export interface PortfoliosSummaries ({
+export type PortfoliosSummaries = ({
     id: string
     userId: string
     name: string
@@ -7049,7 +7049,7 @@ export interface PortfoliosSummaries ({
   })[]
 
 // from mocks/shared/data/raw/portfolios_summaries_light.json
-export interface PortfoliosSummariesLight ({
+export type PortfoliosSummariesLight = ({
     id: string
     userId: string
     name: string
@@ -7284,7 +7284,7 @@ export interface WalletBalanceHistory {
 }
 
 // from mocks/shared/data/raw/wallets.json
-export interface Wallets ({
+export type Wallets = ({
     id: string
     userId: string
     name: string
@@ -7314,7 +7314,7 @@ export interface WalletsTotalBalance {
 }
 
 // from mocks/shared/data/raw/watchlists.json
-export interface Watchlists unknown[]
+export type Watchlists = unknown[]
 
 // from mocks/shared/data/research/AAPL.json
 export interface AAPL {

@@ -3,8 +3,8 @@ node_modules
 .playwright-mcp
 docs
 discovery
-generated
 .contract-parts
-Dockerfile
-docker-compose.yml
+tests
+playwright-report
+test-results
 *.log

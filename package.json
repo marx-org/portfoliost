@@ -1,15 +1,43 @@
 {
-  "name": "example-service-mock",
-  "version": "1.0.0",
+  "name": "portfoliost",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Local mock of the Example service API, contract-faithful to captures from app.example-service.ai",
+  "description": "Portfoliost - a loose Vue 3 copy of the Example service.ai investment portfolio tracker, backed by the local Example service API mock",
   "scripts": {
-    "start": "node mocks/gateway/index.js",
-    "seed": "node scripts/regen-seed.mjs",
-    "test": "node mocks/tests/run.mjs"
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "vue-tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:mock": "node mocks/tests/run.mjs",
+    "mock:start": "node mocks/gateway/index.js",
+    "mock:seed": "node scripts/regen-seed.mjs"
+  },
+  "dependencies": {
+    "apexcharts": "^5.10.0",
+    "pinia": "^2.1.7",
+    "vue": "^3.4.31",
+    "vue-router": "^4.4.0",
+    "vue3-apexcharts": "^1.8.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.45.1",
+    "@types/node": "^20.14.0",
+    "@vitejs/plugin-vue": "^5.0.5",
+    "@vue/test-utils": "^2.4.6",
+    "autoprefixer": "^10.4.19",
+    "happy-dom": "^14.12.3",
+    "postcss": "^8.4.39",
+    "tailwindcss": "^3.4.4",
+    "typescript": "^5.4.5",
+    "vite": "^5.3.3",
+    "vitest": "^2.0.2",
+    "vue-tsc": "^2.0.24"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=20"
   }
 }

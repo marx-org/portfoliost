@@ -1,17 +1,24 @@
-FROM node:22-alpine
+# ---- build stage ----
+FROM node:22-alpine AS build
 
 WORKDIR /app
 
-COPY package.json ./
-COPY example-service-real-api.yaml ./
-COPY mocks/ mocks/
-COPY scripts/ scripts/
+COPY package.json package-lock.json ./
+COPY index.html vite.config.ts tailwind.config.js postcss.config.js tsconfig.json tsconfig.node.json ./
+COPY public/ public/
+COPY src/ src/
+COPY generated/ generated/
+COPY mocks/shared/data/universe.json mocks/shared/data/universe.json
 
-ENV PORT=4010
-ENV HOST=0.0.0.0
-EXPOSE 4010
+RUN npm ci && npm run build
+
+# ---- serve stage ----
+FROM nginx:alpine
+
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/dist /usr/share/nginx/html
+
+EXPOSE 80
 
 HEALTHCHECK --interval=15s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "fetch('http://localhost:4010/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
-
-CMD ["node", "mocks/gateway/index.js"]
+  CMD wget -q -O /dev/null http://localhost/ || exit 1

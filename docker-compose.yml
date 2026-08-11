@@ -2,7 +2,7 @@ services:
   example-service-mock:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.mock
     container_name: example-service-mock
     ports:
       - "4010:4010"
@@ -10,4 +10,15 @@ services:
       EXAMPLE_SERVICE_MOCK_EMAIL: ${EXAMPLE_SERVICE_MOCK_EMAIL:-demo@example.com}
       EXAMPLE_SERVICE_MOCK_PASSWORD: ${EXAMPLE_SERVICE_MOCK_PASSWORD:-example-service-mock}
       EXAMPLE_SERVICE_MOCK_TOKEN: ${EXAMPLE_SERVICE_MOCK_TOKEN:-mock-dev-token}
+    restart: unless-stopped
+
+  portfoliost:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: portfoliost
+    ports:
+      - "8080:80"
+    depends_on:
+      - example-service-mock
     restart: unless-stopped

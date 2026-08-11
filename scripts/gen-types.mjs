@@ -43,7 +43,11 @@ function tsType(value, depth) {
 
 function buildFile(relPath, absPath, name) {
   const data = JSON.parse(readFileSync(absPath, "utf8"))
-  return `// from ${relPath}\nexport interface ${pascal(name)} ${tsType(data, 0).replace(/\n  }$/, "\n}")}\n`
+  const type = tsType(data, 0).replace(/\n  }$/, "\n}")
+  if (Array.isArray(data)) {
+    return `// from ${relPath}\nexport type ${pascal(name)} = ${type}\n`
+  }
+  return `// from ${relPath}\nexport interface ${pascal(name)} ${type}\n`
 }
 
 function main() {
