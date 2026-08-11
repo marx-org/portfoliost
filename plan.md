@@ -26,11 +26,11 @@ Legend: `[ ]` pending · `[x]` done
 - [x] 2.8 News + Compare tabs: ticker-scoped news + research compare table. — `0eeea0e`
 - [x] 2.9 Tests: e2e detail-tab navigation, unit coverage, lint/typecheck. Commit. — `0eeea0e`
 
-## Step 3 — Position row actions (complaint #3)
-- [ ] Trailing three-dots "Position actions" column → menu: Buy, Sell, Dividend, Edit position, Research, Remove position.
-- [ ] Wire Research route, Remove (DELETE endpoint), Buy/Sell/Dividend/Edit dialogs (positions/transactions endpoints).
-- [ ] Row polish: logo + "(US) Stock" label, Market Value cost sub-line, footer Total row.
-- [ ] E2e: menu opens and actions work. Commit.
+## Step 3 — Position row actions (complaint #3) ✅
+- [x] Trailing three-dots "Position actions" column → menu: Buy, Sell, Dividend, Edit position, Research, Remove position.
+- [x] Wire Research route, Remove (DELETE endpoint), Buy/Sell/Dividend/Edit dialogs (positions/transactions endpoints).
+- [x] Row polish: logo + "(US) Stock" label, Market Value cost sub-line, footer Total row.
+- [x] E2e: menu opens and actions work. Commit. — `2d3ff28`
 
 ## Step 4 — Research full tabs + charts (complaint #4)
 - [ ] Expand tabs: Overview, News, Fundamentals, Investor Relations, Ownership, Projections, Compare, Calendar, Dividends (all functional).
