@@ -47,6 +47,32 @@ export async function getPortfolioPositions(id: string): Promise<PortfolioPositi
   return http.get<PortfolioPositions>(`/api/portfolios/${id}/positions`)
 }
 
+export async function createPortfolioPosition(
+  id: string,
+  input: { symbol: string; quantity: number; price?: number; averageCostBasis?: number },
+): Promise<PortfolioPositions[number]> {
+  return http.post<PortfolioPositions[number]>(`/api/portfolios/${id}/positions`, input)
+}
+
+export async function updatePortfolioPosition(
+  id: string,
+  positionId: string,
+  input: Partial<PortfolioPositions[number]>,
+): Promise<PortfolioPositions[number]> {
+  return http.patch<PortfolioPositions[number]>(`/api/portfolios/${id}/positions/${positionId}`, input)
+}
+
+export async function removePortfolioPosition(id: string, positionId: string): Promise<PortfolioPositions[number]> {
+  return http.delete<PortfolioPositions[number]>(`/api/portfolios/${id}/positions/${positionId}`)
+}
+
+export async function createPortfolioTransaction(
+  id: string,
+  input: { type: string; symbol: string; quantity: number; price: number; currency?: string },
+): Promise<PortfolioTransactionsPage["items"][number]> {
+  return http.post<PortfolioTransactionsPage["items"][number]>(`/api/portfolios/${id}/transactions`, input)
+}
+
 export async function getPortfolioAnalytics(id: string, timeframe: PortfolioAnalyticsTimeframe = "1Y"): Promise<PortfolioAnalytics1Y> {
   return http.get<PortfolioAnalytics1Y>(`/api/portfolios/${id}/analytics?timeframe=${timeframe}`)
 }

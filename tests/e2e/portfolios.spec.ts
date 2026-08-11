@@ -92,3 +92,37 @@ test("creating a new portfolio adds it to the list", async ({ page }) => {
 
   await expect(page.getByRole("link", { name })).toBeVisible()
 })
+
+test("position actions menu: buy updates quantity, research navigates, remove deletes a row", async ({ page }) => {
+  await login(page)
+  await page.getByRole("link", { name: /Top10/ }).click()
+  await expect(page).toHaveURL(/\/en\/portfolios\/.*\/holdings/)
+
+  const metaRow = page.locator("tbody tr").first()
+  const metaQty = await metaRow.locator("td").nth(1).innerText()
+
+  await metaRow.getByRole("button", { name: "Position actions" }).click()
+  await expect(page.getByRole("button", { name: "Buy", exact: true })).toBeVisible()
+
+  await page.getByRole("button", { name: "Buy", exact: true }).click()
+  await expect(page.getByRole("dialog", { name: /Buy META/ })).toBeVisible()
+  await page.getByTestId("action-quantity").fill("5")
+  await page.getByTestId("action-price").fill("600")
+  await page.getByRole("button", { name: "Confirm" }).click()
+  await expect(page.getByText(/Bought 5 META/)).toBeVisible()
+  await expect(metaRow.locator("td").nth(1)).toHaveText(String(Number(metaQty) + 5))
+
+  const targetRow = page.locator("tbody tr").last()
+  const targetSymbol = (await targetRow.locator("td").first().innerText()).split("\n")[0]
+
+  await targetRow.getByRole("button", { name: "Position actions" }).click()
+  await page.getByRole("button", { name: "Research" }).click()
+  await expect(page).toHaveURL(new RegExp(`/en/research/${targetSymbol}/overview`))
+
+  await page.goBack()
+  await expect(page).toHaveURL(/\/en\/portfolios\/.*\/holdings/)
+  await page.locator("tbody tr").last().getByRole("button", { name: "Position actions" }).click()
+  await page.getByRole("button", { name: "Remove position" }).click()
+  await expect(page.getByText(new RegExp(`Removed ${targetSymbol}`))).toBeVisible()
+  await expect(page.locator("tbody tr").filter({ hasText: targetSymbol })).toHaveCount(0)
+})

@@ -3,7 +3,7 @@ import { loadRaw, loadResearch, normalize } from "../lib/data.js"
 import { paginatePage, uuid, nowIso } from "../lib/http.js"
 
 const created = new Map()
-const createdPositions = new Map()
+const positionsByPortfolio = new Map()
 
 const ANALYTICS_BY_TIMEFRAME = {
   "6M": "portfolio_analytics_6M.json",
@@ -37,10 +37,16 @@ function withDataFile(id, baseName, emptyName) {
   return findPortfolio(id) ? loadRaw(baseName) : loadRaw(emptyName)
 }
 
+function positionsFor(id) {
+  if (!positionsByPortfolio.has(id)) {
+    const base = created.has(id) ? [] : loadRaw("portfolio_positions.json")
+    positionsByPortfolio.set(id, (Array.isArray(base) ? base : []).map((p) => ({ ...p })))
+  }
+  return positionsByPortfolio.get(id)
+}
+
 function heldPositions(id) {
-  if (created.has(id)) return createdPositions.get(id) || []
-  const positions = loadRaw("portfolio_positions.json")
-  return Array.isArray(positions) ? positions : []
+  return positionsFor(id)
 }
 
 function sumBy(positions, field) {
@@ -158,7 +164,7 @@ export function register(app) {
   app.delete("/api/portfolios/:id", (ctx) => {
     if (!requireAuth(ctx)) return
     created.delete(ctx.params.id)
-    createdPositions.delete(ctx.params.id)
+    positionsByPortfolio.delete(ctx.params.id)
     ctx.res.status(204).end()
   })
 
@@ -177,7 +183,7 @@ export function register(app) {
 
   app.get("/api/portfolios/:id/positions", (ctx) => {
     if (!requireAuth(ctx)) return
-    ctx.res.json(withDataFile(ctx.params.id, "portfolio_positions.json", "empty_portfolio_positions.json"))
+    ctx.res.json(positionsFor(ctx.params.id))
   })
 
   app.get("/api/portfolios/:id/positions/bare", (ctx) => {
@@ -225,15 +231,14 @@ export function register(app) {
       dayChangePercent: 0,
       displayCurrency: "USD",
     }
-    const list = createdPositions.get(ctx.params.id) || []
+    const list = positionsFor(ctx.params.id)
     list.push(position)
-    createdPositions.set(ctx.params.id, list)
     ctx.res.status(201).json(position)
   })
 
   app.patch("/api/portfolios/:id/positions/:positionId", (ctx) => {
     if (!requireAuth(ctx)) return
-    const list = createdPositions.get(ctx.params.id) || []
+    const list = positionsFor(ctx.params.id)
     const idx = list.findIndex((p) => p.id === ctx.params.positionId)
     if (idx < 0) return ctx.res.status(404).json({ error: "NotFound", message: "Position not found" })
     list[idx] = { ...list[idx], ...(ctx.body || {}) }
@@ -242,7 +247,7 @@ export function register(app) {
 
   app.delete("/api/portfolios/:id/positions/:positionId", (ctx) => {
     if (!requireAuth(ctx)) return
-    const list = createdPositions.get(ctx.params.id) || []
+    const list = positionsFor(ctx.params.id)
     const idx = list.findIndex((p) => p.id === ctx.params.positionId)
     if (idx < 0) return ctx.res.status(404).json({ error: "NotFound", message: "Position not found" })
     const [removed] = list.splice(idx, 1)

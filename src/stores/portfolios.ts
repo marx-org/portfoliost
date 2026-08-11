@@ -54,6 +54,15 @@ export const usePortfolioStore = defineStore("portfolios", () => {
     }
   }
 
+  async function fetchPositions(id: string): Promise<void> {
+    try {
+      positions.value = await portfoliosApi.getPortfolioPositions(id)
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : "Failed to load positions"
+      throw err
+    }
+  }
+
   async function setTimeframe(timeframe: portfoliosApi.PortfolioAnalyticsTimeframe, id: string): Promise<void> {
     analyticsTimeframe.value = timeframe
     try {
@@ -90,6 +99,7 @@ export const usePortfolioStore = defineStore("portfolios", () => {
     error,
     fetchAll,
     fetchDetail,
+    fetchPositions,
     setTimeframe,
     createPortfolio,
     reset,
