@@ -1,3 +1,100 @@
+<script setup lang="ts">
+import { onMounted, ref } from "vue"
+import { useRoute } from "vue-router"
+import { getPortfolioCalendar } from "@/api/portfolios"
+import { formatCurrency } from "@/utils/format"
+import type { PortfolioCalendarEvent } from "@/api/types"
+
+const route = useRoute()
+const id = String(route.params.id)
+const upcoming = ref<PortfolioCalendarEvent[]>([])
+const past = ref<PortfolioCalendarEvent[]>([])
+const loading = ref(true)
+const error = ref<string | null>(null)
+
+onMounted(async () => {
+  try {
+    const res = await getPortfolioCalendar(id)
+    upcoming.value = res.upcoming
+    past.value = res.past
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : "Failed to load calendar"
+  } finally {
+    loading.value = false
+  }
+})
+
+function badgeClass(type: string): string {
+  if (type === "earnings") return "bg-blue-50 text-blue-700"
+  if (type === "exDividend") return "bg-amber-50 text-amber-700"
+  return "bg-green-50 text-green-700"
+}
+</script>
+
 <template>
-  <div class="card p-6 text-sm text-slate-500">Upcoming events are loaded here.</div>
+  <div class="space-y-6">
+    <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
+    <p v-if="loading" class="text-sm text-slate-500">Loading calendar...</p>
+
+    <template v-if="!loading && !error">
+      <div class="card overflow-hidden">
+        <div class="border-b border-slate-200 px-5 py-3">
+          <h2 class="text-base font-semibold">Upcoming Events</h2>
+        </div>
+        <div v-if="upcoming.length" class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-slate-100 text-left text-xs uppercase text-slate-500">
+                <th class="px-5 py-2.5 font-medium">Date</th>
+                <th class="px-5 py-2.5 font-medium">Symbol</th>
+                <th class="px-5 py-2.5 font-medium">Event</th>
+                <th class="px-5 py-2.5 text-right font-medium">Amount</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr v-for="e in upcoming" :key="`${e.symbol}-${e.date}-${e.type}`" class="hover:bg-slate-50">
+                <td class="px-5 py-3 whitespace-nowrap">{{ e.date }}</td>
+                <td class="px-5 py-3">
+                  <router-link
+                    :to="{ name: 'research-overview', params: { symbol: e.symbol } }"
+                    class="font-medium text-slate-900 hover:text-blue-600 hover:underline"
+                  >
+                    {{ e.symbol }}
+                  </router-link>
+                </td>
+                <td class="px-5 py-3">
+                  <span class="rounded-full px-2 py-0.5 text-xs font-medium capitalize" :class="badgeClass(e.type)">{{ e.type }}</span>
+                  <span class="ml-2 text-slate-600">{{ e.title }}</span>
+                </td>
+                <td class="px-5 py-3 text-right tabular-nums">{{ e.amount != null ? formatCurrency(e.amount) : "—" }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p v-else class="px-5 py-6 text-sm text-slate-500">No upcoming events.</p>
+      </div>
+
+      <div class="card overflow-hidden">
+        <div class="border-b border-slate-200 px-5 py-3">
+          <h2 class="text-base font-semibold">Recent Events</h2>
+        </div>
+        <div v-if="past.length" class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <tbody class="divide-y divide-slate-100">
+              <tr v-for="e in past" :key="`${e.symbol}-${e.date}-${e.type}`" class="hover:bg-slate-50">
+                <td class="px-5 py-3 whitespace-nowrap">{{ e.date }}</td>
+                <td class="px-5 py-3 font-medium text-slate-900">{{ e.symbol }}</td>
+                <td class="px-5 py-3">
+                  <span class="rounded-full px-2 py-0.5 text-xs font-medium capitalize" :class="badgeClass(e.type)">{{ e.type }}</span>
+                  <span class="ml-2 text-slate-600">{{ e.title }}</span>
+                </td>
+                <td class="px-5 py-3 text-right tabular-nums">{{ e.amount != null ? formatCurrency(e.amount) : "—" }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p v-else class="px-5 py-6 text-sm text-slate-500">No recent events.</p>
+      </div>
+    </template>
+  </div>
 </template>
