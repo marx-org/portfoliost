@@ -44,12 +44,13 @@ test("transactions page lists transactions with pagination", async ({ page }) =>
 })
 
 test("creating a new portfolio adds it to the list", async ({ page }) => {
+  const name = `E2E Test ${Date.now()}`
   await login(page)
 
   await page.getByRole("button", { name: "New portfolio" }).click()
   await expect(page.getByRole("dialog")).toBeVisible()
-  await page.getByRole("textbox", { name: "Name" }).fill("E2E Test Portfolio")
+  await page.getByRole("textbox", { name: "Name" }).fill(name)
   await page.getByRole("button", { name: "Create" }).click()
 
-  await expect(page.getByRole("link", { name: /E2E Test Portfolio/ })).toBeVisible()
+  await expect(page.getByRole("link", { name })).toBeVisible()
 })

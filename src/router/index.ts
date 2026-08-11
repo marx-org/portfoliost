@@ -35,6 +35,11 @@ const router = createRouter({
           component: () => import("@/modules/watchlists/WatchlistsView.vue"),
         },
         {
+          path: "wallets",
+          name: "wallets",
+          component: () => import("@/modules/wallets/WalletsView.vue"),
+        },
+        {
           path: "portfolios/:id",
           name: "portfolio-detail",
           component: () => import("@/modules/portfolios/PortfolioDetailView.vue"),

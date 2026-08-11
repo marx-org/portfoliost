@@ -31,6 +31,10 @@ const items = [
     label: "News",
     to: "/en/news-dashboard",
   },
+  {
+    label: "Wallets",
+    to: { name: "wallets" },
+  },
 ]
 
 function isActive(item: { to: unknown; label: string }): boolean {
