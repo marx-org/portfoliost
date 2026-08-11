@@ -3,7 +3,9 @@ import { computed, onMounted, ref } from "vue"
 import { useRoute } from "vue-router"
 import * as instrumentsApi from "@/api/instruments"
 import StatGroup from "@/components/StatGroup.vue"
-import type { InstrumentsMetrics, InstrumentsOverviewMetrics, InstrumentsProfile, QuoteAapl } from "@/api/types"
+import ResearchPriceChart from "@/modules/instruments/ResearchPriceChart.vue"
+import ResearchSeasonality from "@/modules/instruments/ResearchSeasonality.vue"
+import type { InstrumentsMetrics, InstrumentsOverviewMetrics, InstrumentsProfile, IrEventsAapl, QuoteAapl } from "@/api/types"
 import { formatCompact, formatCurrency, formatNumber, formatPercent } from "@/utils/format"
 
 const route = useRoute()
@@ -14,19 +16,20 @@ const metrics = ref<InstrumentsMetrics | null>(null)
 const overview = ref<InstrumentsOverviewMetrics | null>(null)
 const quote = ref<QuoteAapl | null>(null)
 const epsSurprises = ref<Array<{ date?: string; year?: number; eps?: number; epsEstimate?: number }>>([])
-const priceHistory = ref<{ dates: string[]; prices: number[] }>({ dates: [], prices: [] })
+const irEvents = ref<IrEventsAapl>([])
+const showFullDescription = ref(false)
 const error = ref<string | null>(null)
 const loading = ref(true)
 
 onMounted(async () => {
   try {
-    const [p, m, o, q, eps, hist] = await Promise.all([
+    const [p, m, o, q, eps, ir] = await Promise.all([
       instrumentsApi.getInstrumentProfile(symbol),
       instrumentsApi.getInstrumentMetrics(symbol),
       instrumentsApi.getInstrumentOverviewMetrics(symbol).catch(() => null),
       instrumentsApi.getQuote(symbol),
       instrumentsApi.getEpsSurprises(symbol).catch(() => ({ annual: [] })),
-      instrumentsApi.getHistory(symbol, "daily").catch(() => null),
+      instrumentsApi.getInvestorRelations(symbol).catch(() => []),
     ])
     profile.value = p
     metrics.value = m
@@ -34,13 +37,7 @@ onMounted(async () => {
     quote.value = q
     const raw = (eps ?? {}) as { annual?: Array<{ date?: string; year?: number; eps?: number; epsEstimate?: number }> }
     epsSurprises.value = Array.isArray(eps) ? (eps as never) : raw.annual ?? []
-    if (hist) {
-      const h = hist as { timestamps: number[]; closePrices: number[] }
-      priceHistory.value = {
-        dates: h.timestamps.map((t) => new Date(t * 1000).toLocaleDateString("en-US", { month: "short", year: "2-digit" })),
-        prices: h.closePrices,
-      }
-    }
+    irEvents.value = Array.isArray(ir) ? (ir as unknown as IrEventsAapl) : []
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Failed to load research data"
   } finally {
@@ -51,6 +48,20 @@ onMounted(async () => {
 function stat(label: string, value: string | null | undefined) {
   return { label, value: value ?? "—" }
 }
+
+const descriptionParagraphs = computed(() => {
+  const text = profile.value?.description ?? ""
+  return text ? text.split("\n\n").filter(Boolean) : []
+})
+const visibleParagraphs = computed(() => (showFullDescription.value ? descriptionParagraphs.value : descriptionParagraphs.value.slice(0, 1)))
+
+const priceTarget = computed(() => metrics.value?.priceTarget ?? null)
+
+const latestEarningsCall = computed(() => {
+  if (!irEvents.value.length) return null
+  const transcripts = irEvents.value.filter((e) => "audioUrl" in e && (e.title ?? "").toLowerCase().includes("earnings call"))
+  return transcripts[0] ?? (irEvents.value[0] as { title: string; date: string } | null)
+})
 
 const profileStats = computed(() => {
   const o = overview.value
@@ -124,15 +135,15 @@ const epsChartOptions = computed(() => ({
   legend: { position: "bottom" as const },
 }))
 
-const priceChartOptions = computed(() => ({
-  chart: { type: "area" as const, height: 300, toolbar: { show: true }, zoom: { enabled: false } },
-  colors: ["#2563eb"],
-  series: [{ name: "Price", data: priceHistory.value.prices }],
-  xaxis: { categories: priceHistory.value.dates, labels: { show: false } },
-  stroke: { curve: "smooth" as const, width: 2 },
-  dataLabels: { enabled: false },
-  fill: { type: "gradient" as const, gradient: { opacityFrom: 0.3, opacityTo: 0 } },
-}))
+const targetSpread = computed(() => {
+  const t = priceTarget.value
+  if (!t) return { low: 0, high: 0, current: 0, pct: 0 }
+  const low = t.targetLow
+  const high = t.targetHigh
+  const current = quote.value?.currentPrice ?? 0
+  const span = high - low || 1
+  return { low, high, current, pct: Math.min(100, Math.max(0, ((current - low) / span) * 100)) }
+})
 </script>
 
 <template>
@@ -157,37 +168,101 @@ const priceChartOptions = computed(() => ({
         </div>
       </div>
 
-      <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <div class="card p-6">
-          <h2 class="mb-3 text-base font-semibold">Company Overview</h2>
-          <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-            <dt class="text-slate-500">Name</dt>
-            <dd>{{ profile?.name }}</dd>
-            <dt class="text-slate-500">Sector</dt>
-            <dd>{{ profile?.gicsSector ?? "—" }}</dd>
-            <dt class="text-slate-500">Industry</dt>
-            <dd>{{ profile?.gicsIndustry ?? "—" }}</dd>
-            <dt class="text-slate-500">Country</dt>
-            <dd>{{ profile?.country ?? "—" }}</dd>
-            <dt class="text-slate-500">Exchange</dt>
-            <dd>{{ profile?.exchange ?? "—" }}</dd>
-            <dt class="text-slate-500">Employees</dt>
-            <dd>{{ profile?.employeeTotal ? formatNumber(profile.employeeTotal, 0) : "—" }}</dd>
-            <dt class="text-slate-500">CEO</dt>
-            <dd>{{ profile?.ceo ?? "—" }}</dd>
-          </dl>
-          <a
-            v-if="profile?.weburl"
-            :href="profile.weburl"
-            target="_blank"
-            rel="noopener"
-            class="mt-3 inline-block text-sm text-blue-600 hover:underline"
-          >
-            {{ profile.weburl.replace(/^https?:\/\//, "") }}
-          </a>
-        </div>
+      <div class="card p-6">
+        <h2 class="mb-3 text-base font-semibold">About {{ profile?.name ?? symbol }}</h2>
+        <p v-for="(p, i) in visibleParagraphs" :key="i" class="mb-3 text-sm leading-relaxed text-slate-700 last:mb-0">{{ p }}</p>
+        <button
+          v-if="descriptionParagraphs.length > 1"
+          type="button"
+          class="mt-2 text-sm font-medium text-blue-600 hover:underline"
+          @click="showFullDescription = !showFullDescription"
+        >
+          {{ showFullDescription ? "Show less" : "Show more" }}
+        </button>
+      </div>
 
-        <div class="card p-6 xl:col-span-2">
+      <div v-if="priceTarget" class="card p-6">
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 class="text-base font-semibold">Analyst Price Target</h2>
+          <span class="text-xs text-slate-500">{{ priceTarget.numberAnalysts }} analysts · {{ priceTarget.lastUpdated }}</span>
+        </div>
+        <div class="flex flex-wrap gap-6 text-sm">
+          <div>
+            <p class="text-slate-500">Low</p>
+            <p class="font-semibold">{{ formatCurrency(priceTarget.targetLow) }}</p>
+          </div>
+          <div>
+            <p class="text-slate-500">Mean</p>
+            <p class="font-semibold">{{ formatCurrency(priceTarget.targetMean) }}</p>
+          </div>
+          <div>
+            <p class="text-slate-500">Median</p>
+            <p class="font-semibold">{{ formatCurrency(priceTarget.targetMedian) }}</p>
+          </div>
+          <div>
+            <p class="text-slate-500">High</p>
+            <p class="font-semibold">{{ formatCurrency(priceTarget.targetHigh) }}</p>
+          </div>
+        </div>
+        <div class="relative mt-4 h-2 rounded-full bg-slate-200">
+          <div class="absolute inset-y-0 rounded-full bg-blue-200" :style="{ left: '0%', width: '100%' }"></div>
+          <div
+            class="absolute top-1/2 h-3.5 w-1 -translate-y-1/2 rounded bg-slate-700"
+            :style="{ left: `calc(${targetSpread.pct}% - 2px)` }"
+            :title="`Current ${formatCurrency(targetSpread.current)}`"
+          ></div>
+        </div>
+        <p class="mt-2 text-xs text-slate-500">Current price: {{ formatCurrency(targetSpread.current) }}</p>
+      </div>
+
+      <div class="card p-6">
+        <h2 class="mb-3 text-base font-semibold">Key Facts</h2>
+        <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+          <dt class="text-slate-500">Name</dt>
+          <dd>{{ profile?.name }}</dd>
+          <dt class="text-slate-500">Sector</dt>
+          <dd>{{ profile?.gicsSector ?? "—" }}</dd>
+          <dt class="text-slate-500">Industry</dt>
+          <dd>{{ profile?.gicsIndustry ?? "—" }}</dd>
+          <dt class="text-slate-500">Country</dt>
+          <dd>{{ profile?.country ?? "—" }}</dd>
+          <dt class="text-slate-500">Exchange</dt>
+          <dd>{{ profile?.exchange ?? "—" }}</dd>
+          <dt class="text-slate-500">Employees</dt>
+          <dd>{{ profile?.employeeTotal ? formatNumber(profile.employeeTotal, 0) : "—" }}</dd>
+          <dt class="text-slate-500">CEO</dt>
+          <dd>{{ profile?.ceo ?? "—" }}</dd>
+        </dl>
+        <a
+          v-if="profile?.weburl"
+          :href="profile.weburl"
+          target="_blank"
+          rel="noopener"
+          class="mt-3 inline-block text-sm text-blue-600 hover:underline"
+        >
+          {{ profile.weburl.replace(/^https?:\/\//, "") }}
+        </a>
+      </div>
+
+      <div v-if="latestEarningsCall" class="card p-6">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 class="text-base font-semibold">Latest Earnings Call</h2>
+            <p class="mt-1 text-sm text-slate-600">{{ latestEarningsCall.title }}</p>
+            <p class="text-xs text-slate-500">{{ latestEarningsCall.date }}</p>
+          </div>
+          <router-link
+            :to="{ name: 'research-ir', params: { symbol } }"
+            class="btn-secondary text-sm"
+          >
+            Open transcript
+          </router-link>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <ResearchSeasonality :symbol="symbol" />
+        <div class="card p-6">
           <h2 class="mb-3 text-base font-semibold">EPS Surprises - {{ symbol }}</h2>
           <component :is="'apexchart'" v-if="epsSurprises.length" :options="epsChartOptions" :series="epsChartOptions.series" />
           <p v-else class="text-sm text-slate-500">No earnings data available.</p>
@@ -195,7 +270,7 @@ const priceChartOptions = computed(() => ({
       </div>
 
       <div class="card p-6">
-        <h2 class="mb-4 text-base font-semibold">Company Statistics</h2>
+        <h2 class="mb-4 text-base font-semibold">Key Statistics</h2>
         <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
           <StatGroup title="Profile" :items="profileStats" />
           <StatGroup title="Margins" :items="marginStats" />
@@ -206,11 +281,7 @@ const priceChartOptions = computed(() => ({
         </div>
       </div>
 
-      <div class="card p-6">
-        <h2 class="mb-3 text-base font-semibold">Price Chart</h2>
-        <component :is="'apexchart'" v-if="priceHistory.prices.length" :options="priceChartOptions" :series="priceChartOptions.series" />
-        <p v-else class="text-sm text-slate-500">No price history available.</p>
-      </div>
+      <ResearchPriceChart :symbol="symbol" />
     </template>
   </div>
 </template>

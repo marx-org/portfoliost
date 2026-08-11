@@ -2,7 +2,7 @@ import { flushPromises, mount } from "@vue/test-utils"
 import { describe, expect, it, vi } from "vitest"
 import ResearchOverview from "@/modules/instruments/ResearchOverview.vue"
 import * as instrumentsApi from "@/api/instruments"
-import type { HistoryDaily, InstrumentsMetrics, InstrumentsOverviewMetrics, InstrumentsProfile, QuoteAapl } from "@/api/types"
+import type { InstrumentsMetrics, InstrumentsOverviewMetrics, InstrumentsProfile, QuoteAapl } from "@/api/types"
 
 vi.mock("@/api/instruments", () => ({
   getInstrumentProfile: vi.fn(),
@@ -11,6 +11,7 @@ vi.mock("@/api/instruments", () => ({
   getQuote: vi.fn(),
   getEpsSurprises: vi.fn(),
   getHistory: vi.fn(),
+  getInvestorRelations: vi.fn(),
 }))
 
 vi.mock("vue-router", () => ({
@@ -39,7 +40,8 @@ function makeProfile(): InstrumentsProfile {
     gicsIndustryGroup: "Technology Hardware",
     gicsIndustry: "Consumer Electronics",
     gicsSubIndustry: "Consumer Electronics",
-    description: "Apple designs, manufactures and markets smartphones.",
+    description:
+      "Apple designs, manufactures and markets smartphones.\n\nThe company generated revenue of $390.53B over the trailing twelve months.",
     address: "One Apple Park Way",
     city: "Cupertino",
     state: "CA",
@@ -109,6 +111,15 @@ function makeMetrics(): InstrumentsMetrics {
       cashPerShare: 14.79,
       operatingCashFlowPerShare: 25.78,
     },
+    priceTarget: {
+      symbol: "AAPL",
+      targetHigh: 436.37,
+      targetLow: 215.29,
+      targetMean: 338.32,
+      targetMedian: 332.16,
+      numberAnalysts: 35,
+      lastUpdated: "2026-08-01 00:00:00",
+    },
   } as InstrumentsMetrics
 }
 
@@ -128,24 +139,10 @@ function makeQuote(): QuoteAapl {
   } as unknown as QuoteAapl
 }
 
-function makeHistory(): HistoryDaily {
-  return {
-    symbol: "AAPL",
-    closePrices: [307.56, 310.1],
-    highPrices: [308, 311],
-    lowPrices: [306, 309],
-    openPrices: [307, 310],
-    volumes: [100, 120],
-    timestamps: [1754870400, 1754956800],
-    status: "ok",
-    currency: "USD",
-  } as HistoryDaily
-}
-
 function mountOverview() {
   return mount(ResearchOverview, {
     global: {
-      stubs: { apexchart: true },
+      stubs: { apexchart: true, ResearchPriceChart: true, ResearchSeasonality: true },
     },
   })
 }
@@ -158,7 +155,7 @@ describe("ResearchOverview", () => {
     mocked.getInstrumentOverviewMetrics.mockResolvedValue(makeOverview())
     mocked.getQuote.mockResolvedValue(makeQuote())
     mocked.getEpsSurprises.mockResolvedValue({ annual: [] })
-    mocked.getHistory.mockResolvedValue(makeHistory())
+    mocked.getInvestorRelations.mockResolvedValue([])
   })
 
   it("fetches research data for the route symbol", async () => {
@@ -182,10 +179,30 @@ describe("ResearchOverview", () => {
     const wrapper = mountOverview()
     await flushPromises()
 
-    expect(wrapper.text()).toContain("Company Statistics")
+    expect(wrapper.text()).toContain("Key Statistics")
     expect(wrapper.text()).toContain("Market Cap")
     expect(wrapper.text()).toContain("ROE")
     expect(wrapper.text()).toContain("P/E")
+  })
+
+  it("renders the analyst price target banner", async () => {
+    const wrapper = mountOverview()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain("Analyst Price Target")
+    expect(wrapper.text()).toContain("Low")
+    expect(wrapper.text()).toContain("High")
+  })
+
+  it("expands the description with show more", async () => {
+    const wrapper = mountOverview()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain("Apple designs, manufactures and markets smartphones.")
+    expect(wrapper.text()).not.toContain("$390.53B")
+    await wrapper.findAll("button").find((b) => b.text() === "Show more")!.trigger("click")
+    await flushPromises()
+    expect(wrapper.text()).toContain("$390.53B")
   })
 
   it("renders the company profile fields", async () => {

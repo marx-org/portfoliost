@@ -33,6 +33,10 @@ const pick = (rnd, arr) => arr[Math.floor(rnd() * arr.length)]
 const between = (rnd, lo, hi) => lo + rnd() * (hi - lo)
 const round = (x, d = 2) => Math.round(x * 10 ** d) / 10 ** d
 
+const fmtMoney = (n) =>
+  n >= 1e12 ? `$${(n / 1e12).toFixed(2)}T` : n >= 1e9 ? `$${(n / 1e9).toFixed(2)}B` : n >= 1e6 ? `$${(n / 1e6).toFixed(2)}M` : `$${Math.round(n).toLocaleString("en-US")}`
+const fmtNum = (n) => Math.round(n).toLocaleString("en-US")
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Instrument catalog
 // ─────────────────────────────────────────────────────────────────────────────
@@ -114,7 +118,7 @@ function synthBasics(sym, rnd) {
   const prevClose = round(price / (1 + between(rnd, -0.025, 0.025)))
   const sharesOut = round(between(rnd, 0.5e9, 16e9), 0)
   const mcap = round(price * sharesOut)
-  return { symbol: sym, name: cat.name, sector: cat.sector, industry: cat.industry, country: cat.country, currency: cat.currency, price, prevClose, sharesOutstanding: sharesOut, marketCap: mcap }
+  return { symbol: sym, name: cat.name, sector: cat.sector, industry: cat.industry, country: cat.country, exchange: cat.exchange, currency: cat.currency, price, prevClose, sharesOutstanding: sharesOut, marketCap: mcap }
 }
 
 function synthIncomeStatement(b, rnd, years = 4) {
@@ -405,6 +409,14 @@ function synthAiInsights(b, rnd) {
   }
 }
 
+function synthDescription(b, m) {
+  const tagline = `${b.name} is a ${b.sector} company specializing in ${b.industry}. The company is headquartered in ${b.country === "US" ? "the United States" : b.country} and trades on the ${b.exchange || "public"} exchange, with shares listed under the ticker ${b.symbol}.`
+  const perf = `The company generated revenue of ${fmtMoney(m.revenue)} over the trailing twelve months, with a net margin of ${round(m.netMargin, 1)}%. It employs approximately ${fmtNum(m.employees)} people and carries a market capitalization of ${fmtMoney(m.marketCap)}, making it one of the larger businesses in the ${b.industry} space.`
+  const yieldLine = m.dividendYield > 0 ? ` The current dividend yield is ${round(m.dividendYield, 2)}%.` : ""
+  const outlook = `Analysts covering the company see fair value around a mean target of ${fmtMoney(m.priceTarget)}, versus a last price of ${fmtMoney(b.price)}.${yieldLine}`
+  return [tagline, perf, outlook]
+}
+
 function synthResearch(sym) {
   const rnd = mulberry32(hashString(sym))
   const b = synthBasics(sym, rnd)
@@ -413,6 +425,7 @@ function synthResearch(sym) {
     symbol: sym,
     basics: b,
     overview: { ...CATALOG[sym], symbol: sym, ...b },
+    description: synthDescription(b, metrics),
     metrics,
     compare: synthCompare(metrics, b),
     fundamentals: {

@@ -6,6 +6,7 @@
     "sector": "",
     "industry": "Index Fund",
     "country": "US",
+    "exchange": "US",
     "currency": "USD",
     "price": 530,
     "prevClose": 528.09,
@@ -26,6 +27,11 @@
     "sharesOutstanding": 7906227531,
     "marketCap": 4190300591430
   },
+  "description": [
+    "Invesco QQQ Trust is a  company specializing in Index Fund. The company is headquartered in the United States and trades on the US exchange, with shares listed under the ticker QQQ.",
+    "The company generated revenue of $540.28B over the trailing twelve months, with a net margin of 30.2%. It employs approximately 179,463 people and carries a market capitalization of $4.19T, making it one of the larger businesses in the Index Fund space.",
+    "Analysts covering the company see fair value around a mean target of $686, versus a last price of $530. The current dividend yield is 2.42%."
+  ],
   "metrics": {
     "roa": 19.36,
     "roe": 20.58,
@@ -927,7 +933,7 @@
   },
   "aiInsights": {
     "symbol": "QQQ",
-    "generatedAt": "2026-08-11T09:22:42.698Z",
+    "generatedAt": "2026-08-11T20:46:59.197Z",
     "summary": "Invesco QQQ Trust trades at a 28.8x forward P/E with 9% expected EPS growth. Balance sheet remains healthy with net debt to equity at 0.11.",
     "bullCase": [
       "Revenue growth is expected to continue at 19.7%",

@@ -6,6 +6,7 @@
     "sector": "Technology",
     "industry": "Semiconductors",
     "country": "US",
+    "exchange": "US",
     "currency": "USD",
     "price": 175,
     "prevClose": 174.37,
@@ -26,6 +27,11 @@
     "sharesOutstanding": 15515259836,
     "marketCap": 2715170471300
   },
+  "description": [
+    "QUALCOMM Inc is a Technology company specializing in Semiconductors. The company is headquartered in the United States and trades on the US exchange, with shares listed under the ticker QCOM.",
+    "The company generated revenue of $451.39B over the trailing twelve months, with a net margin of 21.9%. It employs approximately 44,714 people and carries a market capitalization of $2.72T, making it one of the larger businesses in the Semiconductors space.",
+    "Analysts covering the company see fair value around a mean target of $175, versus a last price of $175. The current dividend yield is 2.87%."
+  ],
   "metrics": {
     "roa": 18.12,
     "roe": 134.59,
@@ -927,7 +933,7 @@
   },
   "aiInsights": {
     "symbol": "QCOM",
-    "generatedAt": "2026-08-11T09:22:42.685Z",
+    "generatedAt": "2026-08-11T20:46:59.193Z",
     "summary": "QUALCOMM Inc trades at a 44.2x forward P/E with 10.2% expected EPS growth. Balance sheet remains healthy with net debt to equity at 0.21.",
     "bullCase": [
       "Revenue growth is expected to continue at 24.3%",

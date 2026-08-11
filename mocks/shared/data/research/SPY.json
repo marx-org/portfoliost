@@ -6,6 +6,7 @@
     "sector": "",
     "industry": "Index Fund",
     "country": "US",
+    "exchange": "US",
     "currency": "USD",
     "price": 600,
     "prevClose": 602.13,
@@ -26,6 +27,11 @@
     "sharesOutstanding": 13649677796,
     "marketCap": 8189806677600
   },
+  "description": [
+    "SPDR S&P 500 ETF Trust is a  company specializing in Index Fund. The company is headquartered in the United States and trades on the US exchange, with shares listed under the ticker SPY.",
+    "The company generated revenue of $705.00B over the trailing twelve months, with a net margin of 33.7%. It employs approximately 110,737 people and carries a market capitalization of $8.19T, making it one of the larger businesses in the Index Fund space.",
+    "Analysts covering the company see fair value around a mean target of $711, versus a last price of $600. The current dividend yield is 2.47%."
+  ],
   "metrics": {
     "roa": 18.43,
     "roe": 59.15,
@@ -927,7 +933,7 @@
   },
   "aiInsights": {
     "symbol": "SPY",
-    "generatedAt": "2026-08-11T09:22:42.697Z",
+    "generatedAt": "2026-08-11T20:46:59.197Z",
     "summary": "SPDR S&P 500 ETF Trust trades at a 22.7x forward P/E with 17.3% expected EPS growth. Balance sheet remains healthy with net debt to equity at 0.09.",
     "bullCase": [
       "Revenue growth is expected to continue at 16.7%",

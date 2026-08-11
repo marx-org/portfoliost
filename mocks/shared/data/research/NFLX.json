@@ -6,6 +6,7 @@
     "sector": "Communication Services",
     "industry": "Entertainment",
     "country": "US",
+    "exchange": "US",
     "currency": "USD",
     "price": 990,
     "prevClose": 972.82,
@@ -26,6 +27,11 @@
     "sharesOutstanding": 9169202846,
     "marketCap": 9077510817540
   },
+  "description": [
+    "Netflix Inc is a Communication Services company specializing in Entertainment. The company is headquartered in the United States and trades on the US exchange, with shares listed under the ticker NFLX.",
+    "The company generated revenue of $968.48B over the trailing twelve months, with a net margin of 30.4%. It employs approximately 210,889 people and carries a market capitalization of $9.08T, making it one of the larger businesses in the Entertainment space.",
+    "Analysts covering the company see fair value around a mean target of $1,114, versus a last price of $990. The current dividend yield is 0.3%."
+  ],
   "metrics": {
     "roa": 10.75,
     "roe": 135.33,
@@ -927,7 +933,7 @@
   },
   "aiInsights": {
     "symbol": "NFLX",
-    "generatedAt": "2026-08-11T09:22:42.684Z",
+    "generatedAt": "2026-08-11T20:46:59.192Z",
     "summary": "Netflix Inc trades at a 39.7x forward P/E with 24.6% expected EPS growth. Balance sheet remains healthy with net debt to equity at 0.07.",
     "bullCase": [
       "Revenue growth is expected to continue at 13.5%",

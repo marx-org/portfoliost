@@ -6,6 +6,7 @@
     "sector": "Technology",
     "industry": "Semiconductors",
     "country": "US",
+    "exchange": "US",
     "currency": "USD",
     "price": 190,
     "prevClose": 194,
@@ -26,6 +27,11 @@
     "sharesOutstanding": 9473411017,
     "marketCap": 1799948093230
   },
+  "description": [
+    "Advanced Micro Devices Inc is a Technology company specializing in Semiconductors. The company is headquartered in the United States and trades on the US exchange, with shares listed under the ticker AMD.",
+    "The company generated revenue of $165.34B over the trailing twelve months, with a net margin of 18.5%. It employs approximately 221,891 people and carries a market capitalization of $1.80T, making it one of the larger businesses in the Semiconductors space.",
+    "Analysts covering the company see fair value around a mean target of $249, versus a last price of $190. The current dividend yield is 2.76%."
+  ],
   "metrics": {
     "roa": 32.65,
     "roe": 96.74,
@@ -927,7 +933,7 @@
   },
   "aiInsights": {
     "symbol": "AMD",
-    "generatedAt": "2026-08-11T09:22:42.685Z",
+    "generatedAt": "2026-08-11T20:46:59.193Z",
     "summary": "Advanced Micro Devices Inc trades at a 13.7x forward P/E with 6.3% expected EPS growth. Balance sheet remains healthy with net debt to equity at 0.22.",
     "bullCase": [
       "Revenue growth is expected to continue at 17.6%",

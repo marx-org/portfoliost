@@ -6,6 +6,7 @@
     "sector": "Consumer Discretionary",
     "industry": "Internet Content & Information",
     "country": "US",
+    "exchange": "US",
     "currency": "USD",
     "price": 47.9,
     "prevClose": 48,
@@ -26,6 +27,11 @@
     "sharesOutstanding": 7316097741,
     "marketCap": 350441081793.9
   },
+  "description": [
+    "Maplebear Inc is a Consumer Discretionary company specializing in Internet Content & Information. The company is headquartered in the United States and trades on the US exchange, with shares listed under the ticker CART.",
+    "The company generated revenue of $44.32B over the trailing twelve months, with a net margin of 20.9%. It employs approximately 186,401 people and carries a market capitalization of $350.44B, making it one of the larger businesses in the Internet Content & Information space.",
+    "Analysts covering the company see fair value around a mean target of $51, versus a last price of $48. The current dividend yield is 1.26%."
+  ],
   "metrics": {
     "roa": 8.03,
     "roe": 86.54,
@@ -927,7 +933,7 @@
   },
   "aiInsights": {
     "symbol": "CART",
-    "generatedAt": "2026-08-11T09:22:42.676Z",
+    "generatedAt": "2026-08-11T20:46:59.185Z",
     "summary": "Maplebear Inc trades at a 43.4x forward P/E with 21.2% expected EPS growth. Balance sheet remains healthy with net debt to equity at 0.1.",
     "bullCase": [
       "Revenue growth is expected to continue at 5.2%",

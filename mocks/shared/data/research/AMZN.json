@@ -6,6 +6,7 @@
     "sector": "Consumer Discretionary",
     "industry": "Internet Content & Information",
     "country": "US",
+    "exchange": "US",
     "currency": "USD",
     "price": 235,
     "prevClose": 233.52,
@@ -26,6 +27,11 @@
     "sharesOutstanding": 15324692543,
     "marketCap": 3601302747605
   },
+  "description": [
+    "Amazon.com Inc is a Consumer Discretionary company specializing in Internet Content & Information. The company is headquartered in the United States and trades on the US exchange, with shares listed under the ticker AMZN.",
+    "The company generated revenue of $323.10B over the trailing twelve months, with a net margin of 29.8%. It employs approximately 156,454 people and carries a market capitalization of $3.60T, making it one of the larger businesses in the Internet Content & Information space.",
+    "Analysts covering the company see fair value around a mean target of $269, versus a last price of $235. The current dividend yield is 0.32%."
+  ],
   "metrics": {
     "roa": 28.11,
     "roe": 26.78,
@@ -927,7 +933,7 @@
   },
   "aiInsights": {
     "symbol": "AMZN",
-    "generatedAt": "2026-08-11T09:22:42.683Z",
+    "generatedAt": "2026-08-11T20:46:59.192Z",
     "summary": "Amazon.com Inc trades at a 16.7x forward P/E with 21.9% expected EPS growth. Balance sheet remains healthy with net debt to equity at 0.33.",
     "bullCase": [
       "Revenue growth is expected to continue at 13.9%",

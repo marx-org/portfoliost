@@ -1,0 +1,250 @@
+<script setup lang="ts">
+import { computed, onMounted, ref, watch } from "vue"
+import { getHistory } from "@/api/instruments"
+import type { HistoryCompareSeries } from "@/api/instruments"
+
+const props = defineProps<{ symbol: string }>()
+
+type Timeframe = "1D" | "1W" | "1M" | "3M" | "6M" | "1Y" | "YTD" | "MAX"
+type Mode = "Price" | "Percent" | "Drawdowns"
+type CompareKey = "none" | "spy" | "qqq" | "iwm"
+
+const timeframes: Timeframe[] = ["1D", "1W", "1M", "3M", "6M", "1Y", "YTD", "MAX"]
+const modes: Mode[] = ["Price", "Percent", "Drawdowns"]
+const compareOptions: { key: CompareKey; label: string }[] = [
+  { key: "none", label: "No comparison" },
+  { key: "spy", label: "S&P 500" },
+  { key: "qqq", label: "Nasdaq 100" },
+  { key: "iwm", label: "Russell 2000" },
+]
+
+const timeframe = ref<Timeframe>("1Y")
+const mode = ref<Mode>("Price")
+const compare = ref<CompareKey>("none")
+const fullscreen = ref(false)
+const loading = ref(true)
+const error = ref<string | null>(null)
+
+const timestamps = ref<number[]>([])
+const prices = ref<number[]>([])
+const bench = ref<HistoryCompareSeries | null>(null)
+const loadedCompare = ref<CompareKey>("none")
+
+async function load(compareKey: CompareKey) {
+  loading.value = true
+  error.value = null
+  try {
+    const h = await getHistory(props.symbol, "daily", compareKey === "none" ? undefined : compareKey)
+    timestamps.value = h.timestamps
+    prices.value = h.closePrices
+    bench.value = h.compare ?? null
+    loadedCompare.value = compareKey
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : "Failed to load price history"
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => load("none"))
+watch(compare, (k) => {
+  if (k !== loadedCompare.value) load(k)
+})
+
+const slicePoints = computed(() => {
+  const n = timestamps.value.length
+  switch (timeframe.value) {
+    case "1D":
+      return 2
+    case "1W":
+      return Math.min(5, n)
+    case "1M":
+      return Math.min(21, n)
+    case "3M":
+      return Math.min(63, n)
+    case "6M":
+      return Math.min(126, n)
+    case "1Y":
+    case "MAX":
+      return n
+    case "YTD": {
+      const yearStart = new Date(timestamps.value[n - 1] * 1000).getFullYear()
+      let start = 0
+      for (let i = 0; i < n; i++) {
+        if (new Date(timestamps.value[i] * 1000).getFullYear() === yearStart) {
+          start = i
+          break
+        }
+      }
+      return n - start
+    }
+  }
+})
+
+const series = computed(() => {
+  const n = timestamps.value.length
+  const count = slicePoints.value
+  const startIdx = n - count
+  const dates = timestamps.value.slice(startIdx).map((t) =>
+    new Date(t * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" }),
+  )
+
+  function transform(data: number[]): number[] {
+    const slice = data.slice(startIdx)
+    if (mode.value === "Price") return slice
+    const base = slice[0] || 0
+    if (mode.value === "Percent") return slice.map((p) => (base ? ((p - base) / base) * 100 : 0))
+    let runningMax = -Infinity
+    return slice.map((p) => {
+      runningMax = Math.max(runningMax, p)
+      return runningMax ? ((p - runningMax) / runningMax) * 100 : 0
+    })
+  }
+
+  const out: Array<{ name: string; data: number[] }> = [{ name: props.symbol, data: transform(prices.value) }]
+  if (bench.value && compare.value !== "none") {
+    const benchSlice = bench.value.closePrices.slice(startIdx)
+    const bBase = benchSlice[0] || 0
+    const bData =
+      mode.value === "Price"
+        ? benchSlice
+        : benchSlice.map((p) => (bBase ? ((p - bBase) / bBase) * 100 : 0))
+    out.push({ name: bench.value.name, data: bData })
+  }
+  return { dates, data: out }
+})
+
+const chartOptions = computed(() => ({
+  chart: {
+    type: "area" as const,
+    height: fullscreen.value ? window.innerHeight - 80 : 380,
+    toolbar: { show: false },
+    zoom: { enabled: true },
+    animations: { enabled: true },
+    fontFamily: "inherit",
+  },
+  colors: mode.value === "Drawdowns" ? ["#dc2626", "#94a3b8"] : ["#2563eb", "#94a3b8"],
+  series: series.value.data,
+  xaxis: { categories: series.value.dates, labels: { show: !fullscreen.value, datetimeUTC: false } },
+  yaxis: {
+    labels: {
+      formatter: (v: number) => (mode.value === "Price" ? `$${v.toLocaleString("en-US", { maximumFractionDigits: 2 })}` : `${v.toFixed(2)}%`),
+    },
+  },
+  stroke: { curve: "smooth" as const, width: 2 },
+  dataLabels: { enabled: false },
+  fill: { type: "gradient" as const, gradient: { opacityFrom: 0.25, opacityTo: 0 } },
+  legend: { position: "top" as const, horizontalAlign: "right" as const },
+  grid: { borderColor: "#e2e8f0" },
+  tooltip: { shared: true },
+}))
+
+const summary = computed(() => {
+  const s = series.value.data[0]?.data ?? []
+  if (!s.length) return null
+  const first = s[0]
+  const last = s[s.length - 1]
+  if (mode.value === "Price") return { label: "Change", value: last - first }
+  return { label: "Change", value: last }
+})
+
+function downloadCsv(): void {
+  const { dates, data } = series.value
+  const header = ["Date", ...data.map((d) => d.name)]
+  const rows = dates.map((date, i) => [date, ...data.map((d) => d.data[i] ?? "")].join(","))
+  const csv = [header.join(","), ...rows].join("\n")
+  const blob = new Blob([csv], { type: "text/csv" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = `${props.symbol}_${timeframe.value}_${mode.value.toLowerCase()}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+</script>
+
+<template>
+  <div class="card p-6">
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <h2 class="text-base font-semibold">Price Chart</h2>
+      <div class="flex items-center gap-2">
+        <button
+          v-for="t in timeframes"
+          :key="t"
+          type="button"
+          class="rounded px-2 py-1 text-xs font-medium"
+          :class="timeframe === t ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'"
+          @click="timeframe = t"
+        >
+          {{ t }}
+        </button>
+      </div>
+    </div>
+
+    <div class="mb-4 flex flex-wrap items-center gap-3 text-xs">
+      <div class="flex overflow-hidden rounded-md border border-slate-300">
+        <button
+          v-for="m in modes"
+          :key="m"
+          type="button"
+          class="px-3 py-1.5 font-medium"
+          :class="mode === m ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-100'"
+          @click="mode = m"
+        >
+          {{ m }}
+        </button>
+      </div>
+
+      <label class="flex items-center gap-1.5 text-slate-600">
+        Compare
+        <select v-model="compare" class="rounded-md border border-slate-300 px-2 py-1.5 text-xs">
+          <option v-for="o in compareOptions" :key="o.key" :value="o.key">{{ o.label }}</option>
+        </select>
+      </label>
+
+      <div v-if="summary" class="ml-auto flex items-center gap-4 text-sm">
+        <span class="text-slate-500">{{ summary.label }}</span>
+        <span class="font-semibold" :class="summary.value >= 0 ? 'text-green-600' : 'text-red-600'">
+          {{ mode === "Price" ? `$${summary.value >= 0 ? "+" : ""}${summary.value.toLocaleString("en-US", { maximumFractionDigits: 2 })}` : `${summary.value >= 0 ? "+" : ""}${summary.value.toFixed(2)}%` }}
+        </span>
+      </div>
+
+      <div class="ml-auto flex items-center gap-1">
+        <button
+          type="button"
+          class="rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+          :title="fullscreen ? 'Exit fullscreen' : 'Fullscreen'"
+          @click="fullscreen = !fullscreen"
+        >
+          {{ fullscreen ? "Exit fullscreen" : "Fullscreen" }}
+        </button>
+        <button type="button" class="rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100" title="Download CSV" @click="downloadCsv">
+          Download
+        </button>
+      </div>
+    </div>
+
+    <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
+    <p v-if="loading" class="text-sm text-slate-500">Loading price history...</p>
+
+    <div v-if="fullscreen" class="fixed inset-0 z-50 overflow-auto bg-white p-6" @dblclick="fullscreen = false">
+      <div class="mb-3 flex items-center justify-between">
+        <h2 class="text-base font-semibold">{{ symbol }} - {{ timeframe }} ({{ mode }})</h2>
+        <button type="button" class="btn-secondary text-sm" @click="fullscreen = false">Close</button>
+      </div>
+      <component
+        :is="'apexchart'"
+        v-if="series.data.length && series.data[0].data.length"
+        :options="chartOptions"
+        :series="series.data"
+      />
+    </div>
+    <component
+      :is="'apexchart'"
+      v-else-if="series.data.length && series.data[0].data.length"
+      :options="chartOptions"
+      :series="series.data"
+    />
+    <p v-else class="text-sm text-slate-500">No price history available.</p>
+  </div>
+</template>

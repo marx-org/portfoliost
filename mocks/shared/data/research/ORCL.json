@@ -6,6 +6,7 @@
     "sector": "Technology",
     "industry": "Software - Infrastructure",
     "country": "US",
+    "exchange": "US",
     "currency": "USD",
     "price": 230,
     "prevClose": 226.62,
@@ -26,6 +27,11 @@
     "sharesOutstanding": 12091606459,
     "marketCap": 2781069485570
   },
+  "description": [
+    "Oracle Corp is a Technology company specializing in Software - Infrastructure. The company is headquartered in the United States and trades on the US exchange, with shares listed under the ticker ORCL.",
+    "The company generated revenue of $318.19B over the trailing twelve months, with a net margin of 20.5%. It employs approximately 162,555 people and carries a market capitalization of $2.78T, making it one of the larger businesses in the Software - Infrastructure space.",
+    "Analysts covering the company see fair value around a mean target of $230, versus a last price of $230. The current dividend yield is 2.21%."
+  ],
   "metrics": {
     "roa": 16.99,
     "roe": 112.84,
@@ -927,7 +933,7 @@
   },
   "aiInsights": {
     "symbol": "ORCL",
-    "generatedAt": "2026-08-11T09:22:42.681Z",
+    "generatedAt": "2026-08-11T20:46:59.189Z",
     "summary": "Oracle Corp trades at a 18.7x forward P/E with 23.1% expected EPS growth. Balance sheet remains healthy with net debt to equity at 0.22.",
     "bullCase": [
       "Revenue growth is expected to continue at 10.9%",

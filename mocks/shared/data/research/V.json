@@ -6,6 +6,7 @@
     "sector": "Financials",
     "industry": "Credit Services",
     "country": "US",
+    "exchange": "US",
     "currency": "USD",
     "price": 360,
     "prevClose": 365.28,
@@ -26,6 +27,11 @@
     "sharesOutstanding": 13239320450,
     "marketCap": 4766155362000
   },
+  "description": [
+    "Visa Inc is a Financials company specializing in Credit Services. The company is headquartered in the United States and trades on the US exchange, with shares listed under the ticker V.",
+    "The company generated revenue of $448.57B over the trailing twelve months, with a net margin of 11%. It employs approximately 144,219 people and carries a market capitalization of $4.77T, making it one of the larger businesses in the Credit Services space.",
+    "Analysts covering the company see fair value around a mean target of $387, versus a last price of $360. The current dividend yield is 1.21%."
+  ],
   "metrics": {
     "roa": 25.67,
     "roe": 112.39,
@@ -927,7 +933,7 @@
   },
   "aiInsights": {
     "symbol": "V",
-    "generatedAt": "2026-08-11T09:22:42.690Z",
+    "generatedAt": "2026-08-11T20:46:59.194Z",
     "summary": "Visa Inc trades at a 43.9x forward P/E with 9.2% expected EPS growth. Balance sheet remains healthy with net debt to equity at 0.33.",
     "bullCase": [
       "Revenue growth is expected to continue at 24.2%",

@@ -47,12 +47,57 @@ export async function getQuote(symbol: string): Promise<QuoteAapl> {
   return http.get<QuoteAapl>(`/api/instruments/${symbol}/quote`)
 }
 
-export async function getHistory(symbol: string, resolution: "daily" | "monthly" = "daily"): Promise<HistoryDaily> {
-  return http.get<HistoryDaily>(`/api/instruments/${symbol}/history?resolution=${resolution}`)
+export interface HistoryCompareSeries {
+  name: string
+  closePrices: number[]
+  timestamps: number[]
+}
+
+export async function getHistory(
+  symbol: string,
+  resolution: "daily" | "monthly" = "daily",
+  compare?: "spy" | "qqq" | "iwm",
+): Promise<HistoryDaily & { compare?: HistoryCompareSeries }> {
+  const q = new URLSearchParams({ resolution })
+  if (compare) q.set("compare", compare)
+  return http.get<HistoryDaily & { compare?: HistoryCompareSeries }>(`/api/instruments/${symbol}/history?${q}`)
 }
 
 export async function getEpsSurprises(symbol: string): Promise<unknown> {
   return http.get<unknown>(`/api/instruments/${symbol}/eps-surprises`)
+}
+
+export async function getInstrumentFundamentals(symbol: string): Promise<import("./types").ResearchFundamentals> {
+  return http.get<import("./types").ResearchFundamentals>(`/api/instruments/${symbol}/fundamentals`)
+}
+
+export async function getInstrumentOwnership(symbol: string): Promise<import("./types").ResearchOwnership> {
+  return http.get<import("./types").ResearchOwnership>(`/api/instruments/${symbol}/ownership`)
+}
+
+export async function getInstrumentDividends(symbol: string): Promise<import("./types").ResearchDividends> {
+  return http.get<import("./types").ResearchDividends>(`/api/instruments/${symbol}/dividends`)
+}
+
+export async function getInstrumentCalendar(symbol: string): Promise<import("./types").ResearchCalendar> {
+  return http.get<import("./types").ResearchCalendar>(`/api/instruments/${symbol}/calendar`)
+}
+
+export async function getInstrumentCompare(symbol: string): Promise<import("./types").ResearchCompare> {
+  return http.get<import("./types").ResearchCompare>(`/api/instruments/${symbol}/compare`)
+}
+
+export async function getInstrumentPeers(symbol: string): Promise<import("./types").ResearchPeers> {
+  return http.get<import("./types").ResearchPeers>(`/api/instruments/${symbol}/peers`)
+}
+
+export async function getInstrumentSeasonality(
+  symbol: string,
+  years = 5,
+  metric = "avg",
+): Promise<import("./types").ResearchSeasonality> {
+  const q = new URLSearchParams({ years: String(years), metric })
+  return http.get<import("./types").ResearchSeasonality>(`/api/instruments/${symbol}/seasonality?${q}`)
 }
 
 export async function getProjections(symbol: string): Promise<unknown> {

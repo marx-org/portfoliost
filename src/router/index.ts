@@ -108,14 +108,39 @@ const router = createRouter({
               component: () => import("@/modules/instruments/ResearchNews.vue"),
             },
             {
+              path: "fundamentals",
+              name: "research-fundamentals",
+              component: () => import("@/modules/instruments/ResearchFundamentals.vue"),
+            },
+            {
               path: "investor-relations",
               name: "research-ir",
               component: () => import("@/modules/instruments/ResearchInvestorRelations.vue"),
             },
             {
+              path: "ownership",
+              name: "research-ownership",
+              component: () => import("@/modules/instruments/ResearchOwnership.vue"),
+            },
+            {
               path: "projections",
               name: "research-projections",
               component: () => import("@/modules/instruments/ResearchProjections.vue"),
+            },
+            {
+              path: "compare",
+              name: "research-compare",
+              component: () => import("@/modules/instruments/ResearchCompare.vue"),
+            },
+            {
+              path: "calendar",
+              name: "research-calendar",
+              component: () => import("@/modules/instruments/ResearchCalendar.vue"),
+            },
+            {
+              path: "dividends",
+              name: "research-dividends",
+              component: () => import("@/modules/instruments/ResearchDividends.vue"),
             },
           ],
         },

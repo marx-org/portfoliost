@@ -6,6 +6,7 @@
     "sector": "Consumer Staples",
     "industry": "Beverages - Non-Alcoholic",
     "country": "US",
+    "exchange": "US",
     "currency": "USD",
     "price": 72,
     "prevClose": 72.45,
@@ -26,6 +27,11 @@
     "sharesOutstanding": 10062765177,
     "marketCap": 724519092744
   },
+  "description": [
+    "Coca-Cola Co is a Consumer Staples company specializing in Beverages - Non-Alcoholic. The company is headquartered in the United States and trades on the US exchange, with shares listed under the ticker KO.",
+    "The company generated revenue of $62.90B over the trailing twelve months, with a net margin of 26.1%. It employs approximately 39,700 people and carries a market capitalization of $724.52B, making it one of the larger businesses in the Beverages - Non-Alcoholic space.",
+    "Analysts covering the company see fair value around a mean target of $74, versus a last price of $72. The current dividend yield is 2.78%."
+  ],
   "metrics": {
     "roa": 31.39,
     "roe": 146.82,
@@ -927,7 +933,7 @@
   },
   "aiInsights": {
     "symbol": "KO",
-    "generatedAt": "2026-08-11T09:22:42.695Z",
+    "generatedAt": "2026-08-11T20:46:59.195Z",
     "summary": "Coca-Cola Co trades at a 37.1x forward P/E with 18.5% expected EPS growth. Balance sheet remains healthy with net debt to equity at 0.14.",
     "bullCase": [
       "Revenue growth is expected to continue at 19%",

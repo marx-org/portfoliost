@@ -6,6 +6,7 @@
     "sector": "Communication Services",
     "industry": "Internet Content & Information",
     "country": "US",
+    "exchange": "US",
     "currency": "USD",
     "price": 198,
     "prevClose": 195.35,
@@ -26,6 +27,11 @@
     "sharesOutstanding": 790198349,
     "marketCap": 156459273102
   },
+  "description": [
+    "Alphabet Inc is a Communication Services company specializing in Internet Content & Information. The company is headquartered in the United States and trades on the US exchange, with shares listed under the ticker GOOGL.",
+    "The company generated revenue of $18.40B over the trailing twelve months, with a net margin of 8.5%. It employs approximately 233,136 people and carries a market capitalization of $156.46B, making it one of the larger businesses in the Internet Content & Information space.",
+    "Analysts covering the company see fair value around a mean target of $212, versus a last price of $198. The current dividend yield is 0.62%."
+  ],
   "metrics": {
     "roa": 20.84,
     "roe": 87.95,
@@ -927,7 +933,7 @@
   },
   "aiInsights": {
     "symbol": "GOOGL",
-    "generatedAt": "2026-08-11T09:22:42.683Z",
+    "generatedAt": "2026-08-11T20:46:59.192Z",
     "summary": "Alphabet Inc trades at a 17.9x forward P/E with 5.5% expected EPS growth. Balance sheet remains healthy with net debt to equity at 0.28.",
     "bullCase": [
       "Revenue growth is expected to continue at 12.7%",

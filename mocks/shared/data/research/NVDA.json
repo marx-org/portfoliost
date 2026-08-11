@@ -6,6 +6,7 @@
     "sector": "Technology",
     "industry": "Semiconductors",
     "country": "US",
+    "exchange": "US",
     "currency": "USD",
     "price": 208.4,
     "prevClose": 207.12,
@@ -26,6 +27,11 @@
     "sharesOutstanding": 10795858156,
     "marketCap": 2249856839710.4
   },
+  "description": [
+    "NVIDIA Corp is a Technology company specializing in Semiconductors. The company is headquartered in the United States and trades on the US exchange, with shares listed under the ticker NVDA.",
+    "The company generated revenue of $213.29B over the trailing twelve months, with a net margin of 29.3%. It employs approximately 142,557 people and carries a market capitalization of $2.25T, making it one of the larger businesses in the Semiconductors space.",
+    "Analysts covering the company see fair value around a mean target of $212, versus a last price of $208. The current dividend yield is 1.5%."
+  ],
   "metrics": {
     "roa": 14.94,
     "roe": 149.81,
@@ -927,7 +933,7 @@
   },
   "aiInsights": {
     "symbol": "NVDA",
-    "generatedAt": "2026-08-11T09:22:42.673Z",
+    "generatedAt": "2026-08-11T20:46:59.182Z",
     "summary": "NVIDIA Corp trades at a 44x forward P/E with 10.1% expected EPS growth. Balance sheet remains healthy with net debt to equity at 0.24.",
     "bullCase": [
       "Revenue growth is expected to continue at 17.2%",

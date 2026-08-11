@@ -1,5 +1,5 @@
 import { requireAuth } from "../lib/auth.js"
-import { loadRaw, loadResearch, loadUniverse, normalize } from "../lib/data.js"
+import { loadRaw, loadResearch, loadUniverse, normalize, researchSymbols } from "../lib/data.js"
 import { logoPath } from "../lib/data.js"
 
 function getSymbol(ctx) {
@@ -50,6 +50,7 @@ function profileFor(symbol, research) {
     marketCapitalization: research.basics.marketCap / 1e6,
     marketcapUSD: research.basics.marketCap,
     shareOutstanding: research.basics.sharesOutstanding,
+    description: (research.description ?? []).join("\n\n"),
   }
 }
 
@@ -74,9 +75,21 @@ function overviewMetricsFor(symbol, research) {
   return { ...research.metrics, symbol }
 }
 
-function historyFor(symbol, resolution) {
+function historyFor(symbol, resolution, compare) {
   const base = resolution === "monthly" ? loadRaw("history_monthly.json") : loadRaw("history_daily.json")
-  return { ...base, symbol }
+  const h = { ...base, symbol }
+  if (!compare) return h
+  const prices = base.closePrices
+  if (!prices) return h
+  let prev = 100
+  const bench = prices.map((p, i) => {
+    if (i === 0) return prev
+    const instRet = (p - prices[i - 1]) / prices[i - 1]
+    prev = prev * (1 + instRet * 0.6 + 0.0002)
+    return round2(prev)
+  })
+  h.compare = { name: compare === "qqq" ? "Invesco QQQ" : compare === "iwm" ? "iShares Russell 2000" : "S&P 500 (proxy)", closePrices: bench, timestamps: base.timestamps }
+  return h
 }
 
 function round2(x) {
@@ -128,7 +141,7 @@ export function register(app) {
   app.get("/api/instruments/:symbol/history", (ctx) => {
     if (!requireAuth(ctx)) return
     const symbol = getSymbol(ctx)
-    ctx.res.json(historyFor(symbol, ctx.query.resolution))
+    ctx.res.json(historyFor(symbol, ctx.query.resolution, ctx.query.compare))
   })
 
   app.get("/api/instruments/:symbol/fundamentals", (ctx) => {
@@ -137,6 +150,27 @@ export function register(app) {
     const research = loadResearch(symbol)
     if (!research) return ctx.res.status(404).json({ error: "NotFound", message: `Unknown symbol ${symbol}` })
     ctx.res.json(research.fundamentals)
+  })
+
+  app.get("/api/instruments/:symbol/compare", (ctx) => {
+    if (!requireAuth(ctx)) return
+    const symbol = getSymbol(ctx)
+    const research = loadResearch(symbol)
+    if (!research) return ctx.res.status(404).json({ error: "NotFound", message: `Unknown symbol ${symbol}` })
+    ctx.res.json(research.compare)
+  })
+
+  app.get("/api/instruments/:symbol/peers", (ctx) => {
+    if (!requireAuth(ctx)) return
+    const symbol = getSymbol(ctx)
+    const research = loadResearch(symbol)
+    if (!research) return ctx.res.status(404).json({ error: "NotFound", message: `Unknown symbol ${symbol}` })
+    const sector = research.overview.sector
+    const candidates = researchSymbols()
+      .map((s) => loadResearch(s))
+      .filter((r) => r && r.symbol !== symbol && (sector ? r.overview.sector === sector : true))
+    const peers = candidates.slice(0, 4)
+    ctx.res.json({ symbol, items: [research.compare, ...peers.map((p) => p.compare)] })
   })
 
   app.get("/api/instruments/:symbol/ownership", (ctx) => {
@@ -168,7 +202,15 @@ export function register(app) {
     const symbol = getSymbol(ctx)
     const research = loadResearch(symbol)
     if (!research) return ctx.res.status(404).json({ error: "NotFound", message: `Unknown symbol ${symbol}` })
-    ctx.res.json({ ...research.seasonality, years: Number(ctx.query.years) || 5, metric: ctx.query.metric || "avg" })
+    const years = Number(ctx.query.years) || 5
+    const metric = ctx.query.metric || "avg"
+    const yearScale = years === 3 ? 0.8 : years === 10 ? 1.2 : years === 20 ? 1.45 : 1
+    const metricShift = metric === "avg" ? 0 : metric === "med" ? -0.3 : metric === "min" ? -1.2 : metric === "max" ? 1.2 : 0
+    const monthlyReturns = (research.seasonality.monthly_returns || []).map((m) => ({
+      month: m.month,
+      return_pct: round2(m.return_pct * yearScale + metricShift),
+    }))
+    ctx.res.json({ ...research.seasonality, years, metric, monthly_returns: monthlyReturns })
   })
 
   app.get("/api/instruments/:symbol/eps-surprises", (ctx) => {

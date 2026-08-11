@@ -6,6 +6,7 @@
     "sector": "Health Care",
     "industry": "Drug Manufacturers",
     "country": "US",
+    "exchange": "US",
     "currency": "USD",
     "price": 165,
     "prevClose": 164.42,
@@ -26,6 +27,11 @@
     "sharesOutstanding": 3712272959,
     "marketCap": 612525038235
   },
+  "description": [
+    "Johnson & Johnson is a Health Care company specializing in Drug Manufacturers. The company is headquartered in the United States and trades on the US exchange, with shares listed under the ticker JNJ.",
+    "The company generated revenue of $69.99B over the trailing twelve months, with a net margin of 14.5%. It employs approximately 152,130 people and carries a market capitalization of $612.53B, making it one of the larger businesses in the Drug Manufacturers space.",
+    "Analysts covering the company see fair value around a mean target of $184, versus a last price of $165. The current dividend yield is 1.29%."
+  ],
   "metrics": {
     "roa": 7.99,
     "roe": 141.24,
@@ -927,7 +933,7 @@
   },
   "aiInsights": {
     "symbol": "JNJ",
-    "generatedAt": "2026-08-11T09:22:42.697Z",
+    "generatedAt": "2026-08-11T20:46:59.196Z",
     "summary": "Johnson & Johnson trades at a 13.3x forward P/E with 8.9% expected EPS growth. Balance sheet remains healthy with net debt to equity at 0.33.",
     "bullCase": [
       "Revenue growth is expected to continue at 15.3%",

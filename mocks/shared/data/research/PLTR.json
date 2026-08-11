@@ -6,6 +6,7 @@
     "sector": "Technology",
     "industry": "Software - Infrastructure",
     "country": "US",
+    "exchange": "US",
     "currency": "USD",
     "price": 185.3,
     "prevClose": 186.46,
@@ -26,6 +27,11 @@
     "sharesOutstanding": 15116949539,
     "marketCap": 2801170749576.7
   },
+  "description": [
+    "Palantir Technologies Inc is a Technology company specializing in Software - Infrastructure. The company is headquartered in the United States and trades on the US exchange, with shares listed under the ticker PLTR.",
+    "The company generated revenue of $378.01B over the trailing twelve months, with a net margin of 11.1%. It employs approximately 153,093 people and carries a market capitalization of $2.80T, making it one of the larger businesses in the Software - Infrastructure space.",
+    "Analysts covering the company see fair value around a mean target of $205, versus a last price of $185. The current dividend yield is 0.68%."
+  ],
   "metrics": {
     "roa": 38.78,
     "roe": 33.61,
@@ -927,7 +933,7 @@
   },
   "aiInsights": {
     "symbol": "PLTR",
-    "generatedAt": "2026-08-11T09:22:42.675Z",
+    "generatedAt": "2026-08-11T20:46:59.184Z",
     "summary": "Palantir Technologies Inc trades at a 15.6x forward P/E with 13.8% expected EPS growth. Balance sheet remains healthy with net debt to equity at 0.28.",
     "bullCase": [
       "Revenue growth is expected to continue at 10.3%",

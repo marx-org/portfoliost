@@ -6,6 +6,7 @@
     "sector": "",
     "industry": "Index Fund",
     "country": "US",
+    "exchange": "US",
     "currency": "USD",
     "price": 235,
     "prevClose": 231.15,
@@ -26,6 +27,11 @@
     "sharesOutstanding": 9661245615,
     "marketCap": 2270392719525
   },
+  "description": [
+    "iShares Russell 2000 ETF is a  company specializing in Index Fund. The company is headquartered in the United States and trades on the US exchange, with shares listed under the ticker IWM.",
+    "The company generated revenue of $246.29B over the trailing twelve months, with a net margin of 23.2%. It employs approximately 226,807 people and carries a market capitalization of $2.27T, making it one of the larger businesses in the Index Fund space.",
+    "Analysts covering the company see fair value around a mean target of $266, versus a last price of $235. The current dividend yield is 1.46%."
+  ],
   "metrics": {
     "roa": 19.81,
     "roe": 31.16,
@@ -927,7 +933,7 @@
   },
   "aiInsights": {
     "symbol": "IWM",
-    "generatedAt": "2026-08-11T09:22:42.698Z",
+    "generatedAt": "2026-08-11T20:46:59.198Z",
     "summary": "iShares Russell 2000 ETF trades at a 10.3x forward P/E with 18.1% expected EPS growth. Balance sheet remains healthy with net debt to equity at 0.2.",
     "bullCase": [
       "Revenue growth is expected to continue at 17.5%",

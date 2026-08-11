@@ -33,11 +33,15 @@ Legend: `[ ]` pending · `[x]` done
 - [x] E2e: menu opens and actions work. Commit. — `2d3ff28`
 
 ## Step 4 — Research full tabs + charts (complaint #4)
-- [ ] Expand tabs: Overview, News, Fundamentals, Investor Relations, Ownership, Projections, Compare, Calendar, Dividends (all functional).
-- [ ] Overview: description + Show more, key facts, Latest Earnings Call, Price Chart (timeframes 1D–MAX, Price/%/Drawdowns, comparison, Fullscreen, Download), Seasonality (3Y/5Y/10Y/20Y × Avg/Med/Min/Max).
-- [ ] Header: "Add to Watchlist" + symbol logo row.
-- [ ] New subviews: Fundamentals, Ownership, Compare, Calendar, Dividends.
-- [ ] E2e: charts render with clean console, tabs navigate. Commit.
+- [x] 4.1 Header + tab expansion: ResearchView header gets logo row + "Add to Watchlist"; add Fundamentals, Ownership, Compare, Calendar, Dividends routes (shells).
+- [x] 4.2 Overview upgrade: description + Show more, key facts, Latest Earnings Call, price-target banner.
+- [x] 4.3 Price chart: timeframes 1D–MAX, Price/%/Drawdowns modes, comparison overlay (mock `?compare=`), Fullscreen + CSV Download.
+- [x] 4.4 Seasonality: controls (3Y/5Y/10Y/20Y × Avg/Med/Min/Max) + chart (mock years/metric transforms).
+- [x] 4.5 Fundamentals subview: income statement / balance sheet / cash flow tables.
+- [x] 4.6 Ownership subview: institutional / mutual fund holder tables.
+- [x] 4.7 Compare subview: fundamentals comparison table for the symbol.
+- [x] 4.8 Calendar + Dividends subviews.
+- [x] 4.9 Tests: e2e tab navigation + charts with clean console, unit coverage, lint/typecheck. Commit.
 
 ## Step 5 — Charting module (complaint #5)
 - [ ] New `/en/charting` route + `ChartingView.vue`.

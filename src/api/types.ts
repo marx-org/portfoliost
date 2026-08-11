@@ -86,3 +86,124 @@ export interface PortfolioCompare {
   totalValue: number
   items: PortfolioCompareRow[]
 }
+
+export interface ResearchSeasonality {
+  symbol: string
+  years: number
+  metric: string
+  monthly_returns: { month: string; return_pct: number }[]
+}
+
+export interface ResearchFundamentals {
+  financialHighlights: {
+    incomeStatement: Array<{
+      year: number
+      revenue: number
+      ebit: number
+      netIncome: number
+      netIncomeGrowth: number | null
+      netIncomeMargin: number
+      earningsPerShare: number
+      earningsPerShareGrowth: number | null
+      dilutedSharesOutstanding: number
+      ebitda: number
+    }>
+    balanceSheet: Array<{
+      year: number
+      totalAssets: number
+      totalLiabilities: number
+      shareholdersEquity: number
+      cash: number
+      cashAndShortTermInvestments: number
+      totalDebt: number
+      netDebt: number
+      workingCapital: number
+      retainedEarnings: number
+      debtEquityRatio: number
+    }>
+    cashFlow: Array<{
+      year: number
+      cashFlowFromOperatingActivities: number
+      cashFlowFromFinancingActivities: number
+      cashFlowFromInvestingActivities: number
+      freeCashFlow: number
+      freeCashFlowGrowth: number | null
+      freeCashFlowPerShare: number
+      capitalExpenditures: number
+      depreciation: number
+      dividendPayment: number
+    }>
+  }
+}
+
+export interface ResearchOwnership {
+  institutional: ResearchHolderRow[]
+  mutualFund: ResearchHolderRow[]
+  insider?: ResearchHolderRow[]
+  insiderTransactions?: ResearchInsiderTransaction[]
+}
+
+export interface ResearchInsiderTransaction {
+  title: string
+  transactionDate: string
+  transactionCode: string
+  transactionText: string
+  transactionAmount: number
+  transactionValue: number
+  filingDate: string
+}
+
+export interface ResearchHolderRow {
+  date: string
+  holdingPercentage: number
+  holdersCount: number
+  sumOfCurrentPositions: number
+  sumOfCurrentPositionsValue: number
+}
+
+export interface ResearchDividendRow {
+  date: string
+  year: number
+  amount: number
+  currency: string
+  type: string
+}
+
+export interface ResearchDividends {
+  history: ResearchDividendRow[]
+}
+
+export interface ResearchCalendar {
+  earnings: Array<{ date: string; title?: string; year: number; quarter: number }>
+  exDividend: Array<{ date: string; title?: string; year: number; amount: number }>
+  dividend: Array<{ date: string; title?: string; year: number; amount: number }>
+}
+
+export interface ResearchCompare {
+  symbol: string
+  name: string
+  price: number
+  marketCap: number
+  peRatio: number
+  forwardPe: number
+  pbRatio: number
+  psRatio: number
+  dividendYield: number
+  revenueGrowth: number
+  netMargin: number
+  roe: number
+  grossMargin: number
+  operatingMargin: number
+  evToEbitda: number
+  evToSales: number
+  fcfMargin: number
+  netIncome: number
+  revenue: number
+  sharesOutstanding: number
+  currency: string
+}
+
+export interface ResearchPeers {
+  symbol: string
+  items: ResearchCompare[]
+}
