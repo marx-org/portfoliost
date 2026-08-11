@@ -90,7 +90,7 @@ describe("InvestmentsView", () => {
     const wrapper = mountView()
     await flushPromises()
 
-    expect(wrapper.get("h1").text()).toBe("Investments")
+    expect(wrapper.get("h1").text()).toBe("Portfolios")
     expect(wrapper.text()).toContain("Total Value")
     expect(wrapper.text()).toContain("1,200.00")
     expect(wrapper.text()).toContain("+$200.00")

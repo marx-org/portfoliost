@@ -3,6 +3,8 @@ import { useRoute } from "vue-router"
 
 const route = useRoute()
 
+const currentPath = route?.path ?? (typeof window !== "undefined" ? window.location.pathname : "")
+
 const tabs = [
   {
     label: "Portfolios",
@@ -30,7 +32,7 @@ const tabs = [
         :key="tab.label"
         :to="tab.to"
         class="border-b-2 px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900"
-        :class="tab.match(route.path) ? 'border-blue-600 text-blue-700' : 'border-transparent'"
+        :class="tab.match(currentPath) ? 'border-blue-600 text-blue-700' : 'border-transparent'"
       >
         {{ tab.label }}
       </router-link>
