@@ -2,6 +2,7 @@
 import { onMounted, ref } from "vue"
 import { useWatchlistsStore } from "@/stores/watchlists"
 import type { Watchlist } from "@/api/watchlists"
+import InvestmentsTabs from "@/modules/portfolios/InvestmentsTabs.vue"
 
 const store = useWatchlistsStore()
 const loading = ref(true)
@@ -82,6 +83,8 @@ async function deleteWatchlist(wl: Watchlist) {
       </div>
       <button type="button" class="btn-primary" @click="showCreate = true">New watchlist</button>
     </div>
+
+    <InvestmentsTabs />
 
     <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
     <p v-if="loading" class="text-sm text-slate-500">Loading watchlists...</p>

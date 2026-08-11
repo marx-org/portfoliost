@@ -3,6 +3,7 @@ import { onMounted, ref } from "vue"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { formatCurrency, formatNumber, formatPercent, formatSignedCurrency } from "@/utils/format"
 import type { PortfoliosSummaries } from "@/api/types"
+import InvestmentsTabs from "@/modules/portfolios/InvestmentsTabs.vue"
 
 const store = usePortfolioStore()
 const loading = ref(true)
@@ -49,7 +50,7 @@ function returnClass(p: PortfoliosSummaries[number]): string {
   <div>
     <div class="mb-6 flex items-center justify-between">
       <div>
-        <h1 class="text-2xl font-semibold">Investments</h1>
+        <h1 class="text-2xl font-semibold">Portfolios</h1>
         <p v-if="store.totalMetrics" class="text-sm text-slate-500">
           {{ store.portfolios.length }} portfolio{{ store.portfolios.length === 1 ? "" : "s" }} &middot; base currency
           {{ store.totalMetrics.baseCurrency }}
@@ -57,6 +58,8 @@ function returnClass(p: PortfoliosSummaries[number]): string {
       </div>
       <button type="button" class="btn-primary" @click="showCreate = true">New portfolio</button>
     </div>
+
+    <InvestmentsTabs />
 
     <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
     <p v-if="loading" class="text-sm text-slate-500">Loading portfolios...</p>

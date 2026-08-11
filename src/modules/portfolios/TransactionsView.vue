@@ -3,6 +3,7 @@ import { onMounted, ref } from "vue"
 import { getAllTransactions } from "@/api/portfolios"
 import { formatCurrency, formatDate, formatNumber } from "@/utils/format"
 import type { PortfoliosTransactions } from "@/api/types"
+import InvestmentsTabs from "@/modules/portfolios/InvestmentsTabs.vue"
 
 type Tx = PortfoliosTransactions["items"][number]
 
@@ -47,6 +48,8 @@ function typeClass(type: string): string {
         <p class="text-sm text-slate-500">{{ total.toLocaleString() }} total transactions</p>
       </div>
     </div>
+
+    <InvestmentsTabs />
 
     <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
     <p v-if="loading" class="text-sm text-slate-500">Loading transactions...</p>

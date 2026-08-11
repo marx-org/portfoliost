@@ -11,9 +11,25 @@ async function login(page: import("@playwright/test").Page) {
 test("investments dashboard shows totals and the portfolio", async ({ page }) => {
   await login(page)
 
-  await expect(page.getByRole("heading", { name: "Investments" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Portfolios" })).toBeVisible()
   await expect(page.getByText("Total Value")).toBeVisible()
   await expect(page.getByRole("link", { name: /Top10/ })).toBeVisible()
+})
+
+test("investments tabs switch between portfolios, transactions, and watchlists", async ({ page }) => {
+  await login(page)
+
+  const tabs = page.getByRole("navigation", { name: "Investment sections" })
+  await expect(tabs.getByRole("link", { name: "Portfolios" })).toHaveClass(/border-blue-600/)
+  await expect(page.getByRole("button", { name: "Import from Broker" })).toBeVisible()
+
+  await tabs.getByRole("link", { name: "Transactions" }).click()
+  await expect(page).toHaveURL(/\/en\/investments\/transactions/)
+  await expect(tabs.getByRole("link", { name: "Transactions" })).toHaveClass(/border-blue-600/)
+
+  await tabs.getByRole("link", { name: "Watchlists" }).click()
+  await expect(page).toHaveURL(/\/en\/investments\/watchlist/)
+  await expect(tabs.getByRole("link", { name: "Watchlists" })).toHaveClass(/border-blue-600/)
 })
 
 test("portfolio detail shows summary, analytics, and positions", async ({ page }) => {
