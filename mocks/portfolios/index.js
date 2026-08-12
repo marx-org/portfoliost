@@ -387,7 +387,12 @@ export function register(app) {
 
   app.get("/api/portfolios/:id/transactions", (ctx) => {
     if (!requireAuth(ctx)) return
-    const data = ctx.query.type === "dividend" ? loadRaw("portfolio_transactions_dividend.json") : portfolioTransactions(ctx.params.id)
+    if (ctx.query.type === "dividend") return ctx.res.json(transactionsPage(ctx, loadRaw("portfolio_transactions_dividend.json")))
+    let data = portfolioTransactions(ctx.params.id)
+    if (ctx.query.positionId) {
+      data = { items: data.items.filter((t) => t.positionId === ctx.query.positionId), total: 0 }
+      data.total = data.items.length
+    }
     ctx.res.json(transactionsPage(ctx, data))
   })
 

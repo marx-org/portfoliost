@@ -12,6 +12,7 @@ import {
 import { formatCurrency, formatNumber, formatPercent, formatSignedCurrency } from "@/utils/format"
 import { researchSymbol } from "@/utils/research"
 import type { PortfolioPositions } from "@/api/types"
+import EditPositionDialog from "@/modules/portfolios/EditPositionDialog.vue"
 
 type Position = PortfolioPositions[number]
 
@@ -25,11 +26,13 @@ const id = String(route.params.id)
 const openMenuId = ref<string | null>(null)
 const notice = ref<string | null>(null)
 
-type ActionKind = "buy" | "sell" | "dividend" | "edit"
+type ActionKind = "buy" | "sell" | "dividend"
 const action = ref<{ kind: ActionKind; position: Position } | null>(null)
 const form = ref({ quantity: "", price: "", avgCost: "" })
 const saving = ref(false)
 const actionError = ref<string | null>(null)
+
+const editPosition = ref<Position | null>(null)
 
 const showCustomize = ref(false)
 const sortKey = ref<string | null>(null)
@@ -200,13 +203,25 @@ function openAction(kind: ActionKind, position: Position): void {
   actionError.value = null
 }
 
+function openEditPosition(position: Position): void {
+  openMenuId.value = null
+  editPosition.value = position
+}
+
+function onEditClose() {
+  editPosition.value = null
+}
+
+function onEditSaved() {
+  void store.fetchPositions(id)
+}
+
 function dialogTitle(): string {
   if (!action.value) return ""
   const map: Record<ActionKind, string> = {
     buy: `Buy ${action.value.position.symbol}`,
     sell: `Sell ${action.value.position.symbol}`,
     dividend: `Dividend for ${action.value.position.symbol}`,
-    edit: `Edit ${action.value.position.symbol}`,
   }
   return map[action.value.kind]
 }
@@ -247,14 +262,6 @@ async function submitAction(): Promise<void> {
         price,
       })
       notice.value = `Recorded dividend for ${position.symbol}`
-    } else {
-      await updatePortfolioPosition(id, position.id, {
-        quantity,
-        averageCostBasis: Number(form.value.avgCost),
-        avgCostBasis: Number(form.value.avgCost),
-        instrumentAvgCostBasis: Number(form.value.avgCost),
-      })
-      notice.value = `Updated ${position.symbol}`
     }
     await store.fetchPositions(id)
     action.value = null
@@ -395,7 +402,7 @@ function goResearch(position: Position): void {
                       <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50" @click="openAction('buy', pos)">Buy</button>
                       <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50" @click="openAction('sell', pos)">Sell</button>
                       <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50" @click="openAction('dividend', pos)">Dividend</button>
-                      <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50" @click="openAction('edit', pos)">Edit position</button>
+                      <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50" @click="openEditPosition(pos)">Edit position</button>
                       <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50" @click="goResearch(pos)">Research</button>
                       <button type="button" class="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50" @click="removePosition(pos)">Remove position</button>
                     </div>
@@ -450,18 +457,6 @@ function goResearch(position: Position): void {
             class="input mb-4"
             data-testid="action-quantity"
           />
-          <label v-if="action.kind === 'edit'" for="pos-avg" class="mb-1 block text-sm text-slate-600">Average cost basis</label>
-          <input
-            v-if="action.kind === 'edit'"
-            id="pos-avg"
-            v-model="form.avgCost"
-            type="number"
-            min="0"
-            step="any"
-            required
-            class="input mb-4"
-            data-testid="action-avg-cost"
-          />
           <label
             :for="action.kind === 'dividend' ? 'pos-amount' : 'pos-price'"
             class="mb-1 block text-sm text-slate-600"
@@ -487,5 +482,13 @@ function goResearch(position: Position): void {
       </div>
     </div>
     </div>
+
+    <EditPositionDialog
+      :open="editPosition !== null"
+      :portfolio-id="id"
+      :position="editPosition"
+      @close="onEditClose"
+      @saved="onEditSaved"
+    />
   </div>
 </template>

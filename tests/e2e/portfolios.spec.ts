@@ -150,6 +150,32 @@ test("position actions menu: buy updates quantity, research navigates, remove de
   await expect(page.locator("tbody tr").filter({ hasText: targetSymbol })).toHaveCount(0)
 })
 
+test("edit position opens a transaction list editor with rows and add row", async ({ page }) => {
+  await login(page)
+  await page.getByRole("link", { name: /Top10/ }).click()
+  await expect(page).toHaveURL(/\/en\/portfolios\/.*\/holdings/)
+
+  const metaRow = page.locator("tbody tr").first()
+  await metaRow.getByRole("button", { name: "Position actions" }).click()
+  await page.getByRole("button", { name: "Edit position" }).click()
+
+  const dialog = page.getByRole("dialog", { name: "Edit META position" })
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByText(/Changes save when you leave a field/)).toBeVisible()
+  await expect(dialog.getByRole("columnheader", { name: "Price per share" })).toBeVisible()
+  await expect(dialog.getByRole("columnheader", { name: "Transaction Fees" })).toBeVisible()
+  await expect(dialog.getByRole("columnheader", { name: "Total Cost" })).toBeVisible()
+  await expect(dialog.getByRole("columnheader", { name: "Exchange Rate" })).toBeVisible()
+
+  await dialog.getByLabel("Quantity").last().fill("3")
+  await dialog.getByLabel("Price per share").last().fill("500")
+  await dialog.getByRole("button", { name: "Add", exact: true }).click()
+  await expect(dialog.locator("tbody tr")).toHaveCount(2)
+
+  await dialog.getByRole("button", { name: "Close", exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+})
+
 test("add position from the header opens a chooser with instrument/option/cfd and adds a stock row", async ({ page }) => {
   await login(page)
   await page.getByRole("link", { name: /Top10/ }).click()

@@ -107,9 +107,11 @@ export async function getPortfolioTransactions(
   id: string,
   page = 1,
   limit = 20,
+  positionId?: string,
 ): Promise<PaginatedResponse<PortfolioTransactionsPage["items"][number]>> {
+  const position = positionId ? `&positionId=${encodeURIComponent(positionId)}` : ""
   return http.get<PaginatedResponse<PortfolioTransactionsPage["items"][number]>>(
-    `/api/portfolios/${id}/transactions?page=${page}&limit=${limit}`,
+    `/api/portfolios/${id}/transactions?page=${page}&limit=${limit}${position}`,
   )
 }
 
