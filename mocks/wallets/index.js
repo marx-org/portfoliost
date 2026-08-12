@@ -68,12 +68,15 @@ function toRecentCash(tx) {
     currency: tx.currency ?? "USD",
     exchangeRate: tx.exchangeRate ?? null,
     reference: tx.reference ?? null,
-    date: tx.date ?? tx.executedAt ?? tx.createdAt,
+    date: tx.date ?? tx.transaction_date ?? tx.executedAt ?? tx.createdAt,
     description: tx.description ?? null,
     createdAt: tx.createdAt ?? tx.date ?? tx.executedAt ?? nowIso(),
     portfolioId: tx.portfolioId ?? null,
     fees: tx.fees ?? null,
     taxes: tx.taxes ?? null,
+    feesType: tx.fees_type ?? null,
+    paymentMethod: tx.payment_method ?? null,
+    toWalletId: tx.to_wallet_id ?? null,
     isInternalTransfer: Boolean(tx.isInternalTransfer),
   }
 }
@@ -216,8 +219,10 @@ export function register(app) {
   function mutate(id, kind) {
     const wallet = resolveWallet(id)
     if (!wallet) return null
-    const { amount, description } = ctx_body_store.lastBody || {}
+    const body = ctx_body_store.lastBody || {}
+    const { amount, description, transaction_date, payment_method, fees, fees_type, to_wallet_id } = body
     const value = Number(amount) || 0
+    const feeValue = kind === "transfers" ? Number(fees) || 0 : 0
     const signed = kind === "withdrawals" ? -value : value
     const updated = {
       ...wallet,
@@ -230,14 +235,45 @@ export function register(app) {
       walletId: id,
       type: kind === "deposits" ? "DEPOSIT" : kind === "withdrawals" ? "WITHDRAWAL" : "TRANSFER",
       amount: value,
-      currency: wallet.currency,
+      currency: body.currency || wallet.currency,
       status: "completed",
+      transaction_date: transaction_date ?? null,
+      payment_method: payment_method ?? null,
+      fees: feeValue,
+      fees_type: fees_type ?? "fixed",
+      to_wallet_id: to_wallet_id ?? null,
       createdAt: nowIso(),
       description: description ?? null,
+      new_balance: updated.balance,
+      remaining_balance: updated.availableBalance,
     }
     const list = cashTx.get(id) || []
     list.unshift(tx)
     cashTx.set(id, list)
+    if (kind === "transfers" && to_wallet_id) {
+      const dest = resolveWallet(to_wallet_id)
+      if (dest && dest.id !== id) {
+        const destUpdated = {
+          ...dest,
+          balance: round2(dest.balance + value),
+          availableBalance: round2(dest.availableBalance + value),
+        }
+        walletOverrides.set(to_wallet_id, destUpdated)
+        const destTx = {
+          ...tx,
+          id: uuid(),
+          walletId: to_wallet_id,
+          type: "TRANSFER",
+          to_wallet_id: id,
+          amount: value,
+          remaining_balance: destUpdated.availableBalance,
+          description: description ?? `Transfer from ${wallet.name}`,
+        }
+        const destList = cashTx.get(to_wallet_id) || []
+        destList.unshift(destTx)
+        cashTx.set(to_wallet_id, destList)
+      }
+    }
     return tx
   }
 

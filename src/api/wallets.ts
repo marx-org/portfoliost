@@ -10,7 +10,31 @@ export interface CashTransaction {
   status: string
   createdAt: string
   description: string | null
+  transaction_date?: string | null
+  payment_method?: string | null
+  fees?: number
+  fees_type?: string | null
+  to_wallet_id?: string | null
+  new_balance?: number
+  remaining_balance?: number
   walletName?: string
+}
+
+export interface DepositInput {
+  amount: number
+  currency?: string
+  description?: string
+  transaction_date?: string
+}
+
+export interface WithdrawInput extends DepositInput {
+  payment_method?: string
+}
+
+export interface TransferInput extends DepositInput {
+  to_wallet_id: string
+  fees?: number
+  fees_type?: "fixed" | "pct"
 }
 
 export interface PaginatedCashTransactions {
@@ -101,15 +125,15 @@ export async function deleteWalletTransaction(id: string): Promise<void> {
   return http.delete<void>(`/api/wallets/transactions/${id}`)
 }
 
-export async function depositToWallet(id: string, input: { amount: number; description?: string }): Promise<CashTransaction> {
+export async function depositToWallet(id: string, input: DepositInput): Promise<CashTransaction> {
   return http.post<CashTransaction>(`/api/wallets/${id}/deposits`, input)
 }
 
-export async function withdrawFromWallet(id: string, input: { amount: number; description?: string }): Promise<CashTransaction> {
+export async function withdrawFromWallet(id: string, input: WithdrawInput): Promise<CashTransaction> {
   return http.post<CashTransaction>(`/api/wallets/${id}/withdrawals`, input)
 }
 
-export async function transferBetweenWallets(id: string, input: { amount: number; description?: string }): Promise<CashTransaction> {
+export async function transferBetweenWallets(id: string, input: TransferInput): Promise<CashTransaction> {
   return http.post<CashTransaction>(`/api/wallets/${id}/transfers`, input)
 }
 

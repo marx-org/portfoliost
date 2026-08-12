@@ -53,7 +53,7 @@ async function submitCash() {
       await store.withdraw(props.wallet.id, { amount: cashAmount.value, description: cashDescription.value || undefined })
       notice.value = `Withdrew ${formatCurrency(cashAmount.value, props.wallet.currency)}`
     } else {
-      await store.transfer(props.wallet.id, { amount: cashAmount.value, description: cashDescription.value || undefined })
+      await store.transfer(props.wallet.id, { amount: cashAmount.value, description: cashDescription.value || undefined, to_wallet_id: props.wallet.id })
       notice.value = `Transferred ${formatCurrency(cashAmount.value, props.wallet.currency)}`
     }
     showCashModal.value = false

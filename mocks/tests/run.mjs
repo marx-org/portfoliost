@@ -260,10 +260,32 @@ async function main() {
   check("wallets.balance-history", balanceHistory.status === 200 && Array.isArray(balanceHistory.json.data) && balanceHistory.json.data.length > 50, `got ${balanceHistory.status} len ${balanceHistory.json.data.length}`)
   const walletTx = await request(`/wallets/${walletId}/transactions`, { token })
   check("wallets.transactions", walletTx.status === 200, `got ${walletTx.status}`)
+  const deposit = await request(`/wallets/${walletId}/deposits`, { method: "POST", token, body: { amount: 100, description: "Test deposit", transaction_date: "2026-08-12", currency: "USD" } })
+  check("wallets.deposit new fields", deposit.status === 201 && deposit.json.transaction_date === "2026-08-12" && deposit.json.new_balance === 2016.6 && deposit.json.remaining_balance === 2016.6, `got ${deposit.status} ${JSON.stringify(deposit.json).slice(0, 120)}`)
+  const withdraw = await request(`/wallets/${walletId}/withdrawals`, { method: "POST", token, body: { amount: 50, payment_method: "bank_transfer", transaction_date: "2026-08-12" } })
+  check("wallets.withdraw payment method", withdraw.status === 201 && withdraw.json.payment_method === "bank_transfer" && withdraw.json.remaining_balance === 1966.6, `got ${withdraw.status} ${JSON.stringify(withdraw.json).slice(0, 120)}`)
+  const otherWalletId = wallets.json[1] ? wallets.json[1].id : null
+  if (otherWalletId) {
+    const transfer = await request(`/wallets/${walletId}/transfers`, { method: "POST", token, body: { amount: 100, to_wallet_id: otherWalletId, fees: 2, fees_type: "fixed", transaction_date: "2026-08-12" } })
+    check("wallets.transfer fees + dest", transfer.status === 201 && transfer.json.to_wallet_id === otherWalletId && transfer.json.fees === 2, `got ${transfer.status} ${JSON.stringify(transfer.json).slice(0, 120)}`)
+    const destWallet = await request("/wallets", { token })
+    const destUpdated = destWallet.json.find((w) => w.id === otherWalletId)
+    check("wallets.transfer credits destination", destUpdated && destUpdated.balance > wallets.json.find((w) => w.id === otherWalletId).balance, `got ${JSON.stringify(destUpdated).slice(0, 120)}`)
+  } else {
+    const newWallet = await request("/wallets", { method: "POST", token, body: { name: "Transfer dest", currency: "USD" } })
+    const destId = newWallet.json.id
+    const transfer = await request(`/wallets/${walletId}/transfers`, { method: "POST", token, body: { amount: 100, to_wallet_id: destId, fees: 2, fees_type: "fixed", transaction_date: "2026-08-12" } })
+    check("wallets.transfer fees + dest", transfer.status === 201 && transfer.json.to_wallet_id === destId && transfer.json.fees === 2, `got ${transfer.status} ${JSON.stringify(transfer.json).slice(0, 120)}`)
+    const destWallet = await request("/wallets", { token })
+    const destUpdated = destWallet.json.find((w) => w.id === destId)
+    check("wallets.transfer credits destination", destUpdated && destUpdated.balance === 100, `got ${JSON.stringify(destUpdated).slice(0, 120)}`)
+    const delWallet = await request(`/wallets/${destId}`, { method: "DELETE", token })
+    check("wallets.transfer cleanup delete", delWallet.status === 204, `got ${delWallet.status}`)
+  }
   const recent = await request("/wallets/recent-transactions?page=1&limit=10&sortBy=date&sortOrder=desc", { token })
   check("wallets.recent-transactions", recent.status === 200 && isObj(recent.json) && Array.isArray(recent.json.data) && isObj(recent.json.meta), `got ${recent.status}`)
   check("wallets.recent-transactions fields", recent.status === 200 && hasKeys(recent.json.data[0], ["id", "walletId", "walletName", "type", "displayLabel", "amount", "date"]), JSON.stringify(recent.json.data && recent.json.data[0]).slice(0, 120))
-  check("wallets.recent-transactions total", recent.status === 200 && recent.json.meta.total === 15, `total ${recent.json.meta && recent.json.meta.total}`)
+  check("wallets.recent-transactions total", recent.status === 200 && recent.json.meta.total === 18, `total ${recent.json.meta && recent.json.meta.total}`)
   const recentPg = await request("/wallets/recent-transactions?page=2&limit=5&sortBy=date&sortOrder=desc", { token })
   check("wallets.recent-transactions paginated", recentPg.status === 200 && recentPg.json.meta.page === 2 && recentPg.json.data.length === 5, `len ${recentPg.json.data.length} page ${recentPg.json.meta.page}`)
   const recentSorted = await request("/wallets/recent-transactions?page=1&limit=11&sortBy=amount&sortOrder=asc", { token })
@@ -275,7 +297,7 @@ async function main() {
   const delTx = await request(`/wallets/transactions/${investTx.id}`, { method: "DELETE", token })
   check("wallets.recent DELETE", delTx.status === 204, `got ${delTx.status}`)
   const afterDelete = await request("/wallets/recent-transactions?page=1&limit=11&sortBy=date&sortOrder=desc", { token })
-  check("wallets.recent DELETE tombstones", afterDelete.status === 200 && afterDelete.json.meta.total === 14 && !afterDelete.json.data.some((t) => t.id === investTx.id), `total ${afterDelete.json.meta.total}`)
+  check("wallets.recent DELETE tombstones", afterDelete.status === 200 && afterDelete.json.meta.total === 17 && !afterDelete.json.data.some((t) => t.id === investTx.id), `total ${afterDelete.json.meta.total}`)
 
   // ── Watchlists ──────────────────────────────────────────────
   const wl = await request("/watchlists", { token })

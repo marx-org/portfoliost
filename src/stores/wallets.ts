@@ -2,7 +2,7 @@ import { defineStore } from "pinia"
 import { ref } from "vue"
 import * as walletsApi from "@/api/wallets"
 import type { Wallets, WalletsTotalBalance } from "@/api/types"
-import type { CashTransaction, PaginatedCashTransactions } from "@/api/wallets"
+import type { CashTransaction, DepositInput, PaginatedCashTransactions, TransferInput, WithdrawInput } from "@/api/wallets"
 
 export const useWalletsStore = defineStore("wallets", () => {
   const wallets = ref<Wallets>([])
@@ -41,21 +41,21 @@ export const useWalletsStore = defineStore("wallets", () => {
     }
   }
 
-  async function deposit(id: string, input: { amount: number; description?: string }): Promise<CashTransaction> {
+  async function deposit(id: string, input: DepositInput): Promise<CashTransaction> {
     const tx = await walletsApi.depositToWallet(id, input)
     await fetchAll()
     await fetchTransactions(id)
     return tx
   }
 
-  async function withdraw(id: string, input: { amount: number; description?: string }): Promise<CashTransaction> {
+  async function withdraw(id: string, input: WithdrawInput): Promise<CashTransaction> {
     const tx = await walletsApi.withdrawFromWallet(id, input)
     await fetchAll()
     await fetchTransactions(id)
     return tx
   }
 
-  async function transfer(id: string, input: { amount: number; description?: string }): Promise<CashTransaction> {
+  async function transfer(id: string, input: TransferInput): Promise<CashTransaction> {
     const tx = await walletsApi.transferBetweenWallets(id, input)
     await fetchAll()
     await fetchTransactions(id)
