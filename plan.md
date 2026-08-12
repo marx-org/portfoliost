@@ -11,8 +11,9 @@ Legend: `[ ]` pending · `[x]` done
 - [x] Verify: `npm run test:mock` + `build` + `test`. Commit. — `509209f`
 
 ## Step 2 — Main page: cash balance currency breakdown
-- [ ] `InvestmentsView.vue`: total + per-currency rows (USD 100%) from `walletsStore.wallets`.
-- [ ] Update `tests/unit/modules/portfolios/InvestmentsView.test.ts`.
+- [x] `InvestmentsView.vue`: total + per-currency rows (USD 100%) from `walletsStore.wallets`.
+- [x] Update `tests/unit/modules/portfolios/InvestmentsView.test.ts`.
+- [x] Verify: `npm run test:mock` + `build` + `test` + `test:e2e`. Commit. — `6c40ec7`
 
 ## Step 3 — PortfolioCard: Add Position opens AddPositionDialog
 - [ ] `PortfolioCard.vue`: "Add Position" link → button emitting `add-position`; `InvestmentsView.vue` hosts `AddPositionDialog` for the selected portfolio. News link already targets the portfolio news tab (verify).
