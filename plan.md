@@ -27,7 +27,7 @@ Legend: `[ ]` pending · `[x]` done
   - Transfer: From Wallet (pre-filled), To Wallet, Amount + "Transfer All" + Available, Transfer Date, Fees (optional, % / $ toggle), Cancel/Transfer.
 - [x] Rewire `CashWalletCard.vue` + `WalletsView.vue` to use it.
 - [x] Fix mock: transfers debit source (amount + fees) and credit destination.
-- [x] Verify: `npm run test:mock` + `build` + `test` + `test:e2e`. Commit. — `d71e5e5`
+- [x] Verify: `npm run test:mock` + `build` + `test` + `test:e2e`. Commit. — `e313e47`
 
 ## Step 5 — Wallet detail screen + card navigation
 - [ ] Route `wallets/:id` → `/en/portfolios/wallets/:id` (example-service path): back, Rename, metric strip (Balance/Available/Currency), Deposit/Transfer/Withdraw/Delete, always-visible Balance History chart with timeframe + High/Low/Avg stats, Recent Transactions + View All.
