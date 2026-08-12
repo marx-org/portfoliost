@@ -41,6 +41,42 @@ test("overview description expands with show more", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Show less" })).toBeVisible()
 })
 
+test("overview shows extended statistics and EPS 5Q combobox", async ({ page }) => {
+  await openResearch(page, "overview")
+
+  await expect(page.getByText("Valuation (NTM)")).toBeVisible()
+  const stats = page.locator(".card", { hasText: "Key Statistics" })
+  await expect(stats.getByText("Dividends", { exact: true })).toBeVisible()
+  await expect(stats.getByText("P/FCF", { exact: true }).first()).toBeVisible()
+  await expect(stats.getByText("ROTA", { exact: true }).first()).toBeVisible()
+
+  await page.getByLabel("EPS timeframe").selectOption("quarterly")
+  await expect(page.getByLabel("EPS timeframe")).toHaveValue("quarterly")
+  await expect(page.getByText("EPS Surprises - AAPL")).toBeVisible()
+})
+
+test("research shows quick-switch logo row", async ({ page }) => {
+  await openResearch(page, "overview")
+  await page.getByRole("navigation", { name: "Quick symbol switch" }).getByRole("link", { name: /NVDA/ }).click()
+  await expect(page).toHaveURL(/\/en\/research\/NVDA\/overview/)
+  await expect(page.getByRole("heading", { name: "NVDA", exact: true }).first()).toBeVisible()
+})
+
+test("price chart shows Total Chg and CAGR", async ({ page }) => {
+  await openResearch(page, "overview")
+  const chartCard = page.locator(".card", { hasText: "Price Chart" })
+  await expect(chartCard.getByText("Total Chg")).toBeVisible()
+  await expect(chartCard.getByText("CAGR", { exact: true })).toBeVisible()
+  await expect(page.getByText("Powered by Example service")).toBeVisible()
+})
+
+test("news tab shows timeline and analyzed article counts", async ({ page }) => {
+  await openResearch(page, "news")
+  await expect(page.getByText("Timeline Events")).toBeVisible()
+  await expect(page.getByText("Analyzed Articles")).toBeVisible()
+  await expect(page.getByText(/articles for AAPL/)).toBeVisible()
+})
+
 test("price chart supports timeframes, modes, compare and fullscreen", async ({ page }) => {
   await openResearch(page, "overview")
   const chart = page.getByText("Price Chart")
@@ -52,8 +88,9 @@ test("price chart supports timeframes, modes, compare and fullscreen", async ({ 
   await page.getByRole("button", { name: "Percent", exact: true }).click()
   await expect(page.getByText(/\+?[-\d.]{1,8}%/).first()).toBeVisible()
 
-  await page.getByLabel(/Compare/).selectOption("spy")
-  await expect(page.locator(".apexcharts-canvas").filter({ hasText: "S&P 500" }).first()).toBeVisible()
+  await page.getByRole("button", { name: "Add comparison" }).click()
+  await page.getByRole("button", { name: "S&P 500", exact: true }).click()
+  await expect(page.getByRole("button", { name: /S&P 500/ }).first()).toBeVisible()
 
   await page.getByRole("button", { name: "Fullscreen" }).click()
   await expect(page.getByRole("button", { name: "Close" })).toBeVisible()
@@ -70,10 +107,11 @@ test("price chart downloads csv", async ({ page }) => {
 
 test("seasonality switches years and metric", async ({ page }) => {
   await openResearch(page, "overview")
+  const seasonality = page.locator(".card", { hasText: "Seasonality" })
   await expect(page.getByRole("heading", { name: "Seasonality" })).toBeVisible()
-  await page.getByRole("button", { name: "10Y", exact: true }).click()
-  await page.getByRole("button", { name: "Max", exact: true }).click()
-  await expect(page.getByRole("button", { name: "Max", exact: true })).toHaveClass(/bg-slate-800/)
+  await seasonality.getByRole("button", { name: "10Y", exact: true }).click()
+  await seasonality.getByRole("button", { name: "Max", exact: true }).click()
+  await expect(seasonality.getByRole("button", { name: "Max", exact: true })).toHaveClass(/bg-slate-800/)
   await expect(page.locator(".apexcharts-canvas").nth(1)).toBeVisible()
 })
 

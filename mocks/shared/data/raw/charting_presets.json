@@ -1,44 +1,32 @@
 [
   {
-    "name": "Mega-cap tech",
-    "description": "The biggest tech names by market cap",
-    "symbols": ["AAPL", "MSFT", "AMZN", "GOOGL", "META", "NVDA"],
+    "name": "Tech Giants",
+    "description": "The biggest technology companies by market cap",
+    "symbols": ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "ORCL", "TSLA"],
     "metric": "peRatio"
   },
   {
-    "name": "Chip makers",
-    "description": "Semiconductor peers across the sector",
-    "symbols": ["NVDA", "AMD", "TSMC", "QCOM", "KLAC", "LRCX", "AMAT"],
-    "metric": "evToEbitda"
-  },
-  {
-    "name": "Dividend champions",
-    "description": "Stable dividend payers with attractive yields",
-    "symbols": ["KO", "JNJ", "V", "AAPL", "MSFT", "TSMC"],
-    "metric": "dividendYield"
-  },
-  {
-    "name": "Growth vs. value",
-    "description": "High-growth disruptors against defensive stalwarts",
-    "symbols": ["NVDA", "TSLA", "PLTR", "KO", "JNJ", "V"],
+    "name": "Social Media",
+    "description": "Leading social platforms and content networks",
+    "symbols": ["META", "GOOGL", "NFLX", "SNAP", "SPOT"],
     "metric": "revenueGrowth"
   },
   {
-    "name": "Profitability leaders",
-    "description": "Companies with the fattest net margins",
-    "symbols": ["AAPL", "MSFT", "NVDA", "GOOGL"],
-    "metric": "netMargin"
+    "name": "EVs",
+    "description": "Electric vehicle makers and adjacent plays",
+    "symbols": ["TSLA", "RIVN", "NIO", "LCID", "NVDA"],
+    "metric": "revenueGrowth"
   },
   {
-    "name": "Cash machines",
-    "description": "Highest free-cash-flow margins",
-    "symbols": ["AAPL", "MSFT", "ORCL", "INTU"],
-    "metric": "fcfMargin"
+    "name": "Banks",
+    "description": "The largest US money-center banks",
+    "symbols": ["JPM", "BAC", "WFC", "GS"],
+    "metric": "peRatio"
   },
   {
-    "name": "Size matters",
-    "description": "Market-cap ranking of the largest listed companies",
-    "symbols": ["AAPL", "NVDA", "MSFT", "AMZN", "GOOGL", "META", "TSLA", "V"],
-    "metric": "marketCap"
+    "name": "Streaming",
+    "description": "Streaming media and entertainment platforms",
+    "symbols": ["NFLX", "DIS", "CMCSA", "SPOT"],
+    "metric": "revenueGrowth"
   }
 ]

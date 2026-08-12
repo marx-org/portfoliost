@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue"
 import { useRoute } from "vue-router"
-import { getPortfolioTransactions } from "@/api/portfolios"
+import { getPortfolioTransactions, updatePortfolioTransaction, deletePortfolioTransaction } from "@/api/portfolios"
 import { formatCurrency, formatDate, formatNumber } from "@/utils/format"
 import type { PortfolioTransactionsPage } from "@/api/types"
 
@@ -15,6 +15,12 @@ const page = ref(1)
 const totalPages = ref(1)
 const loading = ref(true)
 const error = ref<string | null>(null)
+const notice = ref<string | null>(null)
+
+const editing = ref<Tx | null>(null)
+const editForm = ref({ type: "BUY", quantity: 0, price: 0, fees: 0 })
+const editBusy = ref(false)
+const editError = ref<string | null>(null)
 
 async function load(targetPage = page.value) {
   loading.value = true
@@ -40,6 +46,47 @@ function typeClass(type: string): string {
   if (t === "SELL") return "bg-red-50 text-red-700"
   return "bg-slate-100 text-slate-600"
 }
+
+function openEdit(tx: Tx) {
+  editing.value = tx
+  editForm.value = { type: tx.type, quantity: tx.quantity, price: tx.price, fees: tx.fees ?? 0 }
+  editError.value = null
+}
+
+async function submitEdit() {
+  if (!editing.value) return
+  editBusy.value = true
+  editError.value = null
+  try {
+    await updatePortfolioTransaction(editing.value.portfolioId, editing.value.id, {
+      type: editForm.value.type,
+      quantity: editForm.value.quantity,
+      price: editForm.value.price,
+      fees: editForm.value.fees,
+    })
+    editing.value = null
+    notice.value = "Transaction updated"
+    await load()
+  } catch (err) {
+    editError.value = err instanceof Error ? err.message : "Failed to update transaction"
+  } finally {
+    editBusy.value = false
+  }
+}
+
+async function removeTransaction(tx: Tx) {
+  try {
+    await deletePortfolioTransaction(tx.portfolioId, tx.id)
+    notice.value = "Transaction deleted"
+    await load()
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : "Failed to delete transaction"
+  }
+}
+
+function costOf(tx: Tx): number {
+  return (tx.totalAmount ?? 0) + (tx.fees ?? 0)
+}
 </script>
 
 <template>
@@ -49,6 +96,7 @@ function typeClass(type: string): string {
       <p v-if="!loading" class="text-sm text-slate-500">{{ total.toLocaleString() }} total transactions</p>
     </div>
 
+    <p v-if="notice" class="border-b border-slate-100 px-5 py-3 text-sm text-green-700">{{ notice }}</p>
     <p v-if="error" class="border-b border-slate-100 px-5 py-3 text-sm text-red-700">{{ error }}</p>
     <p v-if="loading" class="px-5 py-6 text-sm text-slate-500">Loading transactions...</p>
 
@@ -62,7 +110,9 @@ function typeClass(type: string): string {
               <th class="px-5 py-2.5 font-medium">Symbol</th>
               <th class="px-5 py-2.5 text-right font-medium">Quantity</th>
               <th class="px-5 py-2.5 text-right font-medium">Price</th>
-              <th class="px-5 py-2.5 text-right font-medium">Total</th>
+              <th class="px-5 py-2.5 text-right font-medium">Cost</th>
+              <th class="px-5 py-2.5 text-right font-medium">Fees</th>
+              <th class="px-5 py-2.5"><span class="sr-only">Actions</span></th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100">
@@ -82,7 +132,28 @@ function typeClass(type: string): string {
               </td>
               <td class="px-5 py-3 text-right tabular-nums">{{ formatNumber(tx.quantity) }}</td>
               <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(tx.price) }}</td>
-              <td class="px-5 py-3 text-right font-medium tabular-nums">{{ formatCurrency(tx.totalAmount) }}</td>
+              <td class="px-5 py-3 text-right font-medium tabular-nums">{{ formatCurrency(costOf(tx)) }}</td>
+              <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(tx.fees) }}</td>
+              <td class="px-5 py-3">
+                <div class="flex justify-end gap-1">
+                  <button
+                    type="button"
+                    class="btn-ghost px-2 py-1 text-xs"
+                    aria-label="Edit transaction"
+                    @click="openEdit(tx)"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-ghost px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                    aria-label="Delete transaction"
+                    @click="removeTransaction(tx)"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -95,5 +166,37 @@ function typeClass(type: string): string {
         <button type="button" class="btn-ghost text-sm" :disabled="page >= totalPages" @click="load(page + 1)">Next</button>
       </div>
     </template>
+
+    <div
+      v-if="editing"
+      class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
+      @click.self="editing = null"
+    >
+      <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Edit transaction">
+        <h3 class="mb-4 text-base font-semibold">Edit transaction</h3>
+        <form @submit.prevent="submitEdit">
+          <label for="tx-type" class="mb-1 block text-sm text-slate-600">Type</label>
+          <select id="tx-type" v-model="editForm.type" class="input mb-4">
+            <option value="BUY">BUY</option>
+            <option value="SELL">SELL</option>
+            <option value="DIVIDEND">DIVIDEND</option>
+            <option value="TRANSFER">TRANSFER</option>
+          </select>
+          <label for="tx-quantity" class="mb-1 block text-sm text-slate-600">Quantity</label>
+          <input id="tx-quantity" v-model.number="editForm.quantity" type="number" min="0" step="any" required class="input mb-4" />
+          <label for="tx-price" class="mb-1 block text-sm text-slate-600">Price</label>
+          <input id="tx-price" v-model.number="editForm.price" type="number" min="0" step="0.01" required class="input mb-4" />
+          <label for="tx-fees" class="mb-1 block text-sm text-slate-600">Fees</label>
+          <input id="tx-fees" v-model.number="editForm.fees" type="number" min="0" step="0.01" class="input mb-4" />
+          <p v-if="editError" class="mb-3 text-sm text-red-600">{{ editError }}</p>
+          <div class="flex justify-end gap-2">
+            <button type="button" class="btn-ghost" @click="editing = null">Cancel</button>
+            <button type="submit" class="btn-primary" :disabled="editBusy">
+              {{ editBusy ? "Saving..." : "Save" }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
 </template>

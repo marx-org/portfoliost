@@ -24,6 +24,12 @@
   .btn-ghost {
     @apply btn text-slate-600 hover:bg-slate-100;
   }
+  .btn-emerald {
+    @apply btn bg-emerald-600 text-white hover:bg-emerald-700;
+  }
+  .btn-red-ghost {
+    @apply btn border border-red-200 bg-red-50 text-red-700 hover:bg-red-100;
+  }
   .input {
     @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500;
   }

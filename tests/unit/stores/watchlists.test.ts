@@ -55,8 +55,17 @@ describe("watchlists store", () => {
     const store = useWatchlistsStore()
     await store.create("Tech")
 
-    expect(mocked.createWatchlist).toHaveBeenCalledWith("Tech")
+    expect(mocked.createWatchlist).toHaveBeenCalledWith("Tech", undefined)
     expect(store.watchlists).toHaveLength(1)
+  })
+
+  it("creates a watchlist with a description", async () => {
+    mocked.createWatchlist.mockResolvedValue({ ...watchlist(), description: "Track semis" })
+    const store = useWatchlistsStore()
+    await store.create("Chips", "Track semis")
+
+    expect(mocked.createWatchlist).toHaveBeenCalledWith("Chips", "Track semis")
+    expect(store.watchlists[0].description).toBe("Track semis")
   })
 
   it("removes a watchlist", async () => {

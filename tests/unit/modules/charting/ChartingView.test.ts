@@ -38,6 +38,7 @@ describe("ChartingView", () => {
     await flushPromises()
     expect(wrapper.text()).toContain("No stocks added yet")
     expect(wrapper.text()).toContain("Add at least two stocks to build a comparison chart")
+    expect(wrapper.text()).toContain("0/10 selected")
   })
 
   it("adds a stock through the add event and fetches comparison", async () => {
@@ -75,6 +76,7 @@ describe("ChartingView", () => {
 
     expect(mockedCompare).toHaveBeenCalledWith(["AAPL", "MSFT", "NVDA"])
     expect(wrapper.findAll('[data-testid="stock-chip"]').length).toBe(3)
+    expect(wrapper.text()).toContain("3/10 selected")
   })
 
   it("changes the metric via the picker", async () => {

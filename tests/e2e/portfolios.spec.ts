@@ -11,7 +11,7 @@ async function login(page: import("@playwright/test").Page) {
 test("investments dashboard shows totals and the portfolio", async ({ page }) => {
   await login(page)
 
-  await expect(page.getByRole("heading", { name: "Portfolios" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Portfolios", exact: true })).toBeVisible()
   await expect(page.getByText("Total Value")).toBeVisible()
   await expect(page.getByRole("link", { name: /Top10/ })).toBeVisible()
 })
@@ -47,14 +47,16 @@ test("portfolio detail shows metric strip, tabbed sections, and positions", asyn
   await expect(rows.first()).toBeVisible()
   await expect(rows.first().getByText("META", { exact: true })).toBeVisible()
 
-  await tabs.getByRole("link", { name: "Analytics" }).click()
-  await expect(page).toHaveURL(/\/en\/portfolios\/.*\/analytics/)
-  await expect(tabs.getByRole("link", { name: "Analytics" })).toHaveClass(/border-blue-600/)
-  await expect(page.getByText("Equity Curve")).toBeVisible()
-  await expect(page.getByText("Monthly Returns")).toBeVisible()
+  await tabs.getByRole("link", { name: "Performance" }).click()
+  await expect(page).toHaveURL(/\/en\/portfolios\/.*\/performance/)
+  await expect(tabs.getByRole("link", { name: "Performance" })).toHaveClass(/border-blue-600/)
+  await expect(page.getByText("Performance Chart")).toBeVisible()
+  await expect(page.getByText("Returns Chart")).toBeVisible()
 
   const sections: Array<[string, string]> = [
+    ["Performance", /\/performance/],
     ["Allocation", /\/allocation/],
+    ["Risk Analysis", /\/risk-analysis/],
     ["Dividends", /\/dividends/],
     ["Calendar", /\/calendar/],
     ["News", /\/news/],
@@ -72,23 +74,44 @@ test("portfolio detail shows metric strip, tabbed sections, and positions", asyn
   await expect(page).toHaveURL(/\/en\/research\/META\/overview/)
 })
 
-test("transactions page lists transactions with pagination", async ({ page }) => {
+test("transactions page lists transactions with sortable columns and pagination", async ({ page }) => {
   await login(page)
   await page.goto("/en/investments/transactions")
 
   await expect(page.getByRole("heading", { name: "Transactions" })).toBeVisible()
+  await expect(page.getByText(/All investing and cash transactions/)).toBeVisible()
   await expect(page.locator("tbody tr").first()).toBeVisible()
-  await expect(page.getByText(/total transactions/)).toBeVisible()
+  await expect(page.getByTestId("table-th-quantity")).toBeVisible()
+  await expect(page.getByTestId("table-th-amount")).toBeVisible()
+  await expect(page.getByText(/P&L/)).toBeVisible()
+  await expect(page.getByTestId("table-th-date")).toContainText("↓")
+  await page.getByTestId("table-th-amount").click()
+  await expect(page.getByTestId("table-th-amount")).toContainText("↑")
+  await expect(page.getByLabel("Rows per page")).toContainText("10 per page")
+  await expect(page.getByText(/^\d+-\d+ of \d+$/)).toBeVisible()
+})
+
+test("wallet transactions sub-tab lists cash transactions", async ({ page }) => {
+  await login(page)
+  await page.goto("/en/investments/transactions/cash")
+
+  await expect(page.getByRole("heading", { name: "Transactions" })).toBeVisible()
+  await expect(page.getByRole("link", { name: "Wallet Transactions" })).toHaveClass(/border-blue-600/)
+  await expect(page.locator("tbody tr").first()).toBeVisible()
+  await expect(page.getByTestId("table-th-walletName")).toBeVisible()
+  await expect(page.getByTestId("table-th-amount")).toBeVisible()
+  await expect(page.getByTestId("table-th-date")).toContainText("↓")
+  await expect(page.getByRole("button", { name: "Edit transaction" }).first()).toBeVisible()
 })
 
 test("creating a new portfolio adds it to the list", async ({ page }) => {
   const name = `E2E Test ${Date.now()}`
   await login(page)
 
-  await page.getByRole("button", { name: "New portfolio" }).click()
+  await page.getByRole("button", { name: "Create Investment Portfolio" }).click()
   await expect(page.getByRole("dialog")).toBeVisible()
   await page.getByRole("textbox", { name: "Name" }).fill(name)
-  await page.getByRole("button", { name: "Create" }).click()
+  await page.getByRole("button", { name: "Create", exact: true }).click()
 
   await expect(page.getByRole("link", { name })).toBeVisible()
 })
@@ -125,4 +148,69 @@ test("position actions menu: buy updates quantity, research navigates, remove de
   await page.getByRole("button", { name: "Remove position" }).click()
   await expect(page.getByText(new RegExp(`Removed ${targetSymbol}`))).toBeVisible()
   await expect(page.locator("tbody tr").filter({ hasText: targetSymbol })).toHaveCount(0)
+})
+
+test("add position from the header opens a dialog and adds a row", async ({ page }) => {
+  await login(page)
+  await page.getByRole("link", { name: /Top10/ }).click()
+  await expect(page).toHaveURL(/\/en\/portfolios\/.*\/holdings/)
+
+  const rowsBefore = await page.locator("tbody tr").count()
+
+  await page.getByRole("button", { name: "Add Position", exact: true }).click()
+  await expect(page.getByRole("dialog", { name: "Add Position" })).toBeVisible()
+  await page.getByTestId("add-position-symbol").fill("AMD")
+  await page.getByTestId("add-position-quantity").fill("10")
+  await page.getByTestId("add-position-price").fill("120")
+  await page.getByRole("dialog", { name: "Add Position" }).getByRole("button", { name: "Add Position", exact: true }).click()
+
+  await expect(page.getByRole("dialog", { name: "Add Position" })).toHaveCount(0)
+  await expect(page.locator("tbody tr").filter({ hasText: "AMD" })).toHaveCount(1)
+  await expect(page.locator("tbody tr")).toHaveCount(rowsBefore + 1)
+})
+
+test("display currency switcher updates portfolio values and persists", async ({ page }) => {
+  await login(page)
+  await page.getByRole("link", { name: /Top10/ }).click()
+  await expect(page).toHaveURL(/\/en\/portfolios\/.*\/holdings/)
+
+  await expect(page.getByRole("button", { name: /Display currency: USD/ })).toBeVisible()
+  await page.getByRole("button", { name: /Display currency: USD/ }).click()
+  await page.getByRole("button", { name: "EUR", exact: true }).click()
+
+  await expect(page.getByRole("button", { name: /Display currency: EUR/ })).toBeVisible()
+  await expect(page.getByText(/€\s*[0-9]/).first()).toBeVisible()
+
+  await page.reload()
+  await expect(page.getByRole("button", { name: /Display currency: EUR/ })).toBeVisible()
+
+  await page.goto("/en/investments")
+  await expect(page.getByRole("button", { name: /Display currency: EUR/ })).toBeVisible()
+})
+
+test("holdings table groups by type, sector, and country", async ({ page }) => {
+  await login(page)
+  await page.getByRole("link", { name: /Top10/ }).click()
+  await expect(page).toHaveURL(/\/en\/portfolios\/.*\/holdings/)
+
+  const groupSelect = page.getByLabel("Group by")
+  await expect(groupSelect).toHaveValue("none")
+
+  await groupSelect.selectOption("assetType")
+  await expect(page.getByTestId("holdings-group-row")).toHaveCount(1)
+  await expect(page.getByTestId("holdings-group-row")).toContainText("Stock")
+  await expect(page.getByText(/Stock subtotal/)).toHaveCount(1)
+
+  await groupSelect.selectOption("sector")
+  await expect(page.getByTestId("holdings-group-row")).toHaveCount(3)
+  await expect(page.getByTestId("holdings-group-row").first()).toContainText("Communication Services")
+  await expect(page.getByText(/subtotal/)).toHaveCount(3)
+
+  await groupSelect.selectOption("country")
+  await expect(page.getByTestId("holdings-group-row")).toHaveCount(1)
+  await expect(page.getByTestId("holdings-group-row")).toContainText("US")
+
+  await groupSelect.selectOption("none")
+  await expect(page.getByTestId("holdings-group-row")).toHaveCount(0)
+  await expect(page.getByText(/Total/).first()).toBeVisible()
 })

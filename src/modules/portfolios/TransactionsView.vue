@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue"
-import { getAllTransactions } from "@/api/portfolios"
-import { formatCurrency, formatDate, formatNumber } from "@/utils/format"
+import { getAllTransactions, updatePortfolioTransaction, deletePortfolioTransaction } from "@/api/portfolios"
+import { formatCurrency, formatDateTime, formatNumber } from "@/utils/format"
 import type { PortfoliosTransactions } from "@/api/types"
 import InvestmentsTabs from "@/modules/portfolios/InvestmentsTabs.vue"
+import TransactionsSubTabs from "@/modules/portfolios/TransactionsSubTabs.vue"
 
 type Tx = PortfoliosTransactions["items"][number]
 
@@ -13,12 +14,34 @@ const page = ref(1)
 const totalPages = ref(1)
 const loading = ref(true)
 const error = ref<string | null>(null)
+const notice = ref<string | null>(null)
+
+const pageSize = ref(10)
+const pageSizes = [5, 10, 20, 50]
+const sortBy = ref("date")
+const sortOrder = ref<"asc" | "desc">("desc")
+
+const sortableColumns: { key: string; label: string }[] = [
+  { key: "symbol", label: "Symbol" },
+  { key: "date", label: "Date" },
+  { key: "portfolio", label: "Portfolio" },
+  { key: "type", label: "Type" },
+  { key: "quantity", label: "Quantity" },
+  { key: "price", label: "Price" },
+  { key: "fees", label: "Fees" },
+  { key: "amount", label: "Amount" },
+]
+
+const editing = ref<Tx | null>(null)
+const editForm = ref({ type: "BUY", symbol: "", quantity: 0, price: 0, fees: 0 })
+const editBusy = ref(false)
+const editError = ref<string | null>(null)
 
 async function load(targetPage = page.value) {
   loading.value = true
   error.value = null
   try {
-    const res = await getAllTransactions(targetPage, 20)
+    const res = await getAllTransactions(targetPage, pageSize.value, sortBy.value, sortOrder.value)
     transactions.value = res.items
     total.value = res.total
     page.value = res.page
@@ -32,25 +55,110 @@ async function load(targetPage = page.value) {
 
 onMounted(() => load())
 
-function typeClass(type: string): string {
-  const t = type.toUpperCase()
-  if (t === "BUY") return "bg-green-50 text-green-700"
-  if (t === "SELL") return "bg-red-50 text-red-700"
-  return "bg-slate-100 text-slate-600"
+function toggleSort(key: string) {
+  if (sortBy.value === key) {
+    sortOrder.value = sortOrder.value === "desc" ? "asc" : "desc"
+  } else {
+    sortBy.value = key
+    sortOrder.value = "asc"
+  }
+  load(1)
+}
+
+function changePageSize(size: number) {
+  pageSize.value = size
+  load(1)
+}
+
+function onPageSizeChange(e: Event) {
+  changePageSize(Number((e.target as HTMLSelectElement).value))
+}
+
+function goToPage(p: number) {
+  if (p < 1 || p > totalPages.value || p === page.value) return
+  load(p)
+}
+
+function pageNumbers(): (number | "…")[] {
+  const t = totalPages.value
+  if (t <= 7) return Array.from({ length: t }, (_, i) => i + 1)
+  const cur = page.value
+  const set = new Set<number>([1, t, cur - 1, cur, cur + 1])
+  const nums = [...set].filter((n) => n >= 1 && n <= t).sort((a, b) => a - b)
+  const out: (number | "…")[] = []
+  let prev = 0
+  for (const n of nums) {
+    if (n - prev > 1) out.push("…")
+    out.push(n)
+    prev = n
+  }
+  return out
+}
+
+function typeLabel(type: string): string {
+  return type.charAt(0) + type.slice(1).toLowerCase()
+}
+
+function amountOf(tx: Tx): number {
+  const gross = (tx.totalAmount ?? 0) + (tx.fees ?? 0)
+  return tx.type.toUpperCase() === "BUY" ? -gross : gross
+}
+
+function openEdit(tx: Tx) {
+  editing.value = tx
+  editForm.value = {
+    type: tx.type,
+    symbol: tx.instrumentSymbol,
+    quantity: tx.quantity,
+    price: tx.price,
+    fees: tx.fees ?? 0,
+  }
+  editError.value = null
+}
+
+async function submitEdit() {
+  if (!editing.value) return
+  editBusy.value = true
+  editError.value = null
+  try {
+    await updatePortfolioTransaction(editing.value.portfolioId, editing.value.id, {
+      type: editForm.value.type,
+      quantity: editForm.value.quantity,
+      price: editForm.value.price,
+      fees: editForm.value.fees,
+    })
+    editing.value = null
+    notice.value = "Transaction updated"
+    await load()
+  } catch (err) {
+    editError.value = err instanceof Error ? err.message : "Failed to update transaction"
+  } finally {
+    editBusy.value = false
+  }
+}
+
+async function removeTransaction(tx: Tx) {
+  try {
+    await deletePortfolioTransaction(tx.portfolioId, tx.id)
+    notice.value = "Transaction deleted"
+    await load()
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : "Failed to delete transaction"
+  }
 }
 </script>
 
 <template>
   <div>
-    <div class="mb-6 flex items-baseline justify-between">
-      <div>
-        <h1 class="text-2xl font-semibold">Transactions</h1>
-        <p class="text-sm text-slate-500">{{ total.toLocaleString() }} total transactions</p>
-      </div>
+    <div class="mb-6">
+      <h1 class="text-2xl font-semibold">Transactions</h1>
+      <p class="mt-1 text-sm text-slate-500">All investing and cash transactions from across your account.</p>
     </div>
 
     <InvestmentsTabs />
+    <TransactionsSubTabs />
 
+    <p v-if="notice" class="mb-4 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">{{ notice }}</p>
     <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
     <p v-if="loading" class="text-sm text-slate-500">Loading transactions...</p>
 
@@ -58,40 +166,172 @@ function typeClass(type: string): string {
       <div v-if="transactions.length" class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead>
-            <tr class="border-b border-slate-100 text-left text-xs uppercase text-slate-500">
-              <th class="px-5 py-2.5 font-medium">Date</th>
-              <th class="px-5 py-2.5 font-medium">Type</th>
-              <th class="px-5 py-2.5 font-medium">Symbol</th>
-              <th class="px-5 py-2.5 text-right font-medium">Quantity</th>
-              <th class="px-5 py-2.5 text-right font-medium">Price</th>
-              <th class="px-5 py-2.5 text-right font-medium">Total</th>
-              <th class="px-5 py-2.5 font-medium">Portfolio</th>
+            <tr class="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
+              <th
+                v-for="col in sortableColumns"
+                :key="col.key"
+                :data-testid="`table-th-${col.key}`"
+                class="px-5 py-2.5 font-medium"
+              >
+                <button type="button" class="inline-flex items-center gap-1 hover:text-slate-900" @click="toggleSort(col.key)">
+                  {{ col.label }}
+                  <span v-if="sortBy === col.key">{{ sortOrder === "asc" ? "↑" : "↓" }}</span>
+                </button>
+              </th>
+              <th class="px-5 py-2.5 font-medium">Instrument Currency</th>
+              <th class="px-5 py-2.5 font-medium">P&L</th>
+              <th class="px-5 py-2.5"><span class="sr-only">Actions</span></th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100">
             <tr v-for="tx in transactions" :key="tx.id" class="hover:bg-slate-50">
-              <td class="px-5 py-3 whitespace-nowrap">{{ formatDate(tx.executedAt) }}</td>
               <td class="px-5 py-3">
-                <span class="rounded-full px-2 py-0.5 text-xs font-medium" :class="typeClass(tx.type)">{{ tx.type }}</span>
+                <router-link
+                  :to="{ name: 'research-overview', params: { symbol: tx.instrumentSymbol } }"
+                  class="flex items-center gap-3"
+                >
+                  <img :src="`/api/logos/${tx.instrumentSymbol}`" :alt="tx.instrumentSymbol" class="h-8 w-8 rounded-full bg-slate-100" />
+                  <span>
+                    <span class="flex items-center gap-1 font-medium text-slate-900">
+                      {{ tx.instrumentSymbol }}
+                      <span class="text-xs font-normal text-slate-400">(US)</span>
+                      <span class="text-xs font-normal text-slate-400">{{ typeLabel(tx.assetType ?? "STOCK") }}</span>
+                    </span>
+                    <span class="block text-xs text-slate-500">{{ tx.instrumentName }}</span>
+                  </span>
+                </router-link>
               </td>
-              <td class="px-5 py-3">
-                <span class="font-medium text-slate-900">{{ tx.instrumentSymbol }}</span>
-                <p class="text-xs text-slate-500">{{ tx.instrumentName }}</p>
-              </td>
+              <td class="px-5 py-3 whitespace-nowrap text-slate-600">{{ formatDateTime(tx.executedAt) }}</td>
+              <td class="px-5 py-3 text-slate-600">{{ tx.portfolioName || "—" }}</td>
+              <td class="px-5 py-3 font-medium text-slate-900">{{ typeLabel(tx.type) }}</td>
               <td class="px-5 py-3 text-right tabular-nums">{{ formatNumber(tx.quantity) }}</td>
               <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(tx.price) }}</td>
-              <td class="px-5 py-3 text-right font-medium tabular-nums">{{ formatCurrency(tx.totalAmount) }}</td>
-              <td class="px-5 py-3 text-slate-500">{{ tx.portfolioName || "—" }}</td>
+              <td class="px-5 py-3">{{ tx.instrumentCurrency }}</td>
+              <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(tx.fees) }}</td>
+              <td class="px-5 py-3 text-right font-medium tabular-nums" :class="amountOf(tx) < 0 ? 'text-red-600' : 'text-green-700'">
+                {{ formatCurrency(amountOf(tx)) }}
+              </td>
+              <td class="px-5 py-3 text-slate-400">-</td>
+              <td class="px-5 py-3">
+                <div class="flex justify-end gap-1">
+                  <button
+                    type="button"
+                    class="btn-ghost px-2 py-1 text-xs"
+                    aria-label="Edit transaction"
+                    @click="openEdit(tx)"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-ghost px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                    aria-label="Delete transaction"
+                    @click="removeTransaction(tx)"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
       <p v-else class="px-5 py-6 text-sm text-slate-500">No transactions found.</p>
 
-      <div v-if="totalPages > 1" class="flex items-center justify-between border-t border-slate-200 px-5 py-3">
-        <button type="button" class="btn-ghost text-sm" :disabled="page <= 1" @click="load(page - 1)">Previous</button>
-        <span class="text-sm text-slate-500">Page {{ page }} of {{ totalPages }}</span>
-        <button type="button" class="btn-ghost text-sm" :disabled="page >= totalPages" @click="load(page + 1)">Next</button>
+      <div v-if="transactions.length" class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-5 py-3">
+        <p class="text-sm text-slate-500">
+          {{ (page - 1) * pageSize + 1 }}-{{ Math.min(page * pageSize, total) }} of {{ total }}
+        </p>
+        <div class="flex items-center gap-4">
+          <label class="flex items-center gap-2 text-sm text-slate-500">
+            Rows per page
+            <select class="input py-1" :value="pageSize" @change="onPageSizeChange">
+              <option v-for="s in pageSizes" :key="s" :value="s">{{ s }} per page</option>
+            </select>
+          </label>
+          <nav aria-label="Pagination" class="flex items-center gap-1">
+            <button
+              type="button"
+              class="btn-ghost px-2 py-1 text-xs"
+              aria-label="First page"
+              :disabled="page <= 1"
+              @click="goToPage(1)"
+            >
+              «
+            </button>
+            <button
+              type="button"
+              class="btn-ghost px-2 py-1 text-xs"
+              aria-label="Previous page"
+              :disabled="page <= 1"
+              @click="goToPage(page - 1)"
+            >
+              ‹
+            </button>
+            <button
+              v-for="n in pageNumbers()"
+              :key="n"
+              type="button"
+              class="btn-ghost px-2 py-1 text-xs"
+              :class="n === page ? 'bg-slate-900 text-white' : ''"
+              :aria-current="n === page ? 'page' : undefined"
+              :disabled="n === '…'"
+              @click="goToPage(Number(n))"
+            >
+              {{ n }}
+            </button>
+            <button
+              type="button"
+              class="btn-ghost px-2 py-1 text-xs"
+              aria-label="Next page"
+              :disabled="page >= totalPages"
+              @click="goToPage(page + 1)"
+            >
+              ›
+            </button>
+            <button
+              type="button"
+              class="btn-ghost px-2 py-1 text-xs"
+              aria-label="Last page"
+              :disabled="page >= totalPages"
+              @click="goToPage(totalPages)"
+            >
+              »
+            </button>
+          </nav>
+        </div>
+      </div>
+    </div>
+
+    <div
+      v-if="editing"
+      class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
+      @click.self="editing = null"
+    >
+      <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Edit transaction">
+        <h3 class="mb-4 text-base font-semibold">Edit {{ typeLabel(editing.type) }} Transaction</h3>
+        <form @submit.prevent="submitEdit">
+          <label for="tx-type" class="mb-1 block text-sm text-slate-600">Type</label>
+          <select id="tx-type" v-model="editForm.type" class="input mb-4">
+            <option value="BUY">Buy</option>
+            <option value="SELL">Sell</option>
+            <option value="DIVIDEND">Dividend</option>
+            <option value="TRANSFER">Transfer</option>
+          </select>
+          <label for="tx-quantity" class="mb-1 block text-sm text-slate-600">Quantity</label>
+          <input id="tx-quantity" v-model.number="editForm.quantity" type="number" min="0" step="any" required class="input mb-4" />
+          <label for="tx-price" class="mb-1 block text-sm text-slate-600">Price per share ($)</label>
+          <input id="tx-price" v-model.number="editForm.price" type="number" min="0" step="0.01" required class="input mb-4" />
+          <label for="tx-fees" class="mb-1 block text-sm text-slate-600">Transaction Fees</label>
+          <input id="tx-fees" v-model.number="editForm.fees" type="number" min="0" step="0.01" class="input mb-4" />
+          <p v-if="editError" class="mb-3 text-sm text-red-600">{{ editError }}</p>
+          <div class="flex justify-end gap-2">
+            <button type="button" class="btn-ghost" @click="editing = null">Cancel</button>
+            <button type="submit" class="btn-primary" :disabled="editBusy">
+              {{ editBusy ? "Saving..." : "Save" }}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   </div>

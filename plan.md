@@ -1,4 +1,4 @@
-# plan.md — example-service.ai parity (5 reported gaps)
+# plan.md — example-service.ai parity (5 reported gaps + parity audit)
 
 Long-running plan. Each step is implemented, verified (build + unit + mock + e2e), committed, and then marked here.
 
@@ -48,3 +48,68 @@ Legend: `[ ]` pending · `[x]` done
 - [x] Stocks selector (0/10), Add stock via search modal, Popular comparisons presets.
 - [x] Fundamentals comparison charts from `/api/charting/compare` with metric picker.
 - [x] E2e: add stocks → charts appear. Commit.
+
+## Step 6 — Parity audit (page-by-page diff vs example-service.ai)
+Compared every page/button of `app.example-service.ai` (authenticated) to this app. Skipped per user (see AGENTS.md): news dashboard, premium plan description, send error, Copilot, import from broker, alerts, payments/billing. Gaps to implement, grouped:
+
+### 6.1 Sidebar / navigation
+- [x] Remove/relocate "Wallets" — example-service has NO Wallets item; cash lives as "Cash Portfolios" on the Portfolios page.
+- [x] Wire dead links: News → real news page (no route today), Settings → `/en/settings/profile`. (Alerts link removed — alerts skipped per user.)
+- [x] Remove "Report bug" link (bottom of sidebar) — was added earlier, then removed: the send-error form is on the skip list.
+- [ ] Research quick-switch logo row (MSFT/NVDA/META/...) — example-service shows it on the research page too.
+
+### 6.2 Portfolios page (investments)
+- [x] "Display currency" button (USD $ dropdown) in page header.
+- [x] Investment Portfolios + Cash Portfolios sections; return metrics: Total Value / Total Invested / Total Return %.
+- [x] Portfolio card actions: mini chart w/ timeframes (incl. ALL), Add Position, Analytics, News, Calendar.
+- [x] "Manage" menu per portfolio → Edit / Export CSV / Export XML / Export JSON / Delete.
+- [x] Cash wallet card actions: Deposit / Withdraw / Transfer / History / Manage.
+- Skipped per user: "Import from Broker" (see AGENTS.md).
+
+### 6.3 Portfolio detail page
+- [x] Metric strip gains Unrealized / Realized / Income (ours: Total Value/Invested/Return only).
+- [x] "Rename" + "Delete" buttons (rename exists; delete missing).
+- [x] Tabs: rename Analytics→"Performance" (`/performance`), Risk→"Risk Analysis" (`/risk-analysis`), keep route aliases.
+- [x] AI Insight premium banner on Holdings tab ("Premium feature — upgrade to unlock AI portfolio insights").
+- [x] Holdings table: "Export" button, "Customize 7" column picker, sortable headers.
+- [x] Performance tab: Drawdown (max/current + Add custom timeframe), Returns Chart (Day/Month/Year), Top/Bottom Performers.
+- [x] Position actions: Buy/Sell/Dividend/Edit/Research/Remove already match example-service.
+
+Portfolio screen gaps (user-reported):
+- [x] "Add Position" button does nothing (in the page header / card) — now opens a dialog (symbol/quantity/price) → `POST /portfolios/:id/positions`. e2e-covered.
+- [x] Delete button is not styled (in the page header) — now `btn-red-ghost`.
+- [x] No currency switcher ("Display currency") on the portfolio detail header — shared `useDisplayCurrencyStore` (also used by Investments page) feeds the metric strip + holdings table; reactive via `storeToRefs`; persists to localStorage. e2e-covered.
+- [x] No export button near "Positions" on the holdings screen — already present (Export CSV), verified.
+- [x] No grouping switch (none / type / sector / country) for the holdings table — group header + subtotal rows. e2e-covered.
+
+### 6.4 Research page
+- [ ] Route format `AAPL.US` (exchange suffix) instead of `AAPL`; header "Go back" + "Search for a stock… ⌘K" + "Add to Watchlist" (header items done; route format deferred).
+- [x] Research quick-switch logo row (MSFT/NVDA/META/...) on the research page.
+- [x] Company Statistics adds: Returns (ROA/ROTA/ROE), Financial Health (Current/Quick ratio), P/FCF + EV/Gross Profit (Valuation TTM), PEG + Price Target (Valuation NTM), Dividends stats (Yield/Payout/DPS/DPS Growth), Growth CAGR (3/5/10yr + fwd).
+- [x] EPS Surprises + 5Q timeframe combobox; Latest Earnings Call.
+- [x] Price chart: add 5D/3Y/5Y/10Y timeframes; "Add comparison" button (replaces SPY/QQQ/IWM dropdown); Total Chg + CAGR stat; "Powered by Example service".
+- [x] Seasonality: add 20Y option (already present, verified).
+- [x] News tab: Timeline Events count + "Analyzed Articles" count (premium banner skipped per user).
+
+### 6.5 Charting page
+- [x] Heading "Stocks" + "X/10 selected" counter (ours: "Stocks" only).
+- [x] Presets: replace with example-service's five — Tech Giants, Social Media, EVs, Banks, Streaming (added JPM/BAC/WFC/GS/RIVN/NIO/LCID/SNAP/DIS/CMCSA/SPOT to the seeded universe so all five have real data).
+- [x] Modal title "Add Stock to Chart".
+
+### 6.6 Transactions page
+- [x] Sub-tabs "Portfolio Transactions" / "Wallet Transactions" (route `/en/investments/transactions/cash`).
+- [x] Column "Instrument Currency" + Fees + P&L; sortable headers; row Edit/Delete.
+- [x] Pagination w/ rows-per-page 5/10/20/50.
+- [x] Wallet transactions: `GET /api/wallets/recent-transactions` (server-side sort date/walletName/type/amount, `{data, meta}`), `PATCH|DELETE /api/wallets/transactions/:txId` (recomputes displayLabel + signs amount). All-transactions API gains `sortBy`/`sortOrder`.
+
+### 6.7 Watchlists page
+- [x] Description line ("Track symbols you don't own — prices, news and fundamentals in one place.").
+- [x] Empty state "No watchlists yet" + "Create First Watchlist".
+
+### 6.8 Settings module (new, stubbed links)
+- [ ] Routes `/en/settings/profile`, `/en/settings/shared-portfolios`, `/en/settings/broker-connections` (Alerts + Billing tabs removed — skipped per user, see AGENTS.md).
+- [ ] Profile: first/last name, email (disabled), Save Changes, Language Preference, Change password, Danger Zone (Clear All Data / Delete Account).
+- [ ] Shared Portfolios: Active Shares 1/10, share card (views, Copy link, View shared portfolio, Delete).
+
+### 6.9 Alerts
+- Skipped per user (see AGENTS.md skip list). The mock keeps `/api/notifications/*` endpoints, but no UI is wired (no sidebar Alerts link, no Alerts settings tab).

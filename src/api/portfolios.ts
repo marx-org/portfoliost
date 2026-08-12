@@ -73,6 +73,18 @@ export async function createPortfolioTransaction(
   return http.post<PortfolioTransactionsPage["items"][number]>(`/api/portfolios/${id}/transactions`, input)
 }
 
+export async function updatePortfolioTransaction(
+  id: string,
+  txId: string,
+  input: Partial<PortfolioTransactionsPage["items"][number]>,
+): Promise<PortfolioTransactionsPage["items"][number]> {
+  return http.patch<PortfolioTransactionsPage["items"][number]>(`/api/portfolios/${id}/transactions/${txId}`, input)
+}
+
+export async function deletePortfolioTransaction(id: string, txId: string): Promise<void> {
+  return http.delete<void>(`/api/portfolios/${id}/transactions/${txId}`)
+}
+
 export async function getPortfolioAnalytics(id: string, timeframe: PortfolioAnalyticsTimeframe = "1Y"): Promise<PortfolioAnalytics1Y> {
   return http.get<PortfolioAnalytics1Y>(`/api/portfolios/${id}/analytics?timeframe=${timeframe}`)
 }
@@ -111,8 +123,15 @@ export async function getPortfolioRiskMetrics(id: string): Promise<unknown> {
   return http.get<unknown>(`/api/portfolios/${id}/risk-metrics`)
 }
 
-export async function getAllTransactions(page = 1, limit = 20): Promise<PortfoliosTransactions> {
-  return http.get<PortfoliosTransactions>(`/api/portfolios/transactions?page=${page}&limit=${limit}`)
+export async function getAllTransactions(
+  page = 1,
+  limit = 10,
+  sortBy = "date",
+  sortOrder: "asc" | "desc" = "desc",
+): Promise<PortfoliosTransactions> {
+  return http.get<PortfoliosTransactions>(
+    `/api/portfolios/transactions?page=${page}&limit=${limit}&sortBy=${sortBy}&sortOrder=${sortOrder}`,
+  )
 }
 
 export async function createPortfolio(input: {
@@ -121,10 +140,67 @@ export async function createPortfolio(input: {
   strategy?: string
   currency?: string
   isPublic?: boolean
+  walletId?: string
 }): Promise<PortfolioDetail> {
   return http.post<PortfolioDetail>("/api/portfolios", input)
 }
 
+export async function updatePortfolio(id: string, input: Partial<PortfolioDetail>): Promise<PortfolioDetail> {
+  return http.patch<PortfolioDetail>(`/api/portfolios/${id}`, input)
+}
+
 export async function deletePortfolio(id: string): Promise<void> {
   return http.delete<void>(`/api/portfolios/${id}`)
+}
+
+export interface PortfolioShare {
+  id: string
+  portfolioId: string
+  portfolioName: string
+  displayName: string
+  createdAt: string
+  expiresAt: string | null
+  viewCount: number
+  privacySettings: {
+    showValues: boolean
+    showHoldings: boolean
+    showPositions: boolean
+    showPerformanceChart: boolean
+    showTransactionHistory: boolean
+    showAssetAllocation: boolean
+    showSectorDistribution: boolean
+    showGeographicBreakdown: boolean
+    showIndustryDistribution: boolean
+    performanceChartReturnType: string
+    [key: string]: unknown
+  }
+}
+
+export async function getPortfolioShares(): Promise<PortfolioShare[]> {
+  return http.get<PortfolioShare[]>("/api/portfolios/shares")
+}
+
+export async function createPortfolioShare(input: {
+  portfolioId: string
+  displayName?: string
+}): Promise<PortfolioShare> {
+  return http.post<PortfolioShare>("/api/portfolios/shares", input)
+}
+
+export async function deletePortfolioShare(id: string): Promise<void> {
+  return http.delete<void>(`/api/portfolios/shares/${id}`)
+}
+
+export interface PublicPortfolioShare {
+  share: PortfolioShare
+  portfolio: {
+    id: string
+    name: string
+    strategy: string
+    positions: Array<{ symbol: string; quantity: number; marketValue: number; currentPrice: number }>
+  }
+}
+
+export async function getPublicPortfolioShare(shareId: string): Promise<PublicPortfolioShare> {
+  return http.get<PublicPortfolioShare>(`/api/public/portfolios/${shareId}`)
 }

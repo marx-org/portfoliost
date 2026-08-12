@@ -26,10 +26,11 @@ export const useWalletsStore = defineStore("wallets", () => {
     }
   }
 
-  async function create(input: { name: string; currency?: string }): Promise<void> {
+  async function create(input: { name: string; currency?: string }): Promise<Wallets[number]> {
     const created = await walletsApi.createWallet(input)
     wallets.value.push(created)
     await fetchAll()
+    return created
   }
 
   async function fetchTransactions(id: string): Promise<void> {
@@ -54,5 +55,22 @@ export const useWalletsStore = defineStore("wallets", () => {
     return tx
   }
 
-  return { wallets, totalBalance, transactions, loading, error, fetchAll, create, fetchTransactions, deposit, withdraw }
+  async function transfer(id: string, input: { amount: number; description?: string }): Promise<CashTransaction> {
+    const tx = await walletsApi.transferBetweenWallets(id, input)
+    await fetchAll()
+    await fetchTransactions(id)
+    return tx
+  }
+
+  async function rename(id: string, name: string): Promise<void> {
+    await walletsApi.renameWallet(id, { name })
+    await fetchAll()
+  }
+
+  async function remove(id: string): Promise<void> {
+    await walletsApi.deleteWallet(id)
+    await fetchAll()
+  }
+
+  return { wallets, totalBalance, transactions, loading, error, fetchAll, create, fetchTransactions, deposit, withdraw, transfer, rename, remove }
 })

@@ -260,6 +260,22 @@ async function main() {
   check("wallets.balance-history", balanceHistory.status === 200 && Array.isArray(balanceHistory.json.data) && balanceHistory.json.data.length > 50, `got ${balanceHistory.status} len ${balanceHistory.json.data.length}`)
   const walletTx = await request(`/wallets/${walletId}/transactions`, { token })
   check("wallets.transactions", walletTx.status === 200, `got ${walletTx.status}`)
+  const recent = await request("/wallets/recent-transactions?page=1&limit=10&sortBy=date&sortOrder=desc", { token })
+  check("wallets.recent-transactions", recent.status === 200 && isObj(recent.json) && Array.isArray(recent.json.data) && isObj(recent.json.meta), `got ${recent.status}`)
+  check("wallets.recent-transactions fields", recent.status === 200 && hasKeys(recent.json.data[0], ["id", "walletId", "walletName", "type", "displayLabel", "amount", "date"]), JSON.stringify(recent.json.data && recent.json.data[0]).slice(0, 120))
+  check("wallets.recent-transactions total", recent.status === 200 && recent.json.meta.total === 15, `total ${recent.json.meta && recent.json.meta.total}`)
+  const recentPg = await request("/wallets/recent-transactions?page=2&limit=5&sortBy=date&sortOrder=desc", { token })
+  check("wallets.recent-transactions paginated", recentPg.status === 200 && recentPg.json.meta.page === 2 && recentPg.json.data.length === 5, `len ${recentPg.json.data.length} page ${recentPg.json.meta.page}`)
+  const recentSorted = await request("/wallets/recent-transactions?page=1&limit=11&sortBy=amount&sortOrder=asc", { token })
+  const amounts = recentSorted.json.data.map((t) => Number(t.amount))
+  check("wallets.recent-transactions sorted asc", recentSorted.status === 200 && amounts.every((v, i) => i === 0 || amounts[i - 1] <= v), `amounts ${amounts.join(",")}`)
+  const investTx = recent.json.data.find((t) => t.type === "INVEST")
+  const patched = await request(`/wallets/transactions/${investTx.id}`, { method: "PATCH", token, body: { type: "WITHDRAWAL", amount: 100 } })
+  check("wallets.recent PATCH recomputes label", patched.status === 200 && patched.json.displayLabel === "Withdrawal" && patched.json.amount.startsWith("-"), `got ${patched.status} ${patched.json.displayLabel} ${patched.json.amount}`)
+  const delTx = await request(`/wallets/transactions/${investTx.id}`, { method: "DELETE", token })
+  check("wallets.recent DELETE", delTx.status === 204, `got ${delTx.status}`)
+  const afterDelete = await request("/wallets/recent-transactions?page=1&limit=11&sortBy=date&sortOrder=desc", { token })
+  check("wallets.recent DELETE tombstones", afterDelete.status === 200 && afterDelete.json.meta.total === 14 && !afterDelete.json.data.some((t) => t.id === investTx.id), `total ${afterDelete.json.meta.total}`)
 
   // ── Watchlists ──────────────────────────────────────────────
   const wl = await request("/watchlists", { token })
@@ -272,6 +288,41 @@ async function main() {
   check("watchlists.remove item", wlRemove.status === 200 && wlRemove.json.items.length === 0, `got ${wlRemove.status}`)
   const wlDel = await request(`/watchlists/${wlCreated.json.id}`, { method: "DELETE", token })
   check("watchlists.delete", wlDel.status === 204, `got ${wlDel.status}`)
+
+  // ── Settings: users ─────────────────────────────────────────
+  const userProfile = await request("/users/profile", { token })
+  check("users.profile", userProfile.status === 200 && "email" in userProfile.json && "firstName" in userProfile.json, `got ${userProfile.status}`)
+  const profileUpd = await request("/users/profile", { method: "PATCH", token, body: { firstName: "Demo", lastName: "User" } })
+  check("users.profile update", profileUpd.status === 200 && profileUpd.json.firstName === "Demo", `got ${profileUpd.status}`)
+  const profileRefetch = await request("/users/profile", { token })
+  check("users.profile persists", profileRefetch.json.firstName === "Demo", `got ${profileRefetch.json.firstName}`)
+  const pwBad = await request("/users/change-password", { method: "POST", token, body: { newPassword: "short" } })
+  check("users.change-password rejects weak", pwBad.status === 422, `got ${pwBad.status}`)
+  const pwOk = await request("/users/change-password", { method: "POST", token, body: { newPassword: "Str0ngPass" } })
+  check("users.change-password ok", pwOk.status === 200, `got ${pwOk.status}`)
+  const clearData = await request("/users/clear-data", { method: "POST", token })
+  check("users.clear-data → 204", clearData.status === 204, `got ${clearData.status}`)
+  const delAccount = await request("/users/account", { method: "DELETE", token })
+  check("users.delete account → 204", delAccount.status === 204, `got ${delAccount.status}`)
+
+  // ── Settings: notifications ─────────────────────────────────
+  const notifPrefs = await request("/notifications/preferences", { token })
+  check("notifications.preferences", notifPrefs.status === 200 && "newsEnabled" in notifPrefs.json, `got ${notifPrefs.status}`)
+  const notifPrefsUpd = await request("/notifications/preferences", { method: "PATCH", token, body: { newsEnabled: false } })
+  check("notifications.preferences update", notifPrefsUpd.status === 200 && notifPrefsUpd.json.newsEnabled === false, `got ${notifPrefsUpd.status}`)
+  const notifPrefsRefetch = await request("/notifications/preferences", { token })
+  check("notifications.preferences persists", notifPrefsRefetch.json.newsEnabled === false, `got ${notifPrefsRefetch.json.newsEnabled}`)
+
+  // ── Settings: portfolio shares ──────────────────────────────
+  const shares = await request("/portfolios/shares", { token })
+  check("portfolios.shares", shares.status === 200 && Array.isArray(shares.json) && shares.json.length === 1, `got ${shares.status} len ${shares.json.length}`)
+  const shareId = shares.json[0].id
+  const publicShare = await request(`/public/portfolios/${shareId}`)
+  check("public.share view", publicShare.status === 200 && publicShare.json.portfolio.name === "Top10", `got ${publicShare.status}`)
+  const shareDelete = await request(`/portfolios/shares/${shareId}`, { method: "DELETE", token })
+  check("portfolios.shares delete → 204", shareDelete.status === 204, `got ${shareDelete.status}`)
+  const publicGone = await request(`/public/portfolios/${shareId}`)
+  check("public.share deleted → 404", publicGone.status === 404, `got ${publicGone.status}`)
 
   // ── Copilot + Misc ──────────────────────────────────────────
   const conv = await request("/conversations", { token })

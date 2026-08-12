@@ -58,8 +58,10 @@ describe("ResearchPriceChart", () => {
     const wrapper = mountChart()
     await flushPromises()
 
-    const select = wrapper.find("select")
-    await select.setValue("spy")
+    await wrapper.findAll("button").find((b) => b.text().includes("Add comparison"))!.trigger("click")
+    await flushPromises()
+
+    await wrapper.findAll("button").find((b) => b.text().includes("S&P 500"))!.trigger("click")
     await flushPromises()
 
     expect(mockedGetHistory).toHaveBeenCalledWith("AAPL", "daily", "spy")
@@ -69,8 +71,18 @@ describe("ResearchPriceChart", () => {
     const wrapper = mountChart()
     await flushPromises()
 
-    for (const t of ["1D", "1W", "1M", "3M", "6M", "1Y", "YTD", "MAX"]) {
+    for (const t of ["1D", "5D", "1W", "1M", "3M", "6M", "1Y", "3Y", "5Y", "10Y", "YTD", "MAX"]) {
       expect(wrapper.findAll("button").some((b) => b.text() === t)).toBe(true)
     }
+  })
+
+  it("shows Total Chg and CAGR for the default 1Y range", async () => {
+    const wrapper = mountChart()
+    await flushPromises()
+
+    const text = wrapper.text()
+    expect(text).toContain("Total Chg")
+    expect(text).toContain("CAGR")
+    expect(text).toContain("Powered by Example service")
   })
 })

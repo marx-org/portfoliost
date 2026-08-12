@@ -10,6 +10,7 @@ export interface CashTransaction {
   status: string
   createdAt: string
   description: string | null
+  walletName?: string
 }
 
 export interface PaginatedCashTransactions {
@@ -20,6 +21,35 @@ export interface PaginatedCashTransactions {
   totalPages: number
   hasNext: boolean
   hasPrevious: boolean
+}
+
+export interface RecentCashTransaction {
+  id: string
+  walletId: string
+  walletName: string | null
+  type: string
+  displayLabel: string
+  amount: string
+  currency: string
+  exchangeRate: number | null
+  reference: string | null
+  date: string
+  description: string | null
+  createdAt: string
+  portfolioId: string | null
+  fees: number | null
+  taxes: number | null
+  isInternalTransfer: boolean
+}
+
+export interface RecentCashTransactionsPage {
+  data: RecentCashTransaction[]
+  meta: {
+    total: number
+    page: number
+    limit: number
+    totalPages: number
+  }
 }
 
 export async function getWallets(): Promise<Wallets> {
@@ -42,10 +72,51 @@ export async function getWalletTransactions(id: string): Promise<PaginatedCashTr
   return http.get<PaginatedCashTransactions>(`/api/wallets/${id}/transactions`)
 }
 
+export async function getAllWalletTransactions(
+  page = 1,
+  limit = 10,
+  sortBy = "date",
+  sortOrder: "asc" | "desc" = "desc",
+): Promise<RecentCashTransactionsPage> {
+  return http.get<RecentCashTransactionsPage>(
+    `/api/wallets/recent-transactions?page=${page}&limit=${limit}&sortBy=${sortBy}&sortOrder=${sortOrder}`,
+  )
+}
+
+export interface UpdateRecentCashTransaction {
+  type?: string
+  amount?: number
+  description?: string
+  date?: string
+}
+
+export async function updateWalletTransaction(
+  id: string,
+  input: UpdateRecentCashTransaction,
+): Promise<RecentCashTransaction> {
+  return http.patch<RecentCashTransaction>(`/api/wallets/transactions/${id}`, input)
+}
+
+export async function deleteWalletTransaction(id: string): Promise<void> {
+  return http.delete<void>(`/api/wallets/transactions/${id}`)
+}
+
 export async function depositToWallet(id: string, input: { amount: number; description?: string }): Promise<CashTransaction> {
   return http.post<CashTransaction>(`/api/wallets/${id}/deposits`, input)
 }
 
 export async function withdrawFromWallet(id: string, input: { amount: number; description?: string }): Promise<CashTransaction> {
   return http.post<CashTransaction>(`/api/wallets/${id}/withdrawals`, input)
+}
+
+export async function transferBetweenWallets(id: string, input: { amount: number; description?: string }): Promise<CashTransaction> {
+  return http.post<CashTransaction>(`/api/wallets/${id}/transfers`, input)
+}
+
+export async function renameWallet(id: string, input: { name: string }): Promise<Wallets[number]> {
+  return http.patch<Wallets[number]>(`/api/wallets/${id}`, input)
+}
+
+export async function deleteWallet(id: string): Promise<void> {
+  return http.delete<void>(`/api/wallets/${id}`)
 }

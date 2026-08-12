@@ -10,6 +10,7 @@ export interface WatchlistItem {
 export interface Watchlist {
   id: string
   name: string
+  description?: string | null
   createdAt: string
   updatedAt: string
   items: WatchlistItem[]
@@ -23,8 +24,8 @@ export async function getWatchlist(id: string): Promise<Watchlist> {
   return http.get<Watchlist>(`/api/watchlists/${id}`)
 }
 
-export async function createWatchlist(name: string): Promise<Watchlist> {
-  return http.post<Watchlist>("/api/watchlists", { name })
+export async function createWatchlist(name: string, description?: string): Promise<Watchlist> {
+  return http.post<Watchlist>("/api/watchlists", { name, description: description || undefined })
 }
 
 export async function deleteWatchlist(id: string): Promise<void> {

@@ -21,11 +21,13 @@ test("charting shows an empty state and a preset is applied", async ({ page }) =
 
   await openCharting(page)
 
-  await expect(page.getByRole("heading", { name: "Charting" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Stocks 0/10 selected" })).toBeVisible()
+  await expect(page.getByText(/0\/10 selected/)).toBeVisible()
   await expect(page.getByText(/No stocks added yet/)).toBeVisible()
 
-  await page.getByTestId("preset-mega-cap-tech").click()
-  await expect(page.getByTestId("stock-chip")).toHaveCount(6)
+  await page.getByTestId("preset-tech-giants").click()
+  await expect(page.getByTestId("stock-chip")).toHaveCount(8)
+  await expect(page.getByText(/8\/10 selected/)).toBeVisible()
   await expect(page.locator(".apexcharts-canvas").first()).toBeVisible()
   await expect(page.getByText("P/E (TTM)").last()).toBeVisible()
 
@@ -37,6 +39,7 @@ test("charting adds stocks via search and compares them", async ({ page }) => {
 
   await page.getByTestId("add-stock").click()
   await expect(page.getByRole("dialog")).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Add Stock to Chart" })).toBeVisible()
   await page.getByTestId("instrument-search").fill("apple")
   await expect(page.getByRole("button", { name: /Apple Inc/ })).toBeVisible()
   await page.getByRole("button", { name: /Apple Inc/ }).click()
@@ -56,13 +59,13 @@ test("charting adds stocks via search and compares them", async ({ page }) => {
 test("charting switches metric and removes a stock", async ({ page }) => {
   await openCharting(page)
 
-  await page.getByTestId("preset-chip-makers").click()
-  await expect(page.getByTestId("stock-chip")).toHaveCount(7)
-  await expect(page.getByRole("columnheader", { name: "NVDA" })).toBeVisible()
+  await page.getByTestId("preset-banks").click()
+  await expect(page.getByTestId("stock-chip")).toHaveCount(4)
+  await expect(page.getByRole("columnheader", { name: "JPM" })).toBeVisible()
 
   await page.getByTestId("metric-picker").selectOption("netMargin")
   await expect(page.getByText("Net Margin").last()).toBeVisible()
 
   await page.getByTestId("remove-stock").first().click()
-  await expect(page.getByTestId("stock-chip")).toHaveCount(6)
+  await expect(page.getByTestId("stock-chip")).toHaveCount(3)
 })

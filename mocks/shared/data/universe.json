@@ -210,6 +210,116 @@
     "source": "FINNHUB"
   },
   {
+    "symbol": "JPM",
+    "name": "JPMorgan Chase & Co",
+    "type": "STOCK",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "Financials",
+    "industry": "Banks - Diversified",
+    "source": "FINNHUB"
+  },
+  {
+    "symbol": "BAC",
+    "name": "Bank of America Corp",
+    "type": "STOCK",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "Financials",
+    "industry": "Banks - Diversified",
+    "source": "FINNHUB"
+  },
+  {
+    "symbol": "WFC",
+    "name": "Wells Fargo & Co",
+    "type": "STOCK",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "Financials",
+    "industry": "Banks - Diversified",
+    "source": "FINNHUB"
+  },
+  {
+    "symbol": "GS",
+    "name": "Goldman Sachs Group Inc",
+    "type": "STOCK",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "Financials",
+    "industry": "Capital Markets",
+    "source": "FINNHUB"
+  },
+  {
+    "symbol": "RIVN",
+    "name": "Rivian Automotive Inc",
+    "type": "STOCK",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "Consumer Discretionary",
+    "industry": "Auto Manufacturers",
+    "source": "FINNHUB"
+  },
+  {
+    "symbol": "NIO",
+    "name": "NIO Inc",
+    "type": "STOCK",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "Consumer Discretionary",
+    "industry": "Auto Manufacturers",
+    "source": "FINNHUB"
+  },
+  {
+    "symbol": "LCID",
+    "name": "Lucid Group Inc",
+    "type": "STOCK",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "Consumer Discretionary",
+    "industry": "Auto Manufacturers",
+    "source": "FINNHUB"
+  },
+  {
+    "symbol": "SNAP",
+    "name": "Snap Inc",
+    "type": "STOCK",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "Communication Services",
+    "industry": "Internet Content & Information",
+    "source": "FINNHUB"
+  },
+  {
+    "symbol": "DIS",
+    "name": "Walt Disney Co",
+    "type": "STOCK",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "Communication Services",
+    "industry": "Entertainment",
+    "source": "FINNHUB"
+  },
+  {
+    "symbol": "CMCSA",
+    "name": "Comcast Corp",
+    "type": "STOCK",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "Communication Services",
+    "industry": "Entertainment",
+    "source": "FINNHUB"
+  },
+  {
+    "symbol": "SPOT",
+    "name": "Spotify Technology SA",
+    "type": "STOCK",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "Communication Services",
+    "industry": "Internet Content & Information",
+    "source": "FINNHUB"
+  },
+  {
     "symbol": "SPY",
     "name": "SPDR S&P 500 ETF Trust",
     "type": "ETF",

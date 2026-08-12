@@ -150,3 +150,24 @@ export async function getTickerNews(symbol: string): Promise<NewsPageResponse> {
 export async function getAllNews(): Promise<NewsPageResponse> {
   return http.get<NewsPageResponse>(`/api/news/articles`)
 }
+
+export interface NewsStats {
+  error: string | null
+  data: {
+    active: boolean
+    id: string
+    name: string
+    type: string
+    ticker: string
+    inserted_at: string
+    article_count: number
+    last_fetched_at: string
+    total_article_count: number
+    total_analyzed_article_count: number
+  }
+}
+
+export async function getNewsStats(ticker: string): Promise<NewsStats> {
+  const q = new URLSearchParams({ ticker })
+  return http.get<NewsStats>(`/api/news/stats?${q}`)
+}

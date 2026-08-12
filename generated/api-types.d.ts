@@ -166,7 +166,12 @@ export interface BillingSubscription {
 }
 
 // from mocks/shared/data/raw/charting_presets.json
-export type ChartingPresets = unknown[]
+export type ChartingPresets = ({
+    name: string
+    description: string
+    symbols: (string)[]
+    metric: string
+  })[]
 
 // from mocks/shared/data/raw/chatbot_models.json
 export interface ChatbotModels {
@@ -1034,6 +1039,14 @@ export interface InstrumentsMetrics {
     evToEBITDA: number
     evToFCF: number
     dividendYield: number
+    evToGrossProfit: number
+    priceToFcf: number
+    pegRatio: number
+    priceTarget: number
+    payoutRatio: number
+    dividendPerShare: number
+    dpsGrowth5yr: number
+    returnOnTotalAssets: number
   }
     margins: {
     grossMargin: number
@@ -1046,6 +1059,7 @@ export interface InstrumentsMetrics {
     returnOnEquity: number
     assetTurnover: number
     inventoryTurnover: number
+    returnOnTotalAssets: number
   }
     financialHealth: {
     currentRatio: number
@@ -7325,6 +7339,7 @@ export interface AAPL {
     sector: string
     industry: string
     country: string
+    exchange: string
     currency: string
     price: number
     prevClose: number
@@ -7345,6 +7360,7 @@ export interface AAPL {
     sharesOutstanding: number
     marketCap: number
   }
+    description: (string)[]
     metrics: {
     roa: number
     roe: number
@@ -7658,6 +7674,7 @@ export interface AMAT {
     sector: string
     industry: string
     country: string
+    exchange: string
     currency: string
     price: number
     prevClose: number
@@ -7678,6 +7695,7 @@ export interface AMAT {
     sharesOutstanding: number
     marketCap: number
   }
+    description: (string)[]
     metrics: {
     roa: number
     roe: number
@@ -7991,6 +8009,7 @@ export interface AMD {
     sector: string
     industry: string
     country: string
+    exchange: string
     currency: string
     price: number
     prevClose: number
@@ -8011,6 +8030,7 @@ export interface AMD {
     sharesOutstanding: number
     marketCap: number
   }
+    description: (string)[]
     metrics: {
     roa: number
     roe: number
@@ -8324,6 +8344,7 @@ export interface AMZN {
     sector: string
     industry: string
     country: string
+    exchange: string
     currency: string
     price: number
     prevClose: number
@@ -8344,6 +8365,342 @@ export interface AMZN {
     sharesOutstanding: number
     marketCap: number
   }
+    description: (string)[]
+    metrics: {
+    roa: number
+    roe: number
+    cash: number
+    pFcf: number
+    roic: number
+    rota: number
+    isBank: boolean
+    ttmEps: number
+    isMiner: boolean
+    netDebt: number
+    pbRatio: number
+    peRatio: number
+    revenue: number
+    pegRatio: number
+    employees: number
+    evToSales: number
+    fcfMargin: number
+    forwardPe: number
+    marketCap: number
+    netIncome: number
+    netMargin: number
+    evToEbitda: number
+    grossMargin: number
+    payoutRatio: number
+    priceTarget: number
+    dpsGrowth3yr: number
+    dpsGrowth5yr: number
+    ebitdaMargin: number
+    epsGrowth3yr: number
+    epsGrowth5yr: number
+    epsGrowthFwd: number
+    pretaxMargin: number
+    dividendYield: number
+    epsGrowth10yr: number
+    epsLtGrowthEst: number
+    forwardEvSales: number
+    isConglomerate: boolean
+    ebitdaGrowthFwd: number
+    enterpriseValue: number
+    evToGrossProfit: number
+    isDepositLender: boolean
+    operatingMargin: number
+    dividendPerShare: number
+    reportingCadence: string
+    revenueGrowth3yr: number
+    revenueGrowth5yr: number
+    revenueGrowthFwd: number
+    bookValuePerShare: number
+    revenueGrowth10yr: number
+    sharesOutstanding: number
+    lifecycleStatus: string
+    successorSymbol: unknown
+  }
+    compare: {
+    symbol: string
+    name: string
+    price: number
+    marketCap: number
+    peRatio: number
+    forwardPe: number
+    pbRatio: number
+    psRatio: number
+    dividendYield: number
+    revenueGrowth: number
+    netMargin: number
+    roe: number
+    grossMargin: number
+    operatingMargin: number
+    evToEbitda: number
+    evToSales: number
+    fcfMargin: number
+    netIncome: number
+    revenue: number
+    sharesOutstanding: number
+    currency: string
+  }
+    fundamentals: {
+    financialHighlights: {
+    incomeStatement: ({
+    year: number
+    revenue: number
+    ebit: number
+    netIncome: number
+    netIncomeGrowth: unknown
+    netIncomeMargin: number
+    earningsPerShare: number
+    earningsPerShareGrowth: unknown
+    dilutedSharesOutstanding: number
+    ebitda: number
+  } | {
+    year: number
+    revenue: number
+    ebit: number
+    netIncome: number
+    netIncomeGrowth: number
+    netIncomeMargin: number
+    earningsPerShare: number
+    earningsPerShareGrowth: number
+    dilutedSharesOutstanding: number
+    ebitda: number
+  })[]
+    balanceSheet: ({
+    year: number
+    totalAssets: number
+    totalLiabilities: number
+    shareholdersEquity: number
+    cash: number
+    cashAndShortTermInvestments: number
+    totalDebt: number
+    netDebt: number
+    workingCapital: number
+    totalCapitalization: number
+    retainedEarnings: number
+    debtEquityRatio: number
+    longTermDebtToCapitalization: number
+    totalDebtToCapitalization: number
+  })[]
+    cashFlow: ({
+    year: number
+    cashFlowFromOperatingActivities: number
+    cashFlowFromFinancingActivities: number
+    cashFlowFromInvestingActivities: number
+    freeCashFlow: number
+    freeCashFlowGrowth: unknown
+    cashFlowFromOperatingActivitiesGrowth: unknown
+    freeCashFlowPerShare: number
+    capitalExpenditures: number
+    depreciation: number
+    dividendPayment: number
+  } | {
+    year: number
+    cashFlowFromOperatingActivities: number
+    cashFlowFromFinancingActivities: number
+    cashFlowFromInvestingActivities: number
+    freeCashFlow: number
+    freeCashFlowGrowth: number
+    cashFlowFromOperatingActivitiesGrowth: number
+    freeCashFlowPerShare: number
+    capitalExpenditures: number
+    depreciation: number
+    dividendPayment: number
+  })[]
+  }
+  }
+    ownership: {
+    institutional: ({
+    date: string
+    holdingPercentage: number
+    holdersCount: number
+    sumOfCurrentPositions: number
+    sumOfCurrentPositionsValue: number
+  })[]
+    mutualFund: ({
+    date: string
+    holdingPercentage: number
+    holdersCount: number
+    sumOfCurrentPositions: number
+    sumOfCurrentPositionsValue: number
+  })[]
+    insider: ({
+    date: string
+    holdingPercentage: number
+    holdersCount: number
+    sumOfCurrentPositions: number
+    sumOfCurrentPositionsValue: number
+  })[]
+    insiderTransactions: ({
+    title: string
+    transactionDate: string
+    transactionCode: string
+    transactionText: string
+    transactionAmount: number
+    transactionValue: number
+    filingDate: string
+  })[]
+  }
+    dividends: {
+    history: ({
+    date: string
+    year: number
+    amount: number
+    currency: string
+    type: string
+  })[]
+  }
+    calendar: {
+    earnings: ({
+    date: string
+    title: string
+    year: number
+    quarter: number
+  })[]
+    exDividend: ({
+    date: string
+    title: string
+    year: number
+    amount: number
+  })[]
+    dividend: ({
+    date: string
+    title: string
+    year: number
+    amount: number
+  })[]
+  }
+    projections: {
+    priceTarget: {
+    lastUpdated: string
+    low: number
+    mean: number
+    current: number
+    high: number
+  }
+    recommendation: {
+    period: string
+    strongBuy: number
+    buy: number
+    hold: number
+    sell: number
+    strongSell: number
+  }
+    earnings: {
+    avg: number
+    high: number
+    low: number
+    mean: number
+    periods: (string)[]
+  }
+    revenue: {
+    avg: number
+    high: number
+    low: number
+    mean: number
+    periods: (string)[]
+  }
+  }
+    seasonality: {
+    symbol: string
+    years: number
+    metric: string
+    monthly_returns: ({
+    month: string
+    return_pct: number
+  })[]
+  }
+    epsSurprises: {
+    annual: ({
+    date: string
+    year: number
+    quarter: number
+    eps: number
+    epsEstimate: number
+    epsDifference: number
+    revenue: number
+    revenueEstimate: number
+    revenueDifference: number
+    surprise: number
+    surprisePercent: number
+    time: string
+  })[]
+    quarterly: ({
+    date: string
+    year: number
+    quarter: number
+    eps: number
+    epsEstimate: number
+    epsDifference: number
+    revenue: number
+    revenueEstimate: number
+    revenueDifference: number
+    surprise: number
+    surprisePercent: number
+    time: string
+  })[]
+  }
+    aiInsights: {
+    symbol: string
+    generatedAt: string
+    summary: string
+    bullCase: (string)[]
+    bearCase: (string)[]
+    keyMetrics: ({
+    label: string
+    value: number
+    assessment: string
+  } | {
+    label: string
+    value: string
+    assessment: string
+  })[]
+    sentiment: string
+  }
+    priceTarget: {
+    symbol: string
+    targetHigh: number
+    targetLow: number
+    targetMean: number
+    targetMedian: number
+    numberAnalysts: number
+    lastUpdated: string
+  }
+}
+
+// from mocks/shared/data/research/BAC.json
+export interface BAC {
+    symbol: string
+    basics: {
+    symbol: string
+    name: string
+    sector: string
+    industry: string
+    country: string
+    exchange: string
+    currency: string
+    price: number
+    prevClose: number
+    sharesOutstanding: number
+    marketCap: number
+  }
+    overview: {
+    name: string
+    sector: string
+    industry: string
+    country: string
+    exchange: string
+    type: string
+    currency: string
+    symbol: string
+    price: number
+    prevClose: number
+    sharesOutstanding: number
+    marketCap: number
+  }
+    description: (string)[]
     metrics: {
     roa: number
     roe: number
@@ -8657,6 +9014,7 @@ export interface CART {
     sector: string
     industry: string
     country: string
+    exchange: string
     currency: string
     price: number
     prevClose: number
@@ -8677,6 +9035,677 @@ export interface CART {
     sharesOutstanding: number
     marketCap: number
   }
+    description: (string)[]
+    metrics: {
+    roa: number
+    roe: number
+    cash: number
+    pFcf: number
+    roic: number
+    rota: number
+    isBank: boolean
+    ttmEps: number
+    isMiner: boolean
+    netDebt: number
+    pbRatio: number
+    peRatio: number
+    revenue: number
+    pegRatio: number
+    employees: number
+    evToSales: number
+    fcfMargin: number
+    forwardPe: number
+    marketCap: number
+    netIncome: number
+    netMargin: number
+    evToEbitda: number
+    grossMargin: number
+    payoutRatio: number
+    priceTarget: number
+    dpsGrowth3yr: number
+    dpsGrowth5yr: number
+    ebitdaMargin: number
+    epsGrowth3yr: number
+    epsGrowth5yr: number
+    epsGrowthFwd: number
+    pretaxMargin: number
+    dividendYield: number
+    epsGrowth10yr: number
+    epsLtGrowthEst: number
+    forwardEvSales: number
+    isConglomerate: boolean
+    ebitdaGrowthFwd: number
+    enterpriseValue: number
+    evToGrossProfit: number
+    isDepositLender: boolean
+    operatingMargin: number
+    dividendPerShare: number
+    reportingCadence: string
+    revenueGrowth3yr: number
+    revenueGrowth5yr: number
+    revenueGrowthFwd: number
+    bookValuePerShare: number
+    revenueGrowth10yr: number
+    sharesOutstanding: number
+    lifecycleStatus: string
+    successorSymbol: unknown
+  }
+    compare: {
+    symbol: string
+    name: string
+    price: number
+    marketCap: number
+    peRatio: number
+    forwardPe: number
+    pbRatio: number
+    psRatio: number
+    dividendYield: number
+    revenueGrowth: number
+    netMargin: number
+    roe: number
+    grossMargin: number
+    operatingMargin: number
+    evToEbitda: number
+    evToSales: number
+    fcfMargin: number
+    netIncome: number
+    revenue: number
+    sharesOutstanding: number
+    currency: string
+  }
+    fundamentals: {
+    financialHighlights: {
+    incomeStatement: ({
+    year: number
+    revenue: number
+    ebit: number
+    netIncome: number
+    netIncomeGrowth: unknown
+    netIncomeMargin: number
+    earningsPerShare: number
+    earningsPerShareGrowth: unknown
+    dilutedSharesOutstanding: number
+    ebitda: number
+  } | {
+    year: number
+    revenue: number
+    ebit: number
+    netIncome: number
+    netIncomeGrowth: number
+    netIncomeMargin: number
+    earningsPerShare: number
+    earningsPerShareGrowth: number
+    dilutedSharesOutstanding: number
+    ebitda: number
+  })[]
+    balanceSheet: ({
+    year: number
+    totalAssets: number
+    totalLiabilities: number
+    shareholdersEquity: number
+    cash: number
+    cashAndShortTermInvestments: number
+    totalDebt: number
+    netDebt: number
+    workingCapital: number
+    totalCapitalization: number
+    retainedEarnings: number
+    debtEquityRatio: number
+    longTermDebtToCapitalization: number
+    totalDebtToCapitalization: number
+  })[]
+    cashFlow: ({
+    year: number
+    cashFlowFromOperatingActivities: number
+    cashFlowFromFinancingActivities: number
+    cashFlowFromInvestingActivities: number
+    freeCashFlow: number
+    freeCashFlowGrowth: unknown
+    cashFlowFromOperatingActivitiesGrowth: unknown
+    freeCashFlowPerShare: number
+    capitalExpenditures: number
+    depreciation: number
+    dividendPayment: number
+  } | {
+    year: number
+    cashFlowFromOperatingActivities: number
+    cashFlowFromFinancingActivities: number
+    cashFlowFromInvestingActivities: number
+    freeCashFlow: number
+    freeCashFlowGrowth: number
+    cashFlowFromOperatingActivitiesGrowth: number
+    freeCashFlowPerShare: number
+    capitalExpenditures: number
+    depreciation: number
+    dividendPayment: number
+  })[]
+  }
+  }
+    ownership: {
+    institutional: ({
+    date: string
+    holdingPercentage: number
+    holdersCount: number
+    sumOfCurrentPositions: number
+    sumOfCurrentPositionsValue: number
+  })[]
+    mutualFund: ({
+    date: string
+    holdingPercentage: number
+    holdersCount: number
+    sumOfCurrentPositions: number
+    sumOfCurrentPositionsValue: number
+  })[]
+    insider: ({
+    date: string
+    holdingPercentage: number
+    holdersCount: number
+    sumOfCurrentPositions: number
+    sumOfCurrentPositionsValue: number
+  })[]
+    insiderTransactions: ({
+    title: string
+    transactionDate: string
+    transactionCode: string
+    transactionText: string
+    transactionAmount: number
+    transactionValue: number
+    filingDate: string
+  })[]
+  }
+    dividends: {
+    history: ({
+    date: string
+    year: number
+    amount: number
+    currency: string
+    type: string
+  })[]
+  }
+    calendar: {
+    earnings: ({
+    date: string
+    title: string
+    year: number
+    quarter: number
+  })[]
+    exDividend: ({
+    date: string
+    title: string
+    year: number
+    amount: number
+  })[]
+    dividend: ({
+    date: string
+    title: string
+    year: number
+    amount: number
+  })[]
+  }
+    projections: {
+    priceTarget: {
+    lastUpdated: string
+    low: number
+    mean: number
+    current: number
+    high: number
+  }
+    recommendation: {
+    period: string
+    strongBuy: number
+    buy: number
+    hold: number
+    sell: number
+    strongSell: number
+  }
+    earnings: {
+    avg: number
+    high: number
+    low: number
+    mean: number
+    periods: (string)[]
+  }
+    revenue: {
+    avg: number
+    high: number
+    low: number
+    mean: number
+    periods: (string)[]
+  }
+  }
+    seasonality: {
+    symbol: string
+    years: number
+    metric: string
+    monthly_returns: ({
+    month: string
+    return_pct: number
+  })[]
+  }
+    epsSurprises: {
+    annual: ({
+    date: string
+    year: number
+    quarter: number
+    eps: number
+    epsEstimate: number
+    epsDifference: number
+    revenue: number
+    revenueEstimate: number
+    revenueDifference: number
+    surprise: number
+    surprisePercent: number
+    time: string
+  })[]
+    quarterly: ({
+    date: string
+    year: number
+    quarter: number
+    eps: number
+    epsEstimate: number
+    epsDifference: number
+    revenue: number
+    revenueEstimate: number
+    revenueDifference: number
+    surprise: number
+    surprisePercent: number
+    time: string
+  })[]
+  }
+    aiInsights: {
+    symbol: string
+    generatedAt: string
+    summary: string
+    bullCase: (string)[]
+    bearCase: (string)[]
+    keyMetrics: ({
+    label: string
+    value: number
+    assessment: string
+  } | {
+    label: string
+    value: string
+    assessment: string
+  })[]
+    sentiment: string
+  }
+    priceTarget: {
+    symbol: string
+    targetHigh: number
+    targetLow: number
+    targetMean: number
+    targetMedian: number
+    numberAnalysts: number
+    lastUpdated: string
+  }
+}
+
+// from mocks/shared/data/research/CMCSA.json
+export interface CMCSA {
+    symbol: string
+    basics: {
+    symbol: string
+    name: string
+    sector: string
+    industry: string
+    country: string
+    exchange: string
+    currency: string
+    price: number
+    prevClose: number
+    sharesOutstanding: number
+    marketCap: number
+  }
+    overview: {
+    name: string
+    sector: string
+    industry: string
+    country: string
+    exchange: string
+    type: string
+    currency: string
+    symbol: string
+    price: number
+    prevClose: number
+    sharesOutstanding: number
+    marketCap: number
+  }
+    description: (string)[]
+    metrics: {
+    roa: number
+    roe: number
+    cash: number
+    pFcf: number
+    roic: number
+    rota: number
+    isBank: boolean
+    ttmEps: number
+    isMiner: boolean
+    netDebt: number
+    pbRatio: number
+    peRatio: number
+    revenue: number
+    pegRatio: number
+    employees: number
+    evToSales: number
+    fcfMargin: number
+    forwardPe: number
+    marketCap: number
+    netIncome: number
+    netMargin: number
+    evToEbitda: number
+    grossMargin: number
+    payoutRatio: number
+    priceTarget: number
+    dpsGrowth3yr: number
+    dpsGrowth5yr: number
+    ebitdaMargin: number
+    epsGrowth3yr: number
+    epsGrowth5yr: number
+    epsGrowthFwd: number
+    pretaxMargin: number
+    dividendYield: number
+    epsGrowth10yr: number
+    epsLtGrowthEst: number
+    forwardEvSales: number
+    isConglomerate: boolean
+    ebitdaGrowthFwd: number
+    enterpriseValue: number
+    evToGrossProfit: number
+    isDepositLender: boolean
+    operatingMargin: number
+    dividendPerShare: number
+    reportingCadence: string
+    revenueGrowth3yr: number
+    revenueGrowth5yr: number
+    revenueGrowthFwd: number
+    bookValuePerShare: number
+    revenueGrowth10yr: number
+    sharesOutstanding: number
+    lifecycleStatus: string
+    successorSymbol: unknown
+  }
+    compare: {
+    symbol: string
+    name: string
+    price: number
+    marketCap: number
+    peRatio: number
+    forwardPe: number
+    pbRatio: number
+    psRatio: number
+    dividendYield: number
+    revenueGrowth: number
+    netMargin: number
+    roe: number
+    grossMargin: number
+    operatingMargin: number
+    evToEbitda: number
+    evToSales: number
+    fcfMargin: number
+    netIncome: number
+    revenue: number
+    sharesOutstanding: number
+    currency: string
+  }
+    fundamentals: {
+    financialHighlights: {
+    incomeStatement: ({
+    year: number
+    revenue: number
+    ebit: number
+    netIncome: number
+    netIncomeGrowth: unknown
+    netIncomeMargin: number
+    earningsPerShare: number
+    earningsPerShareGrowth: unknown
+    dilutedSharesOutstanding: number
+    ebitda: number
+  } | {
+    year: number
+    revenue: number
+    ebit: number
+    netIncome: number
+    netIncomeGrowth: number
+    netIncomeMargin: number
+    earningsPerShare: number
+    earningsPerShareGrowth: number
+    dilutedSharesOutstanding: number
+    ebitda: number
+  })[]
+    balanceSheet: ({
+    year: number
+    totalAssets: number
+    totalLiabilities: number
+    shareholdersEquity: number
+    cash: number
+    cashAndShortTermInvestments: number
+    totalDebt: number
+    netDebt: number
+    workingCapital: number
+    totalCapitalization: number
+    retainedEarnings: number
+    debtEquityRatio: number
+    longTermDebtToCapitalization: number
+    totalDebtToCapitalization: number
+  })[]
+    cashFlow: ({
+    year: number
+    cashFlowFromOperatingActivities: number
+    cashFlowFromFinancingActivities: number
+    cashFlowFromInvestingActivities: number
+    freeCashFlow: number
+    freeCashFlowGrowth: unknown
+    cashFlowFromOperatingActivitiesGrowth: unknown
+    freeCashFlowPerShare: number
+    capitalExpenditures: number
+    depreciation: number
+    dividendPayment: number
+  } | {
+    year: number
+    cashFlowFromOperatingActivities: number
+    cashFlowFromFinancingActivities: number
+    cashFlowFromInvestingActivities: number
+    freeCashFlow: number
+    freeCashFlowGrowth: number
+    cashFlowFromOperatingActivitiesGrowth: number
+    freeCashFlowPerShare: number
+    capitalExpenditures: number
+    depreciation: number
+    dividendPayment: number
+  })[]
+  }
+  }
+    ownership: {
+    institutional: ({
+    date: string
+    holdingPercentage: number
+    holdersCount: number
+    sumOfCurrentPositions: number
+    sumOfCurrentPositionsValue: number
+  })[]
+    mutualFund: ({
+    date: string
+    holdingPercentage: number
+    holdersCount: number
+    sumOfCurrentPositions: number
+    sumOfCurrentPositionsValue: number
+  })[]
+    insider: ({
+    date: string
+    holdingPercentage: number
+    holdersCount: number
+    sumOfCurrentPositions: number
+    sumOfCurrentPositionsValue: number
+  })[]
+    insiderTransactions: ({
+    title: string
+    transactionDate: string
+    transactionCode: string
+    transactionText: string
+    transactionAmount: number
+    transactionValue: number
+    filingDate: string
+  })[]
+  }
+    dividends: {
+    history: ({
+    date: string
+    year: number
+    amount: number
+    currency: string
+    type: string
+  })[]
+  }
+    calendar: {
+    earnings: ({
+    date: string
+    title: string
+    year: number
+    quarter: number
+  })[]
+    exDividend: ({
+    date: string
+    title: string
+    year: number
+    amount: number
+  })[]
+    dividend: ({
+    date: string
+    title: string
+    year: number
+    amount: number
+  })[]
+  }
+    projections: {
+    priceTarget: {
+    lastUpdated: string
+    low: number
+    mean: number
+    current: number
+    high: number
+  }
+    recommendation: {
+    period: string
+    strongBuy: number
+    buy: number
+    hold: number
+    sell: number
+    strongSell: number
+  }
+    earnings: {
+    avg: number
+    high: number
+    low: number
+    mean: number
+    periods: (string)[]
+  }
+    revenue: {
+    avg: number
+    high: number
+    low: number
+    mean: number
+    periods: (string)[]
+  }
+  }
+    seasonality: {
+    symbol: string
+    years: number
+    metric: string
+    monthly_returns: ({
+    month: string
+    return_pct: number
+  })[]
+  }
+    epsSurprises: {
+    annual: ({
+    date: string
+    year: number
+    quarter: number
+    eps: number
+    epsEstimate: number
+    epsDifference: number
+    revenue: number
+    revenueEstimate: number
+    revenueDifference: number
+    surprise: number
+    surprisePercent: number
+    time: string
+  })[]
+    quarterly: ({
+    date: string
+    year: number
+    quarter: number
+    eps: number
+    epsEstimate: number
+    epsDifference: number
+    revenue: number
+    revenueEstimate: number
+    revenueDifference: number
+    surprise: number
+    surprisePercent: number
+    time: string
+  })[]
+  }
+    aiInsights: {
+    symbol: string
+    generatedAt: string
+    summary: string
+    bullCase: (string)[]
+    bearCase: (string)[]
+    keyMetrics: ({
+    label: string
+    value: number
+    assessment: string
+  } | {
+    label: string
+    value: string
+    assessment: string
+  })[]
+    sentiment: string
+  }
+    priceTarget: {
+    symbol: string
+    targetHigh: number
+    targetLow: number
+    targetMean: number
+    targetMedian: number
+    numberAnalysts: number
+    lastUpdated: string
+  }
+}
+
+// from mocks/shared/data/research/DIS.json
+export interface DIS {
+    symbol: string
+    basics: {
+    symbol: string
+    name: string
+    sector: string
+    industry: string
+    country: string
+    exchange: string
+    currency: string
+    price: number
+    prevClose: number
+    sharesOutstanding: number
+    marketCap: number
+  }
+    overview: {
+    name: string
+    sector: string
+    industry: string
+    country: string
+    exchange: string
+    type: string
+    currency: string
+    symbol: string
+    price: number
+    prevClose: number
+    sharesOutstanding: number
+    marketCap: number
+  }
+    description: (string)[]
     metrics: {
     roa: number
     roe: number
@@ -8990,6 +10019,7 @@ export interface GOOGL {
     sector: string
     industry: string
     country: string
+    exchange: string
     currency: string
     price: number
     prevClose: number
@@ -9010,6 +10040,342 @@ export interface GOOGL {
     sharesOutstanding: number
     marketCap: number
   }
+    description: (string)[]
+    metrics: {
+    roa: number
+    roe: number
+    cash: number
+    pFcf: number
+    roic: number
+    rota: number
+    isBank: boolean
+    ttmEps: number
+    isMiner: boolean
+    netDebt: number
+    pbRatio: number
+    peRatio: number
+    revenue: number
+    pegRatio: number
+    employees: number
+    evToSales: number
+    fcfMargin: number
+    forwardPe: number
+    marketCap: number
+    netIncome: number
+    netMargin: number
+    evToEbitda: number
+    grossMargin: number
+    payoutRatio: number
+    priceTarget: number
+    dpsGrowth3yr: number
+    dpsGrowth5yr: number
+    ebitdaMargin: number
+    epsGrowth3yr: number
+    epsGrowth5yr: number
+    epsGrowthFwd: number
+    pretaxMargin: number
+    dividendYield: number
+    epsGrowth10yr: number
+    epsLtGrowthEst: number
+    forwardEvSales: number
+    isConglomerate: boolean
+    ebitdaGrowthFwd: number
+    enterpriseValue: number
+    evToGrossProfit: number
+    isDepositLender: boolean
+    operatingMargin: number
+    dividendPerShare: number
+    reportingCadence: string
+    revenueGrowth3yr: number
+    revenueGrowth5yr: number
+    revenueGrowthFwd: number
+    bookValuePerShare: number
+    revenueGrowth10yr: number
+    sharesOutstanding: number
+    lifecycleStatus: string
+    successorSymbol: unknown
+  }
+    compare: {
+    symbol: string
+    name: string
+    price: number
+    marketCap: number
+    peRatio: number
+    forwardPe: number
+    pbRatio: number
+    psRatio: number
+    dividendYield: number
+    revenueGrowth: number
+    netMargin: number
+    roe: number
+    grossMargin: number
+    operatingMargin: number
+    evToEbitda: number
+    evToSales: number
+    fcfMargin: number
+    netIncome: number
+    revenue: number
+    sharesOutstanding: number
+    currency: string
+  }
+    fundamentals: {
+    financialHighlights: {
+    incomeStatement: ({
+    year: number
+    revenue: number
+    ebit: number
+    netIncome: number
+    netIncomeGrowth: unknown
+    netIncomeMargin: number
+    earningsPerShare: number
+    earningsPerShareGrowth: unknown
+    dilutedSharesOutstanding: number
+    ebitda: number
+  } | {
+    year: number
+    revenue: number
+    ebit: number
+    netIncome: number
+    netIncomeGrowth: number
+    netIncomeMargin: number
+    earningsPerShare: number
+    earningsPerShareGrowth: number
+    dilutedSharesOutstanding: number
+    ebitda: number
+  })[]
+    balanceSheet: ({
+    year: number
+    totalAssets: number
+    totalLiabilities: number
+    shareholdersEquity: number
+    cash: number
+    cashAndShortTermInvestments: number
+    totalDebt: number
+    netDebt: number
+    workingCapital: number
+    totalCapitalization: number
+    retainedEarnings: number
+    debtEquityRatio: number
+    longTermDebtToCapitalization: number
+    totalDebtToCapitalization: number
+  })[]
+    cashFlow: ({
+    year: number
+    cashFlowFromOperatingActivities: number
+    cashFlowFromFinancingActivities: number
+    cashFlowFromInvestingActivities: number
+    freeCashFlow: number
+    freeCashFlowGrowth: unknown
+    cashFlowFromOperatingActivitiesGrowth: unknown
+    freeCashFlowPerShare: number
+    capitalExpenditures: number
+    depreciation: number
+    dividendPayment: number
+  } | {
+    year: number
+    cashFlowFromOperatingActivities: number
+    cashFlowFromFinancingActivities: number
+    cashFlowFromInvestingActivities: number
+    freeCashFlow: number
+    freeCashFlowGrowth: number
+    cashFlowFromOperatingActivitiesGrowth: number
+    freeCashFlowPerShare: number
+    capitalExpenditures: number
+    depreciation: number
+    dividendPayment: number
+  })[]
+  }
+  }
+    ownership: {
+    institutional: ({
+    date: string
+    holdingPercentage: number
+    holdersCount: number
+    sumOfCurrentPositions: number
+    sumOfCurrentPositionsValue: number
+  })[]
+    mutualFund: ({
+    date: string
+    holdingPercentage: number
+    holdersCount: number
+    sumOfCurrentPositions: number
+    sumOfCurrentPositionsValue: number
+  })[]
+    insider: ({
+    date: string
+    holdingPercentage: number
+    holdersCount: number
+    sumOfCurrentPositions: number
+    sumOfCurrentPositionsValue: number
+  })[]
+    insiderTransactions: ({
+    title: string
+    transactionDate: string
+    transactionCode: string
+    transactionText: string
+    transactionAmount: number
+    transactionValue: number
+    filingDate: string
+  })[]
+  }
+    dividends: {
+    history: ({
+    date: string
+    year: number
+    amount: number
+    currency: string
+    type: string
+  })[]
+  }
+    calendar: {
+    earnings: ({
+    date: string
+    title: string
+    year: number
+    quarter: number
+  })[]
+    exDividend: ({
+    date: string
+    title: string
+    year: number
+    amount: number
+  })[]
+    dividend: ({
+    date: string
+    title: string
+    year: number
+    amount: number
+  })[]
+  }
+    projections: {
+    priceTarget: {
+    lastUpdated: string
+    low: number
+    mean: number
+    current: number
+    high: number
+  }
+    recommendation: {
+    period: string
+    strongBuy: number
+    buy: number
+    hold: number
+    sell: number
+    strongSell: number
+  }
+    earnings: {
+    avg: number
+    high: number
+    low: number
+    mean: number
+    periods: (string)[]
+  }
+    revenue: {
+    avg: number
+    high: number
+    low: number
+    mean: number
+    periods: (string)[]
+  }
+  }
+    seasonality: {
+    symbol: string
+    years: number
+    metric: string
+    monthly_returns: ({
+    month: string
+    return_pct: number
+  })[]
+  }
+    epsSurprises: {
+    annual: ({
+    date: string
+    year: number
+    quarter: number
+    eps: number
+    epsEstimate: number
+    epsDifference: number
+    revenue: number
+    revenueEstimate: number
+    revenueDifference: number
+    surprise: number
+    surprisePercent: number
+    time: string
+  })[]
+    quarterly: ({
+    date: string
+    year: number
+    quarter: number
+    eps: number
+    epsEstimate: number
+    epsDifference: number
+    revenue: number
+    revenueEstimate: number
+    revenueDifference: number
+    surprise: number
+    surprisePercent: number
+    time: string
+  })[]
+  }
+    aiInsights: {
+    symbol: string
+    generatedAt: string
+    summary: string
+    bullCase: (string)[]
+    bearCase: (string)[]
+    keyMetrics: ({
+    label: string
+    value: number
+    assessment: string
+  } | {
+    label: string
+    value: string
+    assessment: string
+  })[]
+    sentiment: string
+  }
+    priceTarget: {
+    symbol: string
+    targetHigh: number
+    targetLow: number
+    targetMean: number
+    targetMedian: number
+    numberAnalysts: number
+    lastUpdated: string
+  }
+}
+
+// from mocks/shared/data/research/GS.json
+export interface GS {
+    symbol: string
+    basics: {
+    symbol: string
+    name: string
+    sector: string
+    industry: string
+    country: string
+    exchange: string
+    currency: string
+    price: number
+    prevClose: number
+    sharesOutstanding: number
+    marketCap: number
+  }
+    overview: {
+    name: string
+    sector: string
+    industry: string
+    country: string
+    exchange: string
+    type: string
+    currency: string
+    symbol: string
+    price: number
+    prevClose: number
+    sharesOutstanding: number
+    marketCap: number
+  }
+    description: (string)[]
     metrics: {
     roa: number
     roe: number
@@ -9323,6 +10689,7 @@ export interface INTU {
     sector: string
     industry: string
     country: string
+    exchange: string
     currency: string
     price: number
     prevClose: number
@@ -9343,6 +10710,7 @@ export interface INTU {
     sharesOutstanding: number
     marketCap: number
   }
+    description: (string)[]
     metrics: {
     roa: number
     roe: number
@@ -9656,6 +11024,7 @@ export interface IWM {
     sector: string
     industry: string
     country: string
+    exchange: string
     currency: string
     price: number
     prevClose: number
@@ -9676,6 +11045,7 @@ export interface IWM {
     sharesOutstanding: number
     marketCap: number
   }
+    description: (string)[]
     metrics: {
     roa: number
     roe: number
@@ -9989,6 +11359,7 @@ export interface JNJ {
     sector: string
     industry: string
     country: string
+    exchange: string
     currency: string
     price: number
     prevClose: number
@@ -10009,6 +11380,342 @@ export interface JNJ {
     sharesOutstanding: number
     marketCap: number
   }
+    description: (string)[]
+    metrics: {
+    roa: number
+    roe: number
+    cash: number
+    pFcf: number
+    roic: number
+    rota: number
+    isBank: boolean
+    ttmEps: number
+    isMiner: boolean
+    netDebt: number
+    pbRatio: number
+    peRatio: number
+    revenue: number
+    pegRatio: number
+    employees: number
+    evToSales: number
+    fcfMargin: number
+    forwardPe: number
+    marketCap: number
+    netIncome: number
+    netMargin: number
+    evToEbitda: number
+    grossMargin: number
+    payoutRatio: number
+    priceTarget: number
+    dpsGrowth3yr: number
+    dpsGrowth5yr: number
+    ebitdaMargin: number
+    epsGrowth3yr: number
+    epsGrowth5yr: number
+    epsGrowthFwd: number
+    pretaxMargin: number
+    dividendYield: number
+    epsGrowth10yr: number
+    epsLtGrowthEst: number
+    forwardEvSales: number
+    isConglomerate: boolean
+    ebitdaGrowthFwd: number
+    enterpriseValue: number
+    evToGrossProfit: number
+    isDepositLender: boolean
+    operatingMargin: number
+    dividendPerShare: number
+    reportingCadence: string
+    revenueGrowth3yr: number
+    revenueGrowth5yr: number
+    revenueGrowthFwd: number
+    bookValuePerShare: number
+    revenueGrowth10yr: number
+    sharesOutstanding: number
+    lifecycleStatus: string
+    successorSymbol: unknown
+  }
+    compare: {
+    symbol: string
+    name: string
+    price: number
+    marketCap: number
+    peRatio: number
+    forwardPe: number
+    pbRatio: number
+    psRatio: number
+    dividendYield: number
+    revenueGrowth: number
+    netMargin: number
+    roe: number
+    grossMargin: number
+    operatingMargin: number
+    evToEbitda: number
+    evToSales: number
+    fcfMargin: number
+    netIncome: number
+    revenue: number
+    sharesOutstanding: number
+    currency: string
+  }
+    fundamentals: {
+    financialHighlights: {
+    incomeStatement: ({
+    year: number
+    revenue: number
+    ebit: number
+    netIncome: number
+    netIncomeGrowth: unknown
+    netIncomeMargin: number
+    earningsPerShare: number
+    earningsPerShareGrowth: unknown
+    dilutedSharesOutstanding: number
+    ebitda: number
+  } | {
+    year: number
+    revenue: number
+    ebit: number
+    netIncome: number
+    netIncomeGrowth: number
+    netIncomeMargin: number
+    earningsPerShare: number
+    earningsPerShareGrowth: number
+    dilutedSharesOutstanding: number
+    ebitda: number
+  })[]
+    balanceSheet: ({
+    year: number
+    totalAssets: number
+    totalLiabilities: number
+    shareholdersEquity: number
+    cash: number
+    cashAndShortTermInvestments: number
+    totalDebt: number
+    netDebt: number
+    workingCapital: number
+    totalCapitalization: number
+    retainedEarnings: number
+    debtEquityRatio: number
+    longTermDebtToCapitalization: number
+    totalDebtToCapitalization: number
+  })[]
+    cashFlow: ({
+    year: number
+    cashFlowFromOperatingActivities: number
+    cashFlowFromFinancingActivities: number
+    cashFlowFromInvestingActivities: number
+    freeCashFlow: number
+    freeCashFlowGrowth: unknown
+    cashFlowFromOperatingActivitiesGrowth: unknown
+    freeCashFlowPerShare: number
+    capitalExpenditures: number
+    depreciation: number
+    dividendPayment: number
+  } | {
+    year: number
+    cashFlowFromOperatingActivities: number
+    cashFlowFromFinancingActivities: number
+    cashFlowFromInvestingActivities: number
+    freeCashFlow: number
+    freeCashFlowGrowth: number
+    cashFlowFromOperatingActivitiesGrowth: number
+    freeCashFlowPerShare: number
+    capitalExpenditures: number
+    depreciation: number
+    dividendPayment: number
+  })[]
+  }
+  }
+    ownership: {
+    institutional: ({
+    date: string
+    holdingPercentage: number
+    holdersCount: number
+    sumOfCurrentPositions: number
+    sumOfCurrentPositionsValue: number
+  })[]
+    mutualFund: ({
+    date: string
+    holdingPercentage: number
+    holdersCount: number
+    sumOfCurrentPositions: number
+    sumOfCurrentPositionsValue: number
+  })[]
+    insider: ({
+    date: string
+    holdingPercentage: number
+    holdersCount: number
+    sumOfCurrentPositions: number
+    sumOfCurrentPositionsValue: number
+  })[]
+    insiderTransactions: ({
+    title: string
+    transactionDate: string
+    transactionCode: string
+    transactionText: string
+    transactionAmount: number
+    transactionValue: number
+    filingDate: string
+  })[]
+  }
+    dividends: {
+    history: ({
+    date: string
+    year: number
+    amount: number
+    currency: string
+    type: string
+  })[]
+  }
+    calendar: {
+    earnings: ({
+    date: string
+    title: string
+    year: number
+    quarter: number
+  })[]
+    exDividend: ({
+    date: string
+    title: string
+    year: number
+    amount: number
+  })[]
+    dividend: ({
+    date: string
+    title: string
+    year: number
+    amount: number
+  })[]
+  }
+    projections: {
+    priceTarget: {
+    lastUpdated: string
+    low: number
+    mean: number
+    current: number
+    high: number
+  }
+    recommendation: {
+    period: string
+    strongBuy: number
+    buy: number
+    hold: number
+    sell: number
+    strongSell: number
+  }
+    earnings: {
+    avg: number
+    high: number
+    low: number
+    mean: number
+    periods: (string)[]
+  }
+    revenue: {
+    avg: number
+    high: number
+    low: number
+    mean: number
+    periods: (string)[]
+  }
+  }
+    seasonality: {
+    symbol: string
+    years: number
+    metric: string
+    monthly_returns: ({
+    month: string
+    return_pct: number
+  })[]
+  }
+    epsSurprises: {
+    annual: ({
+    date: string
+    year: number
+    quarter: number
+    eps: number
+    epsEstimate: number
+    epsDifference: number
+    revenue: number
+    revenueEstimate: number
+    revenueDifference: number
+    surprise: number
+    surprisePercent: number
+    time: string
+  })[]
+    quarterly: ({
+    date: string
+    year: number
+    quarter: number
+    eps: number
+    epsEstimate: number
+    epsDifference: number
+    revenue: number
+    revenueEstimate: number
+    revenueDifference: number
+    surprise: number
+    surprisePercent: number
+    time: string
+  })[]
+  }
+    aiInsights: {
+    symbol: string
+    generatedAt: string
+    summary: string
+    bullCase: (string)[]
+    bearCase: (string)[]
+    keyMetrics: ({
+    label: string
+    value: number
+    assessment: string
+  } | {
+    label: string
+    value: string
+    assessment: string
+  })[]
+    sentiment: string
+  }
+    priceTarget: {
+    symbol: string
+    targetHigh: number
+    targetLow: number
+    targetMean: number
+    targetMedian: number
+    numberAnalysts: number
+    lastUpdated: string
+  }
+}
+
+// from mocks/shared/data/research/JPM.json
+export interface JPM {
+    symbol: string
+    basics: {
+    symbol: string
+    name: string
+    sector: string
+    industry: string
+    country: string
+    exchange: string
+    currency: string
+    price: number
+    prevClose: number
+    sharesOutstanding: number
+    marketCap: number
+  }
+    overview: {
+    name: string
+    sector: string
+    industry: string
+    country: string
+    exchange: string
+    type: string
+    currency: string
+    symbol: string
+    price: number
+    prevClose: number
+    sharesOutstanding: number
+    marketCap: number
+  }
+    description: (string)[]
     metrics: {
     roa: number
     roe: number
@@ -10322,6 +12029,7 @@ export interface KLAC {
     sector: string
     industry: string
     country: string
+    exchange: string
     currency: string
     price: number
     prevClose: number
@@ -10342,6 +12050,7 @@ export interface KLAC {
     sharesOutstanding: number
     marketCap: number
   }
+    description: (string)[]
     metrics: {
     roa: number
     roe: number
@@ -10655,6 +12364,7 @@ export interface KO {
     sector: string
     industry: string
     country: string
+    exchange: string
     currency: string
     price: number
     prevClose: number
@@ -10675,6 +12385,342 @@ export interface KO {
     sharesOutstanding: number
     marketCap: number
   }
+    description: (string)[]
+    metrics: {
+    roa: number
+    roe: number
+    cash: number
+    pFcf: number
+    roic: number
+    rota: number
+    isBank: boolean
+    ttmEps: number
+    isMiner: boolean
+    netDebt: number
+    pbRatio: number
+    peRatio: number
+    revenue: number
+    pegRatio: number
+    employees: number
+    evToSales: number
+    fcfMargin: number
+    forwardPe: number
+    marketCap: number
+    netIncome: number
+    netMargin: number
+    evToEbitda: number
+    grossMargin: number
+    payoutRatio: number
+    priceTarget: number
+    dpsGrowth3yr: number
+    dpsGrowth5yr: number
+    ebitdaMargin: number
+    epsGrowth3yr: number
+    epsGrowth5yr: number
+    epsGrowthFwd: number
+    pretaxMargin: number
+    dividendYield: number
+    epsGrowth10yr: number
+    epsLtGrowthEst: number
+    forwardEvSales: number
+    isConglomerate: boolean
+    ebitdaGrowthFwd: number
+    enterpriseValue: number
+    evToGrossProfit: number
+    isDepositLender: boolean
+    operatingMargin: number
+    dividendPerShare: number
+    reportingCadence: string
+    revenueGrowth3yr: number
+    revenueGrowth5yr: number
+    revenueGrowthFwd: number
+    bookValuePerShare: number
+    revenueGrowth10yr: number
+    sharesOutstanding: number
+    lifecycleStatus: string
+    successorSymbol: unknown
+  }
+    compare: {
+    symbol: string
+    name: string
+    price: number
+    marketCap: number
+    peRatio: number
+    forwardPe: number
+    pbRatio: number
+    psRatio: number
+    dividendYield: number
+    revenueGrowth: number
+    netMargin: number
+    roe: number
+    grossMargin: number
+    operatingMargin: number
+    evToEbitda: number
+    evToSales: number
+    fcfMargin: number
+    netIncome: number
+    revenue: number
+    sharesOutstanding: number
+    currency: string
+  }
+    fundamentals: {
+    financialHighlights: {
+    incomeStatement: ({
+    year: number
+    revenue: number
+    ebit: number
+    netIncome: number
+    netIncomeGrowth: unknown
+    netIncomeMargin: number
+    earningsPerShare: number
+    earningsPerShareGrowth: unknown
+    dilutedSharesOutstanding: number
+    ebitda: number
+  } | {
+    year: number
+    revenue: number
+    ebit: number
+    netIncome: number
+    netIncomeGrowth: number
+    netIncomeMargin: number
+    earningsPerShare: number
+    earningsPerShareGrowth: number
+    dilutedSharesOutstanding: number
+    ebitda: number
+  })[]
+    balanceSheet: ({
+    year: number
+    totalAssets: number
+    totalLiabilities: number
+    shareholdersEquity: number
+    cash: number
+    cashAndShortTermInvestments: number
+    totalDebt: number
+    netDebt: number
+    workingCapital: number
+    totalCapitalization: number
+    retainedEarnings: number
+    debtEquityRatio: number
+    longTermDebtToCapitalization: number
+    totalDebtToCapitalization: number
+  })[]
+    cashFlow: ({
+    year: number
+    cashFlowFromOperatingActivities: number
+    cashFlowFromFinancingActivities: number
+    cashFlowFromInvestingActivities: number
+    freeCashFlow: number
+    freeCashFlowGrowth: unknown
+    cashFlowFromOperatingActivitiesGrowth: unknown
+    freeCashFlowPerShare: number
+    capitalExpenditures: number
+    depreciation: number
+    dividendPayment: number
+  } | {
+    year: number
+    cashFlowFromOperatingActivities: number
+    cashFlowFromFinancingActivities: number
+    cashFlowFromInvestingActivities: number
+    freeCashFlow: number
+    freeCashFlowGrowth: number
+    cashFlowFromOperatingActivitiesGrowth: number
+    freeCashFlowPerShare: number
+    capitalExpenditures: number
+    depreciation: number
+    dividendPayment: number
+  })[]
+  }
+  }
+    ownership: {
+    institutional: ({
+    date: string
+    holdingPercentage: number
+    holdersCount: number
+    sumOfCurrentPositions: number
+    sumOfCurrentPositionsValue: number
+  })[]
+    mutualFund: ({
+    date: string
+    holdingPercentage: number
+    holdersCount: number
+    sumOfCurrentPositions: number
+    sumOfCurrentPositionsValue: number
+  })[]
+    insider: ({
+    date: string
+    holdingPercentage: number
+    holdersCount: number
+    sumOfCurrentPositions: number
+    sumOfCurrentPositionsValue: number
+  })[]
+    insiderTransactions: ({
+    title: string
+    transactionDate: string
+    transactionCode: string
+    transactionText: string
+    transactionAmount: number
+    transactionValue: number
+    filingDate: string
+  })[]
+  }
+    dividends: {
+    history: ({
+    date: string
+    year: number
+    amount: number
+    currency: string
+    type: string
+  })[]
+  }
+    calendar: {
+    earnings: ({
+    date: string
+    title: string
+    year: number
+    quarter: number
+  })[]
+    exDividend: ({
+    date: string
+    title: string
+    year: number
+    amount: number
+  })[]
+    dividend: ({
+    date: string
+    title: string
+    year: number
+    amount: number
+  })[]
+  }
+    projections: {
+    priceTarget: {
+    lastUpdated: string
+    low: number
+    mean: number
+    current: number
+    high: number
+  }
+    recommendation: {
+    period: string
+    strongBuy: number
+    buy: number
+    hold: number
+    sell: number
+    strongSell: number
+  }
+    earnings: {
+    avg: number
+    high: number
+    low: number
+    mean: number
+    periods: (string)[]
+  }
+    revenue: {
+    avg: number
+    high: number
+    low: number
+    mean: number
+    periods: (string)[]
+  }
+  }
+    seasonality: {
+    symbol: string
+    years: number
+    metric: string
+    monthly_returns: ({
+    month: string
+    return_pct: number
+  })[]
+  }
+    epsSurprises: {
+    annual: ({
+    date: string
+    year: number
+    quarter: number
+    eps: number
+    epsEstimate: number
+    epsDifference: number
+    revenue: number
+    revenueEstimate: number
+    revenueDifference: number
+    surprise: number
+    surprisePercent: number
+    time: string
+  })[]
+    quarterly: ({
+    date: string
+    year: number
+    quarter: number
+    eps: number
+    epsEstimate: number
+    epsDifference: number
+    revenue: number
+    revenueEstimate: number
+    revenueDifference: number
+    surprise: number
+    surprisePercent: number
+    time: string
+  })[]
+  }
+    aiInsights: {
+    symbol: string
+    generatedAt: string
+    summary: string
+    bullCase: (string)[]
+    bearCase: (string)[]
+    keyMetrics: ({
+    label: string
+    value: number
+    assessment: string
+  } | {
+    label: string
+    value: string
+    assessment: string
+  })[]
+    sentiment: string
+  }
+    priceTarget: {
+    symbol: string
+    targetHigh: number
+    targetLow: number
+    targetMean: number
+    targetMedian: number
+    numberAnalysts: number
+    lastUpdated: string
+  }
+}
+
+// from mocks/shared/data/research/LCID.json
+export interface LCID {
+    symbol: string
+    basics: {
+    symbol: string
+    name: string
+    sector: string
+    industry: string
+    country: string
+    exchange: string
+    currency: string
+    price: number
+    prevClose: number
+    sharesOutstanding: number
+    marketCap: number
+  }
+    overview: {
+    name: string
+    sector: string
+    industry: string
+    country: string
+    exchange: string
+    type: string
+    currency: string
+    symbol: string
+    price: number
+    prevClose: number
+    sharesOutstanding: number
+    marketCap: number
+  }
+    description: (string)[]
     metrics: {
     roa: number
     roe: number
@@ -10988,6 +13034,7 @@ export interface LRCX {
     sector: string
     industry: string
     country: string
+    exchange: string
     currency: string
     price: number
     prevClose: number
@@ -11008,6 +13055,7 @@ export interface LRCX {
     sharesOutstanding: number
     marketCap: number
   }
+    description: (string)[]
     metrics: {
     roa: number
     roe: number
@@ -11321,6 +13369,7 @@ export interface META {
     sector: string
     industry: string
     country: string
+    exchange: string
     currency: string
     price: number
     prevClose: number
@@ -11341,6 +13390,7 @@ export interface META {
     sharesOutstanding: number
     marketCap: number
   }
+    description: (string)[]
     metrics: {
     roa: number
     roe: number
@@ -11654,6 +13704,7 @@ export interface MSFT {
     sector: string
     industry: string
     country: string
+    exchange: string
     currency: string
     price: number
     prevClose: number
@@ -11674,6 +13725,7 @@ export interface MSFT {
     sharesOutstanding: number
     marketCap: number
   }
+    description: (string)[]
     metrics: {
     roa: number
     roe: number
@@ -11987,6 +14039,7 @@ export interface NFLX {
     sector: string
     industry: string
     country: string
+    exchange: string
     currency: string
     price: number
     prevClose: number
@@ -12007,6 +14060,342 @@ export interface NFLX {
     sharesOutstanding: number
     marketCap: number
   }
+    description: (string)[]
+    metrics: {
+    roa: number
+    roe: number
+    cash: number
+    pFcf: number
+    roic: number
+    rota: number
+    isBank: boolean
+    ttmEps: number
+    isMiner: boolean
+    netDebt: number
+    pbRatio: number
+    peRatio: number
+    revenue: number
+    pegRatio: number
+    employees: number
+    evToSales: number
+    fcfMargin: number
+    forwardPe: number
+    marketCap: number
+    netIncome: number
+    netMargin: number
+    evToEbitda: number
+    grossMargin: number
+    payoutRatio: number
+    priceTarget: number
+    dpsGrowth3yr: number
+    dpsGrowth5yr: number
+    ebitdaMargin: number
+    epsGrowth3yr: number
+    epsGrowth5yr: number
+    epsGrowthFwd: number
+    pretaxMargin: number
+    dividendYield: number
+    epsGrowth10yr: number
+    epsLtGrowthEst: number
+    forwardEvSales: number
+    isConglomerate: boolean
+    ebitdaGrowthFwd: number
+    enterpriseValue: number
+    evToGrossProfit: number
+    isDepositLender: boolean
+    operatingMargin: number
+    dividendPerShare: number
+    reportingCadence: string
+    revenueGrowth3yr: number
+    revenueGrowth5yr: number
+    revenueGrowthFwd: number
+    bookValuePerShare: number
+    revenueGrowth10yr: number
+    sharesOutstanding: number
+    lifecycleStatus: string
+    successorSymbol: unknown
+  }
+    compare: {
+    symbol: string
+    name: string
+    price: number
+    marketCap: number
+    peRatio: number
+    forwardPe: number
+    pbRatio: number
+    psRatio: number
+    dividendYield: number
+    revenueGrowth: number
+    netMargin: number
+    roe: number
+    grossMargin: number
+    operatingMargin: number
+    evToEbitda: number
+    evToSales: number
+    fcfMargin: number
+    netIncome: number
+    revenue: number
+    sharesOutstanding: number
+    currency: string
+  }
+    fundamentals: {
+    financialHighlights: {
+    incomeStatement: ({
+    year: number
+    revenue: number
+    ebit: number
+    netIncome: number
+    netIncomeGrowth: unknown
+    netIncomeMargin: number
+    earningsPerShare: number
+    earningsPerShareGrowth: unknown
+    dilutedSharesOutstanding: number
+    ebitda: number
+  } | {
+    year: number
+    revenue: number
+    ebit: number
+    netIncome: number
+    netIncomeGrowth: number
+    netIncomeMargin: number
+    earningsPerShare: number
+    earningsPerShareGrowth: number
+    dilutedSharesOutstanding: number
+    ebitda: number
+  })[]
+    balanceSheet: ({
+    year: number
+    totalAssets: number
+    totalLiabilities: number
+    shareholdersEquity: number
+    cash: number
+    cashAndShortTermInvestments: number
+    totalDebt: number
+    netDebt: number
+    workingCapital: number
+    totalCapitalization: number
+    retainedEarnings: number
+    debtEquityRatio: number
+    longTermDebtToCapitalization: number
+    totalDebtToCapitalization: number
+  })[]
+    cashFlow: ({
+    year: number
+    cashFlowFromOperatingActivities: number
+    cashFlowFromFinancingActivities: number
+    cashFlowFromInvestingActivities: number
+    freeCashFlow: number
+    freeCashFlowGrowth: unknown
+    cashFlowFromOperatingActivitiesGrowth: unknown
+    freeCashFlowPerShare: number
+    capitalExpenditures: number
+    depreciation: number
+    dividendPayment: number
+  } | {
+    year: number
+    cashFlowFromOperatingActivities: number
+    cashFlowFromFinancingActivities: number
+    cashFlowFromInvestingActivities: number
+    freeCashFlow: number
+    freeCashFlowGrowth: number
+    cashFlowFromOperatingActivitiesGrowth: number
+    freeCashFlowPerShare: number
+    capitalExpenditures: number
+    depreciation: number
+    dividendPayment: number
+  })[]
+  }
+  }
+    ownership: {
+    institutional: ({
+    date: string
+    holdingPercentage: number
+    holdersCount: number
+    sumOfCurrentPositions: number
+    sumOfCurrentPositionsValue: number
+  })[]
+    mutualFund: ({
+    date: string
+    holdingPercentage: number
+    holdersCount: number
+    sumOfCurrentPositions: number
+    sumOfCurrentPositionsValue: number
+  })[]
+    insider: ({
+    date: string
+    holdingPercentage: number
+    holdersCount: number
+    sumOfCurrentPositions: number
+    sumOfCurrentPositionsValue: number
+  })[]
+    insiderTransactions: ({
+    title: string
+    transactionDate: string
+    transactionCode: string
+    transactionText: string
+    transactionAmount: number
+    transactionValue: number
+    filingDate: string
+  })[]
+  }
+    dividends: {
+    history: ({
+    date: string
+    year: number
+    amount: number
+    currency: string
+    type: string
+  })[]
+  }
+    calendar: {
+    earnings: ({
+    date: string
+    title: string
+    year: number
+    quarter: number
+  })[]
+    exDividend: ({
+    date: string
+    title: string
+    year: number
+    amount: number
+  })[]
+    dividend: ({
+    date: string
+    title: string
+    year: number
+    amount: number
+  })[]
+  }
+    projections: {
+    priceTarget: {
+    lastUpdated: string
+    low: number
+    mean: number
+    current: number
+    high: number
+  }
+    recommendation: {
+    period: string
+    strongBuy: number
+    buy: number
+    hold: number
+    sell: number
+    strongSell: number
+  }
+    earnings: {
+    avg: number
+    high: number
+    low: number
+    mean: number
+    periods: (string)[]
+  }
+    revenue: {
+    avg: number
+    high: number
+    low: number
+    mean: number
+    periods: (string)[]
+  }
+  }
+    seasonality: {
+    symbol: string
+    years: number
+    metric: string
+    monthly_returns: ({
+    month: string
+    return_pct: number
+  })[]
+  }
+    epsSurprises: {
+    annual: ({
+    date: string
+    year: number
+    quarter: number
+    eps: number
+    epsEstimate: number
+    epsDifference: number
+    revenue: number
+    revenueEstimate: number
+    revenueDifference: number
+    surprise: number
+    surprisePercent: number
+    time: string
+  })[]
+    quarterly: ({
+    date: string
+    year: number
+    quarter: number
+    eps: number
+    epsEstimate: number
+    epsDifference: number
+    revenue: number
+    revenueEstimate: number
+    revenueDifference: number
+    surprise: number
+    surprisePercent: number
+    time: string
+  })[]
+  }
+    aiInsights: {
+    symbol: string
+    generatedAt: string
+    summary: string
+    bullCase: (string)[]
+    bearCase: (string)[]
+    keyMetrics: ({
+    label: string
+    value: number
+    assessment: string
+  } | {
+    label: string
+    value: string
+    assessment: string
+  })[]
+    sentiment: string
+  }
+    priceTarget: {
+    symbol: string
+    targetHigh: number
+    targetLow: number
+    targetMean: number
+    targetMedian: number
+    numberAnalysts: number
+    lastUpdated: string
+  }
+}
+
+// from mocks/shared/data/research/NIO.json
+export interface NIO {
+    symbol: string
+    basics: {
+    symbol: string
+    name: string
+    sector: string
+    industry: string
+    country: string
+    exchange: string
+    currency: string
+    price: number
+    prevClose: number
+    sharesOutstanding: number
+    marketCap: number
+  }
+    overview: {
+    name: string
+    sector: string
+    industry: string
+    country: string
+    exchange: string
+    type: string
+    currency: string
+    symbol: string
+    price: number
+    prevClose: number
+    sharesOutstanding: number
+    marketCap: number
+  }
+    description: (string)[]
     metrics: {
     roa: number
     roe: number
@@ -12320,6 +14709,7 @@ export interface NVDA {
     sector: string
     industry: string
     country: string
+    exchange: string
     currency: string
     price: number
     prevClose: number
@@ -12340,6 +14730,7 @@ export interface NVDA {
     sharesOutstanding: number
     marketCap: number
   }
+    description: (string)[]
     metrics: {
     roa: number
     roe: number
@@ -12653,6 +15044,7 @@ export interface ORCL {
     sector: string
     industry: string
     country: string
+    exchange: string
     currency: string
     price: number
     prevClose: number
@@ -12673,6 +15065,7 @@ export interface ORCL {
     sharesOutstanding: number
     marketCap: number
   }
+    description: (string)[]
     metrics: {
     roa: number
     roe: number
@@ -12986,6 +15379,7 @@ export interface PLTR {
     sector: string
     industry: string
     country: string
+    exchange: string
     currency: string
     price: number
     prevClose: number
@@ -13006,6 +15400,7 @@ export interface PLTR {
     sharesOutstanding: number
     marketCap: number
   }
+    description: (string)[]
     metrics: {
     roa: number
     roe: number
@@ -13319,6 +15714,7 @@ export interface QCOM {
     sector: string
     industry: string
     country: string
+    exchange: string
     currency: string
     price: number
     prevClose: number
@@ -13339,6 +15735,7 @@ export interface QCOM {
     sharesOutstanding: number
     marketCap: number
   }
+    description: (string)[]
     metrics: {
     roa: number
     roe: number
@@ -13652,6 +16049,7 @@ export interface QQQ {
     sector: string
     industry: string
     country: string
+    exchange: string
     currency: string
     price: number
     prevClose: number
@@ -13672,6 +16070,1012 @@ export interface QQQ {
     sharesOutstanding: number
     marketCap: number
   }
+    description: (string)[]
+    metrics: {
+    roa: number
+    roe: number
+    cash: number
+    pFcf: number
+    roic: number
+    rota: number
+    isBank: boolean
+    ttmEps: number
+    isMiner: boolean
+    netDebt: number
+    pbRatio: number
+    peRatio: number
+    revenue: number
+    pegRatio: number
+    employees: number
+    evToSales: number
+    fcfMargin: number
+    forwardPe: number
+    marketCap: number
+    netIncome: number
+    netMargin: number
+    evToEbitda: number
+    grossMargin: number
+    payoutRatio: number
+    priceTarget: number
+    dpsGrowth3yr: number
+    dpsGrowth5yr: number
+    ebitdaMargin: number
+    epsGrowth3yr: number
+    epsGrowth5yr: number
+    epsGrowthFwd: number
+    pretaxMargin: number
+    dividendYield: number
+    epsGrowth10yr: number
+    epsLtGrowthEst: number
+    forwardEvSales: number
+    isConglomerate: boolean
+    ebitdaGrowthFwd: number
+    enterpriseValue: number
+    evToGrossProfit: number
+    isDepositLender: boolean
+    operatingMargin: number
+    dividendPerShare: number
+    reportingCadence: string
+    revenueGrowth3yr: number
+    revenueGrowth5yr: number
+    revenueGrowthFwd: number
+    bookValuePerShare: number
+    revenueGrowth10yr: number
+    sharesOutstanding: number
+    lifecycleStatus: string
+    successorSymbol: unknown
+  }
+    compare: {
+    symbol: string
+    name: string
+    price: number
+    marketCap: number
+    peRatio: number
+    forwardPe: number
+    pbRatio: number
+    psRatio: number
+    dividendYield: number
+    revenueGrowth: number
+    netMargin: number
+    roe: number
+    grossMargin: number
+    operatingMargin: number
+    evToEbitda: number
+    evToSales: number
+    fcfMargin: number
+    netIncome: number
+    revenue: number
+    sharesOutstanding: number
+    currency: string
+  }
+    fundamentals: {
+    financialHighlights: {
+    incomeStatement: ({
+    year: number
+    revenue: number
+    ebit: number
+    netIncome: number
+    netIncomeGrowth: unknown
+    netIncomeMargin: number
+    earningsPerShare: number
+    earningsPerShareGrowth: unknown
+    dilutedSharesOutstanding: number
+    ebitda: number
+  } | {
+    year: number
+    revenue: number
+    ebit: number
+    netIncome: number
+    netIncomeGrowth: number
+    netIncomeMargin: number
+    earningsPerShare: number
+    earningsPerShareGrowth: number
+    dilutedSharesOutstanding: number
+    ebitda: number
+  })[]
+    balanceSheet: ({
+    year: number
+    totalAssets: number
+    totalLiabilities: number
+    shareholdersEquity: number
+    cash: number
+    cashAndShortTermInvestments: number
+    totalDebt: number
+    netDebt: number
+    workingCapital: number
+    totalCapitalization: number
+    retainedEarnings: number
+    debtEquityRatio: number
+    longTermDebtToCapitalization: number
+    totalDebtToCapitalization: number
+  })[]
+    cashFlow: ({
+    year: number
+    cashFlowFromOperatingActivities: number
+    cashFlowFromFinancingActivities: number
+    cashFlowFromInvestingActivities: number
+    freeCashFlow: number
+    freeCashFlowGrowth: unknown
+    cashFlowFromOperatingActivitiesGrowth: unknown
+    freeCashFlowPerShare: number
+    capitalExpenditures: number
+    depreciation: number
+    dividendPayment: number
+  } | {
+    year: number
+    cashFlowFromOperatingActivities: number
+    cashFlowFromFinancingActivities: number
+    cashFlowFromInvestingActivities: number
+    freeCashFlow: number
+    freeCashFlowGrowth: number
+    cashFlowFromOperatingActivitiesGrowth: number
+    freeCashFlowPerShare: number
+    capitalExpenditures: number
+    depreciation: number
+    dividendPayment: number
+  })[]
+  }
+  }
+    ownership: {
+    institutional: ({
+    date: string
+    holdingPercentage: number
+    holdersCount: number
+    sumOfCurrentPositions: number
+    sumOfCurrentPositionsValue: number
+  })[]
+    mutualFund: ({
+    date: string
+    holdingPercentage: number
+    holdersCount: number
+    sumOfCurrentPositions: number
+    sumOfCurrentPositionsValue: number
+  })[]
+    insider: ({
+    date: string
+    holdingPercentage: number
+    holdersCount: number
+    sumOfCurrentPositions: number
+    sumOfCurrentPositionsValue: number
+  })[]
+    insiderTransactions: ({
+    title: string
+    transactionDate: string
+    transactionCode: string
+    transactionText: string
+    transactionAmount: number
+    transactionValue: number
+    filingDate: string
+  })[]
+  }
+    dividends: {
+    history: ({
+    date: string
+    year: number
+    amount: number
+    currency: string
+    type: string
+  })[]
+  }
+    calendar: {
+    earnings: ({
+    date: string
+    title: string
+    year: number
+    quarter: number
+  })[]
+    exDividend: ({
+    date: string
+    title: string
+    year: number
+    amount: number
+  })[]
+    dividend: ({
+    date: string
+    title: string
+    year: number
+    amount: number
+  })[]
+  }
+    projections: {
+    priceTarget: {
+    lastUpdated: string
+    low: number
+    mean: number
+    current: number
+    high: number
+  }
+    recommendation: {
+    period: string
+    strongBuy: number
+    buy: number
+    hold: number
+    sell: number
+    strongSell: number
+  }
+    earnings: {
+    avg: number
+    high: number
+    low: number
+    mean: number
+    periods: (string)[]
+  }
+    revenue: {
+    avg: number
+    high: number
+    low: number
+    mean: number
+    periods: (string)[]
+  }
+  }
+    seasonality: {
+    symbol: string
+    years: number
+    metric: string
+    monthly_returns: ({
+    month: string
+    return_pct: number
+  })[]
+  }
+    epsSurprises: {
+    annual: ({
+    date: string
+    year: number
+    quarter: number
+    eps: number
+    epsEstimate: number
+    epsDifference: number
+    revenue: number
+    revenueEstimate: number
+    revenueDifference: number
+    surprise: number
+    surprisePercent: number
+    time: string
+  })[]
+    quarterly: ({
+    date: string
+    year: number
+    quarter: number
+    eps: number
+    epsEstimate: number
+    epsDifference: number
+    revenue: number
+    revenueEstimate: number
+    revenueDifference: number
+    surprise: number
+    surprisePercent: number
+    time: string
+  })[]
+  }
+    aiInsights: {
+    symbol: string
+    generatedAt: string
+    summary: string
+    bullCase: (string)[]
+    bearCase: (string)[]
+    keyMetrics: ({
+    label: string
+    value: number
+    assessment: string
+  } | {
+    label: string
+    value: string
+    assessment: string
+  })[]
+    sentiment: string
+  }
+    priceTarget: {
+    symbol: string
+    targetHigh: number
+    targetLow: number
+    targetMean: number
+    targetMedian: number
+    numberAnalysts: number
+    lastUpdated: string
+  }
+}
+
+// from mocks/shared/data/research/RIVN.json
+export interface RIVN {
+    symbol: string
+    basics: {
+    symbol: string
+    name: string
+    sector: string
+    industry: string
+    country: string
+    exchange: string
+    currency: string
+    price: number
+    prevClose: number
+    sharesOutstanding: number
+    marketCap: number
+  }
+    overview: {
+    name: string
+    sector: string
+    industry: string
+    country: string
+    exchange: string
+    type: string
+    currency: string
+    symbol: string
+    price: number
+    prevClose: number
+    sharesOutstanding: number
+    marketCap: number
+  }
+    description: (string)[]
+    metrics: {
+    roa: number
+    roe: number
+    cash: number
+    pFcf: number
+    roic: number
+    rota: number
+    isBank: boolean
+    ttmEps: number
+    isMiner: boolean
+    netDebt: number
+    pbRatio: number
+    peRatio: number
+    revenue: number
+    pegRatio: number
+    employees: number
+    evToSales: number
+    fcfMargin: number
+    forwardPe: number
+    marketCap: number
+    netIncome: number
+    netMargin: number
+    evToEbitda: number
+    grossMargin: number
+    payoutRatio: number
+    priceTarget: number
+    dpsGrowth3yr: number
+    dpsGrowth5yr: number
+    ebitdaMargin: number
+    epsGrowth3yr: number
+    epsGrowth5yr: number
+    epsGrowthFwd: number
+    pretaxMargin: number
+    dividendYield: number
+    epsGrowth10yr: number
+    epsLtGrowthEst: number
+    forwardEvSales: number
+    isConglomerate: boolean
+    ebitdaGrowthFwd: number
+    enterpriseValue: number
+    evToGrossProfit: number
+    isDepositLender: boolean
+    operatingMargin: number
+    dividendPerShare: number
+    reportingCadence: string
+    revenueGrowth3yr: number
+    revenueGrowth5yr: number
+    revenueGrowthFwd: number
+    bookValuePerShare: number
+    revenueGrowth10yr: number
+    sharesOutstanding: number
+    lifecycleStatus: string
+    successorSymbol: unknown
+  }
+    compare: {
+    symbol: string
+    name: string
+    price: number
+    marketCap: number
+    peRatio: number
+    forwardPe: number
+    pbRatio: number
+    psRatio: number
+    dividendYield: number
+    revenueGrowth: number
+    netMargin: number
+    roe: number
+    grossMargin: number
+    operatingMargin: number
+    evToEbitda: number
+    evToSales: number
+    fcfMargin: number
+    netIncome: number
+    revenue: number
+    sharesOutstanding: number
+    currency: string
+  }
+    fundamentals: {
+    financialHighlights: {
+    incomeStatement: ({
+    year: number
+    revenue: number
+    ebit: number
+    netIncome: number
+    netIncomeGrowth: unknown
+    netIncomeMargin: number
+    earningsPerShare: number
+    earningsPerShareGrowth: unknown
+    dilutedSharesOutstanding: number
+    ebitda: number
+  } | {
+    year: number
+    revenue: number
+    ebit: number
+    netIncome: number
+    netIncomeGrowth: number
+    netIncomeMargin: number
+    earningsPerShare: number
+    earningsPerShareGrowth: number
+    dilutedSharesOutstanding: number
+    ebitda: number
+  })[]
+    balanceSheet: ({
+    year: number
+    totalAssets: number
+    totalLiabilities: number
+    shareholdersEquity: number
+    cash: number
+    cashAndShortTermInvestments: number
+    totalDebt: number
+    netDebt: number
+    workingCapital: number
+    totalCapitalization: number
+    retainedEarnings: number
+    debtEquityRatio: number
+    longTermDebtToCapitalization: number
+    totalDebtToCapitalization: number
+  })[]
+    cashFlow: ({
+    year: number
+    cashFlowFromOperatingActivities: number
+    cashFlowFromFinancingActivities: number
+    cashFlowFromInvestingActivities: number
+    freeCashFlow: number
+    freeCashFlowGrowth: unknown
+    cashFlowFromOperatingActivitiesGrowth: unknown
+    freeCashFlowPerShare: number
+    capitalExpenditures: number
+    depreciation: number
+    dividendPayment: number
+  } | {
+    year: number
+    cashFlowFromOperatingActivities: number
+    cashFlowFromFinancingActivities: number
+    cashFlowFromInvestingActivities: number
+    freeCashFlow: number
+    freeCashFlowGrowth: number
+    cashFlowFromOperatingActivitiesGrowth: number
+    freeCashFlowPerShare: number
+    capitalExpenditures: number
+    depreciation: number
+    dividendPayment: number
+  })[]
+  }
+  }
+    ownership: {
+    institutional: ({
+    date: string
+    holdingPercentage: number
+    holdersCount: number
+    sumOfCurrentPositions: number
+    sumOfCurrentPositionsValue: number
+  })[]
+    mutualFund: ({
+    date: string
+    holdingPercentage: number
+    holdersCount: number
+    sumOfCurrentPositions: number
+    sumOfCurrentPositionsValue: number
+  })[]
+    insider: ({
+    date: string
+    holdingPercentage: number
+    holdersCount: number
+    sumOfCurrentPositions: number
+    sumOfCurrentPositionsValue: number
+  })[]
+    insiderTransactions: ({
+    title: string
+    transactionDate: string
+    transactionCode: string
+    transactionText: string
+    transactionAmount: number
+    transactionValue: number
+    filingDate: string
+  })[]
+  }
+    dividends: {
+    history: ({
+    date: string
+    year: number
+    amount: number
+    currency: string
+    type: string
+  })[]
+  }
+    calendar: {
+    earnings: ({
+    date: string
+    title: string
+    year: number
+    quarter: number
+  })[]
+    exDividend: ({
+    date: string
+    title: string
+    year: number
+    amount: number
+  })[]
+    dividend: ({
+    date: string
+    title: string
+    year: number
+    amount: number
+  })[]
+  }
+    projections: {
+    priceTarget: {
+    lastUpdated: string
+    low: number
+    mean: number
+    current: number
+    high: number
+  }
+    recommendation: {
+    period: string
+    strongBuy: number
+    buy: number
+    hold: number
+    sell: number
+    strongSell: number
+  }
+    earnings: {
+    avg: number
+    high: number
+    low: number
+    mean: number
+    periods: (string)[]
+  }
+    revenue: {
+    avg: number
+    high: number
+    low: number
+    mean: number
+    periods: (string)[]
+  }
+  }
+    seasonality: {
+    symbol: string
+    years: number
+    metric: string
+    monthly_returns: ({
+    month: string
+    return_pct: number
+  })[]
+  }
+    epsSurprises: {
+    annual: ({
+    date: string
+    year: number
+    quarter: number
+    eps: number
+    epsEstimate: number
+    epsDifference: number
+    revenue: number
+    revenueEstimate: number
+    revenueDifference: number
+    surprise: number
+    surprisePercent: number
+    time: string
+  })[]
+    quarterly: ({
+    date: string
+    year: number
+    quarter: number
+    eps: number
+    epsEstimate: number
+    epsDifference: number
+    revenue: number
+    revenueEstimate: number
+    revenueDifference: number
+    surprise: number
+    surprisePercent: number
+    time: string
+  })[]
+  }
+    aiInsights: {
+    symbol: string
+    generatedAt: string
+    summary: string
+    bullCase: (string)[]
+    bearCase: (string)[]
+    keyMetrics: ({
+    label: string
+    value: number
+    assessment: string
+  } | {
+    label: string
+    value: string
+    assessment: string
+  })[]
+    sentiment: string
+  }
+    priceTarget: {
+    symbol: string
+    targetHigh: number
+    targetLow: number
+    targetMean: number
+    targetMedian: number
+    numberAnalysts: number
+    lastUpdated: string
+  }
+}
+
+// from mocks/shared/data/research/SNAP.json
+export interface SNAP {
+    symbol: string
+    basics: {
+    symbol: string
+    name: string
+    sector: string
+    industry: string
+    country: string
+    exchange: string
+    currency: string
+    price: number
+    prevClose: number
+    sharesOutstanding: number
+    marketCap: number
+  }
+    overview: {
+    name: string
+    sector: string
+    industry: string
+    country: string
+    exchange: string
+    type: string
+    currency: string
+    symbol: string
+    price: number
+    prevClose: number
+    sharesOutstanding: number
+    marketCap: number
+  }
+    description: (string)[]
+    metrics: {
+    roa: number
+    roe: number
+    cash: number
+    pFcf: number
+    roic: number
+    rota: number
+    isBank: boolean
+    ttmEps: number
+    isMiner: boolean
+    netDebt: number
+    pbRatio: number
+    peRatio: number
+    revenue: number
+    pegRatio: number
+    employees: number
+    evToSales: number
+    fcfMargin: number
+    forwardPe: number
+    marketCap: number
+    netIncome: number
+    netMargin: number
+    evToEbitda: number
+    grossMargin: number
+    payoutRatio: number
+    priceTarget: number
+    dpsGrowth3yr: number
+    dpsGrowth5yr: number
+    ebitdaMargin: number
+    epsGrowth3yr: number
+    epsGrowth5yr: number
+    epsGrowthFwd: number
+    pretaxMargin: number
+    dividendYield: number
+    epsGrowth10yr: number
+    epsLtGrowthEst: number
+    forwardEvSales: number
+    isConglomerate: boolean
+    ebitdaGrowthFwd: number
+    enterpriseValue: number
+    evToGrossProfit: number
+    isDepositLender: boolean
+    operatingMargin: number
+    dividendPerShare: number
+    reportingCadence: string
+    revenueGrowth3yr: number
+    revenueGrowth5yr: number
+    revenueGrowthFwd: number
+    bookValuePerShare: number
+    revenueGrowth10yr: number
+    sharesOutstanding: number
+    lifecycleStatus: string
+    successorSymbol: unknown
+  }
+    compare: {
+    symbol: string
+    name: string
+    price: number
+    marketCap: number
+    peRatio: number
+    forwardPe: number
+    pbRatio: number
+    psRatio: number
+    dividendYield: number
+    revenueGrowth: number
+    netMargin: number
+    roe: number
+    grossMargin: number
+    operatingMargin: number
+    evToEbitda: number
+    evToSales: number
+    fcfMargin: number
+    netIncome: number
+    revenue: number
+    sharesOutstanding: number
+    currency: string
+  }
+    fundamentals: {
+    financialHighlights: {
+    incomeStatement: ({
+    year: number
+    revenue: number
+    ebit: number
+    netIncome: number
+    netIncomeGrowth: unknown
+    netIncomeMargin: number
+    earningsPerShare: number
+    earningsPerShareGrowth: unknown
+    dilutedSharesOutstanding: number
+    ebitda: number
+  } | {
+    year: number
+    revenue: number
+    ebit: number
+    netIncome: number
+    netIncomeGrowth: number
+    netIncomeMargin: number
+    earningsPerShare: number
+    earningsPerShareGrowth: number
+    dilutedSharesOutstanding: number
+    ebitda: number
+  })[]
+    balanceSheet: ({
+    year: number
+    totalAssets: number
+    totalLiabilities: number
+    shareholdersEquity: number
+    cash: number
+    cashAndShortTermInvestments: number
+    totalDebt: number
+    netDebt: number
+    workingCapital: number
+    totalCapitalization: number
+    retainedEarnings: number
+    debtEquityRatio: number
+    longTermDebtToCapitalization: number
+    totalDebtToCapitalization: number
+  })[]
+    cashFlow: ({
+    year: number
+    cashFlowFromOperatingActivities: number
+    cashFlowFromFinancingActivities: number
+    cashFlowFromInvestingActivities: number
+    freeCashFlow: number
+    freeCashFlowGrowth: unknown
+    cashFlowFromOperatingActivitiesGrowth: unknown
+    freeCashFlowPerShare: number
+    capitalExpenditures: number
+    depreciation: number
+    dividendPayment: number
+  } | {
+    year: number
+    cashFlowFromOperatingActivities: number
+    cashFlowFromFinancingActivities: number
+    cashFlowFromInvestingActivities: number
+    freeCashFlow: number
+    freeCashFlowGrowth: number
+    cashFlowFromOperatingActivitiesGrowth: number
+    freeCashFlowPerShare: number
+    capitalExpenditures: number
+    depreciation: number
+    dividendPayment: number
+  })[]
+  }
+  }
+    ownership: {
+    institutional: ({
+    date: string
+    holdingPercentage: number
+    holdersCount: number
+    sumOfCurrentPositions: number
+    sumOfCurrentPositionsValue: number
+  })[]
+    mutualFund: ({
+    date: string
+    holdingPercentage: number
+    holdersCount: number
+    sumOfCurrentPositions: number
+    sumOfCurrentPositionsValue: number
+  })[]
+    insider: ({
+    date: string
+    holdingPercentage: number
+    holdersCount: number
+    sumOfCurrentPositions: number
+    sumOfCurrentPositionsValue: number
+  })[]
+    insiderTransactions: ({
+    title: string
+    transactionDate: string
+    transactionCode: string
+    transactionText: string
+    transactionAmount: number
+    transactionValue: number
+    filingDate: string
+  })[]
+  }
+    dividends: {
+    history: ({
+    date: string
+    year: number
+    amount: number
+    currency: string
+    type: string
+  })[]
+  }
+    calendar: {
+    earnings: ({
+    date: string
+    title: string
+    year: number
+    quarter: number
+  })[]
+    exDividend: ({
+    date: string
+    title: string
+    year: number
+    amount: number
+  })[]
+    dividend: ({
+    date: string
+    title: string
+    year: number
+    amount: number
+  })[]
+  }
+    projections: {
+    priceTarget: {
+    lastUpdated: string
+    low: number
+    mean: number
+    current: number
+    high: number
+  }
+    recommendation: {
+    period: string
+    strongBuy: number
+    buy: number
+    hold: number
+    sell: number
+    strongSell: number
+  }
+    earnings: {
+    avg: number
+    high: number
+    low: number
+    mean: number
+    periods: (string)[]
+  }
+    revenue: {
+    avg: number
+    high: number
+    low: number
+    mean: number
+    periods: (string)[]
+  }
+  }
+    seasonality: {
+    symbol: string
+    years: number
+    metric: string
+    monthly_returns: ({
+    month: string
+    return_pct: number
+  })[]
+  }
+    epsSurprises: {
+    annual: ({
+    date: string
+    year: number
+    quarter: number
+    eps: number
+    epsEstimate: number
+    epsDifference: number
+    revenue: number
+    revenueEstimate: number
+    revenueDifference: number
+    surprise: number
+    surprisePercent: number
+    time: string
+  })[]
+    quarterly: ({
+    date: string
+    year: number
+    quarter: number
+    eps: number
+    epsEstimate: number
+    epsDifference: number
+    revenue: number
+    revenueEstimate: number
+    revenueDifference: number
+    surprise: number
+    surprisePercent: number
+    time: string
+  })[]
+  }
+    aiInsights: {
+    symbol: string
+    generatedAt: string
+    summary: string
+    bullCase: (string)[]
+    bearCase: (string)[]
+    keyMetrics: ({
+    label: string
+    value: number
+    assessment: string
+  } | {
+    label: string
+    value: string
+    assessment: string
+  })[]
+    sentiment: string
+  }
+    priceTarget: {
+    symbol: string
+    targetHigh: number
+    targetLow: number
+    targetMean: number
+    targetMedian: number
+    numberAnalysts: number
+    lastUpdated: string
+  }
+}
+
+// from mocks/shared/data/research/SPOT.json
+export interface SPOT {
+    symbol: string
+    basics: {
+    symbol: string
+    name: string
+    sector: string
+    industry: string
+    country: string
+    exchange: string
+    currency: string
+    price: number
+    prevClose: number
+    sharesOutstanding: number
+    marketCap: number
+  }
+    overview: {
+    name: string
+    sector: string
+    industry: string
+    country: string
+    exchange: string
+    type: string
+    currency: string
+    symbol: string
+    price: number
+    prevClose: number
+    sharesOutstanding: number
+    marketCap: number
+  }
+    description: (string)[]
     metrics: {
     roa: number
     roe: number
@@ -13985,6 +17389,7 @@ export interface SPY {
     sector: string
     industry: string
     country: string
+    exchange: string
     currency: string
     price: number
     prevClose: number
@@ -14005,6 +17410,7 @@ export interface SPY {
     sharesOutstanding: number
     marketCap: number
   }
+    description: (string)[]
     metrics: {
     roa: number
     roe: number
@@ -14318,6 +17724,7 @@ export interface TSLA {
     sector: string
     industry: string
     country: string
+    exchange: string
     currency: string
     price: number
     prevClose: number
@@ -14338,6 +17745,7 @@ export interface TSLA {
     sharesOutstanding: number
     marketCap: number
   }
+    description: (string)[]
     metrics: {
     roa: number
     roe: number
@@ -14651,6 +18059,7 @@ export interface TSMC {
     sector: string
     industry: string
     country: string
+    exchange: string
     currency: string
     price: number
     prevClose: number
@@ -14671,6 +18080,7 @@ export interface TSMC {
     sharesOutstanding: number
     marketCap: number
   }
+    description: (string)[]
     metrics: {
     roa: number
     roe: number
@@ -14984,6 +18394,7 @@ export interface V {
     sector: string
     industry: string
     country: string
+    exchange: string
     currency: string
     price: number
     prevClose: number
@@ -15004,6 +18415,342 @@ export interface V {
     sharesOutstanding: number
     marketCap: number
   }
+    description: (string)[]
+    metrics: {
+    roa: number
+    roe: number
+    cash: number
+    pFcf: number
+    roic: number
+    rota: number
+    isBank: boolean
+    ttmEps: number
+    isMiner: boolean
+    netDebt: number
+    pbRatio: number
+    peRatio: number
+    revenue: number
+    pegRatio: number
+    employees: number
+    evToSales: number
+    fcfMargin: number
+    forwardPe: number
+    marketCap: number
+    netIncome: number
+    netMargin: number
+    evToEbitda: number
+    grossMargin: number
+    payoutRatio: number
+    priceTarget: number
+    dpsGrowth3yr: number
+    dpsGrowth5yr: number
+    ebitdaMargin: number
+    epsGrowth3yr: number
+    epsGrowth5yr: number
+    epsGrowthFwd: number
+    pretaxMargin: number
+    dividendYield: number
+    epsGrowth10yr: number
+    epsLtGrowthEst: number
+    forwardEvSales: number
+    isConglomerate: boolean
+    ebitdaGrowthFwd: number
+    enterpriseValue: number
+    evToGrossProfit: number
+    isDepositLender: boolean
+    operatingMargin: number
+    dividendPerShare: number
+    reportingCadence: string
+    revenueGrowth3yr: number
+    revenueGrowth5yr: number
+    revenueGrowthFwd: number
+    bookValuePerShare: number
+    revenueGrowth10yr: number
+    sharesOutstanding: number
+    lifecycleStatus: string
+    successorSymbol: unknown
+  }
+    compare: {
+    symbol: string
+    name: string
+    price: number
+    marketCap: number
+    peRatio: number
+    forwardPe: number
+    pbRatio: number
+    psRatio: number
+    dividendYield: number
+    revenueGrowth: number
+    netMargin: number
+    roe: number
+    grossMargin: number
+    operatingMargin: number
+    evToEbitda: number
+    evToSales: number
+    fcfMargin: number
+    netIncome: number
+    revenue: number
+    sharesOutstanding: number
+    currency: string
+  }
+    fundamentals: {
+    financialHighlights: {
+    incomeStatement: ({
+    year: number
+    revenue: number
+    ebit: number
+    netIncome: number
+    netIncomeGrowth: unknown
+    netIncomeMargin: number
+    earningsPerShare: number
+    earningsPerShareGrowth: unknown
+    dilutedSharesOutstanding: number
+    ebitda: number
+  } | {
+    year: number
+    revenue: number
+    ebit: number
+    netIncome: number
+    netIncomeGrowth: number
+    netIncomeMargin: number
+    earningsPerShare: number
+    earningsPerShareGrowth: number
+    dilutedSharesOutstanding: number
+    ebitda: number
+  })[]
+    balanceSheet: ({
+    year: number
+    totalAssets: number
+    totalLiabilities: number
+    shareholdersEquity: number
+    cash: number
+    cashAndShortTermInvestments: number
+    totalDebt: number
+    netDebt: number
+    workingCapital: number
+    totalCapitalization: number
+    retainedEarnings: number
+    debtEquityRatio: number
+    longTermDebtToCapitalization: number
+    totalDebtToCapitalization: number
+  })[]
+    cashFlow: ({
+    year: number
+    cashFlowFromOperatingActivities: number
+    cashFlowFromFinancingActivities: number
+    cashFlowFromInvestingActivities: number
+    freeCashFlow: number
+    freeCashFlowGrowth: unknown
+    cashFlowFromOperatingActivitiesGrowth: unknown
+    freeCashFlowPerShare: number
+    capitalExpenditures: number
+    depreciation: number
+    dividendPayment: number
+  } | {
+    year: number
+    cashFlowFromOperatingActivities: number
+    cashFlowFromFinancingActivities: number
+    cashFlowFromInvestingActivities: number
+    freeCashFlow: number
+    freeCashFlowGrowth: number
+    cashFlowFromOperatingActivitiesGrowth: number
+    freeCashFlowPerShare: number
+    capitalExpenditures: number
+    depreciation: number
+    dividendPayment: number
+  })[]
+  }
+  }
+    ownership: {
+    institutional: ({
+    date: string
+    holdingPercentage: number
+    holdersCount: number
+    sumOfCurrentPositions: number
+    sumOfCurrentPositionsValue: number
+  })[]
+    mutualFund: ({
+    date: string
+    holdingPercentage: number
+    holdersCount: number
+    sumOfCurrentPositions: number
+    sumOfCurrentPositionsValue: number
+  })[]
+    insider: ({
+    date: string
+    holdingPercentage: number
+    holdersCount: number
+    sumOfCurrentPositions: number
+    sumOfCurrentPositionsValue: number
+  })[]
+    insiderTransactions: ({
+    title: string
+    transactionDate: string
+    transactionCode: string
+    transactionText: string
+    transactionAmount: number
+    transactionValue: number
+    filingDate: string
+  })[]
+  }
+    dividends: {
+    history: ({
+    date: string
+    year: number
+    amount: number
+    currency: string
+    type: string
+  })[]
+  }
+    calendar: {
+    earnings: ({
+    date: string
+    title: string
+    year: number
+    quarter: number
+  })[]
+    exDividend: ({
+    date: string
+    title: string
+    year: number
+    amount: number
+  })[]
+    dividend: ({
+    date: string
+    title: string
+    year: number
+    amount: number
+  })[]
+  }
+    projections: {
+    priceTarget: {
+    lastUpdated: string
+    low: number
+    mean: number
+    current: number
+    high: number
+  }
+    recommendation: {
+    period: string
+    strongBuy: number
+    buy: number
+    hold: number
+    sell: number
+    strongSell: number
+  }
+    earnings: {
+    avg: number
+    high: number
+    low: number
+    mean: number
+    periods: (string)[]
+  }
+    revenue: {
+    avg: number
+    high: number
+    low: number
+    mean: number
+    periods: (string)[]
+  }
+  }
+    seasonality: {
+    symbol: string
+    years: number
+    metric: string
+    monthly_returns: ({
+    month: string
+    return_pct: number
+  })[]
+  }
+    epsSurprises: {
+    annual: ({
+    date: string
+    year: number
+    quarter: number
+    eps: number
+    epsEstimate: number
+    epsDifference: number
+    revenue: number
+    revenueEstimate: number
+    revenueDifference: number
+    surprise: number
+    surprisePercent: number
+    time: string
+  })[]
+    quarterly: ({
+    date: string
+    year: number
+    quarter: number
+    eps: number
+    epsEstimate: number
+    epsDifference: number
+    revenue: number
+    revenueEstimate: number
+    revenueDifference: number
+    surprise: number
+    surprisePercent: number
+    time: string
+  })[]
+  }
+    aiInsights: {
+    symbol: string
+    generatedAt: string
+    summary: string
+    bullCase: (string)[]
+    bearCase: (string)[]
+    keyMetrics: ({
+    label: string
+    value: number
+    assessment: string
+  } | {
+    label: string
+    value: string
+    assessment: string
+  })[]
+    sentiment: string
+  }
+    priceTarget: {
+    symbol: string
+    targetHigh: number
+    targetLow: number
+    targetMean: number
+    targetMedian: number
+    numberAnalysts: number
+    lastUpdated: string
+  }
+}
+
+// from mocks/shared/data/research/WFC.json
+export interface WFC {
+    symbol: string
+    basics: {
+    symbol: string
+    name: string
+    sector: string
+    industry: string
+    country: string
+    exchange: string
+    currency: string
+    price: number
+    prevClose: number
+    sharesOutstanding: number
+    marketCap: number
+  }
+    overview: {
+    name: string
+    sector: string
+    industry: string
+    country: string
+    exchange: string
+    type: string
+    currency: string
+    symbol: string
+    price: number
+    prevClose: number
+    sharesOutstanding: number
+    marketCap: number
+  }
+    description: (string)[]
     metrics: {
     roa: number
     roe: number

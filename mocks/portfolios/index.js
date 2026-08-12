@@ -4,6 +4,21 @@ import { paginatePage, uuid, nowIso } from "../lib/http.js"
 
 const created = new Map()
 const positionsByPortfolio = new Map()
+const newPortfolioIds = new Set()
+const allTxs = new Map()
+let txInited = false
+let shares = null
+
+function allShares() {
+  if (!shares) shares = JSON.parse(JSON.stringify(loadRaw("portfolios_shares.json")))
+  return shares
+}
+
+function initTxs() {
+  if (txInited) return
+  for (const t of loadRaw("portfolios_transactions.json").items ?? []) allTxs.set(t.id, t)
+  txInited = true
+}
 
 const ANALYTICS_BY_TIMEFRAME = {
   "6M": "portfolio_analytics_6M.json",
@@ -25,21 +40,19 @@ function timelineFor(timeframe) {
 }
 
 function findPortfolio(id) {
+  if (created.has(id)) return created.get(id)
   const existing = loadRaw("portfolios_summaries.json").find((p) => p.id === id)
-  if (existing) return existing
-  const createdPortfolio = created.get(id)
-  if (createdPortfolio) return createdPortfolio
-  return null
+  return existing || null
 }
 
 function withDataFile(id, baseName, emptyName) {
-  if (created.has(id)) return loadRaw(emptyName)
+  if (newPortfolioIds.has(id)) return loadRaw(emptyName)
   return findPortfolio(id) ? loadRaw(baseName) : loadRaw(emptyName)
 }
 
 function positionsFor(id) {
   if (!positionsByPortfolio.has(id)) {
-    const base = created.has(id) ? [] : loadRaw("portfolio_positions.json")
+    const base = newPortfolioIds.has(id) ? [] : loadRaw("portfolio_positions.json")
     positionsByPortfolio.set(id, (Array.isArray(base) ? base : []).map((p) => ({ ...p })))
   }
   return positionsByPortfolio.get(id)
@@ -47,6 +60,48 @@ function positionsFor(id) {
 
 function heldPositions(id) {
   return positionsFor(id)
+}
+
+function allTransactions() {
+  initTxs()
+  const items = [...allTxs.values()]
+  return { items, total: items.length }
+}
+
+function portfolioTransactions(id) {
+  initTxs()
+  const items = [...allTxs.values()].filter((t) => t.portfolioId === id)
+  return { items, total: items.length }
+}
+
+const TX_SORT_FIELDS = {
+  symbol: "instrumentSymbol",
+  date: "executedAt",
+  portfolio: "portfolioName",
+  type: "type",
+  quantity: "quantity",
+  price: "price",
+  fees: "fees",
+  amount: "totalAmount",
+}
+
+function sortTransactions(items, sortBy, sortOrder) {
+  const field = TX_SORT_FIELDS[sortBy]
+  if (!field) return items
+  const dir = String(sortOrder).toLowerCase() === "asc" ? 1 : -1
+  return [...items].sort((a, b) => {
+    const av = a[field]
+    const bv = b[field]
+    if (av == null && bv == null) return 0
+    if (av == null) return 1
+    if (bv == null) return -1
+    return String(av).localeCompare(String(bv), undefined, { numeric: true }) * dir
+  })
+}
+
+function transactionsPage(ctx, data) {
+  const sorted = sortTransactions(data.items, ctx.query.sortBy, ctx.query.sortOrder)
+  return paginatePage(ctx.query.page, ctx.query.limit, sorted, data.total)
 }
 
 function sumBy(positions, field) {
@@ -63,8 +118,9 @@ function sumBy(positions, field) {
 export function register(app) {
   app.get("/api/portfolios", (ctx) => {
     if (!requireAuth(ctx)) return
-    const portfolios = loadRaw("portfolios_summaries.json")
-    ctx.res.json(portfolios.concat([...created.values()]))
+    const byId = new Map(loadRaw("portfolios_summaries.json").map((p) => [p.id, p]))
+    for (const [id, p] of created) byId.set(id, p)
+    ctx.res.json([...byId.values()])
   })
 
   app.get("/api/portfolios/light", (ctx) => {
@@ -102,23 +158,89 @@ export function register(app) {
 
   app.get("/api/portfolios/shares", (ctx) => {
     if (!requireAuth(ctx)) return
-    ctx.res.json(loadRaw("portfolios_shares.json"))
+    ctx.res.json(allShares())
+  })
+
+  app.post("/api/portfolios/shares", (ctx) => {
+    if (!requireAuth(ctx)) return
+    const { portfolioId, displayName = "" } = ctx.body || {}
+    const portfolio = findPortfolio(portfolioId)
+    if (!portfolio) {
+      return ctx.res.status(404).json({ error: "NotFound", message: "Portfolio not found", statusCode: 404 })
+    }
+    if (allShares().length >= 10) {
+      return ctx.res.status(422).json({ error: "LimitReached", message: "You can have up to 10 active shares", statusCode: 422 })
+    }
+    const share = {
+      id: uuid(),
+      portfolioId: portfolio.id,
+      portfolioName: portfolio.name,
+      displayName,
+      createdAt: nowIso(),
+      expiresAt: null,
+      viewCount: 0,
+      privacySettings: {
+        benchmarks: ["SPY"],
+        showValues: true,
+        displayName,
+        showHoldings: true,
+        showPositions: true,
+        positionsToHide: [],
+        showMonthlyReturns: true,
+        showAssetAllocation: true,
+        showPerformanceChart: true,
+        showPositionAllocation: true,
+        showSectorDistribution: true,
+        showTransactionHistory: true,
+        showGeographicBreakdown: true,
+        showIndustryDistribution: true,
+        performanceChartReturnType: "twr",
+      },
+    }
+    allShares().push(share)
+    ctx.res.status(201).json(share)
+  })
+
+  app.delete("/api/portfolios/shares/:id", (ctx) => {
+    if (!requireAuth(ctx)) return
+    const idx = allShares().findIndex((s) => s.id === ctx.params.id)
+    if (idx < 0) {
+      return ctx.res.status(404).json({ error: "NotFound", message: "Share not found", statusCode: 404 })
+    }
+    allShares().splice(idx, 1)
+    ctx.res.status(204).end()
+  })
+
+  app.get("/api/public/portfolios/:shareId", (ctx) => {
+    const share = allShares().find((s) => s.id === ctx.params.shareId)
+    if (!share) {
+      return ctx.res.status(404).json({ error: "NotFound", message: "Shared portfolio not found", statusCode: 404 })
+    }
+    const portfolio = findPortfolio(share.portfolioId) || {}
+    ctx.res.json({
+      share,
+      portfolio: {
+        id: portfolio.id,
+        name: share.portfolioName || portfolio.name,
+        strategy: portfolio.strategy || "GROWTH",
+        positions: positionsFor(share.portfolioId),
+      },
+    })
   })
 
   app.get("/api/portfolios/transactions", (ctx) => {
     if (!requireAuth(ctx)) return
-    const all = loadRaw("portfolios_transactions.json")
-    ctx.res.json(paginatePage(ctx.query.page, ctx.query.limit, all.items, all.total))
+    ctx.res.json(transactionsPage(ctx, allTransactions()))
   })
 
   app.post("/api/portfolios", (ctx) => {
     if (!requireAuth(ctx)) return
-    const { name, description, strategy = "GROWTH", currency = "USD", isPublic = false } = ctx.body || {}
+    const { name, description, strategy = "GROWTH", currency = "USD", isPublic = false, walletId } = ctx.body || {}
     if (!name) {
       return ctx.res.status(422).json({ error: "ValidationError", message: "name is required", statusCode: 422 })
     }
     const id = uuid()
-    const wallet = loadRaw("wallets.json")[0]
+    const wallet = loadRaw("wallets.json").find((w) => w.id === walletId) || loadRaw("wallets.json")[0]
     const now = nowIso()
     const portfolio = {
       id,
@@ -139,6 +261,7 @@ export function register(app) {
       updatedAt: now,
     }
     created.set(id, portfolio)
+    newPortfolioIds.add(id)
     ctx.res.status(201).json(portfolio)
   })
 
@@ -256,13 +379,8 @@ export function register(app) {
 
   app.get("/api/portfolios/:id/transactions", (ctx) => {
     if (!requireAuth(ctx)) return
-    const isCreated = findPortfolio(ctx.params.id) ? false : created.has(ctx.params.id)
-    const data = isCreated
-      ? loadRaw("empty_portfolio_transactions.json")
-      : ctx.query.type === "dividend"
-        ? loadRaw("portfolio_transactions_dividend.json")
-        : loadRaw("portfolio_transactions_page.json")
-    ctx.res.json(paginatePage(ctx.query.page, ctx.query.limit, data.items, data.total))
+    const data = ctx.query.type === "dividend" ? loadRaw("portfolio_transactions_dividend.json") : portfolioTransactions(ctx.params.id)
+    ctx.res.json(transactionsPage(ctx, data))
   })
 
   app.get("/api/portfolios/:id/transactions/export", (ctx) => {
@@ -272,19 +390,77 @@ export function register(app) {
 
   app.post("/api/portfolios/:id/transactions", (ctx) => {
     if (!requireAuth(ctx)) return
+    initTxs()
     const body = ctx.body || {}
     const tx = {
       id: uuid(),
       portfolioId: ctx.params.id,
+      portfolioName: "",
+      walletId: body.walletId ?? null,
+      positionId: body.positionId ?? null,
       type: body.type || "BUY",
-      instrumentSymbol: body.symbol || "AAPL",
+      instrumentSymbol: (body.symbol || "AAPL").toUpperCase(),
+      instrumentName: body.instrumentName ?? null,
       quantity: body.quantity ?? 1,
       price: body.price ?? 100,
+      fees: body.fees ?? 0,
       totalAmount: round2((body.quantity ?? 1) * (body.price ?? 100)),
       currency: body.currency || "USD",
+      instrumentCurrency: body.instrumentCurrency || body.currency || "USD",
+      assetType: body.assetType || "STOCK",
+      exchangeRate: body.exchangeRate ?? 1,
+      isGift: false,
+      synthesizedOpeningLot: false,
+      executedAt: body.executedAt || nowIso(),
       createdAt: nowIso(),
+      displayCurrency: body.currency || "USD",
+      convertedTotalAmount: round2((body.quantity ?? 1) * (body.price ?? 100)),
+      convertedPrice: body.price ?? 100,
+      convertedFees: body.fees ?? 0,
+      convertedRealizedGainLoss: null,
     }
+    allTxs.set(tx.id, tx)
     ctx.res.status(201).json(tx)
+  })
+
+  app.patch("/api/portfolios/:id/transactions/:txId", (ctx) => {
+    if (!requireAuth(ctx)) return
+    initTxs()
+    const existing = allTxs.get(ctx.params.txId)
+    if (!existing || existing.portfolioId !== ctx.params.id) {
+      return ctx.res.status(404).json({ error: "NotFound", message: "Transaction not found" })
+    }
+    const body = ctx.body || {}
+    const quantity = body.quantity ?? existing.quantity ?? 1
+    const price = body.price ?? existing.price ?? 0
+    const fees = body.fees ?? existing.fees ?? 0
+    const updated = {
+      ...existing,
+      ...body,
+      id: existing.id,
+      portfolioId: existing.portfolioId,
+      quantity,
+      price,
+      fees,
+      totalAmount: round2(quantity * price),
+      convertedTotalAmount: round2(quantity * price),
+      convertedPrice: price,
+      convertedFees: fees,
+      updatedAt: nowIso(),
+    }
+    allTxs.set(ctx.params.txId, updated)
+    ctx.res.json(updated)
+  })
+
+  app.delete("/api/portfolios/:id/transactions/:txId", (ctx) => {
+    if (!requireAuth(ctx)) return
+    initTxs()
+    const existing = allTxs.get(ctx.params.txId)
+    if (!existing || existing.portfolioId !== ctx.params.id) {
+      return ctx.res.status(404).json({ error: "NotFound", message: "Transaction not found" })
+    }
+    allTxs.delete(ctx.params.txId)
+    ctx.res.status(204).end()
   })
 
   app.get("/api/portfolios/:id/snapshot", (ctx) => {

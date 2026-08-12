@@ -21,8 +21,8 @@ export const useWatchlistsStore = defineStore("watchlists", () => {
     }
   }
 
-  async function create(name: string): Promise<void> {
-    const created = await watchlistsApi.createWatchlist(name)
+  async function create(name: string, description?: string): Promise<void> {
+    const created = await watchlistsApi.createWatchlist(name, description)
     watchlists.value.push(created)
   }
 

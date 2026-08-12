@@ -20,7 +20,7 @@ test("login with valid credentials lands on investments", async ({ page }) => {
   await page.getByTestId("signin").click()
 
   await expect(page).toHaveURL(/\/en\/investments/)
-  await expect(page.getByRole("heading", { name: "Portfolios" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Portfolios", exact: true })).toBeVisible()
 })
 
 test("login with invalid credentials shows an error", async ({ page }) => {

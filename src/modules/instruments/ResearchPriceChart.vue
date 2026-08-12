@@ -5,11 +5,11 @@ import type { HistoryCompareSeries } from "@/api/instruments"
 
 const props = defineProps<{ symbol: string }>()
 
-type Timeframe = "1D" | "1W" | "1M" | "3M" | "6M" | "1Y" | "YTD" | "MAX"
+type Timeframe = "1D" | "5D" | "1W" | "1M" | "3M" | "6M" | "1Y" | "3Y" | "5Y" | "10Y" | "YTD" | "MAX"
 type Mode = "Price" | "Percent" | "Drawdowns"
 type CompareKey = "none" | "spy" | "qqq" | "iwm"
 
-const timeframes: Timeframe[] = ["1D", "1W", "1M", "3M", "6M", "1Y", "YTD", "MAX"]
+const timeframes: Timeframe[] = ["1D", "5D", "1W", "1M", "3M", "6M", "1Y", "3Y", "5Y", "10Y", "YTD", "MAX"]
 const modes: Mode[] = ["Price", "Percent", "Drawdowns"]
 const compareOptions: { key: CompareKey; label: string }[] = [
   { key: "none", label: "No comparison" },
@@ -21,6 +21,7 @@ const compareOptions: { key: CompareKey; label: string }[] = [
 const timeframe = ref<Timeframe>("1Y")
 const mode = ref<Mode>("Price")
 const compare = ref<CompareKey>("none")
+const showCompare = ref(false)
 const fullscreen = ref(false)
 const loading = ref(true)
 const error = ref<string | null>(null)
@@ -56,6 +57,8 @@ const slicePoints = computed(() => {
   switch (timeframe.value) {
     case "1D":
       return 2
+    case "5D":
+      return Math.min(5, n)
     case "1W":
       return Math.min(5, n)
     case "1M":
@@ -65,6 +68,13 @@ const slicePoints = computed(() => {
     case "6M":
       return Math.min(126, n)
     case "1Y":
+      return Math.min(252, n)
+    case "3Y":
+      return Math.min(756, n)
+    case "5Y":
+      return Math.min(1260, n)
+    case "10Y":
+      return Math.min(2520, n)
     case "MAX":
       return n
     case "YTD": {
@@ -80,6 +90,15 @@ const slicePoints = computed(() => {
     }
   }
 })
+
+function pickCompare(key: CompareKey): void {
+  compare.value = key
+  showCompare.value = false
+}
+
+const compareLabel = computed(() =>
+  compare.value === "none" ? "Add comparison" : (compareOptions.find((o) => o.key === compare.value)?.label ?? "Add comparison"),
+)
 
 const series = computed(() => {
   const n = timestamps.value.length
@@ -140,13 +159,23 @@ const chartOptions = computed(() => ({
 }))
 
 const summary = computed(() => {
-  const s = series.value.data[0]?.data ?? []
-  if (!s.length) return null
-  const first = s[0]
-  const last = s[s.length - 1]
-  if (mode.value === "Price") return { label: "Change", value: last - first }
-  return { label: "Change", value: last }
+  const n = timestamps.value.length
+  const count = slicePoints.value
+  const startIdx = n - count
+  const base = prices.value[startIdx]
+  const last = prices.value[n - 1]
+  if (typeof base !== "number" || typeof last !== "number" || !base) return null
+  const change = last - base
+  const changePct = (last / base - 1) * 100
+  const years = (timestamps.value[n - 1] - timestamps.value[startIdx]) / (365.25 * 86400)
+  const cagr = years > 0.5 ? (Math.pow(last / base, 1 / years) - 1) * 100 : null
+  const display = mode.value === "Price" ? change : changePct
+  return { change, changePct, cagr, display }
 })
+
+function signed(value: number, digits = 2): string {
+  return `${value >= 0 ? "+" : ""}${value.toFixed(digits)}`
+}
 
 function downloadCsv(): void {
   const { dates, data } = series.value
@@ -195,17 +224,45 @@ function downloadCsv(): void {
         </button>
       </div>
 
-      <label class="flex items-center gap-1.5 text-slate-600">
-        Compare
-        <select v-model="compare" class="rounded-md border border-slate-300 px-2 py-1.5 text-xs">
-          <option v-for="o in compareOptions" :key="o.key" :value="o.key">{{ o.label }}</option>
-        </select>
-      </label>
+      <div class="relative">
+        <button
+          type="button"
+          class="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          @click="showCompare = !showCompare"
+        >
+          {{ compareLabel }} <span class="text-slate-400">&#9662;</span>
+        </button>
+        <div v-if="showCompare" class="absolute left-0 z-20 mt-1 w-52 rounded-md border border-slate-200 bg-white p-1 shadow-lg">
+          <button
+            v-for="o in compareOptions"
+            :key="o.key"
+            type="button"
+            class="flex w-full items-center justify-between px-3 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-50"
+            @click="pickCompare(o.key)"
+          >
+            <span>{{ o.label }}</span>
+            <span v-if="compare === o.key" class="text-blue-600">&#10003;</span>
+          </button>
+        </div>
+      </div>
 
       <div v-if="summary" class="ml-auto flex items-center gap-4 text-sm">
-        <span class="text-slate-500">{{ summary.label }}</span>
-        <span class="font-semibold" :class="summary.value >= 0 ? 'text-green-600' : 'text-red-600'">
-          {{ mode === "Price" ? `$${summary.value >= 0 ? "+" : ""}${summary.value.toLocaleString("en-US", { maximumFractionDigits: 2 })}` : `${summary.value >= 0 ? "+" : ""}${summary.value.toFixed(2)}%` }}
+        <span class="text-slate-500">Total Chg</span>
+        <span class="font-semibold" :class="summary.change >= 0 ? 'text-green-600' : 'text-red-600'">
+          {{
+            mode === "Price"
+              ? `$${signed(summary.change, 2)}`
+              : `${signed(summary.changePct)}%`
+          }}
+        </span>
+        <span v-if="mode === 'Price'" class="text-xs text-slate-400">{{ signed(summary.changePct) }}%</span>
+        <span v-if="mode === 'Price'" class="text-slate-500">CAGR</span>
+        <span
+          v-if="mode === 'Price' && summary.cagr !== null"
+          class="font-semibold tabular-nums"
+          :class="summary.cagr >= 0 ? 'text-green-600' : 'text-red-600'"
+        >
+          {{ signed(summary.cagr) }}%
         </span>
       </div>
 
@@ -246,5 +303,6 @@ function downloadCsv(): void {
       :series="series.data"
     />
     <p v-else class="text-sm text-slate-500">No price history available.</p>
+    <p class="mt-2 text-right text-xs text-slate-400">Powered by Example service</p>
   </div>
 </template>

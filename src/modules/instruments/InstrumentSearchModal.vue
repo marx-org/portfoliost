@@ -3,7 +3,10 @@ import { ref, watch } from "vue"
 import { useRouter } from "vue-router"
 import { useInstrumentsStore } from "@/stores/instruments"
 
-const props = defineProps<{ open: boolean; mode?: "navigate" | "add" }>()
+const props = withDefaults(defineProps<{ open: boolean; mode?: "navigate" | "add"; title?: string }>(), {
+  mode: "navigate",
+  title: "Search for Instruments",
+})
 const emit = defineEmits<{ (e: "close"): void; (e: "add", symbol: string, name: string): void }>()
 
 const store = useInstrumentsStore()
@@ -59,7 +62,7 @@ function onKeydown(e: KeyboardEvent) {
     >
       <div class="card w-full max-w-lg overflow-hidden" role="dialog" aria-modal="true" aria-label="Search for Instruments">
         <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-          <h3 class="text-base font-semibold">Search for Instruments</h3>
+          <h3 class="text-base font-semibold">{{ title }}</h3>
           <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="emit('close')">✕</button>
         </div>
 

@@ -15,7 +15,9 @@ const profile = ref<InstrumentsProfile | null>(null)
 const metrics = ref<InstrumentsMetrics | null>(null)
 const overview = ref<InstrumentsOverviewMetrics | null>(null)
 const quote = ref<QuoteAapl | null>(null)
-const epsSurprises = ref<Array<{ date?: string; year?: number; eps?: number; epsEstimate?: number }>>([])
+const epsSurprises = ref<Array<{ date?: string; year?: number; quarter?: number; eps?: number; epsEstimate?: number }>>([])
+const epsMode = ref<"annual" | "quarterly">("annual")
+const rawEps = ref<{ annual: Array<Record<string, never>>; quarterly: Array<Record<string, never>> }>({ annual: [], quarterly: [] })
 const irEvents = ref<IrEventsAapl>([])
 const showFullDescription = ref(false)
 const error = ref<string | null>(null)
@@ -28,15 +30,16 @@ onMounted(async () => {
       instrumentsApi.getInstrumentMetrics(symbol),
       instrumentsApi.getInstrumentOverviewMetrics(symbol).catch(() => null),
       instrumentsApi.getQuote(symbol),
-      instrumentsApi.getEpsSurprises(symbol).catch(() => ({ annual: [] })),
+      instrumentsApi.getEpsSurprises(symbol).catch(() => ({ annual: [], quarterly: [] })),
       instrumentsApi.getInvestorRelations(symbol).catch(() => []),
     ])
     profile.value = p
     metrics.value = m
     overview.value = o
     quote.value = q
-    const raw = (eps ?? {}) as { annual?: Array<{ date?: string; year?: number; eps?: number; epsEstimate?: number }> }
-    epsSurprises.value = Array.isArray(eps) ? (eps as never) : raw.annual ?? []
+    const raw = (eps ?? {}) as { annual?: Array<Record<string, never>>; quarterly?: Array<Record<string, never>> }
+    rawEps.value = { annual: raw.annual ?? [], quarterly: raw.quarterly ?? [] }
+    applyEpsMode("annual")
     irEvents.value = Array.isArray(ir) ? (ir as unknown as IrEventsAapl) : []
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Failed to load research data"
@@ -44,6 +47,16 @@ onMounted(async () => {
     loading.value = false
   }
 })
+
+function applyEpsMode(mode: "annual" | "quarterly"): void {
+  epsMode.value = mode
+  epsSurprises.value = (rawEps.value[mode] ?? []) as never
+}
+
+function epsLabel(e: { date?: string; year?: number; quarter?: number }): string {
+  if (epsMode.value === "quarterly" && e.quarter) return `Q${e.quarter} ${e.year ?? ""}`.trim()
+  return String(e.year ?? e.date ?? "")
+}
 
 function stat(label: string, value: string | null | undefined) {
   return { label, value: value ?? "—" }
@@ -89,7 +102,11 @@ const marginStats = computed(() => {
 const returnStats = computed(() => {
   const ce = metrics.value?.capitalEfficiency
   if (!ce) return []
-  return [stat("ROA", formatPercent(ce.returnOnAssets)), stat("ROE", formatPercent(ce.returnOnEquity))]
+  return [
+    stat("ROA", formatPercent(ce.returnOnAssets)),
+    stat("ROTA", formatPercent(ce.returnOnTotalAssets)),
+    stat("ROE", formatPercent(ce.returnOnEquity)),
+  ]
 })
 
 const valuationStats = computed(() => {
@@ -98,16 +115,44 @@ const valuationStats = computed(() => {
   return [
     stat("P/E", formatNumber(tv.peRatio)),
     stat("P/B", formatNumber(tv.pbRatio)),
+    stat("P/FCF", formatNumber(tv.priceToFcf)),
     stat("EV/Sales", formatNumber(tv.evToSales)),
     stat("EV/EBITDA", formatNumber(tv.evToEBITDA)),
+    stat("EV/Gross Profit", formatNumber(tv.evToGrossProfit)),
     stat("Div Yield", formatPercent(tv.dividendYield)),
+  ]
+})
+
+const valuationNtmStats = computed(() => {
+  const tv = metrics.value?.trailingValuation
+  if (!tv) return []
+  return [
+    stat("PEG", formatNumber(tv.pegRatio)),
+    stat("Price Target", formatCurrency(tv.priceTarget)),
   ]
 })
 
 const healthStats = computed(() => {
   const o = overview.value
+  const fh = metrics.value?.financialHealth
   if (!o) return []
-  return [stat("Cash", formatCompact(o.cash)), stat("Net Debt", formatCompact(o.netDebt))]
+  return [
+    stat("Cash", formatCompact(o.cash)),
+    stat("Net Debt", formatCompact(o.netDebt)),
+    stat("Current Ratio", formatNumber(fh?.currentRatio)),
+    stat("Quick Ratio", formatNumber(fh?.quickRatio)),
+  ]
+})
+
+const dividendStats = computed(() => {
+  const tv = metrics.value?.trailingValuation
+  if (!tv) return []
+  return [
+    stat("Yield", formatPercent(tv.dividendYield)),
+    stat("Payout Ratio", formatPercent(tv.payoutRatio)),
+    stat("DPS", formatCurrency(tv.dividendPerShare)),
+    stat("DPS Growth 5Yr", formatPercent(tv.dpsGrowth5yr)),
+  ]
 })
 
 const growthStats = computed(() => {
@@ -116,7 +161,10 @@ const growthStats = computed(() => {
   return [
     stat("Rev 3Yr", formatPercent(o.revenueGrowth3yr)),
     stat("Rev 5Yr", formatPercent(o.revenueGrowth5yr)),
+    stat("Rev 10Yr", formatPercent(o.revenueGrowth10yr)),
+    stat("EPS 3Yr", formatPercent(o.epsGrowth3yr)),
     stat("EPS 5Yr", formatPercent(o.epsGrowth5yr)),
+    stat("EPS 10Yr", formatPercent(o.epsGrowth10yr)),
     stat("Rev Fwd", formatPercent(o.revenueGrowthFwd)),
     stat("EPS Fwd", formatPercent(o.epsGrowthFwd)),
   ]
@@ -129,7 +177,7 @@ const epsChartOptions = computed(() => ({
     { name: "EPS", data: epsSurprises.value.map((e) => e.eps ?? null) },
     { name: "Estimate", data: epsSurprises.value.map((e) => e.epsEstimate ?? null) },
   ],
-  xaxis: { categories: epsSurprises.value.map((e) => String(e.year ?? e.date ?? "")) },
+  xaxis: { categories: epsSurprises.value.map(epsLabel) },
   plotOptions: { bar: { columnWidth: "45%", borderRadius: 3 } },
   dataLabels: { enabled: false },
   legend: { position: "bottom" as const },
@@ -263,7 +311,13 @@ const targetSpread = computed(() => {
       <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <ResearchSeasonality :symbol="symbol" />
         <div class="card p-6">
-          <h2 class="mb-3 text-base font-semibold">EPS Surprises - {{ symbol }}</h2>
+          <div class="mb-3 flex items-center justify-between">
+            <h2 class="text-base font-semibold">EPS Surprises - {{ symbol }}</h2>
+            <select v-model="epsMode" aria-label="EPS timeframe" class="rounded-md border border-slate-300 px-2 py-1 text-xs" @change="applyEpsMode(epsMode)">
+              <option value="annual">Annual</option>
+              <option value="quarterly">5Q</option>
+            </select>
+          </div>
           <component :is="'apexchart'" v-if="epsSurprises.length" :options="epsChartOptions" :series="epsChartOptions.series" />
           <p v-else class="text-sm text-slate-500">No earnings data available.</p>
         </div>
@@ -276,7 +330,9 @@ const targetSpread = computed(() => {
           <StatGroup title="Margins" :items="marginStats" />
           <StatGroup title="Returns (TTM)" :items="returnStats" />
           <StatGroup title="Valuation (TTM)" :items="valuationStats" />
+          <StatGroup title="Valuation (NTM)" :items="valuationNtmStats" />
           <StatGroup title="Financial Health" :items="healthStats" />
+          <StatGroup title="Dividends" :items="dividendStats" />
           <StatGroup title="Growth (CAGR)" :items="growthStats" />
         </div>
       </div>

@@ -15,6 +15,12 @@ const router = createRouter({
       meta: { public: true },
     },
     {
+      path: "/public/portfolio/:shareId",
+      name: "public-share",
+      component: () => import("@/modules/settings/PublicPortfolioView.vue"),
+      meta: { public: true },
+    },
+    {
       path: "/en",
       component: () => import("@/layout/AppLayout.vue"),
       meta: { requiresAuth: true },
@@ -30,6 +36,11 @@ const router = createRouter({
           component: () => import("@/modules/portfolios/TransactionsView.vue"),
         },
         {
+          path: "investments/transactions/cash",
+          name: "transactions-cash",
+          component: () => import("@/modules/portfolios/CashTransactionsView.vue"),
+        },
+        {
           path: "investments/watchlist",
           name: "watchlist",
           component: () => import("@/modules/watchlists/WatchlistsView.vue"),
@@ -43,6 +54,28 @@ const router = createRouter({
           path: "charting",
           name: "charting",
           component: () => import("@/modules/charting/ChartingView.vue"),
+        },
+        {
+          path: "settings",
+          component: () => import("@/modules/settings/SettingsView.vue"),
+          redirect: { name: "settings-profile" },
+          children: [
+            {
+              path: "profile",
+              name: "settings-profile",
+              component: () => import("@/modules/settings/ProfileView.vue"),
+            },
+            {
+              path: "shared-portfolios",
+              name: "settings-shared-portfolios",
+              component: () => import("@/modules/settings/SharedPortfoliosView.vue"),
+            },
+            {
+              path: "broker-connections",
+              name: "settings-broker-connections",
+              component: () => import("@/modules/settings/BrokerConnectionsView.vue"),
+            },
+          ],
         },
         {
           path: "portfolios/:id",
@@ -61,9 +94,13 @@ const router = createRouter({
               component: () => import("@/modules/portfolios/PortfolioTransactionsTab.vue"),
             },
             {
+              path: "performance",
+              name: "portfolio-performance",
+              component: () => import("@/modules/portfolios/PortfolioPerformanceTab.vue"),
+            },
+            {
               path: "analytics",
-              name: "portfolio-analytics",
-              component: () => import("@/modules/portfolios/PortfolioAnalyticsTab.vue"),
+              redirect: (to) => ({ name: "portfolio-performance", params: { id: to.params.id } }),
             },
             {
               path: "allocation",
@@ -71,9 +108,13 @@ const router = createRouter({
               component: () => import("@/modules/portfolios/PortfolioAllocationTab.vue"),
             },
             {
-              path: "risk",
-              name: "portfolio-risk",
+              path: "risk-analysis",
+              name: "portfolio-risk-analysis",
               component: () => import("@/modules/portfolios/PortfolioRiskTab.vue"),
+            },
+            {
+              path: "risk",
+              redirect: (to) => ({ name: "portfolio-risk-analysis", params: { id: to.params.id } }),
             },
             {
               path: "dividends",

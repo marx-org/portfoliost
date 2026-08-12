@@ -1,0 +1,43 @@
+import { expect, test } from "@playwright/test"
+
+async function login(page: import("@playwright/test").Page) {
+  await page.goto("/login")
+  await page.getByTestId("email").fill("demo@example.com")
+  await page.getByTestId("password").fill("example-service-mock")
+  await page.getByTestId("signin").click()
+  await expect(page).toHaveURL(/\/en\/investments/)
+}
+
+test("settings: sidebar links and tabs navigate", async ({ page }) => {
+  await login(page)
+
+  await page.getByRole("link", { name: "Settings" }).click()
+  await expect(page).toHaveURL(/\/en\/settings\/profile/)
+  await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible()
+
+  const nav = page.getByRole("navigation", { name: "Settings" })
+  const tabs: Record<string, string> = {
+    Profile: "Profile Settings",
+    "Shared Portfolios": "Shared Portfolios",
+    "Broker Connections": "Broker Connections",
+  }
+  for (const [tab, heading] of Object.entries(tabs)) {
+    await nav.getByRole("link", { name: tab, exact: true }).click()
+    await expect(page.getByRole("heading", { name: heading, exact: true })).toBeVisible()
+  }
+})
+
+test("shared portfolios: shows active share and public link works", async ({ page }) => {
+  await login(page)
+  await page.goto("/en/settings/shared-portfolios")
+
+  await expect(page.getByRole("heading", { name: "Shared Portfolios", exact: true })).toBeVisible()
+  await expect(page.getByText("1 / 10")).toBeVisible()
+
+  const pagePromise = page.waitForEvent("popup")
+  await page.getByRole("link", { name: "View shared portfolio" }).click()
+  const popup = await pagePromise
+  await expect(popup).toHaveURL(/\/public\/portfolio\//)
+  await expect(popup.getByRole("heading", { name: "Top10" })).toBeVisible()
+  await expect(popup.getByText("Holdings")).toBeVisible()
+})

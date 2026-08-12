@@ -72,7 +72,7 @@ export const usePortfolioStore = defineStore("portfolios", () => {
     }
   }
 
-  async function createPortfolio(input: { name: string; description?: string; strategy?: string; currency?: string }): Promise<void> {
+  async function createPortfolio(input: { name: string; description?: string; strategy?: string; currency?: string; walletId?: string }): Promise<void> {
     await portfoliosApi.createPortfolio(input)
     await fetchAll()
   }

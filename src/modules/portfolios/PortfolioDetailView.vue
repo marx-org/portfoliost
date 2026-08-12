@@ -1,26 +1,49 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue"
-import { useRoute } from "vue-router"
+import { useRoute, useRouter } from "vue-router"
 import { usePortfolioStore } from "@/stores/portfolios"
+import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
+import { storeToRefs } from "pinia"
+import { createPortfolioPosition, deletePortfolio, updatePortfolio } from "@/api/portfolios"
 import { formatCurrency, formatPercent, formatSignedCurrency } from "@/utils/format"
 
 const route = useRoute()
+const router = useRouter()
 const store = usePortfolioStore()
+const displayCurrencyStore = useDisplayCurrencyStore()
 const id = String(route.params.id)
 const loading = ref(true)
 const error = ref<string | null>(null)
 
+const currencies = ["USD", "EUR", "GBP", "CHF", "PLN"]
+const { currency: displayCurrency } = storeToRefs(displayCurrencyStore)
+const showCurrencyMenu = ref(false)
+
 const tabs = [
   { name: "portfolio-holdings", label: "Holdings" },
   { name: "portfolio-transactions", label: "Transactions" },
-  { name: "portfolio-analytics", label: "Analytics" },
+  { name: "portfolio-performance", label: "Performance" },
   { name: "portfolio-allocation", label: "Allocation" },
-  { name: "portfolio-risk", label: "Risk" },
+  { name: "portfolio-risk-analysis", label: "Risk Analysis" },
   { name: "portfolio-dividends", label: "Dividends" },
   { name: "portfolio-calendar", label: "Calendar" },
   { name: "portfolio-news", label: "News" },
   { name: "portfolio-compare", label: "Compare" },
 ]
+
+const showRename = ref(false)
+const renameName = ref("")
+const renameBusy = ref(false)
+const renameError = ref<string | null>(null)
+
+const showDeleteConfirm = ref(false)
+const deleteBusy = ref(false)
+const deleteError = ref<string | null>(null)
+
+const showAddPosition = ref(false)
+const addForm = ref({ symbol: "", quantity: "1", price: "" })
+const addBusy = ref(false)
+const addError = ref<string | null>(null)
 
 onMounted(load)
 
@@ -48,6 +71,79 @@ const description = computed(() => store.detail?.description ?? store.portfolios
 function gainClass(value: number | undefined): string {
   return (value ?? 0) >= 0 ? "text-green-600" : "text-red-600"
 }
+
+function openRename() {
+  renameName.value = portfolioName.value
+  renameError.value = null
+  showRename.value = true
+}
+
+async function submitRename() {
+  if (!renameName.value.trim()) return
+  renameBusy.value = true
+  renameError.value = null
+  try {
+    await updatePortfolio(id, { name: renameName.value.trim() })
+    showRename.value = false
+    await Promise.all([store.fetchAll(), store.fetchDetail(id)])
+  } catch (err) {
+    renameError.value = err instanceof Error ? err.message : "Failed to rename portfolio"
+  } finally {
+    renameBusy.value = false
+  }
+}
+
+function openDelete() {
+  deleteError.value = null
+  showDeleteConfirm.value = true
+}
+
+function setDisplayCurrency(currency: string) {
+  displayCurrencyStore.setCurrency(currency)
+  showCurrencyMenu.value = false
+}
+
+function openAddPosition() {
+  addForm.value = { symbol: "", quantity: "1", price: "" }
+  addError.value = null
+  showAddPosition.value = true
+}
+
+async function submitAddPosition() {
+  const symbol = addForm.value.symbol.trim().toUpperCase()
+  const quantity = Number(addForm.value.quantity)
+  if (!symbol || !quantity) return
+  addBusy.value = true
+  addError.value = null
+  try {
+    await createPortfolioPosition(id, {
+      symbol,
+      quantity,
+      price: addForm.value.price ? Number(addForm.value.price) : undefined,
+    })
+    showAddPosition.value = false
+    await store.fetchPositions(id)
+  } catch (err) {
+    addError.value = err instanceof Error ? err.message : "Failed to add position"
+  } finally {
+    addBusy.value = false
+  }
+}
+
+async function submitDelete() {
+  deleteBusy.value = true
+  deleteError.value = null
+  try {
+    await deletePortfolio(id)
+    showDeleteConfirm.value = false
+    await store.fetchAll()
+    router.push({ name: "investments" })
+  } catch (err) {
+    deleteError.value = err instanceof Error ? err.message : "Failed to delete portfolio"
+  } finally {
+    deleteBusy.value = false
+  }
+}
 </script>
 
 <template>
@@ -68,20 +164,41 @@ function gainClass(value: number | undefined): string {
         </div>
         <div class="flex gap-2">
           <button type="button" class="btn-secondary text-sm">Share</button>
-          <button type="button" class="btn-secondary text-sm">Rename</button>
-          <button type="button" class="btn-primary text-sm">Add Position</button>
-          <button type="button" class="btn-ghost text-sm text-red-600">Delete</button>
+          <div class="relative">
+            <button type="button" class="btn-secondary text-sm" @click="showCurrencyMenu = !showCurrencyMenu">
+              Display currency: {{ displayCurrency }}
+              {{ displayCurrency === "USD" ? "($" : displayCurrency === "EUR" ? "(€" : displayCurrency === "GBP" ? "(£" : displayCurrency === "CHF" ? "(Fr" : "(zł" }})
+            </button>
+            <template v-if="showCurrencyMenu">
+              <div class="fixed inset-0 z-20" @click="showCurrencyMenu = false"></div>
+              <div class="absolute right-0 z-30 mt-1 w-40 rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+                <button
+                  v-for="c in currencies"
+                  :key="c"
+                  type="button"
+                  class="block w-full px-4 py-2 text-left text-sm hover:bg-slate-50"
+                  :class="displayCurrency === c ? 'bg-blue-50 text-blue-700' : 'text-slate-700'"
+                  @click="setDisplayCurrency(c)"
+                >
+                  {{ c }}
+                </button>
+              </div>
+            </template>
+          </div>
+          <button type="button" class="btn-secondary text-sm" @click="openRename">Rename</button>
+          <button type="button" class="btn-primary text-sm" @click="openAddPosition">Add Position</button>
+          <button type="button" class="btn-red-ghost text-sm" @click="openDelete">Delete</button>
         </div>
       </div>
 
       <div v-if="store.summaryMetrics" class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-6">
         <div class="card p-4">
           <p class="text-sm text-slate-500">Total Value</p>
-          <p class="mt-1 text-xl font-semibold tabular-nums">{{ formatCurrency(store.summaryMetrics.totalValue) }}</p>
+          <p class="mt-1 text-xl font-semibold tabular-nums">{{ formatCurrency(store.summaryMetrics.totalValue, displayCurrency) }}</p>
         </div>
         <div class="card p-4">
           <p class="text-sm text-slate-500">Total Invested</p>
-          <p class="mt-1 text-xl font-semibold tabular-nums">{{ formatCurrency(store.summaryMetrics.totalInvested) }}</p>
+          <p class="mt-1 text-xl font-semibold tabular-nums">{{ formatCurrency(store.summaryMetrics.totalInvested, displayCurrency) }}</p>
         </div>
         <div class="card p-4">
           <p class="text-sm text-slate-500">Return</p>
@@ -92,22 +209,19 @@ function gainClass(value: number | undefined): string {
         <div class="card p-4">
           <p class="text-sm text-slate-500">Unrealized P/L</p>
           <p class="mt-1 text-xl font-semibold tabular-nums" :class="gainClass(store.summaryMetrics.unrealizedGainLoss)">
-            {{ formatSignedCurrency(store.summaryMetrics.unrealizedGainLoss) }}
+            {{ formatSignedCurrency(store.summaryMetrics.unrealizedGainLoss, displayCurrency) }}
           </p>
         </div>
         <div class="card p-4">
           <p class="text-sm text-slate-500">Realized</p>
           <p class="mt-1 text-xl font-semibold tabular-nums" :class="gainClass(store.summaryMetrics.realizedGain)">
-            {{ formatSignedCurrency(store.summaryMetrics.realizedGain) }}
+            {{ formatSignedCurrency(store.summaryMetrics.realizedGain, displayCurrency) }}
           </p>
         </div>
         <div class="card p-4">
-          <p class="text-sm text-slate-500">Day Change</p>
-          <p class="mt-1 text-xl font-semibold tabular-nums" :class="gainClass(store.summaryMetrics.dayChangeAmount)">
-            {{ formatSignedCurrency(store.summaryMetrics.dayChangeAmount) }}
-            <span class="text-xs font-normal" :class="gainClass(store.summaryMetrics.dayChangePercent)">
-              ({{ formatPercent(store.summaryMetrics.dayChangePercent) }})
-            </span>
+          <p class="text-sm text-slate-500">Income</p>
+          <p class="mt-1 text-xl font-semibold tabular-nums" :class="gainClass(store.summaryMetrics.cumulativeDividends)">
+            {{ formatSignedCurrency(store.summaryMetrics.cumulativeDividends, displayCurrency) }}
           </p>
         </div>
       </div>
@@ -126,5 +240,95 @@ function gainClass(value: number | undefined): string {
 
       <router-view />
     </template>
+
+    <div
+      v-if="showRename"
+      class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
+      @click.self="showRename = false"
+    >
+      <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Rename portfolio">
+        <h3 class="mb-4 text-base font-semibold">Rename portfolio</h3>
+        <form @submit.prevent="submitRename">
+          <label for="rename-name" class="mb-1 block text-sm text-slate-600">Name</label>
+          <input id="rename-name" v-model="renameName" type="text" required class="input mb-4" />
+          <p v-if="renameError" class="mb-3 text-sm text-red-600">{{ renameError }}</p>
+          <div class="flex justify-end gap-2">
+            <button type="button" class="btn-ghost" @click="showRename = false">Cancel</button>
+            <button type="submit" class="btn-primary" :disabled="renameBusy || !renameName.trim()">
+              {{ renameBusy ? "Saving..." : "Save" }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div
+      v-if="showDeleteConfirm"
+      class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
+      @click.self="showDeleteConfirm = false"
+    >
+      <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Delete portfolio">
+        <h3 class="mb-4 text-base font-semibold">Delete portfolio</h3>
+        <p class="text-sm text-slate-600">Delete "{{ portfolioName }}" and its positions? This cannot be undone.</p>
+        <p v-if="deleteError" class="mb-3 mt-2 text-sm text-red-600">{{ deleteError }}</p>
+        <div class="mt-4 flex justify-end gap-2">
+          <button type="button" class="btn-ghost" @click="showDeleteConfirm = false">Cancel</button>
+          <button type="button" class="btn-danger" :disabled="deleteBusy" @click="submitDelete">
+            {{ deleteBusy ? "Deleting..." : "Delete" }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      v-if="showAddPosition"
+      class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
+      @click.self="showAddPosition = false"
+    >
+      <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Add position">
+        <h3 class="mb-4 text-base font-semibold">Add Position</h3>
+        <form @submit.prevent="submitAddPosition">
+          <label for="add-pos-symbol" class="label">Symbol</label>
+          <input
+            id="add-pos-symbol"
+            v-model="addForm.symbol"
+            type="text"
+            placeholder="AAPL"
+            required
+            class="input mb-4"
+            data-testid="add-position-symbol"
+          />
+          <label for="add-pos-quantity" class="label">Quantity</label>
+          <input
+            id="add-pos-quantity"
+            v-model="addForm.quantity"
+            type="number"
+            min="0.000001"
+            step="any"
+            required
+            class="input mb-4"
+            data-testid="add-position-quantity"
+          />
+          <label for="add-pos-price" class="label">Price per share</label>
+          <input
+            id="add-pos-price"
+            v-model="addForm.price"
+            type="number"
+            min="0"
+            step="any"
+            placeholder="Optional — defaults to market price"
+            class="input mb-4"
+            data-testid="add-position-price"
+          />
+          <p v-if="addError" class="mb-3 text-sm text-red-600">{{ addError }}</p>
+          <div class="flex justify-end gap-2">
+            <button type="button" class="btn-ghost" @click="showAddPosition = false">Cancel</button>
+            <button type="submit" class="btn-primary" :disabled="addBusy || !addForm.symbol.trim() || !addForm.quantity">
+              {{ addBusy ? "Adding..." : "Add Position" }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
 </template>

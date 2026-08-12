@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue"
 import { useRoute } from "vue-router"
-import { getTickerNews, type NewsArticle } from "@/api/instruments"
+import { getNewsStats, getTickerNews, type NewsArticle, type NewsStats } from "@/api/instruments"
 import { formatDate } from "@/utils/format"
 
 const route = useRoute()
@@ -9,14 +9,16 @@ const symbol = String(route.params.symbol).toUpperCase()
 
 const articles = ref<NewsArticle[]>([])
 const total = ref(0)
+const stats = ref<NewsStats | null>(null)
 const error = ref<string | null>(null)
 const loading = ref(true)
 
 onMounted(async () => {
   try {
-    const page = await getTickerNews(symbol)
+    const [page, s] = await Promise.all([getTickerNews(symbol), getNewsStats(symbol).catch(() => null)])
     articles.value = page.data
     total.value = page.pagination.total_count
+    stats.value = s
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Failed to load news"
   } finally {
@@ -56,6 +58,21 @@ function summary(a: NewsArticle): string | undefined {
     <p v-if="loading" class="text-sm text-slate-500">Loading news...</p>
 
     <template v-if="!loading && !error">
+      <dl v-if="stats" class="grid grid-cols-2 gap-4 sm:grid-cols-3">
+        <div class="card p-4">
+          <dt class="text-sm text-slate-500">Timeline Events</dt>
+          <dd class="mt-1 text-xl font-semibold tabular-nums">{{ stats.data.total_article_count.toLocaleString() }}</dd>
+        </div>
+        <div class="card p-4">
+          <dt class="text-sm text-slate-500">Analyzed Articles</dt>
+          <dd class="mt-1 text-xl font-semibold tabular-nums">{{ stats.data.total_analyzed_article_count.toLocaleString() }}</dd>
+        </div>
+        <div class="card p-4">
+          <dt class="text-sm text-slate-500">Last Fetched</dt>
+          <dd class="mt-1 text-sm font-medium tabular-nums">{{ formatDate(stats.data.last_fetched_at) }}</dd>
+        </div>
+      </dl>
+
       <p class="text-sm text-slate-500">
         {{ articles.length }} of {{ total.toLocaleString() }} articles for {{ symbol }}
       </p>

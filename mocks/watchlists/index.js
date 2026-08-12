@@ -13,9 +13,9 @@ export function register(app) {
 
   app.post("/api/watchlists", (ctx) => {
     if (!requireAuth(ctx)) return
-    const { name } = ctx.body || {}
+    const { name, description } = ctx.body || {}
     if (!name) return ctx.res.status(422).json({ error: "ValidationError", message: "name is required" })
-    const wl = { id: uuid(), name, createdAt: nowIso(), updatedAt: nowIso(), items: [] }
+    const wl = { id: uuid(), name, description: description ?? null, createdAt: nowIso(), updatedAt: nowIso(), items: [] }
     watchlists.set(wl.id, wl)
     ctx.res.status(201).json(wl)
   })

@@ -90,8 +90,13 @@ onMounted(async () => {
 <template>
   <div class="space-y-6">
     <div>
-      <h1 class="text-2xl font-semibold tracking-tight text-slate-900">Charting</h1>
-      <p class="mt-1 text-sm text-slate-500">Compare fundamentals across stocks, or start from a popular comparison.</p>
+      <h1 class="text-2xl font-semibold tracking-tight text-slate-900">
+        Stocks
+        <span class="ml-2 align-middle text-sm font-medium text-slate-500" data-testid="selected-counter">
+          {{ selected.length }}/{{ MAX_STOCKS }} selected
+        </span>
+      </h1>
+      <p class="mt-1 text-sm text-slate-500">Compare fundamentals across stocks, or start from a popular preset.</p>
     </div>
 
     <div class="card p-6">
@@ -139,7 +144,7 @@ onMounted(async () => {
     </div>
 
     <div class="card p-6">
-      <h2 class="mb-3 text-base font-semibold">Popular comparisons</h2>
+      <h2 class="mb-3 text-base font-semibold">Presets</h2>
       <div class="flex flex-wrap gap-2">
         <button
           v-for="preset in presets"
@@ -196,6 +201,6 @@ onMounted(async () => {
       </div>
     </div>
 
-    <InstrumentSearchModal :open="showSearch" mode="add" @close="showSearch = false" @add="addStock" />
+    <InstrumentSearchModal :open="showSearch" mode="add" title="Add Stock to Chart" @close="showSearch = false" @add="addStock" />
   </div>
 </template>
