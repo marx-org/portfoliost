@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, ref } from "vue"
+import { computed, onMounted, ref } from "vue"
+import { useRouter } from "vue-router"
 import { useWalletsStore } from "@/stores/wallets"
 import { getWalletBalanceHistory } from "@/api/wallets"
 import { formatCurrency, formatDate, formatNumber } from "@/utils/format"
@@ -9,6 +10,7 @@ import type { Wallets } from "@/api/types"
 const props = defineProps<{ wallet: Wallets[number] }>()
 
 const store = useWalletsStore()
+const router = useRouter()
 
 const openMenu = ref(false)
 const notice = ref<string | null>(null)
@@ -16,7 +18,6 @@ const notice = ref<string | null>(null)
 const showCashModal = ref(false)
 const cashAction = ref<"deposit" | "withdraw" | "transfer">("deposit")
 
-const showHistory = ref(false)
 const history = ref<Array<{ date: string; balance: number }>>([])
 const historyError = ref<string | null>(null)
 
@@ -28,6 +29,12 @@ const renameError = ref<string | null>(null)
 const showDeleteConfirm = ref(false)
 const deleteBusy = ref(false)
 const deleteError = ref<string | null>(null)
+
+onMounted(loadHistory)
+
+function goToDetail() {
+  router.push({ name: "wallet-detail", params: { id: props.wallet.id } })
+}
 
 function openCash(action: "deposit" | "withdraw" | "transfer") {
   openMenu.value = false
@@ -43,11 +50,10 @@ function cashDone(amount: number) {
   showCashModal.value = false
   const verb = cashAction.value === "deposit" ? "Deposited" : cashAction.value === "withdraw" ? "Withdrew" : "Transferred"
   notice.value = `${verb} ${formatCurrency(amount, props.wallet.currency)}`
+  loadHistory()
 }
 
-async function toggleHistory() {
-  showHistory.value = !showHistory.value
-  if (!showHistory.value) return
+async function loadHistory() {
   historyError.value = null
   try {
     const res = await getWalletBalanceHistory(props.wallet.id)
@@ -102,7 +108,7 @@ async function submitDelete() {
 }
 
 const historyChart = computed(() => ({
-  chart: { type: "area" as const, height: 200, toolbar: { show: false } },
+  chart: { type: "area" as const, height: 160, toolbar: { show: false } },
   colors: ["#16a34a"],
   series: [{ name: "Balance", data: history.value.map((p) => p.balance) }],
   xaxis: { categories: history.value.map((p) => formatDate(p.date)), labels: { show: false } },
@@ -113,13 +119,13 @@ const historyChart = computed(() => ({
 </script>
 
 <template>
-  <div class="card p-5">
+  <div class="card cursor-pointer p-5" @click="goToDetail">
     <div class="flex items-start justify-between gap-3">
       <div>
         <h3 class="font-semibold text-slate-900">{{ wallet.name }}</h3>
         <p class="text-xs text-slate-500">{{ wallet.currency }} &middot; {{ wallet.isDefault ? "Default" : "Secondary" }}</p>
       </div>
-      <div class="flex items-center gap-4">
+      <div class="flex items-center gap-4" @click.stop>
         <div class="text-right">
           <p class="text-lg font-semibold tabular-nums">{{ formatCurrency(wallet.balance, wallet.currency) }}</p>
           <p class="text-xs text-slate-500">{{ formatNumber(wallet.availableBalance) }} available</p>
@@ -148,27 +154,24 @@ const historyChart = computed(() => ({
       </div>
     </div>
 
-    <div class="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
-      <button type="button" class="btn-emerald text-xs" @click="openCash('deposit')">Deposit</button>
-      <button type="button" class="btn-red-ghost text-xs" @click="openCash('withdraw')">Withdraw</button>
-      <button type="button" class="btn-secondary text-xs" @click="openCash('transfer')">Transfer</button>
-      <button
-        type="button"
-        class="btn-ghost text-xs"
-        :class="showHistory ? 'bg-slate-100 text-slate-900' : ''"
-        @click="toggleHistory"
-      >
-        History
-      </button>
+    <div class="mt-4">
+      <div class="mb-1 flex items-center justify-between">
+        <span class="text-xs text-slate-500">Balance</span>
+        <button type="button" class="text-xs font-medium text-blue-600 hover:underline" @click.stop="goToDetail">History</button>
+      </div>
+      <p v-if="historyError" class="text-sm text-red-600">{{ historyError }}</p>
+      <component :is="'apexchart'" v-else-if="history.length" :options="historyChart" :series="historyChart.series" />
+      <div v-else class="flex h-[160px] items-center justify-center">
+        <p class="text-xs text-slate-400">Loading balance...</p>
+      </div>
     </div>
 
     <p v-if="notice" class="mt-3 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">{{ notice }}</p>
 
-    <div v-if="showHistory" class="mt-4 border-t border-slate-100 pt-4">
-      <h4 class="mb-2 text-sm font-semibold text-slate-700">Balance History</h4>
-      <p v-if="historyError" class="text-sm text-red-600">{{ historyError }}</p>
-      <component :is="'apexchart'" v-else-if="history.length" :options="historyChart" :series="historyChart.series" />
-      <p v-else class="text-sm text-slate-500">No balance history available.</p>
+    <div class="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3" @click.stop>
+      <button type="button" class="btn-emerald text-xs" @click="openCash('deposit')">Deposit</button>
+      <button type="button" class="btn-red-ghost text-xs" @click="openCash('withdraw')">Withdraw</button>
+      <button type="button" class="btn-secondary text-xs" @click="openCash('transfer')">Transfer</button>
     </div>
 
     <WalletCashModals

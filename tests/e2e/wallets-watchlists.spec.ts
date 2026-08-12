@@ -76,3 +76,32 @@ test("wallets: creates a new wallet", async ({ page }) => {
 
   await expect(page.locator(".card", { hasText: name })).toBeVisible()
 })
+
+test("wallets: History opens wallet detail screen", async ({ page }) => {
+  await login(page)
+
+  await page.getByRole("button", { name: "History", exact: true }).first().click()
+  await expect(page).toHaveURL(/\/en\/portfolios\/wallets\/1a1f2d68-686c-4f8b-ba34-a67846163275/)
+
+  await expect(page.getByRole("heading", { name: "Portfel USD 1" })).toBeVisible()
+  await expect(page.getByText("Balance", { exact: true }).first()).toBeVisible()
+  await expect(page.getByText("Available", { exact: true })).toBeVisible()
+  await expect(page.getByText("Currency", { exact: true })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Deposit", exact: true })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Transfer", exact: true })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Withdraw", exact: true })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Delete wallet" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Balance History" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "1W" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Recent Transactions" })).toBeVisible()
+
+  await page.getByRole("button", { name: "Go back" }).click()
+  await expect(page).toHaveURL(/\/en\/investments/)
+})
+
+test("wallets: clicking the wallet card opens wallet detail screen", async ({ page }) => {
+  await login(page)
+
+  await page.locator(".card", { hasText: "Portfel USD 1" }).first().click()
+  await expect(page).toHaveURL(/\/en\/portfolios\/wallets\/1a1f2d68-686c-4f8b-ba34-a67846163275/)
+})
