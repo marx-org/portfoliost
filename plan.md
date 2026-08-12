@@ -30,8 +30,9 @@ Legend: `[ ]` pending · `[x]` done
 - [x] Verify: `npm run test:mock` + `build` + `test` + `test:e2e`. Commit. — `e313e47`
 
 ## Step 5 — Wallet detail screen + card navigation
-- [ ] Route `wallets/:id` → `/en/portfolios/wallets/:id` (example-service path): back, Rename, metric strip (Balance/Available/Currency), Deposit/Transfer/Withdraw/Delete, always-visible Balance History chart with timeframe + High/Low/Avg stats, Recent Transactions + View All.
-- [ ] `CashWalletCard.vue`: chart always visible (drop `showHistory`), History button + card click → wallet detail.
+- [x] Route `wallets/:id` → `/en/portfolios/wallets/:id` (example-service path): back, Rename, metric strip (Balance/Available/Currency), Deposit/Transfer/Withdraw/Delete, always-visible Balance History chart with timeframe + High/Low/Avg stats, Recent Transactions + View All.
+- [x] `CashWalletCard.vue`: chart always visible (drop `showHistory`), History button + card click → wallet detail.
+- [x] Verify: `npm run test:mock` + `build` + `test` + `test:e2e`. Commit. — `149117b`
 
 ## Step 6 — Edit portfolio transaction modal
 - [ ] `TransactionsView.vue` + `PortfolioTransactionsTab.vue`: stock header (logo, symbol (US) type, name, Historical Price), Purchase Date, Cash portfolio select, Quantity × Price per share, Fees $/% toggle, Total Cost. PATCH adds `executedAt`, `walletId`, `feesType`.
