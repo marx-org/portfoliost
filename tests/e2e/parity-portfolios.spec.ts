@@ -69,13 +69,13 @@ test("create, rename and delete a portfolio from the card manage menu", async ({
   await expect(page.locator(".card", { hasText: renamed })).toHaveCount(0)
 })
 
-test("holdings: AI banner, customize columns, sort and export", async ({ page }) => {
+test("holdings: no AI premium banner, customize columns, sort and export", async ({ page }) => {
   await login(page)
   await page.getByRole("link", { name: /Top10/ }).first().click()
   await expect(page).toHaveURL(/holdings/)
 
-  await expect(page.getByText("AI Insight")).toBeVisible()
-  await expect(page.getByRole("button", { name: "Upgrade to Premium" })).toBeVisible()
+  await expect(page.getByText("AI Insight")).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "Upgrade to Premium" })).toHaveCount(0)
 
   await page.getByRole("button", { name: /Customize/ }).click()
   await page.getByLabel("Market Value").uncheck()

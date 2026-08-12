@@ -47,9 +47,23 @@ export async function getPortfolioPositions(id: string): Promise<PortfolioPositi
   return http.get<PortfolioPositions>(`/api/portfolios/${id}/positions`)
 }
 
+export interface CreatePortfolioPositionInput {
+  symbol: string
+  quantity: number
+  price?: number
+  averageCostBasis?: number
+  assetType?: string
+  contractSize?: number
+  direction?: string
+  optionType?: string
+  strikePrice?: number
+  expirationDate?: string
+  openedAt?: string
+}
+
 export async function createPortfolioPosition(
   id: string,
-  input: { symbol: string; quantity: number; price?: number; averageCostBasis?: number },
+  input: CreatePortfolioPositionInput,
 ): Promise<PortfolioPositions[number]> {
   return http.post<PortfolioPositions[number]>(`/api/portfolios/${id}/positions`, input)
 }

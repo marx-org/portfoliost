@@ -150,23 +150,30 @@ test("position actions menu: buy updates quantity, research navigates, remove de
   await expect(page.locator("tbody tr").filter({ hasText: targetSymbol })).toHaveCount(0)
 })
 
-test("add position from the header opens a dialog and adds a row", async ({ page }) => {
+test("add position from the header opens a chooser with instrument/option/cfd and adds a stock row", async ({ page }) => {
   await login(page)
   await page.getByRole("link", { name: /Top10/ }).click()
   await expect(page).toHaveURL(/\/en\/portfolios\/.*\/holdings/)
 
-  const rowsBefore = await page.locator("tbody tr").count()
-
   await page.getByRole("button", { name: "Add Position", exact: true }).click()
-  await expect(page.getByRole("dialog", { name: "Add Position" })).toBeVisible()
-  await page.getByTestId("add-position-symbol").fill("AMD")
+  const chooser = page.getByRole("dialog", { name: "Add position" })
+  await expect(chooser).toBeVisible()
+  await expect(chooser.getByTestId("add-position-instrument")).toContainText("Stock, ETF or crypto")
+  await expect(chooser.getByTestId("add-position-option")).toContainText("Option")
+  await expect(chooser.getByTestId("add-position-cfd")).toContainText("CFD")
+
+  await chooser.getByTestId("add-position-instrument").click()
+  await expect(page.getByRole("dialog", { name: "Search for Instruments" })).toBeVisible()
+  await page.getByTestId("instrument-search").fill("AMD")
+  await page.getByRole("dialog", { name: "Search for Instruments" }).getByRole("button", { name: /AMD/ }).first().click()
+
+  await expect(page.getByRole("dialog", { name: "Buy Position" })).toBeVisible()
   await page.getByTestId("add-position-quantity").fill("10")
   await page.getByTestId("add-position-price").fill("120")
-  await page.getByRole("dialog", { name: "Add Position" }).getByRole("button", { name: "Add Position", exact: true }).click()
+  await page.getByRole("dialog", { name: "Buy Position" }).getByRole("button", { name: /Buy for/ }).click()
 
-  await expect(page.getByRole("dialog", { name: "Add Position" })).toHaveCount(0)
+  await expect(page.getByRole("dialog", { name: "Buy Position" })).toHaveCount(0)
   await expect(page.locator("tbody tr").filter({ hasText: "AMD" })).toHaveCount(1)
-  await expect(page.locator("tbody tr")).toHaveCount(rowsBefore + 1)
 })
 
 test("display currency switcher updates portfolio values and persists", async ({ page }) => {

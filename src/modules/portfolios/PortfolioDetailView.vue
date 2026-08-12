@@ -4,8 +4,9 @@ import { useRoute, useRouter } from "vue-router"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
 import { storeToRefs } from "pinia"
-import { createPortfolioPosition, deletePortfolio, updatePortfolio } from "@/api/portfolios"
+import { deletePortfolio, updatePortfolio } from "@/api/portfolios"
 import { formatCurrency, formatPercent, formatSignedCurrency } from "@/utils/format"
+import AddPositionDialog from "@/modules/portfolios/AddPositionDialog.vue"
 
 const route = useRoute()
 const router = useRouter()
@@ -41,9 +42,6 @@ const deleteBusy = ref(false)
 const deleteError = ref<string | null>(null)
 
 const showAddPosition = ref(false)
-const addForm = ref({ symbol: "", quantity: "1", price: "" })
-const addBusy = ref(false)
-const addError = ref<string | null>(null)
 
 onMounted(load)
 
@@ -104,30 +102,15 @@ function setDisplayCurrency(currency: string) {
 }
 
 function openAddPosition() {
-  addForm.value = { symbol: "", quantity: "1", price: "" }
-  addError.value = null
   showAddPosition.value = true
 }
 
-async function submitAddPosition() {
-  const symbol = addForm.value.symbol.trim().toUpperCase()
-  const quantity = Number(addForm.value.quantity)
-  if (!symbol || !quantity) return
-  addBusy.value = true
-  addError.value = null
-  try {
-    await createPortfolioPosition(id, {
-      symbol,
-      quantity,
-      price: addForm.value.price ? Number(addForm.value.price) : undefined,
-    })
-    showAddPosition.value = false
-    await store.fetchPositions(id)
-  } catch (err) {
-    addError.value = err instanceof Error ? err.message : "Failed to add position"
-  } finally {
-    addBusy.value = false
-  }
+function onAddPositionClose() {
+  showAddPosition.value = false
+}
+
+async function onAddPositionAdded() {
+  await store.fetchDetail(id)
 }
 
 async function submitDelete() {
@@ -280,55 +263,11 @@ async function submitDelete() {
       </div>
     </div>
 
-    <div
-      v-if="showAddPosition"
-      class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
-      @click.self="showAddPosition = false"
-    >
-      <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Add position">
-        <h3 class="mb-4 text-base font-semibold">Add Position</h3>
-        <form @submit.prevent="submitAddPosition">
-          <label for="add-pos-symbol" class="label">Symbol</label>
-          <input
-            id="add-pos-symbol"
-            v-model="addForm.symbol"
-            type="text"
-            placeholder="AAPL"
-            required
-            class="input mb-4"
-            data-testid="add-position-symbol"
-          />
-          <label for="add-pos-quantity" class="label">Quantity</label>
-          <input
-            id="add-pos-quantity"
-            v-model="addForm.quantity"
-            type="number"
-            min="0.000001"
-            step="any"
-            required
-            class="input mb-4"
-            data-testid="add-position-quantity"
-          />
-          <label for="add-pos-price" class="label">Price per share</label>
-          <input
-            id="add-pos-price"
-            v-model="addForm.price"
-            type="number"
-            min="0"
-            step="any"
-            placeholder="Optional — defaults to market price"
-            class="input mb-4"
-            data-testid="add-position-price"
-          />
-          <p v-if="addError" class="mb-3 text-sm text-red-600">{{ addError }}</p>
-          <div class="flex justify-end gap-2">
-            <button type="button" class="btn-ghost" @click="showAddPosition = false">Cancel</button>
-            <button type="submit" class="btn-primary" :disabled="addBusy || !addForm.symbol.trim() || !addForm.quantity">
-              {{ addBusy ? "Adding..." : "Add Position" }}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <AddPositionDialog
+      :open="showAddPosition"
+      :portfolio-id="id"
+      @close="onAddPositionClose"
+      @added="onAddPositionAdded"
+    />
   </div>
 </template>

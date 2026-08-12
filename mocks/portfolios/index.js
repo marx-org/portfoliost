@@ -321,12 +321,14 @@ export function register(app) {
 
   app.post("/api/portfolios/:id/positions", (ctx) => {
     if (!requireAuth(ctx)) return
-    const { symbol = "AAPL", quantity = 1, price, averageCostBasis = price } = ctx.body || {}
+    const body = ctx.body || {}
+    const { symbol = "AAPL", quantity = 1, price, averageCostBasis = price } = body
     const research = loadResearch(symbol)
     const template = withDataFile(ctx.params.id, "portfolio_positions.json", "empty_portfolio_positions.json")
+    const assetType = String(body.assetType || "STOCK").toUpperCase()
     const base = (Array.isArray(template) && template[0]) || {
       companyName: research ? research.overview.name : symbol,
-      assetType: "STOCK",
+      assetType,
       instrumentCurrency: "USD",
       purchaseCurrency: "USD",
       sector: research ? research.overview.sector : "Technology",
@@ -336,17 +338,23 @@ export function register(app) {
     const currentPrice = price || (research ? research.basics.price : 100)
     const position = {
       ...base,
+      assetType,
       id: uuid(),
       portfolioId: ctx.params.id,
       symbol,
       quantity,
+      contractSize: body.contractSize ?? 100,
+      direction: body.direction ?? (assetType === "CFD" ? "LONG" : null),
+      optionType: body.optionType ?? null,
+      strikePrice: body.strikePrice ?? null,
+      expirationDate: body.expirationDate ?? null,
       averageCostBasis: averageCostBasis ?? currentPrice,
       avgCostBasis: averageCostBasis ?? currentPrice,
       instrumentAvgCostBasis: averageCostBasis ?? currentPrice,
       totalCostBasis: round2(quantity * (averageCostBasis ?? currentPrice)),
       costBasis: round2(quantity * (averageCostBasis ?? currentPrice)),
       isOpen: true,
-      openedAt: nowIso(),
+      openedAt: body.openedAt ?? nowIso(),
       currentPrice,
       marketValue: round2(quantity * currentPrice),
       unrealizedGainLoss: round2(quantity * (currentPrice - (averageCostBasis ?? currentPrice))),
