@@ -2,6 +2,7 @@
 import { useRouter } from "vue-router"
 import { computed } from "vue"
 import { useAuthStore } from "@/stores/auth"
+import { researchSymbol } from "@/utils/research"
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -21,7 +22,7 @@ const items = [
   },
   {
     label: "Research",
-    to: { name: "research-overview", params: { symbol: "AAPL" } },
+    to: { name: "research-overview", params: { symbol: researchSymbol("AAPL") } },
   },
   {
     label: "Charting",

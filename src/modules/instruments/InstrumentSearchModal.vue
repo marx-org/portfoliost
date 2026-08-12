@@ -2,6 +2,7 @@
 import { ref, watch } from "vue"
 import { useRouter } from "vue-router"
 import { useInstrumentsStore } from "@/stores/instruments"
+import { researchSymbol } from "@/utils/research"
 
 const props = withDefaults(defineProps<{ open: boolean; mode?: "navigate" | "add"; title?: string }>(), {
   mode: "navigate",
@@ -44,7 +45,7 @@ function openResult(symbol: string, name = "") {
     emit("add", symbol, name)
     return
   }
-  router.push({ name: "research-overview", params: { symbol } })
+  router.push({ name: "research-overview", params: { symbol: researchSymbol(symbol) } })
 }
 
 function onKeydown(e: KeyboardEvent) {

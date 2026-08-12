@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue"
 import { useRoute } from "vue-router"
 import { getProjections } from "@/api/instruments"
 import { formatCompact, formatCurrency, formatDate } from "@/utils/format"
+import { baseSymbol } from "@/utils/research"
 
 interface PriceTarget {
   lastUpdated: string
@@ -37,7 +38,7 @@ interface Projections {
 }
 
 const route = useRoute()
-const symbol = String(route.params.symbol).toUpperCase()
+const symbol = baseSymbol(String(route.params.symbol))
 
 const data = ref<Projections | null>(null)
 const error = ref<string | null>(null)

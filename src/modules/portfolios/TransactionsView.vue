@@ -2,6 +2,7 @@
 import { onMounted, ref } from "vue"
 import { getAllTransactions, updatePortfolioTransaction, deletePortfolioTransaction } from "@/api/portfolios"
 import { formatCurrency, formatDateTime, formatNumber } from "@/utils/format"
+import { researchSymbol } from "@/utils/research"
 import type { PortfoliosTransactions } from "@/api/types"
 import InvestmentsTabs from "@/modules/portfolios/InvestmentsTabs.vue"
 import TransactionsSubTabs from "@/modules/portfolios/TransactionsSubTabs.vue"
@@ -187,7 +188,7 @@ async function removeTransaction(tx: Tx) {
             <tr v-for="tx in transactions" :key="tx.id" class="hover:bg-slate-50">
               <td class="px-5 py-3">
                 <router-link
-                  :to="{ name: 'research-overview', params: { symbol: tx.instrumentSymbol } }"
+                  :to="{ name: 'research-overview', params: { symbol: researchSymbol(tx.instrumentSymbol) } }"
                   class="flex items-center gap-3"
                 >
                   <img :src="`/api/logos/${tx.instrumentSymbol}`" :alt="tx.instrumentSymbol" class="h-8 w-8 rounded-full bg-slate-100" />

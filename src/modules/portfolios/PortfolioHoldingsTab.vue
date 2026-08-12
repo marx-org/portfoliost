@@ -10,6 +10,7 @@ import {
   updatePortfolioPosition,
 } from "@/api/portfolios"
 import { formatCurrency, formatNumber, formatPercent, formatSignedCurrency } from "@/utils/format"
+import { researchSymbol } from "@/utils/research"
 import type { PortfolioPositions } from "@/api/types"
 
 type Position = PortfolioPositions[number]
@@ -277,7 +278,7 @@ async function removePosition(position: Position): Promise<void> {
 
 function goResearch(position: Position): void {
   openMenuId.value = null
-  router.push({ name: "research-overview", params: { symbol: position.symbol } })
+  router.push({ name: "research-overview", params: { symbol: researchSymbol(position.symbol) } })
 }
 </script>
 
@@ -366,7 +367,7 @@ function goResearch(position: Position): void {
                     <img :src="`/api/logos/${pos.symbol}`" :alt="pos.symbol" class="h-8 w-8 rounded-full bg-slate-100" />
                     <div>
                       <router-link
-                        :to="{ name: 'research-overview', params: { symbol: pos.symbol } }"
+                        :to="{ name: 'research-overview', params: { symbol: researchSymbol(pos.symbol) } }"
                         class="font-medium text-slate-900 hover:text-blue-600 hover:underline"
                       >
                         {{ pos.symbol }}

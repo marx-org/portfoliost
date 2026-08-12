@@ -3,6 +3,7 @@ import { onMounted, ref } from "vue"
 import { useRoute } from "vue-router"
 import { getPortfolioTransactions, updatePortfolioTransaction, deletePortfolioTransaction } from "@/api/portfolios"
 import { formatCurrency, formatDate, formatNumber } from "@/utils/format"
+import { researchSymbol } from "@/utils/research"
 import type { PortfolioTransactionsPage } from "@/api/types"
 
 type Tx = PortfolioTransactionsPage["items"][number]
@@ -123,7 +124,7 @@ function costOf(tx: Tx): number {
               </td>
               <td class="px-5 py-3">
                 <router-link
-                  :to="{ name: 'research-overview', params: { symbol: tx.instrumentSymbol } }"
+                  :to="{ name: 'research-overview', params: { symbol: researchSymbol(tx.instrumentSymbol) } }"
                   class="font-medium text-slate-900 hover:text-blue-600 hover:underline"
                 >
                   {{ tx.instrumentSymbol }}

@@ -7,9 +7,10 @@ import ResearchPriceChart from "@/modules/instruments/ResearchPriceChart.vue"
 import ResearchSeasonality from "@/modules/instruments/ResearchSeasonality.vue"
 import type { InstrumentsMetrics, InstrumentsOverviewMetrics, InstrumentsProfile, IrEventsAapl, QuoteAapl } from "@/api/types"
 import { formatCompact, formatCurrency, formatNumber, formatPercent } from "@/utils/format"
+import { baseSymbol, researchSymbol } from "@/utils/research"
 
 const route = useRoute()
-const symbol = String(route.params.symbol).toUpperCase()
+const symbol = baseSymbol(String(route.params.symbol))
 
 const profile = ref<InstrumentsProfile | null>(null)
 const metrics = ref<InstrumentsMetrics | null>(null)
@@ -300,7 +301,7 @@ const targetSpread = computed(() => {
             <p class="text-xs text-slate-500">{{ latestEarningsCall.date }}</p>
           </div>
           <router-link
-            :to="{ name: 'research-ir', params: { symbol } }"
+            :to="{ name: 'research-ir', params: { symbol: researchSymbol(symbol) } }"
             class="btn-secondary text-sm"
           >
             Open transcript

@@ -4,9 +4,10 @@ import { useRoute } from "vue-router"
 import { getInstrumentDividends } from "@/api/instruments"
 import type { ResearchDividends } from "@/api/types"
 import { formatCurrency } from "@/utils/format"
+import { baseSymbol } from "@/utils/research"
 
 const route = useRoute()
-const symbol = String(route.params.symbol).toUpperCase()
+const symbol = baseSymbol(String(route.params.symbol))
 
 const data = ref<ResearchDividends | null>(null)
 const loading = ref(true)

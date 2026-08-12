@@ -4,9 +4,10 @@ import { useRoute } from "vue-router"
 import { getInstrumentOwnership } from "@/api/instruments"
 import type { ResearchHolderRow, ResearchOwnership } from "@/api/types"
 import { formatCompact, formatNumber } from "@/utils/format"
+import { baseSymbol } from "@/utils/research"
 
 const route = useRoute()
-const symbol = String(route.params.symbol).toUpperCase()
+const symbol = baseSymbol(String(route.params.symbol))
 
 const data = ref<ResearchOwnership | null>(null)
 const loading = ref(true)

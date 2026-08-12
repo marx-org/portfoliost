@@ -10,7 +10,7 @@ async function login(page: import("@playwright/test").Page) {
 
 async function openResearch(page: import("@playwright/test").Page, tab = "overview") {
   await login(page)
-  await page.goto(`/en/research/AAPL/${tab}`)
+  await page.goto(`/en/research/AAPL.US/${tab}`)
 }
 
 test("research overview shows company data", async ({ page }) => {
@@ -58,7 +58,7 @@ test("overview shows extended statistics and EPS 5Q combobox", async ({ page }) 
 test("research shows quick-switch logo row", async ({ page }) => {
   await openResearch(page, "overview")
   await page.getByRole("navigation", { name: "Quick symbol switch" }).getByRole("link", { name: /NVDA/ }).click()
-  await expect(page).toHaveURL(/\/en\/research\/NVDA\/overview/)
+  await expect(page).toHaveURL(/\/en\/research\/NVDA\.US\/overview/)
   await expect(page.getByRole("heading", { name: "NVDA", exact: true }).first()).toBeVisible()
 })
 
@@ -132,12 +132,12 @@ test("research tabs switch between all views", async ({ page }) => {
 
   for (const [label, path, matcher] of cases) {
     await tabs.getByRole("link", { name: label }).click()
-    await expect(page).toHaveURL(new RegExp(`/en/research/AAPL/${path}`))
+    await expect(page).toHaveURL(new RegExp(`/en/research/AAPL\\.US/${path}`))
     await expect(page.getByText(matcher).first()).toBeVisible()
   }
 
   await tabs.getByRole("link", { name: "Overview" }).click()
-  await expect(page).toHaveURL(/\/en\/research\/AAPL\/overview/)
+  await expect(page).toHaveURL(/\/en\/research\/AAPL\.US\/overview/)
 })
 
 test("add to watchlist updates the button", async ({ page }) => {
@@ -156,6 +156,6 @@ test("search modal opens and navigates to a popular symbol", async ({ page }) =>
   await expect(page.getByRole("dialog")).toBeVisible()
 
   await page.getByRole("button", { name: "MSFT", exact: true }).click()
-  await expect(page).toHaveURL(/\/en\/research\/MSFT\/overview/)
+  await expect(page).toHaveURL(/\/en\/research\/MSFT\.US\/overview/)
   await expect(page.getByRole("heading", { name: "MSFT", exact: true }).first()).toBeVisible()
 })

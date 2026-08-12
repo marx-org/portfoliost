@@ -71,7 +71,7 @@ test("portfolio detail shows metric strip, tabbed sections, and positions", asyn
 
   await tabs.getByRole("link", { name: "Holdings" }).click()
   await page.getByRole("link", { name: "META" }).click()
-  await expect(page).toHaveURL(/\/en\/research\/META\/overview/)
+  await expect(page).toHaveURL(/\/en\/research\/META\.US\/overview/)
 })
 
 test("transactions page lists transactions with sortable columns and pagination", async ({ page }) => {
@@ -140,7 +140,7 @@ test("position actions menu: buy updates quantity, research navigates, remove de
 
   await targetRow.getByRole("button", { name: "Position actions" }).click()
   await page.getByRole("button", { name: "Research" }).click()
-  await expect(page).toHaveURL(new RegExp(`/en/research/${targetSymbol}/overview`))
+  await expect(page).toHaveURL(new RegExp(`/en/research/${targetSymbol}\\.US/overview`))
 
   await page.goBack()
   await expect(page).toHaveURL(/\/en\/portfolios\/.*\/holdings/)

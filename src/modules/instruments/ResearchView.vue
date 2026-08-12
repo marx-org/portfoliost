@@ -4,10 +4,12 @@ import { useRoute } from "vue-router"
 import InstrumentSearchModal from "@/modules/instruments/InstrumentSearchModal.vue"
 import { getInstrumentProfile } from "@/api/instruments"
 import { useWatchlistsStore } from "@/stores/watchlists"
+import { baseSymbol, researchSymbol } from "@/utils/research"
 import type { InstrumentsProfile } from "@/api/types"
 
 const route = useRoute()
-const symbol = computed(() => String(route.params.symbol).toUpperCase())
+const routeSymbol = computed(() => String(route.params.symbol).toUpperCase())
+const symbol = computed(() => baseSymbol(routeSymbol.value))
 const watchlists = useWatchlistsStore()
 const showSearch = ref(false)
 const profile = ref<InstrumentsProfile | null>(null)
@@ -74,7 +76,7 @@ async function addToWatchlist(): Promise<void> {
         <h1 class="text-2xl font-semibold">{{ symbol }}</h1>
         <p v-if="profile?.name" class="text-sm text-slate-500">{{ profile.name }}</p>
       </div>
-      <span class="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-600">{{ symbol }}.US</span>
+      <span class="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-600">{{ routeSymbol }}</span>
       <button
         type="button"
         class="btn-secondary ml-auto text-sm"
@@ -92,7 +94,7 @@ async function addToWatchlist(): Promise<void> {
       <router-link
         v-for="s in quickSymbols"
         :key="s"
-        :to="{ name: String(route.name), params: { symbol: s } }"
+        :to="{ name: String(route.name), params: { symbol: researchSymbol(s) } }"
         class="flex shrink-0 flex-col items-center gap-1 rounded-lg px-2 py-1.5 hover:bg-slate-100"
         :class="symbol === s ? 'bg-slate-100' : ''"
       >
@@ -105,7 +107,7 @@ async function addToWatchlist(): Promise<void> {
       <router-link
         v-for="tab in tabs"
         :key="tab.name"
-        :to="{ name: tab.name, params: { symbol } }"
+        :to="{ name: tab.name, params: { symbol: routeSymbol } }"
         class="whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900"
         :class="route.name === tab.name ? 'border-blue-600 text-blue-700' : 'border-transparent'"
       >

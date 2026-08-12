@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue"
 import { useRoute } from "vue-router"
 import { getInvestorRelations } from "@/api/instruments"
 import { formatDateTime } from "@/utils/format"
+import { baseSymbol } from "@/utils/research"
 
 interface IrEvent {
   type: string
@@ -17,7 +18,7 @@ interface IrEvent {
 }
 
 const route = useRoute()
-const symbol = String(route.params.symbol).toUpperCase()
+const symbol = baseSymbol(String(route.params.symbol))
 
 const events = ref<IrEvent[]>([])
 const error = ref<string | null>(null)

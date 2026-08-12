@@ -56,7 +56,7 @@ Compared every page/button of `app.example-service.ai` (authenticated) to this a
 - [x] Remove/relocate "Wallets" — example-service has NO Wallets item; cash lives as "Cash Portfolios" on the Portfolios page.
 - [x] Wire dead links: News → real news page (no route today), Settings → `/en/settings/profile`. (Alerts link removed — alerts skipped per user.)
 - [x] Remove "Report bug" link (bottom of sidebar) — was added earlier, then removed: the send-error form is on the skip list.
-- [ ] Research quick-switch logo row (MSFT/NVDA/META/...) — example-service shows it on the research page too.
+- [x] Research quick-switch logo row (MSFT/NVDA/META/...) — example-service shows it on the research page too.
 
 ### 6.2 Portfolios page (investments)
 - [x] "Display currency" button (USD $ dropdown) in page header.
@@ -83,7 +83,7 @@ Portfolio screen gaps (user-reported):
 - [x] No grouping switch (none / type / sector / country) for the holdings table — group header + subtotal rows. e2e-covered.
 
 ### 6.4 Research page
-- [ ] Route format `AAPL.US` (exchange suffix) instead of `AAPL`; header "Go back" + "Search for a stock… ⌘K" + "Add to Watchlist" (header items done; route format deferred).
+- [x] Route format `AAPL.US` (exchange suffix) instead of `AAPL` (`/en/research/:symbol` now carries `SYMBOL.US`; `baseSymbol()` strips it for API/display, `researchSymbol()` builds it for every link; mock already normalizes `.US`); header "Go back" + "Search for a stock… ⌘K" + "Add to Watchlist".
 - [x] Research quick-switch logo row (MSFT/NVDA/META/...) on the research page.
 - [x] Company Statistics adds: Returns (ROA/ROTA/ROE), Financial Health (Current/Quick ratio), P/FCF + EV/Gross Profit (Valuation TTM), PEG + Price Target (Valuation NTM), Dividends stats (Yield/Payout/DPS/DPS Growth), Growth CAGR (3/5/10yr + fwd).
 - [x] EPS Surprises + 5Q timeframe combobox; Latest Earnings Call.
@@ -107,9 +107,9 @@ Portfolio screen gaps (user-reported):
 - [x] Empty state "No watchlists yet" + "Create First Watchlist".
 
 ### 6.8 Settings module (new, stubbed links)
-- [ ] Routes `/en/settings/profile`, `/en/settings/shared-portfolios`, `/en/settings/broker-connections` (Alerts + Billing tabs removed — skipped per user, see AGENTS.md).
-- [ ] Profile: first/last name, email (disabled), Save Changes, Language Preference, Change password, Danger Zone (Clear All Data / Delete Account).
-- [ ] Shared Portfolios: Active Shares 1/10, share card (views, Copy link, View shared portfolio, Delete).
+- [x] Routes `/en/settings/profile`, `/en/settings/shared-portfolios`, `/en/settings/broker-connections` (Alerts + Billing tabs removed — skipped per user, see AGENTS.md).
+- [x] Profile: first/last name, email (disabled), Save Changes, Language Preference, Change password, Danger Zone (Clear All Data / Delete Account).
+- [x] Shared Portfolios: Active Shares 1/10, share card (views, Copy link, View shared portfolio, Delete).
 
 ### 6.9 Alerts
 - Skipped per user (see AGENTS.md skip list). The mock keeps `/api/notifications/*` endpoints, but no UI is wired (no sidebar Alerts link, no Alerts settings tab).

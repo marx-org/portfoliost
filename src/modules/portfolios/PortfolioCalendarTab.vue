@@ -3,6 +3,7 @@ import { onMounted, ref } from "vue"
 import { useRoute } from "vue-router"
 import { getPortfolioCalendar } from "@/api/portfolios"
 import { formatCurrency } from "@/utils/format"
+import { researchSymbol } from "@/utils/research"
 import type { PortfolioCalendarEvent } from "@/api/types"
 
 const route = useRoute()
@@ -56,7 +57,7 @@ function badgeClass(type: string): string {
                 <td class="px-5 py-3 whitespace-nowrap">{{ e.date }}</td>
                 <td class="px-5 py-3">
                   <router-link
-                    :to="{ name: 'research-overview', params: { symbol: e.symbol } }"
+                    :to="{ name: 'research-overview', params: { symbol: researchSymbol(e.symbol) } }"
                     class="font-medium text-slate-900 hover:text-blue-600 hover:underline"
                   >
                     {{ e.symbol }}

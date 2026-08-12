@@ -15,7 +15,7 @@ vi.mock("@/api/instruments", () => ({
 }))
 
 vi.mock("vue-router", () => ({
-  useRoute: () => ({ params: { symbol: "AAPL" } }),
+  useRoute: () => ({ params: { symbol: "AAPL.US" } }),
 }))
 
 const mocked = vi.mocked(instrumentsApi)

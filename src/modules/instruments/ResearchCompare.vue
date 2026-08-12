@@ -4,9 +4,10 @@ import { useRoute } from "vue-router"
 import { getInstrumentPeers } from "@/api/instruments"
 import type { ResearchCompare } from "@/api/types"
 import { COMPARE_METRICS } from "./compareMetrics"
+import { baseSymbol } from "@/utils/research"
 
 const route = useRoute()
-const symbol = String(route.params.symbol).toUpperCase()
+const symbol = baseSymbol(String(route.params.symbol))
 
 const items = ref<ResearchCompare[]>([])
 const loading = ref(true)
