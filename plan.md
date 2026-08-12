@@ -16,8 +16,9 @@ Legend: `[ ]` pending · `[x]` done
 - [x] Verify: `npm run test:mock` + `build` + `test` + `test:e2e`. Commit. — `6c40ec7`
 
 ## Step 3 — PortfolioCard: Add Position opens AddPositionDialog
-- [ ] `PortfolioCard.vue`: "Add Position" link → button emitting `add-position`; `InvestmentsView.vue` hosts `AddPositionDialog` for the selected portfolio. News link already targets the portfolio news tab (verify).
-- [ ] Update `tests/e2e/parity-portfolios.spec.ts` (link → button + dialog assertion).
+- [x] `PortfolioCard.vue`: "Add Position" link → button emitting `add-position`; `InvestmentsView.vue` hosts `AddPositionDialog` for the selected portfolio. News link already targets the portfolio news tab (verify).
+- [x] Update `tests/e2e/parity-portfolios.spec.ts` (link → button + dialog assertion).
+- [x] Verify: `npm run test:mock` + `build` + `test` + `test:e2e`. Commit. — `4fa6dc7`
 
 ## Step 4 — Deposit/Withdraw/Transfer modal rework (shared component)
 - [ ] New `WalletCashModals.vue` used by card + detail screen.
