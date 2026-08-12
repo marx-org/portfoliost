@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue"
 import { useWalletsStore } from "@/stores/wallets"
 import { formatCurrency, formatDate, formatNumber } from "@/utils/format"
+import WalletCashModals from "@/modules/portfolios/WalletCashModals.vue"
 import type { Wallets } from "@/api/types"
 
 const store = useWalletsStore()
@@ -15,10 +16,6 @@ const createError = ref<string | null>(null)
 const showCashModal = ref(false)
 const cashAction = ref<"deposit" | "withdraw">("deposit")
 const cashWallet = ref<Wallets[number] | null>(null)
-const cashAmount = ref<number>(0)
-const cashDescription = ref("")
-const cashBusy = ref(false)
-const cashError = ref<string | null>(null)
 
 const selectedWallet = ref<Wallets[number] | null>(null)
 const showTransactions = ref(false)
@@ -58,28 +55,11 @@ async function submitCreate() {
 function openCash(wallet: Wallets[number], action: "deposit" | "withdraw") {
   cashWallet.value = wallet
   cashAction.value = action
-  cashAmount.value = 0
-  cashDescription.value = ""
-  cashError.value = null
   showCashModal.value = true
 }
 
-async function submitCash() {
-  if (!cashWallet.value || cashAmount.value <= 0) return
-  cashBusy.value = true
-  cashError.value = null
-  try {
-    if (cashAction.value === "deposit") {
-      await store.deposit(cashWallet.value.id, { amount: cashAmount.value, description: cashDescription.value || undefined })
-    } else {
-      await store.withdraw(cashWallet.value.id, { amount: cashAmount.value, description: cashDescription.value || undefined })
-    }
-    showCashModal.value = false
-  } catch (err) {
-    cashError.value = err instanceof Error ? err.message : "Failed to process cash movement"
-  } finally {
-    cashBusy.value = false
-  }
+function closeCash() {
+  showCashModal.value = false
 }
 
 async function toggleHistory(wallet: Wallets[number]) {
@@ -227,29 +207,13 @@ const historyChart = computed(() => ({
       </div>
     </div>
 
-    <div
-      v-if="showCashModal && cashWallet"
-      class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
-      @click.self="showCashModal = false"
-    >
-      <div class="card w-full max-w-md p-6" role="dialog" aria-label="Cash movement">
-        <h3 class="mb-4 text-base font-semibold">
-          {{ cashAction === "deposit" ? "Deposit" : "Withdraw" }} &middot; {{ cashWallet.name }}
-        </h3>
-        <form @submit.prevent="submitCash">
-          <label for="cash-amount" class="mb-1 block text-sm text-slate-600">Amount</label>
-          <input id="cash-amount" v-model.number="cashAmount" type="number" min="0" step="0.01" required class="input mb-4" />
-          <label for="cash-description" class="mb-1 block text-sm text-slate-600">Description (optional)</label>
-          <input id="cash-description" v-model="cashDescription" type="text" class="input mb-4" />
-          <p v-if="cashError" class="mb-3 text-sm text-red-600">{{ cashError }}</p>
-          <div class="flex justify-end gap-2">
-            <button type="button" class="btn-ghost" @click="showCashModal = false">Cancel</button>
-            <button type="submit" class="btn-primary" :disabled="cashBusy || cashAmount <= 0">
-              {{ cashBusy ? "Processing..." : cashAction === "deposit" ? "Deposit" : "Withdraw" }}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <WalletCashModals
+      v-if="cashWallet"
+      :open="showCashModal"
+      :action="cashAction"
+      :wallet="cashWallet"
+      @close="closeCash"
+      @done="closeCash"
+    />
   </div>
 </template>

@@ -223,7 +223,7 @@ export function register(app) {
     const { amount, description, transaction_date, payment_method, fees, fees_type, to_wallet_id } = body
     const value = Number(amount) || 0
     const feeValue = kind === "transfers" ? Number(fees) || 0 : 0
-    const signed = kind === "withdrawals" ? -value : value
+    const signed = kind === "deposits" ? value : -(value + feeValue)
     const updated = {
       ...wallet,
       balance: round2(wallet.balance + signed),

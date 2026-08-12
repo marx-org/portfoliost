@@ -3,6 +3,7 @@ import { computed, ref } from "vue"
 import { useWalletsStore } from "@/stores/wallets"
 import { getWalletBalanceHistory } from "@/api/wallets"
 import { formatCurrency, formatDate, formatNumber } from "@/utils/format"
+import WalletCashModals from "@/modules/portfolios/WalletCashModals.vue"
 import type { Wallets } from "@/api/types"
 
 const props = defineProps<{ wallet: Wallets[number] }>()
@@ -14,10 +15,6 @@ const notice = ref<string | null>(null)
 
 const showCashModal = ref(false)
 const cashAction = ref<"deposit" | "withdraw" | "transfer">("deposit")
-const cashAmount = ref(0)
-const cashDescription = ref("")
-const cashBusy = ref(false)
-const cashError = ref<string | null>(null)
 
 const showHistory = ref(false)
 const history = ref<Array<{ date: string; balance: number }>>([])
@@ -35,33 +32,17 @@ const deleteError = ref<string | null>(null)
 function openCash(action: "deposit" | "withdraw" | "transfer") {
   openMenu.value = false
   cashAction.value = action
-  cashAmount.value = 0
-  cashDescription.value = ""
-  cashError.value = null
   showCashModal.value = true
 }
 
-async function submitCash() {
-  if (cashAmount.value <= 0) return
-  cashBusy.value = true
-  cashError.value = null
-  try {
-    if (cashAction.value === "deposit") {
-      await store.deposit(props.wallet.id, { amount: cashAmount.value, description: cashDescription.value || undefined })
-      notice.value = `Deposited ${formatCurrency(cashAmount.value, props.wallet.currency)}`
-    } else if (cashAction.value === "withdraw") {
-      await store.withdraw(props.wallet.id, { amount: cashAmount.value, description: cashDescription.value || undefined })
-      notice.value = `Withdrew ${formatCurrency(cashAmount.value, props.wallet.currency)}`
-    } else {
-      await store.transfer(props.wallet.id, { amount: cashAmount.value, description: cashDescription.value || undefined, to_wallet_id: props.wallet.id })
-      notice.value = `Transferred ${formatCurrency(cashAmount.value, props.wallet.currency)}`
-    }
-    showCashModal.value = false
-  } catch (err) {
-    cashError.value = err instanceof Error ? err.message : "Failed to process cash movement"
-  } finally {
-    cashBusy.value = false
-  }
+function closeCash() {
+  showCashModal.value = false
+}
+
+function cashDone(amount: number) {
+  showCashModal.value = false
+  const verb = cashAction.value === "deposit" ? "Deposited" : cashAction.value === "withdraw" ? "Withdrew" : "Transferred"
+  notice.value = `${verb} ${formatCurrency(amount, props.wallet.currency)}`
 }
 
 async function toggleHistory() {
@@ -190,28 +171,13 @@ const historyChart = computed(() => ({
       <p v-else class="text-sm text-slate-500">No balance history available.</p>
     </div>
 
-    <div
-      v-if="showCashModal"
-      class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
-      @click.self="showCashModal = false"
-    >
-      <div class="card w-full max-w-md p-6" role="dialog" :aria-label="`${cashAction} cash`">
-        <h3 class="mb-4 text-base font-semibold capitalize">{{ cashAction }} &middot; {{ wallet.name }}</h3>
-        <form @submit.prevent="submitCash">
-          <label for="cash-amount" class="mb-1 block text-sm text-slate-600">Amount</label>
-          <input id="cash-amount" v-model.number="cashAmount" type="number" min="0" step="0.01" required class="input mb-4" />
-          <label for="cash-description" class="mb-1 block text-sm text-slate-600">Description (optional)</label>
-          <input id="cash-description" v-model="cashDescription" type="text" class="input mb-4" />
-          <p v-if="cashError" class="mb-3 text-sm text-red-600">{{ cashError }}</p>
-          <div class="flex justify-end gap-2">
-            <button type="button" class="btn-ghost" @click="showCashModal = false">Cancel</button>
-            <button type="submit" class="btn-primary capitalize" :disabled="cashBusy || cashAmount <= 0">
-              {{ cashBusy ? "Processing..." : cashAction }}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <WalletCashModals
+      :open="showCashModal"
+      :action="cashAction"
+      :wallet="wallet"
+      @close="closeCash"
+      @done="cashDone"
+    />
 
     <div
       v-if="showRename"

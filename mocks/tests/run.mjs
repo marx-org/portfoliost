@@ -265,12 +265,15 @@ async function main() {
   const withdraw = await request(`/wallets/${walletId}/withdrawals`, { method: "POST", token, body: { amount: 50, payment_method: "bank_transfer", transaction_date: "2026-08-12" } })
   check("wallets.withdraw payment method", withdraw.status === 201 && withdraw.json.payment_method === "bank_transfer" && withdraw.json.remaining_balance === 1966.6, `got ${withdraw.status} ${JSON.stringify(withdraw.json).slice(0, 120)}`)
   const otherWalletId = wallets.json[1] ? wallets.json[1].id : null
+  const srcBalanceBefore = withdraw.json.remaining_balance ?? wallets.json.find((w) => w.id === walletId).balance
   if (otherWalletId) {
     const transfer = await request(`/wallets/${walletId}/transfers`, { method: "POST", token, body: { amount: 100, to_wallet_id: otherWalletId, fees: 2, fees_type: "fixed", transaction_date: "2026-08-12" } })
     check("wallets.transfer fees + dest", transfer.status === 201 && transfer.json.to_wallet_id === otherWalletId && transfer.json.fees === 2, `got ${transfer.status} ${JSON.stringify(transfer.json).slice(0, 120)}`)
     const destWallet = await request("/wallets", { token })
     const destUpdated = destWallet.json.find((w) => w.id === otherWalletId)
     check("wallets.transfer credits destination", destUpdated && destUpdated.balance > wallets.json.find((w) => w.id === otherWalletId).balance, `got ${JSON.stringify(destUpdated).slice(0, 120)}`)
+    const srcUpdated = destWallet.json.find((w) => w.id === walletId)
+    check("wallets.transfer debits source", srcUpdated && srcUpdated.balance === Math.round((srcBalanceBefore - 102) * 100) / 100, `got ${JSON.stringify(srcUpdated).slice(0, 120)}`)
   } else {
     const newWallet = await request("/wallets", { method: "POST", token, body: { name: "Transfer dest", currency: "USD" } })
     const destId = newWallet.json.id
@@ -279,6 +282,8 @@ async function main() {
     const destWallet = await request("/wallets", { token })
     const destUpdated = destWallet.json.find((w) => w.id === destId)
     check("wallets.transfer credits destination", destUpdated && destUpdated.balance === 100, `got ${JSON.stringify(destUpdated).slice(0, 120)}`)
+    const srcUpdated = destWallet.json.find((w) => w.id === walletId)
+    check("wallets.transfer debits source", srcUpdated && srcUpdated.balance === Math.round((srcBalanceBefore - 102) * 100) / 100, `got ${JSON.stringify(srcUpdated).slice(0, 120)}`)
     const delWallet = await request(`/wallets/${destId}`, { method: "DELETE", token })
     check("wallets.transfer cleanup delete", delWallet.status === 204, `got ${delWallet.status}`)
   }
