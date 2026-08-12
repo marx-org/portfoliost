@@ -6,7 +6,7 @@ Guidelines for working in this repo (example-service.ai parity build).
 
 - **Parity with example-service is the goal.** `app.example-service.ai` is the source of truth for UI, pages, copy, and behavior. When implementing a page, replicate example-service's layout, wording, and interactions as closely as the mock data allows.
 - **Compare against example-service with Playwright.** Use Playwright to open the current project and `app.example-service.ai` side by side (snapshots, a11y trees, screenshots) to diff pages before/after changes. Browser-based comparison is the preferred way to find gaps.
-- **Always test before commit.** A change is only "done" once the full suite passes. Run:
+- **Commit after every step.** A change is only "done" once the full suite passes and it is committed — do not batch multiple plan steps into one commit. Run:
   - `npm run build` (includes `vue-tsc --noEmit`)
   - `npm run test` (vitest unit tests)
   - `npm run test:mock` (mock API tests)
