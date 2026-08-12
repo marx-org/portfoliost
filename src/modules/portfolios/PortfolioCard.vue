@@ -8,6 +8,7 @@ import type { PortfolioAnalyticsTimeframe } from "@/api/portfolios"
 import type { PortfoliosSummaries } from "@/api/types"
 
 const props = defineProps<{ portfolio: PortfoliosSummaries[number] }>()
+const emit = defineEmits<{ (e: "add-position"): void }>()
 
 const store = usePortfolioStore()
 const router = useRouter()
@@ -255,7 +256,7 @@ async function exportPositions(format: "csv" | "xml" | "json") {
     </p>
 
     <div class="mt-4 flex items-center justify-between gap-2 border-t border-slate-100 pt-3" @click.stop>
-      <router-link :to="tabPath('holdings')" class="text-sm font-medium text-blue-600 hover:underline">Add Position</router-link>
+      <button type="button" class="text-sm font-medium text-blue-600 hover:underline" data-testid="card-add-position" @click="emit('add-position')">Add Position</button>
       <div class="flex gap-3 text-sm">
         <router-link :to="tabPath('performance')" class="text-slate-600 hover:text-blue-600">Analytics</router-link>
         <router-link :to="tabPath('news')" class="text-slate-600 hover:text-blue-600">News</router-link>

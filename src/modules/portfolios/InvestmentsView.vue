@@ -8,6 +8,7 @@ import { formatCurrency, formatPercent, formatSignedCurrency } from "@/utils/for
 import InvestmentsTabs from "@/modules/portfolios/InvestmentsTabs.vue"
 import PortfolioCard from "@/modules/portfolios/PortfolioCard.vue"
 import CashWalletCard from "@/modules/portfolios/CashWalletCard.vue"
+import AddPositionDialog from "@/modules/portfolios/AddPositionDialog.vue"
 
 const store = usePortfolioStore()
 const walletsStore = useWalletsStore()
@@ -51,6 +52,18 @@ const showCreate = ref(false)
 const newPortfolio = ref({ name: "", description: "", strategy: "GROWTH", currency: "USD", walletId: "" })
 const creating = ref(false)
 const createError = ref<string | null>(null)
+
+const showAddPosition = ref(false)
+const addPositionPortfolioId = ref("")
+
+function openAddPosition(portfolioId: string) {
+  addPositionPortfolioId.value = portfolioId
+  showAddPosition.value = true
+}
+
+function closeAddPosition() {
+  showAddPosition.value = false
+}
 
 const showCreateWallet = ref(false)
 const newWallet = ref({ name: "", currency: "USD" })
@@ -204,7 +217,7 @@ async function submitCreateWallet() {
       </div>
 
       <div v-if="store.portfolios.length" class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <PortfolioCard v-for="p in store.portfolios" :key="p.id" :portfolio="p" />
+        <PortfolioCard v-for="p in store.portfolios" :key="p.id" :portfolio="p" @add-position="openAddPosition(p.id)" />
       </div>
       <p v-else-if="!error" class="text-sm text-slate-500">No investment portfolios yet.</p>
 
@@ -309,5 +322,7 @@ async function submitCreateWallet() {
         </form>
       </div>
     </div>
+
+    <AddPositionDialog :open="showAddPosition" :portfolio-id="addPositionPortfolioId" @close="closeAddPosition" @added="closeAddPosition" />
   </div>
 </template>
