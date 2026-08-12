@@ -5,10 +5,10 @@ Long-running plan. Each step is implemented, verified (build + unit + mock + e2e
 Legend: `[ ]` pending · `[x]` done
 
 ## Step 1 — Mock + API + store: cash movement fields (foundation)
-- [ ] `mocks/wallets/index.js` `mutate()`: read `transaction_date`, `payment_method`, `fees`, `fees_type`, `to_wallet_id`; deposit returns `new_balance`, withdraw returns `remaining_balance`, transfer also credits destination wallet.
-- [ ] `src/api/wallets.ts` + `src/stores/wallets.ts`: extend deposit/withdraw/transfer input types and pass-through.
-- [ ] `mocks/tests/run.mjs`: round-trip checks for new fields.
-- [ ] Verify: `npm run test:mock` + `build` + `test`. Commit.
+- [x] `mocks/wallets/index.js` `mutate()`: read `transaction_date`, `payment_method`, `fees`, `fees_type`, `to_wallet_id`; deposit returns `new_balance`, withdraw returns `remaining_balance`, transfer also credits destination wallet.
+- [x] `src/api/wallets.ts` + `src/stores/wallets.ts`: extend deposit/withdraw/transfer input types and pass-through.
+- [x] `mocks/tests/run.mjs`: round-trip checks for new fields.
+- [x] Verify: `npm run test:mock` + `build` + `test`. Commit. — `509209f`
 
 ## Step 2 — Main page: cash balance currency breakdown
 - [ ] `InvestmentsView.vue`: total + per-currency rows (USD 100%) from `walletsStore.wallets`.

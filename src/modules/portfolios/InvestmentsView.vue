@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue"
+import { computed, onMounted, ref } from "vue"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { useWalletsStore } from "@/stores/wallets"
 import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
@@ -35,6 +35,18 @@ const strategies = [
   { value: "BALANCED", label: "Balanced" },
 ]
 
+const cashBreakdown = computed(() => {
+  const byCurrency = new Map<string, number>()
+  for (const w of walletsStore.wallets) {
+    byCurrency.set(w.currency, (byCurrency.get(w.currency) ?? 0) + (w.balance ?? 0))
+  }
+  const total = [...byCurrency.values()].reduce((s, v) => s + v, 0)
+  return [...byCurrency.entries()]
+    .map(([currency, balance]) => ({ currency, balance, pct: total > 0 ? (balance / total) * 100 : 0 }))
+    .sort((a, b) => b.balance - a.balance)
+})
+
+const cashTotal = computed(() => cashBreakdown.value.reduce((s, c) => s + c.balance, 0))
 const showCreate = ref(false)
 const newPortfolio = ref({ name: "", description: "", strategy: "GROWTH", currency: "USD", walletId: "" })
 const creating = ref(false)
@@ -119,7 +131,10 @@ async function submitCreateWallet() {
         <div class="card flex items-center gap-2 px-3 py-1.5">
           <span class="text-xs text-slate-500">Cash balance</span>
           <span class="text-sm font-semibold tabular-nums text-slate-900" data-testid="cash-balance">
-            {{ formatCurrency(walletsStore.totalBalance?.totalBalance) }}
+            {{ formatCurrency(cashTotal) }}
+          </span>
+          <span v-for="c in cashBreakdown" :key="c.currency" class="text-xs text-slate-500">
+            {{ c.currency }} {{ formatPercent(c.pct, 0) }}
           </span>
         </div>
         <div class="relative">
@@ -200,7 +215,16 @@ async function submitCreateWallet() {
 
     <section v-if="!loading" class="mb-10">
       <div class="mb-4 flex items-center justify-between">
-        <h2 class="text-lg font-semibold">Cash Portfolios</h2>
+        <div>
+          <h2 class="text-lg font-semibold">Cash Portfolios</h2>
+          <div v-if="walletsStore.wallets.length" class="mt-0.5 flex items-center gap-3 text-sm">
+            <span class="text-slate-500">Total Balance</span>
+            <span class="font-semibold tabular-nums" data-testid="cash-total-balance">{{ formatCurrency(cashTotal) }}</span>
+            <span v-for="c in cashBreakdown" :key="c.currency" class="text-xs text-slate-500">
+              {{ c.currency }} {{ formatPercent(c.pct, 0) }}
+            </span>
+          </div>
+        </div>
         <span v-if="walletsStore.wallets.length" class="text-sm text-slate-500">{{ walletsStore.wallets.length }}</span>
       </div>
 

@@ -122,6 +122,7 @@ describe("InvestmentsView", () => {
   it("renders investment and cash portfolio sections with cards", async () => {
     mockedWallets.getWallets.mockResolvedValue([
       { id: "w1", userId: "u1", name: "Portfel USD 1", currency: "USD", balance: 500, availableBalance: 500, isDefault: true, createdAt: "", updatedAt: "" },
+      { id: "w2", userId: "u1", name: "Portfel EUR 1", currency: "EUR", balance: 200, availableBalance: 200, isDefault: false, createdAt: "", updatedAt: "" },
     ] as never)
     const wrapper = mountView()
     await flushPromises()
@@ -132,6 +133,9 @@ describe("InvestmentsView", () => {
     expect(wrapper.text()).toContain("GROWTH")
     expect(wrapper.text()).toContain("10 open positions")
     expect(wrapper.text()).toContain("Portfel USD 1")
+    expect(wrapper.text()).toContain("Total Balance")
+    expect(wrapper.text()).toContain("USD 71%")
+    expect(wrapper.text()).toContain("EUR 29%")
   })
 
   it("shows the create dialog and creates a portfolio", async () => {
