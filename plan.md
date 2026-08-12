@@ -21,11 +21,13 @@ Legend: `[ ]` pending · `[x]` done
 - [x] Verify: `npm run test:mock` + `build` + `test` + `test:e2e`. Commit. — `4fa6dc7`
 
 ## Step 4 — Deposit/Withdraw/Transfer modal rework (shared component)
-- [ ] New `WalletCashModals.vue` used by card + detail screen.
+- [x] New `WalletCashModals.vue` used by card + detail screen.
   - Deposit: Amount, Description (optional), Transaction Date, Confirmation summary, Cancel/Deposit.
   - Withdraw: Available Balance, Amount, Transaction Date, Description, Payment Method select (Bank Transfer / Card / Wire / PayPal), confirmation w/ Remaining Balance.
   - Transfer: From Wallet (pre-filled), To Wallet, Amount + "Transfer All" + Available, Transfer Date, Fees (optional, % / $ toggle), Cancel/Transfer.
-- [ ] Rewire `CashWalletCard.vue` to use it.
+- [x] Rewire `CashWalletCard.vue` + `WalletsView.vue` to use it.
+- [x] Fix mock: transfers debit source (amount + fees) and credit destination.
+- [x] Verify: `npm run test:mock` + `build` + `test` + `test:e2e`. Commit. — `d71e5e5`
 
 ## Step 5 — Wallet detail screen + card navigation
 - [ ] Route `wallets/:id` → `/en/portfolios/wallets/:id` (example-service path): back, Rename, metric strip (Balance/Available/Currency), Deposit/Transfer/Withdraw/Delete, always-visible Balance History chart with timeframe + High/Low/Avg stats, Recent Transactions + View All.
