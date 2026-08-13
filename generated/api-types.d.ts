@@ -6882,6 +6882,8 @@ export interface PortfolioTransactionsExport {
     convertedPrice: number
     convertedFees: number
     convertedRealizedGainLoss: unknown
+    sector: string
+    country: string
   })[]
     total: number
     page: number
@@ -6920,6 +6922,8 @@ export interface PortfolioTransactionsLimit1 {
     convertedPrice: number
     convertedFees: number
     convertedRealizedGainLoss: unknown
+    sector: string
+    country: string
   })[]
     total: number
     page: number
@@ -6958,6 +6962,8 @@ export interface PortfolioTransactionsPage {
     convertedPrice: number
     convertedFees: number
     convertedRealizedGainLoss: unknown
+    sector: string
+    country: string
   })[]
     total: number
     page: number
@@ -7134,6 +7140,8 @@ export interface PortfoliosTransactions {
     synthesizedOpeningLot: boolean
     executedAt: string
     createdAt: string
+    sector: string
+    country: string
   })[]
     total: number
     page: number

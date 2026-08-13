@@ -62,15 +62,32 @@ function heldPositions(id) {
   return positionsFor(id)
 }
 
+function enrichTx(tx) {
+  if (tx.sector && tx.country) return tx
+  const position = positionsFor(tx.portfolioId).find((p) => p.symbol === tx.instrumentSymbol)
+  if (position && position.sector && position.country) {
+    return { ...tx, sector: position.sector, country: position.country }
+  }
+  const research = loadResearch(tx.instrumentSymbol)
+  if (research) {
+    return {
+      ...tx,
+      sector: research.overview.sector || "Other",
+      country: research.overview.country || "Other",
+    }
+  }
+  return { ...tx, sector: tx.sector || "Other", country: tx.country || "Other" }
+}
+
 function allTransactions() {
   initTxs()
-  const items = [...allTxs.values()]
+  const items = [...allTxs.values()].map(enrichTx)
   return { items, total: items.length }
 }
 
 function portfolioTransactions(id) {
   initTxs()
-  const items = [...allTxs.values()].filter((t) => t.portfolioId === id)
+  const items = [...allTxs.values()].filter((t) => t.portfolioId === id).map(enrichTx)
   return { items, total: items.length }
 }
 
@@ -409,6 +426,7 @@ export function register(app) {
     if (!requireAuth(ctx)) return
     initTxs()
     const body = ctx.body || {}
+    const research = loadResearch(body.symbol || "AAPL")
     const tx = {
       id: uuid(),
       portfolioId: ctx.params.id,
@@ -418,6 +436,8 @@ export function register(app) {
       type: body.type || "BUY",
       instrumentSymbol: (body.symbol || "AAPL").toUpperCase(),
       instrumentName: body.instrumentName ?? null,
+      sector: body.sector ?? (research ? research.overview.sector : "Other"),
+      country: body.country ?? (research ? research.overview.country : "Other"),
       quantity: body.quantity ?? 1,
       price: body.price ?? 100,
       fees: body.fees ?? 0,

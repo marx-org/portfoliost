@@ -218,6 +218,11 @@ async function main() {
   check("portfolios.positions.cfd-hints", cfd.status === 200, `got ${cfd.status}`)
   const txs = await request(`/portfolios/${pid}/transactions?page=1&limit=10`, { token })
   check("portfolios.transactions", txs.status === 200 && txs.json.total === 10 && txs.json.items.length === 10, `got ${txs.status} total ${txs.json && txs.json.total}`)
+  check(
+    "portfolios.transactions enriched sector/country",
+    txs.status === 200 && txs.json.items.every((t) => typeof t.sector === "string" && t.sector.length > 0 && typeof t.country === "string" && t.country.length > 0),
+    `first sector ${txs.json.items[0] && txs.json.items[0].sector}`,
+  )
   const txsPage = await request(`/portfolios/${pid}/transactions?page=2&limit=4`, { token })
   check("portfolios.transactions paginated", txsPage.status === 200 && txsPage.json.items.length === 4 && txsPage.json.page === 2, `len ${txsPage.json.items.length} page ${txsPage.json.page}`)
   const txsDiv = await request(`/portfolios/${pid}/transactions?type=dividend`, { token })

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue"
+import { computed, onMounted, ref } from "vue"
 import { useRoute } from "vue-router"
 import { getPortfolioTransactions, deletePortfolioTransaction } from "@/api/portfolios"
 import { formatCurrency, formatDate, formatNumber } from "@/utils/format"
@@ -86,13 +86,62 @@ async function submitDelete() {
 function costOf(tx: Tx): number {
   return (tx.totalAmount ?? 0) + (tx.fees ?? 0)
 }
+
+type GroupMode = "none" | "assetType" | "sector" | "country"
+const groupBy = ref<GroupMode>("none")
+
+const groupModes: Array<{ value: GroupMode; label: string }> = [
+  { value: "none", label: "None" },
+  { value: "assetType", label: "Kind of investment" },
+  { value: "sector", label: "Sector" },
+  { value: "country", label: "Country" },
+]
+
+function groupValue(tx: Tx, mode: GroupMode): string {
+  switch (mode) {
+    case "assetType":
+      return (tx.assetType || "STOCK").charAt(0) + (tx.assetType || "STOCK").slice(1).toLowerCase()
+    case "sector":
+      return tx.sector || "Other"
+    case "country":
+      return tx.country || "Other"
+    default:
+      return ""
+  }
+}
+
+const groups = computed(() => {
+  if (groupBy.value === "none") return [{ label: "", items: transactions.value }]
+  const map = new Map<string, Tx[]>()
+  for (const tx of transactions.value) {
+    const key = groupValue(tx, groupBy.value)
+    const list = map.get(key) ?? []
+    list.push(tx)
+    map.set(key, list)
+  }
+  return [...map.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([label, items]) => ({ label, items }))
+})
+
+function groupAmount(items: Tx[]): number {
+  return items.reduce((s, tx) => s + costOf(tx), 0)
+}
 </script>
 
 <template>
   <div class="card overflow-hidden">
-    <div class="flex items-baseline justify-between border-b border-slate-200 px-5 py-3">
-      <h2 class="text-base font-semibold">Transactions</h2>
-      <p v-if="!loading" class="text-sm text-slate-500">{{ total.toLocaleString() }} total transactions</p>
+    <div class="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+      <div class="flex items-center gap-3">
+        <h2 class="text-base font-semibold">Transactions</h2>
+        <span v-if="!loading" class="text-sm text-slate-500">{{ total.toLocaleString() }} total transactions</span>
+      </div>
+      <label class="flex items-center gap-1.5 text-xs text-slate-500">
+        Group by
+        <select v-model="groupBy" class="input !w-auto !py-1 !text-xs" aria-label="Group by">
+          <option v-for="mode in groupModes" :key="mode.value" :value="mode.value">{{ mode.label }}</option>
+        </select>
+      </label>
     </div>
 
     <p v-if="notice" class="border-b border-slate-100 px-5 py-3 text-sm text-green-700">{{ notice }}</p>
@@ -114,8 +163,14 @@ function costOf(tx: Tx): number {
               <th class="px-5 py-2.5"><span class="sr-only">Actions</span></th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-slate-100">
-            <tr v-for="tx in transactions" :key="tx.id" class="hover:bg-slate-50">
+          <tbody v-for="g in groups" :key="g.label || 'all'" class="divide-y divide-slate-100">
+            <tr v-if="g.label" class="bg-slate-100/70" data-testid="transactions-group-row">
+              <td :colspan="8" class="px-5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                {{ g.label }}
+                <span class="font-normal text-slate-400">{{ g.items.length }}</span>
+              </td>
+            </tr>
+            <tr v-for="tx in g.items" :key="tx.id" class="hover:bg-slate-50">
               <td class="px-5 py-3 whitespace-nowrap">{{ formatDate(tx.executedAt) }}</td>
               <td class="px-5 py-3">
                 <span class="rounded-full px-2 py-0.5 text-xs font-medium" :class="typeClass(tx.type)">{{ tx.type }}</span>
@@ -153,6 +208,16 @@ function costOf(tx: Tx): number {
                   </button>
                 </div>
               </td>
+            </tr>
+            <tr v-if="g.label" class="border-t border-slate-200 bg-slate-50 font-medium">
+              <td class="px-5 py-3 text-slate-500">{{ g.label }} subtotal</td>
+              <td class="px-5 py-3"></td>
+              <td class="px-5 py-3"></td>
+              <td class="px-5 py-3"></td>
+              <td class="px-5 py-3"></td>
+              <td class="px-5 py-3 text-right font-medium tabular-nums">{{ formatCurrency(groupAmount(g.items)) }}</td>
+              <td class="px-5 py-3"></td>
+              <td class="px-5 py-3"></td>
             </tr>
           </tbody>
         </table>

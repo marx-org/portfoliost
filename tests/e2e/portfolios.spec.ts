@@ -78,7 +78,7 @@ test("transactions page lists transactions with sortable columns and pagination"
   await login(page)
   await page.goto("/en/investments/transactions")
 
-  await expect(page.getByRole("heading", { name: "Transactions" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Transactions", exact: true })).toBeVisible()
   await expect(page.getByText(/All investing and cash transactions/)).toBeVisible()
   await expect(page.locator("tbody tr").first()).toBeVisible()
   await expect(page.getByTestId("table-th-quantity")).toBeVisible()
@@ -95,7 +95,7 @@ test("wallet transactions sub-tab lists cash transactions", async ({ page }) => 
   await login(page)
   await page.goto("/en/investments/transactions/cash")
 
-  await expect(page.getByRole("heading", { name: "Transactions" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Transactions", exact: true })).toBeVisible()
   await expect(page.getByRole("link", { name: "Wallet Transactions" })).toHaveClass(/border-blue-600/)
   await expect(page.locator("tbody tr").first()).toBeVisible()
   await expect(page.getByTestId("table-th-walletName")).toBeVisible()
@@ -108,7 +108,7 @@ test("editing an investing transaction opens example-service-style modal and sav
   await login(page)
   await page.goto("/en/investments/transactions")
 
-  await expect(page.getByRole("heading", { name: "Transactions" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Transactions", exact: true })).toBeVisible()
   await expect(page.locator("tbody tr").first()).toBeVisible()
 
   await page.getByRole("button", { name: "Edit transaction" }).first().click()
@@ -309,11 +309,55 @@ test("holdings table groups by type, sector, and country", async ({ page }) => {
   await expect(page.getByText(/Total/).first()).toBeVisible()
 })
 
+test("transactions page groups by kind of investment, sector, and country", async ({ page }) => {
+  await login(page)
+  await page.goto("/en/investments/transactions")
+
+  await page.getByRole("combobox", { name: "Rows per page" }).selectOption("50")
+  await expect(page.getByTestId("transactions-group-row")).toHaveCount(0)
+
+  const groupSelect = page.getByLabel("Group by")
+  await expect(groupSelect).toHaveValue("none")
+
+  await groupSelect.selectOption("assetType")
+  await expect(page.getByTestId("transactions-group-row")).toHaveCount(1)
+  await expect(page.getByTestId("transactions-group-row")).toContainText("Stock")
+  await expect(page.getByText(/Stock subtotal/)).toHaveCount(1)
+
+  await groupSelect.selectOption("sector")
+  await expect(page.getByTestId("transactions-group-row")).toHaveCount(3)
+  await expect(page.getByTestId("transactions-group-row").first()).toContainText("Communication Services")
+  await expect(page.getByText(/subtotal/)).toHaveCount(3)
+
+  await groupSelect.selectOption("country")
+  await expect(page.getByTestId("transactions-group-row")).toHaveCount(1)
+  await expect(page.getByTestId("transactions-group-row")).toContainText("US")
+
+  await groupSelect.selectOption("none")
+  await expect(page.getByTestId("transactions-group-row")).toHaveCount(0)
+})
+
+test("portfolio transactions tab groups by sector with subtotals", async ({ page }) => {
+  await login(page)
+  await page.getByRole("link", { name: /Top10/ }).click()
+  await page.getByRole("link", { name: "Transactions" }).click()
+  await expect(page).toHaveURL(/\/en\/portfolios\/.*\/transactions/)
+
+  const groupSelect = page.getByLabel("Group by")
+  await groupSelect.selectOption("sector")
+  await expect(page.getByTestId("transactions-group-row")).toHaveCount(3)
+  await expect(page.getByTestId("transactions-group-row").first()).toContainText("Communication Services")
+  await expect(page.getByText("Communication Services subtotal")).toBeVisible()
+
+  await groupSelect.selectOption("none")
+  await expect(page.getByTestId("transactions-group-row")).toHaveCount(0)
+})
+
 test("deleting a transaction asks for confirmation and removes it on confirm", async ({ page }) => {
   await login(page)
   await page.goto("/en/investments/transactions")
 
-  await expect(page.getByRole("heading", { name: "Transactions" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Transactions", exact: true })).toBeVisible()
   const firstDelete = page.getByRole("button", { name: "Delete transaction" }).first()
   await expect(firstDelete).toBeVisible()
 
