@@ -41,7 +41,7 @@ Legend: `[ ]` pending · `[x]` done
 - [x] `TransactionsView`, `PortfolioTransactionsTab`, `CashTransactionsView`: confirm dialog before delete (mirror existing delete-confirm pattern). — `1554756`
 
 ## Step 8 — Buy position modal fields
-- [ ] `AddPositionDialog.vue` stock step: Purchase Date, Cash portfolio select, Fees $/% toggle, Total. Wire `walletId`, `feesType`, `executedAt` through `createPortfolioPosition` + mock POST `/positions`.
+- [x] `AddPositionDialog.vue` stock step: Purchase Date, Cash portfolio select, Fees $/% toggle, Total. Wire `walletId`, `feesType`, `executedAt` through `createPortfolioPosition` + mock POST `/positions`. — `c2e8976`
 
 ## Step 9 — Grouping filter on transactions
 - [ ] Mock: enrich transactions with `sector`/`country` via symbol join from positions.
