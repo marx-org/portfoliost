@@ -44,8 +44,8 @@ Legend: `[ ]` pending · `[x]` done
 - [x] `AddPositionDialog.vue` stock step: Purchase Date, Cash portfolio select, Fees $/% toggle, Total. Wire `walletId`, `feesType`, `executedAt` through `createPortfolioPosition` + mock POST `/positions`. — `c2e8976`
 
 ## Step 9 — Grouping filter on transactions
-- [ ] Mock: enrich transactions with `sector`/`country` via symbol join from positions.
-- [ ] `TransactionsView` (+ `PortfolioTransactionsTab`): "Group by" — None / Kind of investment / Sector / Country (reuse holdings grouping pattern).
+- [x] Mock: enrich transactions with `sector`/`country` via symbol join from positions.
+- [x] `TransactionsView` (+ `PortfolioTransactionsTab`): "Group by" — None / Kind of investment / Sector / Country (reuse holdings grouping pattern). — `4803970`
 
 ## Step 10 — Wallet transactions column order fix
 - [ ] `CashTransactionsView.vue`: header order → Date, Wallet, Type, Description, Amount (matches body).
