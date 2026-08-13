@@ -48,4 +48,4 @@ Legend: `[ ]` pending · `[x]` done
 - [x] `TransactionsView` (+ `PortfolioTransactionsTab`): "Group by" — None / Kind of investment / Sector / Country (reuse holdings grouping pattern). — `4803970`
 
 ## Step 10 — Wallet transactions column order fix
-- [ ] `CashTransactionsView.vue`: header order → Date, Wallet, Type, Description, Amount (matches body).
+- [x] `CashTransactionsView.vue`: header order → Date, Wallet, Type, Description, Amount (matches body). (97be3dd)
