@@ -5,6 +5,7 @@ import { formatCurrency, formatDateTime } from "@/utils/format"
 import type { RecentCashTransaction } from "@/api/wallets"
 import InvestmentsTabs from "@/modules/portfolios/InvestmentsTabs.vue"
 import TransactionsSubTabs from "@/modules/portfolios/TransactionsSubTabs.vue"
+import ConfirmDeleteModal from "@/modules/portfolios/ConfirmDeleteModal.vue"
 
 type Tx = RecentCashTransaction
 
@@ -32,6 +33,10 @@ const editing = ref<Tx | null>(null)
 const editForm = ref({ type: "DEPOSIT", amount: 0, description: "", date: "" })
 const editBusy = ref(false)
 const editError = ref<string | null>(null)
+
+const deleteTarget = ref<Tx | null>(null)
+const deleteBusy = ref(false)
+const deleteError = ref<string | null>(null)
 
 async function load(targetPage = page.value) {
   loading.value = true
@@ -127,13 +132,25 @@ async function submitEdit() {
   }
 }
 
-async function removeTransaction(tx: Tx) {
+function openDelete(tx: Tx) {
+  deleteTarget.value = tx
+  deleteError.value = null
+}
+
+async function submitDelete() {
+  if (!deleteTarget.value) return
+  deleteBusy.value = true
+  deleteError.value = null
+  const target = deleteTarget.value
   try {
-    await deleteWalletTransaction(tx.id)
+    await deleteWalletTransaction(target.id)
+    deleteTarget.value = null
     notice.value = "Transaction deleted"
     await load()
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Failed to delete transaction"
+    deleteError.value = err instanceof Error ? err.message : "Failed to delete transaction"
+  } finally {
+    deleteBusy.value = false
   }
 }
 </script>
@@ -195,7 +212,7 @@ async function removeTransaction(tx: Tx) {
                     type="button"
                     class="btn-ghost px-2 py-1 text-xs text-red-600 hover:bg-red-50"
                     aria-label="Delete transaction"
-                    @click="removeTransaction(tx)"
+                    @click="openDelete(tx)"
                   >
                     Delete
                   </button>
@@ -303,5 +320,13 @@ async function removeTransaction(tx: Tx) {
         </form>
       </div>
     </div>
+    <ConfirmDeleteModal
+      :open="!!deleteTarget"
+      message="Are you sure you want to delete this transaction?"
+      :busy="deleteBusy"
+      :error="deleteError"
+      @close="deleteTarget = null"
+      @confirm="submitDelete"
+    />
   </div>
 </template>

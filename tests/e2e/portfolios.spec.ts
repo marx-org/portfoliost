@@ -273,3 +273,27 @@ test("holdings table groups by type, sector, and country", async ({ page }) => {
   await expect(page.getByTestId("holdings-group-row")).toHaveCount(0)
   await expect(page.getByText(/Total/).first()).toBeVisible()
 })
+
+test("deleting a transaction asks for confirmation and removes it on confirm", async ({ page }) => {
+  await login(page)
+  await page.goto("/en/investments/transactions")
+
+  await expect(page.getByRole("heading", { name: "Transactions" })).toBeVisible()
+  const firstDelete = page.getByRole("button", { name: "Delete transaction" }).first()
+  await expect(firstDelete).toBeVisible()
+
+  await firstDelete.click()
+  const dialog = page.getByRole("dialog", { name: "Delete transaction" })
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByRole("heading", { name: "Delete Transaction" })).toBeVisible()
+  await expect(dialog.getByText("Are you sure you want to delete this transaction? This action cannot be undone.")).toBeVisible()
+
+  await dialog.getByRole("button", { name: "Cancel" }).click()
+  await expect(dialog).toBeHidden()
+  await expect(page.getByRole("button", { name: "Delete transaction" }).first()).toBeVisible()
+
+  await page.getByRole("button", { name: "Delete transaction" }).first().click()
+  await dialog.getByRole("button", { name: "Delete", exact: true }).click()
+  await expect(page.getByText("Transaction deleted")).toBeVisible()
+  await expect(dialog).toBeHidden()
+})

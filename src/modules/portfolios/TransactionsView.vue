@@ -7,6 +7,7 @@ import type { PortfoliosTransactions } from "@/api/types"
 import InvestmentsTabs from "@/modules/portfolios/InvestmentsTabs.vue"
 import TransactionsSubTabs from "@/modules/portfolios/TransactionsSubTabs.vue"
 import EditTransactionModal from "@/modules/portfolios/EditTransactionModal.vue"
+import ConfirmDeleteModal from "@/modules/portfolios/ConfirmDeleteModal.vue"
 
 type Tx = PortfoliosTransactions["items"][number]
 
@@ -35,6 +36,10 @@ const sortableColumns: { key: string; label: string }[] = [
 ]
 
 const editing = ref<Tx | null>(null)
+
+const deleteTarget = ref<Tx | null>(null)
+const deleteBusy = ref(false)
+const deleteError = ref<string | null>(null)
 
 async function load(targetPage = page.value) {
   loading.value = true
@@ -113,13 +118,25 @@ function onEditSaved() {
   load()
 }
 
-async function removeTransaction(tx: Tx) {
+function openDelete(tx: Tx) {
+  deleteTarget.value = tx
+  deleteError.value = null
+}
+
+async function submitDelete() {
+  if (!deleteTarget.value) return
+  deleteBusy.value = true
+  deleteError.value = null
+  const target = deleteTarget.value
   try {
-    await deletePortfolioTransaction(tx.portfolioId, tx.id)
+    await deletePortfolioTransaction(target.portfolioId, target.id)
+    deleteTarget.value = null
     notice.value = "Transaction deleted"
     await load()
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Failed to delete transaction"
+    deleteError.value = err instanceof Error ? err.message : "Failed to delete transaction"
+  } finally {
+    deleteBusy.value = false
   }
 }
 </script>
@@ -202,7 +219,7 @@ async function removeTransaction(tx: Tx) {
                     type="button"
                     class="btn-ghost px-2 py-1 text-xs text-red-600 hover:bg-red-50"
                     aria-label="Delete transaction"
-                    @click="removeTransaction(tx)"
+                    @click="openDelete(tx)"
                   >
                     Delete
                   </button>
@@ -280,5 +297,14 @@ async function removeTransaction(tx: Tx) {
     </div>
 
     <EditTransactionModal :open="!!editing" :transaction="editing" @close="editing = null" @saved="onEditSaved" />
+
+    <ConfirmDeleteModal
+      :open="!!deleteTarget"
+      message="Are you sure you want to delete this transaction? This action cannot be undone."
+      :busy="deleteBusy"
+      :error="deleteError"
+      @close="deleteTarget = null"
+      @confirm="submitDelete"
+    />
   </div>
 </template>
