@@ -13,7 +13,7 @@ Guidelines for working in this repo (example-service.ai parity build).
   - `npm run test:mock` (mock API tests)
   - `npm run test:e2e` (Playwright, against docker compose)
 - **Use docker compose.** `docker compose up -d --build` runs the app (`:8080`) and the mock backend (`:4010`). E2E tests run against the dockerized stack, so rebuild the `portfoliost` container after frontend changes.
-- **Keep the API similar to example-service.** Endpoint paths, request/response shapes, and error formats should mirror the real example-service API (see `EXAMPLE_SERVICE_API.md`, `example-service-openapi.yaml`). Mock endpoints live in `mocks/` with seeded data in `mocks/shared/data/raw/`; regenerate seeds with `npm run mock:seed` after changing raw data.
+- **Keep the API similar to example-service.** Endpoint paths, request/response shapes, and error formats should mirror the real example-service API (see `docs/api/example-service-real-api.yaml`, `docs/api/EXAMPLE_SERVICE_API.md`). Mock endpoints live in `mocks/` with seeded data in `mocks/shared/data/raw/`; regenerate seeds with `npm run mock:seed` after changing raw data.
 - **Replace premium features with real content.** Where example-service gates a feature behind a premium plan, ship a working non-gated version with reasonable guessed content instead of a paywall (e.g. AI portfolio insights, statistics).
 - **Mock where the real API is unavailable.** The `mocks/gateway` serves all `/api` routes; frontend code talks to the same endpoints example-service would. Keep mock responses faithful to the real API contracts.
 
@@ -33,4 +33,4 @@ Do not build or wire these sections from example-service:
 
 - Vue 3 `<script setup lang="ts">` SFCs; Pinia stores; `vue-router`; Tailwind utility classes (`card`, `btn-primary`, `btn-secondary`, `btn-ghost`, `btn-danger`, `input`, `label`).
 - API client functions live in `src/api/<domain>.ts` with explicit return types.
-- Track long-running work in `plan.md`; mark steps `[x]` only after they are verified with the full test suite and committed.
+- Track long-running work in `docs/plan.md`; mark steps `[x]` only after they are verified with the full test suite and committed.

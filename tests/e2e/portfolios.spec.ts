@@ -299,9 +299,11 @@ test("holdings table groups by type, sector, and country", async ({ page }) => {
   await expect(page.getByText(/Stock subtotal/)).toHaveCount(1)
 
   await groupSelect.selectOption("sector")
-  await expect(page.getByTestId("holdings-group-row")).toHaveCount(3)
-  await expect(page.getByTestId("holdings-group-row").first()).toContainText("Communication Services")
-  await expect(page.getByText(/subtotal/)).toHaveCount(3)
+  const sectorGroups = page.getByTestId("holdings-group-row")
+  await expect(sectorGroups.filter({ hasText: "Communication Services" })).toHaveCount(1)
+  await expect(sectorGroups.filter({ hasText: "Consumer Discretionary" })).toHaveCount(1)
+  await expect(sectorGroups.filter({ hasText: "Technology" })).toHaveCount(1)
+  await expect(page.getByText(/subtotal/)).toHaveCount(await sectorGroups.count())
 
   await groupSelect.selectOption("country")
   await expect(page.getByTestId("holdings-group-row")).toHaveCount(1)

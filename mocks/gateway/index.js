@@ -25,7 +25,7 @@ app.get("/health", (ctx) => {
 app.get("/", (ctx) => {
   ctx.res.json({
     name: "Example service API mock",
-    contract: "example-service-real-api.yaml",
+    contract: "docs/api/example-service-real-api.yaml",
     auth: { email: authConfig().email, staticToken: authConfig().staticToken },
     hint: "POST /api/auth/login { email, password } then use the returned access_token",
   })

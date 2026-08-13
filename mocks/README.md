@@ -4,7 +4,7 @@ Local mock of the Example service API, faithful to the live service at
 `https://app.example-service.ai`. All responses were captured from a real authenticated
 account on 2026-08-11 and are replayed from `shared/data/`.
 
-- **Contract:** [`example-service-real-api.yaml`](../example-service-real-api.yaml) — 78 paths, 70 schemas
+- **Contract:** [`example-service-real-api.yaml`](../docs/api/example-service-real-api.yaml) — 78 paths, 70 schemas
 - **Runtime:** zero-dependency Node ≥ 22 (no `npm install` needed)
 - **Port:** `4010` (override with `PORT`)
 
