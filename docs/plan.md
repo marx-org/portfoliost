@@ -49,3 +49,6 @@ Legend: `[ ]` pending · `[x]` done
 
 ## Step 10 — Wallet transactions column order fix
 - [x] `CashTransactionsView.vue`: header order → Date, Wallet, Type, Description, Amount (matches body). (97be3dd)
+
+## Step 11 — Wallet detail recent transactions actions
+- [x] `WalletDetailView.vue`: Recent Transactions rows gain Edit + Delete (with confirmation) actions; edit modal (Type/Amount/Date/Description) + ConfirmDeleteModal mirror example-service. Mock `/wallets/:id/transactions` now reflects recent PATCH/DELETE overrides. — `397f1c7`
