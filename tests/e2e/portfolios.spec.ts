@@ -104,6 +104,32 @@ test("wallet transactions sub-tab lists cash transactions", async ({ page }) => 
   await expect(page.getByRole("button", { name: "Edit transaction" }).first()).toBeVisible()
 })
 
+test("editing an investing transaction opens example-service-style modal and saves", async ({ page }) => {
+  await login(page)
+  await page.goto("/en/investments/transactions")
+
+  await expect(page.getByRole("heading", { name: "Transactions" })).toBeVisible()
+  await expect(page.locator("tbody tr").first()).toBeVisible()
+
+  await page.getByRole("button", { name: "Edit transaction" }).first().click()
+  const dialog = page.getByRole("dialog", { name: "Edit transaction" })
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByRole("heading", { name: /Edit .* Transaction/ })).toBeVisible()
+  await expect(dialog.getByText("Purchase Date")).toBeVisible()
+  await expect(dialog.getByText("Cash portfolio")).toBeVisible()
+  await expect(dialog.getByText("Transaction Fees")).toBeVisible()
+  await expect(dialog.getByText("Total Cost")).toBeVisible()
+  await expect(dialog.getByText("Historical Price", { exact: false })).toBeVisible()
+
+  await dialog.getByLabel("Quantity").fill("5")
+  await dialog.getByLabel("Price per share ($)").fill("100")
+  await expect(dialog.getByText("$500.00")).toBeVisible()
+  await dialog.getByRole("button", { name: "Save" }).click()
+
+  await expect(page.getByText("Transaction updated")).toBeVisible()
+  await expect(dialog).toBeHidden()
+})
+
 test("creating a new portfolio adds it to the list", async ({ page }) => {
   const name = `E2E Test ${Date.now()}`
   await login(page)

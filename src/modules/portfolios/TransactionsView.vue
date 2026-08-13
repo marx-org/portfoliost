@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue"
-import { getAllTransactions, updatePortfolioTransaction, deletePortfolioTransaction } from "@/api/portfolios"
+import { getAllTransactions, deletePortfolioTransaction } from "@/api/portfolios"
 import { formatCurrency, formatDateTime, formatNumber } from "@/utils/format"
 import { researchSymbol } from "@/utils/research"
 import type { PortfoliosTransactions } from "@/api/types"
 import InvestmentsTabs from "@/modules/portfolios/InvestmentsTabs.vue"
 import TransactionsSubTabs from "@/modules/portfolios/TransactionsSubTabs.vue"
+import EditTransactionModal from "@/modules/portfolios/EditTransactionModal.vue"
 
 type Tx = PortfoliosTransactions["items"][number]
 
@@ -34,9 +35,6 @@ const sortableColumns: { key: string; label: string }[] = [
 ]
 
 const editing = ref<Tx | null>(null)
-const editForm = ref({ type: "BUY", symbol: "", quantity: 0, price: 0, fees: 0 })
-const editBusy = ref(false)
-const editError = ref<string | null>(null)
 
 async function load(targetPage = page.value) {
   loading.value = true
@@ -107,35 +105,12 @@ function amountOf(tx: Tx): number {
 
 function openEdit(tx: Tx) {
   editing.value = tx
-  editForm.value = {
-    type: tx.type,
-    symbol: tx.instrumentSymbol,
-    quantity: tx.quantity,
-    price: tx.price,
-    fees: tx.fees ?? 0,
-  }
-  editError.value = null
 }
 
-async function submitEdit() {
-  if (!editing.value) return
-  editBusy.value = true
-  editError.value = null
-  try {
-    await updatePortfolioTransaction(editing.value.portfolioId, editing.value.id, {
-      type: editForm.value.type,
-      quantity: editForm.value.quantity,
-      price: editForm.value.price,
-      fees: editForm.value.fees,
-    })
-    editing.value = null
-    notice.value = "Transaction updated"
-    await load()
-  } catch (err) {
-    editError.value = err instanceof Error ? err.message : "Failed to update transaction"
-  } finally {
-    editBusy.value = false
-  }
+function onEditSaved() {
+  editing.value = null
+  notice.value = "Transaction updated"
+  load()
 }
 
 async function removeTransaction(tx: Tx) {
@@ -304,36 +279,6 @@ async function removeTransaction(tx: Tx) {
       </div>
     </div>
 
-    <div
-      v-if="editing"
-      class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
-      @click.self="editing = null"
-    >
-      <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Edit transaction">
-        <h3 class="mb-4 text-base font-semibold">Edit {{ typeLabel(editing.type) }} Transaction</h3>
-        <form @submit.prevent="submitEdit">
-          <label for="tx-type" class="mb-1 block text-sm text-slate-600">Type</label>
-          <select id="tx-type" v-model="editForm.type" class="input mb-4">
-            <option value="BUY">Buy</option>
-            <option value="SELL">Sell</option>
-            <option value="DIVIDEND">Dividend</option>
-            <option value="TRANSFER">Transfer</option>
-          </select>
-          <label for="tx-quantity" class="mb-1 block text-sm text-slate-600">Quantity</label>
-          <input id="tx-quantity" v-model.number="editForm.quantity" type="number" min="0" step="any" required class="input mb-4" />
-          <label for="tx-price" class="mb-1 block text-sm text-slate-600">Price per share ($)</label>
-          <input id="tx-price" v-model.number="editForm.price" type="number" min="0" step="0.01" required class="input mb-4" />
-          <label for="tx-fees" class="mb-1 block text-sm text-slate-600">Transaction Fees</label>
-          <input id="tx-fees" v-model.number="editForm.fees" type="number" min="0" step="0.01" class="input mb-4" />
-          <p v-if="editError" class="mb-3 text-sm text-red-600">{{ editError }}</p>
-          <div class="flex justify-end gap-2">
-            <button type="button" class="btn-ghost" @click="editing = null">Cancel</button>
-            <button type="submit" class="btn-primary" :disabled="editBusy">
-              {{ editBusy ? "Saving..." : "Save" }}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <EditTransactionModal :open="!!editing" :transaction="editing" @close="editing = null" @saved="onEditSaved" />
   </div>
 </template>

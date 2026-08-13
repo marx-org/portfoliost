@@ -87,10 +87,14 @@ export async function createPortfolioTransaction(
   return http.post<PortfolioTransactionsPage["items"][number]>(`/api/portfolios/${id}/transactions`, input)
 }
 
+export interface UpdatePortfolioTransactionInput extends Partial<PortfolioTransactionsPage["items"][number]> {
+  feesType?: "fixed" | "pct"
+}
+
 export async function updatePortfolioTransaction(
   id: string,
   txId: string,
-  input: Partial<PortfolioTransactionsPage["items"][number]>,
+  input: UpdatePortfolioTransactionInput,
 ): Promise<PortfolioTransactionsPage["items"][number]> {
   return http.patch<PortfolioTransactionsPage["items"][number]>(`/api/portfolios/${id}/transactions/${txId}`, input)
 }
