@@ -101,6 +101,9 @@ test("wallet transactions sub-tab lists cash transactions", async ({ page }) => 
   await expect(page.getByTestId("table-th-walletName")).toBeVisible()
   await expect(page.getByTestId("table-th-amount")).toBeVisible()
   await expect(page.getByTestId("table-th-date")).toContainText("↓")
+  await expect(page.getByRole("columnheader", { name: "Description" })).toBeVisible()
+  await expect(page.locator("thead th").nth(3)).toHaveText("Description")
+  await expect(page.locator("thead th").nth(4)).toContainText("Amount")
   await expect(page.getByRole("button", { name: "Edit transaction" }).first()).toBeVisible()
 })
 

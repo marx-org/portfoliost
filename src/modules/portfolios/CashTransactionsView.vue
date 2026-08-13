@@ -22,13 +22,6 @@ const pageSizes = [5, 10, 20, 50]
 const sortBy = ref("date")
 const sortOrder = ref<"asc" | "desc">("desc")
 
-const sortableColumns: { key: string; label: string }[] = [
-  { key: "date", label: "Date" },
-  { key: "walletName", label: "Wallet" },
-  { key: "type", label: "Type" },
-  { key: "amount", label: "Amount" },
-]
-
 const editing = ref<Tx | null>(null)
 const editForm = ref({ type: "DEPOSIT", amount: 0, description: "", date: "" })
 const editBusy = ref(false)
@@ -174,18 +167,31 @@ async function submitDelete() {
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
-              <th
-                v-for="col in sortableColumns"
-                :key="col.key"
-                :data-testid="`table-th-${col.key}`"
-                class="px-5 py-2.5 font-medium"
-              >
-                <button type="button" class="inline-flex items-center gap-1 hover:text-slate-900" @click="toggleSort(col.key)">
-                  {{ col.label }}
-                  <span v-if="sortBy === col.key">{{ sortOrder === "asc" ? "↑" : "↓" }}</span>
+              <th data-testid="table-th-date" class="px-5 py-2.5 font-medium">
+                <button type="button" class="inline-flex items-center gap-1 hover:text-slate-900" @click="toggleSort('date')">
+                  Date
+                  <span v-if="sortBy === 'date'">{{ sortOrder === "asc" ? "↑" : "↓" }}</span>
+                </button>
+              </th>
+              <th data-testid="table-th-walletName" class="px-5 py-2.5 font-medium">
+                <button type="button" class="inline-flex items-center gap-1 hover:text-slate-900" @click="toggleSort('walletName')">
+                  Wallet
+                  <span v-if="sortBy === 'walletName'">{{ sortOrder === "asc" ? "↑" : "↓" }}</span>
+                </button>
+              </th>
+              <th data-testid="table-th-type" class="px-5 py-2.5 font-medium">
+                <button type="button" class="inline-flex items-center gap-1 hover:text-slate-900" @click="toggleSort('type')">
+                  Type
+                  <span v-if="sortBy === 'type'">{{ sortOrder === "asc" ? "↑" : "↓" }}</span>
                 </button>
               </th>
               <th class="px-5 py-2.5 font-medium">Description</th>
+              <th data-testid="table-th-amount" class="px-5 py-2.5 font-medium">
+                <button type="button" class="inline-flex items-center gap-1 hover:text-slate-900" @click="toggleSort('amount')">
+                  Amount
+                  <span v-if="sortBy === 'amount'">{{ sortOrder === "asc" ? "↑" : "↓" }}</span>
+                </button>
+              </th>
               <th class="px-5 py-2.5"><span class="sr-only">Actions</span></th>
             </tr>
           </thead>
