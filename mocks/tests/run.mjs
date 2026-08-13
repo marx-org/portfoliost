@@ -241,6 +241,21 @@ async function main() {
   check("portfolios empty portfolio analytics", emptyAnalytics.status === 200 && emptyAnalytics.json.performance, `got ${emptyAnalytics.status}`)
   const addPos = await request(`/portfolios/${cid}/positions`, { method: "POST", token, body: { symbol: "MSFT", quantity: 3, price: 500 } })
   check("portfolios.positions.create → 201", addPos.status === 201 && addPos.json.symbol === "MSFT", `got ${addPos.status}`)
+  const addPosFull = await request(`/portfolios/${cid}/positions`, {
+    method: "POST",
+    token,
+    body: { symbol: "INTC", quantity: 10, price: 120, fees: 12, feesType: "pct", walletId: "wallet-1", executedAt: "2026-08-01T00:00:00.000Z" },
+  })
+  check(
+    "portfolios.positions.create persists walletId/fees/feesType/executedAt",
+    addPosFull.status === 201 &&
+      addPosFull.json.walletId === "wallet-1" &&
+      addPosFull.json.fees === 12 &&
+      addPosFull.json.feesType === "pct" &&
+      addPosFull.json.openedAt === "2026-08-01T00:00:00.000Z" &&
+      addPosFull.json.costBasis === 1212,
+    `got ${addPosFull.status}`,
+  )
   const delPos = await request(`/portfolios/${cid}/positions/${addPos.json.id}`, { method: "DELETE", token })
   check("portfolios.positions.delete", delPos.status === 200 && delPos.json.isOpen === false, `got ${delPos.status}`)
   const upd = await request(`/portfolios/${cid}`, { method: "PATCH", token, body: { name: "TEST_TMP_RENAMED" } })

@@ -228,6 +228,41 @@ test("add position from the header opens a chooser with instrument/option/cfd an
   await expect(page.locator("tbody tr").filter({ hasText: "AMD" })).toHaveCount(1)
 })
 
+test("buy position stock step has purchase date, cash portfolio, fee % toggle and total", async ({ page }) => {
+  await login(page)
+  await page.getByRole("link", { name: /Top10/ }).click()
+  await expect(page).toHaveURL(/\/en\/portfolios\/.*\/holdings/)
+
+  await page.getByRole("button", { name: "Add Position", exact: true }).click()
+  const chooser = page.getByRole("dialog", { name: "Add position" })
+  await chooser.getByTestId("add-position-instrument").click()
+  await page.getByTestId("instrument-search").fill("KO")
+  await page.getByRole("dialog", { name: "Search for Instruments" }).getByRole("button", { name: /KO/ }).first().click()
+
+  const dialog = page.getByRole("dialog", { name: "Buy Position" })
+  await expect(dialog).toBeVisible()
+
+  const date = dialog.getByTestId("add-position-date")
+  await expect(date).toBeVisible()
+  await expect(date).toHaveValue(new Date().toISOString().slice(0, 10))
+
+  const wallet = dialog.getByTestId("add-position-wallet")
+  await expect(wallet).toBeVisible()
+  await expect(wallet.locator("option").first()).toContainText("Portfel USD 1")
+  await expect(wallet.locator("option").first()).toContainText("$")
+
+  await dialog.getByTestId("add-position-quantity").fill("10")
+  await dialog.getByTestId("add-position-price").fill("120")
+  await dialog.getByTestId("add-position-fees").fill("1")
+  await dialog.getByTestId("add-position-fees-toggle").click()
+  await expect(dialog.getByTestId("add-position-fees-toggle")).toHaveText("%")
+  await expect(dialog).toContainText("$1,212.00")
+
+  await dialog.getByRole("button", { name: /Buy for \$1,212.00/ }).click()
+  await expect(dialog).toHaveCount(0)
+  await expect(page.locator("tbody tr").filter({ hasText: "KO" })).toHaveCount(1)
+})
+
 test("display currency switcher updates portfolio values and persists", async ({ page }) => {
   await login(page)
   await page.getByRole("link", { name: /Top10/ }).click()

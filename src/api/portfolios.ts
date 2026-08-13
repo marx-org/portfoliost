@@ -59,6 +59,10 @@ export interface CreatePortfolioPositionInput {
   strikePrice?: number
   expirationDate?: string
   openedAt?: string
+  executedAt?: string
+  walletId?: string
+  fees?: number
+  feesType?: "fixed" | "pct"
 }
 
 export async function createPortfolioPosition(

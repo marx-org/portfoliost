@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue"
 import { useRouter } from "vue-router"
 import { createPortfolioPosition } from "@/api/portfolios"
 import { usePortfolioStore } from "@/stores/portfolios"
+import { useWalletsStore } from "@/stores/wallets"
 import { formatCurrency } from "@/utils/format"
 import InstrumentSearchModal from "@/modules/instruments/InstrumentSearchModal.vue"
 
@@ -10,6 +11,7 @@ const props = defineProps<{ open: boolean; portfolioId: string }>()
 const emit = defineEmits<{ (e: "close"): void; (e: "added"): void }>()
 
 const store = usePortfolioStore()
+const walletsStore = useWalletsStore()
 const router = useRouter()
 
 type Step = "chooser" | "stock" | "option" | "cfd"
@@ -19,7 +21,16 @@ const showSearch = ref(false)
 const searchTitle = ref("Search for Instruments")
 let pendingStep: Step = "stock"
 
-const stockForm = ref({ symbol: "", name: "", quantity: "1", price: "", fees: "0" })
+const stockForm = ref({
+  symbol: "",
+  name: "",
+  quantity: "1",
+  price: "",
+  fees: "0",
+  feesType: "fixed" as "fixed" | "pct",
+  executedAt: new Date().toISOString().slice(0, 10),
+  walletId: "",
+})
 const busy = ref(false)
 const error = ref<string | null>(null)
 
@@ -46,6 +57,11 @@ watch(
       step.value = "chooser"
       showSearch.value = false
       error.value = null
+      if (!walletsStore.wallets.length) {
+        walletsStore.fetchAll().then(() => {
+          if (!stockForm.value.walletId) stockForm.value.walletId = walletsStore.wallets[0]?.id || ""
+        })
+      }
     }
   },
 )
@@ -84,7 +100,16 @@ function onSearchClose() {
 function onSearchAdd(symbol: string, name: string) {
   showSearch.value = false
   if (pendingStep === "stock") {
-    stockForm.value = { symbol, name, quantity: "1", price: "", fees: "0" }
+    stockForm.value = {
+      symbol,
+      name,
+      quantity: "1",
+      price: "",
+      fees: "0",
+      feesType: "fixed",
+      executedAt: new Date().toISOString().slice(0, 10),
+      walletId: walletsStore.wallets[0]?.id ?? "",
+    }
     step.value = "stock"
     error.value = null
   } else if (pendingStep === "option") {
@@ -107,11 +132,18 @@ function onSearchAdd(symbol: string, name: string) {
   pendingStep = "chooser"
 }
 
-const stockTotal = computed(() => {
+const stockFeeValue = computed(() => {
   const qty = Number(stockForm.value.quantity) || 0
   const price = Number(stockForm.value.price) || 0
   const fees = Number(stockForm.value.fees) || 0
-  return qty * price + fees
+  if (stockForm.value.feesType === "pct") return (qty * price * fees) / 100
+  return fees
+})
+
+const stockTotal = computed(() => {
+  const qty = Number(stockForm.value.quantity) || 0
+  const price = Number(stockForm.value.price) || 0
+  return qty * price + stockFeeValue.value
 })
 
 const optionTotal = computed(() => {
@@ -135,6 +167,10 @@ async function submitStock() {
   const symbol = stockForm.value.symbol.toUpperCase()
   const quantity = Number(stockForm.value.quantity)
   if (!symbol || !quantity) return
+  if (!stockForm.value.walletId) {
+    error.value = "Select a cash portfolio"
+    return
+  }
   busy.value = true
   error.value = null
   try {
@@ -143,7 +179,10 @@ async function submitStock() {
       quantity,
       price: stockForm.value.price ? Number(stockForm.value.price) : undefined,
       assetType: "STOCK",
-      openedAt: new Date().toISOString(),
+      fees: stockFeeValue.value || undefined,
+      feesType: stockForm.value.feesType,
+      walletId: stockForm.value.walletId || undefined,
+      executedAt: stockForm.value.executedAt ? new Date(stockForm.value.executedAt).toISOString() : undefined,
     })
     await store.fetchPositions(props.portfolioId)
     close()
@@ -275,6 +314,17 @@ function goResearch() {
           </div>
         </div>
         <form @submit.prevent="submitStock">
+          <label for="stock-date" class="mb-1 block text-sm text-slate-600">Purchase Date</label>
+          <input id="stock-date" v-model="stockForm.executedAt" type="date" required class="input mb-4" data-testid="add-position-date" />
+
+          <label for="stock-wallet" class="mb-1 block text-sm text-slate-600">Cash portfolio</label>
+          <select id="stock-wallet" v-model="stockForm.walletId" class="input mb-4" data-testid="add-position-wallet">
+            <option v-if="!walletsStore.wallets.length" value="" disabled>Loading wallets…</option>
+            <option v-for="w in walletsStore.wallets" :key="w.id" :value="w.id">
+              {{ w.name }} ({{ formatCurrency(w.balance, w.currency) }})
+            </option>
+          </select>
+
           <div class="mb-4 grid grid-cols-2 gap-4">
             <div>
               <label for="stock-qty" class="mb-1 block text-sm text-slate-600">Quantity</label>
@@ -286,7 +336,29 @@ function goResearch() {
             </div>
           </div>
           <label for="stock-fees" class="mb-1 block text-sm text-slate-600">Transaction Fees</label>
-          <input id="stock-fees" v-model="stockForm.fees" type="number" min="0" step="any" class="input mb-4" data-testid="add-position-fees" />
+          <div class="mb-4 flex gap-2">
+            <div class="flex flex-1 items-center rounded-lg border border-slate-300 focus-within:border-blue-500">
+              <span class="pl-3 text-sm text-slate-500">{{ stockForm.feesType === "fixed" ? "$" : "%" }}</span>
+              <input
+                id="stock-fees"
+                v-model="stockForm.fees"
+                type="number"
+                min="0"
+                step="0.01"
+                class="input !rounded-l-none !border-0 !ring-0 focus:ring-0"
+                data-testid="add-position-fees"
+              />
+            </div>
+            <button
+              type="button"
+              class="btn-secondary shrink-0 text-sm"
+              :class="stockForm.feesType === 'pct' ? 'bg-slate-200 text-slate-900' : ''"
+              data-testid="add-position-fees-toggle"
+              @click="stockForm.feesType = stockForm.feesType === 'fixed' ? 'pct' : 'fixed'"
+            >
+              {{ stockForm.feesType === "fixed" ? "$" : "%" }}
+            </button>
+          </div>
           <div class="mb-4 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
             <span class="text-sm text-slate-600">Total Cost</span>
             <span class="text-sm font-semibold tabular-nums text-slate-900">{{ formatCurrency(stockTotal, "USD") }}</span>

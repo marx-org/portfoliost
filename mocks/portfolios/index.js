@@ -322,11 +322,10 @@ export function register(app) {
   app.post("/api/portfolios/:id/positions", (ctx) => {
     if (!requireAuth(ctx)) return
     const body = ctx.body || {}
-    const { symbol = "AAPL", quantity = 1, price, averageCostBasis = price } = body
+    const { symbol = "AAPL", quantity = 1, price, averageCostBasis = price, fees = 0 } = body
     const research = loadResearch(symbol)
-    const template = withDataFile(ctx.params.id, "portfolio_positions.json", "empty_portfolio_positions.json")
     const assetType = String(body.assetType || "STOCK").toUpperCase()
-    const base = (Array.isArray(template) && template[0]) || {
+    const base = {
       companyName: research ? research.overview.name : symbol,
       assetType,
       instrumentCurrency: "USD",
@@ -336,6 +335,8 @@ export function register(app) {
       country: research ? research.overview.country : "US",
     }
     const currentPrice = price || (research ? research.basics.price : 100)
+    const feeAmount = Number(fees) || 0
+    const costBasis = round2(quantity * (averageCostBasis ?? currentPrice) + feeAmount)
     const position = {
       ...base,
       assetType,
@@ -349,12 +350,15 @@ export function register(app) {
       strikePrice: body.strikePrice ?? null,
       expirationDate: body.expirationDate ?? null,
       averageCostBasis: averageCostBasis ?? currentPrice,
-      avgCostBasis: averageCostBasis ?? currentPrice,
+      avgCostBasis: round2(costBasis / quantity),
       instrumentAvgCostBasis: averageCostBasis ?? currentPrice,
-      totalCostBasis: round2(quantity * (averageCostBasis ?? currentPrice)),
-      costBasis: round2(quantity * (averageCostBasis ?? currentPrice)),
+      totalCostBasis: costBasis,
+      costBasis,
+      walletId: body.walletId ?? null,
+      fees: feeAmount,
+      feesType: body.feesType ?? "fixed",
       isOpen: true,
-      openedAt: body.openedAt ?? nowIso(),
+      openedAt: body.executedAt ?? body.openedAt ?? nowIso(),
       currentPrice,
       marketValue: round2(quantity * currentPrice),
       unrealizedGainLoss: round2(quantity * (currentPrice - (averageCostBasis ?? currentPrice))),
