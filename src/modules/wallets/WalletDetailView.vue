@@ -2,9 +2,10 @@
 import { computed, onMounted, ref } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { useWalletsStore } from "@/stores/wallets"
-import { getWalletBalanceHistory } from "@/api/wallets"
+import { getWalletBalanceHistory, updateWalletTransaction, deleteWalletTransaction } from "@/api/wallets"
 import { formatCurrency, formatDate, formatSignedCurrency } from "@/utils/format"
 import WalletCashModals from "@/modules/portfolios/WalletCashModals.vue"
+import ConfirmDeleteModal from "@/modules/portfolios/ConfirmDeleteModal.vue"
 import type { CashTransaction } from "@/api/wallets"
 import type { Wallets } from "@/api/types"
 
@@ -29,6 +30,17 @@ const renameError = ref<string | null>(null)
 const showDeleteConfirm = ref(false)
 const deleteBusy = ref(false)
 const deleteError = ref<string | null>(null)
+
+const notice = ref<string | null>(null)
+
+const editing = ref<CashTransaction | null>(null)
+const editForm = ref({ type: "DEPOSIT" as string, amount: 0, description: "", date: "" })
+const editBusy = ref(false)
+const editError = ref<string | null>(null)
+
+const deleteTarget = ref<CashTransaction | null>(null)
+const deleteTxBusy = ref(false)
+const deleteTxError = ref<string | null>(null)
 
 const history = ref<Array<{ date: string; balance: number }>>([])
 const historyError = ref<string | null>(null)
@@ -121,6 +133,60 @@ async function submitDelete() {
   }
 }
 
+function openEdit(tx: CashTransaction) {
+  editing.value = tx
+  editForm.value = {
+    type: tx.type,
+    amount: Math.abs(tx.amount),
+    description: tx.description ?? "",
+    date: tx.createdAt.slice(0, 10),
+  }
+  editError.value = null
+}
+
+async function submitEdit() {
+  if (!editing.value) return
+  editBusy.value = true
+  editError.value = null
+  try {
+    await updateWalletTransaction(editing.value.id, {
+      type: editForm.value.type,
+      amount: editForm.value.amount,
+      description: editForm.value.description,
+      date: editForm.value.date ? new Date(editForm.value.date).toISOString() : editing.value.createdAt,
+    })
+    editing.value = null
+    notice.value = "Transaction updated"
+    await Promise.all([store.fetchTransactions(route.params.id as string), store.fetchAll()])
+  } catch (err) {
+    editError.value = err instanceof Error ? err.message : "Failed to update transaction"
+  } finally {
+    editBusy.value = false
+  }
+}
+
+function openDeleteTx(tx: CashTransaction) {
+  deleteTarget.value = tx
+  deleteTxError.value = null
+}
+
+async function submitDeleteTx() {
+  if (!deleteTarget.value) return
+  deleteTxBusy.value = true
+  deleteTxError.value = null
+  const target = deleteTarget.value
+  try {
+    await deleteWalletTransaction(target.id)
+    deleteTarget.value = null
+    notice.value = "Transaction deleted"
+    await Promise.all([store.fetchTransactions(route.params.id as string), store.fetchAll()])
+  } catch (err) {
+    deleteTxError.value = err instanceof Error ? err.message : "Failed to delete transaction"
+  } finally {
+    deleteTxBusy.value = false
+  }
+}
+
 const filteredHistory = computed(() => {
   const days = RANGE_DAYS[historyRange.value]
   if (!days) return history.value
@@ -150,7 +216,7 @@ const historyChart = computed(() => ({
   fill: { type: "gradient" as const, gradient: { opacityFrom: 0.3, opacityTo: 0 } },
 }))
 
-const TYPE_LABELS: Record<string, string> = { DEPOSIT: "Deposit", WITHDRAWAL: "Withdrawal", TRANSFER: "Transfer" }
+const TYPE_LABELS: Record<string, string> = { DEPOSIT: "Deposit", WITHDRAWAL: "Withdrawal", TRANSFER: "Transfer", INVEST: "Investment" }
 
 function typeLabel(type: string): string {
   return TYPE_LABELS[type] ?? type
@@ -291,6 +357,7 @@ function exportHistory() {
           <h2 class="text-base font-semibold">Recent Transactions</h2>
           <router-link :to="{ name: 'transactions-cash' }" class="btn-ghost text-xs">View All</router-link>
         </div>
+        <p v-if="notice" class="mt-3 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">{{ notice }}</p>
         <div class="mt-4 overflow-x-auto">
           <table v-if="recentTransactions.length" class="w-full text-left text-sm">
             <thead>
@@ -300,6 +367,7 @@ function exportHistory() {
                 <th class="py-2 pr-4 font-medium">Description</th>
                 <th class="py-2 pr-4 text-right font-medium">Amount</th>
                 <th class="py-2 pr-4 text-right font-medium">Balance</th>
+                <th class="py-2"><span class="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
@@ -311,6 +379,26 @@ function exportHistory() {
                   {{ formatSignedCurrency(signedAmount(tx), tx.currency) }}
                 </td>
                 <td class="py-2.5 text-right tabular-nums text-slate-600">{{ formatCurrency(balance, tx.currency) }}</td>
+                <td class="py-2.5">
+                  <div class="flex justify-end gap-1">
+                    <button
+                      type="button"
+                      class="btn-ghost px-2 py-1 text-xs"
+                      aria-label="Edit transaction"
+                      @click="openEdit(tx)"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      class="btn-ghost px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                      aria-label="Delete transaction"
+                      @click="openDeleteTx(tx)"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -356,6 +444,47 @@ function exportHistory() {
           </div>
         </div>
       </div>
+
+      <div
+        v-if="editing"
+        class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
+        @click.self="editing = null"
+      >
+        <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Edit transaction">
+          <h3 class="mb-4 text-base font-semibold">Edit Transaction</h3>
+          <form @submit.prevent="submitEdit">
+            <label for="wallet-tx-type" class="mb-1 block text-sm text-slate-600">Transaction Type</label>
+            <select id="wallet-tx-type" v-model="editForm.type" class="input mb-4">
+              <option value="DEPOSIT">Deposit</option>
+              <option value="WITHDRAWAL">Withdrawal</option>
+              <option value="TRANSFER">Transfer</option>
+              <option value="INVEST">Investment</option>
+            </select>
+            <label for="wallet-tx-amount" class="mb-1 block text-sm text-slate-600">Amount</label>
+            <input id="wallet-tx-amount" v-model.number="editForm.amount" type="number" min="0" step="0.01" required class="input mb-4" />
+            <label for="wallet-tx-date" class="mb-1 block text-sm text-slate-600">Date</label>
+            <input id="wallet-tx-date" v-model="editForm.date" type="date" required class="input mb-4" />
+            <label for="wallet-tx-description" class="mb-1 block text-sm text-slate-600">Description</label>
+            <input id="wallet-tx-description" v-model="editForm.description" type="text" class="input mb-4" placeholder="Transaction description" />
+            <p v-if="editError" class="mb-3 text-sm text-red-600">{{ editError }}</p>
+            <div class="flex justify-end gap-2">
+              <button type="button" class="btn-ghost" @click="editing = null">Cancel</button>
+              <button type="submit" class="btn-primary" :disabled="editBusy">
+                {{ editBusy ? "Saving..." : "Update Transaction" }}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <ConfirmDeleteModal
+        :open="!!deleteTarget"
+        message="Are you sure you want to delete this transaction?"
+        :busy="deleteTxBusy"
+        :error="deleteTxError"
+        @close="deleteTarget = null"
+        @confirm="submitDeleteTx"
+      />
     </template>
   </div>
 </template>

@@ -323,6 +323,18 @@ async function main() {
   check("wallets.recent DELETE", delTx.status === 204, `got ${delTx.status}`)
   const afterDelete = await request("/wallets/recent-transactions?page=1&limit=11&sortBy=date&sortOrder=desc", { token })
   check("wallets.recent DELETE tombstones", afterDelete.status === 200 && afterDelete.json.meta.total === 17 && !afterDelete.json.data.some((t) => t.id === investTx.id), `total ${afterDelete.json.meta.total}`)
+  const seedTx = (await request(`/wallets/${walletId}/transactions`, { token })).json.items.find((t) => t.id.startsWith("seed-"))
+  const patchedSeed = await request(`/wallets/transactions/${seedTx.id}`, { method: "PATCH", token, body: { type: "WITHDRAWAL", amount: 50, description: "Edited" } })
+  check("wallets.detail PATCH returns signed recent shape", patchedSeed.status === 200 && patchedSeed.json.displayLabel === "Withdrawal", `got ${patchedSeed.status} ${patchedSeed.json.displayLabel}`)
+  const detailPatched = (await request(`/wallets/${walletId}/transactions`, { token })).json.items.find((t) => t.id === seedTx.id)
+  check(
+    "wallets.detail reflects recent PATCH (amount abs + type)",
+    detailPatched && detailPatched.type === "WITHDRAWAL" && Number(detailPatched.amount) === 50 && detailPatched.description === "Edited",
+    `found ${detailPatched && JSON.stringify({ type: detailPatched.type, amount: detailPatched.amount, description: detailPatched.description })}`,
+  )
+  await request(`/wallets/transactions/${seedTx.id}`, { method: "DELETE", token })
+  const detailDeleted = (await request(`/wallets/${walletId}/transactions`, { token })).json.items.some((t) => t.id === seedTx.id)
+  check("wallets.detail reflects recent DELETE", !detailDeleted, `deleted tx still present`)
 
   // ── Watchlists ──────────────────────────────────────────────
   const wl = await request("/watchlists", { token })

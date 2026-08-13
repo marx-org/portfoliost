@@ -350,10 +350,20 @@ export function register(app) {
     if (!requireAuth(ctx)) return
     seedCashTransactions()
     const list = cashTx.get(ctx.params.id) || []
-    if (!list.length) {
+    const items = list
+      .filter((tx) => !recentOverrides.has(tx.id) || recentOverrides.get(tx.id) !== null)
+      .map((tx) => {
+        if (!recentOverrides.has(tx.id)) return tx
+        const merged = { ...tx, ...recentOverrides.get(tx.id) }
+        const type = String(merged.type).toUpperCase()
+        merged.amount = Math.abs(Number(merged.amount) || 0)
+        merged.type = type
+        return merged
+      })
+    if (!items.length) {
       return ctx.res.json({ items: [], total: 0, page: 1, limit: 10, totalPages: 1, hasNext: false, hasPrevious: false })
     }
-    ctx.res.json(paginatePage(ctx.query.page, ctx.query.limit, list, list.length))
+    ctx.res.json(paginatePage(ctx.query.page, ctx.query.limit, items, items.length))
   })
 }
 
