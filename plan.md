@@ -35,7 +35,7 @@ Legend: `[ ]` pending · `[x]` done
 - [x] Verify: `npm run test:mock` + `build` + `test` + `test:e2e`. Commit. — `149117b`
 
 ## Step 6 — Edit portfolio transaction modal
-- [ ] `TransactionsView.vue` + `PortfolioTransactionsTab.vue`: stock header (logo, symbol (US) type, name, Historical Price), Purchase Date, Cash portfolio select, Quantity × Price per share, Fees $/% toggle, Total Cost. PATCH adds `executedAt`, `walletId`, `feesType`.
+- [x] `TransactionsView.vue` + `PortfolioTransactionsTab.vue`: stock header (logo, symbol (US) type, name, Historical Price), Purchase Date, Cash portfolio select, Quantity × Price per share, Fees $/% toggle, Total Cost. PATCH adds `executedAt`, `walletId`, `feesType`. — `f900704`
 
 ## Step 7 — Delete confirmation dialogs
 - [ ] `TransactionsView`, `PortfolioTransactionsTab`, `CashTransactionsView`: confirm dialog before delete (mirror existing delete-confirm pattern).
