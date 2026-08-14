@@ -41,3 +41,38 @@ test("shared portfolios: shows active share and public link works", async ({ pag
   await expect(popup.getByRole("heading", { name: "Top10" })).toBeVisible()
   await expect(popup.getByText("Holdings")).toBeVisible()
 })
+
+test("theme switcher: sidebar dropdown applies and persists dark mode", async ({ page }) => {
+  await login(page)
+
+  await expect(page.locator("html")).not.toHaveClass(/dark/)
+
+  const switcher = page.getByRole("button", { name: "Theme" })
+  await switcher.click()
+  const listbox = page.getByRole("listbox", { name: "Theme" })
+  await listbox.getByRole("option", { name: "Dark" }).click()
+  await expect(page.locator("html")).toHaveClass(/dark/)
+
+  await switcher.click()
+  await listbox.getByRole("option", { name: "Light" }).click()
+  await expect(page.locator("html")).not.toHaveClass(/dark/)
+
+  await switcher.click()
+  await listbox.getByRole("option", { name: "Dark" }).click()
+  await expect(page.locator("html")).toHaveClass(/dark/)
+
+  await page.reload()
+  await expect(page.locator("html")).toHaveClass(/dark/)
+})
+
+test("theme switcher: profile appearance buttons toggle theme", async ({ page }) => {
+  await login(page)
+  await page.goto("/en/settings/profile")
+
+  const group = page.getByRole("group", { name: "Theme" })
+  await group.getByRole("button", { name: "Dark" }).click()
+  await expect(page.locator("html")).toHaveClass(/dark/)
+
+  await group.getByRole("button", { name: "Light" }).click()
+  await expect(page.locator("html")).not.toHaveClass(/dark/)
+})

@@ -266,7 +266,7 @@ async function submitDelete() {
               :key="n"
               type="button"
               class="btn-ghost px-2 py-1 text-xs"
-              :class="n === page ? 'bg-slate-900 text-white' : ''"
+              :class="n === page ? 'bg-slate-900 text-white dark:bg-slate-700' : ''"
               :aria-current="n === page ? 'page' : undefined"
               :disabled="n === '…'"
               @click="goToPage(Number(n))"

@@ -16,8 +16,9 @@ function storedPreference(): ThemePreference {
 
 export const useThemeStore = defineStore("theme", () => {
   const preference = ref<ThemePreference>(storedPreference())
+  const systemDark = ref(systemPrefersDark())
 
-  const isDark = computed(() => (preference.value === "system" ? systemPrefersDark() : preference.value === "dark"))
+  const isDark = computed(() => (preference.value === "system" ? systemDark.value : preference.value === "dark"))
 
   let mediaQuery: MediaQueryList | null = null
   let mediaHandler: (() => void) | null = null
@@ -32,8 +33,9 @@ export const useThemeStore = defineStore("theme", () => {
     if (typeof window.matchMedia !== "function") return
     mediaQuery?.removeEventListener("change", mediaHandler!)
     mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
+    systemDark.value = mediaQuery.matches
     mediaHandler = () => {
-      if (preference.value === "system") apply()
+      systemDark.value = mediaQuery?.matches ?? false
     }
     mediaQuery.addEventListener("change", mediaHandler)
   }
@@ -46,8 +48,8 @@ export const useThemeStore = defineStore("theme", () => {
   function setPreference(next: ThemePreference): void {
     preference.value = next
     localStorage.setItem(STORAGE_KEY, next)
-    apply()
     watchSystem()
+    apply()
   }
 
   return { preference, isDark, init, setPreference }
