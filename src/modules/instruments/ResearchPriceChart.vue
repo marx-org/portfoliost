@@ -202,7 +202,7 @@ function downloadCsv(): void {
           :key="t"
           type="button"
           class="rounded px-2 py-1 text-xs font-medium"
-          :class="timeframe === t ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'"
+          :class="timeframe === t ? 'bg-blue-600 text-white' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'"
           @click="timeframe = t"
         >
           {{ t }}
@@ -211,13 +211,13 @@ function downloadCsv(): void {
     </div>
 
     <div class="mb-4 flex flex-wrap items-center gap-3 text-xs">
-      <div class="flex overflow-hidden rounded-md border border-slate-300">
+      <div class="flex overflow-hidden rounded-md border border-slate-300 dark:border-slate-600">
         <button
           v-for="m in modes"
           :key="m"
           type="button"
           class="px-3 py-1.5 font-medium"
-          :class="mode === m ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-100'"
+          :class="mode === m ? 'bg-slate-800 text-white' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'"
           @click="mode = m"
         >
           {{ m }}
@@ -227,40 +227,40 @@ function downloadCsv(): void {
       <div class="relative">
         <button
           type="button"
-          class="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          class="rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50"
           @click="showCompare = !showCompare"
         >
-          {{ compareLabel }} <span class="text-slate-400">&#9662;</span>
+          {{ compareLabel }} <span class="text-slate-400 dark:text-slate-500">&#9662;</span>
         </button>
-        <div v-if="showCompare" class="absolute left-0 z-20 mt-1 w-52 rounded-md border border-slate-200 bg-white p-1 shadow-lg">
+        <div v-if="showCompare" class="absolute left-0 z-20 mt-1 w-52 rounded-md border border-slate-200 dark:border-slate-700/60 bg-white dark:bg-slate-900 p-1 shadow-lg">
           <button
             v-for="o in compareOptions"
             :key="o.key"
             type="button"
-            class="flex w-full items-center justify-between px-3 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-50"
+            class="flex w-full items-center justify-between px-3 py-1.5 text-left text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50"
             @click="pickCompare(o.key)"
           >
             <span>{{ o.label }}</span>
-            <span v-if="compare === o.key" class="text-blue-600">&#10003;</span>
+            <span v-if="compare === o.key" class="text-blue-600 dark:text-blue-400">&#10003;</span>
           </button>
         </div>
       </div>
 
       <div v-if="summary" class="ml-auto flex items-center gap-4 text-sm">
-        <span class="text-slate-500">Total Chg</span>
-        <span class="font-semibold" :class="summary.change >= 0 ? 'text-green-600' : 'text-red-600'">
+        <span class="text-slate-500 dark:text-slate-400">Total Chg</span>
+        <span class="font-semibold" :class="summary.change >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
           {{
             mode === "Price"
               ? `$${signed(summary.change, 2)}`
               : `${signed(summary.changePct)}%`
           }}
         </span>
-        <span v-if="mode === 'Price'" class="text-xs text-slate-400">{{ signed(summary.changePct) }}%</span>
-        <span v-if="mode === 'Price'" class="text-slate-500">CAGR</span>
+        <span v-if="mode === 'Price'" class="text-xs text-slate-400 dark:text-slate-500">{{ signed(summary.changePct) }}%</span>
+        <span v-if="mode === 'Price'" class="text-slate-500 dark:text-slate-400">CAGR</span>
         <span
           v-if="mode === 'Price' && summary.cagr !== null"
           class="font-semibold tabular-nums"
-          :class="summary.cagr >= 0 ? 'text-green-600' : 'text-red-600'"
+          :class="summary.cagr >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
         >
           {{ signed(summary.cagr) }}%
         </span>
@@ -269,22 +269,22 @@ function downloadCsv(): void {
       <div class="ml-auto flex items-center gap-1">
         <button
           type="button"
-          class="rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+          class="rounded px-2 py-1 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
           :title="fullscreen ? 'Exit fullscreen' : 'Fullscreen'"
           @click="fullscreen = !fullscreen"
         >
           {{ fullscreen ? "Exit fullscreen" : "Fullscreen" }}
         </button>
-        <button type="button" class="rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100" title="Download CSV" @click="downloadCsv">
+        <button type="button" class="rounded px-2 py-1 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" title="Download CSV" @click="downloadCsv">
           Download
         </button>
       </div>
     </div>
 
-    <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-slate-500">Loading price history...</p>
+    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
+    <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading price history...</p>
 
-    <div v-if="fullscreen" class="fixed inset-0 z-50 overflow-auto bg-white p-6" @dblclick="fullscreen = false">
+    <div v-if="fullscreen" class="fixed inset-0 z-50 overflow-auto bg-white dark:bg-slate-900 p-6" @dblclick="fullscreen = false">
       <div class="mb-3 flex items-center justify-between">
         <h2 class="text-base font-semibold">{{ symbol }} - {{ timeframe }} ({{ mode }})</h2>
         <button type="button" class="btn-secondary text-sm" @click="fullscreen = false">Close</button>
@@ -302,7 +302,7 @@ function downloadCsv(): void {
       :options="chartOptions"
       :series="series.data"
     />
-    <p v-else class="text-sm text-slate-500">No price history available.</p>
-    <p class="mt-2 text-right text-xs text-slate-400">Powered by Example service</p>
+    <p v-else class="text-sm text-slate-500 dark:text-slate-400">No price history available.</p>
+    <p class="mt-2 text-right text-xs text-slate-400 dark:text-slate-500">Powered by Example service</p>
   </div>
 </template>

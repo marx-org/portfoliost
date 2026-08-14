@@ -89,8 +89,8 @@ function targetPosition(pt: PriceTarget): { left: string; right: string } {
 
 <template>
   <div class="space-y-6">
-    <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-slate-500">Loading projections...</p>
+    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
+    <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading projections...</p>
 
     <template v-if="data && !loading && !error">
       <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -99,29 +99,29 @@ function targetPosition(pt: PriceTarget): { left: string; right: string } {
           <div class="flex items-end gap-6">
             <div>
               <p class="text-2xl font-semibold">{{ formatCurrency(data.priceTarget.current) }}</p>
-              <p class="text-xs text-slate-500">Current price</p>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Current price</p>
             </div>
             <div>
               <p class="text-lg font-medium">{{ formatCurrency(data.priceTarget.mean) }}</p>
-              <p class="text-xs text-slate-500">Mean target</p>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Mean target</p>
             </div>
           </div>
-          <div class="relative mt-6 h-2 rounded-full bg-slate-200">
+          <div class="relative mt-6 h-2 rounded-full bg-slate-200 dark:bg-slate-700/70">
             <div
               class="absolute inset-y-0 rounded-full bg-blue-600"
               :style="{ left: targetPosition(data.priceTarget).left, right: targetPosition(data.priceTarget).right }"
             ></div>
           </div>
-          <div class="mt-2 flex justify-between text-xs text-slate-500">
+          <div class="mt-2 flex justify-between text-xs text-slate-500 dark:text-slate-400">
             <span>{{ formatCurrency(data.priceTarget.low) }}</span>
             <span>{{ formatCurrency(data.priceTarget.high) }}</span>
           </div>
-          <p class="mt-4 text-xs text-slate-500">Updated {{ formatDate(data.priceTarget.lastUpdated) }}</p>
+          <p class="mt-4 text-xs text-slate-500 dark:text-slate-400">Updated {{ formatDate(data.priceTarget.lastUpdated) }}</p>
         </div>
 
         <div class="card p-6">
           <h2 class="mb-2 text-base font-semibold">Recommendation</h2>
-          <p v-if="totalRatings" class="text-xs text-slate-500">{{ totalRatings }} analysts &middot; period {{ data.recommendation.period }}</p>
+          <p v-if="totalRatings" class="text-xs text-slate-500 dark:text-slate-400">{{ totalRatings }} analysts &middot; period {{ data.recommendation.period }}</p>
           <component :is="'apexchart'" :options="recommendationChart" :series="recommendationChart.series" />
         </div>
       </div>
@@ -131,7 +131,7 @@ function targetPosition(pt: PriceTarget): { left: string; right: string } {
           <h2 class="mb-4 text-base font-semibold">Earnings Estimates</h2>
           <table class="w-full text-sm">
             <thead>
-              <tr class="text-left text-xs uppercase text-slate-500">
+              <tr class="text-left text-xs uppercase text-slate-500 dark:text-slate-400">
                 <th class="pb-2 font-medium">Metric</th>
                 <th class="pb-2 text-right font-medium">Avg</th>
                 <th class="pb-2 text-right font-medium">High</th>
@@ -139,7 +139,7 @@ function targetPosition(pt: PriceTarget): { left: string; right: string } {
                 <th class="pb-2 text-right font-medium">Low</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-slate-100">
+            <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
               <tr>
                 <td class="py-2">EPS</td>
                 <td class="py-2 text-right tabular-nums">{{ data.earnings.avg }}</td>
@@ -148,7 +148,7 @@ function targetPosition(pt: PriceTarget): { left: string; right: string } {
                 <td class="py-2 text-right tabular-nums">{{ data.earnings.low }}</td>
               </tr>
               <tr v-for="period in data.earnings.periods" :key="period">
-                <td class="py-2 text-slate-500">{{ period }}</td>
+                <td class="py-2 text-slate-500 dark:text-slate-400">{{ period }}</td>
                 <td class="py-2 text-right tabular-nums">—</td>
                 <td class="py-2 text-right tabular-nums">—</td>
                 <td class="py-2 text-right tabular-nums">—</td>
@@ -162,7 +162,7 @@ function targetPosition(pt: PriceTarget): { left: string; right: string } {
           <h2 class="mb-4 text-base font-semibold">Revenue Estimates</h2>
           <table class="w-full text-sm">
             <thead>
-              <tr class="text-left text-xs uppercase text-slate-500">
+              <tr class="text-left text-xs uppercase text-slate-500 dark:text-slate-400">
                 <th class="pb-2 font-medium">Metric</th>
                 <th class="pb-2 text-right font-medium">Avg</th>
                 <th class="pb-2 text-right font-medium">High</th>
@@ -170,7 +170,7 @@ function targetPosition(pt: PriceTarget): { left: string; right: string } {
                 <th class="pb-2 text-right font-medium">Low</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-slate-100">
+            <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
               <tr>
                 <td class="py-2">Revenue</td>
                 <td class="py-2 text-right tabular-nums">{{ formatCompact(data.revenue.avg) }}</td>
@@ -179,7 +179,7 @@ function targetPosition(pt: PriceTarget): { left: string; right: string } {
                 <td class="py-2 text-right tabular-nums">{{ formatCompact(data.revenue.low) }}</td>
               </tr>
               <tr v-for="period in data.revenue.periods" :key="period">
-                <td class="py-2 text-slate-500">{{ period }}</td>
+                <td class="py-2 text-slate-500 dark:text-slate-400">{{ period }}</td>
                 <td class="py-2 text-right tabular-nums">—</td>
                 <td class="py-2 text-right tabular-nums">—</td>
                 <td class="py-2 text-right tabular-nums">—</td>

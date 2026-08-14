@@ -149,24 +149,25 @@ async function submitDelete() {
 </script>
 
 <template>
+
   <div>
     <div class="mb-6">
       <h1 class="text-2xl font-semibold">Transactions</h1>
-      <p class="mt-1 text-sm text-slate-500">All investing and cash transactions from across your account.</p>
+      <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">All investing and cash transactions from across your account.</p>
     </div>
 
     <InvestmentsTabs />
     <TransactionsSubTabs />
 
-    <p v-if="notice" class="mb-4 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">{{ notice }}</p>
-    <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-slate-500">Loading transactions...</p>
+    <p v-if="notice" class="mb-4 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700 dark:bg-green-500/10 dark:text-green-400">{{ notice }}</p>
+    <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-400">{{ error }}</p>
+    <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading transactions...</p>
 
     <div v-if="!loading && !error" class="card overflow-hidden">
       <div v-if="transactions.length" class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead>
-            <tr class="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
+            <tr class="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:text-slate-400">
               <th data-testid="table-th-date" class="px-5 py-2.5 font-medium">
                 <button type="button" class="inline-flex items-center gap-1 hover:text-slate-900" @click="toggleSort('date')">
                   Date
@@ -195,12 +196,12 @@ async function submitDelete() {
               <th class="px-5 py-2.5"><span class="sr-only">Actions</span></th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-slate-100">
+          <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
             <tr v-for="tx in transactions" :key="tx.id" class="hover:bg-slate-50">
-              <td class="px-5 py-3 whitespace-nowrap text-slate-600">{{ formatDateTime(tx.date) }}</td>
-              <td class="px-5 py-3 text-slate-900">{{ tx.walletName || "—" }}</td>
-              <td class="px-5 py-3 text-slate-600">{{ tx.displayLabel }}</td>
-              <td class="px-5 py-3 text-slate-600">{{ tx.description || "—" }}</td>
+              <td class="px-5 py-3 whitespace-nowrap text-slate-600 dark:text-slate-300">{{ formatDateTime(tx.date) }}</td>
+              <td class="px-5 py-3 text-slate-900 dark:text-slate-100">{{ tx.walletName || "—" }}</td>
+              <td class="px-5 py-3 text-slate-600 dark:text-slate-300">{{ tx.displayLabel }}</td>
+              <td class="px-5 py-3 text-slate-600 dark:text-slate-300">{{ tx.description || "—" }}</td>
               <td class="px-5 py-3 text-right font-medium tabular-nums" :class="amountValue(tx) < 0 ? 'text-red-600' : 'text-green-700'">
                 {{ formatCurrency(amountValue(tx), tx.currency) }}
               </td>
@@ -228,14 +229,14 @@ async function submitDelete() {
           </tbody>
         </table>
       </div>
-      <p v-else class="px-5 py-6 text-sm text-slate-500">No cash transactions found.</p>
+      <p v-else class="px-5 py-6 text-sm text-slate-500 dark:text-slate-400">No cash transactions found.</p>
 
-      <div v-if="transactions.length" class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-5 py-3">
-        <p class="text-sm text-slate-500">
+      <div v-if="transactions.length" class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-5 py-3 dark:border-slate-700/60">
+        <p class="text-sm text-slate-500 dark:text-slate-400">
           {{ (page - 1) * pageSize + 1 }}-{{ Math.min(page * pageSize, total) }} of {{ total }}
         </p>
         <div class="flex items-center gap-4">
-          <label class="flex items-center gap-2 text-sm text-slate-500">
+          <label class="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
             Rows per page
             <select class="input py-1" :value="pageSize" @change="onPageSizeChange">
               <option v-for="s in pageSizes" :key="s" :value="s">{{ s }} per page</option>
@@ -303,20 +304,20 @@ async function submitDelete() {
       <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Edit transaction">
         <h3 class="mb-4 text-base font-semibold">Edit Transaction</h3>
         <form @submit.prevent="submitEdit">
-          <label for="wt-type" class="mb-1 block text-sm text-slate-600">Transaction Type</label>
+          <label for="wt-type" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Transaction Type</label>
           <select id="wt-type" v-model="editForm.type" class="input mb-4">
             <option value="DEPOSIT">Deposit</option>
             <option value="WITHDRAWAL">Withdrawal</option>
             <option value="TRANSFER">Transfer</option>
             <option value="INVEST">Investment</option>
           </select>
-          <label for="wt-amount" class="mb-1 block text-sm text-slate-600">Amount</label>
+          <label for="wt-amount" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Amount</label>
           <input id="wt-amount" v-model.number="editForm.amount" type="number" min="0" step="0.01" required class="input mb-4" />
-          <label for="wt-date" class="mb-1 block text-sm text-slate-600">Date</label>
+          <label for="wt-date" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Date</label>
           <input id="wt-date" v-model="editForm.date" type="date" required class="input mb-4" />
-          <label for="wt-description" class="mb-1 block text-sm text-slate-600">Description</label>
+          <label for="wt-description" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Description</label>
           <input id="wt-description" v-model="editForm.description" type="text" class="input mb-4" placeholder="Transaction description" />
-          <p v-if="editError" class="mb-3 text-sm text-red-600">{{ editError }}</p>
+          <p v-if="editError" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ editError }}</p>
           <div class="flex justify-end gap-2">
             <button type="button" class="btn-ghost" @click="editing = null">Cancel</button>
             <button type="submit" class="btn-primary" :disabled="editBusy">

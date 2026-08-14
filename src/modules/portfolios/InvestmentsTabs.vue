@@ -25,8 +25,9 @@ const tabs = [
 </script>
 
 <template>
+
   <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
-    <nav aria-label="Investment sections" class="flex gap-1 border-b border-slate-200">
+    <nav aria-label="Investment sections" class="flex gap-1 border-b border-slate-200 dark:border-slate-700/60">
       <router-link
         v-for="tab in tabs"
         :key="tab.label"

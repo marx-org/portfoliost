@@ -197,20 +197,20 @@ const targetSpread = computed(() => {
 
 <template>
   <div class="space-y-6">
-    <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-slate-500">Loading research data...</p>
+    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
+    <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading research data...</p>
 
     <template v-if="!loading && !error">
       <div class="flex items-center gap-3">
-        <img :src="`/api/logos/${symbol}`" :alt="profile?.name ?? symbol" class="h-10 w-10 rounded-full bg-slate-100" />
+        <img :src="`/api/logos/${symbol}`" :alt="profile?.name ?? symbol" class="h-10 w-10 rounded-full bg-slate-100 dark:bg-slate-800" />
         <div>
           <div class="flex items-center gap-2">
             <h2 class="text-lg font-semibold">{{ symbol }}</h2>
-            <span class="text-sm text-slate-500">{{ profile?.name }}</span>
+            <span class="text-sm text-slate-500 dark:text-slate-400">{{ profile?.name }}</span>
           </div>
           <p v-if="quote" class="text-sm">
             <span class="font-semibold">{{ formatCurrency(quote.currentPrice) }}</span>
-            <span :class="quote.change >= 0 ? 'text-green-600' : 'text-red-600'" class="ml-2">
+            <span :class="quote.change >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'" class="ml-2">
               {{ quote.change >= 0 ? "+" : "" }}{{ formatCurrency(quote.change) }} ({{ formatPercent(quote.percentChange) }})
             </span>
           </p>
@@ -219,11 +219,11 @@ const targetSpread = computed(() => {
 
       <div class="card p-6">
         <h2 class="mb-3 text-base font-semibold">About {{ profile?.name ?? symbol }}</h2>
-        <p v-for="(p, i) in visibleParagraphs" :key="i" class="mb-3 text-sm leading-relaxed text-slate-700 last:mb-0">{{ p }}</p>
+        <p v-for="(p, i) in visibleParagraphs" :key="i" class="mb-3 text-sm leading-relaxed text-slate-700 dark:text-slate-200 last:mb-0">{{ p }}</p>
         <button
           v-if="descriptionParagraphs.length > 1"
           type="button"
-          class="mt-2 text-sm font-medium text-blue-600 hover:underline"
+          class="mt-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
           @click="showFullDescription = !showFullDescription"
         >
           {{ showFullDescription ? "Show less" : "Show more" }}
@@ -233,27 +233,27 @@ const targetSpread = computed(() => {
       <div v-if="priceTarget" class="card p-6">
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 class="text-base font-semibold">Analyst Price Target</h2>
-          <span class="text-xs text-slate-500">{{ priceTarget.numberAnalysts }} analysts · {{ priceTarget.lastUpdated }}</span>
+          <span class="text-xs text-slate-500 dark:text-slate-400">{{ priceTarget.numberAnalysts }} analysts · {{ priceTarget.lastUpdated }}</span>
         </div>
         <div class="flex flex-wrap gap-6 text-sm">
           <div>
-            <p class="text-slate-500">Low</p>
+            <p class="text-slate-500 dark:text-slate-400">Low</p>
             <p class="font-semibold">{{ formatCurrency(priceTarget.targetLow) }}</p>
           </div>
           <div>
-            <p class="text-slate-500">Mean</p>
+            <p class="text-slate-500 dark:text-slate-400">Mean</p>
             <p class="font-semibold">{{ formatCurrency(priceTarget.targetMean) }}</p>
           </div>
           <div>
-            <p class="text-slate-500">Median</p>
+            <p class="text-slate-500 dark:text-slate-400">Median</p>
             <p class="font-semibold">{{ formatCurrency(priceTarget.targetMedian) }}</p>
           </div>
           <div>
-            <p class="text-slate-500">High</p>
+            <p class="text-slate-500 dark:text-slate-400">High</p>
             <p class="font-semibold">{{ formatCurrency(priceTarget.targetHigh) }}</p>
           </div>
         </div>
-        <div class="relative mt-4 h-2 rounded-full bg-slate-200">
+        <div class="relative mt-4 h-2 rounded-full bg-slate-200 dark:bg-slate-700/70">
           <div class="absolute inset-y-0 rounded-full bg-blue-200" :style="{ left: '0%', width: '100%' }"></div>
           <div
             class="absolute top-1/2 h-3.5 w-1 -translate-y-1/2 rounded bg-slate-700"
@@ -261,25 +261,25 @@ const targetSpread = computed(() => {
             :title="`Current ${formatCurrency(targetSpread.current)}`"
           ></div>
         </div>
-        <p class="mt-2 text-xs text-slate-500">Current price: {{ formatCurrency(targetSpread.current) }}</p>
+        <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">Current price: {{ formatCurrency(targetSpread.current) }}</p>
       </div>
 
       <div class="card p-6">
         <h2 class="mb-3 text-base font-semibold">Key Facts</h2>
         <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-          <dt class="text-slate-500">Name</dt>
+          <dt class="text-slate-500 dark:text-slate-400">Name</dt>
           <dd>{{ profile?.name }}</dd>
-          <dt class="text-slate-500">Sector</dt>
+          <dt class="text-slate-500 dark:text-slate-400">Sector</dt>
           <dd>{{ profile?.gicsSector ?? "—" }}</dd>
-          <dt class="text-slate-500">Industry</dt>
+          <dt class="text-slate-500 dark:text-slate-400">Industry</dt>
           <dd>{{ profile?.gicsIndustry ?? "—" }}</dd>
-          <dt class="text-slate-500">Country</dt>
+          <dt class="text-slate-500 dark:text-slate-400">Country</dt>
           <dd>{{ profile?.country ?? "—" }}</dd>
-          <dt class="text-slate-500">Exchange</dt>
+          <dt class="text-slate-500 dark:text-slate-400">Exchange</dt>
           <dd>{{ profile?.exchange ?? "—" }}</dd>
-          <dt class="text-slate-500">Employees</dt>
+          <dt class="text-slate-500 dark:text-slate-400">Employees</dt>
           <dd>{{ profile?.employeeTotal ? formatNumber(profile.employeeTotal, 0) : "—" }}</dd>
-          <dt class="text-slate-500">CEO</dt>
+          <dt class="text-slate-500 dark:text-slate-400">CEO</dt>
           <dd>{{ profile?.ceo ?? "—" }}</dd>
         </dl>
         <a
@@ -287,7 +287,7 @@ const targetSpread = computed(() => {
           :href="profile.weburl"
           target="_blank"
           rel="noopener"
-          class="mt-3 inline-block text-sm text-blue-600 hover:underline"
+          class="mt-3 inline-block text-sm text-blue-600 dark:text-blue-400 hover:underline"
         >
           {{ profile.weburl.replace(/^https?:\/\//, "") }}
         </a>
@@ -297,8 +297,8 @@ const targetSpread = computed(() => {
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 class="text-base font-semibold">Latest Earnings Call</h2>
-            <p class="mt-1 text-sm text-slate-600">{{ latestEarningsCall.title }}</p>
-            <p class="text-xs text-slate-500">{{ latestEarningsCall.date }}</p>
+            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">{{ latestEarningsCall.title }}</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400">{{ latestEarningsCall.date }}</p>
           </div>
           <router-link
             :to="{ name: 'research-ir', params: { symbol: researchSymbol(symbol) } }"
@@ -314,13 +314,13 @@ const targetSpread = computed(() => {
         <div class="card p-6">
           <div class="mb-3 flex items-center justify-between">
             <h2 class="text-base font-semibold">EPS Surprises - {{ symbol }}</h2>
-            <select v-model="epsMode" aria-label="EPS timeframe" class="rounded-md border border-slate-300 px-2 py-1 text-xs" @change="applyEpsMode(epsMode)">
+            <select v-model="epsMode" aria-label="EPS timeframe" class="rounded-md border border-slate-300 dark:border-slate-600 px-2 py-1 text-xs" @change="applyEpsMode(epsMode)">
               <option value="annual">Annual</option>
               <option value="quarterly">5Q</option>
             </select>
           </div>
           <component :is="'apexchart'" v-if="epsSurprises.length" :options="epsChartOptions" :series="epsChartOptions.series" />
-          <p v-else class="text-sm text-slate-500">No earnings data available.</p>
+          <p v-else class="text-sm text-slate-500 dark:text-slate-400">No earnings data available.</p>
         </div>
       </div>
 

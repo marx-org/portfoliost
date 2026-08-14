@@ -170,21 +170,21 @@ async function exportPositions(format: "csv" | "xml" | "json") {
       <div>
         <router-link
           :to="{ name: 'portfolio-detail', params: { id: portfolio.id } }"
-          class="truncate font-semibold text-slate-900 hover:text-blue-600 hover:underline"
+          class="truncate font-semibold text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 hover:underline"
         >
           {{ portfolio.name }}
         </router-link>
-        <p class="text-xs text-slate-500">{{ portfolio.description || "No description" }}</p>
+        <p class="text-xs text-slate-500 dark:text-slate-400">{{ portfolio.description || "No description" }}</p>
       </div>
       <div class="flex items-center gap-2" @click.stop>
-        <span class="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium uppercase text-slate-600">
+        <span class="shrink-0 rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-xs font-medium uppercase text-slate-600 dark:text-slate-300">
           {{ portfolio.strategy }}
         </span>
         <div class="relative">
           <button
             type="button"
             aria-label="Portfolio actions"
-            class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            class="rounded-lg p-1.5 text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200"
             @click="openMenu = !openMenu"
           >
             <svg class="h-4 w-4" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
@@ -195,30 +195,30 @@ async function exportPositions(format: "csv" | "xml" | "json") {
           </button>
           <template v-if="openMenu">
             <div class="fixed inset-0 z-20" @click="openMenu = false"></div>
-            <div class="absolute right-0 z-30 mt-1 w-48 rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
-              <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50" @click="openRename">Edit</button>
-              <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50" @click="exportPositions('csv')">Export as CSV</button>
-              <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50" @click="exportPositions('xml')">Export as XML</button>
-              <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50" @click="exportPositions('json')">Export as JSON</button>
-              <button type="button" class="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50" @click="openDelete">Delete</button>
+            <div class="absolute right-0 z-30 mt-1 w-48 rounded-lg border border-slate-200 dark:border-slate-700/60 bg-white dark:bg-slate-900 py-1 shadow-lg">
+              <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="openRename">Edit</button>
+              <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="exportPositions('csv')">Export as CSV</button>
+              <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="exportPositions('xml')">Export as XML</button>
+              <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="exportPositions('json')">Export as JSON</button>
+              <button type="button" class="block w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10" @click="openDelete">Delete</button>
             </div>
           </template>
         </div>
       </div>
     </div>
 
-    <p v-if="notice" class="mt-3 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">{{ notice }}</p>
+    <p v-if="notice" class="mt-3 rounded-lg bg-green-50 dark:bg-green-500/10 px-3 py-2 text-sm text-green-700 dark:text-green-400">{{ notice }}</p>
 
     <div class="mt-4">
       <div class="mb-1 flex items-center justify-between">
-        <span class="text-xs text-slate-500">Performance</span>
+        <span class="text-xs text-slate-500 dark:text-slate-400">Performance</span>
         <div class="flex gap-1" @click.stop>
           <button
             v-for="tf in timeframes"
             :key="tf.value"
             type="button"
-            class="rounded px-1.5 py-0.5 text-xs font-medium text-slate-500 hover:bg-slate-100"
-            :class="timeframe === tf.value ? 'bg-blue-50 text-blue-700' : ''"
+            class="rounded px-1.5 py-0.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+            :class="timeframe === tf.value ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400' : ''"
             @click="changeTimeframe(tf.value)"
           >
             {{ tf.label }}
@@ -231,36 +231,36 @@ async function exportPositions(format: "csv" | "xml" | "json") {
         :options="sparkOptions"
         :series="sparkOptions.series"
       />
-      <p v-else-if="chartError" class="py-6 text-center text-xs text-slate-400">Chart unavailable</p>
+      <p v-else-if="chartError" class="py-6 text-center text-xs text-slate-400 dark:text-slate-500">Chart unavailable</p>
       <div v-else class="flex h-[90px] items-center justify-center">
-        <p class="text-xs text-slate-400">Loading chart...</p>
+        <p class="text-xs text-slate-400 dark:text-slate-500">Loading chart...</p>
       </div>
     </div>
 
     <div class="mt-4 grid grid-cols-3 gap-2 text-sm">
       <div>
-        <p class="text-xs text-slate-500">Value</p>
+        <p class="text-xs text-slate-500 dark:text-slate-400">Value</p>
         <p class="font-medium tabular-nums">{{ formatCurrency(portfolio.currentValue) }}</p>
       </div>
       <div>
-        <p class="text-xs text-slate-500">Invested</p>
+        <p class="text-xs text-slate-500 dark:text-slate-400">Invested</p>
         <p class="font-medium tabular-nums">{{ formatCurrency(portfolio.totalInvested) }}</p>
       </div>
       <div>
-        <p class="text-xs text-slate-500">Return</p>
+        <p class="text-xs text-slate-500 dark:text-slate-400">Return</p>
         <p class="font-medium tabular-nums" :class="returnClass(portfolio)">{{ formatPercent(portfolio.metrics?.totalReturn) }}</p>
       </div>
     </div>
-    <p class="mt-2 text-xs text-slate-500">
+    <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
       {{ portfolio.metrics?.openPositions ?? 0 }} open positions &middot; {{ formatNumber(portfolio.metrics?.unrealizedGainLoss) }} unrealized
     </p>
 
-    <div class="mt-4 flex items-center justify-between gap-2 border-t border-slate-100 pt-3" @click.stop>
-      <button type="button" class="text-sm font-medium text-blue-600 hover:underline" data-testid="card-add-position" @click="emit('add-position')">Add Position</button>
+    <div class="mt-4 flex items-center justify-between gap-2 border-t border-slate-100 dark:border-slate-800 pt-3" @click.stop>
+      <button type="button" class="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline" data-testid="card-add-position" @click="emit('add-position')">Add Position</button>
       <div class="flex gap-3 text-sm">
-        <router-link :to="tabPath('performance')" class="text-slate-600 hover:text-blue-600">Analytics</router-link>
-        <router-link :to="tabPath('news')" class="text-slate-600 hover:text-blue-600">News</router-link>
-        <router-link :to="tabPath('calendar')" class="text-slate-600 hover:text-blue-600">Calendar</router-link>
+        <router-link :to="tabPath('performance')" class="text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400">Analytics</router-link>
+        <router-link :to="tabPath('news')" class="text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400">News</router-link>
+        <router-link :to="tabPath('calendar')" class="text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400">Calendar</router-link>
       </div>
     </div>
 
@@ -272,9 +272,9 @@ async function exportPositions(format: "csv" | "xml" | "json") {
       <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Rename portfolio" @click.stop>
         <h3 class="mb-4 text-base font-semibold">Rename portfolio</h3>
         <form @submit.prevent="submitRename">
-          <label for="portfolio-name" class="mb-1 block text-sm text-slate-600">Name</label>
+          <label for="portfolio-name" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Name</label>
           <input id="portfolio-name" v-model="renameName" type="text" required class="input mb-4" />
-          <p v-if="renameError" class="mb-3 text-sm text-red-600">{{ renameError }}</p>
+          <p v-if="renameError" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ renameError }}</p>
           <div class="flex justify-end gap-2">
             <button type="button" class="btn-ghost" @click="showRename = false">Cancel</button>
             <button type="submit" class="btn-primary" :disabled="renameBusy || !renameName.trim()">
@@ -292,8 +292,8 @@ async function exportPositions(format: "csv" | "xml" | "json") {
     >
       <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Delete portfolio" @click.stop>
         <h3 class="mb-4 text-base font-semibold">Delete portfolio</h3>
-        <p class="text-sm text-slate-600">Delete "{{ portfolio.name }}" and its positions? This cannot be undone.</p>
-        <p v-if="deleteError" class="mb-3 mt-2 text-sm text-red-600">{{ deleteError }}</p>
+        <p class="text-sm text-slate-600 dark:text-slate-300">Delete "{{ portfolio.name }}" and its positions? This cannot be undone.</p>
+        <p v-if="deleteError" class="mb-3 mt-2 text-sm text-red-600 dark:text-red-400">{{ deleteError }}</p>
         <div class="mt-4 flex justify-end gap-2">
           <button type="button" class="btn-ghost" @click="showDeleteConfirm = false">Cancel</button>
           <button type="button" class="btn-primary bg-red-600" :disabled="deleteBusy" @click="submitDelete">

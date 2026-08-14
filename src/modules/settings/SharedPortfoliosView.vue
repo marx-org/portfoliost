@@ -98,19 +98,19 @@ async function removeShare() {
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div>
         <h2 class="text-base font-semibold">Shared Portfolios</h2>
-        <p class="mt-1 text-sm text-slate-500">Manage your shared portfolio links. You can have up to 10 active shares at once.</p>
+        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Manage your shared portfolio links. You can have up to 10 active shares at once.</p>
       </div>
       <button type="button" class="btn-primary" @click="openCreate">Share Portfolio</button>
     </div>
 
-    <p v-if="notice" class="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">{{ notice }}</p>
-    <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-slate-500">Loading shares...</p>
+    <p v-if="notice" class="rounded-lg bg-green-50 dark:bg-green-500/10 px-3 py-2 text-sm text-green-700 dark:text-green-400">{{ notice }}</p>
+    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
+    <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading shares...</p>
 
     <div v-if="!loading" class="card p-5">
       <div class="flex items-baseline gap-2">
-        <span class="text-sm font-medium text-slate-700">Active Shares</span>
-        <span class="text-sm text-slate-500">{{ shares.length }} / 10</span>
+        <span class="text-sm font-medium text-slate-700 dark:text-slate-200">Active Shares</span>
+        <span class="text-sm text-slate-500 dark:text-slate-400">{{ shares.length }} / 10</span>
       </div>
     </div>
 
@@ -118,8 +118,8 @@ async function removeShare() {
       <div v-for="share in shares" :key="share.id" class="card p-5">
         <div class="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h3 class="font-semibold text-slate-900">{{ share.displayName || share.portfolioName }}</h3>
-            <div class="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+            <h3 class="font-semibold text-slate-900 dark:text-slate-100">{{ share.displayName || share.portfolioName }}</h3>
+            <div class="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
               <span>Created: {{ formatDate(share.createdAt) }}</span>
               <span>{{ share.viewCount }} views</span>
             </div>
@@ -133,20 +133,20 @@ async function removeShare() {
         </div>
 
         <div class="mt-3 flex flex-wrap gap-2 text-xs">
-          <span v-if="share.privacySettings.showValues" class="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">💰 Shows values</span>
-          <span v-if="share.privacySettings.showHoldings" class="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">📊 Shows holdings</span>
-          <span v-if="share.privacySettings.showPerformanceChart" class="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">📈 Performance chart</span>
+          <span v-if="share.privacySettings.showValues" class="rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-slate-600 dark:text-slate-300">💰 Shows values</span>
+          <span v-if="share.privacySettings.showHoldings" class="rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-slate-600 dark:text-slate-300">📊 Shows holdings</span>
+          <span v-if="share.privacySettings.showPerformanceChart" class="rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-slate-600 dark:text-slate-300">📈 Performance chart</span>
         </div>
 
         <div class="mt-4 flex gap-2">
-          <input :value="shareUrl(share)" readonly class="input flex-1 bg-slate-50 text-slate-500" />
+          <input :value="shareUrl(share)" readonly class="input flex-1 bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400" />
           <button type="button" class="btn-secondary text-sm" @click="copyLink(share)">Copy link</button>
         </div>
       </div>
     </div>
 
     <div v-if="!loading && !shares.length" class="card p-8 text-center">
-      <p class="text-sm text-slate-500">No shared portfolios yet.</p>
+      <p class="text-sm text-slate-500 dark:text-slate-400">No shared portfolios yet.</p>
     </div>
 
     <div
@@ -170,7 +170,7 @@ async function removeShare() {
             class="input mb-4"
             placeholder="Optional display name"
           />
-          <p v-if="createError" class="mb-3 text-sm text-red-600">{{ createError }}</p>
+          <p v-if="createError" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ createError }}</p>
           <div class="flex justify-end gap-2">
             <button type="button" class="btn-ghost" @click="showCreate = false">Cancel</button>
             <button type="submit" class="btn-primary" :disabled="createBusy || !createForm.portfolioId">
@@ -188,7 +188,7 @@ async function removeShare() {
     >
       <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Delete share">
         <h3 class="mb-2 text-base font-semibold">Delete share</h3>
-        <p class="text-sm text-slate-600">
+        <p class="text-sm text-slate-600 dark:text-slate-300">
           Delete the public share for "{{ confirmDelete.displayName || confirmDelete.portfolioName }}"? Anyone with the link will lose access.
         </p>
         <div class="mt-4 flex justify-end gap-2">

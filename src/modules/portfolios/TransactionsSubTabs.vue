@@ -20,13 +20,13 @@ const tabs = [
 </script>
 
 <template>
-  <nav aria-label="Transaction types" class="mb-6 flex gap-1 border-b border-slate-200">
+  <nav aria-label="Transaction types" class="mb-6 flex gap-1 border-b border-slate-200 dark:border-slate-700/60">
     <router-link
       v-for="tab in tabs"
       :key="tab.label"
       :to="tab.to"
-      class="border-b-2 px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900"
-      :class="tab.match(currentPath) ? 'border-blue-600 text-blue-700' : 'border-transparent'"
+      class="border-b-2 px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100"
+      :class="tab.match(currentPath) ? 'border-blue-600 text-blue-700 dark:text-blue-400' : 'border-transparent'"
     >
       {{ tab.label }}
     </router-link>

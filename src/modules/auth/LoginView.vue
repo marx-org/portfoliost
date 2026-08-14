@@ -30,19 +30,19 @@ async function submit() {
 </script>
 
 <template>
-  <div class="flex min-h-screen flex-col bg-slate-50">
+  <div class="flex min-h-screen flex-col bg-slate-50 dark:bg-slate-800/50">
     <header class="flex items-center justify-between px-6 py-4">
       <div class="flex items-center gap-2">
         <img src="/favicon.svg" alt="Portfoliost" class="h-8 w-8" />
-        <span class="text-xl font-semibold text-slate-900">Portfoliost</span>
+        <span class="text-xl font-semibold text-slate-900 dark:text-slate-100">Portfoliost</span>
       </div>
-      <span class="text-sm text-slate-500">Investment portfolio tracking</span>
+      <span class="text-sm text-slate-500 dark:text-slate-400">Investment portfolio tracking</span>
     </header>
 
     <main class="flex flex-1 items-center justify-center px-4">
       <form class="card w-full max-w-md p-8" @submit.prevent="submit">
-        <h1 class="text-2xl font-semibold text-slate-900">Welcome Back</h1>
-        <p class="mt-1 text-sm text-slate-500">Sign in to your account</p>
+        <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-100">Welcome Back</h1>
+        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Sign in to your account</p>
 
         <div class="mt-6 space-y-4">
           <div>
@@ -71,14 +71,14 @@ async function submit() {
           </div>
 
           <div class="flex items-center justify-between">
-            <label class="flex items-center gap-2 text-sm text-slate-600">
-              <input v-model="rememberMe" type="checkbox" class="h-4 w-4 rounded border-slate-300" />
+            <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+              <input v-model="rememberMe" type="checkbox" class="h-4 w-4 rounded border-slate-300 dark:border-slate-600" />
               Remember me
             </label>
-            <a href="#" class="text-sm text-blue-600 hover:underline">Forgot password?</a>
+            <a href="#" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">Forgot password?</a>
           </div>
 
-          <p v-if="auth.error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" data-testid="login-error">
+          <p v-if="auth.error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400" data-testid="login-error">
             {{ auth.error }}
           </p>
 
@@ -93,8 +93,8 @@ async function submit() {
           </button>
         </div>
 
-        <p class="mt-6 text-center text-sm text-slate-500">
-          Don't have an account? <a href="#" class="text-blue-600 hover:underline">Create one</a>
+        <p class="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
+          Don't have an account? <a href="#" class="text-blue-600 dark:text-blue-400 hover:underline">Create one</a>
         </p>
       </form>
     </main>

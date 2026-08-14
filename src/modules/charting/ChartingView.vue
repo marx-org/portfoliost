@@ -90,13 +90,13 @@ onMounted(async () => {
 <template>
   <div class="space-y-6">
     <div>
-      <h1 class="text-2xl font-semibold tracking-tight text-slate-900">
+      <h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
         Stocks
-        <span class="ml-2 align-middle text-sm font-medium text-slate-500" data-testid="selected-counter">
+        <span class="ml-2 align-middle text-sm font-medium text-slate-500 dark:text-slate-400" data-testid="selected-counter">
           {{ selected.length }}/{{ MAX_STOCKS }} selected
         </span>
       </h1>
-      <p class="mt-1 text-sm text-slate-500">Compare fundamentals across stocks, or start from a popular preset.</p>
+      <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Compare fundamentals across stocks, or start from a popular preset.</p>
     </div>
 
     <div class="card p-6">
@@ -122,14 +122,14 @@ onMounted(async () => {
         <span
           v-for="symbol in selected"
           :key="symbol"
-          class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 py-1 pl-3 pr-1 text-sm font-medium text-slate-800"
+          class="inline-flex items-center gap-2 rounded-full border border-slate-200 dark:border-slate-700/60 bg-slate-50 dark:bg-slate-800/50 py-1 pl-3 pr-1 text-sm font-medium text-slate-800 dark:text-slate-200"
           data-testid="stock-chip"
         >
           {{ symbol }}
-          <span class="text-xs font-normal text-slate-500">{{ nameOf(symbol) }}</span>
+          <span class="text-xs font-normal text-slate-500 dark:text-slate-400">{{ nameOf(symbol) }}</span>
           <button
             type="button"
-            class="flex h-5 w-5 items-center justify-center rounded-full text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+            class="flex h-5 w-5 items-center justify-center rounded-full text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700/70 hover:text-slate-700 dark:hover:text-slate-200"
             :aria-label="`Remove ${symbol}`"
             data-testid="remove-stock"
             @click="removeStock(symbol)"
@@ -138,7 +138,7 @@ onMounted(async () => {
           </button>
         </span>
       </div>
-      <p v-else class="text-sm text-slate-500">
+      <p v-else class="text-sm text-slate-500 dark:text-slate-400">
         No stocks added yet. Add at least two stocks to build a comparison chart.
       </p>
     </div>
@@ -150,12 +150,12 @@ onMounted(async () => {
           v-for="preset in presets"
           :key="preset.name"
           type="button"
-          class="rounded-lg border border-slate-200 px-3 py-2 text-left text-xs hover:border-blue-300 hover:bg-blue-50"
+          class="rounded-lg border border-slate-200 dark:border-slate-700/60 px-3 py-2 text-left text-xs hover:border-blue-300 hover:bg-blue-50 dark:hover:bg-blue-500/10"
           :data-testid="`preset-${preset.name.toLowerCase().replace(/\s+/g, '-')}`"
           @click="applyPreset(preset)"
         >
-          <span class="block font-semibold text-slate-800">{{ preset.name }}</span>
-          <span v-if="preset.description" class="block text-slate-500">{{ preset.description }}</span>
+          <span class="block font-semibold text-slate-800 dark:text-slate-200">{{ preset.name }}</span>
+          <span v-if="preset.description" class="block text-slate-500 dark:text-slate-400">{{ preset.description }}</span>
         </button>
       </div>
     </div>
@@ -163,7 +163,7 @@ onMounted(async () => {
     <div class="card p-6">
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 class="text-base font-semibold">Fundamentals comparison</h2>
-        <label class="flex items-center gap-2 text-xs text-slate-600">
+        <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
           Metric
           <select v-model="metric" class="input w-auto" data-testid="metric-picker">
             <option v-for="m in COMPARE_METRICS" :key="m.key" :value="m.key">{{ m.label }}</option>
@@ -171,10 +171,10 @@ onMounted(async () => {
         </label>
       </div>
 
-      <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
-      <p v-if="loading" class="text-sm text-slate-500">Loading comparison...</p>
+      <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
+      <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading comparison...</p>
 
-      <div v-else-if="selected.length < 2" class="rounded-lg bg-slate-50 px-3 py-8 text-center text-sm text-slate-500">
+      <div v-else-if="selected.length < 2" class="rounded-lg bg-slate-50 dark:bg-slate-800/50 px-3 py-8 text-center text-sm text-slate-500 dark:text-slate-400">
         Add at least two stocks to see the comparison chart.
       </div>
 
@@ -183,15 +183,15 @@ onMounted(async () => {
         <div class="mt-4 overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
-              <tr class="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+              <tr class="border-b border-slate-200 dark:border-slate-700/60 text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 <th class="py-2 pr-3">Stock</th>
                 <th v-for="r in items" :key="r.symbol" class="px-3 py-2 text-right">{{ r.symbol }}</th>
               </tr>
             </thead>
             <tbody>
-              <tr class="border-b border-slate-100">
-                <td class="py-2 pr-3 text-slate-600">{{ metricDef.label }}</td>
-                <td v-for="r in items" :key="r.symbol" class="px-3 py-2 text-right font-medium text-slate-800">
+              <tr class="border-b border-slate-100 dark:border-slate-800">
+                <td class="py-2 pr-3 text-slate-600 dark:text-slate-300">{{ metricDef.label }}</td>
+                <td v-for="r in items" :key="r.symbol" class="px-3 py-2 text-right font-medium text-slate-800 dark:text-slate-200">
                   {{ metricDef.fmt(r) }}
                 </td>
               </tr>

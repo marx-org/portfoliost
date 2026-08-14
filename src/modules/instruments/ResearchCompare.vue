@@ -33,30 +33,30 @@ const rows = computed(() =>
 
 <template>
   <div class="space-y-6">
-    <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-slate-500">Loading comparison...</p>
+    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
+    <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading comparison...</p>
 
     <div v-if="!loading && !error && items.length" class="card p-6">
       <h2 class="mb-3 text-base font-semibold">Compare {{ symbol }} with peers</h2>
       <div class="overflow-x-auto">
         <table class="w-full min-w-[720px] text-sm">
           <thead>
-            <tr class="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+            <tr class="border-b border-slate-200 dark:border-slate-700/60 text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
               <th class="py-2 pr-3">Metric</th>
               <th v-for="r in items" :key="r.symbol" class="px-3 py-2 text-right">
-                <div :class="r.symbol === symbol ? 'font-bold text-blue-700' : 'font-medium'">{{ r.symbol }}</div>
-                <div class="text-[10px] font-normal normal-case text-slate-400">{{ r.name }}</div>
+                <div :class="r.symbol === symbol ? 'font-bold text-blue-700 dark:text-blue-400' : 'font-medium'">{{ r.symbol }}</div>
+                <div class="text-[10px] font-normal normal-case text-slate-400 dark:text-slate-500">{{ r.name }}</div>
               </th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(row, i) in rows" :key="row.key" class="border-b border-slate-100" :class="i % 2 ? 'bg-slate-50/50' : ''">
-              <td class="py-2 pr-3 text-slate-600">{{ row.label }}</td>
+            <tr v-for="(row, i) in rows" :key="row.key" class="border-b border-slate-100 dark:border-slate-800" :class="i % 2 ? 'bg-slate-50/50' : ''">
+              <td class="py-2 pr-3 text-slate-600 dark:text-slate-300">{{ row.label }}</td>
               <td
                 v-for="(v, j) in row.values"
                 :key="j"
                 class="px-3 py-2 text-right"
-                :class="items[j].symbol === symbol ? 'font-semibold text-blue-700' : ''"
+                :class="items[j].symbol === symbol ? 'font-semibold text-blue-700 dark:text-blue-400' : ''"
               >
                 {{ v }}
               </td>

@@ -30,17 +30,17 @@ function num(value: unknown, format: (v: number) => string): string {
 
 <template>
   <div class="space-y-6">
-    <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-slate-500">Loading comparison...</p>
+    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
+    <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading comparison...</p>
 
     <div v-if="!loading && !error && rows.length" class="card overflow-hidden">
-      <div class="border-b border-slate-200 px-5 py-3">
+      <div class="border-b border-slate-200 dark:border-slate-700/60 px-5 py-3">
         <h2 class="text-base font-semibold">Held Stocks Comparison</h2>
       </div>
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead>
-            <tr class="border-b border-slate-100 text-left text-xs uppercase text-slate-500">
+            <tr class="border-b border-slate-100 dark:border-slate-800 text-left text-xs uppercase text-slate-500 dark:text-slate-400">
               <th class="px-5 py-2.5 font-medium">Symbol</th>
               <th class="px-5 py-2.5 text-right font-medium">Weight</th>
               <th class="px-5 py-2.5 text-right font-medium">Price</th>
@@ -53,16 +53,16 @@ function num(value: unknown, format: (v: number) => string): string {
               <th class="px-5 py-2.5 text-right font-medium">ROE</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-slate-100">
-            <tr v-for="r in rows" :key="r.symbol" class="hover:bg-slate-50">
+          <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+            <tr v-for="r in rows" :key="r.symbol" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
               <td class="px-5 py-3">
                 <router-link
                   :to="{ name: 'research-overview', params: { symbol: researchSymbol(r.symbol) } }"
-                  class="font-medium text-slate-900 hover:text-blue-600 hover:underline"
+                  class="font-medium text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 hover:underline"
                 >
                   {{ r.symbol }}
                 </router-link>
-                <p class="text-xs text-slate-500">{{ r.name }}</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400">{{ r.name }}</p>
               </td>
               <td class="px-5 py-3 text-right tabular-nums">{{ formatPercent(r.weight) }}</td>
               <td class="px-5 py-3 text-right tabular-nums">{{ num(r.price, formatCurrency) }}</td>
@@ -78,6 +78,6 @@ function num(value: unknown, format: (v: number) => string): string {
         </table>
       </div>
     </div>
-    <p v-else-if="!loading && !error" class="card p-6 text-sm text-slate-500">No positions to compare.</p>
+    <p v-else-if="!loading && !error" class="card p-6 text-sm text-slate-500 dark:text-slate-400">No positions to compare.</p>
   </div>
 </template>

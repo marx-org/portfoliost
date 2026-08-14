@@ -261,19 +261,19 @@ function exportHistory() {
 
 <template>
   <div>
-    <p v-if="loading" class="text-sm text-slate-500">Loading wallet...</p>
+    <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading wallet...</p>
 
     <div v-else-if="notFound" class="card flex flex-col items-center gap-3 p-10 text-center">
-      <p class="font-medium text-slate-900">Wallet not found</p>
+      <p class="font-medium text-slate-900 dark:text-slate-100">Wallet not found</p>
       <router-link :to="{ name: 'investments' }" class="btn-primary">Back to portfolios</router-link>
     </div>
 
     <template v-else-if="wallet">
-      <p v-if="loadError" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{{ loadError }}</p>
+      <p v-if="loadError" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ loadError }}</p>
 
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div class="flex items-start gap-3">
-          <button type="button" aria-label="Go back" class="mt-1 rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700" @click="router.back()">
+          <button type="button" aria-label="Go back" class="mt-1 rounded-lg p-2 text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200" @click="router.back()">
             <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd" />
             </svg>
@@ -281,21 +281,21 @@ function exportHistory() {
           <div>
             <div class="flex items-center gap-2">
               <h1 class="text-2xl font-semibold">{{ wallet.name }}</h1>
-              <button type="button" class="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50" @click="openRename">
+              <button type="button" class="rounded-lg border border-slate-200 dark:border-slate-700/60 px-2.5 py-1 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="openRename">
                 Rename
               </button>
             </div>
             <div class="mt-4 flex flex-wrap gap-x-8 gap-y-2 text-sm">
               <div>
-                <p class="text-xs text-slate-500">Balance</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Balance</p>
                 <p class="font-semibold tabular-nums">{{ formatCurrency(wallet.balance, wallet.currency) }}</p>
               </div>
               <div>
-                <p class="text-xs text-slate-500">Available</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Available</p>
                 <p class="font-semibold tabular-nums">{{ formatCurrency(wallet.availableBalance, wallet.currency) }}</p>
               </div>
               <div>
-                <p class="text-xs text-slate-500">Currency</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Currency</p>
                 <p class="font-semibold">{{ wallet.currency }}</p>
               </div>
             </div>
@@ -320,7 +320,7 @@ function exportHistory() {
             v-for="r in RANGES"
             :key="r"
             type="button"
-            class="rounded px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100"
+            class="rounded px-2 py-1 text-xs font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
             :class="historyRange === r ? 'bg-slate-900 text-white' : ''"
             @click="historyRange = r"
           >
@@ -329,27 +329,27 @@ function exportHistory() {
         </div>
         <div v-if="historyStats" class="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
           <div>
-            <p class="text-xs text-slate-500">High</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400">High</p>
             <p class="font-medium tabular-nums">{{ formatCurrency(historyStats.high, wallet.currency) }}</p>
           </div>
           <div>
-            <p class="text-xs text-slate-500">Low</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Low</p>
             <p class="font-medium tabular-nums">{{ formatCurrency(historyStats.low, wallet.currency) }}</p>
           </div>
           <div>
-            <p class="text-xs text-slate-500">Average</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Average</p>
             <p class="font-medium tabular-nums">{{ formatCurrency(historyStats.average, wallet.currency) }}</p>
           </div>
           <div>
-            <p class="text-xs text-slate-500">Change</p>
-            <p class="font-medium tabular-nums" :class="historyStats.change >= 0 ? 'text-green-600' : 'text-red-600'">
+            <p class="text-xs text-slate-500 dark:text-slate-400">Change</p>
+            <p class="font-medium tabular-nums" :class="historyStats.change >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
               {{ formatSignedCurrency(historyStats.change, wallet.currency) }}
             </p>
           </div>
         </div>
-        <p v-if="historyError" class="mt-3 text-sm text-red-600">{{ historyError }}</p>
+        <p v-if="historyError" class="mt-3 text-sm text-red-600 dark:text-red-400">{{ historyError }}</p>
         <component :is="'apexchart'" v-else-if="filteredHistory.length" :options="historyChart" :series="historyChart.series" />
-        <p v-else class="py-8 text-center text-sm text-slate-500">No balance history available.</p>
+        <p v-else class="py-8 text-center text-sm text-slate-500 dark:text-slate-400">No balance history available.</p>
       </div>
 
       <div class="card mt-6 p-5">
@@ -357,11 +357,11 @@ function exportHistory() {
           <h2 class="text-base font-semibold">Recent Transactions</h2>
           <router-link :to="{ name: 'transactions-cash' }" class="btn-ghost text-xs">View All</router-link>
         </div>
-        <p v-if="notice" class="mt-3 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">{{ notice }}</p>
+        <p v-if="notice" class="mt-3 rounded-lg bg-green-50 dark:bg-green-500/10 px-3 py-2 text-sm text-green-700 dark:text-green-400">{{ notice }}</p>
         <div class="mt-4 overflow-x-auto">
           <table v-if="recentTransactions.length" class="w-full text-left text-sm">
             <thead>
-              <tr class="border-b border-slate-200 text-xs text-slate-500">
+              <tr class="border-b border-slate-200 dark:border-slate-700/60 text-xs text-slate-500 dark:text-slate-400">
                 <th class="py-2 pr-4 font-medium">Date</th>
                 <th class="py-2 pr-4 font-medium">Type</th>
                 <th class="py-2 pr-4 font-medium">Description</th>
@@ -371,14 +371,14 @@ function exportHistory() {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="{ tx, balance } in recentTransactions" :key="tx.id" class="border-b border-slate-100 last:border-0">
-                <td class="py-2.5 pr-4 text-slate-600">{{ formatDate(tx.createdAt) }}</td>
+              <tr v-for="{ tx, balance } in recentTransactions" :key="tx.id" class="border-b border-slate-100 dark:border-slate-800 last:border-0">
+                <td class="py-2.5 pr-4 text-slate-600 dark:text-slate-300">{{ formatDate(tx.createdAt) }}</td>
                 <td class="py-2.5 pr-4 font-medium">{{ typeLabel(tx.type) }}</td>
-                <td class="py-2.5 pr-4 text-slate-500">{{ tx.description ?? "—" }}</td>
-                <td class="py-2.5 pr-4 text-right font-medium tabular-nums" :class="isDebit(tx) ? 'text-red-600' : 'text-green-600'">
+                <td class="py-2.5 pr-4 text-slate-500 dark:text-slate-400">{{ tx.description ?? "—" }}</td>
+                <td class="py-2.5 pr-4 text-right font-medium tabular-nums" :class="isDebit(tx) ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'">
                   {{ formatSignedCurrency(signedAmount(tx), tx.currency) }}
                 </td>
-                <td class="py-2.5 text-right tabular-nums text-slate-600">{{ formatCurrency(balance, tx.currency) }}</td>
+                <td class="py-2.5 text-right tabular-nums text-slate-600 dark:text-slate-300">{{ formatCurrency(balance, tx.currency) }}</td>
                 <td class="py-2.5">
                   <div class="flex justify-end gap-1">
                     <button
@@ -391,7 +391,7 @@ function exportHistory() {
                     </button>
                     <button
                       type="button"
-                      class="btn-ghost px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                      class="btn-ghost px-2 py-1 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10"
                       aria-label="Delete transaction"
                       @click="openDeleteTx(tx)"
                     >
@@ -402,7 +402,7 @@ function exportHistory() {
               </tr>
             </tbody>
           </table>
-          <p v-else class="py-6 text-center text-sm text-slate-500">No transactions yet.</p>
+          <p v-else class="py-6 text-center text-sm text-slate-500 dark:text-slate-400">No transactions yet.</p>
         </div>
       </div>
 
@@ -418,9 +418,9 @@ function exportHistory() {
         <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Rename wallet">
           <h3 class="mb-4 text-base font-semibold">Rename wallet</h3>
           <form @submit.prevent="submitRename">
-            <label for="wallet-name" class="mb-1 block text-sm text-slate-600">Name</label>
+            <label for="wallet-name" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Name</label>
             <input id="wallet-name" v-model="renameName" type="text" required class="input mb-4" />
-            <p v-if="renameError" class="mb-3 text-sm text-red-600">{{ renameError }}</p>
+            <p v-if="renameError" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ renameError }}</p>
             <div class="flex justify-end gap-2">
               <button type="button" class="btn-ghost" @click="showRename = false">Cancel</button>
               <button type="submit" class="btn-primary" :disabled="renameBusy || !renameName.trim()">
@@ -434,8 +434,8 @@ function exportHistory() {
       <div v-if="showDeleteConfirm" class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24" @click.self="showDeleteConfirm = false">
         <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Delete wallet">
           <h3 class="mb-4 text-base font-semibold">Delete wallet</h3>
-          <p class="text-sm text-slate-600">Delete "{{ wallet.name }}" and its cash history? This cannot be undone.</p>
-          <p v-if="deleteError" class="mb-3 mt-2 text-sm text-red-600">{{ deleteError }}</p>
+          <p class="text-sm text-slate-600 dark:text-slate-300">Delete "{{ wallet.name }}" and its cash history? This cannot be undone.</p>
+          <p v-if="deleteError" class="mb-3 mt-2 text-sm text-red-600 dark:text-red-400">{{ deleteError }}</p>
           <div class="mt-4 flex justify-end gap-2">
             <button type="button" class="btn-ghost" @click="showDeleteConfirm = false">Cancel</button>
             <button type="button" class="btn-primary bg-red-600" :disabled="deleteBusy" @click="submitDelete">
@@ -453,20 +453,20 @@ function exportHistory() {
         <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Edit transaction">
           <h3 class="mb-4 text-base font-semibold">Edit Transaction</h3>
           <form @submit.prevent="submitEdit">
-            <label for="wallet-tx-type" class="mb-1 block text-sm text-slate-600">Transaction Type</label>
+            <label for="wallet-tx-type" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Transaction Type</label>
             <select id="wallet-tx-type" v-model="editForm.type" class="input mb-4">
               <option value="DEPOSIT">Deposit</option>
               <option value="WITHDRAWAL">Withdrawal</option>
               <option value="TRANSFER">Transfer</option>
               <option value="INVEST">Investment</option>
             </select>
-            <label for="wallet-tx-amount" class="mb-1 block text-sm text-slate-600">Amount</label>
+            <label for="wallet-tx-amount" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Amount</label>
             <input id="wallet-tx-amount" v-model.number="editForm.amount" type="number" min="0" step="0.01" required class="input mb-4" />
-            <label for="wallet-tx-date" class="mb-1 block text-sm text-slate-600">Date</label>
+            <label for="wallet-tx-date" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Date</label>
             <input id="wallet-tx-date" v-model="editForm.date" type="date" required class="input mb-4" />
-            <label for="wallet-tx-description" class="mb-1 block text-sm text-slate-600">Description</label>
+            <label for="wallet-tx-description" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Description</label>
             <input id="wallet-tx-description" v-model="editForm.description" type="text" class="input mb-4" placeholder="Transaction description" />
-            <p v-if="editError" class="mb-3 text-sm text-red-600">{{ editError }}</p>
+            <p v-if="editError" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ editError }}</p>
             <div class="flex justify-end gap-2">
               <button type="button" class="btn-ghost" @click="editing = null">Cancel</button>
               <button type="submit" class="btn-primary" :disabled="editBusy">

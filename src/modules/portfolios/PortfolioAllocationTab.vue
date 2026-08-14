@@ -44,31 +44,31 @@ function weight(name: string, slices: { name: string; value: number }[] | undefi
 
 <template>
   <div class="space-y-6">
-    <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-slate-500">Loading allocation...</p>
+    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
+    <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading allocation...</p>
 
     <template v-if="!loading && !error">
       <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <div class="card p-6">
           <h2 class="mb-2 text-base font-semibold">By Sector</h2>
           <component :is="'apexchart'" v-if="sectorOptions.series.length" :options="sectorOptions" :series="sectorOptions.series" />
-          <p v-else class="text-sm text-slate-500">No allocation data.</p>
+          <p v-else class="text-sm text-slate-500 dark:text-slate-400">No allocation data.</p>
         </div>
         <div class="card overflow-hidden">
-          <div class="border-b border-slate-200 px-5 py-3">
+          <div class="border-b border-slate-200 dark:border-slate-700/60 px-5 py-3">
             <h2 class="text-base font-semibold">Sector Weights</h2>
           </div>
           <table class="w-full text-sm">
             <thead>
-              <tr class="border-b border-slate-100 text-left text-xs uppercase text-slate-500">
+              <tr class="border-b border-slate-100 dark:border-slate-800 text-left text-xs uppercase text-slate-500 dark:text-slate-400">
                 <th class="px-5 py-2.5 font-medium">Sector</th>
                 <th class="px-5 py-2.5 text-right font-medium">Value</th>
                 <th class="px-5 py-2.5 text-right font-medium">Weight</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-for="s in allocation?.bySector" :key="s.name" class="hover:bg-slate-50">
-                <td class="px-5 py-3 font-medium text-slate-900">{{ s.name }}</td>
+            <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+              <tr v-for="s in allocation?.bySector" :key="s.name" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                <td class="px-5 py-3 font-medium text-slate-900 dark:text-slate-100">{{ s.name }}</td>
                 <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(s.value) }}</td>
                 <td class="px-5 py-3 text-right tabular-nums">{{ formatPercent(weight(s.name, allocation?.bySector)) }}</td>
               </tr>
@@ -79,13 +79,13 @@ function weight(name: string, slices: { name: string; value: number }[] | undefi
 
       <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
         <div class="card overflow-hidden">
-          <div class="border-b border-slate-200 px-5 py-3">
+          <div class="border-b border-slate-200 dark:border-slate-700/60 px-5 py-3">
             <h2 class="text-base font-semibold">By Asset Type</h2>
           </div>
           <table class="w-full text-sm">
-            <tbody class="divide-y divide-slate-100">
-              <tr v-for="s in allocation?.byAssetType" :key="s.name" class="hover:bg-slate-50">
-                <td class="px-5 py-3 font-medium text-slate-900">{{ s.name }}</td>
+            <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+              <tr v-for="s in allocation?.byAssetType" :key="s.name" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                <td class="px-5 py-3 font-medium text-slate-900 dark:text-slate-100">{{ s.name }}</td>
                 <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(s.value) }}</td>
                 <td class="px-5 py-3 text-right tabular-nums">{{ formatPercent(weight(s.name, allocation?.byAssetType)) }}</td>
               </tr>
@@ -93,13 +93,13 @@ function weight(name: string, slices: { name: string; value: number }[] | undefi
           </table>
         </div>
         <div class="card overflow-hidden">
-          <div class="border-b border-slate-200 px-5 py-3">
+          <div class="border-b border-slate-200 dark:border-slate-700/60 px-5 py-3">
             <h2 class="text-base font-semibold">By Currency</h2>
           </div>
           <table class="w-full text-sm">
-            <tbody class="divide-y divide-slate-100">
-              <tr v-for="s in allocation?.byCurrency" :key="s.name" class="hover:bg-slate-50">
-                <td class="px-5 py-3 font-medium text-slate-900">{{ s.name }}</td>
+            <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+              <tr v-for="s in allocation?.byCurrency" :key="s.name" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                <td class="px-5 py-3 font-medium text-slate-900 dark:text-slate-100">{{ s.name }}</td>
                 <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(s.value) }}</td>
                 <td class="px-5 py-3 text-right tabular-nums">{{ formatPercent(weight(s.name, allocation?.byCurrency)) }}</td>
               </tr>

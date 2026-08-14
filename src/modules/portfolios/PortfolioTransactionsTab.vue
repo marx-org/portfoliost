@@ -131,12 +131,12 @@ function groupAmount(items: Tx[]): number {
 
 <template>
   <div class="card overflow-hidden">
-    <div class="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+    <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-700/60 px-5 py-3">
       <div class="flex items-center gap-3">
         <h2 class="text-base font-semibold">Transactions</h2>
-        <span v-if="!loading" class="text-sm text-slate-500">{{ total.toLocaleString() }} total transactions</span>
+        <span v-if="!loading" class="text-sm text-slate-500 dark:text-slate-400">{{ total.toLocaleString() }} total transactions</span>
       </div>
-      <label class="flex items-center gap-1.5 text-xs text-slate-500">
+      <label class="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
         Group by
         <select v-model="groupBy" class="input !w-auto !py-1 !text-xs" aria-label="Group by">
           <option v-for="mode in groupModes" :key="mode.value" :value="mode.value">{{ mode.label }}</option>
@@ -144,15 +144,15 @@ function groupAmount(items: Tx[]): number {
       </label>
     </div>
 
-    <p v-if="notice" class="border-b border-slate-100 px-5 py-3 text-sm text-green-700">{{ notice }}</p>
-    <p v-if="error" class="border-b border-slate-100 px-5 py-3 text-sm text-red-700">{{ error }}</p>
-    <p v-if="loading" class="px-5 py-6 text-sm text-slate-500">Loading transactions...</p>
+    <p v-if="notice" class="border-b border-slate-100 dark:border-slate-800 px-5 py-3 text-sm text-green-700 dark:text-green-400">{{ notice }}</p>
+    <p v-if="error" class="border-b border-slate-100 dark:border-slate-800 px-5 py-3 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
+    <p v-if="loading" class="px-5 py-6 text-sm text-slate-500 dark:text-slate-400">Loading transactions...</p>
 
     <template v-if="!loading && !error">
       <div v-if="transactions.length" class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead>
-            <tr class="border-b border-slate-100 text-left text-xs uppercase text-slate-500">
+            <tr class="border-b border-slate-100 dark:border-slate-800 text-left text-xs uppercase text-slate-500 dark:text-slate-400">
               <th class="px-5 py-2.5 font-medium">Date</th>
               <th class="px-5 py-2.5 font-medium">Type</th>
               <th class="px-5 py-2.5 font-medium">Symbol</th>
@@ -163,14 +163,14 @@ function groupAmount(items: Tx[]): number {
               <th class="px-5 py-2.5"><span class="sr-only">Actions</span></th>
             </tr>
           </thead>
-          <tbody v-for="g in groups" :key="g.label || 'all'" class="divide-y divide-slate-100">
+          <tbody v-for="g in groups" :key="g.label || 'all'" class="divide-y divide-slate-100 dark:divide-slate-800">
             <tr v-if="g.label" class="bg-slate-100/70" data-testid="transactions-group-row">
-              <td :colspan="8" class="px-5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+              <td :colspan="8" class="px-5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
                 {{ g.label }}
-                <span class="font-normal text-slate-400">{{ g.items.length }}</span>
+                <span class="font-normal text-slate-400 dark:text-slate-500">{{ g.items.length }}</span>
               </td>
             </tr>
-            <tr v-for="tx in g.items" :key="tx.id" class="hover:bg-slate-50">
+            <tr v-for="tx in g.items" :key="tx.id" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
               <td class="px-5 py-3 whitespace-nowrap">{{ formatDate(tx.executedAt) }}</td>
               <td class="px-5 py-3">
                 <span class="rounded-full px-2 py-0.5 text-xs font-medium" :class="typeClass(tx.type)">{{ tx.type }}</span>
@@ -178,11 +178,11 @@ function groupAmount(items: Tx[]): number {
               <td class="px-5 py-3">
                 <router-link
                   :to="{ name: 'research-overview', params: { symbol: researchSymbol(tx.instrumentSymbol) } }"
-                  class="font-medium text-slate-900 hover:text-blue-600 hover:underline"
+                  class="font-medium text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 hover:underline"
                 >
                   {{ tx.instrumentSymbol }}
                 </router-link>
-                <p class="text-xs text-slate-500">{{ tx.instrumentName }}</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400">{{ tx.instrumentName }}</p>
               </td>
               <td class="px-5 py-3 text-right tabular-nums">{{ formatNumber(tx.quantity) }}</td>
               <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(tx.price) }}</td>
@@ -200,7 +200,7 @@ function groupAmount(items: Tx[]): number {
                   </button>
                   <button
                     type="button"
-                    class="btn-ghost px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                    class="btn-ghost px-2 py-1 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10"
                     aria-label="Delete transaction"
                     @click="openDelete(tx)"
                   >
@@ -209,8 +209,8 @@ function groupAmount(items: Tx[]): number {
                 </div>
               </td>
             </tr>
-            <tr v-if="g.label" class="border-t border-slate-200 bg-slate-50 font-medium">
-              <td class="px-5 py-3 text-slate-500">{{ g.label }} subtotal</td>
+            <tr v-if="g.label" class="border-t border-slate-200 dark:border-slate-700/60 bg-slate-50 dark:bg-slate-800/50 font-medium">
+              <td class="px-5 py-3 text-slate-500 dark:text-slate-400">{{ g.label }} subtotal</td>
               <td class="px-5 py-3"></td>
               <td class="px-5 py-3"></td>
               <td class="px-5 py-3"></td>
@@ -222,11 +222,11 @@ function groupAmount(items: Tx[]): number {
           </tbody>
         </table>
       </div>
-      <p v-else class="px-5 py-6 text-sm text-slate-500">No transactions found.</p>
+      <p v-else class="px-5 py-6 text-sm text-slate-500 dark:text-slate-400">No transactions found.</p>
 
-      <div v-if="totalPages > 1" class="flex items-center justify-between border-t border-slate-200 px-5 py-3">
+      <div v-if="totalPages > 1" class="flex items-center justify-between border-t border-slate-200 dark:border-slate-700/60 px-5 py-3">
         <button type="button" class="btn-ghost text-sm" :disabled="page <= 1" @click="load(page - 1)">Previous</button>
-        <span class="text-sm text-slate-500">Page {{ page }} of {{ totalPages }}</span>
+        <span class="text-sm text-slate-500 dark:text-slate-400">Page {{ page }} of {{ totalPages }}</span>
         <button type="button" class="btn-ghost text-sm" :disabled="page >= totalPages" @click="load(page + 1)">Next</button>
       </div>
     </template>

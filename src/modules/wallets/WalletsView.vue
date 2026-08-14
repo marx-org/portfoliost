@@ -108,7 +108,7 @@ const historyChart = computed(() => ({
     <div class="mb-6 flex items-center justify-between">
       <div>
         <h1 class="text-2xl font-semibold">Wallets</h1>
-        <p v-if="store.totalBalance" class="text-sm text-slate-500">
+        <p v-if="store.totalBalance" class="text-sm text-slate-500 dark:text-slate-400">
           {{ store.wallets.length }} wallet{{ store.wallets.length === 1 ? "" : "s" }} &middot; base currency
           {{ store.totalBalance.baseCurrency }}
         </p>
@@ -116,16 +116,16 @@ const historyChart = computed(() => ({
       <button type="button" class="btn-primary" @click="showCreate = true">New wallet</button>
     </div>
 
-    <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-slate-500">Loading wallets...</p>
+    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
+    <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading wallets...</p>
 
     <div v-if="store.totalBalance && !loading" class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
       <div class="card p-5">
-        <p class="text-sm text-slate-500">Total Balance</p>
+        <p class="text-sm text-slate-500 dark:text-slate-400">Total Balance</p>
         <p class="mt-1 text-2xl font-semibold tabular-nums">{{ formatCurrency(store.totalBalance.totalBalance) }}</p>
       </div>
       <div class="card p-5">
-        <p class="text-sm text-slate-500">Available Balance</p>
+        <p class="text-sm text-slate-500 dark:text-slate-400">Available Balance</p>
         <p class="mt-1 text-2xl font-semibold tabular-nums">{{ formatCurrency(store.totalBalance.totalAvailableBalance) }}</p>
       </div>
     </div>
@@ -134,13 +134,13 @@ const historyChart = computed(() => ({
       <div v-for="wallet in store.wallets" :key="wallet.id" class="card p-5">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 class="font-semibold text-slate-900">{{ wallet.name }}</h2>
-            <p class="text-xs text-slate-500">{{ wallet.currency }} &middot; {{ wallet.isDefault ? "Default" : "Secondary" }}</p>
+            <h2 class="font-semibold text-slate-900 dark:text-slate-100">{{ wallet.name }}</h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400">{{ wallet.currency }} &middot; {{ wallet.isDefault ? "Default" : "Secondary" }}</p>
           </div>
           <div class="flex items-center gap-4">
             <div class="text-right">
               <p class="text-lg font-semibold tabular-nums">{{ formatCurrency(wallet.balance, wallet.currency) }}</p>
-              <p class="text-xs text-slate-500">{{ formatNumber(wallet.availableBalance) }} available</p>
+              <p class="text-xs text-slate-500 dark:text-slate-400">{{ formatNumber(wallet.availableBalance) }} available</p>
             </div>
             <div class="flex gap-2">
               <button type="button" class="btn-secondary text-xs" @click="openCash(wallet, 'deposit')">Deposit</button>
@@ -151,34 +151,34 @@ const historyChart = computed(() => ({
           </div>
         </div>
 
-        <div v-if="showHistory && selectedWallet?.id === wallet.id" class="mt-4 border-t border-slate-100 pt-4">
-          <h3 class="mb-2 text-sm font-semibold text-slate-700">Balance History</h3>
-          <p v-if="historyError" class="text-sm text-red-600">{{ historyError }}</p>
+        <div v-if="showHistory && selectedWallet?.id === wallet.id" class="mt-4 border-t border-slate-100 dark:border-slate-800 pt-4">
+          <h3 class="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">Balance History</h3>
+          <p v-if="historyError" class="text-sm text-red-600 dark:text-red-400">{{ historyError }}</p>
           <component :is="'apexchart'" v-else-if="history.length" :options="historyChart" :series="historyChart.series" />
-          <p v-else class="text-sm text-slate-500">No balance history available.</p>
+          <p v-else class="text-sm text-slate-500 dark:text-slate-400">No balance history available.</p>
         </div>
 
-        <div v-if="showTransactions && selectedWallet?.id === wallet.id" class="mt-4 border-t border-slate-100 pt-4">
-          <h3 class="mb-2 text-sm font-semibold text-slate-700">Recent Transactions</h3>
-          <ul v-if="store.transactions?.items.length" class="divide-y divide-slate-100 rounded-lg border border-slate-200">
+        <div v-if="showTransactions && selectedWallet?.id === wallet.id" class="mt-4 border-t border-slate-100 dark:border-slate-800 pt-4">
+          <h3 class="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">Recent Transactions</h3>
+          <ul v-if="store.transactions?.items.length" class="divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-700/60">
             <li v-for="tx in store.transactions.items" :key="tx.id" class="flex items-center justify-between px-3 py-2 text-sm">
               <div>
-                <span class="font-medium text-slate-900">{{ tx.type }}</span>
-                <p class="text-xs text-slate-500">{{ formatDate(tx.createdAt) }}{{ tx.description ? ` · ${tx.description}` : "" }}</p>
+                <span class="font-medium text-slate-900 dark:text-slate-100">{{ tx.type }}</span>
+                <p class="text-xs text-slate-500 dark:text-slate-400">{{ formatDate(tx.createdAt) }}{{ tx.description ? ` · ${tx.description}` : "" }}</p>
               </div>
-              <span class="font-medium tabular-nums" :class="tx.type === 'WITHDRAWAL' ? 'text-red-600' : 'text-green-600'">
+              <span class="font-medium tabular-nums" :class="tx.type === 'WITHDRAWAL' ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'">
                 {{ tx.type === "WITHDRAWAL" ? "−" : "+" }}{{ formatCurrency(tx.amount, tx.currency) }}
               </span>
             </li>
           </ul>
-          <p v-else class="text-sm text-slate-500">No transactions yet.</p>
+          <p v-else class="text-sm text-slate-500 dark:text-slate-400">No transactions yet.</p>
         </div>
       </div>
     </div>
 
     <div v-else-if="!loading && !error" class="card flex flex-col items-center gap-3 p-10 text-center">
-      <p class="font-medium text-slate-900">No wallets yet</p>
-      <p class="text-sm text-slate-500">Create a wallet to hold cash in your account.</p>
+      <p class="font-medium text-slate-900 dark:text-slate-100">No wallets yet</p>
+      <p class="text-sm text-slate-500 dark:text-slate-400">Create a wallet to hold cash in your account.</p>
       <button type="button" class="btn-primary" @click="showCreate = true">New wallet</button>
     </div>
 
@@ -186,9 +186,9 @@ const historyChart = computed(() => ({
       <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Create wallet">
         <h3 class="mb-4 text-base font-semibold">Create a wallet</h3>
         <form @submit.prevent="submitCreate">
-          <label for="wallet-name" class="mb-1 block text-sm text-slate-600">Name</label>
+          <label for="wallet-name" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Name</label>
           <input id="wallet-name" v-model="newWallet.name" type="text" required class="input mb-4" placeholder="e.g. USD savings" />
-          <label for="wallet-currency" class="mb-1 block text-sm text-slate-600">Currency</label>
+          <label for="wallet-currency" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Currency</label>
           <select id="wallet-currency" v-model="newWallet.currency" class="input mb-4">
             <option value="USD">USD</option>
             <option value="EUR">EUR</option>
@@ -196,7 +196,7 @@ const historyChart = computed(() => ({
             <option value="CHF">CHF</option>
             <option value="PLN">PLN</option>
           </select>
-          <p v-if="createError" class="mb-3 text-sm text-red-600">{{ createError }}</p>
+          <p v-if="createError" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ createError }}</p>
           <div class="flex justify-end gap-2">
             <button type="button" class="btn-ghost" @click="showCreate = false">Cancel</button>
             <button type="submit" class="btn-primary" :disabled="creating || !newWallet.name.trim()">

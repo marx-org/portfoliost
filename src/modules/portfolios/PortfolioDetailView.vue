@@ -133,17 +133,17 @@ async function submitDelete() {
   <div>
     <router-link to="/en/investments" class="btn-ghost mb-4">&larr; All portfolios</router-link>
 
-    <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-slate-500">Loading portfolio...</p>
+    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
+    <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading portfolio...</p>
 
     <template v-if="!loading && !error">
       <div class="mb-6 flex items-start justify-between gap-4">
         <div>
           <div class="flex items-center gap-3">
             <h1 class="text-2xl font-semibold">{{ portfolioName }}</h1>
-            <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium uppercase text-slate-600">{{ strategy }}</span>
+            <span class="rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-xs font-medium uppercase text-slate-600 dark:text-slate-300">{{ strategy }}</span>
           </div>
-          <p class="mt-1 text-sm text-slate-500">{{ description }}</p>
+          <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ description }}</p>
         </div>
         <div class="flex gap-2">
           <button type="button" class="btn-secondary text-sm">Share</button>
@@ -154,13 +154,13 @@ async function submitDelete() {
             </button>
             <template v-if="showCurrencyMenu">
               <div class="fixed inset-0 z-20" @click="showCurrencyMenu = false"></div>
-              <div class="absolute right-0 z-30 mt-1 w-40 rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+              <div class="absolute right-0 z-30 mt-1 w-40 rounded-lg border border-slate-200 dark:border-slate-700/60 bg-white dark:bg-slate-900 py-1 shadow-lg">
                 <button
                   v-for="c in currencies"
                   :key="c"
                   type="button"
-                  class="block w-full px-4 py-2 text-left text-sm hover:bg-slate-50"
-                  :class="displayCurrency === c ? 'bg-blue-50 text-blue-700' : 'text-slate-700'"
+                  class="block w-full px-4 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                  :class="displayCurrency === c ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400' : 'text-slate-700 dark:text-slate-200'"
                   @click="setDisplayCurrency(c)"
                 >
                   {{ c }}
@@ -176,46 +176,46 @@ async function submitDelete() {
 
       <div v-if="store.summaryMetrics" class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-6">
         <div class="card p-4">
-          <p class="text-sm text-slate-500">Total Value</p>
+          <p class="text-sm text-slate-500 dark:text-slate-400">Total Value</p>
           <p class="mt-1 text-xl font-semibold tabular-nums">{{ formatCurrency(store.summaryMetrics.totalValue, displayCurrency) }}</p>
         </div>
         <div class="card p-4">
-          <p class="text-sm text-slate-500">Total Invested</p>
+          <p class="text-sm text-slate-500 dark:text-slate-400">Total Invested</p>
           <p class="mt-1 text-xl font-semibold tabular-nums">{{ formatCurrency(store.summaryMetrics.totalInvested, displayCurrency) }}</p>
         </div>
         <div class="card p-4">
-          <p class="text-sm text-slate-500">Return</p>
+          <p class="text-sm text-slate-500 dark:text-slate-400">Return</p>
           <p class="mt-1 text-xl font-semibold tabular-nums" :class="gainClass(store.summaryMetrics.simpleReturnPercent)">
             {{ formatPercent(store.summaryMetrics.simpleReturnPercent) }}
           </p>
         </div>
         <div class="card p-4">
-          <p class="text-sm text-slate-500">Unrealized P/L</p>
+          <p class="text-sm text-slate-500 dark:text-slate-400">Unrealized P/L</p>
           <p class="mt-1 text-xl font-semibold tabular-nums" :class="gainClass(store.summaryMetrics.unrealizedGainLoss)">
             {{ formatSignedCurrency(store.summaryMetrics.unrealizedGainLoss, displayCurrency) }}
           </p>
         </div>
         <div class="card p-4">
-          <p class="text-sm text-slate-500">Realized</p>
+          <p class="text-sm text-slate-500 dark:text-slate-400">Realized</p>
           <p class="mt-1 text-xl font-semibold tabular-nums" :class="gainClass(store.summaryMetrics.realizedGain)">
             {{ formatSignedCurrency(store.summaryMetrics.realizedGain, displayCurrency) }}
           </p>
         </div>
         <div class="card p-4">
-          <p class="text-sm text-slate-500">Income</p>
+          <p class="text-sm text-slate-500 dark:text-slate-400">Income</p>
           <p class="mt-1 text-xl font-semibold tabular-nums" :class="gainClass(store.summaryMetrics.cumulativeDividends)">
             {{ formatSignedCurrency(store.summaryMetrics.cumulativeDividends, displayCurrency) }}
           </p>
         </div>
       </div>
 
-      <nav aria-label="Portfolio tabs" class="mb-6 flex gap-1 overflow-x-auto border-b border-slate-200">
+      <nav aria-label="Portfolio tabs" class="mb-6 flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-slate-700/60">
         <router-link
           v-for="tab in tabs"
           :key="tab.name"
           :to="{ name: tab.name, params: { id } }"
-          class="whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900"
-          :class="route.name === tab.name ? 'border-blue-600 text-blue-700' : 'border-transparent'"
+          class="whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100"
+          :class="route.name === tab.name ? 'border-blue-600 text-blue-700 dark:text-blue-400' : 'border-transparent'"
         >
           {{ tab.label }}
         </router-link>
@@ -232,9 +232,9 @@ async function submitDelete() {
       <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Rename portfolio">
         <h3 class="mb-4 text-base font-semibold">Rename portfolio</h3>
         <form @submit.prevent="submitRename">
-          <label for="rename-name" class="mb-1 block text-sm text-slate-600">Name</label>
+          <label for="rename-name" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Name</label>
           <input id="rename-name" v-model="renameName" type="text" required class="input mb-4" />
-          <p v-if="renameError" class="mb-3 text-sm text-red-600">{{ renameError }}</p>
+          <p v-if="renameError" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ renameError }}</p>
           <div class="flex justify-end gap-2">
             <button type="button" class="btn-ghost" @click="showRename = false">Cancel</button>
             <button type="submit" class="btn-primary" :disabled="renameBusy || !renameName.trim()">
@@ -252,8 +252,8 @@ async function submitDelete() {
     >
       <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Delete portfolio">
         <h3 class="mb-4 text-base font-semibold">Delete portfolio</h3>
-        <p class="text-sm text-slate-600">Delete "{{ portfolioName }}" and its positions? This cannot be undone.</p>
-        <p v-if="deleteError" class="mb-3 mt-2 text-sm text-red-600">{{ deleteError }}</p>
+        <p class="text-sm text-slate-600 dark:text-slate-300">Delete "{{ portfolioName }}" and its positions? This cannot be undone.</p>
+        <p v-if="deleteError" class="mb-3 mt-2 text-sm text-red-600 dark:text-red-400">{{ deleteError }}</p>
         <div class="mt-4 flex justify-end gap-2">
           <button type="button" class="btn-ghost" @click="showDeleteConfirm = false">Cancel</button>
           <button type="button" class="btn-danger" :disabled="deleteBusy" @click="submitDelete">

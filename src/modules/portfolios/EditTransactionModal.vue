@@ -110,6 +110,7 @@ function goResearch() {
 </script>
 
 <template>
+
   <div
     v-if="open && transaction"
     class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
@@ -121,34 +122,34 @@ function goResearch() {
         <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="emit('close')">✕</button>
       </div>
 
-      <div class="mb-4 flex items-center gap-3 rounded-xl bg-slate-50 p-3">
+      <div class="mb-4 flex items-center gap-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50">
         <img
           :src="`/api/logos/${transaction.instrumentSymbol}`"
           :alt="transaction.instrumentSymbol"
-          class="h-9 w-9 shrink-0 rounded-full bg-slate-100"
+          class="h-9 w-9 shrink-0 rounded-full bg-slate-100 dark:bg-slate-800"
         />
         <div class="min-w-0 flex-1">
-          <p class="font-medium text-slate-900">
+          <p class="font-medium text-slate-900 dark:text-slate-100">
             {{ transaction.instrumentSymbol }}
-            <span class="text-xs font-normal text-slate-400">(US)</span>
-            <span class="ml-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-slate-500">
+            <span class="text-xs font-normal text-slate-400 dark:text-slate-500">(US)</span>
+            <span class="ml-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-slate-500 dark:bg-slate-800 dark:text-slate-400">
               {{ typeLabel(transaction.assetType || "STOCK") }}
             </span>
           </p>
-          <p class="truncate text-xs text-slate-500">{{ transaction.instrumentName || "—" }}</p>
+          <p class="truncate text-xs text-slate-500 dark:text-slate-400">{{ transaction.instrumentName || "—" }}</p>
         </div>
         <div class="shrink-0 text-right">
           <button type="button" class="text-xs text-blue-600 hover:underline" @click="goResearch">View chart</button>
-          <p class="text-sm font-medium tabular-nums text-slate-900">{{ formatCurrency(transaction.price, transaction.currency) }}</p>
-          <p class="text-[11px] text-slate-400">Historical Price ({{ formatDate(transaction.executedAt) }})</p>
+          <p class="text-sm font-medium tabular-nums text-slate-900 dark:text-slate-100">{{ formatCurrency(transaction.price, transaction.currency) }}</p>
+          <p class="text-[11px] text-slate-400 dark:text-slate-500">Historical Price ({{ formatDate(transaction.executedAt) }})</p>
         </div>
       </div>
 
       <form @submit.prevent="submit">
-        <label for="etx-date" class="mb-1 block text-sm text-slate-600">Purchase Date</label>
+        <label for="etx-date" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Purchase Date</label>
         <input id="etx-date" v-model="executedAt" type="date" required class="input mb-4" />
 
-        <label for="etx-wallet" class="mb-1 block text-sm text-slate-600">Cash portfolio</label>
+        <label for="etx-wallet" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Cash portfolio</label>
         <select id="etx-wallet" v-model="walletId" class="input mb-4">
           <option v-for="w in walletsStore.wallets" :key="w.id" :value="w.id">
             {{ w.name }} ({{ formatCurrency(w.balance, w.currency) }})
@@ -157,19 +158,19 @@ function goResearch() {
 
         <div class="mb-4 grid grid-cols-2 gap-4">
           <div>
-            <label for="etx-quantity" class="mb-1 block text-sm text-slate-600">Quantity</label>
+            <label for="etx-quantity" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Quantity</label>
             <input id="etx-quantity" v-model.number="quantity" type="number" min="0" step="any" required class="input" />
           </div>
           <div>
-            <label for="etx-price" class="mb-1 block text-sm text-slate-600">Price per share ($)</label>
+            <label for="etx-price" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Price per share ($)</label>
             <input id="etx-price" v-model.number="price" type="number" min="0" step="0.01" required class="input" />
           </div>
         </div>
 
-        <label for="etx-fees" class="mb-1 block text-sm text-slate-600">Transaction Fees</label>
+        <label for="etx-fees" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Transaction Fees</label>
         <div class="mb-4 flex gap-2">
           <div class="flex flex-1 items-center rounded-lg border border-slate-300 focus-within:border-blue-500">
-            <span class="pl-3 text-sm text-slate-500">{{ feesType === "fixed" ? currencySymbol : "%" }}</span>
+            <span class="pl-3 text-sm text-slate-500 dark:text-slate-400">{{ feesType === "fixed" ? currencySymbol : "%" }}</span>
             <input
               id="etx-fees"
               v-model.number="fees"
@@ -189,12 +190,12 @@ function goResearch() {
           </button>
         </div>
 
-        <div class="mb-4 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
-          <span class="text-sm text-slate-600">Total Cost</span>
-          <span class="text-sm font-semibold tabular-nums text-slate-900">{{ formatCurrency(totalCost, transaction.currency) }}</span>
+        <div class="mb-4 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/50">
+          <span class="text-sm text-slate-600 dark:text-slate-300">Total Cost</span>
+          <span class="text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ formatCurrency(totalCost, transaction.currency) }}</span>
         </div>
 
-        <p v-if="error" class="mb-3 text-sm text-red-600">{{ error }}</p>
+        <p v-if="error" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ error }}</p>
 
         <div class="flex justify-end gap-2">
           <button type="button" class="btn-ghost" @click="emit('close')">Cancel</button>

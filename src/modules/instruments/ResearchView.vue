@@ -71,12 +71,12 @@ async function addToWatchlist(): Promise<void> {
   <div>
     <div class="mb-6 flex flex-wrap items-center gap-3">
       <router-link to="/en/investments" class="btn-ghost">&larr; Go back</router-link>
-      <img :src="`/api/logos/${symbol}`" :alt="symbol" class="h-9 w-9 rounded-full bg-slate-100" />
+      <img :src="`/api/logos/${symbol}`" :alt="symbol" class="h-9 w-9 rounded-full bg-slate-100 dark:bg-slate-800" />
       <div>
         <h1 class="text-2xl font-semibold">{{ symbol }}</h1>
-        <p v-if="profile?.name" class="text-sm text-slate-500">{{ profile.name }}</p>
+        <p v-if="profile?.name" class="text-sm text-slate-500 dark:text-slate-400">{{ profile.name }}</p>
       </div>
-      <span class="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-600">{{ routeSymbol }}</span>
+      <span class="rounded-full bg-slate-200 dark:bg-slate-700/70 px-2 py-0.5 text-xs font-medium text-slate-600 dark:text-slate-300">{{ routeSymbol }}</span>
       <button
         type="button"
         class="btn-secondary ml-auto text-sm"
@@ -88,28 +88,28 @@ async function addToWatchlist(): Promise<void> {
       <button class="btn-ghost" @click="showSearch = true">Search for a stock... &#8984;K</button>
     </div>
 
-    <p v-if="watchlistStatus" class="mb-4 rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-700">{{ watchlistStatus }}</p>
+    <p v-if="watchlistStatus" class="mb-4 rounded-lg bg-blue-50 dark:bg-blue-500/10 px-3 py-2 text-sm text-blue-700 dark:text-blue-400">{{ watchlistStatus }}</p>
 
     <div role="navigation" aria-label="Quick symbol switch" class="mb-6 flex items-center gap-1 overflow-x-auto">
       <router-link
         v-for="s in quickSymbols"
         :key="s"
         :to="{ name: String(route.name), params: { symbol: researchSymbol(s) } }"
-        class="flex shrink-0 flex-col items-center gap-1 rounded-lg px-2 py-1.5 hover:bg-slate-100"
-        :class="symbol === s ? 'bg-slate-100' : ''"
+        class="flex shrink-0 flex-col items-center gap-1 rounded-lg px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800"
+        :class="symbol === s ? 'bg-slate-100 dark:bg-slate-800' : ''"
       >
-        <img :src="`/api/logos/${s}`" :alt="s" class="h-8 w-8 rounded-full bg-slate-100" />
-        <span class="text-[10px] font-medium text-slate-600">{{ s }}</span>
+        <img :src="`/api/logos/${s}`" :alt="s" class="h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800" />
+        <span class="text-[10px] font-medium text-slate-600 dark:text-slate-300">{{ s }}</span>
       </router-link>
     </div>
 
-    <nav aria-label="Research tabs" class="mb-6 flex gap-1 overflow-x-auto border-b border-slate-200">
+    <nav aria-label="Research tabs" class="mb-6 flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-slate-700/60">
       <router-link
         v-for="tab in tabs"
         :key="tab.name"
         :to="{ name: tab.name, params: { symbol: routeSymbol } }"
-        class="whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900"
-        :class="route.name === tab.name ? 'border-blue-600 text-blue-700' : 'border-transparent'"
+        class="whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100"
+        :class="route.name === tab.name ? 'border-blue-600 text-blue-700 dark:text-blue-400' : 'border-transparent'"
       >
         {{ tab.label }}
       </router-link>

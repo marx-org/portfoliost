@@ -55,26 +55,26 @@ function summary(a: NewsArticle): string | undefined {
 
 <template>
   <div class="space-y-4">
-    <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-slate-500">Loading news...</p>
+    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
+    <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading news...</p>
 
     <template v-if="!loading && !error">
       <dl v-if="stats" class="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <div class="card p-4">
-          <dt class="text-sm text-slate-500">Timeline Events</dt>
+          <dt class="text-sm text-slate-500 dark:text-slate-400">Timeline Events</dt>
           <dd class="mt-1 text-xl font-semibold tabular-nums">{{ stats.data.total_article_count.toLocaleString() }}</dd>
         </div>
         <div class="card p-4">
-          <dt class="text-sm text-slate-500">Analyzed Articles</dt>
+          <dt class="text-sm text-slate-500 dark:text-slate-400">Analyzed Articles</dt>
           <dd class="mt-1 text-xl font-semibold tabular-nums">{{ stats.data.total_analyzed_article_count.toLocaleString() }}</dd>
         </div>
         <div class="card p-4">
-          <dt class="text-sm text-slate-500">Last Fetched</dt>
+          <dt class="text-sm text-slate-500 dark:text-slate-400">Last Fetched</dt>
           <dd class="mt-1 text-sm font-medium tabular-nums">{{ formatDate(stats.data.last_fetched_at) }}</dd>
         </div>
       </dl>
 
-      <p class="text-sm text-slate-500">
+      <p class="text-sm text-slate-500 dark:text-slate-400">
         {{ articles.length }} of {{ total.toLocaleString() }} articles for {{ symbol }}
       </p>
 
@@ -86,14 +86,14 @@ function summary(a: NewsArticle): string | undefined {
                 :href="article.article?.url"
                 target="_blank"
                 rel="noopener"
-                class="font-medium text-slate-900 hover:text-blue-600 hover:underline"
+                class="font-medium text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 hover:underline"
               >
                 {{ article.article?.title ?? "Untitled" }}
               </a>
-              <p class="mt-1 text-xs text-slate-500">
+              <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                 {{ sourceOf(article) ?? "Unknown source" }} &middot; {{ formatDate(article.published_at) }}
               </p>
-              <p v-if="summary(article)" class="mt-2 line-clamp-3 text-sm text-slate-600">{{ summary(article) }}</p>
+              <p v-if="summary(article)" class="mt-2 line-clamp-3 text-sm text-slate-600 dark:text-slate-300">{{ summary(article) }}</p>
             </div>
             <span v-if="toneOf(article)" class="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium" :class="toneClass(toneOf(article))">
               {{ toneOf(article) }}
@@ -102,7 +102,7 @@ function summary(a: NewsArticle): string | undefined {
         </li>
       </ul>
 
-      <p v-else class="text-sm text-slate-500">No news articles found.</p>
+      <p v-else class="text-sm text-slate-500 dark:text-slate-400">No news articles found.</p>
     </template>
   </div>
 </template>

@@ -119,16 +119,17 @@ const historyChart = computed(() => ({
 </script>
 
 <template>
+
   <div class="card cursor-pointer p-5" @click="goToDetail">
     <div class="flex items-start justify-between gap-3">
       <div>
-        <h3 class="font-semibold text-slate-900">{{ wallet.name }}</h3>
-        <p class="text-xs text-slate-500">{{ wallet.currency }} &middot; {{ wallet.isDefault ? "Default" : "Secondary" }}</p>
+        <h3 class="font-semibold text-slate-900 dark:text-slate-100">{{ wallet.name }}</h3>
+        <p class="text-xs text-slate-500 dark:text-slate-400">{{ wallet.currency }} &middot; {{ wallet.isDefault ? "Default" : "Secondary" }}</p>
       </div>
       <div class="flex items-center gap-4" @click.stop>
         <div class="text-right">
           <p class="text-lg font-semibold tabular-nums">{{ formatCurrency(wallet.balance, wallet.currency) }}</p>
-          <p class="text-xs text-slate-500">{{ formatNumber(wallet.availableBalance) }} available</p>
+          <p class="text-xs text-slate-500 dark:text-slate-400">{{ formatNumber(wallet.availableBalance) }} available</p>
         </div>
         <div class="relative">
           <button
@@ -145,7 +146,7 @@ const historyChart = computed(() => ({
           </button>
           <template v-if="openMenu">
             <div class="fixed inset-0 z-20" @click="openMenu = false"></div>
-            <div class="absolute right-0 z-30 mt-1 w-44 rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+            <div class="absolute right-0 z-30 mt-1 w-44 rounded-lg border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700/60 dark:bg-slate-900">
               <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50" @click="openRename">Edit name</button>
               <button type="button" class="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50" @click="openDelete">Delete wallet</button>
             </div>
@@ -156,19 +157,19 @@ const historyChart = computed(() => ({
 
     <div class="mt-4">
       <div class="mb-1 flex items-center justify-between">
-        <span class="text-xs text-slate-500">Balance</span>
+        <span class="text-xs text-slate-500 dark:text-slate-400">Balance</span>
         <button type="button" class="text-xs font-medium text-blue-600 hover:underline" @click.stop="goToDetail">History</button>
       </div>
-      <p v-if="historyError" class="text-sm text-red-600">{{ historyError }}</p>
+      <p v-if="historyError" class="text-sm text-red-600 dark:text-red-400">{{ historyError }}</p>
       <component :is="'apexchart'" v-else-if="history.length" :options="historyChart" :series="historyChart.series" />
       <div v-else class="flex h-[160px] items-center justify-center">
-        <p class="text-xs text-slate-400">Loading balance...</p>
+        <p class="text-xs text-slate-400 dark:text-slate-500">Loading balance...</p>
       </div>
     </div>
 
-    <p v-if="notice" class="mt-3 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">{{ notice }}</p>
+    <p v-if="notice" class="mt-3 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700 dark:bg-green-500/10 dark:text-green-400">{{ notice }}</p>
 
-    <div class="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3" @click.stop>
+    <div class="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 dark:border-slate-800" @click.stop>
       <button type="button" class="btn-emerald text-xs" @click="openCash('deposit')">Deposit</button>
       <button type="button" class="btn-red-ghost text-xs" @click="openCash('withdraw')">Withdraw</button>
       <button type="button" class="btn-secondary text-xs" @click="openCash('transfer')">Transfer</button>
@@ -190,9 +191,9 @@ const historyChart = computed(() => ({
       <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Rename wallet">
         <h3 class="mb-4 text-base font-semibold">Rename wallet</h3>
         <form @submit.prevent="submitRename">
-          <label for="wallet-name" class="mb-1 block text-sm text-slate-600">Name</label>
+          <label for="wallet-name" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Name</label>
           <input id="wallet-name" v-model="renameName" type="text" required class="input mb-4" />
-          <p v-if="renameError" class="mb-3 text-sm text-red-600">{{ renameError }}</p>
+          <p v-if="renameError" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ renameError }}</p>
           <div class="flex justify-end gap-2">
             <button type="button" class="btn-ghost" @click="showRename = false">Cancel</button>
             <button type="submit" class="btn-primary" :disabled="renameBusy || !renameName.trim()">
@@ -210,8 +211,8 @@ const historyChart = computed(() => ({
     >
       <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Delete wallet">
         <h3 class="mb-4 text-base font-semibold">Delete wallet</h3>
-        <p class="text-sm text-slate-600">Delete "{{ wallet.name }}" and its cash history? This cannot be undone.</p>
-        <p v-if="deleteError" class="mb-3 mt-2 text-sm text-red-600">{{ deleteError }}</p>
+        <p class="text-sm text-slate-600 dark:text-slate-300">Delete "{{ wallet.name }}" and its cash history? This cannot be undone.</p>
+        <p v-if="deleteError" class="mb-3 mt-2 text-sm text-red-600 dark:text-red-400">{{ deleteError }}</p>
         <div class="mt-4 flex justify-end gap-2">
           <button type="button" class="btn-ghost" @click="showDeleteConfirm = false">Cancel</button>
           <button type="button" class="btn-primary bg-red-600" :disabled="deleteBusy" @click="submitDelete">

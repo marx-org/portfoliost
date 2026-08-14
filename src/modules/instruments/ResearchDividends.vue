@@ -58,21 +58,21 @@ function dateLabel(d: string): string {
 
 <template>
   <div class="space-y-6">
-    <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-slate-500">Loading dividends...</p>
+    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
+    <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading dividends...</p>
 
     <template v-if="!loading && !error && data">
       <div v-if="stats" class="grid grid-cols-1 gap-6 sm:grid-cols-3">
         <div class="card p-6">
-          <p class="text-sm text-slate-500">Payments</p>
+          <p class="text-sm text-slate-500 dark:text-slate-400">Payments</p>
           <p class="text-2xl font-semibold">{{ stats.count }}</p>
         </div>
         <div class="card p-6">
-          <p class="text-sm text-slate-500">Cumulative ({{ history[0]?.year }}–{{ stats.latestYear }})</p>
+          <p class="text-sm text-slate-500 dark:text-slate-400">Cumulative ({{ history[0]?.year }}–{{ stats.latestYear }})</p>
           <p class="text-2xl font-semibold">{{ formatCurrency(stats.total) }}</p>
         </div>
         <div class="card p-6">
-          <p class="text-sm text-slate-500">Latest ({{ stats.latestYear }})</p>
+          <p class="text-sm text-slate-500 dark:text-slate-400">Latest ({{ stats.latestYear }})</p>
           <p class="text-2xl font-semibold">{{ formatCurrency(stats.latest) }}</p>
         </div>
       </div>
@@ -80,7 +80,7 @@ function dateLabel(d: string): string {
       <div class="card p-6">
         <h2 class="mb-3 text-base font-semibold">Dividends per share - {{ symbol }}</h2>
         <component :is="'apexchart'" v-if="history.length" :options="chartOptions" :series="chartOptions.series" />
-        <p v-else class="text-sm text-slate-500">No dividend data available.</p>
+        <p v-else class="text-sm text-slate-500 dark:text-slate-400">No dividend data available.</p>
       </div>
 
       <div class="card p-6">
@@ -88,7 +88,7 @@ function dateLabel(d: string): string {
         <div class="overflow-x-auto">
           <table class="w-full min-w-[560px] text-sm">
             <thead>
-              <tr class="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+              <tr class="border-b border-slate-200 dark:border-slate-700/60 text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 <th class="py-2 pr-3">Date</th>
                 <th class="py-2 pr-3 text-right">Year</th>
                 <th class="py-2 pr-3 text-right">Amount</th>
@@ -97,10 +97,10 @@ function dateLabel(d: string): string {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="r in history" :key="r.date" class="border-b border-slate-100">
+              <tr v-for="r in history" :key="r.date" class="border-b border-slate-100 dark:border-slate-800">
                 <td class="py-2 pr-3 font-medium">{{ dateLabel(r.date) }}</td>
                 <td class="py-2 pr-3 text-right">{{ r.year }}</td>
-                <td class="py-2 pr-3 text-right font-semibold text-green-700">{{ formatCurrency(r.amount, r.currency) }}</td>
+                <td class="py-2 pr-3 text-right font-semibold text-green-700 dark:text-green-400">{{ formatCurrency(r.amount, r.currency) }}</td>
                 <td class="py-2 pr-3">{{ r.currency }}</td>
                 <td class="py-2 pr-3 capitalize">{{ r.type }}</td>
               </tr>

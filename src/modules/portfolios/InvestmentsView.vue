@@ -131,33 +131,34 @@ async function submitCreateWallet() {
 </script>
 
 <template>
+
   <div>
     <div class="mb-6 flex items-center justify-between">
       <div>
         <h1 class="text-2xl font-semibold">Portfolios</h1>
-        <p v-if="store.totalMetrics" class="text-sm text-slate-500">
+        <p v-if="store.totalMetrics" class="text-sm text-slate-500 dark:text-slate-400">
           {{ store.portfolios.length }} portfolio{{ store.portfolios.length === 1 ? "" : "s" }} &middot; base currency
           {{ store.totalMetrics.baseCurrency }}
         </p>
       </div>
       <div class="flex items-center gap-2">
         <div class="card flex items-center gap-2 px-3 py-1.5">
-          <span class="text-xs text-slate-500">Cash balance</span>
-          <span class="text-sm font-semibold tabular-nums text-slate-900" data-testid="cash-balance">
+          <span class="text-xs text-slate-500 dark:text-slate-400">Cash balance</span>
+          <span class="text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100" data-testid="cash-balance">
             {{ formatCurrency(cashTotal) }}
           </span>
-          <span v-for="c in cashBreakdown" :key="c.currency" class="text-xs text-slate-500">
+          <span v-for="c in cashBreakdown" :key="c.currency" class="text-xs text-slate-500 dark:text-slate-400">
             {{ c.currency }} {{ formatPercent(c.pct, 0) }}
           </span>
         </div>
         <div class="relative">
           <button type="button" class="btn-secondary text-sm" @click="showCurrencyMenu = !showCurrencyMenu">
             Display currency: {{ displayCurrency }} ({{ displayCurrency === "USD" ? "$" : displayCurrency === "EUR" ? "€" : displayCurrency === "GBP" ? "£" : displayCurrency === "CHF" ? "Fr" : "zł" }})
-            <span class="ml-1 text-xs text-slate-400">▾</span>
+            <span class="ml-1 text-xs text-slate-400 dark:text-slate-500">▾</span>
           </button>
           <template v-if="showCurrencyMenu">
             <div class="fixed inset-0 z-20" @click="showCurrencyMenu = false"></div>
-            <div class="absolute right-0 z-30 mt-1 w-44 rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+            <div class="absolute right-0 z-30 mt-1 w-44 rounded-lg border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700/60 dark:bg-slate-900">
               <button
                 v-for="c in currencies"
                 :key="c"
@@ -176,21 +177,21 @@ async function submitCreateWallet() {
 
     <InvestmentsTabs />
 
-    <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-slate-500">Loading portfolios...</p>
+    <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-400">{{ error }}</p>
+    <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading portfolios...</p>
 
     <template v-if="store.totalMetrics">
       <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div class="card p-5">
-          <p class="text-sm text-slate-500">Total Value</p>
+          <p class="text-sm text-slate-500 dark:text-slate-400">Total Value</p>
           <p class="mt-1 text-2xl font-semibold tabular-nums">{{ formatCurrency(store.totalMetrics.totalValue, displayCurrency) }}</p>
         </div>
         <div class="card p-5">
-          <p class="text-sm text-slate-500">Total Invested</p>
+          <p class="text-sm text-slate-500 dark:text-slate-400">Total Invested</p>
           <p class="mt-1 text-2xl font-semibold tabular-nums">{{ formatCurrency(store.totalMetrics.totalInvested, displayCurrency) }}</p>
         </div>
         <div class="card p-5">
-          <p class="text-sm text-slate-500">Total Gain / Loss</p>
+          <p class="text-sm text-slate-500 dark:text-slate-400">Total Gain / Loss</p>
           <p
             class="mt-1 text-2xl font-semibold tabular-nums"
             :class="store.totalMetrics.totalGainLoss >= 0 ? 'text-green-600' : 'text-red-600'"
@@ -199,7 +200,7 @@ async function submitCreateWallet() {
           </p>
         </div>
         <div class="card p-5">
-          <p class="text-sm text-slate-500">Total Return</p>
+          <p class="text-sm text-slate-500 dark:text-slate-400">Total Return</p>
           <p
             class="mt-1 text-2xl font-semibold tabular-nums"
             :class="store.totalMetrics.returnPercentage >= 0 ? 'text-green-600' : 'text-red-600'"
@@ -213,13 +214,13 @@ async function submitCreateWallet() {
     <section v-if="!loading" class="mb-10">
       <div class="mb-4 flex items-center justify-between">
         <h2 class="text-lg font-semibold">Investment Portfolios</h2>
-        <span v-if="store.portfolios.length" class="text-sm text-slate-500">{{ store.portfolios.length }}</span>
+        <span v-if="store.portfolios.length" class="text-sm text-slate-500 dark:text-slate-400">{{ store.portfolios.length }}</span>
       </div>
 
       <div v-if="store.portfolios.length" class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         <PortfolioCard v-for="p in store.portfolios" :key="p.id" :portfolio="p" @add-position="openAddPosition(p.id)" />
       </div>
-      <p v-else-if="!error" class="text-sm text-slate-500">No investment portfolios yet.</p>
+      <p v-else-if="!error" class="text-sm text-slate-500 dark:text-slate-400">No investment portfolios yet.</p>
 
       <div class="mt-4">
         <button type="button" class="btn-secondary text-sm" @click="showCreate = true">Create Investment Portfolio</button>
@@ -231,20 +232,20 @@ async function submitCreateWallet() {
         <div>
           <h2 class="text-lg font-semibold">Cash Portfolios</h2>
           <div v-if="walletsStore.wallets.length" class="mt-0.5 flex items-center gap-3 text-sm">
-            <span class="text-slate-500">Total Balance</span>
+            <span class="text-slate-500 dark:text-slate-400">Total Balance</span>
             <span class="font-semibold tabular-nums" data-testid="cash-total-balance">{{ formatCurrency(cashTotal) }}</span>
-            <span v-for="c in cashBreakdown" :key="c.currency" class="text-xs text-slate-500">
+            <span v-for="c in cashBreakdown" :key="c.currency" class="text-xs text-slate-500 dark:text-slate-400">
               {{ c.currency }} {{ formatPercent(c.pct, 0) }}
             </span>
           </div>
         </div>
-        <span v-if="walletsStore.wallets.length" class="text-sm text-slate-500">{{ walletsStore.wallets.length }}</span>
+        <span v-if="walletsStore.wallets.length" class="text-sm text-slate-500 dark:text-slate-400">{{ walletsStore.wallets.length }}</span>
       </div>
 
       <div v-if="walletsStore.wallets.length" class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         <CashWalletCard v-for="w in walletsStore.wallets" :key="w.id" :wallet="w" />
       </div>
-      <p v-else-if="!error" class="text-sm text-slate-500">No cash portfolios yet.</p>
+      <p v-else-if="!error" class="text-sm text-slate-500 dark:text-slate-400">No cash portfolios yet.</p>
 
       <div class="mt-4">
         <button type="button" class="btn-secondary text-sm" @click="showCreateWallet = true">Create Cash Wallet</button>
@@ -259,25 +260,25 @@ async function submitCreateWallet() {
       <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Create portfolio">
         <h3 class="mb-4 text-base font-semibold">Create a portfolio</h3>
         <form @submit.prevent="submitCreate">
-          <label for="portfolio-name" class="mb-1 block text-sm text-slate-600">Name</label>
+          <label for="portfolio-name" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Name</label>
           <input id="portfolio-name" v-model="newPortfolio.name" type="text" required class="input mb-4" placeholder="e.g. Long-term growth" />
-          <label for="portfolio-description" class="mb-1 block text-sm text-slate-600">Description</label>
+          <label for="portfolio-description" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Description</label>
           <textarea id="portfolio-description" v-model="newPortfolio.description" rows="2" class="input mb-4" placeholder="Optional"></textarea>
           <div class="mb-4 grid grid-cols-2 gap-3">
             <div>
-              <label for="portfolio-strategy" class="mb-1 block text-sm text-slate-600">Strategy</label>
+              <label for="portfolio-strategy" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Strategy</label>
               <select id="portfolio-strategy" v-model="newPortfolio.strategy" class="input">
                 <option v-for="s in strategies" :key="s.value" :value="s.value">{{ s.label }}</option>
               </select>
             </div>
             <div>
-              <label for="portfolio-currency" class="mb-1 block text-sm text-slate-600">Currency</label>
+              <label for="portfolio-currency" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Currency</label>
               <select id="portfolio-currency" v-model="newPortfolio.currency" class="input">
                 <option v-for="c in currencies" :key="c" :value="c">{{ c }}</option>
               </select>
             </div>
           </div>
-          <label for="portfolio-wallet" class="mb-1 block text-sm text-slate-600">Linked wallet</label>
+          <label for="portfolio-wallet" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Linked wallet</label>
           <div class="mb-4 flex gap-2">
             <select id="portfolio-wallet" v-model="newPortfolio.walletId" class="input flex-1">
               <option value="" disabled>Select a wallet…</option>
@@ -287,7 +288,7 @@ async function submitCreateWallet() {
             </select>
             <button type="button" class="btn-secondary shrink-0 text-sm" @click="openCreateWalletFromPortfolio">Create wallet</button>
           </div>
-          <p v-if="createError" class="mb-3 text-sm text-red-600">{{ createError }}</p>
+          <p v-if="createError" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ createError }}</p>
           <div class="flex justify-end gap-2">
             <button type="button" class="btn-ghost" @click="showCreate = false">Cancel</button>
             <button type="submit" class="btn-primary" :disabled="creating || !newPortfolio.name.trim()">
@@ -306,13 +307,13 @@ async function submitCreateWallet() {
       <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Create wallet">
         <h3 class="mb-4 text-base font-semibold">Create a cash wallet</h3>
         <form @submit.prevent="submitCreateWallet">
-          <label for="wallet-name" class="mb-1 block text-sm text-slate-600">Name</label>
+          <label for="wallet-name" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Name</label>
           <input id="wallet-name" v-model="newWallet.name" type="text" required class="input mb-4" placeholder="e.g. USD savings" />
-          <label for="wallet-currency" class="mb-1 block text-sm text-slate-600">Currency</label>
+          <label for="wallet-currency" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Currency</label>
           <select id="wallet-currency" v-model="newWallet.currency" class="input mb-4">
             <option v-for="c in currencies" :key="c" :value="c">{{ c }}</option>
           </select>
-          <p v-if="createWalletError" class="mb-3 text-sm text-red-600">{{ createWalletError }}</p>
+          <p v-if="createWalletError" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ createWalletError }}</p>
           <div class="flex justify-end gap-2">
             <button type="button" class="btn-ghost" @click="showCreateWallet = false">Cancel</button>
             <button type="submit" class="btn-primary" :disabled="creatingWallet || !newWallet.name.trim()">

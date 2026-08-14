@@ -186,20 +186,20 @@ async function submitDelete() {
   <div>
     <div class="mb-6">
       <h1 class="text-2xl font-semibold">Transactions</h1>
-      <p class="mt-1 text-sm text-slate-500">All investing and cash transactions from across your account.</p>
+      <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">All investing and cash transactions from across your account.</p>
     </div>
 
     <InvestmentsTabs />
     <TransactionsSubTabs />
 
-    <p v-if="notice" class="mb-4 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">{{ notice }}</p>
-    <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-slate-500">Loading transactions...</p>
+    <p v-if="notice" class="mb-4 rounded-lg bg-green-50 dark:bg-green-500/10 px-3 py-2 text-sm text-green-700 dark:text-green-400">{{ notice }}</p>
+    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
+    <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading transactions...</p>
 
     <div v-if="!loading && !error" class="card overflow-hidden">
-      <div class="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+      <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-700/60 px-5 py-3">
         <h2 class="text-base font-semibold">All transactions</h2>
-        <label class="flex items-center gap-1.5 text-xs text-slate-500">
+        <label class="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
           Group by
           <select v-model="groupBy" class="input !w-auto !py-1 !text-xs" aria-label="Group by">
             <option v-for="mode in groupModes" :key="mode.value" :value="mode.value">{{ mode.label }}</option>
@@ -209,14 +209,14 @@ async function submitDelete() {
       <div v-if="transactions.length" class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead>
-            <tr class="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
+            <tr class="border-b border-slate-100 dark:border-slate-800 text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
               <th
                 v-for="col in sortableColumns"
                 :key="col.key"
                 :data-testid="`table-th-${col.key}`"
                 class="px-5 py-2.5 font-medium"
               >
-                <button type="button" class="inline-flex items-center gap-1 hover:text-slate-900" @click="toggleSort(col.key)">
+                <button type="button" class="inline-flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100" @click="toggleSort(col.key)">
                   {{ col.label }}
                   <span v-if="sortBy === col.key">{{ sortOrder === "asc" ? "↑" : "↓" }}</span>
                 </button>
@@ -226,41 +226,41 @@ async function submitDelete() {
               <th class="px-5 py-2.5"><span class="sr-only">Actions</span></th>
             </tr>
           </thead>
-          <tbody v-for="g in groups" :key="g.label || 'all'" class="divide-y divide-slate-100">
+          <tbody v-for="g in groups" :key="g.label || 'all'" class="divide-y divide-slate-100 dark:divide-slate-800">
             <tr v-if="g.label" class="bg-slate-100/70" data-testid="transactions-group-row">
-              <td :colspan="11" class="px-5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+              <td :colspan="11" class="px-5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
                 {{ g.label }}
-                <span class="font-normal text-slate-400">{{ g.items.length }}</span>
+                <span class="font-normal text-slate-400 dark:text-slate-500">{{ g.items.length }}</span>
               </td>
             </tr>
-            <tr v-for="tx in g.items" :key="tx.id" class="hover:bg-slate-50">
+            <tr v-for="tx in g.items" :key="tx.id" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
               <td class="px-5 py-3">
                 <router-link
                   :to="{ name: 'research-overview', params: { symbol: researchSymbol(tx.instrumentSymbol) } }"
                   class="flex items-center gap-3"
                 >
-                  <img :src="`/api/logos/${tx.instrumentSymbol}`" :alt="tx.instrumentSymbol" class="h-8 w-8 rounded-full bg-slate-100" />
+                  <img :src="`/api/logos/${tx.instrumentSymbol}`" :alt="tx.instrumentSymbol" class="h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800" />
                   <span>
-                    <span class="flex items-center gap-1 font-medium text-slate-900">
+                    <span class="flex items-center gap-1 font-medium text-slate-900 dark:text-slate-100">
                       {{ tx.instrumentSymbol }}
-                      <span class="text-xs font-normal text-slate-400">(US)</span>
-                      <span class="text-xs font-normal text-slate-400">{{ typeLabel(tx.assetType ?? "STOCK") }}</span>
+                      <span class="text-xs font-normal text-slate-400 dark:text-slate-500">(US)</span>
+                      <span class="text-xs font-normal text-slate-400 dark:text-slate-500">{{ typeLabel(tx.assetType ?? "STOCK") }}</span>
                     </span>
-                    <span class="block text-xs text-slate-500">{{ tx.instrumentName }}</span>
+                    <span class="block text-xs text-slate-500 dark:text-slate-400">{{ tx.instrumentName }}</span>
                   </span>
                 </router-link>
               </td>
-              <td class="px-5 py-3 whitespace-nowrap text-slate-600">{{ formatDateTime(tx.executedAt) }}</td>
-              <td class="px-5 py-3 text-slate-600">{{ tx.portfolioName || "—" }}</td>
-              <td class="px-5 py-3 font-medium text-slate-900">{{ typeLabel(tx.type) }}</td>
+              <td class="px-5 py-3 whitespace-nowrap text-slate-600 dark:text-slate-300">{{ formatDateTime(tx.executedAt) }}</td>
+              <td class="px-5 py-3 text-slate-600 dark:text-slate-300">{{ tx.portfolioName || "—" }}</td>
+              <td class="px-5 py-3 font-medium text-slate-900 dark:text-slate-100">{{ typeLabel(tx.type) }}</td>
               <td class="px-5 py-3 text-right tabular-nums">{{ formatNumber(tx.quantity) }}</td>
               <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(tx.price) }}</td>
               <td class="px-5 py-3">{{ tx.instrumentCurrency }}</td>
               <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(tx.fees) }}</td>
-              <td class="px-5 py-3 text-right font-medium tabular-nums" :class="amountOf(tx) < 0 ? 'text-red-600' : 'text-green-700'">
+              <td class="px-5 py-3 text-right font-medium tabular-nums" :class="amountOf(tx) < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-700 dark:text-green-400'">
                 {{ formatCurrency(amountOf(tx)) }}
               </td>
-              <td class="px-5 py-3 text-slate-400">-</td>
+              <td class="px-5 py-3 text-slate-400 dark:text-slate-500">-</td>
               <td class="px-5 py-3">
                 <div class="flex justify-end gap-1">
                   <button
@@ -273,7 +273,7 @@ async function submitDelete() {
                   </button>
                   <button
                     type="button"
-                    class="btn-ghost px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                    class="btn-ghost px-2 py-1 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10"
                     aria-label="Delete transaction"
                     @click="openDelete(tx)"
                   >
@@ -282,8 +282,8 @@ async function submitDelete() {
                 </div>
               </td>
             </tr>
-            <tr v-if="g.label" class="border-t border-slate-200 bg-slate-50 font-medium">
-              <td class="px-5 py-3 text-slate-500">{{ g.label }} subtotal</td>
+            <tr v-if="g.label" class="border-t border-slate-200 dark:border-slate-700/60 bg-slate-50 dark:bg-slate-800/50 font-medium">
+              <td class="px-5 py-3 text-slate-500 dark:text-slate-400">{{ g.label }} subtotal</td>
               <td class="px-5 py-3"></td>
               <td class="px-5 py-3"></td>
               <td class="px-5 py-3"></td>
@@ -291,7 +291,7 @@ async function submitDelete() {
               <td class="px-5 py-3"></td>
               <td class="px-5 py-3"></td>
               <td class="px-5 py-3"></td>
-              <td class="px-5 py-3 text-right font-medium tabular-nums" :class="groupAmount(g.items) < 0 ? 'text-red-600' : 'text-green-700'">
+              <td class="px-5 py-3 text-right font-medium tabular-nums" :class="groupAmount(g.items) < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-700 dark:text-green-400'">
                 {{ formatCurrency(groupAmount(g.items)) }}
               </td>
               <td class="px-5 py-3"></td>
@@ -300,14 +300,14 @@ async function submitDelete() {
           </tbody>
         </table>
       </div>
-      <p v-else class="px-5 py-6 text-sm text-slate-500">No transactions found.</p>
+      <p v-else class="px-5 py-6 text-sm text-slate-500 dark:text-slate-400">No transactions found.</p>
 
-      <div v-if="transactions.length" class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-5 py-3">
-        <p class="text-sm text-slate-500">
+      <div v-if="transactions.length" class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 dark:border-slate-700/60 px-5 py-3">
+        <p class="text-sm text-slate-500 dark:text-slate-400">
           {{ (page - 1) * pageSize + 1 }}-{{ Math.min(page * pageSize, total) }} of {{ total }}
         </p>
         <div class="flex items-center gap-4">
-          <label class="flex items-center gap-2 text-sm text-slate-500">
+          <label class="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
             Rows per page
             <select class="input py-1" :value="pageSize" @change="onPageSizeChange">
               <option v-for="s in pageSizes" :key="s" :value="s">{{ s }} per page</option>
@@ -337,7 +337,7 @@ async function submitDelete() {
               :key="n"
               type="button"
               class="btn-ghost px-2 py-1 text-xs"
-              :class="n === page ? 'bg-slate-900 text-white' : ''"
+              :class="n === page ? 'bg-slate-900 text-white dark:bg-slate-700' : ''"
               :aria-current="n === page ? 'page' : undefined"
               :disabled="n === '…'"
               @click="goToPage(Number(n))"

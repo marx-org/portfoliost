@@ -109,27 +109,27 @@ const performers = computed(() => {
         </div>
       </div>
       <component :is="'apexchart'" v-if="equityOptions.series[0].data.length" :options="equityOptions" :series="equityOptions.series" />
-      <p v-else class="text-sm text-slate-500">No analytics available.</p>
+      <p v-else class="text-sm text-slate-500 dark:text-slate-400">No analytics available.</p>
     </div>
 
     <div class="card p-6">
       <div class="mb-3 flex items-center justify-between">
         <h2 class="text-base font-semibold">Drawdown</h2>
-        <button type="button" class="text-sm font-medium text-blue-600 hover:underline" @click="showCustomTimeframe = !showCustomTimeframe">
+        <button type="button" class="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline" @click="showCustomTimeframe = !showCustomTimeframe">
           {{ showCustomTimeframe ? "Hide custom timeframe" : "Add custom timeframe" }}
         </button>
       </div>
       <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div class="rounded-lg bg-slate-50 p-4">
-          <dt class="text-sm text-slate-500">Max Drawdown</dt>
-          <dd class="mt-1 text-xl font-semibold tabular-nums text-red-600">{{ formatPercent(maxDrawdownPercent, 2, true) }}</dd>
+        <div class="rounded-lg bg-slate-50 dark:bg-slate-800/50 p-4">
+          <dt class="text-sm text-slate-500 dark:text-slate-400">Max Drawdown</dt>
+          <dd class="mt-1 text-xl font-semibold tabular-nums text-red-600 dark:text-red-400">{{ formatPercent(maxDrawdownPercent, 2, true) }}</dd>
         </div>
-        <div class="rounded-lg bg-slate-50 p-4">
-          <dt class="text-sm text-slate-500">Current Drawdown</dt>
-          <dd class="mt-1 text-xl font-semibold tabular-nums text-red-600">{{ formatPercent(currentDrawdownPercent, 2, true) }}</dd>
+        <div class="rounded-lg bg-slate-50 dark:bg-slate-800/50 p-4">
+          <dt class="text-sm text-slate-500 dark:text-slate-400">Current Drawdown</dt>
+          <dd class="mt-1 text-xl font-semibold tabular-nums text-red-600 dark:text-red-400">{{ formatPercent(currentDrawdownPercent, 2, true) }}</dd>
         </div>
       </dl>
-      <p v-if="showCustomTimeframe" class="mt-3 text-sm text-slate-500">
+      <p v-if="showCustomTimeframe" class="mt-3 text-sm text-slate-500 dark:text-slate-400">
         Custom timeframe support is coming soon. Pick one of the built-in ranges above instead.
       </p>
     </div>
@@ -137,18 +137,18 @@ const performers = computed(() => {
     <div class="card p-6">
       <h2 class="mb-3 text-base font-semibold">Returns Chart</h2>
       <component :is="'apexchart'" v-if="monthlyOptions.series[0].data.length" :options="monthlyOptions" :series="monthlyOptions.series" />
-      <p v-else class="text-sm text-slate-500">No monthly data available.</p>
+      <p v-else class="text-sm text-slate-500 dark:text-slate-400">No monthly data available.</p>
     </div>
 
     <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
       <div class="card p-6">
         <h2 class="mb-3 text-base font-semibold">Top Performers</h2>
-        <p v-if="!performers.top.length" class="text-sm text-slate-500">No open positions.</p>
-        <ul v-else class="divide-y divide-slate-100">
+        <p v-if="!performers.top.length" class="text-sm text-slate-500 dark:text-slate-400">No open positions.</p>
+        <ul v-else class="divide-y divide-slate-100 dark:divide-slate-800">
           <li v-for="p in performers.top" :key="p.id" class="flex items-center justify-between py-2 text-sm">
             <div>
-              <span class="font-medium text-slate-900">{{ p.symbol }}</span>
-              <p class="text-xs text-slate-500">{{ p.companyName }}</p>
+              <span class="font-medium text-slate-900 dark:text-slate-100">{{ p.symbol }}</span>
+              <p class="text-xs text-slate-500 dark:text-slate-400">{{ p.companyName }}</p>
             </div>
             <div class="text-right">
               <p class="font-medium tabular-nums" :class="gainClass(p.unrealizedGainLoss)">{{ formatSignedCurrency(p.unrealizedGainLoss) }}</p>
@@ -160,12 +160,12 @@ const performers = computed(() => {
 
       <div class="card p-6">
         <h2 class="mb-3 text-base font-semibold">Bottom Performers</h2>
-        <p v-if="!performers.bottom.length" class="text-sm text-slate-500">No open positions.</p>
-        <ul v-else class="divide-y divide-slate-100">
+        <p v-if="!performers.bottom.length" class="text-sm text-slate-500 dark:text-slate-400">No open positions.</p>
+        <ul v-else class="divide-y divide-slate-100 dark:divide-slate-800">
           <li v-for="p in performers.bottom" :key="p.id" class="flex items-center justify-between py-2 text-sm">
             <div>
-              <span class="font-medium text-slate-900">{{ p.symbol }}</span>
-              <p class="text-xs text-slate-500">{{ p.companyName }}</p>
+              <span class="font-medium text-slate-900 dark:text-slate-100">{{ p.symbol }}</span>
+              <p class="text-xs text-slate-500 dark:text-slate-400">{{ p.companyName }}</p>
             </div>
             <div class="text-right">
               <p class="font-medium tabular-nums" :class="gainClass(p.unrealizedGainLoss)">{{ formatSignedCurrency(p.unrealizedGainLoss) }}</p>

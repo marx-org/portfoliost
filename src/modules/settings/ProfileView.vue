@@ -2,11 +2,13 @@
 import { computed, onMounted, ref } from "vue"
 import { useRouter } from "vue-router"
 import { useAuthStore } from "@/stores/auth"
+import { useThemeStore, type ThemePreference } from "@/stores/theme"
 import { changePassword, clearAllData, deleteAccount, getUserProfile, updateUserProfile } from "@/api/users"
 import type { UserProfile } from "@/api/users"
 
 const router = useRouter()
 const auth = useAuthStore()
+const theme = useThemeStore()
 
 const profile = ref<UserProfile | null>(null)
 const loading = ref(true)
@@ -23,6 +25,12 @@ const languages = [
   { value: "fr", label: "🇫🇷 Français" },
   { value: "es", label: "🇪🇸 Español" },
   { value: "pl", label: "🇵🇱 Polski" },
+]
+
+const themeOptions: { value: ThemePreference; label: string }[] = [
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+  { value: "system", label: "System" },
 ]
 
 const password = ref({ newPassword: "", confirm: "" })
@@ -129,9 +137,9 @@ async function confirmDanger() {
 
 <template>
   <div class="space-y-6">
-    <p v-if="notice" class="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">{{ notice }}</p>
-    <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-slate-500">Loading profile...</p>
+    <p v-if="notice" class="rounded-lg bg-green-50 dark:bg-green-500/10 px-3 py-2 text-sm text-green-700 dark:text-green-400">{{ notice }}</p>
+    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
+    <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading profile...</p>
 
     <template v-if="profile">
       <section class="card p-6">
@@ -147,11 +155,11 @@ async function confirmDanger() {
           </div>
           <div class="sm:col-span-2">
             <label for="email" class="label">Email</label>
-            <input id="email" :value="profile.email" type="email" disabled class="input cursor-not-allowed bg-slate-50 text-slate-500" />
-            <p class="mt-1 text-xs text-slate-500">Email cannot be changed for security reasons</p>
+            <input id="email" :value="profile.email" type="email" disabled class="input cursor-not-allowed bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400" />
+            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Email cannot be changed for security reasons</p>
           </div>
         </div>
-        <p v-if="saveError" class="mt-3 text-sm text-red-600">{{ saveError }}</p>
+        <p v-if="saveError" class="mt-3 text-sm text-red-600 dark:text-red-400">{{ saveError }}</p>
         <div class="mt-4">
           <button type="button" class="btn-primary" :disabled="!changed || saving" @click="saveProfile">
             {{ saving ? "Saving..." : "Save Changes" }}
@@ -161,15 +169,36 @@ async function confirmDanger() {
 
       <section class="card p-6">
         <h3 class="text-base font-semibold">Language Preference</h3>
-        <p class="mt-1 text-sm text-slate-500">Select your preferred language. Changes are applied immediately.</p>
+        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Select your preferred language. Changes are applied immediately.</p>
         <select class="input mt-4 max-w-xs" aria-label="Language preference" :value="profile.language" @change="changeLanguage">
           <option v-for="lang in languages" :key="lang.value" :value="lang.value">{{ lang.label }}</option>
         </select>
       </section>
 
       <section class="card p-6">
+        <h3 class="text-base font-semibold">Appearance</h3>
+        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Choose how the app looks. Changes are applied immediately.</p>
+        <div class="mt-4 flex gap-2" role="group" aria-label="Theme">
+          <button
+            v-for="opt in themeOptions"
+            :key="opt.value"
+            type="button"
+            class="rounded-lg border px-4 py-2 text-sm font-medium"
+            :class="
+              theme.preference === opt.value
+                ? 'border-blue-600 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400'
+                : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50'
+            "
+            @click="theme.setPreference(opt.value)"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
+      </section>
+
+      <section class="card p-6">
         <h3 class="text-base font-semibold">Change password</h3>
-        <p class="mt-1 text-sm text-slate-500">Choose a new password for signing in with your email address.</p>
+        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Choose a new password for signing in with your email address.</p>
         <div class="mt-4 grid gap-4 sm:grid-cols-2">
           <div>
             <label for="new-password" class="label">New password *</label>
@@ -180,7 +209,7 @@ async function confirmDanger() {
               class="input"
               placeholder="Enter a new password"
             />
-            <p class="mt-1 text-xs text-slate-500">At least 8 characters with uppercase, lowercase, and number</p>
+            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">At least 8 characters with uppercase, lowercase, and number</p>
           </div>
           <div>
             <label for="confirm-password" class="label">Confirm new password *</label>
@@ -193,8 +222,8 @@ async function confirmDanger() {
             />
           </div>
         </div>
-        <p v-if="passwordError" class="mt-3 text-sm text-red-600">{{ passwordError }}</p>
-        <p v-if="passwordOk" class="mt-3 text-sm text-green-600">Password updated</p>
+        <p v-if="passwordError" class="mt-3 text-sm text-red-600 dark:text-red-400">{{ passwordError }}</p>
+        <p v-if="passwordOk" class="mt-3 text-sm text-green-600 dark:text-green-400">Password updated</p>
         <div class="mt-4">
           <button type="button" class="btn-primary" :disabled="!passwordValid || passwordBusy" @click="submitPassword">
             {{ passwordBusy ? "Updating..." : "Update password" }}
@@ -202,17 +231,17 @@ async function confirmDanger() {
         </div>
       </section>
 
-      <section class="card border-red-100 p-6">
+      <section class="card border-red-100 dark:border-red-500/30 p-6">
         <h3 class="text-base font-semibold">Danger Zone</h3>
         <div class="mt-4 grid gap-4 md:grid-cols-2">
-          <div class="rounded-lg border border-slate-200 p-4">
-            <h4 class="font-semibold text-slate-900">Clear All Data</h4>
-            <p class="mt-1 text-sm text-slate-500">Permanently delete all wallets, portfolios, and transaction history.</p>
+          <div class="rounded-lg border border-slate-200 dark:border-slate-700/60 p-4">
+            <h4 class="font-semibold text-slate-900 dark:text-slate-100">Clear All Data</h4>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Permanently delete all wallets, portfolios, and transaction history.</p>
             <button type="button" class="btn-red-ghost mt-3" @click="dangerDialog = 'clear'">Clear Account</button>
           </div>
-          <div class="rounded-lg border border-slate-200 p-4">
-            <h4 class="font-semibold text-slate-900">Delete Account Permanently</h4>
-            <p class="mt-1 text-sm text-slate-500">Permanently delete your account, all of your data, and your login. This cannot be undone.</p>
+          <div class="rounded-lg border border-slate-200 dark:border-slate-700/60 p-4">
+            <h4 class="font-semibold text-slate-900 dark:text-slate-100">Delete Account Permanently</h4>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Permanently delete your account, all of your data, and your login. This cannot be undone.</p>
             <button type="button" class="btn-danger mt-3" @click="dangerDialog = 'delete'">Delete Account</button>
           </div>
         </div>
@@ -228,14 +257,14 @@ async function confirmDanger() {
         <h3 class="mb-2 text-base font-semibold">
           {{ dangerDialog === "clear" ? "Clear All Data" : "Delete Account Permanently" }}
         </h3>
-        <p class="text-sm text-slate-600">
+        <p class="text-sm text-slate-600 dark:text-slate-300">
           {{
             dangerDialog === "clear"
               ? "This will permanently delete all wallets, portfolios, and transaction history. This cannot be undone."
               : "This will permanently delete your account, all of your data, and your login. This cannot be undone."
           }}
         </p>
-        <p v-if="dangerError" class="mt-3 text-sm text-red-600">{{ dangerError }}</p>
+        <p v-if="dangerError" class="mt-3 text-sm text-red-600 dark:text-red-400">{{ dangerError }}</p>
         <div class="mt-4 flex justify-end gap-2">
           <button type="button" class="btn-ghost" @click="dangerDialog = null">Cancel</button>
           <button type="button" class="btn-danger" :disabled="dangerBusy" @click="confirmDanger">

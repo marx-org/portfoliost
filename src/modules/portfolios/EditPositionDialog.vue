@@ -199,6 +199,7 @@ function formatSigned(v: number): string {
 </script>
 
 <template>
+
   <div v-if="open && position" class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-16" @click.self="close">
     <div class="card max-h-[85vh] w-full max-w-3xl overflow-y-auto p-6" role="dialog" aria-modal="true" :aria-label="`Edit ${position.symbol} position`">
       <div class="mb-4 flex items-center justify-between">
@@ -206,14 +207,14 @@ function formatSigned(v: number): string {
         <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="close">✕</button>
       </div>
 
-      <p class="mb-4 text-sm text-slate-500">
+      <p class="mb-4 text-sm text-slate-500 dark:text-slate-400">
         Changes save when you leave a field. On cross-currency rows, type the total your broker charged to set the exchange rate.
       </p>
 
-      <div class="mb-4 flex items-center justify-between rounded-xl bg-slate-50 px-4 py-2.5">
+      <div class="mb-4 flex items-center justify-between rounded-xl bg-slate-50 px-4 py-2.5 dark:bg-slate-800/50">
         <div>
-          <p class="text-sm text-slate-600">Cash in {{ walletsStore.wallets[0]?.name ?? "cash portfolio" }}:</p>
-          <p class="text-sm font-medium tabular-nums text-slate-900">{{ formatCurrency(walletsStore.wallets[0]?.balance ?? 0, walletsStore.wallets[0]?.currency ?? "USD") }}</p>
+          <p class="text-sm text-slate-600 dark:text-slate-300">Cash in {{ walletsStore.wallets[0]?.name ?? "cash portfolio" }}:</p>
+          <p class="text-sm font-medium tabular-nums text-slate-900 dark:text-slate-100">{{ formatCurrency(walletsStore.wallets[0]?.balance ?? 0, walletsStore.wallets[0]?.currency ?? "USD") }}</p>
         </div>
         <div class="flex items-center gap-2">
           <input type="number" class="input !w-32 !py-1.5 text-sm" placeholder="Amount" aria-label="Amount" />
@@ -221,12 +222,12 @@ function formatSigned(v: number): string {
         </div>
       </div>
 
-      <p v-if="error" class="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
+      <p v-if="error" class="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-400">{{ error }}</p>
 
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead>
-            <tr class="border-b border-slate-100 text-left text-xs uppercase text-slate-500">
+            <tr class="border-b border-slate-100 text-left text-xs uppercase text-slate-500 dark:border-slate-800 dark:text-slate-400">
               <th class="px-3 py-2 font-medium">Date</th>
               <th class="px-3 py-2 font-medium">Type</th>
               <th class="px-3 py-2 font-medium">Quantity</th>
@@ -237,37 +238,37 @@ function formatSigned(v: number): string {
               <th class="px-3 py-2"></th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-slate-100">
-            <tr v-if="loading"><td colspan="8" class="px-3 py-4 text-center text-slate-500">Loading...</td></tr>
+          <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+            <tr v-if="loading"><td colspan="8" class="px-3 py-4 text-center text-slate-500 dark:text-slate-400">Loading...</td></tr>
             <tr v-for="tx in transactions" :key="tx.id">
               <td class="px-3 py-2">
-                <span v-if="isSynthetic(tx)" class="text-sm text-slate-700">{{ fmtDate(tx.executedAt) }}</span>
+                <span v-if="isSynthetic(tx)" class="text-sm text-slate-700 dark:text-slate-200">{{ fmtDate(tx.executedAt) }}</span>
                 <input v-else type="date" class="input !w-auto !px-2 !py-1 text-sm" :value="tx.executedAt.slice(0, 10)" @change="updateField(tx, { executedAt: new Date(($event.target as HTMLInputElement).value).toISOString() })" />
               </td>
-              <td class="px-3 py-2 text-slate-700">{{ typeLabel(tx.type) }}</td>
+              <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ typeLabel(tx.type) }}</td>
               <td class="px-3 py-2">
                 <input type="number" min="0" step="any" class="input !w-24 !px-2 !py-1 text-right text-sm tabular-nums" :value="tx.quantity" @change="updateField(tx, { quantity: Number(($event.target as HTMLInputElement).value) })" />
               </td>
               <td class="px-3 py-2">
                 <span class="inline-flex items-center gap-1">
                   <input type="number" min="0" step="any" class="input !w-24 !px-2 !py-1 text-right text-sm tabular-nums" :value="tx.price" @change="updateField(tx, { price: Number(($event.target as HTMLInputElement).value) })" />
-                  <span class="text-xs text-slate-400">{{ tx.currency || tx.instrumentCurrency || "USD" }}</span>
+                  <span class="text-xs text-slate-400 dark:text-slate-500">{{ tx.currency || tx.instrumentCurrency || "USD" }}</span>
                 </span>
               </td>
               <td class="px-3 py-2">
                 <span class="inline-flex items-center gap-1">
                   <input type="number" min="0" step="any" class="input !w-20 !px-2 !py-1 text-right text-sm tabular-nums" :value="tx.fees ?? 0" @change="updateField(tx, { fees: Number(($event.target as HTMLInputElement).value) })" />
-                  <span class="text-xs text-slate-400">{{ tx.currency || tx.instrumentCurrency || "USD" }}</span>
+                  <span class="text-xs text-slate-400 dark:text-slate-500">{{ tx.currency || tx.instrumentCurrency || "USD" }}</span>
                 </span>
               </td>
-              <td class="px-3 py-2 text-slate-400">{{ (tx.exchangeRate ?? 1) === 1 ? "-" : formatNumber(tx.exchangeRate ?? 1, 4) }}</td>
-              <td class="px-3 py-2 text-right font-medium tabular-nums text-slate-900">{{ formatSigned(totalFor(tx)) }}</td>
+              <td class="px-3 py-2 text-slate-400 dark:text-slate-500">{{ (tx.exchangeRate ?? 1) === 1 ? "-" : formatNumber(tx.exchangeRate ?? 1, 4) }}</td>
+              <td class="px-3 py-2 text-right font-medium tabular-nums text-slate-900 dark:text-slate-100">{{ formatSigned(totalFor(tx)) }}</td>
               <td class="px-3 py-2 text-right">
                 <button v-if="!isSynthetic(tx)" type="button" class="text-xs text-red-600 hover:underline" aria-label="Delete Transaction" @click="removeRow(tx)">Delete</button>
               </td>
             </tr>
           </tbody>
-          <tfoot class="border-t border-slate-200 bg-slate-50">
+          <tfoot class="border-t border-slate-200 bg-slate-50 dark:border-slate-700/60 dark:bg-slate-800/50">
             <tr>
               <td class="px-3 py-2">
                 <input type="date" v-model="newTx.date" class="input !w-auto !px-2 !py-1 text-sm" aria-label="Date" />
@@ -284,7 +285,7 @@ function formatSigned(v: number): string {
               <td class="px-3 py-2">
                 <span class="inline-flex items-center gap-1">
                   <input type="number" v-model="newTx.price" min="0" step="any" class="input !w-24 !px-2 !py-1 text-right text-sm" aria-label="Price per share" />
-                  <span class="text-xs text-slate-400">{{ position.instrumentCurrency || "USD" }}</span>
+                  <span class="text-xs text-slate-400 dark:text-slate-500">{{ position.instrumentCurrency || "USD" }}</span>
                 </span>
               </td>
               <td class="px-3 py-2">

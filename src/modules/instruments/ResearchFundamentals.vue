@@ -58,14 +58,14 @@ function cell(row: Record<string, unknown>, key: string): string {
 
 <template>
   <div class="space-y-6">
-    <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-slate-500">Loading fundamentals...</p>
+    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
+    <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading fundamentals...</p>
 
     <template v-if="!loading && !error && data">
       <div class="card p-6">
         <h2 class="mb-4 text-base font-semibold">Revenue vs Net Income - {{ symbol }}</h2>
         <component :is="'apexchart'" v-if="income.length" :options="trendChartOptions" :series="trendChartOptions.series" />
-        <p v-else class="text-sm text-slate-500">No income data available.</p>
+        <p v-else class="text-sm text-slate-500 dark:text-slate-400">No income data available.</p>
       </div>
 
       <div class="card p-6">
@@ -73,7 +73,7 @@ function cell(row: Record<string, unknown>, key: string): string {
         <div class="overflow-x-auto">
           <table class="w-full min-w-[760px] text-sm">
             <thead>
-              <tr class="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+              <tr class="border-b border-slate-200 dark:border-slate-700/60 text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 <th class="py-2 pr-3">Year</th>
                 <th class="py-2 pr-3 text-right">Revenue</th>
                 <th class="py-2 pr-3 text-right">EBITDA</th>
@@ -87,14 +87,14 @@ function cell(row: Record<string, unknown>, key: string): string {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="r in income" :key="r.year" class="border-b border-slate-100">
+              <tr v-for="r in income" :key="r.year" class="border-b border-slate-100 dark:border-slate-800">
                 <td class="py-2 pr-3 font-medium">{{ r.year }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "revenue") }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "ebitda") }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "ebit") }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "netIncome") }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "netIncomeMargin") }}</td>
-                <td class="py-2 pr-3 text-right" :class="r.netIncomeGrowth && r.netIncomeGrowth < 0 ? 'text-red-600' : ''">{{ cell(r, "netIncomeGrowth") }}</td>
+                <td class="py-2 pr-3 text-right" :class="r.netIncomeGrowth && r.netIncomeGrowth < 0 ? 'text-red-600 dark:text-red-400' : ''">{{ cell(r, "netIncomeGrowth") }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "earningsPerShare") }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "earningsPerShareGrowth") }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "dilutedSharesOutstanding") }}</td>
@@ -109,7 +109,7 @@ function cell(row: Record<string, unknown>, key: string): string {
         <div class="overflow-x-auto">
           <table class="w-full min-w-[820px] text-sm">
             <thead>
-              <tr class="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+              <tr class="border-b border-slate-200 dark:border-slate-700/60 text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 <th class="py-2 pr-3">Year</th>
                 <th class="py-2 pr-3 text-right">Total Assets</th>
                 <th class="py-2 pr-3 text-right">Total Liabilities</th>
@@ -123,14 +123,14 @@ function cell(row: Record<string, unknown>, key: string): string {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="r in balance" :key="r.year" class="border-b border-slate-100">
+              <tr v-for="r in balance" :key="r.year" class="border-b border-slate-100 dark:border-slate-800">
                 <td class="py-2 pr-3 font-medium">{{ r.year }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "totalAssets") }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "totalLiabilities") }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "shareholdersEquity") }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "cashAndShortTermInvestments") }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "totalDebt") }}</td>
-                <td class="py-2 pr-3 text-right" :class="r.netDebt && r.netDebt < 0 ? 'text-green-600' : ''">{{ cell(r, "netDebt") }}</td>
+                <td class="py-2 pr-3 text-right" :class="r.netDebt && r.netDebt < 0 ? 'text-green-600 dark:text-green-400' : ''">{{ cell(r, "netDebt") }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "workingCapital") }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "retainedEarnings") }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "debtEquityRatio") }}</td>
@@ -145,7 +145,7 @@ function cell(row: Record<string, unknown>, key: string): string {
         <div class="overflow-x-auto">
           <table class="w-full min-w-[880px] text-sm">
             <thead>
-              <tr class="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+              <tr class="border-b border-slate-200 dark:border-slate-700/60 text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 <th class="py-2 pr-3">Year</th>
                 <th class="py-2 pr-3 text-right">Operating CF</th>
                 <th class="py-2 pr-3 text-right">Investing CF</th>
@@ -159,7 +159,7 @@ function cell(row: Record<string, unknown>, key: string): string {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="r in cashFlow" :key="r.year" class="border-b border-slate-100">
+              <tr v-for="r in cashFlow" :key="r.year" class="border-b border-slate-100 dark:border-slate-800">
                 <td class="py-2 pr-3 font-medium">{{ r.year }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "cashFlowFromOperatingActivities") }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "cashFlowFromInvestingActivities") }}</td>
