@@ -46,25 +46,56 @@ npm run preview      # preview the build locally
 
 ## Environment variables
 
+Each API module has its own backend URL, allowing modules to be migrated to a
+real backend independently. All default to the local mock.
+
+### Per-module backend URLs (Docker / nginx)
+
+| Variable | Nginx location | Default |
+| --- | --- | --- |
+| `API_AUTH_URL` | `/api/auth/*` | `http://example-service-mock:4010` |
+| `API_USERS_URL` | `/api/users/*` | `http://example-service-mock:4010` |
+| `API_PORTFOLIOS_URL` | `/api/portfolios/*` | `http://example-service-mock:4010` |
+| `API_WALLETS_URL` | `/api/wallets/*` | `http://example-service-mock:4010` |
+| `API_INSTRUMENTS_URL` | `/api/instruments/*` | `http://example-service-mock:4010` |
+| `API_WATCHLISTS_URL` | `/api/watchlists/*` | `http://example-service-mock:4010` |
+| `API_NOTIFICATIONS_URL` | `/api/notifications/*` | `http://example-service-mock:4010` |
+| `API_NEWS_URL` | `/api/news/*` | `http://example-service-mock:4010` |
+| `API_BILLING_URL` | `/api/billing/*` | `http://example-service-mock:4010` |
+| `API_CHARTING_URL` | `/api/charting/*` | `http://example-service-mock:4010` |
+| `API_COPILOT_URL` | `/api/conversations`, `/api/chatbot/*` | `http://example-service-mock:4010` |
+| `API_LOGOS_URL` | `/api/logos/*` | `http://example-service-mock:4010` |
+| `API_EXCHANGE_RATES_URL` | `/api/exchange-rates` | `http://example-service-mock:4010` |
+| `API_SNAPTRADE_URL` | `/api/snaptrade/*` | `http://example-service-mock:4010` |
+| `API_PUBLIC_URL` | `/api/public/*` | `http://example-service-mock:4010` |
+| `API_BACKEND_URL` | catch-all `/api/*` | `http://example-service-mock:4010` |
+
+### Dev server proxy
+
 | Variable | Default | Description |
 | --- | --- | --- |
-| `API_BACKEND_URL` | `http://example-service-mock:4010` | Full URL of the API backend that nginx proxies `/api` requests to |
 | `VITE_API_PROXY_TARGET` | `http://localhost:4010` | Backend URL for the Vite dev server proxy (`npm run dev` only) |
 
-Both default to the local mock backend. When deploying against a real API,
-override them:
+### Migrating a module to a real backend
+
+Set the env var for the module you want to migrate — only that module's
+traffic goes to the new backend, everything else still hits the mock:
 
 ```sh
-# Docker Compose — point at a remote backend
-API_BACKEND_URL=https://api.example.com docker compose up -d --build
-
-# Dev server — point at a remote backend
-VITE_API_PROXY_TARGET=https://api.example.com npm run dev
+# Migrate auth to a real backend, keep everything else on mock
+API_AUTH_URL=https://api.real.com docker compose up -d --build
 ```
 
-The frontend code itself uses only relative paths (`/api/...`) — no runtime
-config change is needed in the Vue app. The backend target is resolved entirely
-by the proxy layer (nginx in production, Vite in development).
+Multiple modules can be migrated independently:
+
+```sh
+API_AUTH_URL=https://api.real.com \
+API_PORTFOLIOS_URL=https://api.real.com \
+  docker compose up -d --build
+```
+
+The frontend code uses only relative paths (`/api/...`) — no code changes
+needed. Routing is handled entirely by nginx at the infrastructure layer.
 
 ## Docker
 
@@ -77,7 +108,7 @@ docker compose up -d --build
 | `portfoliost` | `8080` | Nginx serving the Vue SPA + reverse-proxying `/api` |
 | `example-service-mock` | `4010` | Mock REST API (seeded with captured data) |
 
-To deploy without the mock, point `API_BACKEND_URL` at your real backend and
+To deploy without the mock, set all `API_*_URL` vars to your real backend and
 remove or disable the `example-service-mock` service from the compose file.
 
 ## Testing

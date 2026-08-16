@@ -63,12 +63,27 @@ The same variables are forwarded from your shell into the container by
 
 ### Backend switching (frontend)
 
-The frontend container proxies `/api/` requests to the backend via nginx. The
-target is controlled by a single env var:
+The frontend container proxies `/api/` requests to backends via nginx. Each
+module has its own env var so they can be migrated independently:
 
-| Env var | Default | Purpose |
+| Env var | Nginx location | Default |
 | --- | --- | --- |
-| `API_BACKEND_URL` | `http://example-service-mock:4010` | Full URL of the backend to proxy to |
+| `API_AUTH_URL` | `/api/auth/*` | `http://example-service-mock:4010` |
+| `API_USERS_URL` | `/api/users/*` | `http://example-service-mock:4010` |
+| `API_PORTFOLIOS_URL` | `/api/portfolios/*` | `http://example-service-mock:4010` |
+| `API_WALLETS_URL` | `/api/wallets/*` | `http://example-service-mock:4010` |
+| `API_INSTRUMENTS_URL` | `/api/instruments/*` | `http://example-service-mock:4010` |
+| `API_WATCHLISTS_URL` | `/api/watchlists/*` | `http://example-service-mock:4010` |
+| `API_NOTIFICATIONS_URL` | `/api/notifications/*` | `http://example-service-mock:4010` |
+| `API_NEWS_URL` | `/api/news/*` | `http://example-service-mock:4010` |
+| `API_BILLING_URL` | `/api/billing/*` | `http://example-service-mock:4010` |
+| `API_CHARTING_URL` | `/api/charting/*` | `http://example-service-mock:4010` |
+| `API_COPILOT_URL` | `/api/conversations`, `/api/chatbot/*` | `http://example-service-mock:4010` |
+| `API_LOGOS_URL` | `/api/logos/*` | `http://example-service-mock:4010` |
+| `API_EXCHANGE_RATES_URL` | `/api/exchange-rates` | `http://example-service-mock:4010` |
+| `API_SNAPTRADE_URL` | `/api/snaptrade/*` | `http://example-service-mock:4010` |
+| `API_PUBLIC_URL` | `/api/public/*` | `http://example-service-mock:4010` |
+| `API_BACKEND_URL` | catch-all `/api/*` | `http://example-service-mock:4010` |
 
 **To use the mock backend** (default — no action needed):
 
@@ -76,15 +91,33 @@ target is controlled by a single env var:
 docker compose up -d --build
 ```
 
-**To point at a remote/staging backend** instead of the mock:
+**To migrate a single module** to a real backend:
 
 ```sh
-API_BACKEND_URL=https://staging.example.com docker compose up -d --build
+API_AUTH_URL=https://api.real.com docker compose up -d --build
 ```
 
-When using a remote backend the `example-service-mock` container is still started but
-receives no traffic — you can safely remove it from the compose file or add a
-profile to make it optional.
+**To migrate all modules** to a real backend:
+
+```sh
+API_AUTH_URL=https://api.real.com \
+API_USERS_URL=https://api.real.com \
+API_PORTFOLIOS_URL=https://api.real.com \
+API_WALLETS_URL=https://api.real.com \
+API_INSTRUMENTS_URL=https://api.real.com \
+API_WATCHLISTS_URL=https://api.real.com \
+API_NOTIFICATIONS_URL=https://api.real.com \
+API_NEWS_URL=https://api.real.com \
+API_BILLING_URL=https://api.real.com \
+API_CHARTING_URL=https://api.real.com \
+API_COPILOT_URL=https://api.real.com \
+API_LOGOS_URL=https://api.real.com \
+API_EXCHANGE_RATES_URL=https://api.real.com \
+API_SNAPTRADE_URL=https://api.real.com \
+API_PUBLIC_URL=https://api.real.com \
+API_BACKEND_URL=https://api.real.com \
+  docker compose up -d --build
+```
 
 ## What's covered
 
