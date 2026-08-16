@@ -19,6 +19,8 @@ services:
     container_name: portfoliost
     ports:
       - "8080:80"
+    environment:
+      API_BACKEND_URL: ${API_BACKEND_URL:-http://example-service-mock:4010}
     depends_on:
       - example-service-mock
     restart: unless-stopped

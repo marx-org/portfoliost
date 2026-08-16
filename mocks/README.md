@@ -61,6 +61,31 @@ curl -H "Authorization: Bearer mock-dev-token" http://localhost:4010/api/auth/me
 The same variables are forwarded from your shell into the container by
 `docker-compose.yml` (with defaults).
 
+### Backend switching (frontend)
+
+The frontend container proxies `/api/` requests to the backend via nginx. The
+target is controlled by a single env var:
+
+| Env var | Default | Purpose |
+| --- | --- | --- |
+| `API_BACKEND_URL` | `http://example-service-mock:4010` | Full URL of the backend to proxy to |
+
+**To use the mock backend** (default — no action needed):
+
+```sh
+docker compose up -d --build
+```
+
+**To point at a remote/staging backend** instead of the mock:
+
+```sh
+API_BACKEND_URL=https://staging.example.com docker compose up -d --build
+```
+
+When using a remote backend the `example-service-mock` container is still started but
+receives no traffic — you can safely remove it from the compose file or add a
+profile to make it optional.
+
 ## What's covered
 
 | Tag | Base path | Highlights |
