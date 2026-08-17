@@ -10,6 +10,7 @@ A Vue 3 investment portfolio tracker — parity build of [example-service.ai](ht
 - **ApexCharts** via vue3-apexcharts
 - **Vite** build tool
 - **Vitest** unit tests, **Playwright** E2E tests
+- **KrakenD** API gateway for per-module backend routing
 
 ## Getting started
 
@@ -44,14 +45,30 @@ npm run build        # typecheck + vite build → dist/
 npm run preview      # preview the build locally
 ```
 
+## Architecture
+
+```
+Browser → krakend (port 8080)
+              ├── /api/*  → example-service-mock:4010  (or real backend)
+              └── /*      → portfoliost:80    (static SPA files)
+```
+
+Three independent services in Docker Compose:
+
+| Service | Port | Role |
+| --- | --- | --- |
+| `krakend` | `8080` (exposed) | API gateway — single entry point for browser |
+| `portfoliost` | `80` (internal) | Static Vue SPA files |
+| `example-service-mock` | `4010` (internal) | Mock REST API (seeded with captured data) |
+
 ## Environment variables
 
 Each API module has its own backend URL, allowing modules to be migrated to a
 real backend independently. All default to the local mock.
 
-### Per-module backend URLs (Docker / nginx)
+### Per-module backend URLs (KrakenD gateway)
 
-| Variable | Nginx location | Default |
+| Variable | KrakenD endpoint | Default |
 | --- | --- | --- |
 | `API_AUTH_URL` | `/api/auth/*` | `http://example-service-mock:4010` |
 | `API_USERS_URL` | `/api/users/*` | `http://example-service-mock:4010` |
@@ -95,18 +112,13 @@ API_PORTFOLIOS_URL=https://api.real.com \
 ```
 
 The frontend code uses only relative paths (`/api/...`) — no code changes
-needed. Routing is handled entirely by nginx at the infrastructure layer.
+needed. Routing is handled entirely by KrakenD at the infrastructure layer.
 
 ## Docker
 
 ```sh
 docker compose up -d --build
 ```
-
-| Service | Port | Description |
-| --- | --- | --- |
-| `portfoliost` | `8080` | Nginx serving the Vue SPA + reverse-proxying `/api` |
-| `example-service-mock` | `4010` | Mock REST API (seeded with captured data) |
 
 To deploy without the mock, set all `API_*_URL` vars to your real backend and
 remove or disable the `example-service-mock` service from the compose file.

@@ -1,3 +1,4 @@
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ""
 const TOKEN_KEY = "portfoliost_token"
 
 export function getToken(): string | null {
@@ -40,7 +41,7 @@ async function request<T>({ method, url, body }: RequestOptions): Promise<T> {
   if (token) headers.authorization = `Bearer ${token}`
   if (body !== undefined) headers["content-type"] = "application/json"
 
-  const res = await fetch(url, {
+  const res = await fetch(`${API_BASE}${url}`, {
     method,
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
