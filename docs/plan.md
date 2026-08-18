@@ -152,6 +152,6 @@ Separate contracts repo at `github.com/Marx2/portfoliost-contracts`, published t
 - [x] Commit.
 
 ### Step C4 — Cleanup
-- [ ] Move `docs/proposals/database-drizzle-sqlite-postgres.md` → `../portfoliost-backend/docs/`.
-- [ ] Update this plan with commit hashes for C1–C3.
-- [ ] Commit.
+- [x] Move `docs/proposals/database-drizzle-sqlite-postgres.md` → `../portfoliost-backend/docs/`.
+- [x] Update this plan with commit hashes for C1–C3.
+- [x] Commit.
