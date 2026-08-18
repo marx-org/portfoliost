@@ -67,31 +67,40 @@ Legend: `[ ]` pending · `[x]` done
 Backend lives at `../portfoliost-backend/`. See `docs/proposals/database-drizzle-sqlite-postgres.md`.
 
 ### Step B1 — Project scaffold
-- [ ] `../portfoliost-backend/`: `package.json` (type: module), `tsconfig.json`, `src/index.ts` (Hono server with `/health` endpoint), `vitest.config.ts`.
-- [ ] `npm test` passes (health endpoint test).
-- [ ] Commit.
+- [x] `../portfoliost-backend/`: `package.json` (type: module), `tsconfig.json`, `src/index.ts` (Hono server with `/health` endpoint), `vitest.config.ts`.
+- [x] `npm test` passes (health endpoint test).
+- [x] Commit. — `300cf40`
 
 ### Step B2 — Drizzle + SQLite setup
-- [ ] Install `drizzle-orm`, `better-sqlite3`, `drizzle-kit`. Add `src/db/schema.ts`, `src/db/index.ts` (DB connection), `drizzle.config.ts`.
-- [ ] Schema: `user_preferences` table (userId PK, language, uiPreferences JSON, customBenchmarks JSON, customTimeframes JSON, onboardingStatus JSON, createdAt, updatedAt).
-- [ ] Generate initial migration: `npx drizzle-kit generate`.
-- [ ] `npm test` passes.
-- [ ] Commit.
+- [x] Install `drizzle-orm`, `@libsql/core`, `@libsql/client`, `drizzle-kit`. Add `src/db/schema.ts`, `src/db/index.ts` (DB connection), `drizzle.config.ts`.
+- [x] Schema: `user_preferences` table (userId PK, language, uiPreferences JSON, customBenchmarks JSON, customTimeframes JSON, onboardingStatus JSON, onboardingDraft JSON, createdAt, updatedAt).
+- [x] Generate initial migration: `npx drizzle-kit generate`.
+- [x] `npm test` passes.
+- [x] Commit. — `3edc30c`
 
 ### Step B3 — User preferences CRUD endpoints
-- [ ] `GET /api/users/preferences` — read from DB by JWT user ID (for now, accept user ID from header `X-User-Id` until auth is wired).
-- [ ] `PATCH /api/users/preferences` — update DB by user ID.
-- [ ] `GET /api/users/profile` — merge identity (from header `X-User-Id` + `X-User-Email` etc.) + DB language.
-- [ ] `PATCH /api/users/profile` — update language in DB.
-- [ ] Auto-provision: upsert `user_preferences` row on first access.
-- [ ] Tests for all endpoints.
-- [ ] Commit.
+- [x] `GET /api/users/profile` — merge identity (from header `X-User-Id` + `X-User-Email` etc.) + DB language.
+- [x] `PATCH /api/users/profile` — update language in DB (ignore identity fields).
+- [x] `GET /api/users/preferences` — read from DB by user ID.
+- [x] `PATCH /api/users/preferences` — update DB by user ID.
+- [x] `GET /api/users/preferences/custom-benchmarks` — read from DB (JSON column).
+- [x] `GET /api/users/preferences/custom-timeframes` — read from DB (JSON column).
+- [x] `GET /api/users/onboarding/status` — read from DB.
+- [x] `GET /api/users/onboarding/draft` — read from DB.
+- [x] `POST /api/users/change-password` — return 403.
+- [x] `DELETE /api/users/clear-data` — delete row, return 204.
+- [x] `DELETE /api/users/account` — delete row, return 204.
+- [x] Auto-provision: upsert `user_preferences` row on first access.
+- [x] Tests for all endpoints.
+- [x] Commit. — `97f995c`
 
 ### Step B4 — Dockerize
-- [ ] `Dockerfile` (node:22-alpine, build + run, expose 3000, healthcheck).
-- [ ] `.dockerignore` (exclude node_modules, .git, tests).
-- [ ] Build: `docker build -t portfoliost-backend .` succeeds.
-- [ ] Commit.
+- [x] `Dockerfile` (node:22-alpine, build + run, expose 3000, healthcheck).
+- [x] `.dockerignore` (exclude node_modules, .git, tests).
+- [x] `src/server.ts` — Hono server entrypoint with `@hono/node-server`.
+- [x] Build: `docker build -t portfoliost-backend .` succeeds.
+- [x] Container healthcheck passes, profile endpoint returns correct data.
+- [x] Commit. — `76b8d0f`
 
 ### Step B5 — Add to docker compose
 - [ ] `portfoliost` service in `docker-compose.yml` with volume mount for SQLite data.
