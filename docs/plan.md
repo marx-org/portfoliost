@@ -59,3 +59,43 @@ Legend: `[ ]` pending · `[x]` done
 - [x] All views/components get `dark:` variants for their mapped slate/blue/red/green/amber tokens (bg/text/border/divide), including modals (`AddPositionDialog`, `EditPositionDialog`, `EditTransactionModal`, `WalletCashModals`, `ConfirmDeleteModal`, `InstrumentSearchModal`) and active pagination/history pills (`dark:bg-slate-700`).
 - [x] Tests: `tests/unit/stores/theme.test.ts` (default/apply/persist/system/fallback) + e2e coverage for the sidebar dropdown and profile appearance switcher.
 - [x] Verify: `npm run build` + `test` + `test:mock` + `test:e2e`. Commit.
+
+---
+
+## portfoliost-backend — Database Layer (Drizzle + SQLite)
+
+Backend lives at `../portfoliost-backend/`. See `docs/proposals/database-drizzle-sqlite-postgres.md`.
+
+### Step B1 — Project scaffold
+- [ ] `../portfoliost-backend/`: `package.json` (type: module), `tsconfig.json`, `src/index.ts` (Hono server with `/health` endpoint), `vitest.config.ts`.
+- [ ] `npm test` passes (health endpoint test).
+- [ ] Commit.
+
+### Step B2 — Drizzle + SQLite setup
+- [ ] Install `drizzle-orm`, `better-sqlite3`, `drizzle-kit`. Add `src/db/schema.ts`, `src/db/index.ts` (DB connection), `drizzle.config.ts`.
+- [ ] Schema: `user_preferences` table (userId PK, language, uiPreferences JSON, customBenchmarks JSON, customTimeframes JSON, onboardingStatus JSON, createdAt, updatedAt).
+- [ ] Generate initial migration: `npx drizzle-kit generate`.
+- [ ] `npm test` passes.
+- [ ] Commit.
+
+### Step B3 — User preferences CRUD endpoints
+- [ ] `GET /api/users/preferences` — read from DB by JWT user ID (for now, accept user ID from header `X-User-Id` until auth is wired).
+- [ ] `PATCH /api/users/preferences` — update DB by user ID.
+- [ ] `GET /api/users/profile` — merge identity (from header `X-User-Id` + `X-User-Email` etc.) + DB language.
+- [ ] `PATCH /api/users/profile` — update language in DB.
+- [ ] Auto-provision: upsert `user_preferences` row on first access.
+- [ ] Tests for all endpoints.
+- [ ] Commit.
+
+### Step B4 — Dockerize
+- [ ] `Dockerfile` (node:22-alpine, build + run, expose 3000, healthcheck).
+- [ ] `.dockerignore` (exclude node_modules, .git, tests).
+- [ ] Build: `docker build -t portfoliost-backend .` succeeds.
+- [ ] Commit.
+
+### Step B5 — Add to docker compose
+- [ ] `portfoliost` service in `docker-compose.yml` with volume mount for SQLite data.
+- [ ] Update KrakenD env vars to point `API_AUTH_URL` and `API_USERS_URL` to `http://portfoliost-backend:3000`.
+- [ ] `docker compose up --build` works, healthcheck passes.
+- [ ] `npm run test` + `npm run test:mock` + `npm run test:e2e` in portfoliost still pass.
+- [ ] Commit.
