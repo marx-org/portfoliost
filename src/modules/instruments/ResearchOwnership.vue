@@ -2,14 +2,14 @@
 import { computed, onMounted, ref } from "vue"
 import { useRoute } from "vue-router"
 import { getInstrumentOwnership } from "@/api/instruments"
-import type { ResearchHolderRow, ResearchOwnership } from "@/api/types"
+import type { components } from "@/api/types"
 import { formatCompact, formatNumber } from "@/utils/format"
 import { baseSymbol } from "@/utils/research"
 
 const route = useRoute()
 const symbol = baseSymbol(String(route.params.symbol))
 
-const data = ref<ResearchOwnership | null>(null)
+const data = ref<components["schemas"]["OwnershipData"] | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
 
@@ -28,7 +28,7 @@ const mutualFund = computed(() => data.value?.mutualFund ?? [])
 const insider = computed(() => data.value?.insider ?? [])
 const transactions = computed(() => data.value?.insiderTransactions ?? [])
 
-function holdersChart(rows: ResearchHolderRow[]) {
+function holdersChart(rows: components["schemas"]["HoldingGroup"][]) {
   return {
     chart: { type: "bar" as const, height: 200, toolbar: { show: false } },
     colors: ["#2563eb"],
@@ -154,8 +154,8 @@ function amount(v: number): string {
                 <td class="py-2 pr-3">{{ t.transactionDate }}</td>
                 <td class="py-2 pr-3">{{ t.transactionCode }}</td>
                 <td class="py-2 pr-3">{{ t.transactionText }}</td>
-                <td class="py-2 pr-3 text-right">{{ formatNumber(t.transactionAmount, 0) }}</td>
-                <td class="py-2 pr-3 text-right">{{ amount(t.transactionValue) }}</td>
+                <td class="py-2 pr-3 text-right">{{ formatNumber(t.transactionAmount ?? 0, 0) }}</td>
+                <td class="py-2 pr-3 text-right">{{ amount(t.transactionValue ?? 0) }}</td>
                 <td class="py-2 pr-3">{{ t.filingDate }}</td>
               </tr>
             </tbody>

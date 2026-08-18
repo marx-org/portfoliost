@@ -2,13 +2,11 @@
 import { onMounted, ref } from "vue"
 import { useRoute } from "vue-router"
 import { getPortfolioDividends } from "@/api/portfolios"
-import { formatCurrency } from "@/utils/format"
-import { researchSymbol } from "@/utils/research"
-import type { PortfolioDividends } from "@/api/types"
+import type { components } from "@/api/types"
 
 const route = useRoute()
 const id = String(route.params.id)
-const data = ref<PortfolioDividends | null>(null)
+const data = ref<components["schemas"]["DividendsData"] | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
 const limit = ref(50)
@@ -30,18 +28,14 @@ onMounted(async () => {
     <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading dividends...</p>
 
     <template v-if="!loading && !error && data">
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div class="card p-4">
-          <p class="text-sm text-slate-500 dark:text-slate-400">Total Dividends</p>
-          <p class="mt-1 text-xl font-semibold tabular-nums">{{ formatCurrency(data.totalDividends) }}</p>
-        </div>
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div class="card p-4">
           <p class="text-sm text-slate-500 dark:text-slate-400">Payments</p>
-          <p class="mt-1 text-xl font-semibold tabular-nums">{{ data.count.toLocaleString() }}</p>
+          <p class="mt-1 text-xl font-semibold tabular-nums">{{ (data.history?.length ?? 0).toLocaleString() }}</p>
         </div>
         <div class="card p-4">
           <p class="text-sm text-slate-500 dark:text-slate-400">Holdings</p>
-          <p class="mt-1 text-xl font-semibold tabular-nums">{{ new Set(data.items.map((i) => i.symbol)).size }}</p>
+          <p class="mt-1 text-xl font-semibold tabular-nums">{{ new Set(data.history?.map((i) => i.type)).size }}</p>
         </div>
       </div>
 
@@ -54,23 +48,14 @@ onMounted(async () => {
             <thead>
               <tr class="border-b border-slate-100 dark:border-slate-800 text-left text-xs uppercase text-slate-500 dark:text-slate-400">
                 <th class="px-5 py-2.5 font-medium">Date</th>
-                <th class="px-5 py-2.5 font-medium">Symbol</th>
                 <th class="px-5 py-2.5 font-medium">Type</th>
                 <th class="px-5 py-2.5 text-right font-medium">Amount</th>
                 <th class="px-5 py-2.5 text-right font-medium">Currency</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-              <tr v-for="(d, i) in data.items.slice(0, limit)" :key="`${d.symbol}-${d.date}-${i}`" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+              <tr v-for="(d, i) in (data.history ?? []).slice(0, limit)" :key="`${d.date}-${i}`" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                 <td class="px-5 py-3 whitespace-nowrap">{{ d.date }}</td>
-                <td class="px-5 py-3">
-                  <router-link
-                    :to="{ name: 'research-overview', params: { symbol: researchSymbol(d.symbol) } }"
-                    class="font-medium text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 hover:underline"
-                  >
-                    {{ d.symbol }}
-                  </router-link>
-                </td>
                 <td class="px-5 py-3 capitalize text-slate-600 dark:text-slate-300">{{ d.type }}</td>
                 <td class="px-5 py-3 text-right tabular-nums">{{ d.amount.toFixed(4) }}</td>
                 <td class="px-5 py-3 text-right tabular-nums">{{ d.currency }}</td>
@@ -78,8 +63,8 @@ onMounted(async () => {
             </tbody>
           </table>
         </div>
-        <div v-if="data.items.length > limit" class="flex justify-center border-t border-slate-200 dark:border-slate-700/60 px-5 py-3">
-          <button type="button" class="btn-ghost text-sm" @click="limit = data.items.length">Show all {{ data.items.length }}</button>
+        <div v-if="(data.history?.length ?? 0) > limit" class="flex justify-center border-t border-slate-200 dark:border-slate-700/60 px-5 py-3">
+          <button type="button" class="btn-ghost text-sm" @click="limit = data.history?.length ?? 0">Show all {{ data.history?.length ?? 0 }}</button>
         </div>
       </div>
     </template>

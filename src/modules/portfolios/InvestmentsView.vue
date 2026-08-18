@@ -194,18 +194,18 @@ async function submitCreateWallet() {
           <p class="text-sm text-slate-500 dark:text-slate-400">Total Gain / Loss</p>
           <p
             class="mt-1 text-2xl font-semibold tabular-nums"
-            :class="store.totalMetrics.totalGainLoss >= 0 ? 'text-green-600' : 'text-red-600'"
+            :class="(store.totalMetrics?.totalGainLoss ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'"
           >
-            {{ formatSignedCurrency(store.totalMetrics.totalGainLoss, displayCurrency) }}
+            {{ formatSignedCurrency(store.totalMetrics?.totalGainLoss ?? 0, displayCurrency) }}
           </p>
         </div>
         <div class="card p-5">
           <p class="text-sm text-slate-500 dark:text-slate-400">Total Return</p>
           <p
             class="mt-1 text-2xl font-semibold tabular-nums"
-            :class="store.totalMetrics.returnPercentage >= 0 ? 'text-green-600' : 'text-red-600'"
+            :class="(store.totalMetrics?.returnPercentage ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'"
           >
-            {{ formatPercent(store.totalMetrics.returnPercentage) }}
+            {{ formatPercent(store.totalMetrics?.returnPercentage ?? 0) }}
           </p>
         </div>
       </div>

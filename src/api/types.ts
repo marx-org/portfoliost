@@ -1,209 +1,58 @@
+// Auto-generated types from OpenAPI spec (via openapi-typescript)
 export type * from "../../generated/api-types"
 
-export interface AuthUser {
-  id: string
-  email: string
-  language: string
-  role: string
-  isDemoUser: boolean
-  createdAt: string
-  updatedAt: string
-  lastLoginAt: string | null
-}
+// Re-export schemas under short names used by API modules and stores
+import type { components } from "../../generated/api-types"
+export type Schemas = components["schemas"]
 
-export interface AuthResponse {
-  access_token: string
-  token_type: string
-  expires_in: number
-  user: AuthUser
-}
+// ─── Schema aliases used by stores and components ────────────
+export type AuthUser = components["schemas"]["AuthUser"]
+export type AuthResponse = components["schemas"]["AuthResponse"]
+export type MeResponse = components["schemas"]["MeResponse"]
+export type AuthMe = components["schemas"]["MeResponse"]
+export type UserProfile = components["schemas"]["UserProfile"]
+export type UserPreferences = components["schemas"]["UserPreferences"]
+export type BillingPlans = components["schemas"]["BillingPlans"]
+export type BillingSubscription = components["schemas"]["BillingSubscription"]
+export type BillingEntitlements = components["schemas"]["BillingEntitlements"]
 
-export interface AllocationSlice {
-  name: string
-  value: number
-}
+export type Portfolio = components["schemas"]["Portfolio"]
+export type PortfolioDetail = components["schemas"]["PortfolioDetail"]
+export type PortfolioSummaryMetrics = components["schemas"]["PortfolioSummaryMetrics"]
+export type PortfolioAnalytics = components["schemas"]["PortfolioAnalytics"]
+export type PortfolioPositions = components["schemas"]["Position"][]
+export type PortfoliosSummaries = components["schemas"]["Portfolio"][]
+export type PortfoliosTotalMetrics = components["schemas"]["PortfolioTotalMetrics"]
+export type PortfolioAllocation = components["schemas"]["PortfolioSnapshot"]["allocation"]
+export type PortfolioDividends = components["schemas"]["DividendsData"]
+export type PortfolioCalendar = components["schemas"]["CalendarData"]
+export type PortfolioNews = components["schemas"]["NewsArticleList"]
+export type PortfolioCompare = components["schemas"]["PortfolioSnapshot"]
+export type PortfolioTransactionsPage = { items: components["schemas"]["Transaction"][] }
+export type PortfoliosTransactions = { items: components["schemas"]["Transaction"][]; total: number; page: number; limit: number; totalPages: number; hasNext: boolean; hasPrevious: boolean }
 
-export interface PortfolioAllocation {
-  totalValue: number
-  bySector: AllocationSlice[]
-  byAssetType: AllocationSlice[]
-  byCurrency: AllocationSlice[]
-}
+export type CashWallet = components["schemas"]["CashWallet"]
+export type Wallets = components["schemas"]["CashWallet"][]
+export type WalletsTotalBalance = components["schemas"]["WalletsTotalBalance"]
+export type BalanceHistory = components["schemas"]["BalanceHistory"]
+export type CashTransaction = components["schemas"]["CashTransaction"]
 
-export interface PortfolioDividendRow {
-  symbol: string
-  companyName: string
-  date: string
-  year: number
-  amount: number
-  currency: string
-  type: string
-}
+export type InstrumentDetail = components["schemas"]["InstrumentDetail"]
+export type InstrumentMetrics = components["schemas"]["InstrumentMetrics"]
+export type InstrumentOverviewMetrics = components["schemas"]["InstrumentOverviewMetrics"]
+export type InstrumentProfile = components["schemas"]["InstrumentProfile"]
+export type Quote = components["schemas"]["Quote"]
+export type QuoteAapl = components["schemas"]["Quote"]
+export type PriceHistory = components["schemas"]["PriceHistory"]
+export type InstrumentsMetrics = components["schemas"]["InstrumentMetrics"]
+export type InstrumentsOverviewMetrics = components["schemas"]["InstrumentOverviewMetrics"]
+export type InstrumentsProfile = components["schemas"]["InstrumentProfile"]
+export type IrEventsAapl = components["schemas"]["InvestorRelationEvent"][]
+export type HoldingGroup = components["schemas"]["HoldingGroup"]
 
-export interface PortfolioDividends {
-  totalDividends: number
-  count: number
-  items: PortfolioDividendRow[]
-}
-
-export interface PortfolioCalendarEvent {
-  symbol: string
-  companyName: string
-  type: "earnings" | "exDividend" | "dividend"
-  date: string
-  title: string
-  amount: number | null
-  quarter: number | null
-}
-
-export interface PortfolioCalendar {
-  upcoming: PortfolioCalendarEvent[]
-  past: PortfolioCalendarEvent[]
-  total: number
-}
-
-export interface PortfolioNews {
-  data: Array<{
-    id: string
-    ticker: string
-    article: { title: string; url: string }
-    published_at: string
-    sentiment?: { score: number; tone: string; confidence: string }
-  }>
-  total: number
-}
-
-export interface PortfolioCompareRow {
-  symbol: string
-  name: string
-  quantity: number
-  marketValue: number
-  weight: number
-  [key: string]: unknown
-}
-
-export interface PortfolioCompare {
-  totalValue: number
-  items: PortfolioCompareRow[]
-}
-
-export interface ResearchSeasonality {
-  symbol: string
-  years: number
-  metric: string
-  monthly_returns: { month: string; return_pct: number }[]
-}
-
-export interface ResearchFundamentals {
-  financialHighlights: {
-    incomeStatement: Array<{
-      year: number
-      revenue: number
-      ebit: number
-      netIncome: number
-      netIncomeGrowth: number | null
-      netIncomeMargin: number
-      earningsPerShare: number
-      earningsPerShareGrowth: number | null
-      dilutedSharesOutstanding: number
-      ebitda: number
-    }>
-    balanceSheet: Array<{
-      year: number
-      totalAssets: number
-      totalLiabilities: number
-      shareholdersEquity: number
-      cash: number
-      cashAndShortTermInvestments: number
-      totalDebt: number
-      netDebt: number
-      workingCapital: number
-      retainedEarnings: number
-      debtEquityRatio: number
-    }>
-    cashFlow: Array<{
-      year: number
-      cashFlowFromOperatingActivities: number
-      cashFlowFromFinancingActivities: number
-      cashFlowFromInvestingActivities: number
-      freeCashFlow: number
-      freeCashFlowGrowth: number | null
-      freeCashFlowPerShare: number
-      capitalExpenditures: number
-      depreciation: number
-      dividendPayment: number
-    }>
-  }
-}
-
-export interface ResearchOwnership {
-  institutional: ResearchHolderRow[]
-  mutualFund: ResearchHolderRow[]
-  insider?: ResearchHolderRow[]
-  insiderTransactions?: ResearchInsiderTransaction[]
-}
-
-export interface ResearchInsiderTransaction {
-  title: string
-  transactionDate: string
-  transactionCode: string
-  transactionText: string
-  transactionAmount: number
-  transactionValue: number
-  filingDate: string
-}
-
-export interface ResearchHolderRow {
-  date: string
-  holdingPercentage: number
-  holdersCount: number
-  sumOfCurrentPositions: number
-  sumOfCurrentPositionsValue: number
-}
-
-export interface ResearchDividendRow {
-  date: string
-  year: number
-  amount: number
-  currency: string
-  type: string
-}
-
-export interface ResearchDividends {
-  history: ResearchDividendRow[]
-}
-
-export interface ResearchCalendar {
-  earnings: Array<{ date: string; title?: string; year: number; quarter: number }>
-  exDividend: Array<{ date: string; title?: string; year: number; amount: number }>
-  dividend: Array<{ date: string; title?: string; year: number; amount: number }>
-}
-
-export interface ResearchCompare {
-  symbol: string
-  name: string
-  price: number
-  marketCap: number
-  peRatio: number
-  forwardPe: number
-  pbRatio: number
-  psRatio: number
-  dividendYield: number
-  revenueGrowth: number
-  netMargin: number
-  roe: number
-  grossMargin: number
-  operatingMargin: number
-  evToEbitda: number
-  evToSales: number
-  fcfMargin: number
-  netIncome: number
-  revenue: number
-  sharesOutstanding: number
-  currency: string
-}
+// ─── Manual type not yet in OpenAPI spec ─────────────────────
 
 export interface ResearchPeers {
   symbol: string
-  items: ResearchCompare[]
+  items: components["schemas"]["CompareRow"][]
 }

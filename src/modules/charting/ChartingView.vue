@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue"
 import { getChartingCompare, getChartingPresets, type ChartingPreset } from "@/api/charting"
-import type { ResearchCompare } from "@/api/types"
+import type { components } from "@/api/types"
 import InstrumentSearchModal from "@/modules/instruments/InstrumentSearchModal.vue"
 import { COMPARE_METRICS } from "@/modules/instruments/compareMetrics"
+
+type ResearchCompare = components["schemas"]["ResearchCompare"]
 
 const MAX_STOCKS = 10
 

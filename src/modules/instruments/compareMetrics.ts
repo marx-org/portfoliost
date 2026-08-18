@@ -1,5 +1,7 @@
-import type { ResearchCompare } from "@/api/types"
+import type { components } from "@/api/types"
 import { formatCompact, formatCurrency, formatNumber, formatPercent } from "@/utils/format"
+
+type ResearchCompare = components["schemas"]["ResearchCompare"]
 
 export interface CompareMetric {
   key: keyof ResearchCompare

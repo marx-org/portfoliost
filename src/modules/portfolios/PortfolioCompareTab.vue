@@ -4,18 +4,18 @@ import { useRoute } from "vue-router"
 import { getPortfolioCompare } from "@/api/portfolios"
 import { formatCurrency, formatNumber, formatPercent } from "@/utils/format"
 import { researchSymbol } from "@/utils/research"
-import type { PortfolioCompareRow } from "@/api/types"
+import type { components } from "@/api/types"
 
 const route = useRoute()
 const id = String(route.params.id)
-const rows = ref<PortfolioCompareRow[]>([])
+const rows = ref<components["schemas"]["CompareRow"][]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
 
 onMounted(async () => {
   try {
     const res = await getPortfolioCompare(id)
-    rows.value = res.items
+    rows.value = res.items ?? []
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Failed to load comparison"
   } finally {
@@ -57,7 +57,7 @@ function num(value: unknown, format: (v: number) => string): string {
             <tr v-for="r in rows" :key="r.symbol" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
               <td class="px-5 py-3">
                 <router-link
-                  :to="{ name: 'research-overview', params: { symbol: researchSymbol(r.symbol) } }"
+                  :to="{ name: 'research-overview', params: { symbol: researchSymbol(r.symbol ?? '') } }"
                   class="font-medium text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 hover:underline"
                 >
                   {{ r.symbol }}

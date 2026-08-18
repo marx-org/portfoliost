@@ -2,14 +2,14 @@
 import { computed, onMounted, ref } from "vue"
 import { useRoute } from "vue-router"
 import { getInstrumentFundamentals } from "@/api/instruments"
-import type { ResearchFundamentals } from "@/api/types"
+import type { components } from "@/api/types"
 import { formatCompact } from "@/utils/format"
 import { baseSymbol } from "@/utils/research"
 
 const route = useRoute()
 const symbol = baseSymbol(String(route.params.symbol))
 
-const data = ref<ResearchFundamentals | null>(null)
+const data = ref<components["schemas"]["FundamentalsData"] | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
 

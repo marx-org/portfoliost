@@ -4,20 +4,19 @@ import { useRoute } from "vue-router"
 import { getPortfolioCalendar } from "@/api/portfolios"
 import { formatCurrency } from "@/utils/format"
 import { researchSymbol } from "@/utils/research"
-import type { PortfolioCalendarEvent } from "@/api/types"
 
 const route = useRoute()
 const id = String(route.params.id)
-const upcoming = ref<PortfolioCalendarEvent[]>([])
-const past = ref<PortfolioCalendarEvent[]>([])
+const upcoming = ref<Array<{ symbol?: string; companyName?: string; type: string; date: string; title?: string; amount?: number | null; quarter?: number | null }>>([])
+const past = ref<Array<{ symbol?: string; companyName?: string; type: string; date: string; title?: string; amount?: number | null; quarter?: number | null }>>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
 
 onMounted(async () => {
   try {
     const res = await getPortfolioCalendar(id)
-    upcoming.value = res.upcoming
-    past.value = res.past
+    upcoming.value = res.upcoming ?? []
+    past.value = res.past ?? []
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Failed to load calendar"
   } finally {
@@ -57,7 +56,7 @@ function badgeClass(type: string): string {
                 <td class="px-5 py-3 whitespace-nowrap">{{ e.date }}</td>
                 <td class="px-5 py-3">
                   <router-link
-                    :to="{ name: 'research-overview', params: { symbol: researchSymbol(e.symbol) } }"
+                    :to="{ name: 'research-overview', params: { symbol: researchSymbol(e.symbol ?? '') } }"
                     class="font-medium text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 hover:underline"
                   >
                     {{ e.symbol }}

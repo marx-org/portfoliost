@@ -41,7 +41,7 @@ async function loadChart() {
   chartError.value = false
   try {
     const analytics = await getPortfolioAnalytics(props.portfolio.id, timeframe.value)
-    series.value = (analytics.performance?.timeSeries ?? []).map((p) => p.value)
+    series.value = (analytics.performance?.timeSeries ?? []).map((p) => p.value ?? 0)
   } catch {
     chartError.value = true
   }

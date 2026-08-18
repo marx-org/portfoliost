@@ -32,10 +32,10 @@ async function changeTimeframe(timeframe: PortfolioAnalyticsTimeframe) {
 }
 
 const equityOptions = computed(() => {
-  const series = store.analytics?.performance.timeSeries ?? []
-  const values = series.map((p) => [new Date(p.date).getTime(), p.value])
+  const series = store.analytics?.performance?.timeSeries ?? []
+  const values = series.map((p) => [new Date(p.date ?? "").getTime(), p.value ?? 0])
   const bench = store.analytics?.benchmarks?.[0]
-  const benchSeries = (bench?.timeSeries ?? []).map((p) => [new Date(p.date).getTime(), p.value])
+  const benchSeries = (bench?.timeSeries ?? []).map((p) => [new Date(p.date ?? "").getTime(), p.value ?? 0])
   return {
     chart: { type: "line" as const, height: 300, toolbar: { show: false }, zoom: { enabled: false } },
     colors: ["#2563eb", "#94a3b8"],
@@ -50,7 +50,7 @@ const equityOptions = computed(() => {
 })
 
 const monthlyOptions = computed(() => {
-  const returns = store.analytics?.performance.monthlyReturns ?? []
+  const returns = store.analytics?.performance?.monthlyReturns ?? []
   return {
     chart: { type: "bar" as const, height: 220, toolbar: { show: false } },
     colors: ["#2563eb"],
@@ -61,7 +61,7 @@ const monthlyOptions = computed(() => {
   }
 })
 
-const seriesValues = computed(() => (store.analytics?.performance.timeSeries ?? []).map((p) => p.value))
+const seriesValues = computed(() => (store.analytics?.performance?.timeSeries ?? []).map((p) => p.value ?? 0))
 
 const currentDrawdownPercent = computed(() => {
   const values = seriesValues.value

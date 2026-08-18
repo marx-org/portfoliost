@@ -3,11 +3,11 @@ import { computed, onMounted, ref } from "vue"
 import { useRoute } from "vue-router"
 import { getPortfolioAllocation } from "@/api/portfolios"
 import { formatCurrency, formatPercent } from "@/utils/format"
-import type { PortfolioAllocation } from "@/api/types"
+import type { components } from "@/api/types"
 
 const route = useRoute()
 const id = String(route.params.id)
-const allocation = ref<PortfolioAllocation | null>(null)
+const allocation = ref<components["schemas"]["PortfolioSnapshot"]["allocation"] | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
 
@@ -34,11 +34,11 @@ const sectorOptions = computed(() => {
   }
 })
 
-function weight(name: string, slices: { name: string; value: number }[] | undefined): number {
+function weight(name: string, slices: { name?: string; value?: number }[] | undefined): number {
   const list = slices ?? []
-  const total = list.reduce((s, x) => s + x.value, 0)
+  const total = list.reduce((s, x) => s + (x.value ?? 0), 0)
   const slice = list.find((x) => x.name === name)
-  return total > 0 && slice ? (slice.value / total) * 100 : 0
+  return total > 0 && slice ? ((slice.value ?? 0) / total) * 100 : 0
 }
 </script>
 
@@ -69,8 +69,8 @@ function weight(name: string, slices: { name: string; value: number }[] | undefi
             <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
               <tr v-for="s in allocation?.bySector" :key="s.name" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                 <td class="px-5 py-3 font-medium text-slate-900 dark:text-slate-100">{{ s.name }}</td>
-                <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(s.value) }}</td>
-                <td class="px-5 py-3 text-right tabular-nums">{{ formatPercent(weight(s.name, allocation?.bySector)) }}</td>
+                <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(s.value ?? 0) }}</td>
+                <td class="px-5 py-3 text-right tabular-nums">{{ formatPercent(weight(s.name ?? "", allocation?.bySector)) }}</td>
               </tr>
             </tbody>
           </table>
@@ -86,8 +86,8 @@ function weight(name: string, slices: { name: string; value: number }[] | undefi
             <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
               <tr v-for="s in allocation?.byAssetType" :key="s.name" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                 <td class="px-5 py-3 font-medium text-slate-900 dark:text-slate-100">{{ s.name }}</td>
-                <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(s.value) }}</td>
-                <td class="px-5 py-3 text-right tabular-nums">{{ formatPercent(weight(s.name, allocation?.byAssetType)) }}</td>
+                <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(s.value ?? 0) }}</td>
+                <td class="px-5 py-3 text-right tabular-nums">{{ formatPercent(weight(s.name ?? "", allocation?.byAssetType)) }}</td>
               </tr>
             </tbody>
           </table>
@@ -100,8 +100,8 @@ function weight(name: string, slices: { name: string; value: number }[] | undefi
             <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
               <tr v-for="s in allocation?.byCurrency" :key="s.name" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                 <td class="px-5 py-3 font-medium text-slate-900 dark:text-slate-100">{{ s.name }}</td>
-                <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(s.value) }}</td>
-                <td class="px-5 py-3 text-right tabular-nums">{{ formatPercent(weight(s.name, allocation?.byCurrency)) }}</td>
+                <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(s.value ?? 0) }}</td>
+                <td class="px-5 py-3 text-right tabular-nums">{{ formatPercent(weight(s.name ?? "", allocation?.byCurrency)) }}</td>
               </tr>
             </tbody>
           </table>

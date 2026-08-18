@@ -1,13 +1,14 @@
 import { http } from "./client"
-import type {
-  HistoryDaily,
-  InstrumentsDetail,
-  InstrumentsMetrics,
-  InstrumentsOverviewMetrics,
-  InstrumentsProfile,
-  IrEventsAapl,
-  QuoteAapl,
-} from "./types"
+import type { components } from "../../generated/api-types"
+import type { ResearchPeers } from "./types"
+
+type InstrumentsDetail = components["schemas"]["InstrumentDetail"]
+type InstrumentsMetrics = components["schemas"]["InstrumentMetrics"]
+type InstrumentsOverviewMetrics = components["schemas"]["InstrumentOverviewMetrics"]
+type InstrumentsProfile = components["schemas"]["InstrumentProfile"]
+type HistoryDaily = components["schemas"]["PriceHistory"]
+type QuoteAapl = components["schemas"]["Quote"]
+type IrEventsAapl = components["schemas"]["InvestorRelationEvent"][]
 
 export interface InstrumentSearchResult {
   symbol: string
@@ -67,37 +68,37 @@ export async function getEpsSurprises(symbol: string): Promise<unknown> {
   return http.get<unknown>(`/api/instruments/${symbol}/eps-surprises`)
 }
 
-export async function getInstrumentFundamentals(symbol: string): Promise<import("./types").ResearchFundamentals> {
-  return http.get<import("./types").ResearchFundamentals>(`/api/instruments/${symbol}/fundamentals`)
+export async function getInstrumentFundamentals(symbol: string): Promise<components["schemas"]["FundamentalsData"]> {
+  return http.get<components["schemas"]["FundamentalsData"]>(`/api/instruments/${symbol}/fundamentals`)
 }
 
-export async function getInstrumentOwnership(symbol: string): Promise<import("./types").ResearchOwnership> {
-  return http.get<import("./types").ResearchOwnership>(`/api/instruments/${symbol}/ownership`)
+export async function getInstrumentOwnership(symbol: string): Promise<components["schemas"]["OwnershipData"]> {
+  return http.get<components["schemas"]["OwnershipData"]>(`/api/instruments/${symbol}/ownership`)
 }
 
-export async function getInstrumentDividends(symbol: string): Promise<import("./types").ResearchDividends> {
-  return http.get<import("./types").ResearchDividends>(`/api/instruments/${symbol}/dividends`)
+export async function getInstrumentDividends(symbol: string): Promise<components["schemas"]["DividendsData"]> {
+  return http.get<components["schemas"]["DividendsData"]>(`/api/instruments/${symbol}/dividends`)
 }
 
-export async function getInstrumentCalendar(symbol: string): Promise<import("./types").ResearchCalendar> {
-  return http.get<import("./types").ResearchCalendar>(`/api/instruments/${symbol}/calendar`)
+export async function getInstrumentCalendar(symbol: string): Promise<components["schemas"]["CalendarData"]> {
+  return http.get<components["schemas"]["CalendarData"]>(`/api/instruments/${symbol}/calendar`)
 }
 
-export async function getInstrumentCompare(symbol: string): Promise<import("./types").ResearchCompare> {
-  return http.get<import("./types").ResearchCompare>(`/api/instruments/${symbol}/compare`)
+export async function getInstrumentCompare(symbol: string): Promise<components["schemas"]["ResearchCompare"]> {
+  return http.get<components["schemas"]["ResearchCompare"]>(`/api/instruments/${symbol}/compare`)
 }
 
-export async function getInstrumentPeers(symbol: string): Promise<import("./types").ResearchPeers> {
-  return http.get<import("./types").ResearchPeers>(`/api/instruments/${symbol}/peers`)
+export async function getInstrumentPeers(symbol: string): Promise<ResearchPeers> {
+  return http.get<ResearchPeers>(`/api/instruments/${symbol}/peers`)
 }
 
 export async function getInstrumentSeasonality(
   symbol: string,
   years = 5,
   metric = "avg",
-): Promise<import("./types").ResearchSeasonality> {
+): Promise<components["schemas"]["SeasonalityData"]> {
   const q = new URLSearchParams({ years: String(years), metric })
-  return http.get<import("./types").ResearchSeasonality>(`/api/instruments/${symbol}/seasonality?${q}`)
+  return http.get<components["schemas"]["SeasonalityData"]>(`/api/instruments/${symbol}/seasonality?${q}`)
 }
 
 export async function getProjections(symbol: string): Promise<unknown> {

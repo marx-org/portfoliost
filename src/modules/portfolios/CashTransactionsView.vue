@@ -36,10 +36,10 @@ async function load(targetPage = page.value) {
   error.value = null
   try {
     const res = await getAllWalletTransactions(targetPage, pageSize.value, sortBy.value, sortOrder.value)
-    transactions.value = res.data
-    total.value = res.meta.total
-    page.value = res.meta.page
-    totalPages.value = res.meta.totalPages
+    transactions.value = res.data ?? []
+    total.value = res.meta?.total ?? 0
+    page.value = res.meta?.page ?? 1
+    totalPages.value = res.meta?.totalPages ?? 1
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Failed to load wallet transactions"
   } finally {

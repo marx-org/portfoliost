@@ -1,7 +1,7 @@
 import { defineStore } from "pinia"
 import { ref } from "vue"
 import * as portfoliosApi from "@/api/portfolios"
-import type { PortfolioAnalytics1Y, PortfolioDetail, PortfolioPositions, PortfolioSummaryMetrics, PortfoliosSummaries, PortfoliosTotalMetrics } from "@/api/types"
+import type { PortfolioAnalytics, PortfolioDetail, PortfolioPositions, PortfolioSummaryMetrics, PortfoliosSummaries, PortfoliosTotalMetrics } from "@/api/types"
 
 export const usePortfolioStore = defineStore("portfolios", () => {
   const portfolios = ref<PortfoliosSummaries>([])
@@ -9,7 +9,7 @@ export const usePortfolioStore = defineStore("portfolios", () => {
   const detail = ref<PortfolioDetail | null>(null)
   const summaryMetrics = ref<PortfolioSummaryMetrics | null>(null)
   const positions = ref<PortfolioPositions>([])
-  const analytics = ref<PortfolioAnalytics1Y | null>(null)
+  const analytics = ref<PortfolioAnalytics | null>(null)
   const analyticsTimeframe = ref<portfoliosApi.PortfolioAnalyticsTimeframe>("1Y")
   const loading = ref(false)
   const error = ref<string | null>(null)

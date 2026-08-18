@@ -1,19 +1,17 @@
 import { http } from "./client"
-import type {
-  PortfolioAllocation,
-  PortfolioAnalytics1Y,
-  PortfolioCalendar,
-  PortfolioCompare,
-  PortfolioDetail,
-  PortfolioDividends,
-  PortfolioNews,
-  PortfolioPositions,
-  PortfolioSummaryMetrics,
-  PortfoliosSummaries,
-  PortfoliosTotalMetrics,
-  PortfolioTransactionsPage,
-  PortfoliosTransactions,
-} from "./types"
+import type { components } from "../../generated/api-types"
+
+type PortfolioDetail = components["schemas"]["PortfolioDetail"]
+type PortfolioSummaryMetrics = components["schemas"]["PortfolioSummaryMetrics"]
+type PortfolioPositions = components["schemas"]["Position"][]
+type PortfolioAnalytics1Y = components["schemas"]["PortfolioAnalytics"]
+type PortfoliosSummaries = components["schemas"]["Portfolio"][]
+type PortfoliosTotalMetrics = components["schemas"]["PortfolioTotalMetrics"]
+type PortfolioTransactionsPage = { items: components["schemas"]["Transaction"][] }
+type PortfolioAllocation = components["schemas"]["PortfolioSnapshot"]["allocation"]
+type PortfolioDividends = components["schemas"]["DividendsData"]
+type PortfolioCalendar = components["schemas"]["CalendarData"]
+type PortfolioNews = components["schemas"]["NewsArticleList"]
 
 export interface PaginatedResponse<T> {
   items: T[]
@@ -139,8 +137,8 @@ export async function getPortfolioNews(id: string): Promise<PortfolioNews> {
   return http.get<PortfolioNews>(`/api/portfolios/${id}/news`)
 }
 
-export async function getPortfolioCompare(id: string): Promise<PortfolioCompare> {
-  return http.get<PortfolioCompare>(`/api/portfolios/${id}/compare`)
+export async function getPortfolioCompare(id: string): Promise<components["schemas"]["PortfolioSnapshot"]> {
+  return http.get<components["schemas"]["PortfolioSnapshot"]>(`/api/portfolios/${id}/compare`)
 }
 
 export async function getPortfolioRiskMetrics(id: string): Promise<unknown> {
@@ -152,8 +150,8 @@ export async function getAllTransactions(
   limit = 10,
   sortBy = "date",
   sortOrder: "asc" | "desc" = "desc",
-): Promise<PortfoliosTransactions> {
-  return http.get<PortfoliosTransactions>(
+): Promise<PaginatedResponse<PortfolioTransactionsPage["items"][number]>> {
+  return http.get<PaginatedResponse<PortfolioTransactionsPage["items"][number]>>(
     `/api/portfolios/transactions?page=${page}&limit=${limit}&sortBy=${sortBy}&sortOrder=${sortOrder}`,
   )
 }

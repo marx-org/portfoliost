@@ -17,6 +17,7 @@
     "mock:seed": "node scripts/regen-seed.mjs"
   },
   "dependencies": {
+    "@marx2/contracts": "^1.0.0",
     "apexcharts": "^5.10.0",
     "pinia": "^2.1.7",
     "vue": "^3.4.31",
@@ -30,6 +31,7 @@
     "@vue/test-utils": "^2.4.6",
     "autoprefixer": "^10.4.19",
     "happy-dom": "^14.12.3",
+    "openapi-typescript": "^7.13.0",
     "postcss": "^8.4.39",
     "tailwindcss": "^3.4.4",
     "typescript": "^5.4.5",

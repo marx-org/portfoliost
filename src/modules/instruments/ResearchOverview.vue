@@ -91,12 +91,13 @@ const profileStats = computed(() => {
 
 const marginStats = computed(() => {
   const m = metrics.value
-  if (!m) return []
+  const margins = m?.margins
+  if (!m || !margins) return []
   return [
-    stat("Gross", formatPercent(m.margins.grossMargin)),
-    stat("EBITDA", formatPercent(m.margins.ebitdaMargin)),
-    stat("Operating", formatPercent(m.margins.operatingMargin)),
-    stat("Net", formatPercent(m.margins.netProfitMargin)),
+    stat("Gross", formatPercent(margins.grossMargin)),
+    stat("EBITDA", formatPercent(margins.ebitdaMargin)),
+    stat("Operating", formatPercent(margins.operatingMargin)),
+    stat("Net", formatPercent(margins.netProfitMargin)),
   ]
 })
 
@@ -187,8 +188,8 @@ const epsChartOptions = computed(() => ({
 const targetSpread = computed(() => {
   const t = priceTarget.value
   if (!t) return { low: 0, high: 0, current: 0, pct: 0 }
-  const low = t.targetLow
-  const high = t.targetHigh
+  const low = t.targetLow ?? 0
+  const high = t.targetHigh ?? 0
   const current = quote.value?.currentPrice ?? 0
   const span = high - low || 1
   return { low, high, current, pct: Math.min(100, Math.max(0, ((current - low) / span) * 100)) }

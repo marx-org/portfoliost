@@ -103,8 +103,55 @@ Backend lives at `../portfoliost-backend/`. See `docs/proposals/database-drizzle
 - [x] Commit. — `76b8d0f`
 
 ### Step B5 — Add to docker compose
-- [ ] `portfoliost` service in `docker-compose.yml` with volume mount for SQLite data.
-- [ ] Update KrakenD env vars to point `API_AUTH_URL` and `API_USERS_URL` to `http://portfoliost-backend:3000`.
-- [ ] `docker compose up --build` works, healthcheck passes.
-- [ ] `npm run test` + `npm run test:mock` + `npm run test:e2e` in portfoliost still pass.
+- [x] `portfoliost-backend` service in `docker-compose.yml` with volume for SQLite data persistence.
+- [x] Update KrakenD env var `API_USERS_URL` → `http://portfoliost-backend:3000`.
+- [x] Add `X-User-*` headers to KrakenD `input_headers` for user endpoints.
+- [x] `docker compose up --build` works, all 4 services start.
+- [x] User endpoints accessible through KrakenD at `localhost:8080/api/users/*`.
+- [x] Existing mock routes (portfolios, wallets, etc.) still work.
+- [x] `npm run test` + `npm run test:mock` pass in portfoliost.
+- [x] Commit. — `5a60063`
+
+---
+
+## OpenAPI Contracts Repo + Integration
+
+Separate contracts repo at `github.com/Marx2/portfoliost-contracts`, published to GitHub Packages as `@marx2/contracts`. Source of truth for API types, consumed by both frontend (openapi-typescript) and backend (hono-zod-openapi).
+
+### Step C1 — Create portfoliost-contracts repo
+- [ ] Create GitHub repo `Marx2/portfoliost-contracts`.
+- [ ] `package.json` — `name: "@marx2/contracts"`, type: module, exports `./openapi.yaml`.
+- [ ] `.npmrc` — `registry=https://npm.pkg.github.com`.
+- [ ] `openapi.yaml` — copy `example-service-real-api.yaml`, add `/api/users/*` endpoints from portfoliost-backend, adjust `info.title` → "Portfoliost API", adjust `servers`.
+- [ ] `example-service-reference/example-service-real-api.yaml` — original example-service spec as reference.
+- [ ] `.github/workflows/publish.yml` — on push to main: `npm publish` to GitHub Packages.
+- [ ] `README.md` — brief description, how both repos consume it.
+- [ ] Verify: push, confirm package appears in GitHub Packages.
+- [ ] Commit.
+
+### Step C2 — Backend: contract-first with hono-zod-openapi
+- [ ] Install `@marx2/contracts`, `hono-zod-openapi`, `zod` in portfoliost-backend.
+- [ ] Create `src/schemas/users.ts` — Zod schemas for all user endpoints (request params, body, headers, responses).
+- [ ] Rewrite `src/routes/users.ts` — use `openApi(operation)` middleware + `c.var.res()` typed responses.
+- [ ] Add `src/doc.ts` — `createOpenApiDocument()` mounting at `GET /api/doc`.
+- [ ] Register `/api/doc` route in `src/index.ts`.
+- [ ] Add `npm run gen:openapi` script — exports generated spec to `dist/openapi.yaml`.
+- [ ] Tests: all existing endpoint tests pass, new test validates generated spec.
+- [ ] Commit.
+
+### Step C3 — Frontend: openapi-typescript replaces gen-types.mjs
+- [ ] Install `@marx2/contracts`, `openapi-typescript` in portfoliost.
+- [ ] Add `npm run gen:types` script — `openapi-typescript @marx2/contracts/openapi.yaml -o generated/api-types.d.ts`.
+- [ ] Update `src/api/types.ts` — re-export generated types.
+- [ ] Audit `src/api/users.ts` — replace inline types with generated types.
+- [ ] Audit `src/api/auth.ts` — replace inline `AuthUser`, `AuthResponse` with generated types.
+- [ ] Audit remaining API modules — verify generated types match usage.
+- [ ] Delete `scripts/gen-types.mjs`.
+- [ ] Delete `docs/proposals/openapi-typescript-integration.md`.
+- [ ] Verify: `npm run build` + `npm run test` + `npm run test:mock` pass.
+- [ ] Commit.
+
+### Step C4 — Cleanup
+- [ ] Move `docs/proposals/database-drizzle-sqlite-postgres.md` → `../portfoliost-backend/docs/`.
+- [ ] Update this plan with commit hashes for C1–C3.
 - [ ] Commit.

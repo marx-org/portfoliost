@@ -1,24 +1,12 @@
 import { http } from "./client"
-import type { WalletBalanceHistory, Wallets, WalletsTotalBalance } from "./types"
+import type { components } from "../../generated/api-types"
 
-export interface CashTransaction {
-  id: string
-  walletId: string
-  type: "DEPOSIT" | "WITHDRAWAL" | "TRANSFER"
-  amount: number
-  currency: string
-  status: string
-  createdAt: string
-  description: string | null
-  transaction_date?: string | null
-  payment_method?: string | null
-  fees?: number
-  fees_type?: string | null
-  to_wallet_id?: string | null
-  new_balance?: number
-  remaining_balance?: number
-  walletName?: string
-}
+type Wallets = components["schemas"]["CashWallet"][]
+type WalletBalanceHistory = components["schemas"]["BalanceHistory"]
+type WalletsTotalBalance = components["schemas"]["WalletsTotalBalance"]
+export type CashTransaction = components["schemas"]["CashTransaction"]
+export type RecentCashTransaction = components["schemas"]["RecentCashTransaction"]
+type RecentCashTransactionsPage = components["schemas"]["RecentCashTransactionsPage"]
 
 export interface DepositInput {
   amount: number
@@ -45,35 +33,6 @@ export interface PaginatedCashTransactions {
   totalPages: number
   hasNext: boolean
   hasPrevious: boolean
-}
-
-export interface RecentCashTransaction {
-  id: string
-  walletId: string
-  walletName: string | null
-  type: string
-  displayLabel: string
-  amount: string
-  currency: string
-  exchangeRate: number | null
-  reference: string | null
-  date: string
-  description: string | null
-  createdAt: string
-  portfolioId: string | null
-  fees: number | null
-  taxes: number | null
-  isInternalTransfer: boolean
-}
-
-export interface RecentCashTransactionsPage {
-  data: RecentCashTransaction[]
-  meta: {
-    total: number
-    page: number
-    limit: number
-    totalPages: number
-  }
 }
 
 export async function getWallets(): Promise<Wallets> {

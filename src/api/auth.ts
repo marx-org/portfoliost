@@ -1,5 +1,8 @@
 import { http } from "./client"
-import type { AuthMe, AuthResponse } from "./types"
+import type { components } from "../../generated/api-types"
+
+type AuthMe = components["schemas"]["MeResponse"]
+type AuthResponse = components["schemas"]["AuthResponse"]
 
 export type LoginPayload = {
   email: string

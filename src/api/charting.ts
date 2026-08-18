@@ -1,5 +1,7 @@
 import { http } from "./client"
-import type { ResearchCompare } from "./types"
+import type { components } from "../../generated/api-types"
+
+type ResearchCompare = components["schemas"]["ResearchCompare"]
 
 export interface ChartingPreset {
   name: string

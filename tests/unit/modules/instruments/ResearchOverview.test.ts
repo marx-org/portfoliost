@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest"
 import ResearchOverview from "@/modules/instruments/ResearchOverview.vue"
 import * as instrumentsApi from "@/api/instruments"
 import type { InstrumentsMetrics, InstrumentsOverviewMetrics, InstrumentsProfile, QuoteAapl } from "@/api/types"
+import type { components } from "../../../../generated/api-types"
 
 vi.mock("@/api/instruments", () => ({
   getInstrumentProfile: vi.fn(),
@@ -155,7 +156,7 @@ describe("ResearchOverview", () => {
     mocked.getInstrumentOverviewMetrics.mockResolvedValue(makeOverview())
     mocked.getQuote.mockResolvedValue(makeQuote())
     mocked.getEpsSurprises.mockResolvedValue({ annual: [] })
-    mocked.getInvestorRelations.mockResolvedValue([])
+    mocked.getInvestorRelations.mockResolvedValue([] as components["schemas"]["InvestorRelationEvent"][])
   })
 
   it("fetches research data for the route symbol", async () => {

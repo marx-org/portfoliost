@@ -18,7 +18,7 @@ async function load() {
   error.value = null
   try {
     const res = await getInstrumentSeasonality(props.symbol, years.value, metric.value)
-    monthly.value = res.monthly_returns
+    monthly.value = res.monthly_returns ?? []
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Failed to load seasonality"
   } finally {
