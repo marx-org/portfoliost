@@ -119,37 +119,37 @@ Backend lives at `../portfoliost-backend/`. See `docs/proposals/database-drizzle
 Separate contracts repo at `github.com/Marx2/portfoliost-contracts`, published to GitHub Packages as `@marx2/contracts`. Source of truth for API types, consumed by both frontend (openapi-typescript) and backend (hono-zod-openapi).
 
 ### Step C1 — Create portfoliost-contracts repo
-- [ ] Create GitHub repo `Marx2/portfoliost-contracts`.
-- [ ] `package.json` — `name: "@marx2/contracts"`, type: module, exports `./openapi.yaml`.
-- [ ] `.npmrc` — `registry=https://npm.pkg.github.com`.
-- [ ] `openapi.yaml` — copy `example-service-real-api.yaml`, add `/api/users/*` endpoints from portfoliost-backend, adjust `info.title` → "Portfoliost API", adjust `servers`.
-- [ ] `example-service-reference/example-service-real-api.yaml` — original example-service spec as reference.
-- [ ] `.github/workflows/publish.yml` — on push to main: `npm publish` to GitHub Packages.
-- [ ] `README.md` — brief description, how both repos consume it.
-- [ ] Verify: push, confirm package appears in GitHub Packages.
-- [ ] Commit.
+- [x] Create GitHub repo `Marx2/portfoliost-contracts`.
+- [x] `package.json` — `name: "@marx2/contracts"`, type: module, exports `./openapi.yaml`.
+- [x] `.npmrc` — `registry=https://npm.pkg.github.com`.
+- [x] `openapi.yaml` — copy `example-service-real-api.yaml`, add `/api/users/*` endpoints from portfoliost-backend, adjust `info.title` → "Portfoliost API", adjust `servers`.
+- [x] `example-service-reference/example-service-real-api.yaml` — original example-service spec as reference.
+- [x] `.github/workflows/publish.yml` — on push to main: `npm publish` to GitHub Packages.
+- [x] `README.md` — brief description, how both repos consume it.
+- [x] Verify: push, confirm package appears in GitHub Packages.
+- [x] Commit.
 
 ### Step C2 — Backend: contract-first with hono-zod-openapi
-- [ ] Install `@marx2/contracts`, `hono-zod-openapi`, `zod` in portfoliost-backend.
-- [ ] Create `src/schemas/users.ts` — Zod schemas for all user endpoints (request params, body, headers, responses).
-- [ ] Rewrite `src/routes/users.ts` — use `openApi(operation)` middleware + `c.var.res()` typed responses.
-- [ ] Add `src/doc.ts` — `createOpenApiDocument()` mounting at `GET /api/doc`.
-- [ ] Register `/api/doc` route in `src/index.ts`.
-- [ ] Add `npm run gen:openapi` script — exports generated spec to `dist/openapi.yaml`.
-- [ ] Tests: all existing endpoint tests pass, new test validates generated spec.
-- [ ] Commit.
+- [x] Install `@marx2/contracts`, `hono-zod-openapi`, `zod` in portfoliost-backend.
+- [x] Create `src/schemas/users.ts` — Zod schemas for all user endpoints (request params, body, headers, responses).
+- [x] Rewrite `src/routes/users.ts` — use `openApi(operation)` middleware + `c.var.res()` typed responses.
+- [x] Add `src/doc.ts` — `createOpenApiDocument()` mounting at `GET /api/doc`.
+- [x] Register `/api/doc` route in `src/index.ts`.
+- [x] Add `npm run gen:openapi` script — exports generated spec to `dist/openapi.yaml`.
+- [x] Tests: all existing endpoint tests pass, new test validates generated spec.
+- [x] Commit.
 
 ### Step C3 — Frontend: openapi-typescript replaces gen-types.mjs
-- [ ] Install `@marx2/contracts`, `openapi-typescript` in portfoliost.
-- [ ] Add `npm run gen:types` script — `openapi-typescript @marx2/contracts/openapi.yaml -o generated/api-types.d.ts`.
-- [ ] Update `src/api/types.ts` — re-export generated types.
-- [ ] Audit `src/api/users.ts` — replace inline types with generated types.
-- [ ] Audit `src/api/auth.ts` — replace inline `AuthUser`, `AuthResponse` with generated types.
-- [ ] Audit remaining API modules — verify generated types match usage.
-- [ ] Delete `scripts/gen-types.mjs`.
-- [ ] Delete `docs/proposals/openapi-typescript-integration.md`.
-- [ ] Verify: `npm run build` + `npm run test` + `npm run test:mock` pass.
-- [ ] Commit.
+- [x] Install `@marx2/contracts`, `openapi-typescript` in portfoliost.
+- [x] Add `npm run gen:types` script — `openapi-typescript @marx2/contracts/openapi.yaml -o generated/api-types.d.ts`.
+- [x] Update `src/api/types.ts` — re-export generated types.
+- [x] Audit `src/api/users.ts` — replace inline types with generated types.
+- [x] Audit `src/api/auth.ts` — replace inline `AuthUser`, `AuthResponse` with generated types.
+- [x] Audit remaining API modules — verify generated types match usage.
+- [x] Delete `scripts/gen-types.mjs`.
+- [x] Delete `docs/proposals/openapi-typescript-integration.md`.
+- [x] Verify: `npm run build` + `npm run test` + `npm run test:mock` pass.
+- [x] Commit.
 
 ### Step C4 — Cleanup
 - [ ] Move `docs/proposals/database-drizzle-sqlite-postgres.md` → `../portfoliost-backend/docs/`.
