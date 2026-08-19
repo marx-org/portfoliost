@@ -45,11 +45,11 @@ export const useAuthStore = defineStore("auth", () => {
     }
   }
 
-  async function loginWithCode(code: string, verifier: string): Promise<void> {
+  async function loginWithCode(code: string, verifier: string, redirectUri: string): Promise<void> {
     loading.value = true
     error.value = null
     try {
-      const res = await authApi.loginWithCode({ code, verifier })
+      const res = await authApi.loginWithCode({ code, verifier, redirect_uri: redirectUri })
       token.value = res.access_token
       user.value = res.user
       setToken(res.access_token)

@@ -12,6 +12,7 @@ export type LoginPayload = {
 export type LoginWithCodePayload = {
   code: string
   verifier: string
+  redirect_uri: string
 }
 
 export async function loginWithCode(payload: LoginWithCodePayload): Promise<AuthResponse> {

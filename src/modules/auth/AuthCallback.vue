@@ -17,7 +17,7 @@ onMounted(async () => {
   const errorParam = route.query.error as string
 
   if (errorParam) {
-    error.value = route.query.error_description as string || "Authorization failed"
+    error.value = (route.query.error_description as string) || "Authorization failed"
     loading.value = false
     return
   }
@@ -42,7 +42,8 @@ onMounted(async () => {
   }
 
   try {
-    await auth.loginWithCode(code, verifier)
+    const redirectUri = `${window.location.origin}/auth/callback`
+    await auth.loginWithCode(code, verifier, redirectUri)
     clearVerifier()
     const redirect = route.query.redirect as string
     router.push(redirect || { name: "investments" })

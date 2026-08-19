@@ -191,3 +191,44 @@ Gradual migration: local mock stays as-is for development, cluster uses PocketID
 - [x] Switch both repos to `github:Marx2/portfoliost-contracts` in package.json.
 - [x] Remove `.npmrc` files, `GITHUB_TOKEN` Dockerfile arg.
 - [x] Docker build succeeds without auth tokens. Commit.
+
+### Step A5 — Backend: token exchange endpoint
+- [ ] Add `POST /api/auth/token` to portfoliost-backend — exchanges OIDC code + code_verifier for JWT via PocketID token endpoint.
+- [ ] Env vars: `POCKETID_CLIENT_ID`, `POCKETID_CLIENT_SECRET`, `POCKETID_TOKEN_URL`.
+- [ ] Frontend sends `{ code, code_verifier, redirect_uri }` to backend; backend calls PocketID, validates JWT, upserts user_preferences, returns `{ access_token, token_type, expires_in, user }`.
+- [ ] Tests. Commit.
+
+### Step A6 — Frontend: backend token exchange integration
+- [ ] Update `AuthCallback.vue` to call `POST /api/auth/token` with code + verifier.
+- [ ] Update `auth.ts` API client — `loginWithCode()` sends to backend instead of direct exchange.
+- [ ] Test flow with Docker Compose (mock mode) — callback redirects to login in mock mode.
+- [ ] Typecheck + tests. Commit.
+
+---
+
+## Cluster Deployment
+
+### Step K1 — portfoliost-backend HelmRelease
+- [ ] Create `cluster/apps/pfire/portfoliost-backend/` directory structure (ks.yaml, app/kustomization.yaml, app/helmrelease.yaml).
+- [ ] HelmRelease: `app-template` chart, image `ghcr.io/marx2/portfoliost-backend:latest`, replicas: 1.
+- [ ] Env vars: `POCKETID_CLIENT_ID`, `POCKETID_CLIENT_SECRET`, `POCKETID_ISSUER_URL`, `POCKETID_AUDIENCE`, `POCKETID_TOKEN_URL`.
+- [ ] Volume for SQLite data (or use CrunchyData Postgres).
+- [ ] Healthcheck endpoint `/health`.
+- [ ] Add to `cluster/apps/pfire/kustomization.yaml`. Commit.
+
+### Step K2 — KrakenD ConfigMap: route auth + users to backend
+- [ ] Update `cluster/apps/pfire/krakend/app/krakend-configmap.yaml`:
+  - Change `API_AUTH_URL` from mock to `http://portfoliost-backend.pfire.svc.cluster.local:3000`.
+  - Change `API_USERS_URL` from mock to `http://portfoliost-backend.pfire.svc.cluster.local:3000`.
+- [ ] Verify all other endpoints still route to mock. Commit.
+
+### Step K3 — portfoliost ingress: remove oauth2-proxy auth
+- [ ] Remove `nginx.ingress.kubernetes.io/auth-url` and `auth-signin` annotations from portfoliost HelmRelease.
+- [ ] Auth is now handled by the app itself (PocketID OIDC). Commit.
+
+### Step K4 — PocketID OIDCClient CRD
+- [ ] Create `PocketIDOIDCClient` CRD for portfoliost in `cluster/apps/networking/pocket-id-operator/app/`.
+- [ ] callbackURLs: `https://portfoliost.${SECRET_DOMAIN}/auth/callback`.
+- [ ] logoutURLs: `https://portfoliost.${SECRET_DOMAIN}/logout`.
+- [ ] Operator creates client and writes credentials to secret `portfoliost-oidc-credentials`.
+- [ ] Reference secret in portfoliost-backend HelmRelease. Commit.
