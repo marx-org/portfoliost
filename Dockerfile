@@ -6,6 +6,12 @@ WORKDIR /app
 ARG VITE_API_BASE_URL=""
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
+ARG VITE_OIDC_ISSUER_URL=""
+ENV VITE_OIDC_ISSUER_URL=$VITE_OIDC_ISSUER_URL
+
+ARG VITE_OIDC_CLIENT_ID=""
+ENV VITE_OIDC_CLIENT_ID=$VITE_OIDC_CLIENT_ID
+
 COPY package.json package-lock.json ./
 COPY index.html vite.config.ts tailwind.config.js postcss.config.js tsconfig.json tsconfig.node.json ./
 COPY public/ public/

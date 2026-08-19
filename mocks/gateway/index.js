@@ -1,5 +1,6 @@
 import { createApp } from "../lib/http.js"
 import * as authModule from "../auth/index.js"
+import * as oidcModule from "../oidc/index.js"
 import * as usersModule from "../users/index.js"
 import * as billingModule from "../billing/index.js"
 import * as notificationsModule from "../notifications/index.js"
@@ -32,6 +33,7 @@ app.get("/", (ctx) => {
 })
 
 const modules = [
+  oidcModule,
   authModule,
   usersModule,
   billingModule,

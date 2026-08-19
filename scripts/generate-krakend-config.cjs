@@ -26,6 +26,7 @@ const subRoutes = {
   auth: [
     { path: 'login',                    methods: ['POST'] },
     { path: 'register',                 methods: ['POST'] },
+    { path: 'token',                    methods: ['POST'] },
     { path: 'me',                       methods: ['GET'] },
     { path: 'logout',                   methods: ['DELETE'] },
   ],
@@ -130,6 +131,11 @@ const extraEndpoints = [
   { endpoint: '/api/chatbot/{path}', env: 'API_COPILOT_URL', methods: ['GET'] },
   { endpoint: '/api/exchange-rates', env: 'API_EXCHANGE_RATES_URL', methods: ['GET'] },
   { endpoint: '/api/public/portfolios/{shareId}', env: 'API_PUBLIC_URL', methods: ['GET'] },
+  // OIDC endpoints — /.well-known through KrakenD (no query params needed);
+  // /authorize is NOT routed through KrakenD because KrakenD CE strips query params.
+  // The browser hits /authorize directly via VITE_OIDC_ISSUER_URL.
+  { endpoint: '/.well-known/openid-configuration', env: 'API_AUTH_URL', methods: ['GET'] },
+  { endpoint: '/.well-known/jwks.json', env: 'API_AUTH_URL', methods: ['GET'] },
 ];
 
 let count = 0;
@@ -207,7 +213,7 @@ for (const extra of extraEndpoints) {
       endpoint: extra.endpoint,
       method,
       host: envHost(extra.env),
-      url_pattern: extra.urlPattern || extra.endpoint
+      url_pattern: extra.urlPattern || extra.endpoint,
     });
   }
 }

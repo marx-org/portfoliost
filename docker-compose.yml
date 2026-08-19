@@ -4,12 +4,15 @@ services:
       context: .
       dockerfile: Dockerfile.mock
     container_name: example-service-mock
-    expose:
-      - "4010"
+    ports:
+      - "4010:4010"
     environment:
       EXAMPLE_SERVICE_MOCK_EMAIL: ${EXAMPLE_SERVICE_MOCK_EMAIL:-demo@example.com}
       EXAMPLE_SERVICE_MOCK_PASSWORD: ${EXAMPLE_SERVICE_MOCK_PASSWORD:-example-service-mock}
       EXAMPLE_SERVICE_MOCK_TOKEN: ${EXAMPLE_SERVICE_MOCK_TOKEN:-mock-dev-token}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-mock-client}
+      OIDC_ISSUER: ${OIDC_ISSUER:-http://krakend:8080}
+      OIDC_REDIRECT_URI: ${OIDC_REDIRECT_URI:-http://localhost:3000/auth/callback}
     restart: unless-stopped
 
   portfoliost:
@@ -18,6 +21,8 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080}
+        VITE_OIDC_ISSUER_URL: ${VITE_OIDC_ISSUER_URL:-http://localhost:4010}
+        VITE_OIDC_CLIENT_ID: ${VITE_OIDC_CLIENT_ID:-mock-client}
     container_name: portfoliost
     ports:
       - "3000:80"
@@ -30,6 +35,9 @@ services:
     container_name: portfoliost-backend
     expose:
       - "3000"
+    environment:
+      POCKETID_ISSUER_URL: ${POCKETID_ISSUER_URL:-http://krakend:8080}
+      POCKETID_AUDIENCE: ${POCKETID_AUDIENCE:-mock-client}
     volumes:
       - backend-data:/app/data
     restart: unless-stopped

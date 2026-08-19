@@ -15,7 +15,7 @@
       "endpoint": "/api/auth",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_AUTH_URL"}}"],
         "url_pattern": "/api/auth",
@@ -26,7 +26,7 @@
       "endpoint": "/api/auth",
       "method": "POST",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_AUTH_URL"}}"],
         "url_pattern": "/api/auth",
@@ -37,7 +37,7 @@
       "endpoint": "/api/auth/login",
       "method": "POST",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_AUTH_URL"}}"],
         "url_pattern": "/api/auth/login",
@@ -48,7 +48,7 @@
       "endpoint": "/api/auth/register",
       "method": "POST",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_AUTH_URL"}}"],
         "url_pattern": "/api/auth/register",
@@ -56,10 +56,21 @@
       }]
     },
     {
+      "endpoint": "/api/auth/token",
+      "method": "POST",
+      "output_encoding": "no-op",
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
+      "backend": [{
+        "host": ["{{env "API_AUTH_URL"}}"],
+        "url_pattern": "/api/auth/token",
+        "encoding": "no-op"
+      }]
+    },
+    {
       "endpoint": "/api/auth/me",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_AUTH_URL"}}"],
         "url_pattern": "/api/auth/me",
@@ -70,7 +81,7 @@
       "endpoint": "/api/users",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_USERS_URL"}}"],
         "url_pattern": "/api/users",
@@ -81,7 +92,7 @@
       "endpoint": "/api/users",
       "method": "POST",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_USERS_URL"}}"],
         "url_pattern": "/api/users",
@@ -92,7 +103,7 @@
       "endpoint": "/api/users",
       "method": "PATCH",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_USERS_URL"}}"],
         "url_pattern": "/api/users",
@@ -103,7 +114,7 @@
       "endpoint": "/api/users",
       "method": "PUT",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_USERS_URL"}}"],
         "url_pattern": "/api/users",
@@ -114,7 +125,7 @@
       "endpoint": "/api/users",
       "method": "DELETE",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_USERS_URL"}}"],
         "url_pattern": "/api/users",
@@ -125,7 +136,7 @@
       "endpoint": "/api/users/{id}",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_USERS_URL"}}"],
         "url_pattern": "/api/users/{id}",
@@ -136,7 +147,7 @@
       "endpoint": "/api/users/{id}",
       "method": "PATCH",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_USERS_URL"}}"],
         "url_pattern": "/api/users/{id}",
@@ -147,7 +158,7 @@
       "endpoint": "/api/users/{id}",
       "method": "DELETE",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_USERS_URL"}}"],
         "url_pattern": "/api/users/{id}",
@@ -158,7 +169,7 @@
       "endpoint": "/api/users/account",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_USERS_URL"}}"],
         "url_pattern": "/api/users/account",
@@ -169,7 +180,7 @@
       "endpoint": "/api/users/account",
       "method": "PATCH",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_USERS_URL"}}"],
         "url_pattern": "/api/users/account",
@@ -180,7 +191,7 @@
       "endpoint": "/api/users/account",
       "method": "DELETE",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_USERS_URL"}}"],
         "url_pattern": "/api/users/account",
@@ -191,7 +202,7 @@
       "endpoint": "/api/users/profile",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_USERS_URL"}}"],
         "url_pattern": "/api/users/profile",
@@ -202,7 +213,7 @@
       "endpoint": "/api/users/profile",
       "method": "PATCH",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_USERS_URL"}}"],
         "url_pattern": "/api/users/profile",
@@ -213,7 +224,7 @@
       "endpoint": "/api/users/change-password",
       "method": "POST",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_USERS_URL"}}"],
         "url_pattern": "/api/users/change-password",
@@ -224,7 +235,7 @@
       "endpoint": "/api/users/clear-data",
       "method": "DELETE",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_USERS_URL"}}"],
         "url_pattern": "/api/users/clear-data",
@@ -232,98 +243,10 @@
       }]
     },
     {
-      "endpoint": "/api/users/preferences",
-      "method": "GET",
-      "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
-      "backend": [{
-        "host": ["{{env "API_USERS_URL"}}"],
-        "url_pattern": "/api/users/preferences",
-        "encoding": "no-op"
-      }]
-    },
-    {
-      "endpoint": "/api/users/preferences",
-      "method": "PATCH",
-      "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
-      "backend": [{
-        "host": ["{{env "API_USERS_URL"}}"],
-        "url_pattern": "/api/users/preferences",
-        "encoding": "no-op"
-      }]
-    },
-    {
-      "endpoint": "/api/users/preferences/custom-benchmarks",
-      "method": "GET",
-      "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
-      "backend": [{
-        "host": ["{{env "API_USERS_URL"}}"],
-        "url_pattern": "/api/users/preferences/custom-benchmarks",
-        "encoding": "no-op"
-      }]
-    },
-    {
-      "endpoint": "/api/users/preferences/custom-timeframes",
-      "method": "GET",
-      "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
-      "backend": [{
-        "host": ["{{env "API_USERS_URL"}}"],
-        "url_pattern": "/api/users/preferences/custom-timeframes",
-        "encoding": "no-op"
-      }]
-    },
-    {
-      "endpoint": "/api/users/onboarding/status",
-      "method": "GET",
-      "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
-      "backend": [{
-        "host": ["{{env "API_USERS_URL"}}"],
-        "url_pattern": "/api/users/onboarding/status",
-        "encoding": "no-op"
-      }]
-    },
-    {
-      "endpoint": "/api/users/onboarding/status",
-      "method": "PATCH",
-      "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
-      "backend": [{
-        "host": ["{{env "API_USERS_URL"}}"],
-        "url_pattern": "/api/users/onboarding/status",
-        "encoding": "no-op"
-      }]
-    },
-    {
-      "endpoint": "/api/users/onboarding/draft",
-      "method": "GET",
-      "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
-      "backend": [{
-        "host": ["{{env "API_USERS_URL"}}"],
-        "url_pattern": "/api/users/onboarding/draft",
-        "encoding": "no-op"
-      }]
-    },
-    {
-      "endpoint": "/api/users/onboarding/draft",
-      "method": "PATCH",
-      "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
-      "backend": [{
-        "host": ["{{env "API_USERS_URL"}}"],
-        "url_pattern": "/api/users/onboarding/draft",
-        "encoding": "no-op"
-      }]
-    },
-    {
       "endpoint": "/api/portfolios",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios",
@@ -334,7 +257,7 @@
       "endpoint": "/api/portfolios",
       "method": "POST",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios",
@@ -345,7 +268,7 @@
       "endpoint": "/api/portfolios",
       "method": "PATCH",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios",
@@ -356,7 +279,7 @@
       "endpoint": "/api/portfolios",
       "method": "DELETE",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios",
@@ -367,7 +290,7 @@
       "endpoint": "/api/portfolios/{id}",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios/{id}",
@@ -378,7 +301,7 @@
       "endpoint": "/api/portfolios/{id}",
       "method": "PATCH",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios/{id}",
@@ -389,7 +312,7 @@
       "endpoint": "/api/portfolios/{id}",
       "method": "DELETE",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios/{id}",
@@ -400,7 +323,7 @@
       "endpoint": "/api/portfolios/{id}/summary-metrics",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios/{id}/summary-metrics",
@@ -411,7 +334,7 @@
       "endpoint": "/api/portfolios/{id}/positions",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios/{id}/positions",
@@ -422,7 +345,7 @@
       "endpoint": "/api/portfolios/{id}/positions",
       "method": "POST",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios/{id}/positions",
@@ -433,7 +356,7 @@
       "endpoint": "/api/portfolios/{id}/positions/bare",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios/{id}/positions/bare",
@@ -444,7 +367,7 @@
       "endpoint": "/api/portfolios/{id}/positions/cfd-hints",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios/{id}/positions/cfd-hints",
@@ -455,7 +378,7 @@
       "endpoint": "/api/portfolios/{id}/positions/{posId}",
       "method": "PATCH",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios/{id}/positions/{posId}",
@@ -466,7 +389,7 @@
       "endpoint": "/api/portfolios/{id}/positions/{posId}",
       "method": "DELETE",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios/{id}/positions/{posId}",
@@ -477,7 +400,7 @@
       "endpoint": "/api/portfolios/{id}/analytics",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios/{id}/analytics",
@@ -488,7 +411,7 @@
       "endpoint": "/api/portfolios/{id}/transactions",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios/{id}/transactions",
@@ -499,7 +422,7 @@
       "endpoint": "/api/portfolios/{id}/transactions",
       "method": "POST",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios/{id}/transactions",
@@ -510,7 +433,7 @@
       "endpoint": "/api/portfolios/{id}/transactions/export",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios/{id}/transactions/export",
@@ -521,7 +444,7 @@
       "endpoint": "/api/portfolios/{id}/transactions/{txId}",
       "method": "PATCH",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios/{id}/transactions/{txId}",
@@ -532,7 +455,7 @@
       "endpoint": "/api/portfolios/{id}/transactions/{txId}",
       "method": "DELETE",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios/{id}/transactions/{txId}",
@@ -543,7 +466,7 @@
       "endpoint": "/api/portfolios/{id}/allocation",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios/{id}/allocation",
@@ -554,7 +477,7 @@
       "endpoint": "/api/portfolios/{id}/dividends",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios/{id}/dividends",
@@ -565,7 +488,7 @@
       "endpoint": "/api/portfolios/{id}/calendar",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios/{id}/calendar",
@@ -576,7 +499,7 @@
       "endpoint": "/api/portfolios/{id}/news",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios/{id}/news",
@@ -587,7 +510,7 @@
       "endpoint": "/api/portfolios/{id}/compare",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios/{id}/compare",
@@ -598,7 +521,7 @@
       "endpoint": "/api/portfolios/{id}/risk-metrics",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios/{id}/risk-metrics",
@@ -609,7 +532,7 @@
       "endpoint": "/api/portfolios/{id}/snapshot",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios/{id}/snapshot",
@@ -620,7 +543,7 @@
       "endpoint": "/api/portfolios/total-metrics",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios/total-metrics",
@@ -631,7 +554,7 @@
       "endpoint": "/api/portfolios/shares",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios/shares",
@@ -642,7 +565,7 @@
       "endpoint": "/api/portfolios/shares",
       "method": "POST",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios/shares",
@@ -653,7 +576,7 @@
       "endpoint": "/api/portfolios/shares/{id}",
       "method": "DELETE",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios/shares/{id}",
@@ -664,7 +587,7 @@
       "endpoint": "/api/portfolios/transactions",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios/transactions",
@@ -675,7 +598,7 @@
       "endpoint": "/api/portfolios/held-stocks",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios/held-stocks",
@@ -686,7 +609,7 @@
       "endpoint": "/api/portfolios/light",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios/light",
@@ -697,7 +620,7 @@
       "endpoint": "/api/portfolios/merged",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios/merged",
@@ -708,7 +631,7 @@
       "endpoint": "/api/portfolios/merged/light",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PORTFOLIOS_URL"}}"],
         "url_pattern": "/api/portfolios/merged/light",
@@ -719,7 +642,7 @@
       "endpoint": "/api/wallets",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_WALLETS_URL"}}"],
         "url_pattern": "/api/wallets",
@@ -730,7 +653,7 @@
       "endpoint": "/api/wallets",
       "method": "POST",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_WALLETS_URL"}}"],
         "url_pattern": "/api/wallets",
@@ -741,7 +664,7 @@
       "endpoint": "/api/wallets",
       "method": "PATCH",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_WALLETS_URL"}}"],
         "url_pattern": "/api/wallets",
@@ -752,7 +675,7 @@
       "endpoint": "/api/wallets",
       "method": "DELETE",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_WALLETS_URL"}}"],
         "url_pattern": "/api/wallets",
@@ -763,7 +686,7 @@
       "endpoint": "/api/wallets/{id}",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_WALLETS_URL"}}"],
         "url_pattern": "/api/wallets/{id}",
@@ -774,7 +697,7 @@
       "endpoint": "/api/wallets/{id}",
       "method": "PATCH",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_WALLETS_URL"}}"],
         "url_pattern": "/api/wallets/{id}",
@@ -785,7 +708,7 @@
       "endpoint": "/api/wallets/{id}",
       "method": "DELETE",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_WALLETS_URL"}}"],
         "url_pattern": "/api/wallets/{id}",
@@ -796,7 +719,7 @@
       "endpoint": "/api/wallets/{id}/balance-history",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_WALLETS_URL"}}"],
         "url_pattern": "/api/wallets/{id}/balance-history",
@@ -807,7 +730,7 @@
       "endpoint": "/api/wallets/{id}/deposits",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_WALLETS_URL"}}"],
         "url_pattern": "/api/wallets/{id}/deposits",
@@ -818,7 +741,7 @@
       "endpoint": "/api/wallets/{id}/transactions",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_WALLETS_URL"}}"],
         "url_pattern": "/api/wallets/{id}/transactions",
@@ -829,7 +752,7 @@
       "endpoint": "/api/wallets/{id}/transfers",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_WALLETS_URL"}}"],
         "url_pattern": "/api/wallets/{id}/transfers",
@@ -840,7 +763,7 @@
       "endpoint": "/api/wallets/{id}/withdrawals",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_WALLETS_URL"}}"],
         "url_pattern": "/api/wallets/{id}/withdrawals",
@@ -851,7 +774,7 @@
       "endpoint": "/api/wallets/total-balance",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_WALLETS_URL"}}"],
         "url_pattern": "/api/wallets/total-balance",
@@ -862,7 +785,7 @@
       "endpoint": "/api/wallets/recent-transactions",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_WALLETS_URL"}}"],
         "url_pattern": "/api/wallets/recent-transactions",
@@ -873,7 +796,7 @@
       "endpoint": "/api/wallets/transactions/{id}",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_WALLETS_URL"}}"],
         "url_pattern": "/api/wallets/transactions/{id}",
@@ -884,7 +807,7 @@
       "endpoint": "/api/wallets/transactions/{id}",
       "method": "PATCH",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_WALLETS_URL"}}"],
         "url_pattern": "/api/wallets/transactions/{id}",
@@ -895,7 +818,7 @@
       "endpoint": "/api/wallets/transactions/{id}",
       "method": "DELETE",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_WALLETS_URL"}}"],
         "url_pattern": "/api/wallets/transactions/{id}",
@@ -906,7 +829,7 @@
       "endpoint": "/api/instruments",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_INSTRUMENTS_URL"}}"],
         "url_pattern": "/api/instruments",
@@ -917,7 +840,7 @@
       "endpoint": "/api/instruments/{symbol}",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_INSTRUMENTS_URL"}}"],
         "url_pattern": "/api/instruments/{symbol}",
@@ -928,7 +851,7 @@
       "endpoint": "/api/instruments/{symbol}/overview-metrics",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_INSTRUMENTS_URL"}}"],
         "url_pattern": "/api/instruments/{symbol}/overview-metrics",
@@ -939,7 +862,7 @@
       "endpoint": "/api/instruments/{symbol}/metrics",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_INSTRUMENTS_URL"}}"],
         "url_pattern": "/api/instruments/{symbol}/metrics",
@@ -950,7 +873,7 @@
       "endpoint": "/api/instruments/{symbol}/quote",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_INSTRUMENTS_URL"}}"],
         "url_pattern": "/api/instruments/{symbol}/quote",
@@ -961,7 +884,7 @@
       "endpoint": "/api/instruments/{symbol}/profile",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_INSTRUMENTS_URL"}}"],
         "url_pattern": "/api/instruments/{symbol}/profile",
@@ -972,7 +895,7 @@
       "endpoint": "/api/instruments/{symbol}/fundamentals",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_INSTRUMENTS_URL"}}"],
         "url_pattern": "/api/instruments/{symbol}/fundamentals",
@@ -983,7 +906,7 @@
       "endpoint": "/api/instruments/{symbol}/history",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_INSTRUMENTS_URL"}}"],
         "url_pattern": "/api/instruments/{symbol}/history",
@@ -994,7 +917,7 @@
       "endpoint": "/api/instruments/{symbol}/dividends",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_INSTRUMENTS_URL"}}"],
         "url_pattern": "/api/instruments/{symbol}/dividends",
@@ -1005,7 +928,7 @@
       "endpoint": "/api/instruments/{symbol}/eps-surprises",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_INSTRUMENTS_URL"}}"],
         "url_pattern": "/api/instruments/{symbol}/eps-surprises",
@@ -1016,7 +939,7 @@
       "endpoint": "/api/instruments/{symbol}/ownership",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_INSTRUMENTS_URL"}}"],
         "url_pattern": "/api/instruments/{symbol}/ownership",
@@ -1027,7 +950,7 @@
       "endpoint": "/api/instruments/{symbol}/projections",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_INSTRUMENTS_URL"}}"],
         "url_pattern": "/api/instruments/{symbol}/projections",
@@ -1038,7 +961,7 @@
       "endpoint": "/api/instruments/{symbol}/peers",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_INSTRUMENTS_URL"}}"],
         "url_pattern": "/api/instruments/{symbol}/peers",
@@ -1049,7 +972,7 @@
       "endpoint": "/api/instruments/{symbol}/compare",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_INSTRUMENTS_URL"}}"],
         "url_pattern": "/api/instruments/{symbol}/compare",
@@ -1060,7 +983,7 @@
       "endpoint": "/api/instruments/{symbol}/calendar",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_INSTRUMENTS_URL"}}"],
         "url_pattern": "/api/instruments/{symbol}/calendar",
@@ -1071,7 +994,7 @@
       "endpoint": "/api/instruments/{symbol}/seasonality",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_INSTRUMENTS_URL"}}"],
         "url_pattern": "/api/instruments/{symbol}/seasonality",
@@ -1082,7 +1005,7 @@
       "endpoint": "/api/instruments/{symbol}/investor-relations",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_INSTRUMENTS_URL"}}"],
         "url_pattern": "/api/instruments/{symbol}/investor-relations",
@@ -1093,7 +1016,7 @@
       "endpoint": "/api/instruments/{symbol}/investor-relations/{eventId}/transcript",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_INSTRUMENTS_URL"}}"],
         "url_pattern": "/api/instruments/{symbol}/investor-relations/{eventId}/transcript",
@@ -1104,7 +1027,7 @@
       "endpoint": "/api/instruments/search",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_INSTRUMENTS_URL"}}"],
         "url_pattern": "/api/instruments/search",
@@ -1115,7 +1038,7 @@
       "endpoint": "/api/instruments/lookup",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_INSTRUMENTS_URL"}}"],
         "url_pattern": "/api/instruments/lookup",
@@ -1126,7 +1049,7 @@
       "endpoint": "/api/watchlists",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_WATCHLISTS_URL"}}"],
         "url_pattern": "/api/watchlists",
@@ -1137,7 +1060,7 @@
       "endpoint": "/api/watchlists",
       "method": "POST",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_WATCHLISTS_URL"}}"],
         "url_pattern": "/api/watchlists",
@@ -1148,7 +1071,7 @@
       "endpoint": "/api/watchlists",
       "method": "DELETE",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_WATCHLISTS_URL"}}"],
         "url_pattern": "/api/watchlists",
@@ -1159,7 +1082,7 @@
       "endpoint": "/api/watchlists/{id}",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_WATCHLISTS_URL"}}"],
         "url_pattern": "/api/watchlists/{id}",
@@ -1170,7 +1093,7 @@
       "endpoint": "/api/watchlists/{id}",
       "method": "DELETE",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_WATCHLISTS_URL"}}"],
         "url_pattern": "/api/watchlists/{id}",
@@ -1181,7 +1104,7 @@
       "endpoint": "/api/watchlists/{id}/items",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_WATCHLISTS_URL"}}"],
         "url_pattern": "/api/watchlists/{id}/items",
@@ -1192,7 +1115,7 @@
       "endpoint": "/api/watchlists/{id}/items",
       "method": "POST",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_WATCHLISTS_URL"}}"],
         "url_pattern": "/api/watchlists/{id}/items",
@@ -1203,7 +1126,7 @@
       "endpoint": "/api/watchlists/{id}/items/{symbol}",
       "method": "DELETE",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_WATCHLISTS_URL"}}"],
         "url_pattern": "/api/watchlists/{id}/items/{symbol}",
@@ -1214,7 +1137,7 @@
       "endpoint": "/api/notifications",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_NOTIFICATIONS_URL"}}"],
         "url_pattern": "/api/notifications",
@@ -1225,7 +1148,7 @@
       "endpoint": "/api/notifications",
       "method": "PATCH",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_NOTIFICATIONS_URL"}}"],
         "url_pattern": "/api/notifications",
@@ -1236,7 +1159,7 @@
       "endpoint": "/api/notifications/preferences",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_NOTIFICATIONS_URL"}}"],
         "url_pattern": "/api/notifications/preferences",
@@ -1247,7 +1170,7 @@
       "endpoint": "/api/notifications/preferences",
       "method": "PATCH",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_NOTIFICATIONS_URL"}}"],
         "url_pattern": "/api/notifications/preferences",
@@ -1258,7 +1181,7 @@
       "endpoint": "/api/notifications/symbols",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_NOTIFICATIONS_URL"}}"],
         "url_pattern": "/api/notifications/symbols",
@@ -1269,7 +1192,7 @@
       "endpoint": "/api/notifications/symbols/{symbol}",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_NOTIFICATIONS_URL"}}"],
         "url_pattern": "/api/notifications/symbols/{symbol}",
@@ -1280,7 +1203,7 @@
       "endpoint": "/api/notifications/symbols/{symbol}",
       "method": "PATCH",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_NOTIFICATIONS_URL"}}"],
         "url_pattern": "/api/notifications/symbols/{symbol}",
@@ -1291,7 +1214,7 @@
       "endpoint": "/api/news",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_NEWS_URL"}}"],
         "url_pattern": "/api/news",
@@ -1302,7 +1225,7 @@
       "endpoint": "/api/news/articles",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_NEWS_URL"}}"],
         "url_pattern": "/api/news/articles",
@@ -1313,7 +1236,7 @@
       "endpoint": "/api/news/stats",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_NEWS_URL"}}"],
         "url_pattern": "/api/news/stats",
@@ -1324,7 +1247,7 @@
       "endpoint": "/api/billing",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_BILLING_URL"}}"],
         "url_pattern": "/api/billing",
@@ -1335,7 +1258,7 @@
       "endpoint": "/api/billing",
       "method": "POST",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_BILLING_URL"}}"],
         "url_pattern": "/api/billing",
@@ -1346,7 +1269,7 @@
       "endpoint": "/api/billing/plans",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_BILLING_URL"}}"],
         "url_pattern": "/api/billing/plans",
@@ -1357,7 +1280,7 @@
       "endpoint": "/api/billing/current",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_BILLING_URL"}}"],
         "url_pattern": "/api/billing/current",
@@ -1368,7 +1291,7 @@
       "endpoint": "/api/billing/subscription",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_BILLING_URL"}}"],
         "url_pattern": "/api/billing/subscription",
@@ -1379,7 +1302,7 @@
       "endpoint": "/api/billing/subscription",
       "method": "POST",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_BILLING_URL"}}"],
         "url_pattern": "/api/billing/subscription",
@@ -1390,7 +1313,7 @@
       "endpoint": "/api/charting",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_CHARTING_URL"}}"],
         "url_pattern": "/api/charting",
@@ -1401,7 +1324,7 @@
       "endpoint": "/api/charting/presets",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_CHARTING_URL"}}"],
         "url_pattern": "/api/charting/presets",
@@ -1412,7 +1335,7 @@
       "endpoint": "/api/charting/compare",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_CHARTING_URL"}}"],
         "url_pattern": "/api/charting/compare",
@@ -1423,7 +1346,7 @@
       "endpoint": "/api/logos",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_LOGOS_URL"}}"],
         "url_pattern": "/api/logos",
@@ -1434,7 +1357,7 @@
       "endpoint": "/api/logos/{symbol}",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_LOGOS_URL"}}"],
         "url_pattern": "/api/logos/{symbol}",
@@ -1445,7 +1368,7 @@
       "endpoint": "/api/snaptrade",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_SNAPTRADE_URL"}}"],
         "url_pattern": "/api/snaptrade",
@@ -1456,7 +1379,7 @@
       "endpoint": "/api/public",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PUBLIC_URL"}}"],
         "url_pattern": "/api/public",
@@ -1467,7 +1390,7 @@
       "endpoint": "/api/conversations",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_COPILOT_URL"}}"],
         "url_pattern": "/api/conversations",
@@ -1478,7 +1401,7 @@
       "endpoint": "/api/conversations",
       "method": "POST",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_COPILOT_URL"}}"],
         "url_pattern": "/api/conversations",
@@ -1489,7 +1412,7 @@
       "endpoint": "/api/chatbot/{path}",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_COPILOT_URL"}}"],
         "url_pattern": "/api/chatbot/{path}",
@@ -1500,7 +1423,7 @@
       "endpoint": "/api/exchange-rates",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_EXCHANGE_RATES_URL"}}"],
         "url_pattern": "/api/exchange-rates",
@@ -1511,10 +1434,32 @@
       "endpoint": "/api/public/portfolios/{shareId}",
       "method": "GET",
       "output_encoding": "no-op",
-      "input_headers": ["Authorization", "Content-Type", "Accept", "X-User-Id", "X-User-Email", "X-User-FirstName", "X-User-LastName"],
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{
         "host": ["{{env "API_PUBLIC_URL"}}"],
         "url_pattern": "/api/public/portfolios/{shareId}",
+        "encoding": "no-op"
+      }]
+    },
+    {
+      "endpoint": "/.well-known/openid-configuration",
+      "method": "GET",
+      "output_encoding": "no-op",
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
+      "backend": [{
+        "host": ["{{env "API_AUTH_URL"}}"],
+        "url_pattern": "/.well-known/openid-configuration",
+        "encoding": "no-op"
+      }]
+    },
+    {
+      "endpoint": "/.well-known/jwks.json",
+      "method": "GET",
+      "output_encoding": "no-op",
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
+      "backend": [{
+        "host": ["{{env "API_AUTH_URL"}}"],
+        "url_pattern": "/.well-known/jwks.json",
         "encoding": "no-op"
       }]
     }
