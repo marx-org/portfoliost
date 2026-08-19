@@ -45,5 +45,21 @@ export const useAuthStore = defineStore("auth", () => {
     }
   }
 
-  return { token, user, loading, error, isAuthenticated, login, fetchMe, logout }
+  async function loginWithCode(code: string, verifier: string): Promise<void> {
+    loading.value = true
+    error.value = null
+    try {
+      const res = await authApi.loginWithCode({ code, verifier })
+      token.value = res.access_token
+      user.value = res.user
+      setToken(res.access_token)
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : "Login failed"
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  return { token, user, loading, error, isAuthenticated, login, loginWithCode, fetchMe, logout }
 })

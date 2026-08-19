@@ -2,9 +2,14 @@
 import { computed, ref } from "vue"
 import { useRouter } from "vue-router"
 import { useAuthStore } from "@/stores/auth"
+import { createAuthorizationUrl } from "@/auth/pkce"
 
 const auth = useAuthStore()
 const router = useRouter()
+
+const OIDC_ISSUER = import.meta.env.VITE_OIDC_ISSUER_URL
+const OIDC_CLIENT_ID = import.meta.env.VITE_OIDC_CLIENT_ID
+const oidcEnabled = computed(() => Boolean(OIDC_ISSUER && OIDC_CLIENT_ID))
 
 const email = ref("demo@example.com")
 const password = ref("example-service-mock")
@@ -27,6 +32,17 @@ async function submit() {
     // error is stored in auth.error
   }
 }
+
+async function startOidcLogin() {
+  const redirect = typeof router.currentRoute.value.query.redirect === "string" ? router.currentRoute.value.query.redirect : undefined
+  const redirectUri = `${window.location.origin}/auth/callback${redirect ? `?redirect=${encodeURIComponent(redirect)}` : ""}`
+  const { url } = await createAuthorizationUrl({
+    issuerUrl: OIDC_ISSUER!,
+    clientId: OIDC_CLIENT_ID!,
+    redirectUri,
+  })
+  window.location.href = url
+}
 </script>
 
 <template>
@@ -45,6 +61,25 @@ async function submit() {
         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Sign in to your account</p>
 
         <div class="mt-6 space-y-4">
+          <div v-if="oidcEnabled">
+            <button
+              type="button"
+              class="btn-primary w-full"
+              :disabled="auth.loading"
+              data-testid="oidc-signin"
+              @click="startOidcLogin"
+            >
+              Sign in with Passkey
+            </button>
+            <div class="relative my-4">
+              <div class="absolute inset-0 flex items-center">
+                <div class="w-full border-t border-slate-200 dark:border-slate-700"></div>
+              </div>
+              <div class="relative flex justify-center text-sm">
+                <span class="bg-white px-2 text-slate-500 dark:bg-slate-800 dark:text-slate-400">or</span>
+              </div>
+            </div>
+          </div>
           <div>
             <label class="label" for="email">Email Address *</label>
             <input

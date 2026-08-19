@@ -9,6 +9,15 @@ export type LoginPayload = {
   password: string
 }
 
+export type LoginWithCodePayload = {
+  code: string
+  verifier: string
+}
+
+export async function loginWithCode(payload: LoginWithCodePayload): Promise<AuthResponse> {
+  return http.post<AuthResponse>("/api/auth/token", payload)
+}
+
 export async function login(payload: LoginPayload): Promise<AuthResponse> {
   return http.post<AuthResponse>("/api/auth/login", payload)
 }

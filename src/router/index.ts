@@ -15,6 +15,12 @@ const router = createRouter({
       meta: { public: true },
     },
     {
+      path: "/auth/callback",
+      name: "auth-callback",
+      component: () => import("@/modules/auth/AuthCallback.vue"),
+      meta: { public: true },
+    },
+    {
       path: "/public/portfolio/:shareId",
       name: "public-share",
       component: () => import("@/modules/settings/PublicPortfolioView.vue"),

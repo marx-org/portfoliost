@@ -1666,6 +1666,8 @@ export interface components {
             email: string;
             language: string;
             role: string;
+            /** @description User's group memberships for authorization */
+            groups?: string[];
             isDemoUser: boolean;
             /** Format: date-time */
             createdAt: string;

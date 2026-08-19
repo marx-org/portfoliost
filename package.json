@@ -14,10 +14,11 @@
     "test:e2e": "playwright test",
     "test:mock": "node mocks/tests/run.mjs",
     "mock:start": "node mocks/gateway/index.js",
-    "mock:seed": "node scripts/regen-seed.mjs"
+    "mock:seed": "node scripts/regen-seed.mjs",
+    "gen:types": "openapi-typescript node_modules/@marx2/contracts/openapi.yaml -o generated/api-types.d.ts"
   },
   "dependencies": {
-    "@marx2/contracts": "^1.3.0",
+    "@marx2/contracts": "github:Marx2/portfoliost-contracts",
     "apexcharts": "^5.10.0",
     "pinia": "^2.1.7",
     "vue": "^3.4.31",

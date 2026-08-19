@@ -27,8 +27,6 @@ services:
     build:
       context: ../portfoliost-backend
       dockerfile: Dockerfile
-      args:
-        GITHUB_TOKEN: ${GITHUB_TOKEN}
     container_name: portfoliost-backend
     expose:
       - "3000"

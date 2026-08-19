@@ -155,3 +155,39 @@ Separate contracts repo at `github.com/Marx2/portfoliost-contracts`, published t
 - [x] Move `docs/proposals/database-drizzle-sqlite-postgres.md` → `../portfoliost-backend/docs/`.
 - [x] Update this plan with commit hashes for C1–C3.
 - [x] Commit.
+
+---
+
+## PocketID OIDC Auth Integration
+
+Gradual migration: local mock stays as-is for development, cluster uses PocketID. Frontend detects mode via `VITE_OIDC_ISSUER_URL` / `VITE_OIDC_CLIENT_ID` env vars.
+
+### Step A1 — Backend auth infrastructure
+- [x] Install `jose` in portfoliost-backend for JWT validation.
+- [x] Create `src/auth.ts` — `userIdentityMiddleware` (dual-mode: X-User-* headers for Docker Compose, JWT validation for cluster), `validateJwt`, `requireGroup`.
+- [x] Create `src/routes/auth.ts` — `GET /api/auth/me`, `POST /api/auth/logout`.
+- [x] Register auth routes in `src/index.ts`.
+- [x] Update `src/routes/users.ts` to import from `auth.ts` instead of `context.ts`.
+- [x] Delete `src/context.ts`.
+- [x] Build + test pass. Commit.
+
+### Step A2 — Contracts: groups in AuthUser
+- [x] Add `groups` array to `AuthUser` schema in `portfoliost-contracts/openapi.yaml`.
+- [x] Commit + push contracts. GitHub Actions publishes.
+- [x] Regenerate frontend types (`npm run gen:types`).
+- [x] Regenerate backend OpenAPI spec (`npm run gen:openapi`).
+
+### Step A3 — Frontend OIDC flow
+- [x] Create `src/auth/pkce.ts` — PKCE utilities (code_verifier, code_challenge, state, authorization URL builder).
+- [x] Create `src/modules/auth/AuthCallback.vue` — handles `/auth/callback` redirect, validates state, exchanges code via backend.
+- [x] Add `/auth/callback` route to router.
+- [x] Update `src/api/auth.ts` — add `loginWithCode()` calling `POST /api/auth/token`.
+- [x] Update `src/stores/auth.ts` — add `loginWithCode()` action.
+- [x] Update `LoginView.vue` — detect OIDC mode, show "Sign in with Passkey" button above email form.
+- [x] Typecheck + unit tests + mock tests pass. Commit.
+
+### Step A4 — Switch from npm registry to git URL
+- [x] Remove `@marx2/contracts` from GitHub Packages (private: true, delete publish workflow).
+- [x] Switch both repos to `github:Marx2/portfoliost-contracts` in package.json.
+- [x] Remove `.npmrc` files, `GITHUB_TOKEN` Dockerfile arg.
+- [x] Docker build succeeds without auth tokens. Commit.
