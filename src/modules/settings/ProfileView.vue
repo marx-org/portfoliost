@@ -158,6 +158,18 @@ async function confirmDanger() {
             <input id="email" :value="profile.email" type="email" disabled class="input cursor-not-allowed bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400" />
             <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Email cannot be changed for security reasons</p>
           </div>
+          <div class="sm:col-span-2">
+            <label class="label">Groups</label>
+            <div class="flex flex-wrap gap-2 mt-1">
+              <span
+                v-for="group in profile.groups"
+                :key="group"
+                class="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-500/10 px-2.5 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-400"
+              >{{ group }}</span>
+              <span v-if="!profile.groups?.length" class="text-sm text-slate-500 dark:text-slate-400">No groups assigned</span>
+            </div>
+            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Group membership is managed by your identity provider</p>
+          </div>
         </div>
         <p v-if="saveError" class="mt-3 text-sm text-red-600 dark:text-red-400">{{ saveError }}</p>
         <div class="mt-4">

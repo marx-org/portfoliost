@@ -5,6 +5,7 @@ export interface UserProfile {
   email: string
   firstName: string
   lastName: string
+  groups: string[]
   language: string
   createdAt: string
   updatedAt: string
