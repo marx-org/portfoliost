@@ -26,6 +26,9 @@ services:
     container_name: portfoliost
     ports:
       - "3000:80"
+    environment:
+      OIDC_ISSUER_URL: ${OIDC_ISSUER_URL:-http://localhost:4010}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-mock-client}
     restart: unless-stopped
 
   portfoliost-backend:

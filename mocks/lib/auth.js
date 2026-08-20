@@ -27,7 +27,28 @@ export function resolveUser(bearer) {
   if (!bearer) return null
   if (bearer === STATIC_TOKEN) return USER
   const s = sessions.get(bearer)
-  return s ? s.user : null
+  if (s) return s.user
+  // Accept OIDC JWTs (mock — decode only, no signature verification)
+  try {
+    const parts = bearer.split(".")
+    if (parts.length === 3) {
+      const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString())
+      if (payload.sub && payload.email) {
+        return {
+          id: payload.sub,
+          email: payload.email,
+          firstName: payload.given_name || "",
+          lastName: payload.family_name || "",
+          language: "en",
+          role: "user",
+          isDemoUser: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }
+      }
+    }
+  } catch {}
+  return null
 }
 
 export function requireAuth(ctx) {

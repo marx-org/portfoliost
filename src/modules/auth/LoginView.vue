@@ -3,12 +3,14 @@ import { computed, ref } from "vue"
 import { useRouter } from "vue-router"
 import { useAuthStore } from "@/stores/auth"
 import { createAuthorizationUrl } from "@/auth/pkce"
+import { getOidcConfig } from "@/runtime-config"
 
 const auth = useAuthStore()
 const router = useRouter()
 
-const OIDC_ISSUER = import.meta.env.VITE_OIDC_ISSUER_URL
-const OIDC_CLIENT_ID = import.meta.env.VITE_OIDC_CLIENT_ID
+const oidc = getOidcConfig()
+const OIDC_ISSUER = oidc.issuerUrl
+const OIDC_CLIENT_ID = oidc.clientId
 const oidcEnabled = computed(() => Boolean(OIDC_ISSUER && OIDC_CLIENT_ID))
 
 const email = ref("demo@example.com")

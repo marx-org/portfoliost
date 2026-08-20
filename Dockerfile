@@ -27,9 +27,12 @@ FROM node:22-alpine
 RUN npm install -g serve
 
 COPY --from=build /app/dist /app/dist
+COPY scripts/docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 
 EXPOSE 80
 
+ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["serve", "-s", "/app/dist", "-l", "80"]
 
 HEALTHCHECK --interval=15s --timeout=3s --start-period=5s --retries=3 \
