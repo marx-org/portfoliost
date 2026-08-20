@@ -45,7 +45,8 @@ onMounted(async () => {
     const redirectUri = `${window.location.origin}/auth/callback`
     await auth.loginWithCode(code, verifier, redirectUri)
     clearVerifier()
-    const redirect = route.query.redirect as string
+    const redirect = sessionStorage.getItem("portfoliost_oidc_redirect")
+    sessionStorage.removeItem("portfoliost_oidc_redirect")
     router.push(redirect || { name: "investments" })
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Token exchange failed"

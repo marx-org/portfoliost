@@ -37,7 +37,8 @@ async function submit() {
 
 async function startOidcLogin() {
   const redirect = typeof router.currentRoute.value.query.redirect === "string" ? router.currentRoute.value.query.redirect : undefined
-  const redirectUri = `${window.location.origin}/auth/callback${redirect ? `?redirect=${encodeURIComponent(redirect)}` : ""}`
+  if (redirect) sessionStorage.setItem("portfoliost_oidc_redirect", redirect)
+  const redirectUri = `${window.location.origin}/auth/callback`
   const { url } = await createAuthorizationUrl({
     issuerUrl: OIDC_ISSUER!,
     clientId: OIDC_CLIENT_ID!,
