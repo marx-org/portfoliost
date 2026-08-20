@@ -39,6 +39,7 @@ export function resolveUser(bearer) {
           email: payload.email,
           firstName: payload.given_name || "",
           lastName: payload.family_name || "",
+          avatarUrl: payload.picture || null,
           language: "en",
           role: "user",
           isDemoUser: false,

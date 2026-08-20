@@ -1668,6 +1668,11 @@ export interface components {
             role: string;
             /** @description User's group memberships for authorization */
             groups?: string[];
+            /**
+             * Format: uri
+             * @description URL to user's avatar image from identity provider
+             */
+            avatarUrl?: string | null;
             isDemoUser: boolean;
             /** Format: date-time */
             createdAt: string;
@@ -1685,6 +1690,12 @@ export interface components {
             email: string;
             firstName?: string | null;
             lastName?: string | null;
+            /**
+             * Format: uri
+             * @description URL to user's avatar image from identity provider
+             */
+            avatarUrl?: string | null;
+            groups: string[];
             language: string;
             /** Format: date-time */
             createdAt: string;

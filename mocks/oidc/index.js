@@ -44,7 +44,7 @@ export function register(app) {
       subject_types_supported: ["public"],
       id_token_signing_alg_values_supported: ["RS256"],
       scopes_supported: ["openid", "profile", "email", "groups"],
-      claims_supported: ["sub", "email", "given_name", "family_name", "groups"],
+      claims_supported: ["sub", "email", "given_name", "family_name", "picture", "groups"],
     })
   })
 
@@ -120,6 +120,9 @@ export function register(app) {
       exp: now + 3600,
       iat: now,
       email: authCode.email,
+      given_name: "Dev",
+      family_name: "User",
+      picture: "https://api.dicebear.com/7.x/initials/svg?seed=Dev+User",
       groups: ["portfoliost_admin"],
     })
 

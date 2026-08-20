@@ -144,6 +144,23 @@ async function confirmDanger() {
     <template v-if="profile">
       <section class="card p-6">
         <h2 class="mb-4 text-base font-semibold">Profile Settings</h2>
+        <div class="flex items-center gap-4 mb-6">
+          <img
+            v-if="profile.avatarUrl"
+            :src="profile.avatarUrl"
+            :alt="`${profile.firstName || ''} ${profile.lastName || ''}`.trim() || 'User avatar'"
+            class="h-16 w-16 rounded-full object-cover ring-2 ring-slate-200 dark:ring-slate-700"
+          />
+          <div
+            v-else
+            class="flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-500/20 text-xl font-semibold text-blue-600 dark:text-blue-400 ring-2 ring-slate-200 dark:ring-slate-700"
+          >
+            {{ (profile.firstName?.[0] || profile.email[0] || "?").toUpperCase() }}
+          </div>
+          <div>
+            <p class="text-sm text-slate-500 dark:text-slate-400">Avatar is managed by your identity provider</p>
+          </div>
+        </div>
         <div class="grid gap-4 sm:grid-cols-2">
           <div>
             <label for="first-name" class="label">First Name</label>
