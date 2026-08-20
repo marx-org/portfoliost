@@ -216,6 +216,18 @@ Gradual migration: local mock stays as-is for development, cluster uses PocketID
 - [x] Set `POCKETID_ISSUER_URL=http://krakend:8080` and `POCKETID_AUDIENCE=mock-client` on backend for JWT validation.
 - [x] Tests. Committed.
 
+### Step A8 — Profile avatar from OIDC
+- [x] Add `avatarUrl` to `UserProfile` and `AuthUser` in contracts (`openapi.yaml`).
+- [x] Add `picture` claim to backend `UserIdentity` (from OIDC JWT `picture` claim).
+- [x] Add `avatarUrl` to `UserProfileSchema` (z.string().url().nullable()).
+- [x] Return `avatarUrl` in `GET /profile` and `PATCH /profile`.
+- [x] Frontend `UserProfile` interface: add `avatarUrl: string | null`.
+- [x] `ProfileView.vue`: show avatar image with fallback initial, "managed by identity provider" note.
+- [x] Mock: OIDC JWT includes `picture` claim (dicebear initials URL).
+- [x] Mock: raw data (`auth_me.json`, `users_profile.json`) includes `avatarUrl`.
+- [x] Mock: `resolveUser()` extracts `picture` → `avatarUrl` from JWT payload.
+- [x] Unit + mock tests pass. Committed. — `b5dd8cb`
+
 ---
 
 ## Cluster Deployment
