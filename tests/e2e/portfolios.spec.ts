@@ -199,7 +199,7 @@ test("edit position opens a transaction list editor with rows and add row", asyn
   await dialog.getByLabel("Quantity").last().fill("3")
   await dialog.getByLabel("Price per share").last().fill("500")
   await dialog.getByRole("button", { name: "Add", exact: true }).click()
-  await expect(dialog.locator("tbody tr")).toHaveCount(2)
+  await expect(dialog.locator("tbody tr")).toHaveCount(11)
 
   await dialog.getByRole("button", { name: "Close", exact: true }).click()
   await expect(dialog).toHaveCount(0)

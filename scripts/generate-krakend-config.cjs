@@ -67,10 +67,10 @@ const subRoutes = {
   wallets: [
     { path: '{id}',                     methods: ['GET','PATCH','DELETE'] },
     { path: '{id}/balance-history',     methods: ['GET'] },
-    { path: '{id}/deposits',            methods: ['GET'] },
+    { path: '{id}/deposits',            methods: ['GET','POST'] },
     { path: '{id}/transactions',        methods: ['GET'] },
-    { path: '{id}/transfers',           methods: ['GET'] },
-    { path: '{id}/withdrawals',         methods: ['GET'] },
+    { path: '{id}/transfers',           methods: ['GET','POST'] },
+    { path: '{id}/withdrawals',         methods: ['GET','POST'] },
     { path: 'total-balance',            methods: ['GET'] },
     { path: 'recent-transactions',      methods: ['GET'] },
     { path: 'transactions/{id}',        methods: ['GET','PATCH','DELETE'] },

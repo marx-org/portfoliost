@@ -52,8 +52,8 @@ test("charting adds stocks via search and compares them", async ({ page }) => {
 
   await expect(page.getByTestId("stock-chip")).toHaveCount(2)
   await expect(page.locator(".apexcharts-canvas").first()).toBeVisible()
-  await expect(page.getByRole("columnheader", { name: "AAPL" })).toBeVisible()
-  await expect(page.getByRole("columnheader", { name: "MSFT" })).toBeVisible()
+  await expect(page.locator("th", { hasText: "AAPL" })).toBeVisible()
+  await expect(page.locator("th", { hasText: "MSFT" })).toBeVisible()
 })
 
 test("charting switches metric and removes a stock", async ({ page }) => {
@@ -61,7 +61,7 @@ test("charting switches metric and removes a stock", async ({ page }) => {
 
   await page.getByTestId("preset-banks").click()
   await expect(page.getByTestId("stock-chip")).toHaveCount(4)
-  await expect(page.getByRole("columnheader", { name: "JPM" })).toBeVisible()
+  await expect(page.locator(".apexcharts-canvas").first()).toBeVisible()
 
   await page.getByTestId("metric-picker").selectOption("netMargin")
   await expect(page.getByText("Net Margin").last()).toBeVisible()

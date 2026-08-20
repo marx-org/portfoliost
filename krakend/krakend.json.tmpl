@@ -738,6 +738,17 @@
       }]
     },
     {
+      "endpoint": "/api/wallets/{id}/deposits",
+      "method": "POST",
+      "output_encoding": "no-op",
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
+      "backend": [{
+        "host": ["{{env "API_WALLETS_URL"}}"],
+        "url_pattern": "/api/wallets/{id}/deposits",
+        "encoding": "no-op"
+      }]
+    },
+    {
       "endpoint": "/api/wallets/{id}/transactions",
       "method": "GET",
       "output_encoding": "no-op",
@@ -760,8 +771,30 @@
       }]
     },
     {
+      "endpoint": "/api/wallets/{id}/transfers",
+      "method": "POST",
+      "output_encoding": "no-op",
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
+      "backend": [{
+        "host": ["{{env "API_WALLETS_URL"}}"],
+        "url_pattern": "/api/wallets/{id}/transfers",
+        "encoding": "no-op"
+      }]
+    },
+    {
       "endpoint": "/api/wallets/{id}/withdrawals",
       "method": "GET",
+      "output_encoding": "no-op",
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
+      "backend": [{
+        "host": ["{{env "API_WALLETS_URL"}}"],
+        "url_pattern": "/api/wallets/{id}/withdrawals",
+        "encoding": "no-op"
+      }]
+    },
+    {
+      "endpoint": "/api/wallets/{id}/withdrawals",
+      "method": "POST",
       "output_encoding": "no-op",
       "input_headers": ["Authorization", "Content-Type", "Accept"],
       "backend": [{

@@ -59,6 +59,7 @@ test("wallets: shows balance and deposits cash", async ({ page }) => {
   const dialog = page.getByRole("dialog", { name: "Cash movement" })
   await dialog.getByRole("spinbutton", { name: "Amount" }).fill("100")
   await dialog.getByRole("button", { name: "Deposit", exact: true }).click()
+  await expect(dialog).not.toBeVisible()
 
   await page.getByRole("button", { name: "Transactions" }).first().click()
   await expect(page.getByText("DEPOSIT").first()).toBeVisible()
