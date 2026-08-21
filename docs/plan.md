@@ -334,4 +334,7 @@ Backend switches from SQLite/libSQL to **Postgres everywhere** (unit tests via P
 - [x] Commit. — `f796be9` (frontend), `5836edb` (backend)
 
 ### Step G5 — Cluster deployment (**last point — discuss separately first**)
-- [ ] Point cluster backend HelmRelease at existing cluster Postgres (`DATABASE_URL` secret), migration strategy on deploy, drop any SQLite volume remnants. *Not started — needs discussion.*
+- [x] Dedicated user + database via operator: `portfoliost` user (least-privilege, non-superuser) owning `portfoliost` DB added to `postgrescluster-pfire.yaml` → secret `postgres-pfire-pguser-portfoliost`. Commit `7e30d4042` (homelab).
+- [x] One-time manual fix for PG15+ public-schema lockdown: PGO creates the DB owned by `postgres`, so `public` is not writable by the app role and drizzle-kit migrate fails with a silent exit 1 (`42501 insufficient_privilege`). Applied as superuser in DB `portfoliost`: `ALTER SCHEMA public OWNER TO portfoliost;` — re-run if the DB is ever recreated.
+- [x] Backend HelmRelease switched to cluster Postgres: `DATABASE_URL` from secret key `uri`, image v1.0.7 (first Postgres build), command override skips `db:seed` in production, SQLite PVC dropped. Commit `16769db49` (homelab).
+- [x] Verified live: migrations apply at boot, `user_preferences` table created (owned by `portfoliost`, 0 rows = no seed), pod Ready on `/health`.
