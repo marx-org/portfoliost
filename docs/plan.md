@@ -323,8 +323,10 @@ Backend switches from SQLite/libSQL to **Postgres everywhere** (unit tests via P
 ### Step G3 — Docker compose: volatile Postgres
 - [x] Add `postgres` service (`postgres:17-alpine`, tmpfs data dir → fresh database on every start, `pg_isready` healthcheck).
 - [x] Backend `DATABASE_URL` → compose Postgres; backend keeps migrate+seed on start (seeds fresh DB each start for tests).
-- [x] Verified: volatility (marker row gone after recreate, DB reseeded), backend health via compose, frontend `build` + `test` + `test:mock`, e2e 50/51 — 1 pre-existing charting failure, unrelated to this change. Commit.
+- [x] Verified: volatility (marker row gone after recreate, DB reseeded), backend health via compose, frontend `build` + `test` (66) + `test:mock` (140), backend tests (17). Commit. — `550a42c`
+- [x] E2E baseline confirmed **50/51 with `--workers=1`** (CI mode): single failure is `charting adds stocks via search`, caused by the KrakenD issue below — pre-existing, unrelated to this migration.
 - [ ] **Discovered blocker for Phase 2** (separate fix): KrakenD CE strips query strings on all endpoints even with `querystring_params` configured (verified with minimal repro against `krakend:2.13`). Affects mock today (`/api/charting/compare?symbols=` → the known charting e2e failure) and will affect real-backend endpoints routed through KrakenD in Phase 2+. Needs a gateway-level solution before endpoint migration starts.
+- [ ] **Note (e2e determinism)**: local runs use `fullyParallel`; multiple workers race on the shared stateful mock (`example-service-mock` keeps mutations in memory across runs), so assertion failures drift run-to-run. Serial (`--workers=1`) against a freshly recreated stack is deterministic and is what CI uses. If local parallel e2e fails oddly: `docker compose restart example-service-mock` (or down/up) first.
 
 ### Step G4 — Docs sweep: remove remaining SQLite mentions
 - [x] Rewrite `docs/proposals/testing-strategy.md` environment tiers for Postgres (incl. KrakenD query-string blocker note).
