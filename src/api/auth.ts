@@ -32,5 +32,5 @@ export async function fetchMe(): Promise<AuthMe> {
 }
 
 export async function logout(): Promise<void> {
-  await http.delete("/api/auth/logout")
+  await http.post("/api/auth/logout")
 }

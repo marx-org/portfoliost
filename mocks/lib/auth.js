@@ -18,6 +18,10 @@ export function createSession() {
   return token
 }
 
+export function destroySession(token) {
+  return sessions.delete(token)
+}
+
 export function isValidCredentials(email, password) {
   if (typeof email !== "string" || typeof password !== "string") return false
   return email.trim().toLowerCase() === EMAIL.toLowerCase() && password === PASSWORD

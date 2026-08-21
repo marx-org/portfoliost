@@ -78,6 +78,17 @@
       }]
     },
     {
+      "endpoint": "/api/auth/logout",
+      "method": "POST",
+      "output_encoding": "no-op",
+      "input_headers": ["Authorization", "Content-Type", "Accept"],
+      "backend": [{
+        "host": ["{{env "API_AUTH_URL"}}"],
+        "url_pattern": "/api/auth/logout",
+        "encoding": "no-op"
+      }]
+    },
+    {
       "endpoint": "/api/users",
       "method": "GET",
       "output_encoding": "no-op",

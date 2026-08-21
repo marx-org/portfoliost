@@ -85,6 +85,13 @@ async function main() {
   const noAuth = await request("/portfolios")
   check("protected routes require auth", noAuth.status === 401, `got ${noAuth.status}`)
 
+  const logoutLogin = await request("/auth/login", { method: "POST", body: { email: EMAIL, password: PASSWORD } })
+  const logoutToken = logoutLogin.json.access_token
+  const logoutRes = await request("/auth/logout", { method: "POST", token: logoutToken })
+  check("auth.logout returns 204", logoutRes.status === 204, `got ${logoutRes.status}`)
+  const afterLogout = await request("/auth/me", { token: logoutToken })
+  check("auth.logout invalidates session", afterLogout.status === 401, `got ${afterLogout.status}`)
+
   // ── Users ───────────────────────────────────────────────────
   const profile = await request("/users/profile", { token })
   check("users.profile", profile.status === 200 && profile.json.email, `got ${profile.status}`)

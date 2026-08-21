@@ -1,4 +1,4 @@
-import { authConfig, createSession, isValidCredentials, requireAuth } from "../lib/auth.js"
+import { authConfig, createSession, destroySession, isValidCredentials, requireAuth } from "../lib/auth.js"
 import { loadRaw } from "../lib/data.js"
 
 export function register(app) {
@@ -42,6 +42,9 @@ export function register(app) {
 
   app.post("/api/auth/logout", (ctx) => {
     if (!requireAuth(ctx)) return
+    const auth = ctx.headers.authorization || ""
+    const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : ""
+    destroySession(token)
     ctx.res.status(204).end()
   })
 }
