@@ -299,3 +299,36 @@ Gradual migration: local mock stays as-is for development, cluster uses PocketID
 - [ ] Remove `npm run test:mock` script.
 - [ ] Remove `scripts/regen-seed.mjs` and `discovery/raw/`.
 - [ ] Update `AGENTS.md` to reflect new architecture.
+
+---
+
+## Postgres Migration
+
+Backend switches from SQLite/libSQL to **Postgres everywhere** (unit tests via PGlite, docker compose, cluster). See `../portfoliost-backend/docs/database-postgres-drizzle.md`.
+
+> **Cluster deployment changes are deferred to the last point of this phase and will be discussed separately before implementation** (credentials, network policy, migration job against the existing cluster Postgres).
+
+### Step G1 — Proposal rewrite + plan
+- [x] Rename `docs/database-drizzle-sqlite-postgres.md` → `docs/database-postgres-drizzle.md`, rewrite as Postgres-only proposal (jsonb columns, ISO-text timestamps, volatile compose DB, PGlite unit tests).
+
+### Step G2 — Backend dialect switch (SQLite → Postgres)
+- [ ] `src/db/schema.ts` → `drizzle-orm/pg-core` (`pgTable`, `jsonb`).
+- [ ] Driver: `@libsql/client` → `postgres` (postgres-js); remove `@libsql/client` + `@libsql/core`.
+- [ ] `drizzle.config.ts` → `dialect: "postgresql"`; regenerate fresh baseline migration.
+- [ ] Unit tests → embedded Postgres (PGlite) running the real migrations folder; drop hand-written DDL.
+- [ ] Seed runner + fixtures in Postgres SQL (`ON CONFLICT DO NOTHING`).
+- [ ] Routes/auth: drop manual JSON.stringify for jsonb columns.
+- [ ] Verify: backend `npm run build` + `npm run test`. Commit.
+
+### Step G3 — Docker compose: volatile Postgres
+- [ ] Add `postgres` service (`postgres:17-alpine`, tmpfs data dir → fresh database on every start, `pg_isready` healthcheck).
+- [ ] Backend `DATABASE_URL` → compose Postgres; backend keeps migrate+seed on start (seeds fresh DB each start for tests).
+- [ ] Verify: full suite — frontend `build` + `test` + `test:mock` + backend tests + `docker compose up -d --build` + `test:e2e`. Commit.
+
+### Step G4 — Docs sweep: remove remaining SQLite mentions
+- [ ] Rewrite `docs/proposals/testing-strategy.md` environment tiers for Postgres.
+- [ ] Sweep READMEs/AGENTS for stale sqlite/libsql references.
+- [ ] Commit.
+
+### Step G5 — Cluster deployment (**last point — discuss separately first**)
+- [ ] Point cluster backend HelmRelease at existing cluster Postgres (`DATABASE_URL` secret), migration strategy on deploy, drop any SQLite volume remnants. *Not started — needs discussion.*
