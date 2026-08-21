@@ -31,6 +31,22 @@ services:
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-mock-client}
     restart: unless-stopped
 
+  postgres:
+    image: postgres:17-alpine
+    container_name: portfoliost-postgres
+    environment:
+      POSTGRES_USER: portfoliost
+      POSTGRES_PASSWORD: portfoliost
+      POSTGRES_DB: portfoliost
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U portfoliost -d portfoliost"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
   portfoliost-backend:
     build:
       context: ../portfoliost-backend
@@ -41,9 +57,10 @@ services:
     environment:
       POCKETID_ISSUER_URL: ${POCKETID_ISSUER_URL:-http://krakend:8080}
       POCKETID_AUDIENCE: ${POCKETID_AUDIENCE:-mock-client}
-      DATABASE_URL: ${DATABASE_URL:-file:/tmp/portfoliost.db}
-    tmpfs:
-      - /tmp
+      DATABASE_URL: postgres://portfoliost:portfoliost@postgres:5432/portfoliost
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
 
   krakend:

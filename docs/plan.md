@@ -321,9 +321,10 @@ Backend switches from SQLite/libSQL to **Postgres everywhere** (unit tests via P
 - [x] Verify: backend `npm run build` + `npm run test`; migrate+seed verified against disposable `postgres:17-alpine`. Commit. — `f0d33f3` (backend)
 
 ### Step G3 — Docker compose: volatile Postgres
-- [ ] Add `postgres` service (`postgres:17-alpine`, tmpfs data dir → fresh database on every start, `pg_isready` healthcheck).
-- [ ] Backend `DATABASE_URL` → compose Postgres; backend keeps migrate+seed on start (seeds fresh DB each start for tests).
-- [ ] Verify: full suite — frontend `build` + `test` + `test:mock` + backend tests + `docker compose up -d --build` + `test:e2e`. Commit.
+- [x] Add `postgres` service (`postgres:17-alpine`, tmpfs data dir → fresh database on every start, `pg_isready` healthcheck).
+- [x] Backend `DATABASE_URL` → compose Postgres; backend keeps migrate+seed on start (seeds fresh DB each start for tests).
+- [x] Verified: volatility (marker row gone after recreate, DB reseeded), backend health via compose, frontend `build` + `test` + `test:mock`, e2e 50/51 — 1 pre-existing charting failure, unrelated to this change. Commit.
+- [ ] **Discovered blocker for Phase 2** (separate fix): KrakenD CE strips query strings on all endpoints even with `querystring_params` configured (verified with minimal repro against `krakend:2.13`). Affects mock today (`/api/charting/compare?symbols=` → the known charting e2e failure) and will affect real-backend endpoints routed through KrakenD in Phase 2+. Needs a gateway-level solution before endpoint migration starts.
 
 ### Step G4 — Docs sweep: remove remaining SQLite mentions
 - [ ] Rewrite `docs/proposals/testing-strategy.md` environment tiers for Postgres.
