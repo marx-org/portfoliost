@@ -260,3 +260,42 @@ Gradual migration: local mock stays as-is for development, cluster uses PocketID
 ## Related Proposals
 
 - [Testing Strategy — Mock Phase-Out and SQLite Environment Tiers](proposals/testing-strategy.md)
+
+## Testing Strategy Implementation
+
+### Phase 1 — Environment-Aware SQLite + Seed System
+- [x] Add `DATABASE_URL` env var to `portfoliost-backend/src/db/index.ts` (defaults to `file:data/portfoliost.db`).
+- [x] Update `drizzle.config.ts` to respect `DATABASE_URL`.
+- [x] Create `seed/run.mjs` + `src/db/seed.ts` seed runner (checks if `user_preferences` is empty, runs SQL fixtures).
+- [x] Create `seed/001_user_preferences.sql` with test user data.
+- [x] Add `db:seed` npm script to `portfoliost-backend/package.json`.
+- [x] Update `portfoliost-backend/Dockerfile`: copy `seed/`, CMD runs `db:migrate && db:seed`.
+- [x] Update `docker-compose.yml`: remove `backend-data` volume, add `tmpfs: [/tmp]`, set `DATABASE_URL=file:/tmp/portfoliost.db`.
+- [x] Fix pre-existing auth test bug (`code_verifier` → `verifier`).
+- [x] Verify: build + unit + mock + e2e (50/51, 1 pre-existing charting flake). Commit. — `06fa23a` (backend) `8ab90ba` (frontend)
+
+### Phase 2 — First Endpoint Migration
+- [ ] Pick endpoint to migrate (suggestion: `GET /api/users/preferences`).
+- [ ] Implement in `portfoliost-backend`.
+- [ ] Write backend unit tests.
+- [ ] Add seed data if needed.
+- [ ] Switch KrakenD route: `API_USERS_URL` → `http://portfoliost-backend:3000`.
+- [ ] Add E2E test for the endpoint.
+- [ ] Delete mock handler.
+- [ ] Verify: build + unit + mock + e2e. Commit.
+
+### Phase 3 — Subsequent Endpoints
+- [ ] `/api/auth/*` + `/api/users/*` (partially done — auth + users routes exist).
+- [ ] `/api/portfolios/*`
+- [ ] `/api/wallets/*`
+- [ ] `/api/watchlists/*`
+- [ ] `/api/instruments/*`
+- [ ] `/api/charting/*`
+
+### Phase 4 — Mock Removal
+- [ ] Delete `mocks/` directory.
+- [ ] Remove `example-service-mock` service from `docker-compose.yml`.
+- [ ] Remove `Dockerfile.mock`.
+- [ ] Remove `npm run test:mock` script.
+- [ ] Remove `scripts/regen-seed.mjs` and `discovery/raw/`.
+- [ ] Update `AGENTS.md` to reflect new architecture.
