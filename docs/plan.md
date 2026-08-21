@@ -312,13 +312,13 @@ Backend switches from SQLite/libSQL to **Postgres everywhere** (unit tests via P
 - [x] Rename `docs/database-drizzle-sqlite-postgres.md` → `docs/database-postgres-drizzle.md`, rewrite as Postgres-only proposal (jsonb columns, ISO-text timestamps, volatile compose DB, PGlite unit tests).
 
 ### Step G2 — Backend dialect switch (SQLite → Postgres)
-- [ ] `src/db/schema.ts` → `drizzle-orm/pg-core` (`pgTable`, `jsonb`).
-- [ ] Driver: `@libsql/client` → `postgres` (postgres-js); remove `@libsql/client` + `@libsql/core`.
-- [ ] `drizzle.config.ts` → `dialect: "postgresql"`; regenerate fresh baseline migration.
-- [ ] Unit tests → embedded Postgres (PGlite) running the real migrations folder; drop hand-written DDL.
-- [ ] Seed runner + fixtures in Postgres SQL (`ON CONFLICT DO NOTHING`).
-- [ ] Routes/auth: drop manual JSON.stringify for jsonb columns.
-- [ ] Verify: backend `npm run build` + `npm run test`. Commit.
+- [x] `src/db/schema.ts` → `drizzle-orm/pg-core` (`pgTable`, `jsonb`).
+- [x] Driver: `@libsql/client` → `postgres` (postgres-js); remove `@libsql/client` + `@libsql/core`.
+- [x] `drizzle.config.ts` → `dialect: "postgresql"`; regenerate fresh baseline migration.
+- [x] Unit tests → embedded Postgres (PGlite) running the real migrations folder; drop hand-written DDL.
+- [x] Seed runner + fixtures in Postgres SQL (`ON CONFLICT DO NOTHING`).
+- [x] Routes/auth: drop manual JSON.stringify for jsonb columns.
+- [x] Verify: backend `npm run build` + `npm run test`; migrate+seed verified against disposable `postgres:17-alpine`. Commit. — `f0d33f3` (backend)
 
 ### Step G3 — Docker compose: volatile Postgres
 - [ ] Add `postgres` service (`postgres:17-alpine`, tmpfs data dir → fresh database on every start, `pg_isready` healthcheck).
