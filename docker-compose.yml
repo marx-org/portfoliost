@@ -41,8 +41,9 @@ services:
     environment:
       POCKETID_ISSUER_URL: ${POCKETID_ISSUER_URL:-http://krakend:8080}
       POCKETID_AUDIENCE: ${POCKETID_AUDIENCE:-mock-client}
-    volumes:
-      - backend-data:/app/data
+      DATABASE_URL: ${DATABASE_URL:-file:/tmp/portfoliost.db}
+    tmpfs:
+      - /tmp
     restart: unless-stopped
 
   krakend:
@@ -74,6 +75,3 @@ services:
       API_BACKEND_URL: ${API_BACKEND_URL:-http://example-service-mock:4010}
     command: ["krakend", "run", "-d", "-c", "/etc/krakend/krakend.json.tmpl"]
     restart: unless-stopped
-
-volumes:
-  backend-data:

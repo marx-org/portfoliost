@@ -256,3 +256,7 @@ Gradual migration: local mock stays as-is for development, cluster uses PocketID
 - [x] logoutURLs: `https://portfoliost.${SECRET_DOMAIN}/logout`.
 - [x] Operator creates client and writes credentials to secret `portfoliost-oidc-credentials`.
 - [x] Reference secret in portfoliost-backend HelmRelease. Commit.
+
+## Related Proposals
+
+- [Testing Strategy — Mock Phase-Out and SQLite Environment Tiers](proposals/testing-strategy.md)
