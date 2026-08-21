@@ -329,7 +329,7 @@ Backend switches from SQLite/libSQL to **Postgres everywhere** (unit tests via P
 ### Step G4 — Docs sweep: remove remaining SQLite mentions
 - [x] Rewrite `docs/proposals/testing-strategy.md` environment tiers for Postgres (incl. KrakenD query-string blocker note).
 - [x] Update backend cross-reference `docs/testing-strategy.md`; auth proposal wording; plan.md pointers (historical steps kept as record).
-- [ ] Commit.
+- [x] Commit. — `f796be9` (frontend), `5836edb` (backend)
 
 ### Step G5 — Cluster deployment (**last point — discuss separately first**)
 - [ ] Point cluster backend HelmRelease at existing cluster Postgres (`DATABASE_URL` secret), migration strategy on deploy, drop any SQLite volume remnants. *Not started — needs discussion.*
