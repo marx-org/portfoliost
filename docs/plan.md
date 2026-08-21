@@ -62,9 +62,9 @@ Legend: `[ ]` pending · `[x]` done
 
 ---
 
-## portfoliost-backend — Database Layer (Drizzle + SQLite)
+## portfoliost-backend — Database Layer (Drizzle + SQLite) *(historical — superseded by the Postgres Migration phase below)*
 
-Backend lives at `../portfoliost-backend/`. See `docs/proposals/database-drizzle-sqlite-postgres.md`.
+Backend lives at `../portfoliost-backend/`. Current database proposal: `../portfoliost-backend/docs/database-postgres-drizzle.md`. Steps below are a historical record of the original (since-replaced) SQLite implementation.
 
 ### Step B1 — Project scaffold
 - [x] `../portfoliost-backend/`: `package.json` (type: module), `tsconfig.json`, `src/index.ts` (Hono server with `/health` endpoint), `vitest.config.ts`.
@@ -259,7 +259,7 @@ Gradual migration: local mock stays as-is for development, cluster uses PocketID
 
 ## Related Proposals
 
-- [Testing Strategy — Mock Phase-Out and SQLite Environment Tiers](proposals/testing-strategy.md)
+- [Testing Strategy — Mock Phase-Out and Database Environment Tiers](proposals/testing-strategy.md)
 
 ## Testing Strategy Implementation
 
@@ -327,8 +327,8 @@ Backend switches from SQLite/libSQL to **Postgres everywhere** (unit tests via P
 - [ ] **Discovered blocker for Phase 2** (separate fix): KrakenD CE strips query strings on all endpoints even with `querystring_params` configured (verified with minimal repro against `krakend:2.13`). Affects mock today (`/api/charting/compare?symbols=` → the known charting e2e failure) and will affect real-backend endpoints routed through KrakenD in Phase 2+. Needs a gateway-level solution before endpoint migration starts.
 
 ### Step G4 — Docs sweep: remove remaining SQLite mentions
-- [ ] Rewrite `docs/proposals/testing-strategy.md` environment tiers for Postgres.
-- [ ] Sweep READMEs/AGENTS for stale sqlite/libsql references.
+- [x] Rewrite `docs/proposals/testing-strategy.md` environment tiers for Postgres (incl. KrakenD query-string blocker note).
+- [x] Update backend cross-reference `docs/testing-strategy.md`; auth proposal wording; plan.md pointers (historical steps kept as record).
 - [ ] Commit.
 
 ### Step G5 — Cluster deployment (**last point — discuss separately first**)

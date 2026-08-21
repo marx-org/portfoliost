@@ -1,15 +1,15 @@
-# Proposal: Testing Strategy — Mock Phase-Out and SQLite Environment Tiers
+# Proposal: Testing Strategy — Mock Phase-Out and Database Environment Tiers
 
-**Status**: Proposed
+**Status**: Accepted (updated 2026-08-21 for the Postgres migration)
 **Date**: 2026-08-20
-**Supersedes**: Parts of `portfoliost-backend/docs/database-drizzle-sqlite-postgres.md` (SQLite environment behavior)
+**Supersedes**: Parts of `portfoliost-backend/docs/database-postgres-drizzle.md` (environment behavior)
 
 ## Problem
 
 The project is migrating from a mock backend (`example-service-mock`) to a real backend (`portfoliost-backend`) endpoint by endpoint. Two risks must be addressed:
 
 1. **Mock drift**: If E2E tests keep hitting the mock, the mock must be maintained for every new feature — effectively maintaining two codebases indefinitely.
-2. **SQLite environment mismatch**: The same SQLite database must behave differently depending on context — volatile and seeded for local development, persistent for production, in-memory for unit tests.
+2. **Database environment mismatch**: If development used a different database engine than production, tests would never exercise the dialect that actually runs in production. Solved by running **Postgres everywhere** (see `portfoliost-backend/docs/database-postgres-drizzle.md`): only the volatility/persistence profile differs per environment.
 
 Without a clear strategy, the team risks:
 - Mock becoming a maintenance burden that slows feature development
@@ -18,11 +18,11 @@ Without a clear strategy, the team risks:
 
 ## Goals
 
-- E2E tests exercise the real backend end-to-end (frontend → KrakenD → backend → SQLite)
+- E2E tests exercise the real backend end-to-end (frontend → KrakenD → backend → Postgres)
 - Mock is retired incrementally as endpoints are migrated — no new mock code is ever written
-- SQLite is volatile in docker compose (fresh state on each startup) and persistent in Kubernetes
+- Postgres is volatile in docker compose (fresh, seeded state on each startup) and persistent in the cluster
 - Seed data provides realistic test fixtures without touching production databases
-- Backend unit tests remain fast and isolated with in-memory SQLite
+- Backend unit tests remain fast and isolated with embedded Postgres (PGlite) — no external server needed
 
 ## Architecture: Three-Tier Testing
 
@@ -33,10 +33,11 @@ Without a clear strategy, the team risks:
 │                                                                 │
 │  Tier 1: Backend Unit Tests                                     │
 │  ┌─────────────────────────────────────────────────────────┐    │
-│  │  Vitest + in-memory SQLite (:memory:)                   │    │
+│  │  Vitest + embedded Postgres (PGlite, in-process WASM)   │    │
+│  │  Real migrations applied per test                       │    │
 │  │  Tests: handlers, schema, auth, business logic          │    │
 │  │  Scope: Single function / route handler                 │    │
-│  │  Speed: < 1s                                            │    │
+│  │  Speed: < 5s                                            │    │
 │  └─────────────────────────────────────────────────────────┘    │
 │                                                                 │
 │  Tier 2: Frontend Unit Tests                                    │
@@ -53,7 +54,7 @@ Without a clear strategy, the team risks:
 │  │  Tests: full user flows through KrakenD → real backend  │    │
 │  │  Scope: Cross-service integration, real HTTP            │    │
 │  │  Speed: 30-120s                                         │    │
-│  │  DB: Volatile SQLite, seeded on startup                 │    │
+│  │  DB: Volatile Postgres, seeded on startup               │    │
 │  └─────────────────────────────────────────────────────────┘    │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
@@ -65,6 +66,7 @@ Without a clear strategy, the team risks:
 |-----------|:---:|:---:|:---:|
 | Incorrect DB queries / schema | Yes | - | Yes |
 | Handler business logic | Yes | - | Yes |
+| SQL dialect issues | Yes | - | Yes (same dialect as prod) |
 | Vue component rendering | - | Yes | Yes |
 | Pinia store state management | - | Yes | Yes |
 | KrakenD routing misconfiguration | - | - | Yes |
@@ -72,33 +74,28 @@ Without a clear strategy, the team risks:
 | CORS / auth middleware issues | - | - | Yes |
 | Request/response shape drift | - | - | Yes |
 
-## SQLite Behavior Per Environment
+## Database Behavior Per Environment
 
 ### Configuration
 
-The backend reads `DATABASE_URL` env var with a file-based default:
+The backend reads `DATABASE_URL` env var with a local default:
 
 ```ts
 // src/db/index.ts
-const url = process.env.DATABASE_URL || "file:data/portfoliost.db"
+import { drizzle } from "drizzle-orm/postgres-js"
+import postgres from "postgres"
 
-export function getDb() {
-  if (!_db) {
-    _client = createClient({ url })
-    _db = drizzle(_client, { schema })
-  }
-  return _db
-}
+const url = process.env.DATABASE_URL || "postgres://portfoliost:portfoliost@localhost:5432/portfoliost"
 ```
 
 ### Environment Matrix
 
-| Environment | `DATABASE_URL` | SQLite behavior | Seeding |
-|-------------|---------------|-----------------|---------|
-| Backend unit tests | `:memory:` (hardcoded) | In-memory, per-test | No — each test creates its own data |
-| Frontend unit tests | n/a (mocked API) | No database | No |
-| Docker Compose (dev) | `file:/tmp/portfoliost.db` or omitted (container ephemeral) | Volatile — wiped on container restart | Yes — seed scripts run if DB is empty |
-| Kubernetes (production) | `file:/data/portfoliost.db` + PVC mount | Persistent — survives pod restarts | No — auto-provisions per user on first auth |
+| Environment | `DATABASE_URL` | Database | Volatility | Seeding |
+|-------------|---------------|----------|------------|---------|
+| Backend unit tests | n/a (hardcoded) | Embedded Postgres (PGlite), in-process | Fresh per test; real migrations from `drizzle/` | No — each test creates its own data |
+| Frontend unit tests | n/a (mocked API) | No database | - | No |
+| Docker Compose (dev/E2E) | `postgres://...@postgres:5432/portfoliost` | `postgres:17-alpine`, tmpfs data dir | Volatile — fresh database on every start | Yes — `db:migrate && db:seed` in container CMD |
+| Cluster (production) | secret referencing existing cluster Postgres | Existing cluster instance | Persistent — survives restarts | No — auto-provisions per user on first auth |
 
 ### Why Volatile in Docker Compose
 
@@ -107,11 +104,13 @@ export function getDb() {
 - **Seed consistency**: Test fixtures are loaded from `seed/` files, not ad-hoc manual inserts
 - **Fast iteration**: No need to manually reset or migrate — just rebuild
 
-### Why Persistent in Kubernetes
+The tmpfs mount keeps the container lightweight while behaving exactly like the production engine.
+
+### Why Persistent in the Cluster
 
 - **Real user data**: Users expect their preferences, benchmarks, and settings to persist
 - **No seed in production**: Auto-provisioning on first auth (`onConflictDoNothing()`) handles new users
-- **PVC-backed**: The database file lives on a PersistentVolumeClaim that survives pod restarts and rescheduling
+- **Managed infrastructure**: The cluster already operates a Postgres instance; the backend is just another client defined by credentials and network policy (rollout discussed separately — see plan Step G5)
 
 ## Seed System
 
@@ -122,76 +121,65 @@ portfoliost-backend/
   seed/
     001_user_preferences.sql
     002_*.sql                         # future tables
-    seed.ts                           # runner script
+    run.mjs                           # runner script
 ```
 
 ### Seed Runner
 
-A lightweight script that:
-1. Checks if the database already has data (e.g., `SELECT COUNT(*) FROM user_preferences`)
+A lightweight script (`src/db/seed.ts`) that:
+1. Checks if `user_preferences` already has rows (`SELECT COUNT(*)`)
 2. If empty, applies all `.sql` files in `seed/` in order
 3. If not empty, skips seeding entirely
 
 ```ts
-// seed/seed.ts
-import { createClient } from "@libsql/client"
-import { readdir } from "fs/promises"
-import { join } from "path"
+import postgres from "postgres"
 
-async function shouldSeed(client: ReturnType<typeof createClient>): Promise<boolean> {
-  const result = await client.execute("SELECT COUNT(*) as count FROM sqlite_master WHERE type='table'")
-  const tableCount = Number(result.rows[0].count)
-  return tableCount === 0  // empty DB = needs seeding
-}
-
-async function seed() {
-  const url = process.env.DATABASE_URL || "file:data/portfoliost.db"
-  const client = createClient({ url })
-
-  if (!(await shouldSeed(client))) {
-    console.log("Database already has tables, skipping seed")
-    return
-  }
-
-  const files = (await readdir("seed")).filter(f => f.endsWith(".sql")).sort()
+export async function seed(dbUrl: string, seedDir: string) {
+  const sql = postgres(dbUrl, { max: 1 })
+  const rows = await sql`SELECT COUNT(*)::int AS count FROM user_preferences`
+  if (rows[0].count > 0) return false // skip
+  const files = (await readdir(seedDir)).filter((f) => f.endsWith(".sql")).sort()
   for (const file of files) {
-    const sql = await readFile(join("seed", file), "utf-8")
-    await client.executeMultiple(sql)
-    console.log(`Seeded: ${file}`)
+    await sql.unsafe(await readFile(join(seedDir, file), "utf-8"))
   }
+  await sql.end()
+  return true
 }
 ```
 
 ### npm Script
 
 ```json
-"db:seed": "tsx seed/seed.ts"
+"db:seed": "node seed/run.mjs"
 ```
 
 ### Docker Compose Integration
 
-Update the backend Dockerfile CMD to include seeding:
+The backend Dockerfile CMD runs migrations then seeds before starting the server:
 
 ```dockerfile
 CMD ["sh", "-c", "npm run db:migrate && npm run db:seed && node dist/server.js"]
 ```
 
-Seeding is safe in production because:
-- The production DB already has tables (from `db:migrate` + real usage)
-- The `shouldSeed()` check skips seeding if tables exist
-- Even if somehow triggered, all seed SQL uses `INSERT OR IGNORE` to avoid overwriting real data
+Seeding is safe everywhere because:
+- The seed check skips when data exists (persistent environments)
+- All seed SQL is idempotent (`ON CONFLICT (user_id) DO NOTHING`)
+- In compose the database is empty on every start, so fixtures load deterministically — this is intentional and required by E2E tests
 
 ### Seed File Format
 
-All seed files use idempotent SQL (`INSERT OR IGNORE`) to be safe if run multiple times:
+All seed files use idempotent Postgres SQL:
 
 ```sql
 -- seed/001_user_preferences.sql
-INSERT OR IGNORE INTO user_preferences (user_id, language, ui_preferences, created_at, updated_at)
+INSERT INTO user_preferences (user_id, language, ui_preferences, created_at, updated_at)
 VALUES
-  ('test-user-001', 'en', '{"chartTimeframe":"1M","tableColumns":["name","value"]}', datetime('now'), datetime('now')),
-  ('test-user-002', 'de', '{"chartTimeframe":"1Y","tableColumns":["name","value","gain"]}', datetime('now'), datetime('now'));
+  ('test-user-001', 'en', '{"chartTimeframe":"1M","tableColumns":["name","value"]}'::jsonb, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z'),
+  ('test-user-002', 'de', '{"chartTimeframe":"1Y","tableColumns":["name","value","gain"]}'::jsonb, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')
+ON CONFLICT (user_id) DO NOTHING;
 ```
+
+Timestamps are fixed ISO literals — deterministic fixtures, stable snapshots.
 
 ### What Gets Seeded
 
@@ -206,7 +194,9 @@ Seed data should mirror what a real user would have — not exhaustive edge case
 
 ### Current State
 
-All KrakenD routes point to `example-service-mock`. The real backend exists but is not wired into the gateway.
+All KrakenD routes point to `example-service-mock`. The real backend runs in compose against the volatile Postgres but is not yet wired into the gateway.
+
+> **Known blocker**: KrakenD CE strips query strings even when `querystring_params` is configured (verified against `krakend:2.13`). This causes the long-standing charting e2e failure (`/api/charting/compare?symbols=`) and must be solved before routing real endpoints through the gateway (Phase 2).
 
 ### Migration Flow Per Endpoint
 
@@ -215,7 +205,7 @@ All KrakenD routes point to `example-service-mock`. The real backend exists but 
 │                   ENDPOINT MIGRATION                         │
 │                                                              │
 │  1. Implement endpoint in portfoliost-backend                │
-│  2. Write backend unit tests (in-memory SQLite)              │
+│  2. Write backend unit tests (embedded Postgres / PGlite)    │
 │  3. Add seed data for the endpoint's tables                  │
 │  4. Switch KrakenD route:                                    │
 │     API_<MODULE>_URL: http://example-service-mock:4010                │
@@ -259,24 +249,23 @@ Current:                          Target:
      │                                 │
      ├─→ example-service-mock (all)             ├─→ portfoliost-backend (all)
      └─→ portfoliost-backend (none)    │
-                                       └─→ example-service-mock (DELETED)
+                                        └─→ example-service-mock (DELETED)
 ```
 
-## Implementation Steps
+## Implementation Status
 
-### Phase 1: Environment-Aware SQLite (this PR)
+### Phase 1: Environment-Aware Database + Seed System (done — since migrated to Postgres)
 
-1. Add `DATABASE_URL` env var to `src/db/index.ts`
-2. Update `docker-compose.yml`:
-   - Remove `backend-data:/app/data` named volume
-   - Set `DATABASE_URL=file:/tmp/portfoliost.db` on the backend service
-3. Update `portfoliost-backend/Dockerfile` CMD to include `db:seed`
-4. Create `seed/seed.ts` with the empty-DB check
-5. Create `seed/001_user_preferences.sql` with test user data
-6. Add `"db:seed"` script to `package.json`
-7. Update K8s HelmRelease (separate cluster repo) to set `DATABASE_URL=file:/data/portfoliost.db` with PVC
+1. ✅ `DATABASE_URL` env var in `src/db/index.ts`
+2. ✅ Docker compose: volatile database, seeded on startup (now `postgres:17-alpine` on tmpfs)
+3. ✅ Backend Dockerfile CMD runs `db:migrate && db:seed`
+4. ✅ Seed runner with empty-database check
+5. ✅ `seed/001_user_preferences.sql` with test user data
+6. ✅ `"db:seed"` script in `package.json`
 
 ### Phase 2: First Endpoint Migration (prove the pattern)
+
+Blocked until the KrakenD query-string issue is resolved.
 
 1. Pick one endpoint to migrate (suggestion: `GET /api/users/preferences`)
 2. Implement in `portfoliost-backend`
@@ -312,5 +301,6 @@ Once all endpoints are migrated:
 - **Seed data staleness**: Seed files must be updated when schemas change. CI should verify that `db:seed` runs without errors on a fresh database (covered by E2E tests).
 - **E2E test speed**: Playwright tests against docker compose are slower than mock-only tests. This is acceptable — the value of real integration coverage outweighs the speed cost.
 - **Transition period**: During migration, some E2E tests hit mock, some hit real backend. This is fine — KrakenD handles routing, and tests don't care which backend responds.
-- **SQLite concurrency**: libSQL/SQLite handles single-writer access well. For a single-user homelab, this is not a concern. If multi-user write contention arises, the migration path to Postgres is straightforward via Drizzle.
+- **KrakenD query-string stripping**: Verified gateway-level issue (see blocker note above). Must be fixed before Phase 2; otherwise endpoints taking query params (`?symbols=`, `?page=`, filters) silently receive defaults.
+- **Single Postgres instance**: Dev/E2E share one compose Postgres; tests assume isolated, freshly-seeded state. Connection pool defaults (`max: 10`) are fine at homelab scale.
 - **Seed data for non-user tables**: Tables like portfolios, positions, and watchlists are user-scoped. Seed data for these should use known test user IDs that E2E tests authenticate as.

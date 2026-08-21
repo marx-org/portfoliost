@@ -30,7 +30,7 @@ Docker Compose (local dev)          Cluster (production)
 
 **Docker Compose**: KrakenD routes ALL endpoints (including `/api/auth/*`) to the mock backend. Zero changes to existing setup. Mock still issues simple tokens.
 
-**Cluster**: KrakenD splits traffic — `/api/auth/*` and `/api/users/*` to `portfoliost-backend` (PocketID JWT validation + SQLite/Postgres), everything else stays on the mock backend (also deployed in the cluster).
+**Cluster**: KrakenD splits traffic — `/api/auth/*` and `/api/users/*` to `portfoliost-backend` (PocketID JWT validation + Postgres), everything else stays on the mock backend (also deployed in the cluster).
 
 ### KrakenD Config Difference
 
