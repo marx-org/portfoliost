@@ -367,5 +367,10 @@ Proposal: [backend-topology.md](proposals/backend-topology.md) (accepted 2026-08
 
 ### Later phases (not started)
 - Module extraction (market-data first), `/__meta` endpoints, D9 edge auth once `users-auth` is real.
-- Cluster rollout: ingress replaces gateway container, `service-urls` ConfigMap via `envFrom`, drop homelab `krakend` deployment.
+- Cluster rollout: per-module switching via git-managed ingress paths (`service-urls` ConfigMap only for backend-to-backend calls once modules exist).
 - Backtest module: DB queue + compose worker, k8s Jobs in cluster (see proposal D11).
+
+### Step T4 — Cluster rollout: ingress path routing, drop homelab krakend
+- [x] `cluster/apps/pfire/portfoliost/app/helmrelease.yaml`: ingress paths now `/` → portfoliost, `/api/auth` + `/api/users` → portfoliost-backend:3000, `/api` → example-service-mock:4010 (ingress-nginx longest-prefix match replaces the gateway container; cluster switching model = one path entry per module, git-managed). Commit `e6b39b378` (homelab).
+- [x] Delete `cluster/apps/pfire/krakend/` + kustomization ref; Flux pruned HelmRelease/deployment/service/configmap.
+- [x] Verified live through host: 4 upstreams on ingress; `/api/auth/me` unauth → backend JWT-validation error copy; `/api/charting/compare?symbols=` → mock JSON with query string intact; SPA 200. Mock accepts real PocketID JWTs (sub+email decoded, no signature check) so UI flow unchanged.
