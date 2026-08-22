@@ -338,3 +338,33 @@ Backend switches from SQLite/libSQL to **Postgres everywhere** (unit tests via P
 - [x] One-time manual fix for PG15+ public-schema lockdown: PGO creates the DB owned by `postgres`, so `public` is not writable by the app role and drizzle-kit migrate fails with a silent exit 1 (`42501 insufficient_privilege`). Applied as superuser in DB `portfoliost`: `ALTER SCHEMA public OWNER TO portfoliost;` — re-run if the DB is ever recreated.
 - [x] Backend HelmRelease switched to cluster Postgres: `DATABASE_URL` from secret key `uri`, image v1.0.7 (first Postgres build), command override skips `db:seed` in production, SQLite PVC dropped. Commit `16769db49` (homelab).
 - [x] Verified live: migrations apply at boot, `user_preferences` table created (owned by `portfoliost`, 0 rows = no seed), pod Ready on `/health`.
+
+---
+
+## Backend Topology — Coarse Modules + nginx Edge
+
+Proposal: [backend-topology.md](proposals/backend-topology.md) (accepted 2026-08-22). Splits the backend into coarse modules (`users-auth`, `portfolio-domain` incl. wallets, `watchlists`, `market-data`, `misc`, future `backtest`), replaces KrakenD with nginx, and introduces one URL source of truth for per-module mock↔real switching.
+
+> Cluster (homelab) changes are deferred to the last step of this phase.
+
+### Step T1 — Proposal
+- [x] Write `docs/proposals/backend-topology.md` — decisions D1–D11 (nginx edge, provider tier openst/cachest, services.env→ConfigMap switching, `/__meta`, per-module JWT, schema-per-module, sync REST + event candidates, sync UI, auth_request preflight, public shares, jobs/backtest pattern). Commit. — `ec99b3f`
+
+### Step T2 — Replace KrakenD with nginx in docker compose
+- [ ] Create `deploy/services.env` — single source of truth, one `API_*_URL` key per module, all defaulting to `http://example-service-mock:4010`.
+- [ ] Create `gateway/nginx.conf.template` (envsubst templating): `listen 8080`; per-module `location` blocks → upstream vars; CORS headers with `always` (origins `:3000`/`:8080`, methods GET/POST/PATCH/PUT/DELETE, headers Authorization/Content-Type/Accept); `OPTIONS` → 204; `/.well-known/*` → auth upstream.
+- [ ] Delete `krakend/` directory.
+- [ ] Rewire `docker-compose.yml`: `krakend` service → `gateway` (`nginx:alpine`, templates mount, `env_file: deploy/services.env`, port `8080:8080`); rename issuer refs to `http://gateway:8080` (mock `OIDC_ISSUER`, backend `POCKETID_ISSUER_URL`).
+- [ ] Smoke: login round-trip through gateway, `/api/charting/compare?symbols=` returns query params, OIDC discovery, OPTIONS preflight, unauthenticated 401 shape.
+- [ ] Verify: build + unit + mock + e2e (**51/51** expected — charting query-string flake resolved by design). Commit.
+
+### Step T3 — Docs sweep
+- [ ] README.md + mocks/README.md: replace KrakenD sections with nginx gateway.
+- [ ] `docs/proposals/testing-strategy.md`: remove the KrakenD query-string blocker note.
+- [ ] `mocks/oidc/index.js`: update stale KrakenD comments (behavior unchanged).
+- [ ] Mark T2 done here; adjust Phase 2 "Switch KrakenD route" wording. Commit.
+
+### Later phases (not started)
+- Module extraction (market-data first), `/__meta` endpoints, D9 edge auth once `users-auth` is real.
+- Cluster rollout: ingress replaces gateway container, `service-urls` ConfigMap via `envFrom`, drop homelab `krakend` deployment.
+- Backtest module: DB queue + compose worker, k8s Jobs in cluster (see proposal D11).
