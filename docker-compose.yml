@@ -11,7 +11,7 @@ services:
       EXAMPLE_SERVICE_MOCK_PASSWORD: ${EXAMPLE_SERVICE_MOCK_PASSWORD:-example-service-mock}
       EXAMPLE_SERVICE_MOCK_TOKEN: ${EXAMPLE_SERVICE_MOCK_TOKEN:-mock-dev-token}
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-mock-client}
-      OIDC_ISSUER: ${OIDC_ISSUER:-http://krakend:8080}
+      OIDC_ISSUER: ${OIDC_ISSUER:-http://gateway:8080}
       OIDC_REDIRECT_URI: ${OIDC_REDIRECT_URI:-http://localhost:3000/auth/callback}
     restart: unless-stopped
 
@@ -55,7 +55,7 @@ services:
     expose:
       - "3000"
     environment:
-      POCKETID_ISSUER_URL: ${POCKETID_ISSUER_URL:-http://krakend:8080}
+      POCKETID_ISSUER_URL: ${POCKETID_ISSUER_URL:-http://gateway:8080}
       POCKETID_AUDIENCE: ${POCKETID_AUDIENCE:-mock-client}
       DATABASE_URL: postgres://portfoliost:portfoliost@postgres:5432/portfoliost
     depends_on:
@@ -63,32 +63,15 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  krakend:
-    image: krakend:2.13
-    container_name: krakend
+  gateway:
+    image: nginx:alpine
+    container_name: portfoliost-gateway
     ports:
       - "8080:8080"
     volumes:
-      - ./krakend:/etc/krakend
-    environment:
-      FC_ENABLE: "1"
-      FC_OUT: /tmp/krakend.json
-      FC_TEMPLATES: /etc/krakend
-      API_AUTH_URL: ${API_AUTH_URL:-http://example-service-mock:4010}
-      API_USERS_URL: ${API_USERS_URL:-http://example-service-mock:4010}
-      API_PORTFOLIOS_URL: ${API_PORTFOLIOS_URL:-http://example-service-mock:4010}
-      API_WALLETS_URL: ${API_WALLETS_URL:-http://example-service-mock:4010}
-      API_INSTRUMENTS_URL: ${API_INSTRUMENTS_URL:-http://example-service-mock:4010}
-      API_WATCHLISTS_URL: ${API_WATCHLISTS_URL:-http://example-service-mock:4010}
-      API_NOTIFICATIONS_URL: ${API_NOTIFICATIONS_URL:-http://example-service-mock:4010}
-      API_NEWS_URL: ${API_NEWS_URL:-http://example-service-mock:4010}
-      API_BILLING_URL: ${API_BILLING_URL:-http://example-service-mock:4010}
-      API_CHARTING_URL: ${API_CHARTING_URL:-http://example-service-mock:4010}
-      API_COPILOT_URL: ${API_COPILOT_URL:-http://example-service-mock:4010}
-      API_LOGOS_URL: ${API_LOGOS_URL:-http://example-service-mock:4010}
-      API_EXCHANGE_RATES_URL: ${API_EXCHANGE_RATES_URL:-http://example-service-mock:4010}
-      API_SNAPTRADE_URL: ${API_SNAPTRADE_URL:-http://example-service-mock:4010}
-      API_PUBLIC_URL: ${API_PUBLIC_URL:-http://example-service-mock:4010}
-      API_BACKEND_URL: ${API_BACKEND_URL:-http://example-service-mock:4010}
-    command: ["krakend", "run", "-d", "-c", "/etc/krakend/krakend.json.tmpl"]
+      - ./gateway/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+    env_file:
+      - deploy/services.env
+    depends_on:
+      - example-service-mock
     restart: unless-stopped

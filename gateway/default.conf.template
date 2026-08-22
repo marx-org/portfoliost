@@ -1,0 +1,63 @@
+# portfoliost gateway — no-op reverse proxy with per-module upstreams.
+# Rendered by the official nginx entrypoint (envsubst) from
+# /etc/nginx/templates/default.conf.template -> /etc/nginx/conf.d/default.conf.
+#
+# Upstream hosts come from deploy/services.env (see proposal D3). nginx
+# passes the original request URI including query strings — the reason this
+# replaces KrakenD, which stripped them (charting compare bug).
+
+map $http_origin $cors_allow_origin {
+    default                 "";
+    "http://localhost:3000" $http_origin;
+    "http://localhost:8080" $http_origin;
+}
+
+server {
+    listen 8080;
+    server_name _;
+
+    # Shared proxy behavior for all locations (inherited; no location-level
+    # proxy_set_header anywhere below).
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    # CORS, mirroring the former KrakenD security/cors block. `always` so
+    # 4xx/5xx and the 204 preflight response carry the headers too. An empty
+    # value (origin not allow-listed) makes nginx omit the header.
+    add_header Access-Control-Allow-Origin  $cors_allow_origin always;
+    add_header Access-Control-Allow-Methods "GET, POST, PATCH, PUT, DELETE, OPTIONS" always;
+    add_header Access-Control-Allow-Headers "Authorization, Content-Type, Accept" always;
+    add_header Access-Control-Max-Age       "86400" always;
+
+    # CORS preflight — answered at the edge (replaces KrakenD auto_options).
+    if ($request_method = OPTIONS) {
+        return 204;
+    }
+
+    # --- per-module upstreams ---
+    location /api/auth           { proxy_pass ${API_AUTH_URL}; }
+    location /api/users          { proxy_pass ${API_USERS_URL}; }
+    location /api/portfolios     { proxy_pass ${API_PORTFOLIOS_URL}; }
+    location /api/wallets        { proxy_pass ${API_WALLETS_URL}; }
+    location /api/instruments    { proxy_pass ${API_INSTRUMENTS_URL}; }
+    location /api/watchlists     { proxy_pass ${API_WATCHLISTS_URL}; }
+    location /api/notifications  { proxy_pass ${API_NOTIFICATIONS_URL}; }
+    location /api/news           { proxy_pass ${API_NEWS_URL}; }
+    location /api/billing        { proxy_pass ${API_BILLING_URL}; }
+    location /api/charting       { proxy_pass ${API_CHARTING_URL}; }
+    location /api/logos          { proxy_pass ${API_LOGOS_URL}; }
+    location /api/snaptrade      { proxy_pass ${API_SNAPTRADE_URL}; }
+    location /api/public         { proxy_pass ${API_PUBLIC_URL}; }
+    location /api/conversations  { proxy_pass ${API_COPILOT_URL}; }
+    location /api/chatbot/       { proxy_pass ${API_COPILOT_URL}; }
+    location /api/exchange-rates { proxy_pass ${API_EXCHANGE_RATES_URL}; }
+
+    # OIDC discovery + JWKS are served by the auth module.
+    location /.well-known/       { proxy_pass ${API_AUTH_URL}; }
+
+    # Fallback for API paths not yet mapped to a dedicated module.
+    location /api/               { proxy_pass ${API_BACKEND_URL}; }
+}
