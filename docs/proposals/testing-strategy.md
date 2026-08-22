@@ -2,14 +2,14 @@
 
 **Status**: Accepted (updated 2026-08-22: nginx gateway replaces KrakenD; query-string blocker resolved)
 **Date**: 2026-08-20
-**Supersedes**: Parts of `portfoliost-backend/docs/database-postgres-drizzle.md` (environment behavior)
+**Supersedes**: Parts of `portfoliost-users-auth/docs/database-postgres-drizzle.md` (environment behavior)
 
 ## Problem
 
-The project is migrating from a mock backend (`example-service-mock`) to a real backend (`portfoliost-backend`) endpoint by endpoint. Two risks must be addressed:
+The project is migrating from a mock backend (`example-service-mock`) to real backend modules (`portfoliost-users-auth`, …) endpoint by endpoint. Two risks must be addressed:
 
 1. **Mock drift**: If E2E tests keep hitting the mock, the mock must be maintained for every new feature — effectively maintaining two codebases indefinitely.
-2. **Database environment mismatch**: If development used a different database engine than production, tests would never exercise the dialect that actually runs in production. Solved by running **Postgres everywhere** (see `portfoliost-backend/docs/database-postgres-drizzle.md`): only the volatility/persistence profile differs per environment.
+2. **Database environment mismatch**: If development used a different database engine than production, tests would never exercise the dialect that actually runs in production. Solved by running **Postgres everywhere** (see `portfoliost-users-auth/docs/database-postgres-drizzle.md`): only the volatility/persistence profile differs per environment.
 
 Without a clear strategy, the team risks:
 - Mock becoming a maintenance burden that slows feature development
@@ -117,7 +117,7 @@ The tmpfs mount keeps the container lightweight while behaving exactly like the 
 ### Design
 
 ```
-portfoliost-backend/
+portfoliost-users-auth/
   seed/
     001_user_preferences.sql
     002_*.sql                         # future tables
@@ -204,12 +204,12 @@ All gateway routes point to `example-service-mock`. The real backend runs in com
 ┌──────────────────────────────────────────────────────────────┐
 │                   ENDPOINT MIGRATION                         │
 │                                                              │
-│  1. Implement endpoint in portfoliost-backend                │
+│  1. Implement endpoint in the owning module (e.g. portfoliost-users-auth)                │
 │  2. Write backend unit tests (embedded Postgres / PGlite)    │
 │  3. Add seed data for the endpoint's tables                  │
 │  4. Switch gateway route (deploy/services.env):               │
 │     API_<MODULE>_URL: http://example-service-mock:4010                │
-│                    → http://portfoliost-backend:3000          │
+│                    → http://<module-service>:3000             │
 │  5. Add/update E2E tests against the real endpoint           │
 │  6. Delete the mock endpoint handler                         │
 │  7. Run full test suite: build + unit + mock + e2e           │
@@ -222,11 +222,11 @@ All gateway routes point to `example-service-mock`. The real backend runs in com
 The only change per endpoint is one value in `deploy/services.env`:
 
 ```yaml
-# Before: mock serves this endpoint
-API_AUTH_URL: http://example-service-mock:4010
+# Before: mock serves this module
+API_USERS_AUTH_URL: http://example-service-mock:4010
 
-# After: real backend serves this endpoint
-API_AUTH_URL: http://portfoliost-backend:3000
+# After: real users-auth module serves this module
+API_USERS_AUTH_URL: http://users-auth:3000
 ```
 
 The frontend never changes — it talks to the gateway, which routes transparently.
@@ -247,8 +247,8 @@ Current:                          Target:
 │  gateway │                      │  gateway │
 └────┬─────┘                      └────┬─────┘
      │                                 │
-     ├─→ example-service-mock (all)             ├─→ portfoliost-backend (all)
-     └─→ portfoliost-backend (none)    │
+     ├─→ example-service-mock (all)             ├─→ real modules (all)
+     └─→ real modules (users-auth)    │
                                         └─→ example-service-mock (DELETED)
 ```
 
@@ -268,7 +268,7 @@ Current:                          Target:
 Unblocked (gateway query-string issue resolved by the nginx swap).
 
 1. Pick one endpoint to migrate (suggestion: `GET /api/users/preferences`)
-2. Implement in `portfoliost-backend`
+2. Implement in the owning module repo
 3. Write unit tests
 4. Add seed data if needed
 5. Switch gateway route in deploy/services.env

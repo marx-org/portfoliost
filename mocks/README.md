@@ -70,8 +70,7 @@ the `gateway` service via `env_file`).
 
 | Env var | Gateway route | Default |
 | --- | --- | --- |
-| `API_AUTH_URL` | `/api/auth/*` | `http://example-service-mock:4010` |
-| `API_USERS_URL` | `/api/users/*` | `http://example-service-mock:4010` |
+| `API_USERS_AUTH_URL` | `/api/auth/*`, `/api/users/*`, `/.well-known/*` | `http://example-service-mock:4010` |
 | `API_PORTFOLIOS_URL` | `/api/portfolios/*` | `http://example-service-mock:4010` |
 | `API_WALLETS_URL` | `/api/wallets/*` | `http://example-service-mock:4010` |
 | `API_INSTRUMENTS_URL` | `/api/instruments/*` | `http://example-service-mock:4010` |
@@ -93,17 +92,16 @@ the `gateway` service via `env_file`).
 docker compose up -d --build
 ```
 
-**To migrate a single module** to a real backend:
+**To migrate a single module** to its real backend (users-auth example):
 
 ```sh
-API_AUTH_URL=https://api.real.com docker compose up -d --build
+API_USERS_AUTH_URL=http://users-auth:3000 docker compose up -d --build gateway
 ```
 
-**To migrate all modules** to a real backend:
+**To migrate all modules** to real backends:
 
 ```sh
-API_AUTH_URL=https://api.real.com \
-API_USERS_URL=https://api.real.com \
+API_USERS_AUTH_URL=http://users-auth:3000 \
 API_PORTFOLIOS_URL=https://api.real.com \
 API_WALLETS_URL=https://api.real.com \
 API_INSTRUMENTS_URL=https://api.real.com \

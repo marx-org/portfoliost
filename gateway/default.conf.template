@@ -38,8 +38,9 @@ server {
     }
 
     # --- per-module upstreams ---
-    location /api/auth           { proxy_pass ${API_AUTH_URL}; }
-    location /api/users          { proxy_pass ${API_USERS_URL}; }
+    # users-auth module (auth + users + profile/preferences/onboarding)
+    location /api/auth           { proxy_pass ${API_USERS_AUTH_URL}; }
+    location /api/users          { proxy_pass ${API_USERS_AUTH_URL}; }
     location /api/portfolios     { proxy_pass ${API_PORTFOLIOS_URL}; }
     location /api/wallets        { proxy_pass ${API_WALLETS_URL}; }
     location /api/instruments    { proxy_pass ${API_INSTRUMENTS_URL}; }
@@ -55,8 +56,8 @@ server {
     location /api/chatbot/       { proxy_pass ${API_COPILOT_URL}; }
     location /api/exchange-rates { proxy_pass ${API_EXCHANGE_RATES_URL}; }
 
-    # OIDC discovery + JWKS are served by the auth module.
-    location /.well-known/       { proxy_pass ${API_AUTH_URL}; }
+    # OIDC discovery + JWKS are served by the users-auth module.
+    location /.well-known/       { proxy_pass ${API_USERS_AUTH_URL}; }
 
     # Fallback for API paths not yet mapped to a dedicated module.
     location /api/               { proxy_pass ${API_BACKEND_URL}; }

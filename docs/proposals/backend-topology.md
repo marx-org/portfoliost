@@ -4,7 +4,7 @@ Status: **accepted** (2026-08-22). Supersedes the KrakenD-based gateway assumpti
 
 ## Context
 
-The backend (`../portfoliost-backend`, Hono + Drizzle + Postgres) is currently a single deployable behind KrakenD, which routes `/api/*` to per-domain upstreams that all point at the example-service mock. The goal is to split it into coarse modules while keeping:
+The backend (`../portfoliost-users-auth`, Hono + Drizzle + Postgres) is currently a single deployable behind KrakenD, which routes `/api/*` to per-domain upstreams that all point at the example-service mock. The goal is to split it into coarse modules while keeping:
 
 - **example-service contract parity** — every module speaks the same `/api/...` shapes as the mock (types from `@marx2/contracts`).
 - **Coordinated switching** — flipping one module from mock to real must switch it *everywhere*: browser-facing routing and any backend module calling it internally.

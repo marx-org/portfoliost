@@ -50,8 +50,8 @@ npm run preview      # preview the build locally
 ```
 Browser → portfoliost (port 3000, static SPA)
               └── /api/* → gateway (port 8080, nginx)
-                              ├── /api/auth/*   → API_AUTH_URL
-                              ├── /api/users/*  → API_USERS_URL
+                              ├── /api/auth/*   → API_USERS_AUTH_URL (users-auth module)
+                              ├── /api/users/*  → API_USERS_AUTH_URL (users-auth module)
                               ├── /api/...      → per-module upstreams
                               └── catch-all     → API_BACKEND_URL
 ```
@@ -63,8 +63,8 @@ Services in Docker Compose:
 | `gateway` | `8080` (exposed) | nginx edge — proxies `/api/*` to per-module upstreams from `deploy/services.env` |
 | `portfoliost` | `3000` (exposed) | Static Vue SPA files |
 | `example-service-mock` | `4010` (internal) | Mock REST API (seeded with captured data) |
-| `portfoliost-backend` | `3000` (internal) | Real backend (Hono + Postgres) |
-| `postgres` | `5432` (internal) | Backend database (volatile, re-seeded on start) |
+| `users-auth` | `3000` (internal) | users-auth module — real backend (Hono + Postgres), repo `../portfoliost-users-auth` |
+| `postgres` | `5432` (internal) | Module databases (volatile, re-seeded on start) |
 
 ## Environment variables
 
@@ -78,8 +78,7 @@ by the gateway (and later by backend modules calling each other internally).
 
 | Variable | Gateway route | Default |
 | --- | --- | --- |
-| `API_AUTH_URL` | `/api/auth/*` | `http://example-service-mock:4010` |
-| `API_USERS_URL` | `/api/users/*` | `http://example-service-mock:4010` |
+| `API_USERS_AUTH_URL` | `/api/auth/*`, `/api/users/*`, `/.well-known/*` | `http://example-service-mock:4010` |
 | `API_PORTFOLIOS_URL` | `/api/portfolios/*` | `http://example-service-mock:4010` |
 | `API_WALLETS_URL` | `/api/wallets/*` | `http://example-service-mock:4010` |
 | `API_INSTRUMENTS_URL` | `/api/instruments/*` | `http://example-service-mock:4010` |
@@ -108,8 +107,8 @@ goes to the new backend, everything else still hits the mock — then recreate
 the consumers:
 
 ```sh
-# Migrate auth to a real backend, keep everything else on mock:
-#   deploy/services.env → API_AUTH_URL=https://api.real.com
+# Migrate users-auth to the real module, keep everything else on mock:
+#   deploy/services.env → API_USERS_AUTH_URL=http://users-auth:3000
 docker compose up -d --build gateway
 ```
 

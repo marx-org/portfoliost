@@ -47,11 +47,11 @@ services:
       retries: 12
     restart: unless-stopped
 
-  portfoliost-backend:
+  users-auth:
     build:
-      context: ../portfoliost-backend
+      context: ../portfoliost-users-auth
       dockerfile: Dockerfile
-    container_name: portfoliost-backend
+    container_name: users-auth
     expose:
       - "3000"
     environment:
@@ -74,4 +74,5 @@ services:
       - deploy/services.env
     depends_on:
       - example-service-mock
+      - users-auth
     restart: unless-stopped

@@ -9,7 +9,7 @@ Auth is currently fully mocked: the mock backend issues in-memory UUID tokens, v
 
 ## Architecture Overview
 
-The backend lives at `../portfoliost-backend/` (sibling to the `portfoliost` frontend repo).
+The backend lives at `../portfoliost-users-auth/` (sibling to the `portfoliost` frontend repo).
 
 ### Two Deployment Modes via KrakenD
 
