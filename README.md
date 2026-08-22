@@ -10,7 +10,7 @@ A Vue 3 investment portfolio tracker — parity build of [example-service.ai](ht
 - **ApexCharts** via vue3-apexcharts
 - **Vite** build tool
 - **Vitest** unit tests, **Playwright** E2E tests
-- **KrakenD** API gateway for per-module backend routing
+- **nginx** edge gateway for per-module backend routing (`deploy/services.env`)
 
 ## Getting started
 
@@ -48,27 +48,35 @@ npm run preview      # preview the build locally
 ## Architecture
 
 ```
-Browser → krakend (port 8080)
-              ├── /api/*  → example-service-mock:4010  (or real backend)
-              └── /*      → portfoliost:80    (static SPA files)
+Browser → portfoliost (port 3000, static SPA)
+              └── /api/* → gateway (port 8080, nginx)
+                              ├── /api/auth/*   → API_AUTH_URL
+                              ├── /api/users/*  → API_USERS_URL
+                              ├── /api/...      → per-module upstreams
+                              └── catch-all     → API_BACKEND_URL
 ```
 
-Three independent services in Docker Compose:
+Services in Docker Compose:
 
 | Service | Port | Role |
 | --- | --- | --- |
-| `krakend` | `8080` (exposed) | API gateway — single entry point for browser |
-| `portfoliost` | `80` (internal) | Static Vue SPA files |
+| `gateway` | `8080` (exposed) | nginx edge — proxies `/api/*` to per-module upstreams from `deploy/services.env` |
+| `portfoliost` | `3000` (exposed) | Static Vue SPA files |
 | `example-service-mock` | `4010` (internal) | Mock REST API (seeded with captured data) |
+| `portfoliost-backend` | `3000` (internal) | Real backend (Hono + Postgres) |
+| `postgres` | `5432` (internal) | Backend database (volatile, re-seeded on start) |
 
 ## Environment variables
 
 Each API module has its own backend URL, allowing modules to be migrated to a
 real backend independently. All default to the local mock.
 
-### Per-module backend URLs (KrakenD gateway)
+### Per-module backend URLs (nginx gateway)
 
-| Variable | KrakenD endpoint | Default |
+All values live in `deploy/services.env` — the single source of truth consumed
+by the gateway (and later by backend modules calling each other internally).
+
+| Variable | Gateway route | Default |
 | --- | --- | --- |
 | `API_AUTH_URL` | `/api/auth/*` | `http://example-service-mock:4010` |
 | `API_USERS_URL` | `/api/users/*` | `http://example-service-mock:4010` |
@@ -95,24 +103,20 @@ real backend independently. All default to the local mock.
 
 ### Migrating a module to a real backend
 
-Set the env var for the module you want to migrate — only that module's
-traffic goes to the new backend, everything else still hits the mock:
+Edit the module's value in `deploy/services.env` — only that module's traffic
+goes to the new backend, everything else still hits the mock — then recreate
+the consumers:
 
 ```sh
-# Migrate auth to a real backend, keep everything else on mock
-API_AUTH_URL=https://api.real.com docker compose up -d --build
+# Migrate auth to a real backend, keep everything else on mock:
+#   deploy/services.env → API_AUTH_URL=https://api.real.com
+docker compose up -d --build gateway
 ```
 
-Multiple modules can be migrated independently:
-
-```sh
-API_AUTH_URL=https://api.real.com \
-API_PORTFOLIOS_URL=https://api.real.com \
-  docker compose up -d --build
-```
-
-The frontend code uses only relative paths (`/api/...`) — no code changes
-needed. Routing is handled entirely by KrakenD at the infrastructure layer.
+Multiple modules can be migrated independently (one line each in
+`deploy/services.env`). The frontend code uses only relative paths
+(`/api/...`) — no code changes needed. Routing is handled entirely by the
+nginx gateway at the infrastructure layer.
 
 ## Docker
 
@@ -120,16 +124,20 @@ needed. Routing is handled entirely by KrakenD at the infrastructure layer.
 docker compose up -d --build
 ```
 
-To deploy without the mock, set all `API_*_URL` vars to your real backend and
-remove or disable the `example-service-mock` service from the compose file.
+To deploy without the mock, set all `API_*_URL` values in
+`deploy/services.env` to your real backend and remove or disable the
+`example-service-mock` service from the compose file.
 
 ## Testing
 
 ```sh
 npm run test         # unit tests (vitest)
-npm run test:mock    # mock API contract tests (138 checks)
+npm run test:mock    # mock API contract tests (140 checks)
 npm run test:e2e     # Playwright E2E against docker compose stack
 ```
+
+E2E runs against a **freshly recreated** stack for deterministic results (the
+mock is stateful): `docker compose down && docker compose up -d --build` first.
 
 All tests must pass before committing:
 

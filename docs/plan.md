@@ -279,7 +279,7 @@ Gradual migration: local mock stays as-is for development, cluster uses PocketID
 - [ ] Implement in `portfoliost-backend`.
 - [ ] Write backend unit tests.
 - [ ] Add seed data if needed.
-- [ ] Switch KrakenD route: `API_USERS_URL` → `http://portfoliost-backend:3000`.
+- [ ] Switch gateway route in `deploy/services.env`: `API_USERS_URL` → `http://portfoliost-backend:3000`.
 - [ ] Add E2E test for the endpoint.
 - [ ] Delete mock handler.
 - [ ] Verify: build + unit + mock + e2e. Commit.
@@ -325,7 +325,7 @@ Backend switches from SQLite/libSQL to **Postgres everywhere** (unit tests via P
 - [x] Backend `DATABASE_URL` → compose Postgres; backend keeps migrate+seed on start (seeds fresh DB each start for tests).
 - [x] Verified: volatility (marker row gone after recreate, DB reseeded), backend health via compose, frontend `build` + `test` (66) + `test:mock` (140), backend tests (17). Commit. — `550a42c`
 - [x] E2E baseline confirmed **50/51 with `--workers=1`** (CI mode): single failure is `charting adds stocks via search`, caused by the KrakenD issue below — pre-existing, unrelated to this migration.
-- [ ] **Discovered blocker for Phase 2** (separate fix): KrakenD CE strips query strings on all endpoints even with `querystring_params` configured (verified with minimal repro against `krakend:2.13`). Affects mock today (`/api/charting/compare?symbols=` → the known charting e2e failure) and will affect real-backend endpoints routed through KrakenD in Phase 2+. Needs a gateway-level solution before endpoint migration starts.
+- [x] **Resolved blocker for Phase 2**: KrakenD CE stripped query strings on all endpoints even with `querystring_params` configured (verified with minimal repro against `krakend:2.13`). Resolved by replacing KrakenD with an nginx gateway (Backend Topology T2, `a9a4a5b`) — nginx forwards query strings natively; charting e2e now passes.
 - [ ] **Note (e2e determinism)**: local runs use `fullyParallel`; multiple workers race on the shared stateful mock (`example-service-mock` keeps mutations in memory across runs), so assertion failures drift run-to-run. Serial (`--workers=1`) against a freshly recreated stack is deterministic and is what CI uses. If local parallel e2e fails oddly: `docker compose restart example-service-mock` (or down/up) first.
 
 ### Step G4 — Docs sweep: remove remaining SQLite mentions
@@ -351,18 +351,19 @@ Proposal: [backend-topology.md](proposals/backend-topology.md) (accepted 2026-08
 - [x] Write `docs/proposals/backend-topology.md` — decisions D1–D11 (nginx edge, provider tier openst/cachest, services.env→ConfigMap switching, `/__meta`, per-module JWT, schema-per-module, sync REST + event candidates, sync UI, auth_request preflight, public shares, jobs/backtest pattern). Commit. — `ec99b3f`
 
 ### Step T2 — Replace KrakenD with nginx in docker compose
-- [ ] Create `deploy/services.env` — single source of truth, one `API_*_URL` key per module, all defaulting to `http://example-service-mock:4010`.
-- [ ] Create `gateway/nginx.conf.template` (envsubst templating): `listen 8080`; per-module `location` blocks → upstream vars; CORS headers with `always` (origins `:3000`/`:8080`, methods GET/POST/PATCH/PUT/DELETE, headers Authorization/Content-Type/Accept); `OPTIONS` → 204; `/.well-known/*` → auth upstream.
-- [ ] Delete `krakend/` directory.
-- [ ] Rewire `docker-compose.yml`: `krakend` service → `gateway` (`nginx:alpine`, templates mount, `env_file: deploy/services.env`, port `8080:8080`); rename issuer refs to `http://gateway:8080` (mock `OIDC_ISSUER`, backend `POCKETID_ISSUER_URL`).
-- [ ] Smoke: login round-trip through gateway, `/api/charting/compare?symbols=` returns query params, OIDC discovery, OPTIONS preflight, unauthenticated 401 shape.
-- [ ] Verify: build + unit + mock + e2e (**51/51** expected — charting query-string flake resolved by design). Commit.
+- [x] Create `deploy/services.env` — single source of truth, one `API_*_URL` key per module, all defaulting to `http://example-service-mock:4010`.
+- [x] Create `gateway/default.conf.template` (envsubst templating): `listen 8080`; per-module `location` blocks → upstream vars; CORS headers with `always` (origins `:3000`/`:8080`, methods GET/POST/PATCH/PUT/DELETE, headers Authorization/Content-Type/Accept); `OPTIONS` → 204; `/.well-known/*` → auth upstream.
+- [x] Delete `krakend/` directory.
+- [x] Rewire `docker-compose.yml`: `krakend` service → `gateway` (`nginx:alpine`, templates mount, `env_file: deploy/services.env`, port `8080:8080`); rename issuer refs to `http://gateway:8080` (mock `OIDC_ISSUER`, backend `POCKETID_ISSUER_URL`). — `a9a4a5b`
+- [x] Smoke verified through gateway: login round-trip, `/api/charting/compare?symbols=` returns real comparison data (query strings preserved), OIDC discovery doc (`issuer=http://gateway:8080`), OPTIONS preflight → 204 + CORS headers, CORS on error responses, no ACAO for disallowed origins, unauthenticated parity (404/401 identical to direct-mock).
+- [x] Fix pre-existing broken test: `edit position ... add row` expected `toHaveCount(11)` — an erroneous adaptation from `069adf2` that only matched polluted stateful-mock state; restored the authored `toHaveCount(2)` from `6cf127d` (dialog is positionId-filtered; seeded META has exactly 1 tx). — `bbe62fb`
+- [x] Verify: build ✓ · unit 66/66 ✓ · mock 140/140 ✓ · **e2e 51/51** (CI mode, freshly recreated stack) — charting query-string flake resolved by design.
 
 ### Step T3 — Docs sweep
-- [ ] README.md + mocks/README.md: replace KrakenD sections with nginx gateway.
-- [ ] `docs/proposals/testing-strategy.md`: remove the KrakenD query-string blocker note.
-- [ ] `mocks/oidc/index.js`: update stale KrakenD comments (behavior unchanged).
-- [ ] Mark T2 done here; adjust Phase 2 "Switch KrakenD route" wording. Commit.
+- [x] README.md + mocks/README.md: replace KrakenD sections with nginx gateway; flip instructions now point at `deploy/services.env` (shell-env overrides no longer reach containers after moving URLs into `env_file`); service table includes gateway/backend/postgres; e2e determinism note added.
+- [x] `docs/proposals/testing-strategy.md`: query-string blocker marked resolved (Phase 2 unblocked), KrakenD wording → nginx gateway.
+- [x] `mocks/oidc/index.js`: stale KrakenD comments updated (behavior unchanged).
+- [x] Mark T2/T3 done here; adjust Phase 2 "Switch KrakenD route" wording. Commit.
 
 ### Later phases (not started)
 - Module extraction (market-data first), `/__meta` endpoints, D9 edge auth once `users-auth` is real.

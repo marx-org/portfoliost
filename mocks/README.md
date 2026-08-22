@@ -61,14 +61,14 @@ curl -H "Authorization: Bearer mock-dev-token" http://localhost:4010/api/auth/me
 The same variables are forwarded from your shell into the container by
 `docker-compose.yml` (with defaults).
 
-### Backend switching (KrakenD gateway)
+### Backend switching (nginx gateway)
 
-The KrakenD API gateway sits in front of the mock and routes `/api/` requests
+The nginx gateway sits in front of the mock and routes `/api/` requests
 to backends. Each module has its own env var so they can be migrated
-independently. The env vars live on the **krakend** service in
-`docker-compose.yml`.
+independently. The env vars live in **`deploy/services.env`** (consumed by
+the `gateway` service via `env_file`).
 
-| Env var | KrakenD endpoint | Default |
+| Env var | Gateway route | Default |
 | --- | --- | --- |
 | `API_AUTH_URL` | `/api/auth/*` | `http://example-service-mock:4010` |
 | `API_USERS_URL` | `/api/users/*` | `http://example-service-mock:4010` |

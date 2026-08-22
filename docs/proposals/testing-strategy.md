@@ -1,6 +1,6 @@
 # Proposal: Testing Strategy — Mock Phase-Out and Database Environment Tiers
 
-**Status**: Accepted (updated 2026-08-21 for the Postgres migration)
+**Status**: Accepted (updated 2026-08-22: nginx gateway replaces KrakenD; query-string blocker resolved)
 **Date**: 2026-08-20
 **Supersedes**: Parts of `portfoliost-backend/docs/database-postgres-drizzle.md` (environment behavior)
 
@@ -18,7 +18,7 @@ Without a clear strategy, the team risks:
 
 ## Goals
 
-- E2E tests exercise the real backend end-to-end (frontend → KrakenD → backend → Postgres)
+- E2E tests exercise the real backend end-to-end (frontend → nginx gateway → backend → Postgres)
 - Mock is retired incrementally as endpoints are migrated — no new mock code is ever written
 - Postgres is volatile in docker compose (fresh, seeded state on each startup) and persistent in the cluster
 - Seed data provides realistic test fixtures without touching production databases
@@ -51,7 +51,7 @@ Without a clear strategy, the team risks:
 │  Tier 3: E2E Integration Tests                                  │
 │  ┌─────────────────────────────────────────────────────────┐    │
 │  │  Playwright + docker compose stack                      │    │
-│  │  Tests: full user flows through KrakenD → real backend  │    │
+│  │  Tests: full user flows through nginx gateway → real backend  │    │
 │  │  Scope: Cross-service integration, real HTTP            │    │
 │  │  Speed: 30-120s                                         │    │
 │  │  DB: Volatile Postgres, seeded on startup               │    │
@@ -69,7 +69,7 @@ Without a clear strategy, the team risks:
 | SQL dialect issues | Yes | - | Yes (same dialect as prod) |
 | Vue component rendering | - | Yes | Yes |
 | Pinia store state management | - | Yes | Yes |
-| KrakenD routing misconfiguration | - | - | Yes |
+| Gateway routing misconfiguration | - | - | Yes |
 | Frontend↔backend contract mismatch | - | - | Yes |
 | CORS / auth middleware issues | - | - | Yes |
 | Request/response shape drift | - | - | Yes |
@@ -194,9 +194,9 @@ Seed data should mirror what a real user would have — not exhaustive edge case
 
 ### Current State
 
-All KrakenD routes point to `example-service-mock`. The real backend runs in compose against the volatile Postgres but is not yet wired into the gateway.
+All gateway routes point to `example-service-mock`. The real backend runs in compose against the volatile Postgres but is not yet wired into the gateway.
 
-> **Known blocker**: KrakenD CE strips query strings even when `querystring_params` is configured (verified against `krakend:2.13`). This causes the long-standing charting e2e failure (`/api/charting/compare?symbols=`) and must be solved before routing real endpoints through the gateway (Phase 2).
+> **Resolved blocker**: KrakenD CE stripped query strings even when `querystring_params` was configured — the cause of the long-standing charting e2e failure (`/api/charting/compare?symbols=`). Fixed by replacing KrakenD with an nginx gateway (`docs/proposals/backend-topology.md`, D1); nginx forwards query strings natively. Phase 2 is unblocked.
 
 ### Migration Flow Per Endpoint
 
@@ -207,7 +207,7 @@ All KrakenD routes point to `example-service-mock`. The real backend runs in com
 │  1. Implement endpoint in portfoliost-backend                │
 │  2. Write backend unit tests (embedded Postgres / PGlite)    │
 │  3. Add seed data for the endpoint's tables                  │
-│  4. Switch KrakenD route:                                    │
+│  4. Switch gateway route (deploy/services.env):               │
 │     API_<MODULE>_URL: http://example-service-mock:4010                │
 │                    → http://portfoliost-backend:3000          │
 │  5. Add/update E2E tests against the real endpoint           │
@@ -217,9 +217,9 @@ All KrakenD routes point to `example-service-mock`. The real backend runs in com
 └──────────────────────────────────────────────────────────────┘
 ```
 
-### KrakenD Route Switching
+### Gateway Route Switching
 
-The only change per endpoint is an environment variable in `docker-compose.yml`:
+The only change per endpoint is one value in `deploy/services.env`:
 
 ```yaml
 # Before: mock serves this endpoint
@@ -229,7 +229,7 @@ API_AUTH_URL: http://example-service-mock:4010
 API_AUTH_URL: http://portfoliost-backend:3000
 ```
 
-The frontend never changes — it talks to KrakenD, which routes transparently.
+The frontend never changes — it talks to the gateway, which routes transparently.
 
 ### When to Remove Mock Contract Tests
 
@@ -244,7 +244,7 @@ Until then, keep both test suites. The mock contract tests catch regressions in 
 ```
 Current:                          Target:
 ┌──────────┐                      ┌──────────┐
-│ KrakenD  │                      │ KrakenD  │
+│  gateway │                      │  gateway │
 └────┬─────┘                      └────┬─────┘
      │                                 │
      ├─→ example-service-mock (all)             ├─→ portfoliost-backend (all)
@@ -265,13 +265,13 @@ Current:                          Target:
 
 ### Phase 2: First Endpoint Migration (prove the pattern)
 
-Blocked until the KrakenD query-string issue is resolved.
+Unblocked (gateway query-string issue resolved by the nginx swap).
 
 1. Pick one endpoint to migrate (suggestion: `GET /api/users/preferences`)
 2. Implement in `portfoliost-backend`
 3. Write unit tests
 4. Add seed data if needed
-5. Switch KrakenD route
+5. Switch gateway route in deploy/services.env
 6. Add E2E test
 7. Delete mock handler
 8. Run full test suite, commit
@@ -300,7 +300,7 @@ Once all endpoints are migrated:
 
 - **Seed data staleness**: Seed files must be updated when schemas change. CI should verify that `db:seed` runs without errors on a fresh database (covered by E2E tests).
 - **E2E test speed**: Playwright tests against docker compose are slower than mock-only tests. This is acceptable — the value of real integration coverage outweighs the speed cost.
-- **Transition period**: During migration, some E2E tests hit mock, some hit real backend. This is fine — KrakenD handles routing, and tests don't care which backend responds.
-- **KrakenD query-string stripping**: Verified gateway-level issue (see blocker note above). Must be fixed before Phase 2; otherwise endpoints taking query params (`?symbols=`, `?page=`, filters) silently receive defaults.
+- **Transition period**: During migration, some E2E tests hit mock, some hit real backend. This is fine — the gateway handles routing, and tests don't care which backend responds.
+- ~~**KrakenD query-string stripping**~~: Resolved — the nginx gateway forwards query strings natively (verified: charting e2e passes).
 - **Single Postgres instance**: Dev/E2E share one compose Postgres; tests assume isolated, freshly-seeded state. Connection pool defaults (`max: 10`) are fine at homelab scale.
 - **Seed data for non-user tables**: Tables like portfolios, positions, and watchlists are user-scoped. Seed data for these should use known test user IDs that E2E tests authenticate as.

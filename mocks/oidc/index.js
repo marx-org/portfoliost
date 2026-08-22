@@ -56,8 +56,8 @@ export function register(app) {
   })
 
   // Authorization endpoint - redirect to callback with code
-  // Note: KrakenD CE does not forward query params, so client_id is not validated here.
-  // The mock only serves one client in local dev.
+  // Note: client_id is not validated here — the mock only serves one client
+  // in local dev.
   app.get("/authorize", (ctx) => {
     const { redirect_uri, state, code_challenge, code_challenge_method } = ctx.query
 
@@ -73,15 +73,15 @@ export function register(app) {
     })
 
     const callbackUrl = `${redirect_uri || REDIRECT_URI}?code=${code}&state=${state || ""}`
-    // Return HTML redirect instead of 302 — KrakenD no-op encoding follows 302 server-side
-    // and fails because the callback host is unreachable from the Docker network.
+    // Return an HTML meta-refresh instead of a 302 so the redirect is
+    // followed by the browser regardless of proxy behavior.
     const html = `<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;url=${callbackUrl}"></head><body><p>Redirecting...</p></body></html>`
     ctx.res.setHeader("content-type", "text/html; charset=utf-8")
     ctx.res.end(html)
   })
 
   // Token endpoint - exchange code for JWT
-  // Reached via POST /api/auth/token through KrakenD
+  // Reached via POST /api/auth/token through the gateway
   app.post("/api/auth/token", (ctx) => {
     const { code, verifier, redirect_uri } = ctx.body || {}
 
