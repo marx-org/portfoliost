@@ -45,6 +45,13 @@ npm run build        # typecheck + vite build → dist/
 npm run preview      # preview the build locally
 ```
 
+## Modularisation
+
+Backend modules live in separate projects, each producing its own container.
+`users-auth` (repo `../portfoliost-users-auth`) is the reference
+implementation. Conventions and the extraction checklist:
+[docs/MODULARISATION.md](docs/MODULARISATION.md).
+
 ## Architecture
 
 ```
