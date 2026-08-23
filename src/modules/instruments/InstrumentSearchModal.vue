@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from "vue"
+import { computed, ref, watch } from "vue"
 import { useRouter } from "vue-router"
 import { useInstrumentsStore } from "@/stores/instruments"
 import { researchSymbol } from "@/utils/research"
@@ -29,13 +29,21 @@ watch(
 watch(query, (value) => {
   clearTimeout(debounceTimer)
   debounceTimer = setTimeout(() => {
-    if (value.trim().length >= 1) {
+    // Single-letter queries match thousands of instruments (SEC universe) —
+    // rendering them all OOMs browsers. Require 2+ chars.
+    if (value.trim().length >= 2) {
       void store.search(value.trim())
     } else {
       store.resetSearch()
     }
   }, 250)
 })
+
+// Rendering thousands of rows (each with a logo request) crashes browsers —
+// show a bounded slice and ask the user to refine instead.
+const MAX_RENDERED = 50
+const renderedResults = computed(() => store.searchResults.slice(0, MAX_RENDERED))
+const hiddenCount = computed(() => Math.max(0, store.searchResults.length - MAX_RENDERED))
 
 const popular = ["AAPL", "GOOGL", "MSFT", "AMZN", "TSLA", "SPY", "QQQ"]
 
@@ -96,13 +104,13 @@ function onKeydown(e: KeyboardEvent) {
           <div v-else-if="store.searchError" class="mt-4 text-sm text-red-600 dark:text-red-400">{{ store.searchError }}</div>
 
           <ul v-else-if="store.searchResults.length" class="mt-2 max-h-72 divide-y divide-slate-100 dark:divide-slate-800 overflow-y-auto">
-            <li v-for="result in store.searchResults" :key="result.symbol">
+            <li v-for="result in renderedResults" :key="result.symbol">
               <button
                 type="button"
                 class="flex w-full items-center gap-3 px-2 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50"
                 @click="openResult(result.symbol, result.name)"
               >
-                <img :src="`/api/logos/${result.symbol}`" alt="" class="h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800" />
+                <img loading="lazy" :src="`/api/logos/${result.symbol}`" alt="" class="h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800" />
                 <span class="flex-1">
                   <span class="block text-sm font-medium text-slate-900 dark:text-slate-100">{{ result.symbol }}</span>
                   <span class="block text-xs text-slate-500 dark:text-slate-400">{{ result.name }}</span>
@@ -113,8 +121,14 @@ function onKeydown(e: KeyboardEvent) {
               </button>
             </li>
           </ul>
+          <p v-if="hiddenCount > 0" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+            Showing first {{ renderedResults.length }} of {{ store.searchResults.length }} results — refine your search to narrow it down.
+          </p>
 
-          <p v-else class="mt-4 text-sm text-slate-500 dark:text-slate-400">No results</p>
+          <p v-if="!store.searchResults.length && !store.searching && !store.searchError" class="mt-4 text-sm text-slate-500 dark:text-slate-400">
+            No results
+          </p>
+
         </div>
       </div>
     </div>
