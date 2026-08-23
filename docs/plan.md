@@ -384,8 +384,8 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass (
 - [x] Write `docs/proposals/instruments-provider-module.md` (D12–D15: full instruments surface JWT-protected, per-endpoint source map openst/cachest/db-seed, no direct gateway→cachest routing, compose provider tier). Commit.
 
 ### Step I3 — openst extensions
-- [ ] New endpoints behind existing Redis-cache pattern: profile, quote, price history, fundamentals, metrics, eps-surprises, calendar (earnings/ex-dividend), institutional ownership, search. Tokens from `.env`.
-- [ ] pytest suite green + standalone docker compose smoke: every new route curl-checked.
+- [x] New endpoints behind existing Redis-cache pattern: profile, quote, price history (ohlcv variant), fundamentals, metrics, projections, calendar (earnings/dividend windows), search. Tokens from `.env`. eps-surprises + institutional ownership verified unreachable at current FMP tier (402) → stay on existing mock calls per D13.
+- [x] pytest suite green (92 tests) + standalone docker compose smoke: every new route curl-checked live incl. 4xx paths and cache cold/warm timing. openst@389f29a.
 
 ### Step I4 — cachest routes
 - [ ] `config.yaml`: routes proxying new openst endpoints (TTL/stale policy), JSON passthrough verified.
