@@ -144,7 +144,11 @@ const chartOptions = computed(() => ({
   },
   colors: mode.value === "Drawdowns" ? ["#dc2626", "#94a3b8"] : ["#2563eb", "#94a3b8"],
   series: series.value.data,
-  xaxis: { categories: series.value.dates, labels: { show: !fullscreen.value, datetimeUTC: false } },
+  xaxis: {
+    categories: series.value.dates,
+    labels: { show: !fullscreen.value, datetimeUTC: false },
+    tickAmount: Math.min(12, series.value.dates.length),
+  },
   yaxis: {
     labels: {
       formatter: (v: number) => (mode.value === "Price" ? `$${v.toLocaleString("en-US", { maximumFractionDigits: 2 })}` : `${v.toFixed(2)}%`),
