@@ -399,8 +399,8 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass (
 - [x] Superseded per decision 2026-08-23 (user): no DB seeding — providerless endpoints (eps-surprises, ownership, peers, seasonality, IR/transcripts) keep existing mock-backed gateway calls until provider research unlocks them (see docs/openst-coverage.md). Module keeps Drizzle+Postgres wiring per playbook but ships no seed data; any schema is limited to what real features need.
 
 ### Step I7 — controllers pt1
-- [ ] search, :symbol detail, profile, metrics, overview-metrics, quote, history, price — adapters call cachest, translate to example-service shapes (`generated/api-types`).
-- [ ] PGlite handler tests + fetch-mocked adapter tests green.
+- [x] search, :symbol detail, profile, metrics, overview-metrics, quote, history (+price) — adapters call cachest, translate to example-service shapes (`generated/api-types`). Market-phase detection, fractional percentChange normalization, monthly OHLCV aggregation included.
+- [x] Handler tests with mocked cachest adapter + pure translation tests green (28 tests, tsc clean). CI v1.0.1 image published.
 
 ### Step I8 — controllers pt2
 - [ ] fundamentals, eps-surprises, calendar, ownership, dividends, peers, seasonality, projections, compare, investor-relations (+transcript).
