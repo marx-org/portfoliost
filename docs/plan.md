@@ -404,6 +404,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass (
 
 ### Step I8 — controllers pt2
 - [ ] fundamentals, eps-surprises, calendar, ownership, dividends, peers, seasonality, projections, compare, investor-relations (+transcript).
+- [x] I8a (2026-08-23): fundamentals, calendar, dividends, projections, compare + `price?date=` historical close. Wired into compose (`instruments`+`cachest`+`openst`+`redis`, gateway upstream flipped); verified live through gateway. Required: cachest `/dividends/{ticker}` route + 404 pass-through; openst dividend-history date fix for non-datetime indexes. Tests: instruments 66 unit, cachest 61, openst 93, frontend build/unit/mock/e2e green.
 - [ ] Tests green; `/__meta` reflects real impl.
 
 ### Step I9 — module stack test

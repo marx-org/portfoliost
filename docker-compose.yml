@@ -75,4 +75,63 @@ services:
     depends_on:
       - example-service-mock
       - users-auth
+      - instruments
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: portfoliost-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  openst:
+    build:
+      context: ../openst
+      target: runtime
+    container_name: portfoliost-openst
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      REDIS_HOST: redis
+    env_file:
+      - path: ../openst/.env
+        required: false
+    restart: unless-stopped
+
+  cachest:
+    build:
+      context: ../cachest
+      target: runtime
+    container_name: portfoliost-cachest
+    volumes:
+      - ../cachest/config.yaml:/app/config.yaml:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+      openst:
+        condition: service_started
+    environment:
+      REDIS_HOST: redis
+    restart: unless-stopped
+
+  instruments:
+    build:
+      context: ../portfoliost-instruments
+      dockerfile: Dockerfile
+    container_name: portfoliost-instruments
+    expose:
+      - "3000"
+    environment:
+      DATABASE_URL: postgres://portfoliost:portfoliost@postgres:5432/portfoliost
+      CACHEST_URL: http://cachest:8080
+    depends_on:
+      postgres:
+        condition: service_healthy
+      cachest:
+        condition: service_started
     restart: unless-stopped
