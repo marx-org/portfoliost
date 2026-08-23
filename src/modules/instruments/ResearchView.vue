@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue"
+import { computed, onMounted, ref, watch } from "vue"
 import { useRoute } from "vue-router"
 import InstrumentSearchModal from "@/modules/instruments/InstrumentSearchModal.vue"
 import { getInstrumentProfile } from "@/api/instruments"
@@ -33,6 +33,17 @@ const quickSymbols = ["MSFT", "NVDA", "META", "AAPL", "TSLA", "AMZN", "GOOGL", "
 onMounted(async () => {
   try {
     profile.value = await getInstrumentProfile(symbol.value)
+  } catch {
+    profile.value = null
+  }
+})
+
+// Same-route navigation (quick switcher / search) only changes the param —
+// refetch the header profile when it does.
+watch(symbol, async (sym) => {
+  profile.value = null
+  try {
+    profile.value = await getInstrumentProfile(sym)
   } catch {
     profile.value = null
   }
@@ -115,7 +126,7 @@ async function addToWatchlist(): Promise<void> {
       </router-link>
     </nav>
 
-    <router-view />
+    <router-view :key="symbol" />
 
     <InstrumentSearchModal :open="showSearch" @close="showSearch = false" />
   </div>
