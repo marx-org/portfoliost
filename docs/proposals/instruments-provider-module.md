@@ -33,33 +33,27 @@ contract shapes (`generated/api-types`). Provider access goes through **cachest 
 
 | Endpoint | Source v1 | Notes |
 | --- | --- | --- |
-| `/search?q=` | DB (seeded universe + research index) | OpenBB search optional later |
+| `/search?q=` | openst→cachest (`equity.search`, sec provider) | returns `{cik,name,symbol}`; module enriches via detail adapters |
 | `/:symbol` (detail) | composite: quote + profile adapters, research fallback | aggregation is module logic (D2) |
-| `/:symbol/profile` | openst→cachest | OpenBB equity profile |
-| `/:symbol/metrics`, `/overview-metrics` | openst→cachest | fundamental metrics; overview = subset mapping |
-| `/:symbol/quote`, `/price` | openst→cachest | price derives from quote |
-| `/:symbol/history?resolution=` | openst→cachest | price historical; daily/monthly mapping |
-| `/:symbol/fundamentals` | openst→cachest | income/balance/cash assembly |
-| `/:symbol/eps-surprises` | DB seed | captured data is finnhub `/stock/earnings`-shaped (`raw/finnhub_earnings.json`, quarterly) + research `epsSurprises` (annual); no dependable OSS OpenBB command — openst extension only if I3 verifies one |
-| `/:symbol/ownership` | openst→cachest if covered; else DB seed | institutional ownership |
+| `/:symbol/profile` | openst→cachest | verified: `equity.profile` fmp + yfinance |
+| `/:symbol/metrics`, `/overview-metrics` | openst→cachest | verified: `fundamental.metrics` yfinance/fmp (+ `ratios` fmp) |
+| `/:symbol/quote`, `/price` | openst→cachest | verified: `price.quote` yfinance/fmp |
+| `/:symbol/history?resolution=` | openst→cachest | verified: `price.historical`; extend openst route with `start`/`end` + OHLCV |
+| `/:symbol/fundamentals` | openst→cachest | verified: `fundamental.income/balance/cash` fmp/yfinance |
+| `/:symbol/eps-surprises` | **existing mock call kept** | no reachable OSS provider at our FMP tier: `calendar.earnings` by symbol → 402, `fundamental.historical_eps` → 402, `estimates.historical` → 402 (verified I3) |
+| `/:symbol/ownership` | **existing mock call kept** | `ownership.institutional` fmp → 402 Restricted at our tier (verified I3) |
 | `/:symbol/dividends` | openst→cachest (exists today: yield + history) | `{date,amount}` → `{date, year, amount, currency, type}` |
-| `/:symbol/calendar` | openst→cachest (earnings + dividend calendars) | else DB seed |
-| `/:symbol/projections` | openst→cachest price targets if covered; else DB seed | research.projections fallback |
-| `/:symbol/peers` | DB seed | no reliable provider command |
-| `/:symbol/seasonality` | DB seed | no OpenBB equivalent |
+| `/:symbol/calendar` | openst→cachest calendar windows | verified free: unfiltered `calendar.earnings` + `calendar.dividend` (fmp); module filters per symbol from a daily-cached window |
+| `/:symbol/projections` | openst→cachest | verified: `estimates.consensus` fmp (`target_consensus/high/low/median`) + yfinance (recommendation, analyst count) |
+| `/:symbol/peers` | **existing mock call kept** | no peers command in OSS OpenBB |
+| `/:symbol/seasonality` | **existing mock call kept** | no OpenBB equivalent |
 | `/:symbol/compare?symbols=` | module composition over history/quote adapters | multi-symbol fan-out, cached upstream |
-| `/:symbol/investor-relations` (+transcript) | DB seed (`ir_events_*`, `ir_transcript`) | transcripts not in OSS OpenBB |
+| `/:symbol/investor-relations` (+transcript) | **existing mock call kept** | transcripts not in OSS OpenBB |
 | news endpoints | out of scope | AGENTS.md skip-list |
 
-DB seeds come from existing captured data: `mocks/shared/data/raw/instruments_*.json`,
-`quote_*.json`, `search_unified.json`, `ir_*.json`, `history_{daily,monthly}.json`,
-`universe.json` and `mocks/shared/data/research/<SYM>.json`. Seed loader copies these
-files at build time (no runtime dependency on the mocks directory).
-
-Where "openst→cachest if covered" fails at implementation time (I3 verifies actual
-OpenBB coverage of the installed version/providers), the endpoint falls back to DB seed
-and the map above is corrected in this document — coverage gaps are recorded, not
-silently dropped.
+No new DB seeding: where providers can't go (eps-surprises, ownership, peers,
+seasonality, IR/transcripts — all verified during I3), the existing mock-backed
+gateway calls remain until a provider tier upgrade unlocks them.
 
 ### D14 — no direct gateway routing to providers
 
@@ -90,7 +84,8 @@ Both provider repos get standalone compose smoke tests too (their own
 
 ## Risks
 
-1. **OpenBB coverage gaps** — mitigated by D13 fallback policy (DB seed + documented gap).
+1. **OpenBB coverage gaps** — mitigated by D13 policy: verified gaps keep their existing
+   mock-backed gateway calls; upgrades land when provider keys unlock (documented per endpoint).
 2. **Provider rate limits** — cachest TTLs absorb them locally; openst keeps its Redis
    cache; alphavantage/FMP keys already present in `.env`.
 3. **History volume** — monthly resolution preferred for compare fan-outs; cachest
