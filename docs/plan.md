@@ -395,9 +395,8 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass (
 - [ ] New private repo `Marx2/portfoliost-instruments` from users-auth skeleton (Hono/Drizzle/Postgres/PGlite/jose, /health + /__meta + /internal/verify, CI pipeline).
 - [ ] Push → first CI image published on GHCR.
 
-### Step I6 — schema + seed fallbacks
-- [ ] Schema `instruments`; tables for providerless endpoints (search index, peers, seasonality, IR/transcripts, projections, compare composites) seeded from raw JSON.
-- [ ] PGlite migration + seed unit tests green.
+### Step I6 — schema + persistence scope
+- [x] Superseded per decision 2026-08-23 (user): no DB seeding — providerless endpoints (eps-surprises, ownership, peers, seasonality, IR/transcripts) keep existing mock-backed gateway calls until provider research unlocks them (see docs/openst-coverage.md). Module keeps Drizzle+Postgres wiring per playbook but ships no seed data; any schema is limited to what real features need.
 
 ### Step I7 — controllers pt1
 - [ ] search, :symbol detail, profile, metrics, overview-metrics, quote, history, price — adapters call cachest, translate to example-service shapes (`generated/api-types`).
