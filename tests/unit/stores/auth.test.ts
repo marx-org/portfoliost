@@ -2,6 +2,7 @@ import { createPinia, setActivePinia } from "pinia"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { useAuthStore } from "@/stores/auth"
 import * as authApi from "@/api/auth"
+import { NetworkError } from "@/api/client"
 import type { AuthMe, AuthResponse } from "@/api/types"
 
 vi.mock("@/api/auth", () => ({
@@ -9,6 +10,7 @@ vi.mock("@/api/auth", () => ({
   register: vi.fn(),
   fetchMe: vi.fn(),
   logout: vi.fn(),
+  loginWithCode: vi.fn(),
 }))
 
 const mocked = vi.mocked(authApi)
@@ -92,5 +94,28 @@ describe("auth store", () => {
     expect(store.isAuthenticated).toBe(false)
     expect(store.user).toBeNull()
     expect(localStorage.getItem("portfoliost_token")).toBeNull()
+  })
+
+  it("network error during login forces local logout of a stale session", async () => {
+    localStorage.setItem("portfoliost_token", "stale-token")
+    mocked.login.mockRejectedValue(new NetworkError())
+    const store = useAuthStore()
+    await expect(store.login("x@y.com", "pw")).rejects.toThrow(NetworkError)
+    expect(localStorage.getItem("portfoliost_token")).toBeNull()
+    expect(store.isAuthenticated).toBe(false)
+    expect(store.user).toBeNull()
+    expect(store.error).toBe("Network error — the server could not be reached")
+  })
+
+  it("network error during OIDC token exchange forces local logout too", async () => {
+    localStorage.setItem("portfoliost_token", "stale-token")
+    mocked.loginWithCode.mockRejectedValue(new NetworkError())
+    const store = useAuthStore()
+    await expect(store.loginWithCode("code", "verifier", "http://localhost:3000/auth/callback")).rejects.toThrow(
+      NetworkError,
+    )
+    expect(localStorage.getItem("portfoliost_token")).toBeNull()
+    expect(store.isAuthenticated).toBe(false)
+    expect(store.error).toBe("Network error — the server could not be reached")
   })
 })

@@ -29,6 +29,17 @@ export class ApiError extends Error {
   }
 }
 
+/** fetch() itself failed (server unreachable, wrong host, offline…). */
+export class NetworkError extends Error {
+  readonly cause?: unknown
+
+  constructor(cause?: unknown) {
+    super("Network error — the server could not be reached")
+    this.name = "NetworkError"
+    this.cause = cause
+  }
+}
+
 type RequestOptions = {
   method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE"
   url: string
@@ -41,11 +52,16 @@ async function request<T>({ method, url, body }: RequestOptions): Promise<T> {
   if (token) headers.authorization = `Bearer ${token}`
   if (body !== undefined) headers["content-type"] = "application/json"
 
-  const res = await fetch(`${API_BASE}${url}`, {
-    method,
-    headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  })
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE}${url}`, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    })
+  } catch (e) {
+    throw new NetworkError(e)
+  }
 
   const text = await res.text()
   let data: unknown = null
