@@ -59,6 +59,7 @@ Browser → portfoliost (port 3000, static SPA)
               └── /api/* → gateway (port 8080, nginx)
                               ├── /api/auth/*   → API_USERS_AUTH_URL (users-auth module)
                               ├── /api/users/*  → API_USERS_AUTH_URL (users-auth module)
+                              ├── /api/instruments/* → API_INSTRUMENTS_URL (instruments module stack)
                               ├── /api/...      → per-module upstreams
                               └── catch-all     → API_BACKEND_URL
 ```
@@ -72,6 +73,10 @@ Services in Docker Compose:
 | `example-service-mock` | `4010` (internal) | Mock REST API (seeded with captured data) |
 | `users-auth` | `3000` (internal) | users-auth module — real backend (Hono + Postgres), repo `../portfoliost-users-auth` |
 | `postgres` | `5432` (internal) | Module databases (volatile, re-seeded on start) |
+| `redis` | — | Provider-tier cache for openst/cachest |
+| `openst` | internal | Provider tier — OpenBB/FMP market data (repo `../openst`) |
+| `cachest` | internal | Caching reverse proxy in front of openst (repo `../cachest`) |
+| `instruments` | `3000` (internal) | instruments module — real backend serving `/api/instruments/*`, repo `../portfoliost-instruments` |
 
 ## Environment variables
 
@@ -88,7 +93,7 @@ by the gateway (and later by backend modules calling each other internally).
 | `API_USERS_AUTH_URL` | `/api/auth/*`, `/api/users/*`, `/.well-known/*` | `http://example-service-mock:4010` |
 | `API_PORTFOLIOS_URL` | `/api/portfolios/*` | `http://example-service-mock:4010` |
 | `API_WALLETS_URL` | `/api/wallets/*` | `http://example-service-mock:4010` |
-| `API_INSTRUMENTS_URL` | `/api/instruments/*` | `http://example-service-mock:4010` |
+| `API_INSTRUMENTS_URL` | `/api/instruments/*` | `http://instruments:3000` (real module stack) |
 | `API_WATCHLISTS_URL` | `/api/watchlists/*` | `http://example-service-mock:4010` |
 | `API_NOTIFICATIONS_URL` | `/api/notifications/*` | `http://example-service-mock:4010` |
 | `API_NEWS_URL` | `/api/news/*` | `http://example-service-mock:4010` |
@@ -118,6 +123,11 @@ the consumers:
 #   deploy/services.env → API_USERS_AUTH_URL=http://users-auth:3000
 docker compose up -d --build gateway
 ```
+
+The instruments module is already migrated: `API_INSTRUMENTS_URL` points at
+the real stack (`instruments` → `cachest` → `openst`). To temporarily fall
+back to the mock for that route, point it back at `http://example-service-mock:4010`
+and recreate the gateway; verify either way with `npm run test:stack`.
 
 Multiple modules can be migrated independently (one line each in
 `deploy/services.env`). The frontend code uses only relative paths

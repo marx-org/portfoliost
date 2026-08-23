@@ -73,7 +73,7 @@ the `gateway` service via `env_file`).
 | `API_USERS_AUTH_URL` | `/api/auth/*`, `/api/users/*`, `/.well-known/*` | `http://example-service-mock:4010` |
 | `API_PORTFOLIOS_URL` | `/api/portfolios/*` | `http://example-service-mock:4010` |
 | `API_WALLETS_URL` | `/api/wallets/*` | `http://example-service-mock:4010` |
-| `API_INSTRUMENTS_URL` | `/api/instruments/*` | `http://example-service-mock:4010` |
+| `API_INSTRUMENTS_URL` | `/api/instruments/*` | `http://instruments:3000` (real module stack; set to `http://example-service-mock:4010` to fall back) |
 | `API_WATCHLISTS_URL` | `/api/watchlists/*` | `http://example-service-mock:4010` |
 | `API_NOTIFICATIONS_URL` | `/api/notifications/*` | `http://example-service-mock:4010` |
 | `API_NEWS_URL` | `/api/news/*` | `http://example-service-mock:4010` |
