@@ -388,8 +388,8 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass (
 - [x] pytest suite green (92 tests) + standalone docker compose smoke: every new route curl-checked live incl. 4xx paths and cache cold/warm timing. openst@389f29a.
 
 ### Step I4 — cachest routes
-- [ ] `config.yaml`: routes proxying new openst endpoints (TTL/stale policy), JSON passthrough verified.
-- [ ] pytest green + standalone docker compose smoke incl. cache-hit behavior.
+- [x] `config.yaml`: routes proxying new openst endpoints (TTL/stale policy), JSON passthrough verified. Added declared `query_params` support (URL substitution + cache-key inclusion + 422) and collision-free template cache keys. cachest@170b1cf.
+- [x] pytest green (58 tests) + standalone docker compose smoke incl. cache-hit behavior (MISS→HIT, per-window key separation, 422 on missing params).
 
 ### Step I5 — portfoliost-instruments scaffold
 - [ ] New private repo `Marx2/portfoliost-instruments` from users-auth skeleton (Hono/Drizzle/Postgres/PGlite/jose, /health + /__meta + /internal/verify, CI pipeline).
