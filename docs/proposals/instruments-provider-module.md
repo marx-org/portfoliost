@@ -54,6 +54,8 @@ contract shapes (`generated/api-types`). Provider access goes through **cachest 
 No new DB seeding: where providers can't go (eps-surprises, ownership, peers,
 seasonality, IR/transcripts — all verified during I3), the existing mock-backed
 gateway calls remain until a provider tier upgrade unlocks them.
+Canonical verification matrix incl. research pointers for the gaps:
+[openst-coverage.md](../docs/openst-coverage.md).
 
 ### D14 — no direct gateway routing to providers
 
