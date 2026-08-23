@@ -139,7 +139,17 @@ To deploy without the mock, set all `API_*_URL` values in
 ```sh
 npm run test         # unit tests (vitest)
 npm run test:mock    # mock API contract tests (140 checks)
+npm run test:stack   # instruments stack contract test (29 checks, real|mock|any)
 npm run test:e2e     # Playwright E2E against docker compose stack
+```
+
+`test:stack` exercises every `/api/instruments/*` endpoint through the nginx
+gateway with contract-shape assertions and detects whether the upstream is the
+real module stack (instruments+cachest+openst) or example-service-mock:
+
+```sh
+docker compose up -d --build   # once
+npm run test:stack -- real     # or: mock | any
 ```
 
 E2E runs against a **freshly recreated** stack for deterministic results (the

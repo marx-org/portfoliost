@@ -409,8 +409,8 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass (
 - [ ] Tests green; `/__meta` reflects real impl.
 
 ### Step I9 — module stack test
-- [ ] Compose stack: instruments + openst + cachest (+redis) standalone test with contract-shape curl checks through the gateway template.
-- [ ] Flip test: API_INSTRUMENTS_URL → real module; distinguishing checks vs mock.
+- [x] Compose stack: instruments + openst + cachest (+redis) standalone test with contract-shape curl checks through the gateway template. — `scripts/instruments-stack-test.mjs` (`npm run test:stack`): 29 contract checks across the full `/api/instruments/*` surface (detail, profile, quote, metrics, overview-metrics, search, history, fundamentals, calendar, dividends, projections, compare, seasonality, eps-surprises, peers, IR events+transcript, historical price) with upstream auto-detection.
+- [x] Flip test: API_INSTRUMENTS_URL → real module; distinguishing checks vs mock. — Ran both modes: `real` 29/29 (detected real via dividend history predating 2000), flipped gateway to example-service-mock: `mock` 29/29 (shapes identical across backends). Rest state stays on the real module (mock phase-out direction); I10's "default stays mock" is superseded by I8a wiring.
 
 ### Step I10 — portfoliost wiring
 - [ ] docker-compose.yml: redis + openst (env_file ../openst/.env) + cachest services; services.env default stays mock; docs sweep (README, mocks/README).
