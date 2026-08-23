@@ -371,6 +371,53 @@ Proposal: [backend-topology.md](proposals/backend-topology.md) (accepted 2026-08
 - [x] Cluster: app dir/HelmRelease/service renamed `portfoliost-users-auth` (image pinned to GHCR-verified v1.0.8), ingress paths repointed; live checks passed (`/__meta` = users-auth/v1.0.8, table in `users_auth` with data preserved, old resources pruned). Wedged pending-install recovered per playbook ops notes. — homelab `cab0fecfe`
 - [x] Wrote [MODULARISATION.md](MODULARISATION.md) — naming conventions + step-by-step extraction checklist for the next modules.
 
+## Phase 3 — instruments module (provider tier realized)
+
+Proposal: [instruments-provider-module.md](proposals/instruments-provider-module.md) — second extracted module; data from openst/cachest via in-module adapters (D2); compose gains redis/openst/cachest for local testing. Local verification only (no cluster changes this phase).
+
+Rules: one step = one commit; a step is marked `[x]` only after its tests pass (unit + docker-compose level, standalone-service compose for provider repos).
+
+### Step I1 — AGENTS.md rules
+- [x] Working guidelines extended: step-test-commit discipline, provider-tier-first, MODULARISATION.md as the module playbook. — `3946c44`
+
+### Step I2 — Proposal
+- [ ] Write `docs/proposals/instruments-provider-module.md` (D12–D15: full instruments surface JWT-protected, per-endpoint source map openst/cachest/db-seed, no direct gateway→cachest routing, compose provider tier). Commit.
+
+### Step I3 — openst extensions
+- [ ] New endpoints behind existing Redis-cache pattern: profile, quote, price history, fundamentals, metrics, eps-surprises, calendar (earnings/ex-dividend), institutional ownership, search. Tokens from `.env`.
+- [ ] pytest suite green + standalone docker compose smoke: every new route curl-checked.
+
+### Step I4 — cachest routes
+- [ ] `config.yaml`: routes proxying new openst endpoints (TTL/stale policy), JSON passthrough verified.
+- [ ] pytest green + standalone docker compose smoke incl. cache-hit behavior.
+
+### Step I5 — portfoliost-instruments scaffold
+- [ ] New private repo `Marx2/portfoliost-instruments` from users-auth skeleton (Hono/Drizzle/Postgres/PGlite/jose, /health + /__meta + /internal/verify, CI pipeline).
+- [ ] Push → first CI image published on GHCR.
+
+### Step I6 — schema + seed fallbacks
+- [ ] Schema `instruments`; tables for providerless endpoints (search index, peers, seasonality, IR/transcripts, projections, compare composites) seeded from raw JSON.
+- [ ] PGlite migration + seed unit tests green.
+
+### Step I7 — controllers pt1
+- [ ] search, :symbol detail, profile, metrics, overview-metrics, quote, history, price — adapters call cachest, translate to example-service shapes (`generated/api-types`).
+- [ ] PGlite handler tests + fetch-mocked adapter tests green.
+
+### Step I8 — controllers pt2
+- [ ] fundamentals, eps-surprises, calendar, ownership, dividends, peers, seasonality, projections, compare, investor-relations (+transcript).
+- [ ] Tests green; `/__meta` reflects real impl.
+
+### Step I9 — module stack test
+- [ ] Compose stack: instruments + openst + cachest (+redis) standalone test with contract-shape curl checks through the gateway template.
+- [ ] Flip test: API_INSTRUMENTS_URL → real module; distinguishing checks vs mock.
+
+### Step I10 — portfoliost wiring
+- [ ] docker-compose.yml: redis + openst (env_file ../openst/.env) + cachest services; services.env default stays mock; docs sweep (README, mocks/README).
+- [ ] Full suite green: build · unit 66 · mock 140 · e2e 51.
+
+### Step I11 — closeout
+- [ ] plan.md final marks + proposal source-map cross-check corrected from implementation findings.
+
 ### Later phases (not started)
 - Module extraction (market-data first), `/__meta` endpoints, D9 edge auth once `users-auth` is real.
 - Cluster rollout: per-module switching via git-managed ingress paths (`service-urls` ConfigMap only for backend-to-backend calls once modules exist).
