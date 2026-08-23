@@ -381,7 +381,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass (
 - [x] Working guidelines extended: step-test-commit discipline, provider-tier-first, MODULARISATION.md as the module playbook. — `3946c44`
 
 ### Step I2 — Proposal
-- [ ] Write `docs/proposals/instruments-provider-module.md` (D12–D15: full instruments surface JWT-protected, per-endpoint source map openst/cachest/db-seed, no direct gateway→cachest routing, compose provider tier). Commit.
+- [x] Write `docs/proposals/instruments-provider-module.md` (D12–D15: full instruments surface JWT-protected, per-endpoint source map openst/cachest/db-seed, no direct gateway→cachest routing, compose provider tier). Commit.
 
 ### Step I3 — openst extensions
 - [ ] New endpoints behind existing Redis-cache pattern: profile, quote, price history, fundamentals, metrics, eps-surprises, calendar (earnings/ex-dividend), institutional ownership, search. Tokens from `.env`.
