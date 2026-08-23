@@ -40,20 +40,27 @@ contract shapes (`generated/api-types`). Provider access goes through **cachest 
 | `/:symbol/quote`, `/price` | openst→cachest | verified: `price.quote` yfinance/fmp |
 | `/:symbol/history?resolution=` | openst→cachest | verified: `price.historical`; extend openst route with `start`/`end` + OHLCV |
 | `/:symbol/fundamentals` | openst→cachest | verified: `fundamental.income/balance/cash` fmp/yfinance |
-| `/:symbol/eps-surprises` | **existing mock call kept** | no reachable OSS provider at our FMP tier: `calendar.earnings` by symbol → 402, `fundamental.historical_eps` → 402, `estimates.historical` → 402 (verified I3) |
-| `/:symbol/ownership` | **existing mock call kept** | `ownership.institutional` fmp → 402 Restricted at our tier (verified I3) |
-| `/:symbol/dividends` | openst→cachest (exists today: yield + history) | `{date,amount}` → `{date, year, amount, currency, type}` |
-| `/:symbol/calendar` | openst→cachest calendar windows | verified free: unfiltered `calendar.earnings` + `calendar.dividend` (fmp); module filters per symbol from a daily-cached window |
+| `/:symbol/eps-surprises` | **derived in module** (I8b) | original plan: keep mock call (estimates all 402). Shipped: quarterly income statements → actual EPS/revenue; estimates = prior-year quarter baseline. Live. |
+| `/:symbol/ownership` | **empty-content stub** (I8b) | `ownership.institutional` fmp → 402 Restricted; intrinio v2 key unauthorized. Real module serves valid empty structure; revisit on provider upgrade. |
+| `/:symbol/dividends` | openst→cachest (exists today: yield + history) | `{date,amount}` → `{date, year, amount, currency, type}` — live since I8a (incl. openst RangeIndex date fix) |
+| `/:symbol/calendar` | openst→cachest calendar windows | verified free: unfiltered `calendar.earnings` + `calendar.dividend` (fmp); module filters per symbol from a daily-cached window; empty window degrades to `{earnings:[],exDividend:[]}` (cachest 404 pass-through, I8a) |
 | `/:symbol/projections` | openst→cachest | verified: `estimates.consensus` fmp (`target_consensus/high/low/median`) + yfinance (recommendation, analyst count) |
-| `/:symbol/peers` | **existing mock call kept** | no peers command in OSS OpenBB |
-| `/:symbol/seasonality` | **existing mock call kept** | no OpenBB equivalent |
-| `/:symbol/compare?symbols=` | module composition over history/quote adapters | multi-symbol fan-out, cached upstream |
-| `/:symbol/investor-relations` (+transcript) | **existing mock call kept** | transcripts not in OSS OpenBB |
+| `/:symbol/peers` | **module composition** (I8b) | no OSS peers command; shipped same-sector compare rows from a curated large-cap candidate universe with live sector profiles |
+| `/:symbol/seasonality` | **computed in module** (I8b) | monthly last-closes from multi-year OHLCV → avg/median/min/max per calendar month |
+| `/:symbol/compare?symbols=` | single-symbol compare snapshot (frontend calls it per symbol) | profile+quote+metrics composition — live since I8a |
+| `/:symbol/investor-relations` (+transcript) | **derived in module** (I8b) | events generated from real reported quarters; transcript = structured stub (`fundamental.transcript` is FMP-only/premium). No audio URLs. |
 | news endpoints | out of scope | AGENTS.md skip-list |
 
-No new DB seeding: where providers can't go (eps-surprises, ownership, peers,
-seasonality, IR/transcripts — all verified during I3), the existing mock-backed
-gateway calls remain until a provider tier upgrade unlocks them.
+Where the provider tier truly can't go (ownership today), the endpoint still
+exists with valid-but-empty content so the UI degrades gracefully instead of
+splitting traffic between mock and real backends.
+
+Implementation findings worth keeping:
+- cachest passes upstream 404 through as 404 ("no data") while 429/5xx serve
+  stale-then-503 — modules can distinguish outage from empty.
+- FMP rate-limits block whole windows (openst blocks until reset); the
+  instruments calendar route treats upstream 404 as empty lists.
+- openst dividend history must normalize non-datetime indexes to ISO dates.
 Canonical verification matrix incl. research pointers for the gaps:
 [openst-coverage.md](../docs/openst-coverage.md).
 

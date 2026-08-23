@@ -20,21 +20,26 @@ keys (`FMP_API_KEY` starter tier, yfinance, sec; intrinio key present but broken
 
 ## Missing — needs research
 
-1. **eps-surprises** (`/:symbol/eps-surprises`) — closest commands all FMP-premium at
-   current tier: `calendar.earnings` by symbol → 402, `fundamental.historical_eps` → 402,
-   `estimates.historical` → 402. Research: FMP tier upgrade, direct Finnhub
-   (`/stock/earnings`; raw capture already finnhub-shaped), or derive once
-   `estimates.historical` unlocks. **Mock call stays meanwhile.**
-2. **institutional ownership** (`/:symbol/ownership`) — `ownership.institutional` fmp →
-   402 Restricted. Research: FMP upgrade, SEC 13F filings (`ownership.form_13f`),
-   intrinio entitlements. **Mock call stays.**
-3. **peers** (`/:symbol/peers`) — no peers command in OSS OpenBB. Research:
-   sector/industry join over profiles, FMP `stock_peers` direct call.
-4. **seasonality** (`/:symbol/seasonality`) — no equivalent. Candidate: compute from
-   multi-year `price.historical` monthly aggregates (could be openst-side later).
-5. **investor-relations events / transcripts** — `fundamental.transcript` exists as a
-   command but provider support/premium status unverified. Research before relying on it.
-   **Mock call stays.**
+Status after I8b (2026-08-23): four of the five gaps were closed by deriving
+content inside the instruments module; only ownership still waits on a
+provider.
+
+1. **eps-surprises** (`/:symbol/eps-surprises`) — RESOLVED by derivation
+   (I8b): quarterly income statements give actual EPS/revenue; estimates use
+   the prior-year quarter as a baseline. True analyst estimates still need an
+   FMP upgrade or Finnhub.
+2. **institutional ownership** (`/:symbol/ownership`) — STILL OPEN.
+   `ownership.institutional` fmp → 402 Restricted; intrinio v2 key returns 401.
+   Real module serves valid empty content meanwhile. Research: FMP upgrade,
+   SEC 13F filings (`ownership.form_13f`), intrinio entitlements.
+3. **peers** (`/:symbol/peers`) — RESOLVED by composition (I8b): same-sector
+   compare rows over a curated large-cap candidate pool with live sector
+   profiles. FMP `stock_peers` remains the research path for true broker peers.
+4. **seasonality** (`/:symbol/seasonality`) — RESOLVED in module (I8b):
+   monthly last-closes from multi-year OHLCV → avg/median/min/max.
+5. **investor-relations events / transcripts** — RESOLVED partially (I8b):
+   events derived from real reported quarters; transcript endpoint returns a
+   structured stub (`fundamental.transcript` is FMP-only/premium, no audio).
 
 ## Provider quirks worth remembering
 

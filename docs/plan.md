@@ -417,7 +417,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass (
 - [x] Full suite green: build · unit 66 · mock 140 · e2e 39 (plan's "51" was stale) · stack 29/29 (real mode).
 
 ### Step I11 — closeout
-- [ ] plan.md final marks + proposal source-map cross-check corrected from implementation findings.
+- [x] plan.md final marks + proposal source-map cross-check corrected from implementation findings. — `docs/proposals/instruments-provider-module.md` D13 table updated with I8a/I8b status per endpoint (eps-surprises/peers/seasonality/IR now derived in module; ownership = empty-content stub pending provider; compare is single-symbol composition); `docs/openst-coverage.md` gaps annotated. Stale "Later phases" `/__meta` note corrected (instruments ships one).
 
 ### Later phases (not started)
 - Module extraction (market-data first), `/__meta` endpoints, D9 edge auth once `users-auth` is real.
