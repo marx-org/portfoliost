@@ -11,7 +11,7 @@ describe("FeeCell (§10.5)", () => {
 
   it("falls back to transaction currency when no fee currency set", () => {
     const w = mount(FeeCell, { props: { fees: 5, feeCurrency: null, fallbackCurrency: "PLN" } })
-    expect(w.text()).toContain("PLN 5.00")
+    expect(w.text().replace(/\u00A0/g, " ")).toContain("PLN 5.00")
   })
 
   it("shows the custom fx badge only for manual rates", () => {
