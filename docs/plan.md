@@ -460,7 +460,8 @@ Proposal: [fees-and-custom-fx.md](proposals/fees-and-custom-fx.md) (accepted 202
 - [ ] 10.4 SPA wallet cash modals — fee currency select; transfer source→target rate inputs aligned with wallets D22 elastic shape
 - [ ] 10.5 Transactions tables — render fee with its own currency + custom-rate marker/tooltips
 - [ ] 10.6 Tests — unit, mock contract round-trips, e2e flows updated (defaults, pct ignores feeCurrency, custom-rate propagation)
-- [ ] 10.7 Docs sweep — AGENTS.md conventions note (camelCase for new fields), cross-links between proposals
+- [ ] 10.7 Available-currencies registry — contract `GET /api/currencies` (D31), mock serves from demo rates, SPA fetch-once-and-cache consumed by every currency selector
+- [ ] 10.8 Docs sweep — AGENTS.md conventions note (camelCase for new fields), cross-links between proposals
 
 ## 11. Wallets & transactions module (`portfoliost-wallets`)
 
@@ -473,7 +474,8 @@ Proposal: [wallets-module.md](proposals/wallets-module.md) (accepted 2026-08-24,
 - [ ] 11.5 Transaction edit/delete with real ledger recomputation of wallet balances
 - [ ] 11.6 History & pagination — `/wallets/:id/transactions`, `/wallets/transactions`, `/recent-transactions` feed shapes per contract
 - [ ] 11.7 FX subsystem — one-shot historical import (frankfurter/ECB), daily incremental CronJob, lazy gap backfill via provider tier (openst→cachest), carry-forward across non-business days
-- [ ] 11.8 Conversion service — auto/manual rate snapshots on write, valuation at latest rate, per-date conversion for balance-history, total-balance aggregation breakdown
-- [ ] 11.9 users-auth preference integration — read `baseCurrency` via internal route for defaults
-- [ ] 11.10 Gateway + compose wiring, contract tests green against mock AND module, e2e switch via `API_WALLETS_URL`
-- [ ] 11.11 Cluster rollout — HelmRelease, ingress path, FX-sync CronJob
+- [ ] 11.8 Serve `GET /api/currencies` from `fx_rates` × contracts metadata catalog; gateway route switch mock→wallets
+- [ ] 11.9 Conversion service — auto/manual rate snapshots on write, valuation at latest rate, per-date conversion for balance-history, total-balance aggregation breakdown
+- [ ] 11.10 users-auth preference integration — read `baseCurrency` via internal route for defaults
+- [ ] 11.11 Gateway + compose wiring, contract tests green against mock AND module, e2e switch via `API_WALLETS_URL`
+- [ ] 11.12 Cluster rollout — HelmRelease, ingress path, FX-sync CronJob

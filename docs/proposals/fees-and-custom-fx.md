@@ -72,8 +72,8 @@ the inconsistency is documented, not propagated.
 
 1. **Buy/Sell stock step** (`AddPositionDialog`) and **EditTransactionModal**:
    - fee input gains a compact currency select bound to `feeCurrency`
-     (preselected = transaction currency; options: transaction currency +
-     commonly traded currencies, full ISO list behind search later);
+     (preselected = transaction currency; options from the shared
+     available-currencies registry, D31);
    - a collapsible **"Exchange rate"** section: segmented control
      `Automatic | Custom`. Custom reveals a rate input (placeholder shows the
      last automatic rate when known) and a hint of the direction
@@ -106,6 +106,16 @@ feeExchangeRate:  { type: number, nullable: true }
 - Response echoes the effective values after defaults resolution (so clients
   never guess): omitted `feeCurrency` comes back as the transaction currency;
   `automatic` comes back with resolved rate values filled.
+- **`GET /api/currencies`** — the available-currencies registry (D31):
+  ```yaml
+  CurrenciesResponse:
+    currencies:
+      - code: { type: string }        # ISO 4217
+        name: { type: string }
+        symbol: { type: string }
+        minorUnits: { type: integer }
+        popular: { type: boolean }
+  ```
 - Versioned as a minor contracts release; SPA regenerates `generated/api-types`.
 
 ### D29 — mock behavior
@@ -133,6 +143,24 @@ feeExchangeRate:  { type: number, nullable: true }
   dropped.
 - D20/D21 unchanged (fx store, snapshot semantics); `manual` here feeds
   `rate_source='manual'` snapshots verbatim.
+
+### D31 — single source of truth for available currencies
+
+All currency selectors (fee currency, wallet creation, base-currency picks,
+later portfolio settings) consume one registry:
+
+- **Availability SoT = the wallets `fx_rates` table** — we support exactly the
+  currencies we can import rates for; the set refreshes automatically with every
+  daily FX import (new currency appears in `fx_rates` ⇒ selectable; nothing else
+  to maintain).
+- **Display metadata** (name, symbol, minor units, popular flag) is a static
+  catalog in `portfoliost-contracts` (`currencies.yaml` → generated TS) keyed by
+  ISO code; the endpoint joins dynamic availability with this metadata.
+- Wire shape: `GET /api/currencies` (D28). Long-term served by the wallets
+  module (owner of `fx_rates`; gateway routes `/api/currencies` →
+  `API_WALLETS_URL`). Interim (§10, pre-wallets): mock serves the same shape
+  from its demo rate table so UI work is final-form from day one.
+- SPA fetches once per session and caches; selectors never hardcode lists.
 
 ### Plan placement
 

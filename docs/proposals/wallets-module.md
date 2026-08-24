@@ -200,6 +200,11 @@ seed source, not as the live chain).
 Internal exposure: `GET /internal/fx-rates?date=&from=&to=` serves other modules
 (portfolios will need it later) without them touching the `wallets` schema.
 
+Currency registry (fees-and-custom-fx D31): the set of distinct currencies in
+`fx_rates` IS the supported-currency list; wallets serves it publicly as
+`GET /api/currencies` joined with display metadata from the contracts catalog.
+The list auto-updates with every daily import — no separate registry to maintain.
+
 ### D21 — conversion semantics: snapshot on write (auto or manual)
 
 Two distinct needs:
