@@ -1,17 +1,20 @@
-# Proposal: fees in their own currency + custom (manual) exchange rates
+# Proposal: FX rates & supported currencies first, then fees in own currency + custom (manual) rates
 
 **Status**: accepted (2026-08-24)
 **Builds on**: [backend-topology.md](backend-topology.md) (D1–D11), [wallets-module.md](wallets-module.md) (D16–D24)
-**Scope**: contract + mock + SPA adjustment layer beneath the wallets module implementation (plan §10, ahead of §11). Touches BOTH portfolio transactions and wallet cash transactions:
+**Scope**: the FX-rate foundation and the supported-currencies registry come **first** (everything else consumes them), followed by contract + mock + SPA adjustments for fees and manual rates. Touches BOTH portfolio transactions and wallet cash transactions:
 
-1. a fee may be denominated in a currency different from the transaction (default: transaction currency);
-2. the user may supply a **custom exchange rate** for the transaction itself and for the fee — default mode `automatic`, exactly the `rate_source='manual'` path the wallets proposal reserved (D21/D22);
-3. UI surfaces both; OpenAPI contract documents both; mock behaves accordingly.
+1. FX rate store: which rates we import, how they refresh, and the single source of truth for selectable currencies;
+2. a fee may be denominated in a currency different from the transaction (default: transaction currency);
+3. the user may supply a **custom exchange rate** for the transaction itself and for the fee — default mode `automatic`, exactly the `rate_source='manual'` path the wallets proposal reserved (D21/D22);
+4. UI surfaces all of it; OpenAPI contract documents it; mock behaves accordingly.
 
 ## Context
 
 Today (contracts + mock + SPA):
 
+- No FX store exists anywhere; nothing defines WHICH currencies the system
+  supports; every selector would have to hardcode a list.
 - `Transaction` (portfolio) carries `fees: number` + `feesType: 'fixed'|'pct'`
   implicitly via request bodies; `exchangeRate` is a **required number that
   nothing populates meaningfully**; `convertedTotalAmount/convertedPrice/
@@ -21,11 +24,41 @@ Today (contracts + mock + SPA):
 - SPA (`AddPositionDialog`, `EditTransactionModal`, `WalletCashModals`) renders a
   fee input with a `%` toggle and computes the effective fee on the fly.
 
-Real-world gap this closes: a PLN-based investor trading on a US exchange pays
-the broker's fee in EUR, and the broker converts at **its own** rate — which is
-rarely the market mid the system would pick automatically.
+Real-world gaps closed: a PLN-based investor trading on a US exchange pays the
+broker's fee in EUR, and the broker converts at **its own** rate — rarely the
+market mid the system would pick automatically.
 
-### D25 — fee currency (default = transaction currency)
+### D25 — FX rate foundation: local store, daily import
+
+Owned by the wallets module (`fx_rates`, EUR-based daily closes — details in
+[wallets-module.md](wallets-module.md) D20):
+
+- **Primary source — ECB via frankfurter.dev** (free, no key): one-shot full
+  history import back to 1999, then daily incremental fetch ~17:00 CET via
+  cluster CronJob; carry-forward across weekends/holidays.
+- **Fallback — provider tier** (openst → cachest, yfinance/FMP) fills currencies
+  outside ECB coverage and lazy-backfills gaps on demand.
+- The physical store lands with the wallets module (plan §11.7); until then a
+  static demo rate table inside the mock plays the same role so §10 UI/contract
+  work is final-form from day one.
+
+### D26 — available-currencies registry (single source of truth)
+
+All currency selectors (fee currency, wallet creation, base-currency picks,
+later portfolio settings) consume ONE registry:
+
+- **Availability SoT = the `fx_rates` table** — we support exactly the currencies
+  we can import rates for; the set refreshes automatically with every daily FX
+  import (a currency appears in `fx_rates` ⇒ selectable; nothing else to maintain).
+- **Display metadata** (name, symbol, minor units, popular flag) is a static
+  catalog in `portfoliost-contracts` (`currencies.yaml` → generated TS) keyed by
+  ISO code; the endpoint joins dynamic availability with this metadata.
+- Long-term served by the wallets module (owner of `fx_rates`; gateway routes
+  `/api/currencies` → `API_WALLETS_URL`). Interim (§10, pre-wallets): the mock
+  serves the same shape from its demo rate table.
+- SPA fetches once per session and caches; selectors never hardcode lists.
+
+### D27 — fee currency (default = transaction currency)
 
 - New optional field **`feeCurrency`** on every fee-bearing transaction
   (portfolio buy/sell; wallet deposit/withdraw/transfer). When omitted it
@@ -37,10 +70,10 @@ rarely the market mid the system would pick automatically.
 - Ledger/settlement view (used by balances once real modules land): the cash
   impact of a fee is its **settled amount in the wallet's currency**
   (`fees_settled`). Same-currency fees settle 1:1; foreign-currency fees settle
-  via the fee's exchange rate (D26). Until then the mock settles with a static
-  demo rate table (D28) and records what it used.
+  via the fee's exchange rate (D28). Until then the mock settles with a static
+  demo rate table (D31) and records what it used.
 
-### D26 — custom exchange rates with `automatic` default
+### D28 — custom exchange rates with `automatic` default
 
 Two independent rate slots per transaction — one for the main amount, one for
 the fee:
@@ -59,8 +92,8 @@ Semantics:
 - `automatic` ⇒ system resolves the rate (provider/fx store at write time once
   wallets §11 ships; until then today's behavior — identity/static). Supplied
   rate values are ignored in automatic mode (never persisted as manual).
-- This is precisely the `rate_source='auto'|'manual'` column pair reserved in
-  the wallets schema (D17/D21); this proposal finalizes the wire format so the
+- This is precisely the `rate_source='automatic'|'manual'` column pair in the
+  wallets schema (D17/D21); this proposal finalizes the wire format so the
   module implementation consumes it unchanged.
 
 Field naming: new fields use **camelCase everywhere on the wire**
@@ -68,12 +101,12 @@ Field naming: new fields use **camelCase everywhere on the wire**
 legacy `CashTransaction` fields are snake_case — no renames of existing fields;
 the inconsistency is documented, not propagated.
 
-### D27 — UI adjustments (SPA)
+### D29 — UI adjustments (SPA)
 
 1. **Buy/Sell stock step** (`AddPositionDialog`) and **EditTransactionModal**:
    - fee input gains a compact currency select bound to `feeCurrency`
      (preselected = transaction currency; options from the shared
-     available-currencies registry, D31);
+     available-currencies registry, D26);
    - a collapsible **"Exchange rate"** section: segmented control
      `Automatic | Custom`. Custom reveals a rate input (placeholder shows the
      last automatic rate when known) and a hint of the direction
@@ -89,7 +122,7 @@ the inconsistency is documented, not propagated.
    wallet detail): fee cell renders `12,50 EUR` style with its own currency;
    custom-rated rows show the badge; tooltips spell out applied rates.
 
-### D28 — contract changes (`portfoliost-contracts`)
+### D30 — contract changes (`portfoliost-contracts`)
 
 ```yaml
 # shared, new fields on Transaction (portfolio) and CashTransaction /
@@ -106,7 +139,7 @@ feeExchangeRate:  { type: number, nullable: true }
 - Response echoes the effective values after defaults resolution (so clients
   never guess): omitted `feeCurrency` comes back as the transaction currency;
   `automatic` comes back with resolved rate values filled.
-- **`GET /api/currencies`** — the available-currencies registry (D31):
+- **`GET /api/currencies`** — the available-currencies registry (D26):
   ```yaml
   CurrenciesResponse:
     currencies:
@@ -118,12 +151,13 @@ feeExchangeRate:  { type: number, nullable: true }
   ```
 - Versioned as a minor contracts release; SPA regenerates `generated/api-types`.
 
-### D29 — mock behavior
+### D31 — mock behavior
 
-- Persist + echo all new fields with defaults resolved (per D28 echo rule).
+- Persist + echo all new fields with defaults resolved (per D30 echo rule).
 - Bundled static demo rate table in `mocks/lib` (EUR/USD/PLN/GBP/CHF snapshot)
-  used to settle foreign-currency fees into the wallet currency and to fill
-  `automatic` rates; `manual` rates override everything they apply to.
+  doubles as the interim availability source for `/api/currencies`, settles
+  foreign-currency fees into the wallet currency, and fills `automatic` rates;
+  `manual` rates override everything they apply to.
 - Balance math for wallet movements becomes
   `Δbalance = signed(amount) − fees_settled` where `fees_settled` honors
   fee currency + fee rate; transfer destination crediting follows wallets D22
@@ -131,7 +165,7 @@ feeExchangeRate:  { type: number, nullable: true }
 - Round-trip tests: default resolution, pct ignoring feeCurrency, manual rate
   propagation into converted outputs, 422 on bad manual rates.
 
-### D30 — wallets proposal alignment (supersedes parts of D17/D22)
+### D32 — wallets proposal alignment (supersedes parts of D17/D22)
 
 - Schema D17 gains the finalized columns:
   `fee_currency char(3)`, `fee_rate_source text CHECK IN ('automatic','manual')`,
@@ -144,25 +178,9 @@ feeExchangeRate:  { type: number, nullable: true }
 - D20/D21 unchanged (fx store, snapshot semantics); `manual` here feeds
   `rate_source='manual'` snapshots verbatim.
 
-### D31 — single source of truth for available currencies
-
-All currency selectors (fee currency, wallet creation, base-currency picks,
-later portfolio settings) consume one registry:
-
-- **Availability SoT = the wallets `fx_rates` table** — we support exactly the
-  currencies we can import rates for; the set refreshes automatically with every
-  daily FX import (new currency appears in `fx_rates` ⇒ selectable; nothing else
-  to maintain).
-- **Display metadata** (name, symbol, minor units, popular flag) is a static
-  catalog in `portfoliost-contracts` (`currencies.yaml` → generated TS) keyed by
-  ISO code; the endpoint joins dynamic availability with this metadata.
-- Wire shape: `GET /api/currencies` (D28). Long-term served by the wallets
-  module (owner of `fx_rates`; gateway routes `/api/currencies` →
-  `API_WALLETS_URL`). Interim (§10, pre-wallets): mock serves the same shape
-  from its demo rate table so UI work is final-form from day one.
-- SPA fetches once per session and caches; selectors never hardcode lists.
-
 ### Plan placement
 
 Implemented as plan **§10 Fees & FX-rate entry (contract/mock/UI)** — before the
-wallets module (§11), because §11 consumes these exact field shapes.
+wallets module (§11), because §11 consumes these exact field shapes. The FX
+foundation itself (import pipeline, CronJob) materializes in §11.7; §10 ships
+the contract shapes, the registry endpoint served by the mock (D26), and all UI.

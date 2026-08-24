@@ -81,8 +81,8 @@ CREATE TABLE wallets.wallet_transactions (
   rate_source      text NOT NULL DEFAULT 'automatic'
                      CHECK (rate_source IN ('automatic','manual')),
                    -- 'automatic': derived from fx_rates at write; 'manual': user-provided
-                   -- (wire format finalized by fees-and-custom-fx.md D26)
-  fee_currency     char(3),                       -- D25 (fees-and-custom-fx): default = transaction ccy
+                   -- (wire format finalized by fees-and-custom-fx.md D28)
+  fee_currency     char(3),                       -- D27 (fees-and-custom-fx): default = transaction ccy
   fee_rate_source  text NOT NULL DEFAULT 'automatic'
                      CHECK (fee_rate_source IN ('automatic','manual')),
   fee_exchange_rate numeric(20,10),               -- settles foreign-currency fees into wallet ccy
@@ -200,7 +200,7 @@ seed source, not as the live chain).
 Internal exposure: `GET /internal/fx-rates?date=&from=&to=` serves other modules
 (portfolios will need it later) without them touching the `wallets` schema.
 
-Currency registry (fees-and-custom-fx D31): the set of distinct currencies in
+Currency registry (fees-and-custom-fx D25/D26): the set of distinct currencies in
 `fx_rates` IS the supported-currency list; wallets serves it publicly as
 `GET /api/currencies` joined with display metadata from the contracts catalog.
 The list auto-updates with every daily import — no separate registry to maintain.
@@ -259,7 +259,7 @@ rule — elastic by design, works for automatic and (later) manually negotiated 
   from `fx_rates`; because both values are persisted, a future UI can accept a
   manually entered target amount/rate without schema changes;
 - fees carry their own currency and rate per [fees-and-custom-fx.md](fees-and-custom-fx.md)
-  (D25/D26): settled into the source wallet via `fee_exchange_rate`;
+  (D27/D28): settled into the source wallet via `fee_exchange_rate`;
 - response echoes source amount, target amount, and the applied rates.
 
 ### D23 — resolved questions
@@ -273,7 +273,7 @@ rule — elastic by design, works for automatic and (later) manually negotiated 
    proposal) (D21).
 4. **Q4 — transfers**: settled → elastic storage of source amount, target amount
    and `transfer_fx_rate` on both legs; fees settle per the fees-and-custom-fx
-   companion proposal (D25–D26).
+   companion proposal (D27–D28).
 5. **Open for portfolios phase** — delete-guard for wallets referenced by a
    portfolio: runtime internal check vs event-driven; decide when portfolios lands.
 6. **Open** — INVEST rows editable? Mock allows editing them; real systems usually

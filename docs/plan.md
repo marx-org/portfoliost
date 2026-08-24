@@ -452,7 +452,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass (
 
 ## 10. Fees & FX-rate entry (contract / mock / UI)
 
-Proposal: [fees-and-custom-fx.md](proposals/fees-and-custom-fx.md) (accepted 2026-08-24, D25–D30). Fees may carry their own currency (default = transaction currency); transaction and fee each accept a custom exchange rate (`automatic` default). Applies to portfolio AND wallet transactions; finalizes wire shapes the wallets module (§11) consumes.
+Proposal: [fees-and-custom-fx.md](proposals/fees-and-custom-fx.md) (accepted 2026-08-24, D25–D32). FX foundation and supported-currency registry first, then: fees may carry their own currency (default = transaction currency) and transaction/fee each accept a custom exchange rate (`automatic` default). Applies to portfolio AND wallet transactions; finalizes wire shapes the wallets module (§11) consumes.
 
 - [ ] 10.1 Contracts — extend `Transaction`/`CashTransaction` + request bodies with `feeCurrency`, `rateSource`, `feeExchangeRate`, `feeRateSource`; `exchangeRate` nullable; regenerate `generated/api-types`; release contracts
 - [ ] 10.2 Mock — persist/echo resolved fields; static demo FX table settles foreign-currency fees; manual rates drive converted outputs; 422 on invalid manual rates; round-trip tests
@@ -460,7 +460,7 @@ Proposal: [fees-and-custom-fx.md](proposals/fees-and-custom-fx.md) (accepted 202
 - [ ] 10.4 SPA wallet cash modals — fee currency select; transfer source→target rate inputs aligned with wallets D22 elastic shape
 - [ ] 10.5 Transactions tables — render fee with its own currency + custom-rate marker/tooltips
 - [ ] 10.6 Tests — unit, mock contract round-trips, e2e flows updated (defaults, pct ignores feeCurrency, custom-rate propagation)
-- [ ] 10.7 Available-currencies registry — contract `GET /api/currencies` (D31), mock serves from demo rates, SPA fetch-once-and-cache consumed by every currency selector
+- [ ] 10.7 Available-currencies registry — contract `GET /api/currencies` (D26), mock serves from demo rates, SPA fetch-once-and-cache consumed by every currency selector
 - [ ] 10.8 Docs sweep — AGENTS.md conventions note (camelCase for new fields), cross-links between proposals
 
 ## 11. Wallets & transactions module (`portfoliost-wallets`)
