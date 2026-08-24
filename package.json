@@ -17,7 +17,8 @@
     "test:stack": "node scripts/instruments-stack-test.mjs",
     "mock:start": "node mocks/gateway/index.js",
     "mock:seed": "node scripts/regen-seed.mjs",
-    "gen:types": "openapi-typescript node_modules/@marx2/contracts/openapi.yaml -o generated/api-types.d.ts"
+    "gen:types": "openapi-typescript node_modules/@marx2/contracts/openapi.yaml -o generated/api-types.d.ts",
+    "test:stack:wallets": "node scripts/wallets-stack-test.mjs"
   },
   "dependencies": {
     "@marx2/contracts": "github:Marx2/portfoliost-contracts",

@@ -467,15 +467,15 @@ Proposal: [fees-and-custom-fx.md](proposals/fees-and-custom-fx.md) (accepted 202
 
 Proposal: [wallets-module.md](proposals/wallets-module.md) (accepted 2026-08-24, decisions D16–D23). Cash-wallet domain as its own module: wallets, cash ledger transactions, unified recent-transactions feed, balance history, multicurrency (local FX store: ECB/frankfurter primary + openst/cachest fallback). Multi-user: every table and query is user-scoped (D24). No implementation started yet.
 
-- [ ] 11.1 Scaffold repo from users-auth skeleton (`/health`, `/__meta`, `/internal/verify`, CI release pipeline); compose service `wallets`, env key `API_WALLETS_URL`
-- [ ] 11.2 Drizzle migrations per D17/D24: `wallets.wallets` (mandatory `currency`, `base_currency` default from user prefs), `wallets.wallet_transactions` (user-scoped ledger, mandatory currency, `rate_source`/`fee_rate_source`, `transfer_fx_rate`, `fee_currency`), `fx_rates`, `fx_sync_state`
-- [ ] 11.3 Wallet CRUD endpoints — create requires currency (422 otherwise), rename, list; delete guarded per D18/D24: only when zero transactions and unreferenced (409 otherwise)
-- [ ] 11.4 Cash movement endpoints — deposits/withdrawals (overdraft 422) /transfers incl. cross-currency elastic legs (source+target amounts + rate on both linked rows)
-- [ ] 11.5 Transaction edit/delete with real ledger recomputation of wallet balances
-- [ ] 11.6 History & pagination — `/wallets/:id/transactions`, `/wallets/transactions`, `/recent-transactions` feed shapes per contract
-- [ ] 11.7 FX subsystem — one-shot historical import (frankfurter/ECB), daily incremental CronJob, lazy gap backfill via provider tier (openst→cachest), carry-forward across non-business days
-- [ ] 11.8 Serve `GET /api/currencies` from `fx_rates` × contracts metadata catalog; gateway route switch mock→wallets
-- [ ] 11.9 Conversion service — auto/manual rate snapshots on write, valuation at latest rate, per-date conversion for balance-history, total-balance aggregation breakdown
-- [ ] 11.10 users-auth preference integration — read `baseCurrency` via internal route for defaults
-- [ ] 11.11 Gateway + compose wiring, contract tests green against mock AND module, e2e switch via `API_WALLETS_URL`
+- [x] 11.1 Scaffold repo from users-auth skeleton (`/health`, `/__meta`, `/internal/verify`, CI release pipeline); compose service `wallets`, env key `API_WALLETS_URL`
+- [x] 11.2 Drizzle migrations per D17/D24: `wallets.wallets` (mandatory `currency`, `base_currency` default from user prefs), `wallets.wallet_transactions` (user-scoped ledger, mandatory currency, `rate_source`/`fee_rate_source`, `transfer_fx_rate`, `fee_currency`), `fx_rates`, `fx_sync_state`
+- [x] 11.3 Wallet CRUD endpoints — create requires currency (422 otherwise), rename, list; delete guarded per D18/D24: only when zero transactions and unreferenced (409 otherwise)
+- [x] 11.4 Cash movement endpoints — deposits/withdrawals (overdraft 422) /transfers incl. cross-currency elastic legs (source+target amounts + rate on both linked rows)
+- [x] 11.5 Transaction edit/delete with real ledger recomputation of wallet balances
+- [x] 11.6 History & pagination — `/wallets/:id/transactions`, `/wallets/transactions`, `/recent-transactions` feed shapes per contract
+- [x] 11.7 FX subsystem — one-shot historical import (frankfurter/ECB), daily incremental CronJob, lazy gap backfill via provider tier (openst→cachest), carry-forward across non-business days
+- [x] 11.8 Serve `GET /api/currencies` from `fx_rates` × contracts metadata catalog; gateway route switch mock→wallets
+- [x] 11.9 Conversion service — auto/manual rate snapshots on write, valuation at latest rate, per-date conversion for balance-history, total-balance aggregation breakdown
+- [x] 11.10 users-auth preference integration — read `baseCurrency` via internal route for defaults
+- [x] 11.11 Gateway + compose wiring, contract tests green against mock AND module, e2e switch via `API_WALLETS_URL`
 - [ ] 11.12 Cluster rollout — HelmRelease, ingress path, FX-sync CronJob

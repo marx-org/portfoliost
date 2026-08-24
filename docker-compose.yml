@@ -119,6 +119,21 @@ services:
       REDIS_HOST: redis
     restart: unless-stopped
 
+  wallets:
+    build:
+      context: ../portfoliost-wallets
+      dockerfile: Dockerfile
+    container_name: portfoliost-wallets
+    ports:
+      - "3002:3000"
+    environment:
+      DATABASE_URL: postgres://portfoliost:portfoliost@postgres:5432/portfoliost
+      USERS_AUTH_URL: http://users-auth:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
   instruments:
     build:
       context: ../portfoliost-instruments
