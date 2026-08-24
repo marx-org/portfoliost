@@ -286,7 +286,7 @@ function goResearch() {
       class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
       @click.self="close"
     >
-      <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Add position">
+      <div class="card max-h-[85vh] w-full max-w-md overflow-y-auto p-6" role="dialog" aria-modal="true" aria-label="Add position">
         <div class="mb-4 flex items-center justify-between">
           <h3 class="text-base font-semibold">Add Position</h3>
           <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="close">✕</button>
@@ -313,7 +313,7 @@ function goResearch() {
       class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
       @click.self="close"
     >
-      <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Buy Position">
+      <div class="card max-h-[85vh] w-full max-w-md overflow-y-auto p-6" role="dialog" aria-modal="true" aria-label="Buy Position">
         <div class="mb-4 flex items-center justify-between">
           <h3 class="text-base font-semibold">Buy Position</h3>
           <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="close">✕</button>
@@ -433,7 +433,7 @@ function goResearch() {
       class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
       @click.self="close"
     >
-      <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Buy Position">
+      <div class="card max-h-[85vh] w-full max-w-md overflow-y-auto p-6" role="dialog" aria-modal="true" aria-label="Buy Position">
         <div class="mb-4 flex items-center justify-between">
           <h3 class="text-base font-semibold">Buy Position</h3>
           <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="close">✕</button>
@@ -511,7 +511,7 @@ function goResearch() {
       class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
       @click.self="close"
     >
-      <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Add CFD position">
+      <div class="card max-h-[85vh] w-full max-w-md overflow-y-auto p-6" role="dialog" aria-modal="true" aria-label="Add CFD position">
         <div class="mb-4 flex items-center justify-between">
           <h3 class="text-base font-semibold">Add CFD position</h3>
           <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="close">✕</button>

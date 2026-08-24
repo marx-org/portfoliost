@@ -85,7 +85,7 @@ test("transactions page lists transactions with sortable columns and pagination"
   await expect(page.getByTestId("table-th-amount")).toBeVisible()
   await expect(page.getByText(/P&L/)).toBeVisible()
   await expect(page.getByTestId("table-th-date")).toContainText("↓")
-  await page.getByTestId("table-th-amount").click()
+  await page.getByTestId("table-th-amount").locator("button").click()
   await expect(page.getByTestId("table-th-amount")).toContainText("↑")
   await expect(page.getByLabel("Rows per page")).toContainText("10 per page")
   await expect(page.getByText(/^\d+-\d+ of \d+$/)).toBeVisible()

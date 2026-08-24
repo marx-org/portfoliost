@@ -152,7 +152,7 @@ const submitLabel = computed(() => (props.action === "deposit" ? "Deposit" : pro
     class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
     @click.self="emit('close')"
   >
-    <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Cash movement">
+    <div class="card max-h-[85vh] w-full max-w-md overflow-y-auto p-6" role="dialog" aria-modal="true" aria-label="Cash movement">
       <div class="mb-4 flex items-center justify-between">
         <h3 class="text-base font-semibold">{{ title }}</h3>
         <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="emit('close')">✕</button>

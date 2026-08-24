@@ -209,3 +209,14 @@ Implemented as plan **§10 Fees & FX-rate entry (contract/mock/UI)** — before 
 wallets module (§11), because §11 consumes these exact field shapes. The FX
 foundation itself (import pipeline, CronJob) materializes in §11.7; §10 ships
 the contract shapes, the registry endpoint served by the mock (D26), and all UI.
+
+## Implementation notes (2026-08-24)
+
+- Contracts released with `FeeFxFields`, `/api/currencies`, and the shared
+  helpers (`@marx2/contracts/fx` + `/currencies`); rate-source enums ship
+  nullable without `default` keywords (codegen forced them required otherwise).
+- Mock vendors `node_modules/@marx2/contracts/dist` into its image
+  (.dockerignore exception) — one conversion implementation everywhere.
+- UI: shared `CurrencySelect` + `FeeCell`; dialogs made scrollable
+  (`max-h-[85vh]`) after e2e caught tall modals pushing submit buttons off-viewport;
+  edit-modal price input relaxed to `step="any"` for sub-cent historical prices.
