@@ -1889,6 +1889,8 @@ export interface components {
             ticker?: string;
             name?: string;
             country?: string;
+            countryCode?: string | null;
+            isin?: string | null;
             currency?: string;
             exchange?: string;
             finnhubIndustry?: string | null;

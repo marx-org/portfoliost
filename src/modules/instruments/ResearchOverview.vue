@@ -22,31 +22,36 @@ const rawEps = ref<{ annual: Array<Record<string, never>>; quarterly: Array<Reco
 const irEvents = ref<IrEventsAapl>([])
 const showFullDescription = ref(false)
 const error = ref<string | null>(null)
+const limitedCoverage = ref(false)
 const loading = ref(true)
 
 onMounted(async () => {
-  try {
-    const [p, m, o, q, eps, ir] = await Promise.all([
-      instrumentsApi.getInstrumentProfile(symbol),
-      instrumentsApi.getInstrumentMetrics(symbol),
-      instrumentsApi.getInstrumentOverviewMetrics(symbol).catch(() => null),
-      instrumentsApi.getQuote(symbol),
-      instrumentsApi.getEpsSurprises(symbol).catch(() => ({ annual: [], quarterly: [] })),
-      instrumentsApi.getInvestorRelations(symbol).catch(() => []),
-    ])
-    profile.value = p
-    metrics.value = m
-    overview.value = o
-    quote.value = q
-    const raw = (eps ?? {}) as { annual?: Array<Record<string, never>>; quarterly?: Array<Record<string, never>> }
-    rawEps.value = { annual: raw.annual ?? [], quarterly: raw.quarterly ?? [] }
-    applyEpsMode("annual")
-    irEvents.value = Array.isArray(ir) ? (ir as unknown as IrEventsAapl) : []
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : "Failed to load research data"
-  } finally {
-    loading.value = false
+  // Degrade per section: symbols the provider tier doesn't cover (e.g. WSE)
+  // still render identity data (Key Facts from profile + ticker reference).
+  const [p, m, o, q, eps, ir] = await Promise.allSettled([
+    instrumentsApi.getInstrumentProfile(symbol),
+    instrumentsApi.getInstrumentMetrics(symbol),
+    instrumentsApi.getInstrumentOverviewMetrics(symbol),
+    instrumentsApi.getQuote(symbol),
+    instrumentsApi.getEpsSurprises(symbol),
+    instrumentsApi.getInvestorRelations(symbol),
+  ])
+  if (p.status === "fulfilled") profile.value = p.value
+  if (m.status === "fulfilled") metrics.value = m.value
+  if (o.status === "fulfilled") overview.value = o.value
+  if (q.status === "fulfilled") quote.value = q.value
+  const raw = (eps.status === "fulfilled" ? eps.value : {}) as { annual?: Array<Record<string, never>>; quarterly?: Array<Record<string, never>> }
+  rawEps.value = { annual: raw.annual ?? [], quarterly: raw.quarterly ?? [] }
+  applyEpsMode("annual")
+  irEvents.value = ir.status === "fulfilled" && Array.isArray(ir.value) ? (ir.value as unknown as IrEventsAapl) : []
+  if (p.status === "rejected") {
+    error.value = p.reason instanceof Error ? p.reason.message : "Failed to load research data"
+  } else {
+    // Provider tier has no market data for this market (e.g. WSE) — identity
+    // data from the ticker reference is still shown.
+    limitedCoverage.value = [m, q].some((r) => r.status === "rejected")
   }
+  loading.value = false
 })
 
 function applyEpsMode(mode: "annual" | "quarterly"): void {
@@ -199,6 +204,15 @@ const targetSpread = computed(() => {
 <template>
   <div class="space-y-6">
     <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
+    <div v-if="limitedCoverage && !error" class="mb-4 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+      <svg class="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+        <path fill-rule="evenodd" d="M18 10A8 8 0 1 1 2 10a8 8 0 0 1 16 0Zm-8-4a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 6Zm0 8a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z" clip-rule="evenodd" />
+      </svg>
+      <span>
+        <span class="font-medium">Limited data availability.</span>
+        Market data for this listing is not covered by our data providers yet — basic instrument facts below come from the ticker reference database.
+      </span>
+    </div>
     <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading research data...</p>
 
     <template v-if="!loading && !error">
@@ -209,7 +223,7 @@ const targetSpread = computed(() => {
             <h2 class="text-lg font-semibold">{{ symbol }}</h2>
             <span class="text-sm text-slate-500 dark:text-slate-400">{{ profile?.name }}</span>
           </div>
-          <p v-if="quote" class="text-sm">
+          <p v-if="quote?.currentPrice" class="text-sm">
             <span class="font-semibold">{{ formatCurrency(quote.currentPrice) }}</span>
             <span :class="quote.change >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'" class="ml-2">
               {{ quote.change >= 0 ? "+" : "" }}{{ formatCurrency(quote.change) }} ({{ formatPercent(quote.percentChange) }})
@@ -218,7 +232,7 @@ const targetSpread = computed(() => {
         </div>
       </div>
 
-      <div class="card p-6">
+      <div v-if="descriptionParagraphs.length" class="card p-6">
         <h2 class="mb-3 text-base font-semibold">About {{ profile?.name ?? symbol }}</h2>
         <p v-for="(p, i) in visibleParagraphs" :key="i" class="mb-3 text-sm leading-relaxed text-slate-700 dark:text-slate-200 last:mb-0">{{ p }}</p>
         <button
@@ -275,7 +289,18 @@ const targetSpread = computed(() => {
           <dt class="text-slate-500 dark:text-slate-400">Industry</dt>
           <dd>{{ profile?.gicsIndustry ?? "—" }}</dd>
           <dt class="text-slate-500 dark:text-slate-400">Country</dt>
-          <dd>{{ profile?.country ?? "—" }}</dd>
+          <dd class="flex items-center gap-1.5">
+            <img
+              v-if="profile?.countryCode"
+              :src="`https://flagcdn.com/w40/${profile.countryCode.toLowerCase()}.png`"
+              :alt="profile.country ?? ''"
+              class="h-3 w-[18px] rounded-[1px] object-cover"
+              loading="lazy"
+            />
+            <span>{{ profile?.country ?? "—" }}</span>
+          </dd>
+          <dt class="text-slate-500 dark:text-slate-400">ISIN</dt>
+          <dd class="tabular-nums">{{ profile?.isin ?? "—" }}</dd>
           <dt class="text-slate-500 dark:text-slate-400">Exchange</dt>
           <dd>{{ profile?.exchange ?? "—" }}</dd>
           <dt class="text-slate-500 dark:text-slate-400">Employees</dt>
@@ -325,7 +350,7 @@ const targetSpread = computed(() => {
         </div>
       </div>
 
-      <div class="card p-6">
+      <div v-if="metrics" class="card p-6">
         <h2 class="mb-4 text-base font-semibold">Key Statistics</h2>
         <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
           <StatGroup title="Profile" :items="profileStats" />
