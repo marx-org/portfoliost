@@ -13,6 +13,14 @@ export interface DepositInput {
   currency?: string
   description?: string
   transaction_date?: string
+  /** fees-and-custom-fx D28/D29 */
+  fees?: number
+  fees_type?: "fixed" | "pct"
+  feeCurrency?: string
+  rateSource?: "automatic" | "manual"
+  exchangeRate?: number
+  feeRateSource?: "automatic" | "manual"
+  feeExchangeRate?: number
 }
 
 export interface WithdrawInput extends DepositInput {
@@ -21,8 +29,9 @@ export interface WithdrawInput extends DepositInput {
 
 export interface TransferInput extends DepositInput {
   to_wallet_id: string
-  fees?: number
-  fees_type?: "fixed" | "pct"
+  /** elastic cross-currency transfer (wallets D22): explicit target leg */
+  targetAmount?: number
+  targetFxRate?: number
 }
 
 export interface PaginatedCashTransactions {

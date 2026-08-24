@@ -2,6 +2,8 @@
 import { computed, ref, watch } from "vue"
 import { useWalletsStore } from "@/stores/wallets"
 import { formatCurrency } from "@/utils/format"
+import CurrencySelect from "@/components/CurrencySelect.vue"
+import { useCurrenciesStore } from "@/stores/currencies"
 import type { Wallets } from "@/api/types"
 
 const props = defineProps<{
@@ -13,6 +15,7 @@ const props = defineProps<{
 const emit = defineEmits<{ (e: "close"): void; (e: "done", amount: number): void }>()
 
 const store = useWalletsStore()
+const currenciesStore = useCurrenciesStore()
 
 const amount = ref<number>(0)
 const description = ref("")
@@ -21,12 +24,26 @@ const paymentMethod = ref("bank_transfer")
 const toWalletId = ref("")
 const fees = ref<number>(0)
 const feesType = ref<"fixed" | "pct">("fixed")
+const feeCurrency = ref("USD")
+const rateSource = ref<"automatic" | "manual">("automatic")
+const exchangeRate = ref("")
+const showFxSection = ref(false)
+const manualTargetAmount = ref<number | null>(null)
 const busy = ref(false)
 const error = ref<string | null>(null)
 
 const availableBalance = computed(() => props.wallet.availableBalance ?? props.wallet.balance ?? 0)
 
 const targetWallets = computed(() => store.wallets.filter((w) => w.id !== props.wallet.id))
+
+const destCurrency = computed(() => {
+  const dest = store.wallets.find((w) => w.id === toWalletId.value)
+  return dest?.currency ?? null
+})
+
+const isCrossCurrencyTransfer = computed(
+  () => props.action === "transfer" && destCurrency.value != null && destCurrency.value !== props.wallet.currency,
+)
 
 const feeAmount = computed(() => {
   if (feesType.value === "pct") return (amount.value * (fees.value || 0)) / 100
@@ -51,6 +68,12 @@ watch(
       toWalletId.value = ""
       fees.value = 0
       feesType.value = "fixed"
+      feeCurrency.value = props.wallet.currency || "USD"
+      rateSource.value = "automatic"
+      exchangeRate.value = ""
+      showFxSection.value = false
+      manualTargetAmount.value = null
+      if (!currenciesStore.loaded) void currenciesStore.load()
       busy.value = false
       error.value = null
     }
@@ -67,12 +90,22 @@ async function submit() {
   error.value = null
   try {
     const date = transactionDate.value || undefined
+    // shared fee/fx fields (fees-and-custom-fx D28/D29); transfer adds the elastic target leg (D22)
+    const feeFx = {
+      fees: fees.value || undefined,
+      fees_type: feesType.value,
+      feeCurrency: feesType.value === "fixed" ? feeCurrency.value : undefined,
+      rateSource: rateSource.value,
+      exchangeRate:
+        rateSource.value === "manual" && exchangeRate.value ? Number(exchangeRate.value) : undefined,
+    }
     if (props.action === "deposit") {
       await store.deposit(props.wallet.id, {
         amount: amount.value,
         currency: props.wallet.currency,
         description: description.value || undefined,
         transaction_date: date,
+        ...feeFx,
       })
     } else if (props.action === "withdraw") {
       await store.withdraw(props.wallet.id, {
@@ -81,6 +114,7 @@ async function submit() {
         description: description.value || undefined,
         transaction_date: date,
         payment_method: paymentMethod.value,
+        ...feeFx,
       })
     } else {
       await store.transfer(props.wallet.id, {
@@ -89,8 +123,10 @@ async function submit() {
         description: description.value || undefined,
         transaction_date: date,
         to_wallet_id: toWalletId.value,
-        fees: fees.value || undefined,
-        fees_type: feesType.value,
+        ...(isCrossCurrencyTransfer.value && manualTargetAmount.value != null
+          ? { targetAmount: manualTargetAmount.value }
+          : {}),
+        ...feeFx,
       })
     }
     emit("done", amount.value)
@@ -184,21 +220,48 @@ const submitLabel = computed(() => (props.action === "deposit" ? "Deposit" : pro
           />
         </div>
 
-        <div v-if="action === 'transfer'" class="mb-4">
+        <div class="mb-4">
           <label for="wc-fees" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Fees (Optional)</label>
           <div class="flex gap-2">
             <div class="flex flex-1 items-center rounded-lg border border-slate-300 dark:border-slate-600 focus-within:border-blue-500">
-              <span class="pl-3 text-sm text-slate-500 dark:text-slate-400">{{ feesType === "fixed" ? wallet.currency : "%" }}</span>
+              <CurrencySelect
+                v-if="feesType === 'fixed'"
+                v-model="feeCurrency"
+                aria-label="Fee currency"
+                testid="wc-fee-currency"
+                class="!rounded-l-lg !border-0 !border-r"
+              />
+              <span v-else class="pl-3 text-sm text-slate-500 dark:text-slate-400">%</span>
               <input id="wc-fees" v-model.number="fees" type="number" min="0" step="0.01" class="input !rounded-l-none !border-0 !ring-0 focus:ring-0" />
             </div>
             <button
               type="button"
               class="btn-secondary shrink-0 text-sm"
               :class="feesType === 'pct' ? 'bg-slate-200 dark:bg-slate-700/70 text-slate-900 dark:text-slate-100' : ''"
+              data-testid="wc-fees-toggle"
               @click="feesType = feesType === 'fixed' ? 'pct' : 'fixed'"
             >
-              {{ feesType === "fixed" ? "$" : "%" }}
+              {{ feesType === "fixed" ? "Fixed" : "%" }}
             </button>
+          </div>
+
+          <div v-if="isCrossCurrencyTransfer" class="mt-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50">
+            <p class="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
+              Cross-currency transfer · {{ wallet.currency }} → {{ destCurrency }}
+            </p>
+            <label for="wc-target-amount" class="mb-1 block text-xs text-slate-500 dark:text-slate-400">
+              Target amount in {{ destCurrency }} — leave empty to convert automatically at the daily rate
+            </label>
+            <input
+              id="wc-target-amount"
+              v-model.number="manualTargetAmount"
+              type="number"
+              min="0"
+              step="any"
+              class="input"
+              :placeholder="'auto'"
+              data-testid="wc-target-amount"
+            />
           </div>
         </div>
 
@@ -206,8 +269,11 @@ const submitLabel = computed(() => (props.action === "deposit" ? "Deposit" : pro
           <p class="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">Transaction Confirmation</p>
           <p class="mt-0.5 font-semibold tabular-nums">{{ formatCurrency(amount || 0, wallet.currency) }}</p>
           <p v-if="action === 'withdraw'" class="mt-0.5 text-slate-500 dark:text-slate-400">Remaining Balance: {{ formatCurrency(remainingBalance, wallet.currency) }}</p>
-          <p v-if="action === 'transfer' && feeAmount > 0" class="mt-0.5 text-slate-500 dark:text-slate-400">
-            Fees: {{ formatCurrency(feeAmount, wallet.currency) }} ({{ feesType === "pct" ? `${fees}%` : `${wallet.currency} fixed` }})
+          <p v-if="feeAmount > 0 && action !== 'deposit'" class="mt-0.5 text-slate-500 dark:text-slate-400">
+            Fees: {{ formatCurrency(feeAmount, feeCurrency) }} ({{ feesType === "pct" ? `${fees}%` : `${feeCurrency} fixed` }})
+          </p>
+          <p v-if="isCrossCurrencyTransfer" class="mt-0.5 text-slate-500 dark:text-slate-400">
+            Target: {{ manualTargetAmount != null ? formatCurrency(manualTargetAmount, destCurrency || '') : `auto · daily ${wallet.currency}/${destCurrency} rate` }}
           </p>
         </div>
 

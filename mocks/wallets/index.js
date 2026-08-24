@@ -245,8 +245,7 @@ export function register(app) {
       toCcy: dest?.currency,
     })
     if (fx.error) return { error: "validation", message: fx.error }
-    const feesSettled = kind === "deposits" ? 0 : fx.feesSettled
-    const cashFee = feesSettled
+    const cashFee = fx.feesSettled
     const signed = kind === "deposits" ? value : -(value + cashFee)
 
     let creditedAmount = null
@@ -281,7 +280,7 @@ export function register(app) {
       transaction_date: transaction_date ?? null,
       payment_method: payment_method ?? null,
       fees: rawFees,
-      fees_settled: Math.round(feesSettled * 1e8) / 1e8,
+      fees_settled: Math.round(fx.feesSettled * 1e8) / 1e8,
       fees_type: fx.fields.feesType,
       feeCurrency: fx.fields.feeCurrency,
       rateSource: fx.fields.rateSource,
