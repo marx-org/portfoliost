@@ -1303,6 +1303,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/currencies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Available currencies (auto-updated from FX imports) */
+        get: operations["listCurrencies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/wallets": {
         parameters: {
             query?: never;
@@ -2606,7 +2623,7 @@ export interface components {
                 issues?: Record<string, never>[];
             };
         };
-        Transaction: {
+        Transaction: components["schemas"]["FeeFxFields"] & {
             /** Format: uuid */
             id: string;
             /** Format: uuid */
@@ -2627,7 +2644,6 @@ export interface components {
             priceCurrency: string;
             instrumentCurrency: string;
             assetType: string;
-            exchangeRate: number;
             isGift: boolean;
             synthesizedOpeningLot: boolean;
             /** Format: date-time */
@@ -2641,6 +2657,76 @@ export interface components {
             convertedRealizedGainLoss?: number | null;
             sector?: string;
             country?: string;
+        };
+        FeeFxFields: {
+            /** @description Transaction-currency -> display/base-currency rate. Null when rates equal. Manual values are user-provided truth; automatic are resolved by the system at write time. */
+            exchangeRate?: number | null;
+            /** @enum {string|null} */
+            rateSource?: "automatic" | "manual" | null;
+            /** @description ISO 4217; defaults to the transaction currency when omitted. */
+            feeCurrency?: string | null;
+            /** @enum {string|null} */
+            feeRateSource?: "automatic" | "manual" | null;
+            /** @description Fee-currency -> transaction/wallet-currency rate for settlement. */
+            feeExchangeRate?: number | null;
+        };
+        CreateTransactionRequest: components["schemas"]["FeeFxFields"] & {
+            type?: string;
+            symbol?: string;
+            quantity?: number;
+            price?: number;
+            priceCurrency?: string;
+            currency?: string;
+            fees?: number;
+            /** @enum {string} */
+            feesType?: "fixed" | "pct";
+            /** Format: date-time */
+            executedAt?: string;
+            /** Format: uuid */
+            walletId?: string;
+        };
+        DepositRequest: components["schemas"]["FeeFxFields"] & {
+            amount?: number;
+            currency?: string;
+            description?: string;
+            transaction_date?: string;
+            fees?: number;
+            /** @enum {string} */
+            fees_type?: "fixed" | "pct";
+        };
+        WithdrawRequest: components["schemas"]["FeeFxFields"] & {
+            amount?: number;
+            currency?: string;
+            description?: string;
+            transaction_date?: string;
+            payment_method?: string;
+            fees?: number;
+            /** @enum {string} */
+            fees_type?: "fixed" | "pct";
+        };
+        TransferRequest: components["schemas"]["FeeFxFields"] & {
+            amount?: number;
+            currency?: string;
+            description?: string;
+            transfer_date?: string;
+            /** Format: uuid */
+            to_wallet_id?: string;
+            fees?: number;
+            /** @enum {string} */
+            fees_type?: "fixed" | "pct";
+            targetAmount?: number | null;
+            targetFxRate?: number | null;
+        };
+        CurrencyInfo: {
+            /** @description ISO 4217 code */
+            code: string;
+            name: string;
+            symbol?: string;
+            minorUnits: number;
+            popular: boolean;
+        };
+        CurrenciesResponse: {
+            currencies: components["schemas"]["CurrencyInfo"][];
         };
         CashWallet: {
             /** Format: uuid */
@@ -2694,7 +2780,7 @@ export interface components {
                 percentChange?: number | null;
             };
         };
-        CashTransaction: {
+        CashTransaction: components["schemas"]["FeeFxFields"] & {
             /** Format: uuid */
             id: string;
             /** Format: uuid */
@@ -2737,6 +2823,12 @@ export interface components {
             fees?: number | null;
             taxes?: number | null;
             isInternalTransfer: boolean;
+            feeCurrency?: string | null;
+            /** @enum {string|null} */
+            rateSource?: "automatic" | "manual" | null;
+            /** @enum {string|null} */
+            feeRateSource?: "automatic" | "manual" | null;
+            feeExchangeRate?: number | null;
         };
         RecentCashTransactionsPage: {
             data?: components["schemas"]["RecentCashTransaction"][];
@@ -4437,15 +4529,9 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
+        requestBody: {
             content: {
-                "application/json": {
-                    type?: string;
-                    symbol?: string;
-                    quantity?: number;
-                    price?: number;
-                    currency?: string;
-                };
+                "application/json": components["schemas"]["CreateTransactionRequest"];
             };
         };
         responses: {
@@ -4640,6 +4726,26 @@ export interface operations {
             };
         };
     };
+    listCurrencies: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Supported currencies */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurrenciesResponse"];
+                };
+            };
+        };
+    };
     listWallets: {
         parameters: {
             query?: never;
@@ -4741,7 +4847,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DepositRequest"];
+            };
+        };
         responses: {
             /** @description Deposited */
             201: {
@@ -4763,7 +4873,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithdrawRequest"];
+            };
+        };
         responses: {
             /** @description Withdrawn */
             201: {
@@ -4785,7 +4899,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferRequest"];
+            };
+        };
         responses: {
             /** @description Transferred */
             201: {
