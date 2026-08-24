@@ -1,6 +1,6 @@
 # Proposal: wallets & transactions module (`portfoliost-wallets`)
 
-**Status**: draft (2026-08-24)
+**Status**: accepted (2026-08-24)
 **Builds on**: [backend-topology.md](backend-topology.md) (D1–D11), [instruments-provider-module.md](instruments-provider-module.md) (D12–D15), [MODULARISATION.md](../MODULARISATION.md)
 **Scope**: third extracted backend module. Owns the cash-wallet domain: wallets, cash transactions (deposits/withdrawals/transfers), the unified recent-transactions feed, balance history, and multicurrency support (FX rate storage + conversion). Investment portfolios come later and will consume this module's internal cash-movement API.
 
@@ -45,7 +45,8 @@ CREATE TABLE wallets.wallets (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id       text NOT NULL,                    -- from JWT sub
   name          text NOT NULL,
-  currency      char(3) NOT NULL,                 -- ISO 4217, wallet base currency
+  currency      char(3) NOT NULL,                 -- ISO 4217: settlement currency (cash held)
+  base_currency char(3) NOT NULL DEFAULT 'USD',   -- display/valuation ccy (D21b); default from user prefs at creation
   balance       numeric(20,8) NOT NULL DEFAULT 0, -- denormalized, ledger-maintained
   available_balance numeric(20,8) NOT NULL DEFAULT 0, -- = balance - reserved (reserved stays 0 until portfolio integration)
   reserved      numeric(20,8) NOT NULL DEFAULT 0,
@@ -76,6 +77,11 @@ CREATE TABLE wallets.wallet_transactions (
   reference        text,                          -- e.g. PORTFOLIO_BUY_AAPL.US_<uuid>
   portfolio_id     uuid,                          -- set on INVEST/SELL/DIVIDEND rows
   exchange_rate    numeric(20,10),                -- D21 snapshot: wallet ccy -> user base ccy at execution
+  rate_source      text NOT NULL DEFAULT 'auto' CHECK (rate_source IN ('auto','manual')),
+                   -- 'auto': derived from fx_rates at write; 'manual': user-provided (delivered in a
+                   -- follow-up proposal — column ships now so the shape is final)
+  transfer_fx_rate numeric(20,10),                -- D22: from-ccy -> to-ccy rate applied on cross-currency
+                                                   -- transfers; stored on BOTH legs of the pair
   created_at       timestamptz NOT NULL DEFAULT now(),
   updated_at       timestamptz NOT NULL DEFAULT now()
 );
@@ -111,7 +117,7 @@ Notes:
 | --- | --- | --- |
 | `GET /wallets` | list wallets for JWT user | includes `balance`, `availableBalance`, `isDefault` |
 | `GET /wallets/total-balance` | convert all wallets → user base ccy at latest fx rate | `{totalBalance, totalAvailableBalance, baseCurrency, walletBreakdown[{original*, converted*, exchangeRate}]}` |
-| `POST /wallets` | create (name, currency) | 201, zeroed balances |
+| `POST /wallets` | create (name, currency; `baseCurrency` optional, defaults from user prefs per D21b) | 201, zeroed balances |
 | `PATCH /wallets/:id` | rename/settings | returns updated wallet |
 | `DELETE /wallets/:id` | delete + cascade txns | blocked if referenced by a portfolio link (see D23 open question) |
 | `POST /wallets/:id/deposits` | insert DEPOSIT row + bump balance | responds `new_balance` |
@@ -184,57 +190,77 @@ seed source, not as the live chain).
 Internal exposure: `GET /internal/fx-rates?date=&from=&to=` serves other modules
 (portfolios will need it later) without them touching the `wallets` schema.
 
-### D21 — conversion semantics: snapshot on write, value at latest
+### D21 — conversion semantics: snapshot on write (auto or manual)
 
 Two distinct needs:
 
 1. **Historical reporting** (transaction lists in base currency, performance over
    time) → uses the **rate of the transaction's date**, snapshotted into
    `exchange_rate` when the row is written. Rationale: providers retroactively
-   revise series; snapshots keep the user's recorded history immutable. Null rate
-   (same currency as base) renders without conversion.
+   revise series; snapshots keep the user's recorded history immutable.
 2. **Current valuation** (balances, total-balance, chart "today") → always the
    **latest available rate**, computed at request time from `fx_rates`.
 
+Every snapshot records its origin in `rate_source`:
+
+- `'auto'` — derived from the stored `fx_rates` table at write time;
+- `'manual'` — user-provided rate, stored verbatim. The API accepts it already
+  (`exchangeRate` + `rateSource` on create/edit), full UX for manually delivered
+  rates lands in a follow-up proposal.
+
+Null `exchange_rate` (wallet ccy = base ccy) renders without conversion.
+
+#### D21b — per-wallet/per-portfolio display currency, user preference as default
+
+There is no single global reporting currency:
+
+- each wallet (and later portfolio) carries its own `base_currency` (display/
+  valuation currency), settable at creation and changeable on screens that offer a
+  currency choice (wallet detail, main investments page);
+- the **user's preferred default** lives in `users_auth.user_preferences`
+  (`ui_preferences.baseCurrency`) and is applied as the pre-selected value:
+  - when creating a new wallet/portfolio,
+  - as the fallback for aggregate screens (`total-balance`) when nothing more
+    specific is chosen.
+- Wallets resolves the preference once per request via users-auth internal route
+  (`GET /internal/preferences/:userId`); if absent → `USD`.
+
 `balance-history`: deterministic reconstruction — opening balance + cumulative
-signed sums per day from the ledger; when `baseCurrency ≠ wallet.currency`, each
-day is converted at that day's carried-forward rate. Series start at wallet
-creation (or `ALL` ⇒ earliest transaction).
+signed sums per day from the ledger; converted per-day at carried-forward rates
+when the wallet's `base_currency ≠ currency`. Series start at wallet creation
+(or `ALL` ⇒ earliest transaction).
 
-Base currency resolution order: explicit `?baseCurrency=` → user preference
-(`users_auth.user_preferences.ui_preferences.baseCurrency`, read via users-auth
-internal endpoint or duplicated into wallets at write time — open question Q3)
-→ wallet currency if single wallet → `USD`.
+### D22 — cross-currency transfers: elastic storage
 
-### D22 — cross-currency transfers
+Same-currency transfers behave exactly like today (mirror legs). Cross-currency
+transfers store **both amounts explicitly** instead of deriving one from a rate
+rule — elastic by design, works for automatic and (later) manually negotiated rates:
 
-Same-currency transfers behave exactly like today (mirror legs). When
-`from.currency ≠ to.currency`:
+- debit source by `amount` (source currency);
+- credit destination by `target_amount` (target currency);
+- `transfer_fx_rate` (source→target) stored on **both** legs of the pair
+  (`linked_tx_id` links them);
+- v1 auto-fills `target_amount = amount × rate(source→target, transfer_date)`
+  from `fx_rates`; because both values are persisted, a future UI can accept a
+  manually entered target amount/rate without schema changes;
+- fees: existing `fees`/`fees_type` columns charged in source currency; fee
+  currency + fee FX-rate treatment is deferred to the next proposal;
+- response echoes source amount, target amount, and the applied rate.
 
-- debit source by `amount` (its own currency);
-- credit destination by `amount × rate(from→to, transfer_date)`;
-- both legs linked via `linked_tx_id`; the incoming leg stores the applied
-  `exchange_rate` and its own currency;
-- fees always charged in the source currency;
-- response echoes both amounts + rate so the UI can show "1000 USD → 3 9xx PLN".
+### D23 — resolved questions
 
-Alternative considered: let the user type the target amount manually (some brokers
-do). Rejected for v1 (more UI churn); can be layered later as `to_amount` optional
-field — the ledger shape above supports it unchanged.
-
-### D23 — open questions
-
-1. **Q1 — rate sourcing** (see D20): agree with ECB/frankfurter-primary +
-   openst/cachest-fallback split?
-2. **Q2 — default base/display currency**: USD (example-service parity) or user-settable
-   with PLN-friendly default?
-3. **Q3 — where does the user's base currency preference live**: users_auth
-   preferences (read via internal call per request) vs copied/denormalized into
-   wallets at profile-update time?
-4. **Q4 — delete-guard for wallets referenced by portfolios**: wallets calls a
-   portfolios internal endpoint at delete time (runtime coupling), or portfolios
-   listens for deletion events? Decided properly when portfolios lands; v1 ships
-   the naive delete.
-5. **Q5 — INVEST rows editable?** Mock allows editing them; real systems usually
+1. **Q1 — rate sourcing**: settled → ECB/frankfurter primary + openst/cachest
+   fallback (D20).
+2. **Q2 — base currency**: settled → per-wallet/per-portfolio `base_currency`,
+   defaulted from user preferences at creation and on aggregate screens (D21b).
+3. **Q3 — rate snapshots**: settled → store on the transaction row; `rate_source`
+   distinguishes auto (from `fx_rates`) vs manual delivery (full UX in follow-up
+   proposal) (D21).
+4. **Q4 — transfers**: settled → elastic storage of source amount, target amount
+   and `transfer_fx_rate` on both legs; fee currency/rate deferred to next
+   proposal (D22).
+5. **Open for portfolios phase** — delete-guard for wallets referenced by a
+   portfolio: runtime internal check vs event-driven; decide when portfolios lands.
+6. **Open** — INVEST rows editable? Mock allows editing them; real systems usually
    forbid editing trade-derived cash rows. Proposal: allow edit/delete only for
    `DEPOSIT/WITHDRAWAL/TRANSFER/ADJUSTMENT`; reject others with 422.
