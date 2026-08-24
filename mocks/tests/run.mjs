@@ -406,6 +406,149 @@ async function main() {
   const logo = await fetch(`http://localhost:${PORT}/api/logos/AAPL`)
   check("logos placeholder svg", logo.status === 200 && logo.headers.get("content-type").includes("svg"), `got ${logo.status}`)
 
+  // ── Fees & FX (fees-and-custom-fx §10.2 round-trips) ───────
+  {
+    const cur = await request("/currencies", { token })
+    const okShape =
+      cur.status === 200 &&
+      Array.isArray(cur.json?.currencies) &&
+      cur.json.currencies.length >= 10 &&
+      cur.json.currencies.every((c) => c.code && typeof c.minorUnits === "number")
+    check("feesfx.currencies registry", okShape, `got ${cur.status}`)
+
+    const usdWalletsBefore = await request("/wallets", { token })
+    const createW = await request("/wallets", {
+      method: "POST",
+      token,
+      body: { name: "FX test wallet", currency: "EUR" },
+    })
+    check("feesfx.create EUR wallet", createW.status === 201 && createW.json.currency === "EUR", `got ${createW.status}`)
+    const eurId = createW.json.id
+
+    // deposit without fees echoes resolved defaults (feeCurrency = tx ccy)
+    const dep = await request(`/wallets/${eurId}/deposits`, {
+      method: "POST",
+      token,
+      body: { amount: 1000, description: "fx seed" },
+    })
+    check(
+      "feesfx.deposit defaults feeCurrency + auto rate",
+      dep.status === 201 &&
+        dep.json.feeCurrency === "EUR" &&
+        dep.json.rateSource === "automatic" &&
+        Math.abs(dep.json.exchangeRate - 1.08) < 1e-9,
+      JSON.stringify(dep.json || {}).slice(0, 160),
+    )
+
+    // withdrawal with pct fee materialized on the fly (2% of 100)
+    const wd = await request(`/wallets/${eurId}/withdrawals`, {
+      method: "POST",
+      token,
+      body: { amount: 100, fees: 2, fees_type: "pct", description: "pct fee" },
+    })
+    check(
+      "feesfx.withdrawal pct fee settled",
+      wd.status === 201 && Number(wd.json.fees_settled) === 2 && wd.json.new_balance === 898,
+      JSON.stringify(wd.json || {}).slice(0, 200),
+    )
+
+    // foreign-currency fee settles via demo rates (10 USD fee into EUR wallet)
+    const wdf = await request(`/wallets/${eurId}/withdrawals`, {
+      method: "POST",
+      token,
+      body: { amount: 10, fees: 10, fees_type: "fixed", feeCurrency: "USD", description: "usd fee" },
+    })
+    // 10 USD = 10/1.08 EUR ≈ 9.2593; balance math uses the settled amount
+    check(
+      "feesfx.foreign fee converted",
+      wdf.status === 201 && Math.abs(Number(wdf.json.fees_settled) - 10 / 1.08) < 1e-6,
+      JSON.stringify({ settled: wdf.json?.fees_settled }).slice(0, 120),
+    )
+
+    // manual exchange rate is echoed verbatim
+    const manual = await request(`/wallets/${eurId}/deposits`, {
+      method: "POST",
+      token,
+      body: { amount: 1, rateSource: "manual", exchangeRate: 4.5 },
+    })
+    check(
+      "feesfx.manual main rate echoed",
+      manual.status === 201 && manual.json.rateSource === "manual" && manual.json.exchangeRate === 4.5,
+      JSON.stringify(manual.json || {}).slice(0, 160),
+    )
+
+    // invalid manual rates → 422
+    const bad = await request(`/wallets/${eurId}/deposits`, {
+      method: "POST",
+      token,
+      body: { amount: 1, rateSource: "manual", exchangeRate: -3 },
+    })
+    check("feesfx.negative manual rate → 422", bad.status === 422, `got ${bad.status}`)
+    const badFee = await request(`/wallets/${eurId}/withdrawals`, {
+      method: "POST",
+      token,
+      body: { amount: 1, fees: 1, feeRateSource: "manual", feeExchangeRate: 0 },
+    })
+    check("feesfx.zero manual fee rate → 422", badFee.status === 422, `got ${badFee.status}`)
+
+    // cross-currency transfer credits target at demo cross rate
+    const usdCreate = await request("/wallets", {
+      method: "POST",
+      token,
+      body: { name: "FX target USD", currency: "USD" },
+    })
+    const usdId = usdCreate.json.id
+    const xfer = await request(`/wallets/${eurId}/transfers`, {
+      method: "POST",
+      token,
+      body: { amount: 43, to_wallet_id: usdId, description: "cross" },
+    })
+    // 43 EUR -> USD at 1.08 = 46.44
+    check(
+      "feesfx.cross transfer credited at rate",
+      xfer.status === 201 && Math.abs(Number(xfer.json.target_amount) - 46.44) < 1e-6,
+      JSON.stringify({ target: xfer.json?.target_amount, fxr: xfer.json?.transfer_fx_rate }).slice(0, 140),
+    )
+    const usdTxs = await request(`/wallets/${usdId}/transactions`, { token })
+    check(
+      "feesfx.transfer dest leg recorded",
+      usdTxs.status === 200 && usdTxs.json.items.some((t) => t.amount === 46.44 || t.amount === 46.440000000000005),
+      `items ${(usdTxs.json?.items || []).length}`,
+    )
+
+    // cleanup created wallets so other tests see seed state
+    for (const id of [eurId, usdId]) await request(`/wallets/${id}`, { method: "DELETE", token })
+
+    // portfolio transaction with manual rate drives converted outputs
+    const portfolios = await request("/portfolios", { token })
+    const pid2 = portfolios.json[0].id
+    const ptx = await request(`/portfolios/${pid2}/transactions`, {
+      method: "POST",
+      token,
+      body: {
+        type: "BUY",
+        symbol: "PKN.WA",
+        quantity: 1,
+        price: 40,
+        currency: "PLN",
+        fees: 2,
+        feeCurrency: "EUR",
+        rateSource: "manual",
+        exchangeRate: 0.25,
+      },
+    })
+    check(
+      "feesfx.portfolio tx manual rate converts totals",
+      ptx.status === 201 &&
+        ptx.json.rateSource === "manual" &&
+        ptx.json.exchangeRate === 0.25 &&
+        Math.abs(ptx.json.convertedTotalAmount - 10) < 1e-9 &&
+        ptx.json.convertedFees > 0,
+      JSON.stringify(ptx.json || {}).slice(0, 220),
+    )
+    await request(`/portfolios/${pid2}/transactions/${ptx.json.id}`, { method: "DELETE", token })
+  }
+
   // ── 404 + errors ────────────────────────────────────────────
   const nope = await request("/does/not/exist", { token })
   check("unknown route → 404", nope.status === 404, `got ${nope.status}`)

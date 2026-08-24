@@ -1,6 +1,7 @@
 import { requireAuth } from "../lib/auth.js"
 import { loadRaw } from "../lib/data.js"
 import { paginatePage, uuid, nowIso } from "../lib/http.js"
+import { currenciesPayload, resolveFeeFx } from "../lib/demo-fx.js"
 
 const wallets = new Map()
 const cashTx = new Map()
@@ -74,7 +75,12 @@ function toRecentCash(tx) {
     portfolioId: tx.portfolioId ?? null,
     fees: tx.fees ?? null,
     taxes: tx.taxes ?? null,
-    feesType: tx.fees_type ?? null,
+    feesType: tx.fees_type ?? tx.feesType ?? null,
+    feeCurrency: tx.feeCurrency ?? null,
+    rateSource: tx.rateSource ?? "automatic",
+    exchangeRate: tx.exchangeRate ?? null,
+    feeRateSource: tx.feeRateSource ?? "automatic",
+    feeExchangeRate: tx.feeExchangeRate ?? null,
     paymentMethod: tx.payment_method ?? null,
     toWalletId: tx.to_wallet_id ?? null,
     isInternalTransfer: Boolean(tx.isInternalTransfer),
@@ -154,6 +160,10 @@ function allWallets() {
 }
 
 export function register(app) {
+  app.get("/api/currencies", (ctx) => {
+    ctx.res.json(currenciesPayload())
+  })
+
   app.get("/api/wallets", (ctx) => {
     if (!requireAuth(ctx)) return
     ctx.res.json(allWallets())
@@ -218,29 +228,68 @@ export function register(app) {
 
   function mutate(id, kind) {
     const wallet = resolveWallet(id)
-    if (!wallet) return null
+    if (!wallet) return { error: "notfound" }
     const body = ctx_body_store.lastBody || {}
-    const { amount, description, transaction_date, payment_method, fees, fees_type, to_wallet_id } = body
+    const { amount, description, transaction_date, payment_method, to_wallet_id } = body
     const value = Number(amount) || 0
-    const feeValue = kind === "transfers" ? Number(fees) || 0 : 0
-    const signed = kind === "deposits" ? value : -(value + feeValue)
+
+    const dest = kind === "transfers" && to_wallet_id ? resolveWallet(to_wallet_id) : null
+    if (kind === "transfers" && to_wallet_id && !dest) return { error: "dest_notfound" }
+
+    // Fee/FX resolution (fees-and-custom-fx D28/D32): pct materialized on the
+    // fly, foreign fee currency settled into the wallet currency, manual rates
+    // validated (422).
+    const fx = resolveFeeFx(body, wallet.currency, {
+      notional: value,
+      displayRate: undefined,
+      toCcy: dest?.currency,
+    })
+    if (fx.error) return { error: "validation", message: fx.error }
+    const feesSettled = kind === "deposits" ? 0 : fx.feesSettled
+    const cashFee = feesSettled
+    const signed = kind === "deposits" ? value : -(value + cashFee)
+
+    let creditedAmount = null
+    let destUpdated = null
+    if (kind === "transfers" && dest && dest.id !== id) {
+      const manualTarget = body.targetAmount != null ? Number(body.targetAmount) : null
+      creditedAmount =
+        manualTarget ??
+        (fx.fields.transferFxRate != null ? Math.round(value * fx.fields.transferFxRate * 1e8) / 1e8 : value)
+      destUpdated = {
+        ...dest,
+        balance: round2(dest.balance + creditedAmount),
+        availableBalance: round2(dest.availableBalance + creditedAmount),
+      }
+      walletOverrides.set(to_wallet_id, destUpdated)
+    }
+
     const updated = {
       ...wallet,
       balance: round2(wallet.balance + signed),
       availableBalance: round2(wallet.availableBalance + signed),
     }
     walletOverrides.set(id, updated)
+    const rawFees = Number(body.fees) || 0
     const tx = {
       id: uuid(),
       walletId: id,
       type: kind === "deposits" ? "DEPOSIT" : kind === "withdrawals" ? "WITHDRAWAL" : "TRANSFER",
       amount: value,
-      currency: body.currency || wallet.currency,
+      currency: wallet.currency,
       status: "completed",
       transaction_date: transaction_date ?? null,
       payment_method: payment_method ?? null,
-      fees: feeValue,
-      fees_type: fees_type ?? "fixed",
+      fees: rawFees,
+      fees_settled: Math.round(feesSettled * 1e8) / 1e8,
+      fees_type: fx.fields.feesType,
+      feeCurrency: fx.fields.feeCurrency,
+      rateSource: fx.fields.rateSource,
+      exchangeRate: fx.fields.exchangeRate,
+      feeRateSource: fx.fields.feeRateSource,
+      feeExchangeRate: fx.fields.feeExchangeRate,
+      target_amount: creditedAmount,
+      transfer_fx_rate: fx.fields.transferFxRate,
       to_wallet_id: to_wallet_id ?? null,
       createdAt: nowIso(),
       description: description ?? null,
@@ -250,29 +299,20 @@ export function register(app) {
     const list = cashTx.get(id) || []
     list.unshift(tx)
     cashTx.set(id, list)
-    if (kind === "transfers" && to_wallet_id) {
-      const dest = resolveWallet(to_wallet_id)
-      if (dest && dest.id !== id) {
-        const destUpdated = {
-          ...dest,
-          balance: round2(dest.balance + value),
-          availableBalance: round2(dest.availableBalance + value),
-        }
-        walletOverrides.set(to_wallet_id, destUpdated)
-        const destTx = {
-          ...tx,
-          id: uuid(),
-          walletId: to_wallet_id,
-          type: "TRANSFER",
-          to_wallet_id: id,
-          amount: value,
-          remaining_balance: destUpdated.availableBalance,
-          description: description ?? `Transfer from ${wallet.name}`,
-        }
-        const destList = cashTx.get(to_wallet_id) || []
-        destList.unshift(destTx)
-        cashTx.set(to_wallet_id, destList)
+    if (kind === "transfers" && dest && dest.id !== id) {
+      const destTx = {
+        ...tx,
+        id: uuid(),
+        walletId: to_wallet_id,
+        type: "TRANSFER",
+        to_wallet_id: id,
+        amount: creditedAmount,
+        remaining_balance: destUpdated.availableBalance,
+        description: description ?? `Transfer from ${wallet.name}`,
       }
+      const destList = cashTx.get(to_wallet_id) || []
+      destList.unshift(destTx)
+      cashTx.set(to_wallet_id, destList)
     }
     return tx
   }
@@ -281,23 +321,27 @@ export function register(app) {
   app.post("/api/wallets/:id/deposits", (ctx) => {
     if (!requireAuth(ctx)) return
     ctx_body_store.lastBody = ctx.body || {}
-    const tx = mutate(ctx.params.id, "deposits")
-    if (!tx) return ctx.res.status(404).json({ error: "NotFound", message: "Wallet not found" })
-    ctx.res.status(201).json(tx)
+    const res = mutate(ctx.params.id, "deposits")
+    if (!res || res.error === "notfound") return ctx.res.status(404).json({ error: "NotFound", message: "Wallet not found" })
+    if (res.error === "validation") return ctx.res.status(422).json({ error: "ValidationError", message: res.message })
+    ctx.res.status(201).json(res)
   })
   app.post("/api/wallets/:id/withdrawals", (ctx) => {
     if (!requireAuth(ctx)) return
     ctx_body_store.lastBody = ctx.body || {}
-    const tx = mutate(ctx.params.id, "withdrawals")
-    if (!tx) return ctx.res.status(404).json({ error: "NotFound", message: "Wallet not found" })
-    ctx.res.status(201).json(tx)
+    const res = mutate(ctx.params.id, "withdrawals")
+    if (!res || res.error === "notfound") return ctx.res.status(404).json({ error: "NotFound", message: "Wallet not found" })
+    if (res.error === "validation") return ctx.res.status(422).json({ error: "ValidationError", message: res.message })
+    ctx.res.status(201).json(res)
   })
   app.post("/api/wallets/:id/transfers", (ctx) => {
     if (!requireAuth(ctx)) return
     ctx_body_store.lastBody = ctx.body || {}
-    const tx = mutate(ctx.params.id, "transfers")
-    if (!tx) return ctx.res.status(404).json({ error: "NotFound", message: "Wallet not found" })
-    ctx.res.status(201).json(tx)
+    const res = mutate(ctx.params.id, "transfers")
+    if (!res || res.error === "notfound") return ctx.res.status(404).json({ error: "NotFound", message: "Wallet not found" })
+    if (res.error === "validation") return ctx.res.status(422).json({ error: "ValidationError", message: res.message })
+    if (res.error === "dest_notfound") return ctx.res.status(404).json({ error: "NotFound", message: "Destination wallet not found" })
+    ctx.res.status(201).json(res)
   })
 
   app.get("/api/wallets/:id/balance-history", (ctx) => {

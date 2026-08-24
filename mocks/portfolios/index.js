@@ -1,4 +1,5 @@
 import { requireAuth } from "../lib/auth.js"
+import { resolveFeeFx } from "../lib/demo-fx.js"
 import { loadRaw, loadResearch, normalize } from "../lib/data.js"
 import { paginatePage, uuid, nowIso } from "../lib/http.js"
 
@@ -427,6 +428,18 @@ export function register(app) {
     initTxs()
     const body = ctx.body || {}
     const research = loadResearch(body.symbol || "AAPL")
+    const currency = body.currency || "USD"
+    const quantity = body.quantity ?? 1
+    const price = body.price ?? 100
+    // Fee/FX resolution (fees-and-custom-fx D28/D32); manual rates validated.
+    const fx = resolveFeeFx(body, currency, {
+      notional: quantity * price,
+      displayRate: undefined,
+    })
+    if (fx.error) {
+      return ctx.res.status(422).json({ error: "ValidationError", message: fx.error })
+    }
+    const { rateSource, exchangeRate } = fx.fields
     const tx = {
       id: uuid(),
       portfolioId: ctx.params.id,
@@ -438,22 +451,33 @@ export function register(app) {
       instrumentName: body.instrumentName ?? null,
       sector: body.sector ?? (research ? research.overview.sector : "Other"),
       country: body.country ?? (research ? research.overview.country : "Other"),
-      quantity: body.quantity ?? 1,
-      price: body.price ?? 100,
-      fees: body.fees ?? 0,
-      totalAmount: round2((body.quantity ?? 1) * (body.price ?? 100)),
-      currency: body.currency || "USD",
-      instrumentCurrency: body.instrumentCurrency || body.currency || "USD",
+      quantity,
+      price,
+      fees: Number(body.fees) || 0,
+      feesType: fx.fields.feesType,
+      feeCurrency: fx.fields.feeCurrency,
+      feesSettled: Math.round(fx.feesSettled * 1e8) / 1e8,
+      totalAmount: round2(quantity * price),
+      currency,
+      instrumentCurrency: body.instrumentCurrency || currency,
       assetType: body.assetType || "STOCK",
-      exchangeRate: body.exchangeRate ?? 1,
+      exchangeRate,
+      rateSource,
       isGift: false,
       synthesizedOpeningLot: false,
       executedAt: body.executedAt || nowIso(),
       createdAt: nowIso(),
-      displayCurrency: body.currency || "USD",
-      convertedTotalAmount: round2((body.quantity ?? 1) * (body.price ?? 100)),
-      convertedPrice: body.price ?? 100,
-      convertedFees: body.fees ?? 0,
+      displayCurrency: "USD",
+      convertedTotalAmount: round2(quantity * price * exchangeRate),
+      convertedPrice: round2(price * exchangeRate),
+      convertedFees:
+        body.fees == null
+          ? 0
+          : round2(
+              (fx.fields.feesType === "pct" ? (quantity * price * (Number(body.fees) || 0)) / 100 : Number(body.fees)) *
+                (fx.fields.feeCurrency === currency ? 1 : fx.fields.feeExchangeRate ?? 1) *
+                exchangeRate,
+            ),
       convertedRealizedGainLoss: null,
     }
     allTxs.set(tx.id, tx)
@@ -468,9 +492,15 @@ export function register(app) {
       return ctx.res.status(404).json({ error: "NotFound", message: "Transaction not found" })
     }
     const body = ctx.body || {}
+    const mergedBody = { ...existing, ...body }
     const quantity = body.quantity ?? existing.quantity ?? 1
     const price = body.price ?? existing.price ?? 0
     const fees = body.fees ?? existing.fees ?? 0
+    const currency = existing.currency || "USD"
+    const fx = resolveFeeFx(mergedBody, currency, { notional: quantity * price })
+    if (fx.error) {
+      return ctx.res.status(422).json({ error: "ValidationError", message: fx.error })
+    }
     const updated = {
       ...existing,
       ...body,
@@ -479,10 +509,16 @@ export function register(app) {
       quantity,
       price,
       fees,
+      feeCurrency: fx.fields.feeCurrency,
+      feesSettled: Math.round(fx.feesSettled * 1e8) / 1e8,
+      rateSource: fx.fields.rateSource,
+      exchangeRate: fx.fields.exchangeRate,
+      feeRateSource: fx.fields.feeRateSource,
+      feeExchangeRate: fx.fields.feeExchangeRate,
       totalAmount: round2(quantity * price),
-      convertedTotalAmount: round2(quantity * price),
-      convertedPrice: price,
-      convertedFees: fees,
+      convertedTotalAmount: round2(quantity * price * fx.fields.exchangeRate),
+      convertedPrice: round2(price * fx.fields.exchangeRate),
+      convertedFees: round2((Number(fees) || 0) * fx.fields.exchangeRate),
       updatedAt: nowIso(),
     }
     allTxs.set(ctx.params.txId, updated)
