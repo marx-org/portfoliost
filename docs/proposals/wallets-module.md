@@ -78,9 +78,14 @@ CREATE TABLE wallets.wallet_transactions (
   reference        text,                          -- e.g. PORTFOLIO_BUY_AAPL.US_<uuid>
   portfolio_id     uuid,                          -- set on INVEST/SELL/DIVIDEND rows
   exchange_rate    numeric(20,10),                -- D21 snapshot: wallet ccy -> user base ccy at execution
-  rate_source      text NOT NULL DEFAULT 'auto' CHECK (rate_source IN ('auto','manual')),
-                   -- 'auto': derived from fx_rates at write; 'manual': user-provided (delivered in a
-                   -- follow-up proposal — column ships now so the shape is final)
+  rate_source      text NOT NULL DEFAULT 'automatic'
+                     CHECK (rate_source IN ('automatic','manual')),
+                   -- 'automatic': derived from fx_rates at write; 'manual': user-provided
+                   -- (wire format finalized by fees-and-custom-fx.md D26)
+  fee_currency     char(3),                       -- D25 (fees-and-custom-fx): default = transaction ccy
+  fee_rate_source  text NOT NULL DEFAULT 'automatic'
+                     CHECK (fee_rate_source IN ('automatic','manual')),
+  fee_exchange_rate numeric(20,10),               -- settles foreign-currency fees into wallet ccy
   transfer_fx_rate numeric(20,10),                -- D22: from-ccy -> to-ccy rate applied on cross-currency
                                                    -- transfers; stored on BOTH legs of the pair
   created_at       timestamptz NOT NULL DEFAULT now(),
@@ -208,7 +213,7 @@ Two distinct needs:
 
 Every snapshot records its origin in `rate_source`:
 
-- `'auto'` — derived from the stored `fx_rates` table at write time;
+- `'automatic'` — derived from the stored `fx_rates` table at write time;
 - `'manual'` — user-provided rate, stored verbatim. The API accepts it already
   (`exchangeRate` + `rateSource` on create/edit), full UX for manually delivered
   rates lands in a follow-up proposal.
@@ -248,9 +253,9 @@ rule — elastic by design, works for automatic and (later) manually negotiated 
 - v1 auto-fills `target_amount = amount × rate(source→target, transfer_date)`
   from `fx_rates`; because both values are persisted, a future UI can accept a
   manually entered target amount/rate without schema changes;
-- fees: existing `fees`/`fees_type` columns charged in source currency; fee
-  currency + fee FX-rate treatment is deferred to the next proposal;
-- response echoes source amount, target amount, and the applied rate.
+- fees carry their own currency and rate per [fees-and-custom-fx.md](fees-and-custom-fx.md)
+  (D25/D26): settled into the source wallet via `fee_exchange_rate`;
+- response echoes source amount, target amount, and the applied rates.
 
 ### D23 — resolved questions
 
@@ -262,8 +267,8 @@ rule — elastic by design, works for automatic and (later) manually negotiated 
    distinguishes auto (from `fx_rates`) vs manual delivery (full UX in follow-up
    proposal) (D21).
 4. **Q4 — transfers**: settled → elastic storage of source amount, target amount
-   and `transfer_fx_rate` on both legs; fee currency/rate deferred to next
-   proposal (D22).
+   and `transfer_fx_rate` on both legs; fees settle per the fees-and-custom-fx
+   companion proposal (D25–D26).
 5. **Open for portfolios phase** — delete-guard for wallets referenced by a
    portfolio: runtime internal check vs event-driven; decide when portfolios lands.
 6. **Open** — INVEST rows editable? Mock allows editing them; real systems usually

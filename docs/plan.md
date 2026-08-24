@@ -450,18 +450,30 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass (
 ### 9.11 (was I11) — closeout
 - [x] plan.md final marks + proposal source-map cross-check corrected from implementation findings. — `docs/proposals/instruments-provider-module.md` D13 table updated with I8a/I8b status per endpoint (eps-surprises/peers/seasonality/IR now derived in module; ownership = empty-content stub pending provider; compare is single-symbol composition); `docs/openst-coverage.md` gaps annotated. Stale "Later phases" `/__meta` note corrected (instruments ships one).
 
-## 10. Wallets & transactions module (`portfoliost-wallets`)
+## 10. Fees & FX-rate entry (contract / mock / UI)
+
+Proposal: [fees-and-custom-fx.md](proposals/fees-and-custom-fx.md) (accepted 2026-08-24, D25–D30). Fees may carry their own currency (default = transaction currency); transaction and fee each accept a custom exchange rate (`automatic` default). Applies to portfolio AND wallet transactions; finalizes wire shapes the wallets module (§11) consumes.
+
+- [ ] 10.1 Contracts — extend `Transaction`/`CashTransaction` + request bodies with `feeCurrency`, `rateSource`, `feeExchangeRate`, `feeRateSource`; `exchangeRate` nullable; regenerate `generated/api-types`; release contracts
+- [ ] 10.2 Mock — persist/echo resolved fields; static demo FX table settles foreign-currency fees; manual rates drive converted outputs; 422 on invalid manual rates; round-trip tests
+- [ ] 10.3 SPA buy/sell step + edit modal — fee currency select (preselected tx ccy), "Exchange rate" disclosure (Automatic | Custom) for amount and fee, live totals, `custom fx` badge
+- [ ] 10.4 SPA wallet cash modals — fee currency select; transfer source→target rate inputs aligned with wallets D22 elastic shape
+- [ ] 10.5 Transactions tables — render fee with its own currency + custom-rate marker/tooltips
+- [ ] 10.6 Tests — unit, mock contract round-trips, e2e flows updated (defaults, pct ignores feeCurrency, custom-rate propagation)
+- [ ] 10.7 Docs sweep — AGENTS.md conventions note (camelCase for new fields), cross-links between proposals
+
+## 11. Wallets & transactions module (`portfoliost-wallets`)
 
 Proposal: [wallets-module.md](proposals/wallets-module.md) (accepted 2026-08-24, decisions D16–D23). Cash-wallet domain as its own module: wallets, cash ledger transactions, unified recent-transactions feed, balance history, multicurrency (local FX store: ECB/frankfurter primary + openst/cachest fallback). Multi-user: every table and query is user-scoped (D24). No implementation started yet.
 
-- [ ] 10.1 Scaffold repo from users-auth skeleton (`/health`, `/__meta`, `/internal/verify`, CI release pipeline); compose service `wallets`, env key `API_WALLETS_URL`
-- [ ] 10.2 Drizzle migrations per D17/D24: `wallets.wallets` (mandatory `currency`, `base_currency` default from user prefs), `wallets.wallet_transactions` (user-scoped ledger, mandatory currency, `rate_source`, `transfer_fx_rate`), `fx_rates`, `fx_sync_state`
-- [ ] 10.3 Wallet CRUD endpoints — create requires currency (422 otherwise), rename, list; delete guarded per D18/D24: only when zero transactions and unreferenced (409 otherwise)
-- [ ] 10.4 Cash movement endpoints — deposits/withdrawals (overdraft 422) /transfers incl. cross-currency elastic legs (source+target amounts + rate on both linked rows)
-- [ ] 10.5 Transaction edit/delete with real ledger recomputation of wallet balances
-- [ ] 10.6 History & pagination — `/wallets/:id/transactions`, `/wallets/transactions`, `/recent-transactions` feed shapes per contract
-- [ ] 10.7 FX subsystem — one-shot historical import (frankfurter/ECB), daily incremental CronJob, lazy gap backfill via provider tier (openst→cachest), carry-forward across non-business days
-- [ ] 10.8 Conversion service — auto/manual rate snapshots on write, valuation at latest rate, per-date conversion for balance-history, total-balance aggregation breakdown
-- [ ] 10.9 users-auth preference integration — read `baseCurrency` via internal route for defaults
-- [ ] 10.10 Gateway + compose wiring, contract tests green against mock AND module, e2e switch via `API_WALLETS_URL`
-- [ ] 10.11 Cluster rollout — HelmRelease, ingress path, FX-sync CronJob
+- [ ] 11.1 Scaffold repo from users-auth skeleton (`/health`, `/__meta`, `/internal/verify`, CI release pipeline); compose service `wallets`, env key `API_WALLETS_URL`
+- [ ] 11.2 Drizzle migrations per D17/D24: `wallets.wallets` (mandatory `currency`, `base_currency` default from user prefs), `wallets.wallet_transactions` (user-scoped ledger, mandatory currency, `rate_source`/`fee_rate_source`, `transfer_fx_rate`, `fee_currency`), `fx_rates`, `fx_sync_state`
+- [ ] 11.3 Wallet CRUD endpoints — create requires currency (422 otherwise), rename, list; delete guarded per D18/D24: only when zero transactions and unreferenced (409 otherwise)
+- [ ] 11.4 Cash movement endpoints — deposits/withdrawals (overdraft 422) /transfers incl. cross-currency elastic legs (source+target amounts + rate on both linked rows)
+- [ ] 11.5 Transaction edit/delete with real ledger recomputation of wallet balances
+- [ ] 11.6 History & pagination — `/wallets/:id/transactions`, `/wallets/transactions`, `/recent-transactions` feed shapes per contract
+- [ ] 11.7 FX subsystem — one-shot historical import (frankfurter/ECB), daily incremental CronJob, lazy gap backfill via provider tier (openst→cachest), carry-forward across non-business days
+- [ ] 11.8 Conversion service — auto/manual rate snapshots on write, valuation at latest rate, per-date conversion for balance-history, total-balance aggregation breakdown
+- [ ] 11.9 users-auth preference integration — read `baseCurrency` via internal route for defaults
+- [ ] 11.10 Gateway + compose wiring, contract tests green against mock AND module, e2e switch via `API_WALLETS_URL`
+- [ ] 11.11 Cluster rollout — HelmRelease, ingress path, FX-sync CronJob
