@@ -58,6 +58,7 @@ CREATE INDEX idx_wallets_user ON wallets.wallets (user_id);
 
 CREATE TABLE wallets.wallet_transactions (
   id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id          text NOT NULL,                 -- denormalized owner (D24): direct authz on every tx op
   wallet_id        uuid NOT NULL REFERENCES wallets.wallets(id),
   type             text NOT NULL CHECK (type IN
                      ('DEPOSIT','WITHDRAWAL','TRANSFER','INVEST','SELL',
@@ -86,9 +87,10 @@ CREATE TABLE wallets.wallet_transactions (
   updated_at       timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_wtx_wallet ON wallets.wallet_transactions (wallet_id, executed_at DESC);
-CREATE INDEX idx_wtx_user_recent ON wallets.wallet_transactions (portfolio_id);
+CREATE INDEX idx_wtx_user_recent ON wallets.wallet_transactions (user_id, executed_at DESC);
 
 -- FX storage, owned by this module (D20). EUR-based daily closes.
+-- NOTE: fx_rates / fx_sync_state are GLOBAL reference data — not user-scoped (D24).
 CREATE TABLE wallets.fx_rates (
   rate_date     date NOT NULL,
   currency      char(3) NOT NULL,                 -- quote currency; base is always EUR
@@ -107,6 +109,9 @@ CREATE TABLE wallets.fx_sync_state (
 ```
 
 Notes:
+- **Currency is mandatory everywhere**: `wallets.currency` (settlement) and
+  `wallet_transactions.currency` are `NOT NULL`; the API rejects wallet creation
+  without an explicit currency (422 — the mock's silent `USD` default is not carried over).
 - `CHECK` constraints instead of PG enums — adding types later must not need a migration dance.
 - `exchange_rate` nullable: legacy/single-currency rows may skip it; UI treats null as "no conversion".
 - Seed path reuses `mocks/shared/data/raw/wallets.json` so dev/mock-parity tests stay meaningful.
@@ -117,9 +122,9 @@ Notes:
 | --- | --- | --- |
 | `GET /wallets` | list wallets for JWT user | includes `balance`, `availableBalance`, `isDefault` |
 | `GET /wallets/total-balance` | convert all wallets → user base ccy at latest fx rate | `{totalBalance, totalAvailableBalance, baseCurrency, walletBreakdown[{original*, converted*, exchangeRate}]}` |
-| `POST /wallets` | create (name, currency; `baseCurrency` optional, defaults from user prefs per D21b) | 201, zeroed balances |
+| `POST /wallets` | create (name, **currency required** — 422 when missing; `baseCurrency` optional, defaults from user prefs per D21b) | 201, zeroed balances |
 | `PATCH /wallets/:id` | rename/settings | returns updated wallet |
-| `DELETE /wallets/:id` | delete + cascade txns | blocked if referenced by a portfolio link (see D23 open question) |
+| `DELETE /wallets/:id` | **Guarded delete (D24 rule)**: allowed only when the wallet has zero ledger rows AND is not referenced by any portfolio link; otherwise 409 Conflict | within the wallets domain, zero transactions already implies unreferenced — any inbound transfer leg would itself be a row; the portfolio-link check activates when that module lands |
 | `POST /wallets/:id/deposits` | insert DEPOSIT row + bump balance | responds `new_balance` |
 | `POST /wallets/:id/withdrawals` | overdraft guard → WITHDRAWAL row | responds `remaining_balance`; 422 if insufficient |
 | `POST /wallets/:id/transfers` | two linked rows (out w/ fees, in converted) | same-currency: mirror of mock; cross-currency: D22 |
@@ -264,3 +269,23 @@ rule — elastic by design, works for automatic and (later) manually negotiated 
 6. **Open** — INVEST rows editable? Mock allows editing them; real systems usually
    forbid editing trade-derived cash rows. Proposal: allow edit/delete only for
    `DEPOSIT/WITHDRAWAL/TRANSFER/ADJUSTMENT`; reject others with 422.
+
+### D24 — user-centric data model (multi-user from day one)
+
+The application is multi-user enabled; wallets are strictly per-user:
+
+- `users_auth` JWT `sub` is the ownership key. `wallets.user_id` is the primary
+  scoping column; `wallet_transactions.user_id` denormalizes it so every
+  transaction read/edit/delete authorizes in a single indexed lookup.
+- **Every** SELECT/UPDATE/DELETE filters by the authenticated user — including
+  nested resources: a valid JWT for wallet A cannot read or mutate wallet B; the
+  response is 404 (resource "not found" for this user), matching example-service's
+  error-copy style rather than 403.
+- Aggregations (`total-balance`, `recent-transactions`, history) operate only on
+  the caller's rows.
+- Internal service routes stay explicit about ownership:
+  `/internal/cash-movements` payloads carry the `userId` from the trade context
+  and are validated against an existing wallet owned by that user;
+  `/internal/fx-rates` serves global reference data only.
+- `fx_rates` / `fx_sync_state` are global shared reference data (rates are not
+  per-user); no user column, no user filtering.
