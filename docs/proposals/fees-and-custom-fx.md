@@ -58,7 +58,32 @@ later portfolio settings) consume ONE registry:
   serves the same shape from its demo rate table.
 - SPA fetches once per session and caches; selectors never hardcode lists.
 
-### D27 — fee currency (default = transaction currency)
+### D27 — uniform FX conversion helper (shared, pure, one formula everywhere)
+
+Cross-rate math (`A→B = rate(B)/rate(A)`, both EUR-quoted) is needed by the mock
+settlement (D32), wallet transfers (wallets D22), balance-history per-date
+conversion (wallets D21), total-balance aggregation, SPA live totals (D30), and
+later portfolios — so it lives in **one place**: `src/fx.ts` in
+`portfoliost-contracts` (zero-dependency TypeScript, consumed by SPA and every
+Hono module alike).
+
+```ts
+convert(amount, from, to, ratesForDate)        // cross via EUR; identity when from === to
+resolveRate(from, to, series, { maxStaleness }) // carry-forward aware, returns { rate, asOf }
+settleFee(feeAmount, feeCcy, walletCcy, rates)  // fees_settled semantics (D27 fee settlement)
+roundMinor(amount, minorUnits)                  // ISO 4217 minor units (JPY=0, USD=2, ...)
+```
+
+Owned edge cases: missing-rate carry-forward with staleness limit, same-currency
+and EUR shortcuts, single rate convention ("1 EUR = X units of ccy"), manual-rate
+validation (>0, finite), minor-unit rounding. Pure functions ⇒ property-testable
+(`A→B × B→A ≈ 1`, triangle identity through EUR).
+
+UI note: the SPA uses it synchronously for live totals; the rate table for
+preview comes from the mock's demo endpoint now and from real rates once wallets
+ships — server responses remain authoritative.
+
+### D28 — fee currency (default = transaction currency)
 
 - New optional field **`feeCurrency`** on every fee-bearing transaction
   (portfolio buy/sell; wallet deposit/withdraw/transfer). When omitted it
@@ -70,10 +95,10 @@ later portfolio settings) consume ONE registry:
 - Ledger/settlement view (used by balances once real modules land): the cash
   impact of a fee is its **settled amount in the wallet's currency**
   (`fees_settled`). Same-currency fees settle 1:1; foreign-currency fees settle
-  via the fee's exchange rate (D28). Until then the mock settles with a static
-  demo rate table (D31) and records what it used.
+  via the fee's exchange rate (D29). Until then the mock settles with a static
+  demo rate table (D32) and records what it used.
 
-### D28 — custom exchange rates with `automatic` default
+### D29 — custom exchange rates with `automatic` default
 
 Two independent rate slots per transaction — one for the main amount, one for
 the fee:
@@ -101,7 +126,7 @@ Field naming: new fields use **camelCase everywhere on the wire**
 legacy `CashTransaction` fields are snake_case — no renames of existing fields;
 the inconsistency is documented, not propagated.
 
-### D29 — UI adjustments (SPA)
+### D30 — UI adjustments (SPA)
 
 1. **Buy/Sell stock step** (`AddPositionDialog`) and **EditTransactionModal**:
    - fee input gains a compact currency select bound to `feeCurrency`
@@ -122,7 +147,7 @@ the inconsistency is documented, not propagated.
    wallet detail): fee cell renders `12,50 EUR` style with its own currency;
    custom-rated rows show the badge; tooltips spell out applied rates.
 
-### D30 — contract changes (`portfoliost-contracts`)
+### D31 — contract changes (`portfoliost-contracts`)
 
 ```yaml
 # shared, new fields on Transaction (portfolio) and CashTransaction /
@@ -151,9 +176,9 @@ feeExchangeRate:  { type: number, nullable: true }
   ```
 - Versioned as a minor contracts release; SPA regenerates `generated/api-types`.
 
-### D31 — mock behavior
+### D32 — mock behavior
 
-- Persist + echo all new fields with defaults resolved (per D30 echo rule).
+- Persist + echo all new fields with defaults resolved (per D31 echo rule).
 - Bundled static demo rate table in `mocks/lib` (EUR/USD/PLN/GBP/CHF snapshot)
   doubles as the interim availability source for `/api/currencies`, settles
   foreign-currency fees into the wallet currency, and fills `automatic` rates;
@@ -165,7 +190,7 @@ feeExchangeRate:  { type: number, nullable: true }
 - Round-trip tests: default resolution, pct ignoring feeCurrency, manual rate
   propagation into converted outputs, 422 on bad manual rates.
 
-### D32 — wallets proposal alignment (supersedes parts of D17/D22)
+### D33 — wallets proposal alignment (supersedes parts of D17/D22)
 
 - Schema D17 gains the finalized columns:
   `fee_currency char(3)`, `fee_rate_source text CHECK IN ('automatic','manual')`,

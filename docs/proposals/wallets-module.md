@@ -81,8 +81,8 @@ CREATE TABLE wallets.wallet_transactions (
   rate_source      text NOT NULL DEFAULT 'automatic'
                      CHECK (rate_source IN ('automatic','manual')),
                    -- 'automatic': derived from fx_rates at write; 'manual': user-provided
-                   -- (wire format finalized by fees-and-custom-fx.md D28)
-  fee_currency     char(3),                       -- D27 (fees-and-custom-fx): default = transaction ccy
+                   -- (wire format finalized by fees-and-custom-fx.md D29)
+  fee_currency     char(3),                       -- D28 (fees-and-custom-fx): default = transaction ccy
   fee_rate_source  text NOT NULL DEFAULT 'automatic'
                      CHECK (fee_rate_source IN ('automatic','manual')),
   fee_exchange_rate numeric(20,10),               -- settles foreign-currency fees into wallet ccy
@@ -259,7 +259,7 @@ rule — elastic by design, works for automatic and (later) manually negotiated 
   from `fx_rates`; because both values are persisted, a future UI can accept a
   manually entered target amount/rate without schema changes;
 - fees carry their own currency and rate per [fees-and-custom-fx.md](fees-and-custom-fx.md)
-  (D27/D28): settled into the source wallet via `fee_exchange_rate`;
+  (D28/D29): settled into the source wallet via `fee_exchange_rate`;
 - response echoes source amount, target amount, and the applied rates.
 
 ### D23 — resolved questions
@@ -273,7 +273,7 @@ rule — elastic by design, works for automatic and (later) manually negotiated 
    proposal) (D21).
 4. **Q4 — transfers**: settled → elastic storage of source amount, target amount
    and `transfer_fx_rate` on both legs; fees settle per the fees-and-custom-fx
-   companion proposal (D27–D28).
+   companion proposal (D28–D29).
 5. **Open for portfolios phase** — delete-guard for wallets referenced by a
    portfolio: runtime internal check vs event-driven; decide when portfolios lands.
 6. **Open** — INVEST rows editable? Mock allows editing them; real systems usually
