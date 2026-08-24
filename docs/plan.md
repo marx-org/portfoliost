@@ -478,4 +478,4 @@ Proposal: [wallets-module.md](proposals/wallets-module.md) (accepted 2026-08-24,
 - [x] 11.9 Conversion service — auto/manual rate snapshots on write, valuation at latest rate, per-date conversion for balance-history, total-balance aggregation breakdown
 - [x] 11.10 users-auth preference integration — read `baseCurrency` via internal route for defaults
 - [x] 11.11 Gateway + compose wiring, contract tests green against mock AND module, e2e switch via `API_WALLETS_URL`
-- [ ] 11.12 Cluster rollout — HelmRelease, ingress path, FX-sync CronJob
+- [x] 11.12 Cluster rollout — HelmRelease, ingress path, FX-sync CronJob
