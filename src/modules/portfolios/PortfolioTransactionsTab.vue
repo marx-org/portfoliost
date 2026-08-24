@@ -4,6 +4,7 @@ import { useRoute } from "vue-router"
 import { getPortfolioTransactions, deletePortfolioTransaction } from "@/api/portfolios"
 import { formatCurrency, formatDate, formatNumber } from "@/utils/format"
 import { researchSymbol } from "@/utils/research"
+import FeeCell from "@/components/FeeCell.vue"
 import type { PortfolioTransactionsPage } from "@/api/types"
 import EditTransactionModal from "@/modules/portfolios/EditTransactionModal.vue"
 import ConfirmDeleteModal from "@/modules/portfolios/ConfirmDeleteModal.vue"
@@ -187,7 +188,9 @@ function groupAmount(items: Tx[]): number {
               <td class="px-5 py-3 text-right tabular-nums">{{ formatNumber(tx.quantity) }}</td>
               <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(tx.price) }}</td>
               <td class="px-5 py-3 text-right font-medium tabular-nums">{{ formatCurrency(costOf(tx)) }}</td>
-              <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(tx.fees) }}</td>
+              <td class="px-5 py-3 text-right text-slate-600 tabular-nums dark:text-slate-300">
+                <FeeCell :fees="tx.fees" :fee-currency="tx.feeCurrency" :fallback-currency="tx.currency" :rate-source="tx.rateSource" />
+              </td>
               <td class="px-5 py-3">
                 <div class="flex justify-end gap-1">
                   <button

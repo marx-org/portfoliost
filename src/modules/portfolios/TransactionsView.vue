@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue"
 import { getAllTransactions, deletePortfolioTransaction } from "@/api/portfolios"
 import { formatCurrency, formatDateTime, formatNumber } from "@/utils/format"
 import { researchSymbol } from "@/utils/research"
+import FeeCell from "@/components/FeeCell.vue"
 import type { PortfoliosTransactions } from "@/api/types"
 import InvestmentsTabs from "@/modules/portfolios/InvestmentsTabs.vue"
 import TransactionsSubTabs from "@/modules/portfolios/TransactionsSubTabs.vue"
@@ -256,7 +257,9 @@ async function submitDelete() {
               <td class="px-5 py-3 text-right tabular-nums">{{ formatNumber(tx.quantity) }}</td>
               <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(tx.price) }}</td>
               <td class="px-5 py-3">{{ tx.instrumentCurrency }}</td>
-              <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(tx.fees) }}</td>
+              <td class="px-5 py-3 text-right text-slate-600 tabular-nums dark:text-slate-300">
+                <FeeCell :fees="tx.fees" :fee-currency="tx.feeCurrency" :fallback-currency="tx.currency" :rate-source="tx.rateSource" />
+              </td>
               <td class="px-5 py-3 text-right font-medium tabular-nums" :class="amountOf(tx) < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-700 dark:text-green-400'">
                 {{ formatCurrency(amountOf(tx)) }}
               </td>

@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { useWalletsStore } from "@/stores/wallets"
+import FeeCell from "@/components/FeeCell.vue"
 import { getWalletBalanceHistory, updateWalletTransaction, deleteWalletTransaction } from "@/api/wallets"
 import { formatCurrency, formatDate, formatSignedCurrency } from "@/utils/format"
 import WalletCashModals from "@/modules/portfolios/WalletCashModals.vue"
@@ -373,7 +374,17 @@ function exportHistory() {
             <tbody>
               <tr v-for="{ tx, balance } in recentTransactions" :key="tx.id" class="border-b border-slate-100 dark:border-slate-800 last:border-0">
                 <td class="py-2.5 pr-4 text-slate-600 dark:text-slate-300">{{ formatDate(tx.createdAt) }}</td>
-                <td class="py-2.5 pr-4 font-medium">{{ typeLabel(tx.type) }}</td>
+                <td class="py-2.5 pr-4 font-medium">
+                  {{ typeLabel(tx.type) }}
+                  <FeeCell
+                    v-if="Number(tx.fees) > 0"
+                    :fees="tx.fees"
+                    :fee-currency="tx.feeCurrency"
+                    :fallback-currency="tx.currency"
+                    :rate-source="tx.rateSource"
+                    class="ml-1 align-middle text-[11px] font-normal"
+                  />
+                </td>
                 <td class="py-2.5 pr-4 text-slate-500 dark:text-slate-400">{{ tx.description ?? "—" }}</td>
                 <td class="py-2.5 pr-4 text-right font-medium tabular-nums" :class="isDebit(tx) ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'">
                   {{ formatSignedCurrency(signedAmount(tx), tx.currency) }}
