@@ -460,7 +460,7 @@ Proposal: [fees-and-custom-fx.md](proposals/fees-and-custom-fx.md) (accepted 202
 - [ ] 10.4 SPA wallet cash modals — fee currency select; transfer source→target rate inputs aligned with wallets D22 elastic shape
 - [ ] 10.5 Transactions tables — render fee with its own currency + custom-rate marker/tooltips
 - [ ] 10.6 Tests — unit, mock contract round-trips, e2e flows updated (defaults, pct ignores feeCurrency, custom-rate propagation)
-- [ ] 10.7 Available-currencies registry — contract `GET /api/currencies` (D26), mock serves from demo rates, SPA fetch-once-and-cache consumed by every currency selector
+- [x] 10.7 Available-currencies registry — contract `GET /api/currencies` (D26), mock serves from demo rates, SPA fetch-once-and-cache consumed by every currency selector
 - [ ] 10.8 Docs sweep — AGENTS.md conventions note (camelCase for new fields), cross-links between proposals
 
 ## 11. Wallets & transactions module (`portfoliost-wallets`)
