@@ -6,12 +6,15 @@ import { usePortfolioStore } from "@/stores/portfolios"
 import { useWalletsStore } from "@/stores/wallets"
 import { formatCurrency } from "@/utils/format"
 import InstrumentSearchModal from "@/modules/instruments/InstrumentSearchModal.vue"
+import CurrencySelect from "@/components/CurrencySelect.vue"
+import { useCurrenciesStore } from "@/stores/currencies"
 
 const props = defineProps<{ open: boolean; portfolioId: string }>()
 const emit = defineEmits<{ (e: "close"): void; (e: "added"): void }>()
 
 const store = usePortfolioStore()
 const walletsStore = useWalletsStore()
+const currenciesStore = useCurrenciesStore()
 const router = useRouter()
 
 type Step = "chooser" | "stock" | "option" | "cfd"
@@ -28,9 +31,13 @@ const stockForm = ref({
   price: "",
   fees: "0",
   feesType: "fixed" as "fixed" | "pct",
+  feeCurrency: "USD",
+  rateSource: "automatic" as "automatic" | "manual",
+  exchangeRate: "",
   executedAt: new Date().toISOString().slice(0, 10),
   walletId: "",
 })
+const showFxSection = ref(false)
 const busy = ref(false)
 const error = ref<string | null>(null)
 
@@ -57,6 +64,7 @@ watch(
       step.value = "chooser"
       showSearch.value = false
       error.value = null
+      if (!currenciesStore.loaded) void currenciesStore.load()
       if (!walletsStore.wallets.length) {
         walletsStore.fetchAll().then(() => {
           if (!stockForm.value.walletId) stockForm.value.walletId = walletsStore.wallets[0]?.id || ""
@@ -107,9 +115,13 @@ function onSearchAdd(symbol: string, name: string) {
       price: "",
       fees: "0",
       feesType: "fixed",
+      feeCurrency: "USD",
+      rateSource: "automatic",
+      exchangeRate: "",
       executedAt: new Date().toISOString().slice(0, 10),
       walletId: walletsStore.wallets[0]?.id ?? "",
     }
+    showFxSection.value = false
     step.value = "stock"
     error.value = null
   } else if (pendingStep === "option") {
@@ -181,6 +193,12 @@ async function submitStock() {
       assetType: "STOCK",
       fees: stockFeeValue.value || undefined,
       feesType: stockForm.value.feesType,
+      feeCurrency: stockForm.value.feesType === "fixed" ? stockForm.value.feeCurrency : undefined,
+      rateSource: stockForm.value.rateSource,
+      exchangeRate:
+        stockForm.value.rateSource === "manual" && stockForm.value.exchangeRate
+          ? Number(stockForm.value.exchangeRate)
+          : undefined,
       walletId: stockForm.value.walletId || undefined,
       executedAt: stockForm.value.executedAt ? new Date(stockForm.value.executedAt).toISOString() : undefined,
     })
@@ -337,9 +355,12 @@ function goResearch() {
             </div>
           </div>
           <label for="stock-fees" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Transaction Fees</label>
-          <div class="mb-4 flex gap-2">
+          <div class="mb-1 flex gap-2">
             <div class="flex flex-1 items-center rounded-lg border border-slate-300 focus-within:border-blue-500">
-              <span class="pl-3 text-sm text-slate-500 dark:text-slate-400">{{ stockForm.feesType === "fixed" ? "$" : "%" }}</span>
+              <template v-if="stockForm.feesType === 'fixed'">
+                <CurrencySelect v-model="stockForm.feeCurrency" aria-label="Fee currency" testid="add-position-fee-currency" class="!rounded-l-lg !border-0 !border-r" />
+              </template>
+              <span v-else class="pl-3 text-sm text-slate-500 dark:text-slate-400">%</span>
               <input
                 id="stock-fees"
                 v-model="stockForm.fees"
@@ -357,8 +378,40 @@ function goResearch() {
               data-testid="add-position-fees-toggle"
               @click="stockForm.feesType = stockForm.feesType === 'fixed' ? 'pct' : 'fixed'"
             >
-              {{ stockForm.feesType === "fixed" ? "$" : "%" }}
+              {{ stockForm.feesType === "fixed" ? "Fixed" : "%" }}
             </button>
+          </div>
+
+          <div class="mb-4">
+            <button type="button" class="text-xs text-slate-500 hover:text-blue-600 dark:text-slate-400" data-testid="add-position-fx-toggle" @click="showFxSection = !showFxSection">
+              Exchange rate {{ stockForm.rateSource === "manual" ? "· custom" : "" }} {{ showFxSection ? "▾" : "▸" }}
+            </button>
+            <div v-if="showFxSection" class="mt-2 space-y-2 rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50">
+              <div class="flex gap-2">
+                <button type="button" class="btn-secondary flex-1 py-1 text-xs" :class="stockForm.rateSource === 'automatic' ? '!bg-blue-600 !text-white' : ''" data-testid="add-position-fx-auto" @click="stockForm.rateSource = 'automatic'">
+                  Automatic
+                </button>
+                <button type="button" class="btn-secondary flex-1 py-1 text-xs" :class="stockForm.rateSource === 'manual' ? '!bg-blue-600 !text-white' : ''" data-testid="add-position-fx-manual" @click="stockForm.rateSource = 'manual'">
+                  Custom
+                </button>
+              </div>
+              <div v-if="stockForm.rateSource === 'manual'" class="flex items-center gap-2">
+                <input
+                  v-model="stockForm.exchangeRate"
+                  type="number"
+                  min="0"
+                  step="any"
+                  placeholder="e.g. 4.35"
+                  class="input"
+                  aria-label="Custom exchange rate (transaction currency to display currency)"
+                  data-testid="add-position-fx-rate"
+                />
+                <span class="whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">per 1 USD</span>
+              </div>
+              <p class="text-[11px] leading-tight text-slate-400 dark:text-slate-500">
+                Automatic uses the daily market rate. Choose Custom when your broker converted at a different rate.
+              </p>
+            </div>
           </div>
           <div class="mb-4 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/50">
             <span class="text-sm text-slate-600 dark:text-slate-300">Total Cost</span>

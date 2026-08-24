@@ -61,6 +61,12 @@ export interface CreatePortfolioPositionInput {
   walletId?: string
   fees?: number
   feesType?: "fixed" | "pct"
+  /** ISO 4217; defaults to transaction currency when omitted (fees-and-custom-fx D28) */
+  feeCurrency?: string
+  rateSource?: "automatic" | "manual"
+  exchangeRate?: number
+  feeRateSource?: "automatic" | "manual"
+  feeExchangeRate?: number
 }
 
 export async function createPortfolioPosition(
@@ -84,7 +90,20 @@ export async function removePortfolioPosition(id: string, positionId: string): P
 
 export async function createPortfolioTransaction(
   id: string,
-  input: { type: string; symbol: string; quantity: number; price: number; currency?: string },
+  input: {
+    type: string
+    symbol: string
+    quantity: number
+    price: number
+    currency?: string
+    fees?: number
+    feesType?: "fixed" | "pct"
+    feeCurrency?: string
+    rateSource?: "automatic" | "manual"
+    exchangeRate?: number
+    feeRateSource?: "automatic" | "manual"
+    feeExchangeRate?: number
+  },
 ): Promise<PortfolioTransactionsPage["items"][number]> {
   return http.post<PortfolioTransactionsPage["items"][number]>(`/api/portfolios/${id}/transactions`, input)
 }
