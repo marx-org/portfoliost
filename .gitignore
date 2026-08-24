@@ -27,3 +27,6 @@ playwright/.cache/
 # Tooling artifacts
 .playwright-mcp/
 .contract-parts/
+
+# Ad-hoc debug screenshots (repo root only)
+/*.png
