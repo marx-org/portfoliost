@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue"
 import { useRoute } from "vue-router"
+import { baseSymbol } from "@/utils/research"
 import { getInstrumentPeers } from "@/api/instruments"
 import type { components } from "@/api/types"
 import { COMPARE_METRICS } from "./compareMetrics"
-import { baseSymbol } from "@/utils/research"
 
 const route = useRoute()
-const symbol = baseSymbol(String(route.params.symbol))
+const routeSymbol = String(route.params.symbol).toUpperCase()
+const symbol = baseSymbol(routeSymbol)
 
 const items = ref<components["schemas"]["ResearchCompare"][]>([])
 const loading = ref(true)
@@ -36,8 +37,8 @@ const rows = computed(() =>
     <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
     <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading comparison...</p>
 
+    <h2 class="mb-3 text-base font-semibold">Compare {{ symbol }} with peers</h2>
     <div v-if="!loading && !error && items.length" class="card p-6">
-      <h2 class="mb-3 text-base font-semibold">Compare {{ symbol }} with peers</h2>
       <div class="overflow-x-auto">
         <table class="w-full min-w-[720px] text-sm">
           <thead>

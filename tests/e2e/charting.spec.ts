@@ -47,8 +47,9 @@ test("charting adds stocks via search and compares them", async ({ page }) => {
 
   await page.getByTestId("add-stock").click()
   await page.getByTestId("instrument-search").fill("microsoft")
-  await expect(page.getByRole("button", { name: /Microsoft Corp/ })).toBeVisible()
-  await page.getByRole("button", { name: /Microsoft Corp/ }).click()
+  // ticker reference returns multiple MSFT listings (US, CDR…) — pick the US one
+  await expect(page.getByRole("button", { name: /^MSFT Microsoft Corporation/ }).first()).toBeVisible()
+  await page.getByRole("button", { name: /^MSFT Microsoft Corporation/ }).first().click()
 
   await expect(page.getByTestId("stock-chip")).toHaveCount(2)
   await expect(page.locator(".apexcharts-canvas").first()).toBeVisible()

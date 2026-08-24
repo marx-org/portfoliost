@@ -163,9 +163,10 @@ describe("ResearchOverview", () => {
     const wrapper = mountOverview()
     await flushPromises()
 
-    expect(mocked.getInstrumentProfile).toHaveBeenCalledWith("AAPL")
-    expect(mocked.getInstrumentMetrics).toHaveBeenCalledWith("AAPL")
-    expect(mocked.getQuote).toHaveBeenCalledWith("AAPL")
+    // full venue-qualified route symbol is passed through to the API
+    expect(mocked.getInstrumentProfile).toHaveBeenCalledWith("AAPL.US")
+    expect(mocked.getInstrumentMetrics).toHaveBeenCalledWith("AAPL.US")
+    expect(mocked.getQuote).toHaveBeenCalledWith("AAPL.US")
     expect(wrapper.find("h2").text()).toContain("AAPL")
   })
 

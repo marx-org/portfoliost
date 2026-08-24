@@ -11,6 +11,7 @@
     "typecheck": "vue-tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "pretest:e2e": "bash scripts/reset-mock-state.sh",
     "test:e2e": "playwright test",
     "test:mock": "node mocks/tests/run.mjs",
     "test:stack": "node scripts/instruments-stack-test.mjs",

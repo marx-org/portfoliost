@@ -3,10 +3,9 @@ import { onMounted, ref } from "vue"
 import { useRoute } from "vue-router"
 import { getNewsStats, getTickerNews, type NewsArticle, type NewsStats } from "@/api/instruments"
 import { formatDate } from "@/utils/format"
-import { baseSymbol } from "@/utils/research"
 
 const route = useRoute()
-const symbol = baseSymbol(String(route.params.symbol))
+const symbol = String(route.params.symbol).toUpperCase()
 
 const articles = ref<NewsArticle[]>([])
 const total = ref(0)

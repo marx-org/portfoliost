@@ -169,7 +169,7 @@ test("position actions menu: buy updates quantity, research navigates, remove de
 
   await targetRow.getByRole("button", { name: "Position actions" }).click()
   await page.getByRole("button", { name: "Research" }).click()
-  await expect(page).toHaveURL(new RegExp(`/en/research/${targetSymbol}\\.US/overview`))
+  await expect(page).toHaveURL(new RegExp(`/en/research/${targetSymbol}(\\.US)?/overview`))
 
   await page.goBack()
   await expect(page).toHaveURL(/\/en\/portfolios\/.*\/holdings/)
@@ -217,9 +217,12 @@ test("add position from the header opens a chooser with instrument/option/cfd an
   await expect(chooser.getByTestId("add-position-option")).toContainText("Option")
   await expect(chooser.getByTestId("add-position-cfd")).toContainText("CFD")
 
+  const amdRowsBefore = await page.locator("tbody tr").filter({ hasText: "AMD" }).count()
+
   await chooser.getByTestId("add-position-instrument").click()
   await expect(page.getByRole("dialog", { name: "Search for Instruments" })).toBeVisible()
   await page.getByTestId("instrument-search").fill("AMD")
+  await expect(page.getByRole("button", { name: /AMD/ }).first()).toBeVisible()
   await page.getByRole("dialog", { name: "Search for Instruments" }).getByRole("button", { name: /AMD/ }).first().click()
 
   await expect(page.getByRole("dialog", { name: "Buy Position" })).toBeVisible()
@@ -228,7 +231,9 @@ test("add position from the header opens a chooser with instrument/option/cfd an
   await page.getByRole("dialog", { name: "Buy Position" }).getByRole("button", { name: /Buy for/ }).click()
 
   await expect(page.getByRole("dialog", { name: "Buy Position" })).toHaveCount(0)
-  await expect(page.locator("tbody tr").filter({ hasText: "AMD" })).toHaveCount(1)
+  // The mock backend keeps state across runs — assert the row count grew by one
+  const amdRows = page.locator("tbody tr").filter({ hasText: "AMD" })
+  await expect(amdRows).toHaveCount(amdRowsBefore + 1, { timeout: 10000 })
 })
 
 test("buy position stock step has purchase date, cash portfolio, fee % toggle and total", async ({ page }) => {

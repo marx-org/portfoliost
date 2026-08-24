@@ -53,7 +53,10 @@ function openResult(symbol: string, name = "") {
     emit("add", symbol, name)
     return
   }
-  router.push({ name: "research-overview", params: { symbol: researchSymbol(symbol) } })
+  // TICKERDB results arrive venue-qualified (SNT.WA) — use as-is. Bare
+  // symbols (mock source, popular list) get the legacy ".US" suffix.
+  const route = symbol.includes(".") ? symbol.toUpperCase() : researchSymbol(symbol)
+  router.push({ name: "research-overview", params: { symbol: route } })
 }
 
 function onKeydown(e: KeyboardEvent) {

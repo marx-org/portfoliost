@@ -7,10 +7,10 @@ import ResearchPriceChart from "@/modules/instruments/ResearchPriceChart.vue"
 import ResearchSeasonality from "@/modules/instruments/ResearchSeasonality.vue"
 import type { InstrumentsMetrics, InstrumentsOverviewMetrics, InstrumentsProfile, IrEventsAapl, QuoteAapl } from "@/api/types"
 import { formatCompact, formatCurrency, formatNumber, formatPercent } from "@/utils/format"
-import { baseSymbol, researchSymbol } from "@/utils/research"
+import { researchSymbol } from "@/utils/research"
 
 const route = useRoute()
-const symbol = baseSymbol(String(route.params.symbol))
+const symbol = String(route.params.symbol).toUpperCase()
 
 const profile = ref<InstrumentsProfile | null>(null)
 const metrics = ref<InstrumentsMetrics | null>(null)

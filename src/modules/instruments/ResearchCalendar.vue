@@ -4,10 +4,9 @@ import { useRoute } from "vue-router"
 import { getInstrumentCalendar } from "@/api/instruments"
 import type { components } from "@/api/types"
 import { formatCurrency } from "@/utils/format"
-import { baseSymbol } from "@/utils/research"
 
 const route = useRoute()
-const symbol = baseSymbol(String(route.params.symbol))
+const symbol = String(route.params.symbol).toUpperCase()
 
 const data = ref<components["schemas"]["CalendarData"] | null>(null)
 const loading = ref(true)

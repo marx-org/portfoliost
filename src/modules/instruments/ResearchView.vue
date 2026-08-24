@@ -32,7 +32,7 @@ const quickSymbols = ["MSFT", "NVDA", "META", "AAPL", "TSLA", "AMZN", "GOOGL", "
 
 onMounted(async () => {
   try {
-    profile.value = await getInstrumentProfile(symbol.value)
+    profile.value = await getInstrumentProfile(routeSymbol.value)
   } catch {
     profile.value = null
   }
@@ -40,7 +40,7 @@ onMounted(async () => {
 
 // Same-route navigation (quick switcher / search) only changes the param —
 // refetch the header profile when it does.
-watch(symbol, async (sym) => {
+watch(routeSymbol, async (sym) => {
   profile.value = null
   try {
     profile.value = await getInstrumentProfile(sym)
