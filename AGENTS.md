@@ -34,6 +34,11 @@ Do not build or wire these sections from example-service:
 
 ## Conventions
 
+- New API wire fields use camelCase even where legacy schemas are snake_case (see `docs/proposals/fees-and-custom-fx.md` D29).
+- FX conversion math must go through `@marx2/contracts/fx` — never re-implement cross-rate/settlement formulas locally (D27).
+- Currency selectors are fed exclusively by the `/api/currencies` registry (`useCurrenciesStore`); never hardcode currency lists.
+
+
 - Vue 3 `<script setup lang="ts">` SFCs; Pinia stores; `vue-router`; Tailwind utility classes (`card`, `btn-primary`, `btn-secondary`, `btn-ghost`, `btn-danger`, `input`, `label`).
 - API client functions live in `src/api/<domain>.ts` with explicit return types.
 - Track long-running work in `docs/plan.md`; mark steps `[x]` only after they are verified with the full test suite and committed.
