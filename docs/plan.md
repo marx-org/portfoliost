@@ -492,3 +492,20 @@ Verified provider facts (2026-08-25): FMP's legacy `financialmodelingprep.com/im
 - [x] 12.4 `/api/logos/:symbol` (+`/logos/:symbol` parity alias) serving local files with immutable caching; deterministic initials SVG fallback (ported from mock), never persisted; auth-exempt (SPA `<img>` tags carry no JWT); gateway flip `API_LOGOS_URL` → instruments; mock handler retired
 - [x] 12.5 disc volume: bind mount `../portfoliost-instruments/data/logos` in compose; cluster HelmRelease persistence deferred with the module's cluster rollout (D15 scope)
 - [x] 12.6 stack-test logo checks (real/mock distinguishing) + e2e: WSE ticker renders a logo (real or initials); file persisted on disc; I10 full suite green
+
+## 13. Shared Redis for the provider tier (cluster)
+
+Follow-up to §12's cachest outage (2026-08-25): the per-app **redis sidecars** used floating tags (`8-alpine`) with long-lived PVCs — a restart pulled a different build whose RDB version couldn't load the old dump → CrashLoop → deployment never Ready (the `sh.helm.release.v1.cachest.v18 not found` noise was fallout: helm-controller persists release storage only after readiness succeeds).
+
+Target: apps stay stateless; the namespace-level shared instance (`redis`, pinned `8.10.1`, `--requirepass`) serves every cache consumer, mirroring what local compose already does.
+
+| Consumer | DB | Isolation |
+|---|---|---|
+| ghostfolio (existing) | 0 | unchanged |
+| cachest | 1 | logical DB |
+| openst | 2 | logical DB |
+
+- [x] 13.1 cachest HelmRelease — remove `redis` sidecar + `cachest-redis` PVC persistence; ConfigMap points at shared instance (`host: redis`, `${SECRET_REDIS_PASS}`, `db: 1`)
+- [x] 13.2 openst HelmRelease — drop localhost redis sidecar; `REDIS_HOST=redis`, `${SECRET_REDIS_PASS}`, `REDIS_DB=2`
+- [ ] 13.3 cutover runbook (needs cluster access): reconcile both HRs, confirm keys land under DB 1/2 on the shared instance, then delete orphaned `cachest-redis` PVC
+- [x] 13.4 local compose hygiene — pin floating minor (`redis:7-alpine` → `redis:7.4-alpine`) across portfoliost / openst / cachest compose files (dev-only isolation unaffected)
