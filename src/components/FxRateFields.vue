@@ -22,6 +22,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "update:rateSource", v: "automatic" | "manual"): void
   (e: "update:rate", v: string): void
+  /** resolved reference rate for this leg — lets parents do live math (D39) */
+  (e: "suggestion", r: LatestRate | null): void
 }>()
 
 const tid = props.testid ?? "fx"
@@ -32,9 +34,11 @@ const needsConversion = () => !props.hidden && props.from !== props.to
 async function loadSuggestion(): Promise<void> {
   if (!needsConversion()) {
     suggestion.value = null
+    emit("suggestion", null)
     return
   }
   suggestion.value = await getLatestRate(props.from, props.to, props.date)
+  emit("suggestion", suggestion.value)
 }
 
 watch(
@@ -43,15 +47,13 @@ watch(
   { immediate: true },
 )
 
-// D39 — selecting Custom prefills the input with the market rate on the leg date
-watch(
-  () => props.rateSource,
-  (mode) => {
-    if (mode === "manual" && suggestion.value && !props.rate) {
-      emit("update:rate", suggestion.value.rate.toFixed(4))
-    }
-  },
-)
+// D39 — Custom prefills with the market rate on the leg date; also fires when
+// the suggestion arrives after the user already toggled Custom (async race)
+watch([() => props.rateSource, suggestion], ([mode, sug]) => {
+  if (mode === "manual" && sug && !props.rate) {
+    emit("update:rate", sug.rate.toFixed(4))
+  }
+})
 </script>
 
 <template>

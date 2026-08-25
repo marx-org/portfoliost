@@ -4,6 +4,7 @@ import { useWalletsStore } from "@/stores/wallets"
 import { formatCurrency } from "@/utils/format"
 import FeeFields from "@/components/FeeFields.vue"
 import FxRateFields from "@/components/FxRateFields.vue"
+import type { LatestRate } from "@/api/fx"
 import { useCurrenciesStore } from "@/stores/currencies"
 import type { Wallets } from "@/api/types"
 
@@ -32,6 +33,8 @@ const feeRateSource = ref<"automatic" | "manual">("automatic")
 const feeExchangeRate = ref("")
 const targetRateSource = ref<"automatic" | "manual">("automatic")
 const manualTargetAmount = ref<number | null>(null)
+const feeSuggestion = ref<LatestRate | null>(null)
+const transferSuggestion = ref<LatestRate | null>(null)
 const busy = ref(false)
 const error = ref<string | null>(null)
 
@@ -53,7 +56,37 @@ const feeAmount = computed(() => {
   return fees.value || 0
 })
 
-const remainingBalance = computed(() => Math.max(0, availableBalance.value - amount.value - feeAmount.value))
+const feeRateValue = computed<number | null>(() => {
+  if (feeAmount.value <= 0) return null
+  if (feeCurrency.value === props.wallet.currency) return 1
+  if (feeRateSource.value === "manual" && Number(feeExchangeRate.value) > 0) return Number(feeExchangeRate.value)
+  return feeSuggestion.value?.rate ?? null
+})
+
+const feeInWalletCcy = computed<number | null>(() => {
+  if (feeAmount.value <= 0) return 0
+  if (feeRateValue.value == null) return null
+  return feesType.value === "pct" ? feeAmount.value : feeAmount.value * feeRateValue.value
+})
+
+const transferRateValue = computed<number | null>(() => {
+  if (!isCrossCurrencyTransfer.value) return null
+  if (targetRateSource.value === "manual" && manualTargetAmount.value != null && amount.value > 0) {
+    return manualTargetAmount.value / amount.value
+  }
+  return transferSuggestion.value?.rate ?? null
+})
+
+const targetAmountValue = computed<number | null>(() => {
+  if (!isCrossCurrencyTransfer.value) return null
+  if (targetRateSource.value === "manual" && manualTargetAmount.value != null) return manualTargetAmount.value
+  if (transferRateValue.value == null) return null
+  return amount.value * transferRateValue.value
+})
+
+const totalDebited = computed(() => amount.value + (feeInWalletCcy.value ?? 0))
+
+const remainingBalance = computed(() => Math.max(0, availableBalance.value - totalDebited.value))
 
 const canSubmit = computed(() => {
   if (props.action === "transfer") return amount.value > 0 && toWalletId.value !== ""
@@ -78,6 +111,8 @@ watch(
       feeExchangeRate.value = ""
       targetRateSource.value = "automatic"
       manualTargetAmount.value = null
+      feeSuggestion.value = null
+      transferSuggestion.value = null
       if (!currenciesStore.loaded) void currenciesStore.load()
       busy.value = false
       error.value = null
@@ -223,6 +258,7 @@ const submitLabel = computed(() => (props.action === "deposit" ? "Deposit" : pro
           :date="transactionDate"
           :hidden="!isCrossCurrencyTransfer"
           v-model:rate-source="targetRateSource"
+          @suggestion="transferSuggestion = $event"
           testid="wc-transfer-fx"
           class="sm:col-span-2"
         >
@@ -290,14 +326,40 @@ const submitLabel = computed(() => (props.action === "deposit" ? "Deposit" : pro
 
         <div class="rounded-lg bg-slate-50 dark:bg-slate-800/50 px-3 py-2 text-sm sm:col-span-2">
           <p class="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">Transaction Confirmation</p>
-          <p class="mt-0.5 font-semibold tabular-nums">{{ formatCurrency(amount || 0, wallet.currency) }}</p>
-          <p v-if="action === 'withdraw'" class="mt-0.5 text-slate-500 dark:text-slate-400">Remaining Balance: {{ formatCurrency(remainingBalance, wallet.currency) }}</p>
-          <p v-if="feeAmount > 0 && action !== 'deposit'" class="mt-0.5 text-slate-500 dark:text-slate-400">
-            Fees: {{ formatCurrency(feeAmount, feeCurrency) }} ({{ feesType === "pct" ? `${fees}%` : `${feeCurrency} fixed` }})
-          </p>
-          <p v-if="isCrossCurrencyTransfer" class="mt-0.5 text-slate-500 dark:text-slate-400">
-            Target: {{ manualTargetAmount != null ? formatCurrency(manualTargetAmount, destCurrency || '') : `auto · daily ${wallet.currency}/${destCurrency} rate` }}
-          </p>
+          <dl class="mt-1 space-y-0.5 tabular-nums text-slate-600 dark:text-slate-300">
+            <div class="flex justify-between gap-3">
+              <dt>{{ action === "transfer" ? "Transfer amount" : "Amount" }}</dt>
+              <dd>{{ formatCurrency(amount || 0, wallet.currency) }}</dd>
+            </div>
+            <div v-if="feeAmount > 0" class="flex justify-between gap-3">
+              <dt>Fee ({{ feesType === "pct" ? `${fees}%` : feeCurrency }})</dt>
+              <dd>
+                {{ formatCurrency(feeAmount, feeCurrency) }}
+                <template v-if="feeCurrency !== wallet.currency">
+                  <template v-if="feeInWalletCcy != null"> &asymp; {{ formatCurrency(feeInWalletCcy, wallet.currency) }}</template>
+                  <template v-else> · rate pending</template>
+                </template>
+              </dd>
+            </div>
+            <div v-if="action !== 'deposit'" class="flex justify-between gap-3 border-t border-slate-200 pt-0.5 font-semibold text-slate-900 dark:text-slate-100 dark:border-slate-700">
+              <dt>Total debited</dt>
+              <dd>{{ formatCurrency(totalDebited, wallet.currency) }} <span class="text-xs font-normal text-slate-400">{{ wallet.currency }}</span></dd>
+            </div>
+            <div v-if="isCrossCurrencyTransfer" class="flex justify-between gap-3">
+              <dt>Target ({{ destCurrency }})</dt>
+              <dd>
+                <template v-if="targetAmountValue != null">{{ formatCurrency(targetAmountValue, destCurrency || "") }}</template>
+                <template v-else>—</template>
+                <span class="text-xs text-slate-400">
+                  {{ transferRateValue != null ? `@ ${transferRateValue.toFixed(4)}` : "· rate pending" }}
+                </span>
+              </dd>
+            </div>
+            <div v-if="action !== 'deposit'" class="flex justify-between gap-3">
+              <dt>Remaining balance</dt>
+              <dd>{{ formatCurrency(remainingBalance, wallet.currency) }}</dd>
+            </div>
+          </dl>
         </div>
 
         <p v-if="error" class="text-sm text-red-600 dark:text-red-400 sm:col-span-2">{{ error }}</p>
