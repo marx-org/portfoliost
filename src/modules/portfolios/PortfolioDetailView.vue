@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
+import { useCurrenciesStore } from "@/stores/currencies"
 import { storeToRefs } from "pinia"
 import { deletePortfolio, updatePortfolio } from "@/api/portfolios"
 import { formatCurrency, formatPercent, formatSignedCurrency } from "@/utils/format"
@@ -16,7 +17,10 @@ const id = String(route.params.id)
 const loading = ref(true)
 const error = ref<string | null>(null)
 
-const currencies = ["USD", "EUR", "GBP", "CHF", "PLN"]
+// D26: registry-fed selector
+const currenciesStore = useCurrenciesStore()
+if (!currenciesStore.loaded) void currenciesStore.load()
+const currencies = computed(() => currenciesStore.options.map((c) => c.code))
 const { currency: displayCurrency } = storeToRefs(displayCurrencyStore)
 const showCurrencyMenu = ref(false)
 
@@ -149,8 +153,7 @@ async function submitDelete() {
           <button type="button" class="btn-secondary text-sm">Share</button>
           <div class="relative">
             <button type="button" class="btn-secondary text-sm" @click="showCurrencyMenu = !showCurrencyMenu">
-              Display currency: {{ displayCurrency }}
-              {{ displayCurrency === "USD" ? "($" : displayCurrency === "EUR" ? "(€" : displayCurrency === "GBP" ? "(£" : displayCurrency === "CHF" ? "(Fr" : "(zł" }})
+              Display currency: {{ displayCurrency }} ({{ currenciesStore.info(displayCurrency)?.symbol ?? "" }})
             </button>
             <template v-if="showCurrencyMenu">
               <div class="fixed inset-0 z-20" @click="showCurrencyMenu = false"></div>

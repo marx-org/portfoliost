@@ -129,6 +129,8 @@ services:
     environment:
       DATABASE_URL: postgres://portfoliost:portfoliost@postgres:5432/portfoliost
       USERS_AUTH_URL: http://users-auth:3000
+      # dev identity resolution for opaque mock tokens (never used in cluster)
+      AUTH_ME_URL: http://example-service-mock:4010
     depends_on:
       postgres:
         condition: service_healthy

@@ -245,7 +245,12 @@ test("buy position stock step has purchase date, cash portfolio, fee % toggle an
   const chooser = page.getByRole("dialog", { name: "Add position" })
   await chooser.getByTestId("add-position-instrument").click()
   await page.getByTestId("instrument-search").fill("KO")
-  await page.getByRole("dialog", { name: "Search for Instruments" }).getByRole("button", { name: /KO/ }).first().click()
+  // ticker reference returns many KO-prefixed listings — pick the US original
+  await page
+    .getByRole("dialog", { name: "Search for Instruments" })
+    .getByRole("button", { name: /^KO The Coca-Cola/ })
+    .first()
+    .click()
 
   const dialog = page.getByRole("dialog", { name: "Buy Position" })
   await expect(dialog).toBeVisible()
@@ -266,9 +271,10 @@ test("buy position stock step has purchase date, cash portfolio, fee % toggle an
   await expect(dialog.getByTestId("add-position-fees-toggle")).toHaveText("%")
   await expect(dialog).toContainText("$1,212.00")
 
+  const koRowsBefore = await page.locator("tbody tr").filter({ hasText: "KO" }).count()
   await dialog.getByRole("button", { name: /Buy for \$1,212.00/ }).click()
   await expect(dialog).toHaveCount(0)
-  await expect(page.locator("tbody tr").filter({ hasText: "KO" })).toHaveCount(1)
+  await expect(page.locator("tbody tr").filter({ hasText: "KO" })).toHaveCount(koRowsBefore + 1, { timeout: 10000 })
 })
 
 test("display currency switcher updates portfolio values and persists", async ({ page }) => {

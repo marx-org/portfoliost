@@ -62,7 +62,10 @@ test("transactions table shows custom fx badge after editing with a manual rate"
   await rows.first().getByRole("button", { name: "Edit transaction" }).click()
   const modal = page.getByRole("dialog", { name: /^Edit/ })
   await expect(modal).toBeVisible()
-  await modal.getByTestId("edit-tx-fx-toggle").click()
+  // section may already be open when the row persists a manual rate
+  if (!(await modal.getByTestId("edit-tx-fx-manual").isVisible())) {
+    await modal.getByTestId("edit-tx-fx-toggle").click()
+  }
   await modal.getByTestId("edit-tx-fx-manual").click()
   await modal.getByTestId("edit-tx-fx-rate").fill("0.92")
   await modal.getByRole("button", { name: "Save" }).click()

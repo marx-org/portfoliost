@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue"
 import { useWalletsStore } from "@/stores/wallets"
+import CurrencySelect from "@/components/CurrencySelect.vue"
+import { useCurrenciesStore } from "@/stores/currencies"
 import { formatCurrency, formatDate, formatNumber } from "@/utils/format"
 import WalletCashModals from "@/modules/portfolios/WalletCashModals.vue"
 import type { Wallets } from "@/api/types"
@@ -9,7 +11,13 @@ const store = useWalletsStore()
 const loading = ref(true)
 const error = ref<string | null>(null)
 const showCreate = ref(false)
+const currenciesStore = useCurrenciesStore()
 const newWallet = ref({ name: "", currency: "USD" })
+
+function openCreate() {
+  showCreate.value = true
+  if (!currenciesStore.loaded) void currenciesStore.load()
+}
 const creating = ref(false)
 const createError = ref<string | null>(null)
 
@@ -113,7 +121,7 @@ const historyChart = computed(() => ({
           {{ store.totalBalance.baseCurrency }}
         </p>
       </div>
-      <button type="button" class="btn-primary" @click="showCreate = true">New wallet</button>
+      <button type="button" class="btn-primary" @click="openCreate">New wallet</button>
     </div>
 
     <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
@@ -179,7 +187,7 @@ const historyChart = computed(() => ({
     <div v-else-if="!loading && !error" class="card flex flex-col items-center gap-3 p-10 text-center">
       <p class="font-medium text-slate-900 dark:text-slate-100">No wallets yet</p>
       <p class="text-sm text-slate-500 dark:text-slate-400">Create a wallet to hold cash in your account.</p>
-      <button type="button" class="btn-primary" @click="showCreate = true">New wallet</button>
+      <button type="button" class="btn-primary" @click="openCreate">New wallet</button>
     </div>
 
     <div v-if="showCreate" class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24" @click.self="showCreate = false">
@@ -189,13 +197,7 @@ const historyChart = computed(() => ({
           <label for="wallet-name" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Name</label>
           <input id="wallet-name" v-model="newWallet.name" type="text" required class="input mb-4" placeholder="e.g. USD savings" />
           <label for="wallet-currency" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Currency</label>
-          <select id="wallet-currency" v-model="newWallet.currency" class="input mb-4">
-            <option value="USD">USD</option>
-            <option value="EUR">EUR</option>
-            <option value="GBP">GBP</option>
-            <option value="CHF">CHF</option>
-            <option value="PLN">PLN</option>
-          </select>
+          <CurrencySelect v-model="newWallet.currency" aria-label="Wallet currency" testid="wallet-currency" class="input !w-full mb-4" />
           <p v-if="createError" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ createError }}</p>
           <div class="flex justify-end gap-2">
             <button type="button" class="btn-ghost" @click="showCreate = false">Cancel</button>

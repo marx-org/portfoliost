@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { useWalletsStore } from "@/stores/wallets"
 import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
+import { useCurrenciesStore } from "@/stores/currencies"
 import { storeToRefs } from "pinia"
 import { formatCurrency, formatPercent, formatSignedCurrency } from "@/utils/format"
 import InvestmentsTabs from "@/modules/portfolios/InvestmentsTabs.vue"
@@ -15,7 +16,11 @@ const walletsStore = useWalletsStore()
 const loading = ref(true)
 const error = ref<string | null>(null)
 
-const currencies = ["USD", "EUR", "GBP", "CHF", "PLN"]
+// D26: every currency selector is fed exclusively by the /api/currencies registry
+const currenciesStore = useCurrenciesStore()
+if (!currenciesStore.loaded) void currenciesStore.load()
+const currencies = computed(() => currenciesStore.options.map((c) => c.code))
+const currencySymbol = (code: string) => currenciesStore.info(code)?.symbol ?? code
 const displayCurrencyStore = useDisplayCurrencyStore()
 const { currency: displayCurrency } = storeToRefs(displayCurrencyStore)
 const showCurrencyMenu = ref(false)
@@ -153,7 +158,7 @@ async function submitCreateWallet() {
         </div>
         <div class="relative">
           <button type="button" class="btn-secondary text-sm" @click="showCurrencyMenu = !showCurrencyMenu">
-            Display currency: {{ displayCurrency }} ({{ displayCurrency === "USD" ? "$" : displayCurrency === "EUR" ? "€" : displayCurrency === "GBP" ? "£" : displayCurrency === "CHF" ? "Fr" : "zł" }})
+            Display currency: {{ displayCurrency }} ({{ currencySymbol(displayCurrency) }})
             <span class="ml-1 text-xs text-slate-400 dark:text-slate-500">▾</span>
           </button>
           <template v-if="showCurrencyMenu">
