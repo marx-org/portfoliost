@@ -1,5 +1,6 @@
 import { flushPromises, mount } from "@vue/test-utils"
 import { createPinia, setActivePinia, type Pinia } from "pinia"
+import { useCurrenciesStore } from "@/stores/currencies"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import InvestmentsView from "@/modules/portfolios/InvestmentsView.vue"
 import * as portfoliosApi from "@/api/portfolios"
@@ -91,6 +92,13 @@ describe("InvestmentsView", () => {
   beforeEach(() => {
     pinia = createPinia()
     setActivePinia(pinia)
+    // registry-fed selectors: seed the currencies store (D26)
+    const store = useCurrenciesStore()
+    store.currencies = [
+      { code: "EUR", name: "Euro", symbol: "€", minorUnits: 2, popular: true },
+      { code: "USD", name: "US Dollar", symbol: "$", minorUnits: 2, popular: true },
+    ]
+    store.loaded = true
     vi.clearAllMocks()
     mocked.getPortfolios.mockResolvedValue(summary())
     mocked.getPortfolioTotalMetrics.mockResolvedValue({
