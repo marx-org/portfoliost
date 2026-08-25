@@ -1,9 +1,18 @@
+import { nextTick } from "vue"
 import { flushPromises, mount } from "@vue/test-utils"
 import { createPinia, setActivePinia } from "pinia"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import WalletCashModals from "@/modules/portfolios/WalletCashModals.vue"
 import * as walletsApi from "@/api/wallets"
-import { useCurrenciesStore } from "@/stores/currencies"
+
+vi.mock("@/stores/currencies", () => {
+  const registry = [
+    { code: "EUR", name: "Euro", symbol: "€", minorUnits: 2, popular: true },
+    { code: "USD", name: "US Dollar", symbol: "$", minorUnits: 2, popular: true },
+    { code: "PLN", name: "Polish Zloty", symbol: "zł", minorUnits: 2, popular: true },
+  ]
+  return { useCurrenciesStore: () => ({ loaded: true, load: vi.fn(), currencies: registry, options: registry, info: {}, minorUnits: {} }) }
+})
 
 vi.mock("@/api/wallets", async (importOriginal) => {
   const actual = await importOriginal<typeof walletsApi>()
@@ -15,12 +24,6 @@ vi.mock("@/api/wallets", async (importOriginal) => {
   }
 })
 const mocked = vi.mocked(walletsApi)
-
-const registry = [
-  { code: "EUR", name: "Euro", symbol: "€", minorUnits: 2, popular: true },
-  { code: "USD", name: "US Dollar", symbol: "$", minorUnits: 2, popular: true },
-  { code: "PLN", name: "Polish Zloty", symbol: "zł", minorUnits: 2, popular: true },
-]
 
 const eurWallet = {
   id: "w-eur",
@@ -49,9 +52,6 @@ const usdWallet = {
 function makeEnv() {
   const pinia = createPinia()
   setActivePinia(pinia)
-  const store = useCurrenciesStore()
-  store.currencies = registry
-  store.loaded = true
   return pinia
 }
 
@@ -181,5 +181,32 @@ describe("WalletCashModals — dual-currency confirmation (§10a D39/D40)", () =
     await wrapper.find("#wc-amount").setValue(50)
     await flushPromises()
     expect(wrapper.text()).not.toContain("≈")
+  })
+})
+
+describe("WalletCashModals — deposit net summary (§13 follow-up)", () => {
+  it("deposit with foreign-currency fee shows net credited once rate resolves", async () => {
+    const pinia = makeEnv()
+    const wrapper = mount(WalletCashModals, {
+      props: { open: false, action: "deposit", wallet: usdWallet },
+      global: { plugins: [pinia] },
+    })
+    await wrapper.setProps({ open: true })
+    await flushPromises()
+    await wrapper.find("#wc-amount").setValue(200)
+    await nextTick(); await flushPromises()
+    await wrapper.find('[data-testid="wc-fee-currency"]').setValue("PLN")
+    await nextTick(); await flushPromises()
+    await wrapper.find('[data-testid="wc-fees"]').setValue(10)
+    await nextTick(); await flushPromises()
+    // fee leg resolves PLN→USD (transfer leg also mounts while hidden — pick by testid)
+    const feeLeg = wrapper
+      .findAllComponents({ name: "FxRateFields" })
+      .find((w) => w.props("testid") === "wc-fee-fx")!
+    ;(feeLeg.vm.$emit as (e: string, v: unknown) => void)("suggestion", { rate: 0.25, asOf: "2026-08-25" })
+    await nextTick(); await flushPromises(); await nextTick(); await flushPromises()
+    const text = wrapper.text().replace(/\u00A0/g, " ")
+    expect(text).toContain("Total credited (net)")
+    expect(text).toContain("$197.50") // 200 − 10×0.25
   })
 })

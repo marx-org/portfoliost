@@ -1,6 +1,7 @@
 export function formatCurrency(value: number | null | undefined, currency = "USD"): string {
   if (value === null || value === undefined || Number.isNaN(value)) return "—"
-  return new Intl.NumberFormat("en-US", { style: "currency", currency, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
+  const ccy = currency && /^[A-Za-z]{3}$/.test(currency) ? currency : "USD"
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: ccy, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
 }
 
 export function formatNumber(value: number | null | undefined, digits = 2): string {

@@ -86,6 +86,12 @@ const targetAmountValue = computed<number | null>(() => {
 
 const totalDebited = computed(() => amount.value + (feeInWalletCcy.value ?? 0))
 
+const netCredited = computed<number | null>(() => {
+  if (props.action !== "deposit") return null
+  if (feeAmount.value > 0 && feeInWalletCcy.value == null) return null // rate pending
+  return Math.max(0, amount.value - (feeInWalletCcy.value ?? 0))
+})
+
 const dualActive = computed(() => isCrossCurrencyTransfer.value && transferRateValue.value != null)
 
 /** " ≈ X" equivalent in the other currency, driven by the live transfer rate */
@@ -329,6 +335,7 @@ const submitLabel = computed(() => (props.action === "deposit" ? "Deposit" : pro
             :hidden="feesType !== 'fixed' || feeCurrency === wallet.currency"
             v-model:rate-source="feeRateSource"
             v-model:rate="feeExchangeRate"
+            @suggestion="feeSuggestion = $event"
             testid="wc-fee-fx"
             class="mt-3"
           />
@@ -351,6 +358,10 @@ const submitLabel = computed(() => (props.action === "deposit" ? "Deposit" : pro
                   <template v-else> · rate pending</template>
                 </template>
               </dd>
+            </div>
+            <div v-if="action === 'deposit' && netCredited != null" class="flex justify-between gap-3 border-t border-slate-200 pt-0.5 font-semibold text-slate-900 dark:text-slate-100 dark:border-slate-700">
+              <dt>Total credited (net)</dt>
+              <dd>{{ formatCurrency(netCredited, wallet.currency) }}</dd>
             </div>
             <div v-if="action !== 'deposit'" class="flex justify-between gap-3 border-t border-slate-200 pt-0.5 font-semibold text-slate-900 dark:text-slate-100 dark:border-slate-700">
               <dt>Total debited</dt>
