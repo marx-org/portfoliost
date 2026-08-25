@@ -4,6 +4,9 @@ import { useRoute, useRouter } from "vue-router"
 import { useWalletsStore } from "@/stores/wallets"
 import FeeCell from "@/components/FeeCell.vue"
 import { getWalletBalanceHistory, updateWalletTransaction, deleteWalletTransaction } from "@/api/wallets"
+import FeeFields from "@/components/FeeFields.vue"
+import FxRateFields from "@/components/FxRateFields.vue"
+import type { LatestRate } from "@/api/fx"
 import { formatCurrency, formatDate, formatSignedCurrency } from "@/utils/format"
 import WalletCashModals from "@/modules/portfolios/WalletCashModals.vue"
 import ConfirmDeleteModal from "@/modules/portfolios/ConfirmDeleteModal.vue"
@@ -35,7 +38,18 @@ const deleteError = ref<string | null>(null)
 const notice = ref<string | null>(null)
 
 const editing = ref<CashTransaction | null>(null)
-const editForm = ref({ type: "DEPOSIT" as string, amount: 0, description: "", date: "" })
+const editForm = ref({
+  type: "DEPOSIT" as string,
+  amount: 0,
+  description: "",
+  date: "",
+  fees: 0,
+  feesType: "fixed" as "fixed" | "pct",
+  feeCurrency: "USD",
+  feeRateSource: "automatic" as "automatic" | "manual",
+  feeExchangeRate: "",
+})
+const editFeeSuggestion = ref<LatestRate | null>(null)
 const editBusy = ref(false)
 const editError = ref<string | null>(null)
 
@@ -141,6 +155,11 @@ function openEdit(tx: CashTransaction) {
     amount: Math.abs(tx.amount),
     description: tx.description ?? "",
     date: tx.createdAt.slice(0, 10),
+    fees: tx.fees ?? 0,
+    feesType: "fixed",
+    feeCurrency: tx.feeCurrency ?? tx.currency ?? "USD",
+    feeRateSource: "automatic",
+    feeExchangeRate: "",
   }
   editError.value = null
 }
@@ -155,6 +174,20 @@ async function submitEdit() {
       amount: editForm.value.amount,
       description: editForm.value.description,
       date: editForm.value.date ? new Date(editForm.value.date).toISOString() : editing.value.createdAt,
+      fees: editForm.value.fees || undefined,
+      fees_type: editForm.value.feesType,
+      feeCurrency: editForm.value.feesType === "fixed" ? editForm.value.feeCurrency : undefined,
+      feeRateSource:
+        editForm.value.feesType === "fixed" && editForm.value.feeCurrency !== wallet.value?.currency
+          ? editForm.value.feeRateSource
+          : undefined,
+      feeExchangeRate:
+        editForm.value.feesType === "fixed" &&
+        editForm.value.feeCurrency !== wallet.value?.currency &&
+        editForm.value.feeRateSource === "manual" &&
+        editForm.value.feeExchangeRate
+          ? Number(editForm.value.feeExchangeRate)
+          : undefined,
     })
     editing.value = null
     notice.value = "Transaction updated"
@@ -473,6 +506,27 @@ function exportHistory() {
             </select>
             <label for="wallet-tx-amount" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Amount</label>
             <input id="wallet-tx-amount" v-model.number="editForm.amount" type="number" min="0" step="0.01" required class="input mb-4" />
+            <label for="wallet-tx-fees" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Fees (Optional)</label>
+            <FeeFields
+              v-model:fees="editForm.fees"
+              v-model:fees-type="editForm.feesType"
+              v-model:fee-currency="editForm.feeCurrency"
+              testid="wallet-tx"
+              input-id="wallet-tx-fees"
+              class="mb-4"
+            />
+            <FxRateFields
+              leg="Fee"
+              :from="editForm.feeCurrency"
+              :to="wallet?.currency ?? 'USD'"
+              :date="editForm.date"
+              :hidden="editForm.feesType !== 'fixed' || editForm.feeCurrency === wallet?.currency"
+              v-model:rate-source="editForm.feeRateSource"
+              v-model:rate="editForm.feeExchangeRate"
+              @suggestion="editFeeSuggestion = $event"
+              testid="wallet-tx-fee-fx"
+              class="mb-4"
+            />
             <label for="wallet-tx-date" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Date</label>
             <input id="wallet-tx-date" v-model="editForm.date" type="date" required class="input mb-4" />
             <label for="wallet-tx-description" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Description</label>

@@ -80,6 +80,12 @@ export interface UpdateRecentCashTransaction {
   amount?: number
   description?: string
   date?: string
+  /** fees-and-custom-fx edit parity (plan §13 follow-up 2/6) */
+  fees?: number
+  fees_type?: "fixed" | "pct"
+  feeCurrency?: string
+  feeRateSource?: "automatic" | "manual"
+  feeExchangeRate?: number
 }
 
 export async function updateWalletTransaction(
