@@ -60,6 +60,7 @@ Browser → portfoliost (port 3000, static SPA)
                               ├── /api/auth/*   → API_USERS_AUTH_URL (users-auth module)
                               ├── /api/users/*  → API_USERS_AUTH_URL (users-auth module)
                               ├── /api/instruments/* → API_INSTRUMENTS_URL (instruments module stack)
+                              ├── /api/admin/*    → API_ADMIN_URL (admin module)
                               ├── /api/...      → per-module upstreams
                               └── catch-all     → API_BACKEND_URL
 ```
@@ -77,6 +78,7 @@ Services in Docker Compose:
 | `openst` | internal | Provider tier — OpenBB/FMP market data (repo `../openst`) |
 | `cachest` | internal | Caching reverse proxy in front of openst (repo `../cachest`) |
 | `instruments` | `3000` (internal) | instruments module — real backend serving `/api/instruments/*`, repo `../portfoliost-instruments` |
+| `admin` | `3000` (internal) | admin module — system versions, FX rates, users; repo `../portfoliost-admin` |
 
 ## Environment variables
 
@@ -105,6 +107,7 @@ by the gateway (and later by backend modules calling each other internally).
 | `API_SNAPTRADE_URL` | `/api/snaptrade/*` | `http://example-service-mock:4010` |
 | `API_PUBLIC_URL` | `/api/public/*` | `http://example-service-mock:4010` |
 | `API_BACKEND_URL` | catch-all `/api/*` | `http://example-service-mock:4010` |
+| `API_ADMIN_URL` | `/api/admin/*` | `http://example-service-mock:4010` |
 
 ### Dev server proxy
 

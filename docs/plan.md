@@ -517,3 +517,70 @@ Target: apps stay stateless; the namespace-level shared instance (`redis`, pinne
 - [x] 13.2 openst HelmRelease — drop localhost redis sidecar; `REDIS_HOST=redis`, `${SECRET_REDIS_PASS}`, `REDIS_DB=2`
 - [x] 13.3 cutover complete (2026-08-25): sidecars gone (single `app` container on both), shared redis carries openst db2 + cachest db1 (ghostfolio db0 untouched); stale `REDIS_HOST=localhost` env removed from cachest HR; orphaned `cachest-redis` PVC deleted
 - [x] 13.4 local compose hygiene — pin floating minor (`redis:7-alpine` → `redis:7.4-alpine`) across portfoliost / openst / cachest compose files (dev-only isolation unaffected)
+
+## 14. Admin module (`portfoliost-admin`)
+
+Proposal: [admin-module.md](proposals/admin-module.md) (D42–D52). Read-only admin panel: system versions, FX rates, OIDC users. No database. Backend is a new Hono+jose repo that proxies other modules' APIs. Frontend lives in the existing SPA under `/en/admin/*`, gated by `portfoliost_admin` group.
+
+### 14.1 — Admin backend scaffold + compose wiring (D42, D51)
+- [ ] New repo `Marx2/portfoliost-admin` from users-auth skeleton (strip Drizzle, DB, seed — no database).
+- [ ] `src/index.ts`: Hono app with `/health`, `/__meta` (`{ service: "admin", impl: "real", version }`), `/internal/verify` (JWT preflight).
+- [ ] `src/auth.ts`: copy `validateJwt` + `userIdentityMiddleware` + `requireGroup("portfoliost_admin")` from users-auth.
+- [ ] `Dockerfile`: node:22-alpine, `npm ci && npm run build`, `node dist/server.js` (no migrate/seed).
+- [ ] Tests: `/health` returns 200, `/__meta` returns correct shape, `/internal/verify` 201/401, admin middleware 403 for non-admin.
+- [ ] `docker-compose.yml`: `admin` service (build `../portfoliost-admin`, expose 3000, env `API_USERS_AUTH_URL`, `API_WALLETS_URL`, `API_INSTRUMENTS_URL`, `OIDC_ISSUER_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, depends_on postgres).
+- [ ] `deploy/services.env`: add `API_ADMIN_URL=http://example-service-mock:4010` (default mock).
+- [ ] `gateway/default.conf.template`: add `location /api/admin/ { proxy_pass ${API_ADMIN_URL}; }`.
+- [ ] Verify: `docker compose up -d --build`, admin `/health` + `/__meta` reachable through gateway, full unit+mock green. Commit.
+
+### 14.2 — SPA router + sidebar admin entry (D43, D44, D45)
+- [ ] `src/api/admin.ts`: `http.get` wrappers for `/api/admin/system/versions`, `/api/admin/currencies/rates`, `/api/admin/users`.
+- [ ] `src/stores/auth.ts`: add `isAdmin` computed (`user.value?.groups?.includes("portfoliost_admin") ?? false`).
+- [ ] `src/router/index.ts`: add admin routes under `/en/admin` with `meta: { requiresAuth: true }`:
+  - `/en/admin` → redirect to `/en/admin/system`
+  - `/en/admin/system` → `SystemInfoView` (lazy)
+  - `/en/admin/currencies` → `CurrencyRatesView` (lazy)
+  - `/en/admin/users` → `UsersView` (lazy)
+- [ ] Router guard: extend `beforeEach` — if route has `meta.admin` and `!auth.isAdmin`, redirect to `/en/investments`.
+- [ ] `src/layout/SidebarNav.vue`: add "Admin" item (`router-link to="/en/admin"`, cog/shield icon, `v-if="auth.isAdmin"`) between main nav and bottom section.
+- [ ] `src/modules/admin/SystemInfoView.vue`: empty shell (heading only).
+- [ ] `src/modules/admin/CurrencyRatesView.vue`: empty shell.
+- [ ] `src/modules/admin/UsersView.vue`: empty shell.
+- [ ] Tests: `isAdmin` computed, router guard blocks non-admin, sidebar hides for non-admin. Build + unit + mock green. Commit.
+
+### 14.3 — System versions screen (D46)
+- [x] Admin backend `GET /api/admin/system/versions`: for each configured module URL (users-auth, wallets, instruments, admin itself, openst, cachest, example-service-mock), call `GET /__meta`. Aggregate into `{ services: [{ service, version, impl }], fetchedAt }`. Unreachable → `{ version: "unreachable", impl: "unknown" }`.
+- [x] Unit tests: all reachable, some unreachable, all unreachable.
+- [x] `SystemInfoView.vue`: card layout, one row per service, status badge (green=real, yellow=mock, red=unreachable), auto-refresh every 30s via `setInterval` + `onUnmounted` cleanup.
+- [x] Verify: `docker compose up -d --build`, navigate to `/en/admin/system`, cards render with live data from `/__meta` endpoints. Unit+mock green. Commit.
+
+### 14.4 — Wallets admin FX rates endpoint + admin proxy + frontend table (D47)
+- [x] **Wallets module** `src/routes/admin.ts`: `GET /api/wallets/admin/fx-rates` with `requireGroup("portfoliost_admin")`, query params: `page`, `per_page` (max 200), `sort_by` (date/base_currency/quote_currency/rate), `sort_dir`, `base_currency`, `quote_currency`, `date_from`, `date_to`. Query `wallets.fx_rates` with filters/sort/pagination. Response: `{ items: [...], pagination: { total, page, per_page, total_pages } }`.
+- [x] Mount in wallets `src/index.ts`: `api.route("/admin", createAdminRoutes())`.
+- [x] Wallets unit tests: admin endpoint returns paginated results, filtered, sorted, 403 without admin group.
+- [x] **Admin backend** `GET /api/admin/currencies/rates`: proxy to `GET ${API_WALLETS_URL}/admin/fx-rates` with same query params, pass through response.
+- [x] Admin unit test: proxy forwards params and response.
+- [x] `CurrencyRatesView.vue`: Tailwind table with sortable column headers (click toggles asc/desc/none), filter row (2 `<select>` for base/quote from `/api/currencies`, 2 `<input type="date">`), pagination controls (prev/next + page indicator). All server-side.
+- [x] Verify: `docker compose up -d --build`, navigate to `/en/admin/currencies`, table renders FX rates, sort/filter/paginate work. Unit+mock green. Commit.
+
+### 14.5 — Users-auth admin endpoint + OIDC enrichment + frontend table (D48, D48b, D49)
+- [x] **Users-auth** `src/routes/admin.ts`: `GET /api/users/admin/list` with `requireGroup("portfoliost_admin")`, query: `page`, `per_page` (max 200), `search` (user_id prefix). Query `users_auth.user_preferences` for `userId`, `createdAt`, `updatedAt`. Response: `{ items: [...], pagination: {...} }`.
+- [x] Mount in users-auth `src/index.ts`: `api.route("/users/admin", createAdminRoutes())`.
+- [x] Users-auth unit tests: admin endpoint returns paginated results, search filter, 403 without admin group.
+- [x] **Admin backend** `GET /api/admin/users`: call users-auth `GET /api/users/admin/list`, then for each user call OIDC provider `GET /oauth2/userinfo` with server-side client-credentials token (D49). Merge identity fields. Cache results 5 min. Env vars: `OIDC_ISSUER_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`. Response: `{ items: [{ id, email, firstName, lastName, groups, lastLogin, createdAt }], pagination }`.
+- [x] Admin unit tests: mock users-auth + OIDC calls, verify merge + caching.
+- [x] `UsersView.vue`: Tailwind table, client-side sort (reusable sortable-column pattern), client-side text filter (across email/firstName/lastName), group badges (`portfoliost_admin` highlighted), read-only (no edit actions).
+- [x] Verify: `docker compose up -d --build`, navigate to `/en/admin/users`, table renders users with groups. Unit+mock green. Commit.
+
+### 14.6 — Admin authorization middleware enforcement (D50)
+- [x] **Admin backend**: all `/api/admin/*` routes wrapped with `userIdentityMiddleware` + `requireGroup("portfoliost_admin")` at router level. Non-admin JWT → 403 `{ error: "Admin access required" }`.
+- [x] **Wallets module**: admin routes (`/api/wallets/admin/*`) already gated by `requireGroup` from 14.4 — verify.
+- [x] **Users-auth module**: admin routes (`/api/users/admin/list`) already gated by `requireGroup` from 14.5 — verify.
+- [x] Unit tests: 403 for non-admin JWT on all three modules, 200 for admin JWT.
+- [x] Full suite: build + unit + mock + e2e green. Commit.
+
+### 14.7 — Docs sweep + closeout
+- [x] Update `docs/proposals/admin-module.md`: status → Implemented.
+- [x] Update `docs/plan.md`: all 14.x points marked done.
+- [ ] Update `README.md`: admin module in service table, `API_ADMIN_URL` in env table.
+- [ ] Final: full test suite green across all repos. Commit.

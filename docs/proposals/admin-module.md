@@ -1,6 +1,6 @@
 # Proposal: Admin module (`portfoliost-admin`)
 
-**Status**: Proposed
+**Status**: Implemented
 **Date**: 2026-08-25
 **Builds on**: [backend-topology.md](backend-topology.md) (D1–D11), [wallets-module.md](wallets-module.md) (D16–D24), [fees-and-custom-fx.md](fees-and-custom-fx.md) (D25–D41), [MODULARISATION.md](../MODULARISATION.md)
 **Scope**: admin panel as a backend module + in-app SPA routes. Surfaces system versions, FX rate data, and registered OIDC users for operators. Gated by OIDC group membership (`portfoliost_admin`). No database — reads data through module APIs and OIDC UserInfo.
