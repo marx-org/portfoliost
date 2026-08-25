@@ -515,5 +515,5 @@ Target: apps stay stateless; the namespace-level shared instance (`redis`, pinne
 
 - [x] 13.1 cachest HelmRelease — remove `redis` sidecar + `cachest-redis` PVC persistence; ConfigMap points at shared instance (`host: redis`, `${SECRET_REDIS_PASS}`, `db: 1`)
 - [x] 13.2 openst HelmRelease — drop localhost redis sidecar; `REDIS_HOST=redis`, `${SECRET_REDIS_PASS}`, `REDIS_DB=2`
-- [ ] 13.3 cutover runbook (needs cluster access): reconcile both HRs, confirm keys land under DB 1/2 on the shared instance, then delete orphaned `cachest-redis` PVC
+- [x] 13.3 cutover complete (2026-08-25): sidecars gone (single `app` container on both), shared redis carries openst db2 + cachest db1 (ghostfolio db0 untouched); stale `REDIS_HOST=localhost` env removed from cachest HR; orphaned `cachest-redis` PVC deleted
 - [x] 13.4 local compose hygiene — pin floating minor (`redis:7-alpine` → `redis:7.4-alpine`) across portfoliost / openst / cachest compose files (dev-only isolation unaffected)
