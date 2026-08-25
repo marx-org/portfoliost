@@ -126,6 +126,9 @@ describe("WalletCashModals — fee currency & cross-currency transfer (§10.4)",
 
     await wrapper.find("#wc-to-wallet").setValue("w-eur")
     await flushPromises()
+    // target leg uses the unified disclosure — Custom reveals the amount input
+    await wrapper.find('[data-testid="wc-transfer-fx-manual"]').trigger("click")
+    await wrapper.setProps({}) // noop keepalive
     expect(wrapper.find('[data-testid="wc-target-amount"]').exists()).toBe(true)
 
     await wrapper.find("#wc-amount").setValue(100)

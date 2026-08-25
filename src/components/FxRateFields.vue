@@ -12,7 +12,8 @@ const props = defineProps<{
   /** leg date (YYYY-MM-DD) — drives the custom-rate suggestion (D39) */
   date?: string
   rateSource: "automatic" | "manual"
-  rate: string
+  /** only used by the default manual input; supply via #manual slot otherwise */
+  rate?: string
   /** hide the whole disclosure (absent = shown); Vue booleans default false when absent */
   hidden?: boolean
   testid?: string
@@ -91,19 +92,23 @@ watch(
       </template>
       <template v-else>daily market rate</template>
     </p>
-    <div v-else class="mt-1.5 flex items-center gap-2">
-      <input
-        :value="rate"
-        type="number"
-        min="0"
-        step="any"
-        :placeholder="suggestion ? suggestion.rate.toFixed(4) : 'e.g. 4.35'"
-        class="input"
-        :aria-label="`Custom ${leg.toLowerCase()} exchange rate (${from} to ${to})`"
-        :data-testid="`${tid}-rate`"
-        @input="emit('update:rate', ($event.target as HTMLInputElement).value)"
-      />
-      <span class="whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">per 1 {{ from }}</span>
+    <div v-else class="mt-1.5">
+      <slot name="manual" :suggestion="suggestion">
+        <div class="flex items-center gap-2">
+          <input
+            :value="rate"
+            type="number"
+            min="0"
+            step="any"
+            :placeholder="suggestion ? suggestion.rate.toFixed(4) : 'e.g. 4.35'"
+            class="input"
+            :aria-label="`Custom ${leg.toLowerCase()} exchange rate (${from} to ${to})`"
+            :data-testid="`${tid}-rate`"
+            @input="emit('update:rate', ($event.target as HTMLInputElement).value)"
+          />
+          <span class="whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">per 1 {{ from }}</span>
+        </div>
+      </slot>
     </div>
   </div>
 </template>

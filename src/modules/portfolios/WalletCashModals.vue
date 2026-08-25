@@ -30,7 +30,7 @@ const rateSource = ref<"automatic" | "manual">("automatic")
 const exchangeRate = ref("")
 const feeRateSource = ref<"automatic" | "manual">("automatic")
 const feeExchangeRate = ref("")
-const showFxSection = ref(false)
+const targetRateSource = ref<"automatic" | "manual">("automatic")
 const manualTargetAmount = ref<number | null>(null)
 const busy = ref(false)
 const error = ref<string | null>(null)
@@ -76,7 +76,7 @@ watch(
       exchangeRate.value = ""
       feeRateSource.value = "automatic"
       feeExchangeRate.value = ""
-      showFxSection.value = false
+      targetRateSource.value = "automatic"
       manualTargetAmount.value = null
       if (!currenciesStore.loaded) void currenciesStore.load()
       busy.value = false
@@ -139,7 +139,9 @@ async function submit() {
         description: description.value || undefined,
         transaction_date: date,
         to_wallet_id: toWalletId.value,
-        ...(isCrossCurrencyTransfer.value && manualTargetAmount.value != null
+        ...(isCrossCurrencyTransfer.value &&
+        targetRateSource.value === "manual" &&
+        manualTargetAmount.value != null
           ? { targetAmount: manualTargetAmount.value }
           : {}),
         ...feeFx,
@@ -174,19 +176,19 @@ const submitLabel = computed(() => (props.action === "deposit" ? "Deposit" : pro
         <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="emit('close')">✕</button>
       </div>
 
-      <form @submit.prevent="submit">
+      <form class="grid grid-cols-1 gap-4 sm:grid-cols-2" @submit.prevent="submit">
         <template v-if="action === 'withdraw'">
-          <p class="mb-4 rounded-lg bg-slate-50 dark:bg-slate-800/50 px-3 py-2 text-sm text-slate-700 dark:text-slate-200">
+          <p class="rounded-lg bg-slate-50 dark:bg-slate-800/50 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 sm:col-span-2">
             Available Balance: {{ formatCurrency(availableBalance, wallet.currency) }}
           </p>
         </template>
 
         <template v-if="action === 'transfer'">
-          <div class="mb-4">
+          <div>
             <label for="wc-from-wallet" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">From Wallet *</label>
             <input id="wc-from-wallet" type="text" class="input" :value="`${wallet.name} - ${formatCurrency(wallet.balance, wallet.currency)}`" disabled />
           </div>
-          <div class="mb-4">
+          <div>
             <label for="wc-to-wallet" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">To Wallet *</label>
             <select id="wc-to-wallet" v-model="toWalletId" class="input" required>
               <option value="" disabled>Select destination wallet</option>
@@ -197,7 +199,7 @@ const submitLabel = computed(() => (props.action === "deposit" ? "Deposit" : pro
           </div>
         </template>
 
-        <div class="mb-4">
+        <div>
           <label for="wc-amount" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Amount *</label>
           <div class="flex gap-2">
             <div class="flex flex-1 items-center rounded-lg border border-slate-300 dark:border-slate-600 focus-within:border-blue-500">
@@ -206,26 +208,25 @@ const submitLabel = computed(() => (props.action === "deposit" ? "Deposit" : pro
             </div>
             <button v-if="action === 'transfer'" type="button" class="btn-secondary shrink-0 text-sm" @click="transferAll">Transfer All</button>
           </div>
-          <p v-if="action === 'transfer'" class="mt-1 text-xs text-slate-500 dark:text-slate-400">Available: {{ formatCurrency(availableBalance, wallet.currency) }}</p>
+          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Available: {{ formatCurrency(availableBalance, wallet.currency) }}</p>
         </div>
 
-        <div class="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label for="wc-date" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Transaction Date</label>
-            <input id="wc-date" v-model="transactionDate" type="date" class="input" />
-          </div>
-          <div v-if="action === 'withdraw'">
-            <label for="wc-payment" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Payment Method</label>
-            <select id="wc-payment" v-model="paymentMethod" class="input">
-              <option value="bank_transfer">Bank Transfer</option>
-              <option value="card">Card</option>
-              <option value="wire">Wire</option>
-              <option value="paypal">PayPal</option>
-            </select>
-          </div>
+        <div>
+          <label for="wc-date" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Transaction Date</label>
+          <input id="wc-date" v-model="transactionDate" type="date" class="input" />
         </div>
 
-        <div class="mb-4">
+        <div v-if="action === 'withdraw'">
+          <label for="wc-payment" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Payment Method</label>
+          <select id="wc-payment" v-model="paymentMethod" class="input">
+            <option value="bank_transfer">Bank Transfer</option>
+            <option value="card">Card</option>
+            <option value="wire">Wire</option>
+            <option value="paypal">PayPal</option>
+          </select>
+        </div>
+
+        <div class="sm:col-span-2">
           <label for="wc-description" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Description (Optional)</label>
           <input
             id="wc-description"
@@ -236,7 +237,7 @@ const submitLabel = computed(() => (props.action === "deposit" ? "Deposit" : pro
           />
         </div>
 
-        <div class="mb-4">
+        <div>
           <label for="wc-fees" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Fees (Optional)</label>
           <FeeFields
             v-model:fees="fees"
@@ -245,24 +246,31 @@ const submitLabel = computed(() => (props.action === "deposit" ? "Deposit" : pro
             testid="wc"
             input-id="wc-fees"
           />
+        </div>
 
-          <FxRateFields
-            leg="Fee"
-            :from="feeCurrency"
-            :to="wallet.currency"
-            :date="transactionDate"
-            :hidden="feesType !== 'fixed' || feeCurrency === wallet.currency"
-            v-model:rate-source="feeRateSource"
-            v-model:rate="feeExchangeRate"
-            testid="wc-fee-fx"
-          />
+        <FxRateFields
+          leg="Fee"
+          :from="feeCurrency"
+          :to="wallet.currency"
+          :date="transactionDate"
+          :hidden="feesType !== 'fixed' || feeCurrency === wallet.currency"
+          v-model:rate-source="feeRateSource"
+          v-model:rate="feeExchangeRate"
+          testid="wc-fee-fx"
+        />
 
-          <div v-if="isCrossCurrencyTransfer" class="mt-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50">
-            <p class="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
-              Cross-currency transfer · {{ wallet.currency }} → {{ destCurrency }}
-            </p>
+        <FxRateFields
+          leg="Transfer"
+          :from="wallet.currency"
+          :to="destCurrency ?? wallet.currency"
+          :date="transactionDate"
+          :hidden="!isCrossCurrencyTransfer"
+          v-model:rate-source="targetRateSource"
+          testid="wc-transfer-fx"
+        >
+          <template #manual>
             <label for="wc-target-amount" class="mb-1 block text-xs text-slate-500 dark:text-slate-400">
-              Target amount in {{ destCurrency }} — leave empty to convert automatically at the daily rate
+              Target amount in {{ destCurrency }} — leave empty to convert at the custom rate
             </label>
             <input
               id="wc-target-amount"
@@ -271,13 +279,14 @@ const submitLabel = computed(() => (props.action === "deposit" ? "Deposit" : pro
               min="0"
               step="any"
               class="input"
-              :placeholder="'auto'"
+              placeholder="auto"
               data-testid="wc-target-amount"
             />
-          </div>
-        </div>
+          </template>
+        </FxRateFields>
 
-        <div class="mb-4 rounded-lg bg-slate-50 dark:bg-slate-800/50 px-3 py-2 text-sm">
+
+        <div class="rounded-lg bg-slate-50 dark:bg-slate-800/50 px-3 py-2 text-sm sm:col-span-2">
           <p class="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">Transaction Confirmation</p>
           <p class="mt-0.5 font-semibold tabular-nums">{{ formatCurrency(amount || 0, wallet.currency) }}</p>
           <p v-if="action === 'withdraw'" class="mt-0.5 text-slate-500 dark:text-slate-400">Remaining Balance: {{ formatCurrency(remainingBalance, wallet.currency) }}</p>
@@ -289,9 +298,9 @@ const submitLabel = computed(() => (props.action === "deposit" ? "Deposit" : pro
           </p>
         </div>
 
-        <p v-if="error" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ error }}</p>
+        <p v-if="error" class="text-sm text-red-600 dark:text-red-400 sm:col-span-2">{{ error }}</p>
 
-        <div class="flex justify-end gap-2">
+        <div class="flex justify-end gap-2 sm:col-span-2">
           <button type="button" class="btn-ghost" @click="emit('close')">Cancel</button>
           <button type="submit" class="btn-primary capitalize" :disabled="busy || !canSubmit">
             {{ busy ? "Processing..." : submitLabel }}
