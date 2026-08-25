@@ -479,3 +479,14 @@ Proposal: [wallets-module.md](proposals/wallets-module.md) (accepted 2026-08-24,
 - [x] 11.10 users-auth preference integration — read `baseCurrency` via internal route for defaults
 - [x] 11.11 Gateway + compose wiring, contract tests green against mock AND module, e2e switch via `API_WALLETS_URL`
 - [x] 11.12 Cluster rollout — HelmRelease, ingress path, FX-sync CronJob
+
+## 12. Instrument logos (provider-resolved, permanently stored)
+
+Proposal: [logos.md](proposals/logos.md) (draft 2026-08-25, D34–D37). Resolve logos once through the provider tier (FMP → yfinance → favicon), persist binaries on disc + metadata in Postgres, serve from our own infrastructure; generated initials as terminal fallback.
+
+- [ ] 12.1 openst `equity.logo` route (FMP → yfinance → favicon chain) + stack test
+- [ ] 12.2 cachest route for logo resolution lookups (short TTL)
+- [ ] 12.3 instruments: `logos` table migration + resolve/persist/single-flight service
+- [ ] 12.4 `/api/logos/:symbol` serving local files + initials fallback; mock handler retired
+- [ ] 12.5 disc volume in compose + cluster HelmRelease persistence
+- [ ] 12.6 e2e: WSE ticker search renders a logo (real or initials); file persisted on disc
