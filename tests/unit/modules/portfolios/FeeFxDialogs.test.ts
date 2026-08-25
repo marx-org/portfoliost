@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from "pinia"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import AddPositionDialog from "@/modules/portfolios/AddPositionDialog.vue"
 import EditTransactionModal, { type EditTransaction } from "@/modules/portfolios/EditTransactionModal.vue"
+import { usePortfolioStore } from "@/stores/portfolios"
 import * as portfoliosApi from "@/api/portfolios"
 import * as walletsApi from "@/api/wallets"
 import { useCurrenciesStore } from "@/stores/currencies"
@@ -37,6 +38,9 @@ function makeEnv() {
   const store = useCurrenciesStore()
   store.currencies = registry
   store.loaded = true
+  // D40: portfolio currency is the conversion target for transaction legs
+  const portfolios = usePortfolioStore()
+  portfolios.portfolios = [{ id: "p1", currency: "PLN" }] as never
   mockedWallets.getWallets.mockResolvedValue([
     { id: "w1", userId: "u", name: "Cash USD", currency: "USD", balance: 1000, availableBalance: 1000, isDefault: false, createdAt: "", updatedAt: "" },
   ] as never)
@@ -88,9 +92,10 @@ describe("AddPositionDialog — fee currency & fx disclosure (§10.3)", () => {
     wrapper.unmount()
   })
 
-  it("fx section is always visible, defaults to automatic, hides the rate input", async () => {
+  it("fx section targets the portfolio currency, defaults to automatic, hides the rate input", async () => {
     const wrapper = await openStockStep()
-    expect(wrapper.find('[data-testid="add-position-fx-section"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="add-position-fx-section"]').exists()).toBe(true) // USD → PLN (portfolio ccy)
+    expect(wrapper.text()).toContain("USD → PLN")
     expect(wrapper.find('[data-testid="add-position-fx-rate"]').exists()).toBe(false)
     wrapper.unmount()
   })

@@ -2,7 +2,8 @@
 import { computed, ref, watch } from "vue"
 import { useWalletsStore } from "@/stores/wallets"
 import { formatCurrency } from "@/utils/format"
-import CurrencySelect from "@/components/CurrencySelect.vue"
+import FeeFields from "@/components/FeeFields.vue"
+import FxRateFields from "@/components/FxRateFields.vue"
 import { useCurrenciesStore } from "@/stores/currencies"
 import type { Wallets } from "@/api/types"
 
@@ -27,6 +28,8 @@ const feesType = ref<"fixed" | "pct">("fixed")
 const feeCurrency = ref("USD")
 const rateSource = ref<"automatic" | "manual">("automatic")
 const exchangeRate = ref("")
+const feeRateSource = ref<"automatic" | "manual">("automatic")
+const feeExchangeRate = ref("")
 const showFxSection = ref(false)
 const manualTargetAmount = ref<number | null>(null)
 const busy = ref(false)
@@ -71,6 +74,8 @@ watch(
       feeCurrency.value = props.wallet.currency || "USD"
       rateSource.value = "automatic"
       exchangeRate.value = ""
+      feeRateSource.value = "automatic"
+      feeExchangeRate.value = ""
       showFxSection.value = false
       manualTargetAmount.value = null
       if (!currenciesStore.loaded) void currenciesStore.load()
@@ -98,6 +103,17 @@ async function submit() {
       rateSource: rateSource.value,
       exchangeRate:
         rateSource.value === "manual" && exchangeRate.value ? Number(exchangeRate.value) : undefined,
+      feeRateSource:
+        feesType.value === "fixed" && feeCurrency.value !== props.wallet.currency
+          ? feeRateSource.value
+          : undefined,
+      feeExchangeRate:
+        feesType.value === "fixed" &&
+        feeCurrency.value !== props.wallet.currency &&
+        feeRateSource.value === "manual" &&
+        feeExchangeRate.value
+          ? Number(feeExchangeRate.value)
+          : undefined,
     }
     if (props.action === "deposit") {
       await store.deposit(props.wallet.id, {
@@ -222,28 +238,24 @@ const submitLabel = computed(() => (props.action === "deposit" ? "Deposit" : pro
 
         <div class="mb-4">
           <label for="wc-fees" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Fees (Optional)</label>
-          <div class="flex gap-2">
-            <div class="flex flex-1 items-center rounded-lg border border-slate-300 dark:border-slate-600 focus-within:border-blue-500">
-              <CurrencySelect
-                v-if="feesType === 'fixed'"
-                v-model="feeCurrency"
-                aria-label="Fee currency"
-                testid="wc-fee-currency"
-                class="!rounded-l-lg !border-0 !border-r"
-              />
-              <span v-else class="pl-3 text-sm text-slate-500 dark:text-slate-400">%</span>
-              <input id="wc-fees" v-model.number="fees" type="number" min="0" step="0.01" class="input !rounded-l-none !border-0 !ring-0 focus:ring-0" />
-            </div>
-            <button
-              type="button"
-              class="btn-secondary shrink-0 text-sm"
-              :class="feesType === 'pct' ? 'bg-slate-200 dark:bg-slate-700/70 text-slate-900 dark:text-slate-100' : ''"
-              data-testid="wc-fees-toggle"
-              @click="feesType = feesType === 'fixed' ? 'pct' : 'fixed'"
-            >
-              {{ feesType === "fixed" ? "Fixed" : "%" }}
-            </button>
-          </div>
+          <FeeFields
+            v-model:fees="fees"
+            v-model:fees-type="feesType"
+            v-model:fee-currency="feeCurrency"
+            testid="wc"
+            input-id="wc-fees"
+          />
+
+          <FxRateFields
+            leg="Fee"
+            :from="feeCurrency"
+            :to="wallet.currency"
+            :date="transactionDate"
+            :hidden="feesType !== 'fixed' || feeCurrency === wallet.currency"
+            v-model:rate-source="feeRateSource"
+            v-model:rate="feeExchangeRate"
+            testid="wc-fee-fx"
+          />
 
           <div v-if="isCrossCurrencyTransfer" class="mt-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50">
             <p class="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">

@@ -5,9 +5,11 @@ import { updatePortfolioTransaction } from "@/api/portfolios"
 import { useWalletsStore } from "@/stores/wallets"
 import { formatCurrency, formatDate } from "@/utils/format"
 import { researchSymbol } from "@/utils/research"
-import CurrencySelect from "@/components/CurrencySelect.vue"
+import FeeFields from "@/components/FeeFields.vue"
+import FxRateFields from "@/components/FxRateFields.vue"
 import { useCurrenciesStore } from "@/stores/currencies"
-import { getLatestRate, type LatestRate } from "@/api/fx"
+import { usePortfolioStore } from "@/stores/portfolios"
+import { useTargetCurrency } from "@/composables/useTargetCurrency"
 
 export interface EditTransaction {
   id: string
@@ -25,6 +27,8 @@ export interface EditTransaction {
   feeCurrency?: string | null
   rateSource?: "automatic" | "manual" | null
   exchangeRate?: number | null
+  feeRateSource?: "automatic" | "manual" | null
+  feeExchangeRate?: number | null
 }
 
 const props = defineProps<{
@@ -47,7 +51,15 @@ const feesType = ref<"fixed" | "pct">("fixed")
 const feeCurrency = ref("USD")
 const rateSource = ref<"automatic" | "manual">("automatic")
 const exchangeRate = ref("")
-const autoRate = ref<LatestRate | null>(null)
+const feeRateSource = ref<"automatic" | "manual">("automatic")
+const feeExchangeRate = ref("")
+
+const portfolioStore = usePortfolioStore()
+const targetCurrency = useTargetCurrency(
+  computed(() =>
+    portfolioStore.portfolios.find((p) => p.id === props.transaction?.portfolioId)?.currency ?? null,
+  ),
+)
 const busy = ref(false)
 const error = ref<string | null>(null)
 
@@ -64,8 +76,8 @@ watch(
       feeCurrency.value = props.transaction.feeCurrency || props.transaction.currency || "USD"
       rateSource.value = props.transaction.rateSource === "manual" ? "manual" : "automatic"
       exchangeRate.value = props.transaction.exchangeRate != null ? String(props.transaction.exchangeRate) : ""
-      autoRate.value = null
-      void getLatestRate(props.transaction.currency, "USD").then((r) => (autoRate.value = r))
+      feeRateSource.value = props.transaction.feeRateSource === "manual" ? "manual" : "automatic"
+      feeExchangeRate.value = props.transaction.feeExchangeRate != null ? String(props.transaction.feeExchangeRate) : ""
       if (!currenciesStore.loaded) void currenciesStore.load()
       busy.value = false
       error.value = null
@@ -106,6 +118,17 @@ async function submit() {
       rateSource: rateSource.value,
       exchangeRate:
         rateSource.value === "manual" && exchangeRate.value ? Number(exchangeRate.value) : undefined,
+      feeRateSource:
+        feesType.value === "fixed" && feeCurrency.value !== props.transaction.currency
+          ? feeRateSource.value
+          : undefined,
+      feeExchangeRate:
+        feesType.value === "fixed" &&
+        feeCurrency.value !== props.transaction.currency &&
+        feeRateSource.value === "manual" &&
+        feeExchangeRate.value
+          ? Number(feeExchangeRate.value)
+          : undefined,
     })
     emit("saved")
   } catch (err) {
@@ -181,61 +204,34 @@ function goResearch() {
         </div>
 
         <label for="etx-fees" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Transaction Fees</label>
-        <div class="mb-1 flex gap-2">
-          <div class="flex flex-1 items-center rounded-lg border border-slate-300 focus-within:border-blue-500">
-            <template v-if="feesType === 'fixed'">
-              <CurrencySelect v-model="feeCurrency" aria-label="Fee currency" testid="edit-tx-fee-currency" class="!rounded-l-lg !border-0 !border-r" />
-            </template>
-            <span v-else class="pl-3 text-sm text-slate-500 dark:text-slate-400">%</span>
-            <input
-              id="etx-fees"
-              v-model.number="fees"
-              type="number"
-              min="0"
-              step="0.01"
-              class="input !rounded-l-none !border-0 !ring-0 focus:ring-0"
-            />
-          </div>
-          <button
-            type="button"
-            class="btn-secondary shrink-0 text-sm"
-            :class="feesType === 'pct' ? 'bg-slate-200 text-slate-900' : ''"
-            @click="feesType = feesType === 'fixed' ? 'pct' : 'fixed'"
-          >
-            {{ feesType === "fixed" ? "Fixed" : "%" }}
-          </button>
-        </div>
+        <FeeFields
+          v-model:fees="fees"
+          v-model:fees-type="feesType"
+          v-model:fee-currency="feeCurrency"
+          testid="edit-tx"
+          input-id="etx-fees"
+        />
 
-        <div class="mb-4 rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50" data-testid="edit-tx-fx-section">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">Exchange rate</span>
-            <div class="flex gap-1">
-              <button type="button" class="btn-secondary px-2 py-0.5 text-xs" :class="rateSource === 'automatic' ? '!bg-blue-600 !text-white' : ''" data-testid="edit-tx-fx-auto" @click="rateSource = 'automatic'">
-                Automatic
-              </button>
-              <button type="button" class="btn-secondary px-2 py-0.5 text-xs" :class="rateSource === 'manual' ? '!bg-blue-600 !text-white' : ''" data-testid="edit-tx-fx-manual" @click="rateSource = 'manual'">
-                Custom
-              </button>
-            </div>
-          </div>
-          <p v-if="rateSource === 'automatic'" class="mt-1.5 text-xs tabular-nums text-slate-500 dark:text-slate-400">
-            <template v-if="autoRate">1 {{ transaction.currency }} = {{ autoRate.rate.toFixed(4) }} USD <span class="text-slate-400">· {{ autoRate.asOf }}</span></template>
-            <template v-else>daily market rate</template>
-          </p>
-          <div v-else class="mt-1.5 flex items-center gap-2">
-            <input
-              v-model="exchangeRate"
-              type="number"
-              min="0"
-              step="any"
-              :placeholder="autoRate ? autoRate.rate.toFixed(4) : 'e.g. 4.35'"
-              class="input"
-              aria-label="Custom exchange rate (transaction currency to display currency)"
-              data-testid="edit-tx-fx-rate"
-            />
-            <span class="whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">per 1 {{ transaction.currency }}</span>
-          </div>
-        </div>
+        <FxRateFields
+          leg="Transaction"
+          :from="transaction.currency"
+          :to="targetCurrency"
+          :date="executedAt"
+          v-model:rate-source="rateSource"
+          v-model:rate="exchangeRate"
+          testid="edit-tx-fx"
+        />
+
+        <FxRateFields
+          leg="Fee"
+          :from="feeCurrency"
+          :to="transaction.currency"
+          :date="executedAt"
+          :hidden="feesType !== 'fixed' || feeCurrency === transaction.currency"
+          v-model:rate-source="feeRateSource"
+          v-model:rate="feeExchangeRate"
+          testid="edit-tx-fee-fx"
+        />
 
         <div class="mb-4 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/50">
           <span class="text-sm text-slate-600 dark:text-slate-300">Total Cost</span>

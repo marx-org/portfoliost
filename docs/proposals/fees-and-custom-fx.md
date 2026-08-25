@@ -220,3 +220,40 @@ the contract shapes, the registry endpoint served by the mock (D26), and all UI.
 - UI: shared `CurrencySelect` + `FeeCell`; dialogs made scrollable
   (`max-h-[85vh]`) after e2e caught tall modals pushing submit buttons off-viewport;
   edit-modal price input relaxed to `step="any"` for sub-cent historical prices.
+
+## Addendum: FX entry UX unification (2026-08-25, D38–D41)
+
+Follow-up after real-world use of the §10 UIs: rate entry was inconsistent across
+the four forms and ignored the transaction date. Extracts the duplicated
+fee/rate UI into shared components and adds date-aware suggestions.
+
+### D38 — reusable fee/FX field components
+
+`FeeFields.vue` (fee amount + Fixed/% toggle + currency select) and
+`FxRateFields.vue` (one "EXCHANGE RATE [Automatic|Custom]" disclosure **per
+leg**) become the only sanctioned way to collect fees and rates. Legs:
+**transaction** and **fee** — each carries its own `rateSource` + optional
+manual rate, matching the contract fields 1:1. Consumers: AddPositionDialog
+(stock + options), EditTransactionModal, WalletCashModals.
+
+### D39 — custom-rate suggestion from the transaction date
+
+Selecting **Custom** prefills the input from
+`/api/fx/latest?from&to&date={leg date}` (D20 lookup incl. carry-forward);
+the hint reads "market rate on {date}". `Automatic` keeps settling at the
+daily rate at write time. `getLatestRate(from, to, date?)` gains the optional
+date parameter (cached per from/to/date).
+
+### D40 — conversion-target precedence
+
+Every disclosure states its target explicitly. Precedence:
+**portfolio `currency` / wallet `currency` → user display base currency**
+(`useTargetCurrency` composable, single source of truth). Cash movements
+always settle into the wallet currency; portfolio transactions into the
+portfolio currency — the profile base is only the fallback when no
+portfolio/wallet context exists.
+
+### D41 — options form parity
+
+The options leg adopts `FeeFields`/`FxRateFields` too (fee currency was
+hardcoded USD; no rate entry) — no more per-form snowflakes.

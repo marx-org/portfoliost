@@ -6,9 +6,10 @@ import { usePortfolioStore } from "@/stores/portfolios"
 import { useWalletsStore } from "@/stores/wallets"
 import { formatCurrency } from "@/utils/format"
 import InstrumentSearchModal from "@/modules/instruments/InstrumentSearchModal.vue"
-import CurrencySelect from "@/components/CurrencySelect.vue"
+import FeeFields from "@/components/FeeFields.vue"
+import FxRateFields from "@/components/FxRateFields.vue"
 import { useCurrenciesStore } from "@/stores/currencies"
-import { getLatestRate, type LatestRate } from "@/api/fx"
+import { useTargetCurrency } from "@/composables/useTargetCurrency"
 
 const props = defineProps<{ open: boolean; portfolioId: string }>()
 const emit = defineEmits<{ (e: "close"): void; (e: "added"): void }>()
@@ -40,8 +41,6 @@ const stockForm = ref({
   executedAt: new Date().toISOString().slice(0, 10),
   walletId: "",
 })
-const autoRate = ref<LatestRate | null>(null)
-const autoFeeRate = ref<LatestRate | null>(null)
 const busy = ref(false)
 const error = ref<string | null>(null)
 
@@ -55,7 +54,12 @@ const optionForm = ref({
   sharesPerContract: "100",
   premium: "0",
   fees: "0",
-  feeMode: "$",
+  feesType: "fixed" as "fixed" | "pct",
+  feeCurrency: "USD",
+  rateSource: "automatic" as "automatic" | "manual",
+  exchangeRate: "",
+  feeRateSource: "automatic" as "automatic" | "manual",
+  feeExchangeRate: "",
 })
 const optionPending = ref<{ symbol: string; name: string } | null>(null)
 
@@ -69,7 +73,6 @@ watch(
       showSearch.value = false
       error.value = null
       if (!currenciesStore.loaded) void currenciesStore.load()
-    void refreshAutoRates()
       if (!walletsStore.wallets.length) {
         walletsStore.fetchAll().then(() => {
           if (!stockForm.value.walletId) stockForm.value.walletId = walletsStore.wallets[0]?.id || ""
@@ -80,16 +83,9 @@ watch(
 )
 
 const TX_CCY = "USD" // stock step prices are USD-denominated
-const DISPLAY_CCY = "USD"
-
-async function refreshAutoRates() {
-  autoRate.value = await getLatestRate(TX_CCY, DISPLAY_CCY)
-  if (stockForm.value.feeCurrency && stockForm.value.feeCurrency !== TX_CCY) {
-    autoFeeRate.value = await getLatestRate(stockForm.value.feeCurrency, TX_CCY)
-  } else {
-    autoFeeRate.value = null
-  }
-}
+const targetCurrency = useTargetCurrency(
+  computed(() => store.portfolios.find((p) => p.id === props.portfolioId)?.currency ?? null),
+)
 
 function chooseStock() {
   pendingStep = "stock"
@@ -140,8 +136,6 @@ function onSearchAdd(symbol: string, name: string) {
       executedAt: new Date().toISOString().slice(0, 10),
       walletId: walletsStore.wallets[0]?.id ?? "",
     }
-    autoRate.value = null
-    autoFeeRate.value = null
     step.value = "stock"
     error.value = null
   } else if (pendingStep === "option") {
@@ -156,7 +150,12 @@ function onSearchAdd(symbol: string, name: string) {
       sharesPerContract: "100",
       premium: "0",
       fees: "0",
-      feeMode: "$",
+      feesType: "fixed",
+      feeCurrency: "USD",
+      rateSource: "automatic",
+      exchangeRate: "",
+      feeRateSource: "automatic",
+      feeExchangeRate: "",
     }
     step.value = "option"
     error.value = null
@@ -259,6 +258,25 @@ async function submitOption() {
       strikePrice: Number(optionForm.value.strike) || 0,
       expirationDate: optionForm.value.expirationDate || undefined,
       openedAt: new Date(optionForm.value.tradeDate).toISOString(),
+      fees: Number(optionForm.value.fees) || undefined,
+      feesType: optionForm.value.feesType,
+      feeCurrency: optionForm.value.feesType === "fixed" ? optionForm.value.feeCurrency : undefined,
+      rateSource: optionForm.value.rateSource,
+      exchangeRate:
+        optionForm.value.rateSource === "manual" && optionForm.value.exchangeRate
+          ? Number(optionForm.value.exchangeRate)
+          : undefined,
+      feeRateSource:
+        optionForm.value.feesType === "fixed" && optionForm.value.feeCurrency !== TX_CCY
+          ? optionForm.value.feeRateSource
+          : undefined,
+      feeExchangeRate:
+        optionForm.value.feesType === "fixed" &&
+        optionForm.value.feeCurrency !== TX_CCY &&
+        optionForm.value.feeRateSource === "manual" &&
+        optionForm.value.feeExchangeRate
+          ? Number(optionForm.value.feeExchangeRate)
+          : undefined,
     })
     await store.fetchPositions(props.portfolioId)
     close()
@@ -386,89 +404,35 @@ function goResearch() {
             </div>
           </div>
           <label for="stock-fees" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Transaction Fees</label>
-          <div class="mb-1 flex gap-2">
-            <div class="flex flex-1 items-center rounded-lg border border-slate-300 focus-within:border-blue-500">
-              <template v-if="stockForm.feesType === 'fixed'">
-                <CurrencySelect
-                  v-model="stockForm.feeCurrency"
-                  aria-label="Fee currency"
-                  testid="add-position-fee-currency"
-                  class="!rounded-l-lg !border-0 !border-r"
-                  @update:model-value="refreshAutoRates"
-                />
-              </template>
-              <span v-else class="pl-3 text-sm text-slate-500 dark:text-slate-400">%</span>
-              <input
-                id="stock-fees"
-                v-model="stockForm.fees"
-                type="number"
-                min="0"
-                step="0.01"
-                class="input !rounded-l-none !border-0 !ring-0 focus:ring-0"
-                data-testid="add-position-fees"
-              />
-            </div>
-            <button
-              type="button"
-              class="btn-secondary shrink-0 text-sm"
-              :class="stockForm.feesType === 'pct' ? 'bg-slate-200 text-slate-900' : ''"
-              data-testid="add-position-fees-toggle"
-              @click="stockForm.feesType = stockForm.feesType === 'fixed' ? 'pct' : 'fixed'"
-            >
-              {{ stockForm.feesType === "fixed" ? "Fixed" : "%" }}
-            </button>
-          </div>
+          <FeeFields
+            v-model:fees="stockForm.fees"
+            v-model:fees-type="stockForm.feesType"
+            v-model:fee-currency="stockForm.feeCurrency"
+            testid="add-position"
+            input-id="stock-fees"
+            class="mb-1"
+          />
 
-          <div class="mb-4 rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50" data-testid="add-position-fx-section">
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">Exchange rate</span>
-              <div class="flex gap-1">
-                <button type="button" class="btn-secondary px-2 py-0.5 text-xs" :class="stockForm.rateSource === 'automatic' ? '!bg-blue-600 !text-white' : ''" data-testid="add-position-fx-auto" @click="stockForm.rateSource = 'automatic'">
-                  Automatic
-                </button>
-                <button type="button" class="btn-secondary px-2 py-0.5 text-xs" :class="stockForm.rateSource === 'manual' ? '!bg-blue-600 !text-white' : ''" data-testid="add-position-fx-manual" @click="stockForm.rateSource = 'manual'">
-                  Custom
-                </button>
-              </div>
-            </div>
-            <p v-if="stockForm.rateSource === 'automatic'" class="mt-1.5 text-xs tabular-nums text-slate-500 dark:text-slate-400" data-testid="add-position-fx-auto-value">
-              <template v-if="autoRate">1 {{ TX_CCY }} = {{ autoRate.rate.toFixed(4) }} {{ DISPLAY_CCY }} <span class="text-slate-400">· {{ autoRate.asOf }}</span></template>
-              <template v-else>daily market rate</template>
-            </p>
-            <div v-else class="mt-1.5 flex items-center gap-2">
-              <input
-                v-model="stockForm.exchangeRate"
-                type="number"
-                min="0"
-                step="any"
-                :placeholder="autoRate ? autoRate.rate.toFixed(4) : 'e.g. 4.35'"
-                class="input"
-                aria-label="Custom exchange rate (transaction currency to display currency)"
-                data-testid="add-position-fx-rate"
-              />
-              <span class="whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">per 1 {{ TX_CCY }}</span>
-            </div>
-            <template v-if="stockForm.feesType === 'fixed' && stockForm.feeCurrency !== TX_CCY">
-              <div class="mt-2 flex items-center justify-between border-t border-slate-200 pt-2 dark:border-slate-700">
-                <span class="text-xs text-slate-500 dark:text-slate-400">Fee rate ({{ stockForm.feeCurrency }} → {{ TX_CCY }})</span>
-                <span v-if="stockForm.feeRateSource === 'automatic' || !stockForm.feeRateSource" class="text-xs tabular-nums text-slate-500 dark:text-slate-400" data-testid="add-position-fee-fx-auto">
-                  {{ autoFeeRate ? autoFeeRate.rate.toFixed(4) : "daily rate" }}
-                </span>
-              </div>
-              <div v-if="stockForm.feeRateSource === 'manual'" class="mt-1.5 flex items-center gap-2">
-                <input
-                  v-model="stockForm.feeExchangeRate"
-                  type="number"
-                  min="0"
-                  step="any"
-                  :placeholder="autoFeeRate ? autoFeeRate.rate.toFixed(4) : 'e.g. 1.08'"
-                  class="input"
-                  aria-label="Custom fee exchange rate"
-                  data-testid="add-position-fee-fx-rate"
-                />
-              </div>
-            </template>
-          </div>
+          <FxRateFields
+            leg="Transaction"
+            :from="TX_CCY"
+            :to="targetCurrency"
+            :date="stockForm.executedAt"
+            v-model:rate-source="stockForm.rateSource"
+            v-model:rate="stockForm.exchangeRate"
+            testid="add-position-fx"
+          />
+
+          <FxRateFields
+            leg="Fee"
+            :from="stockForm.feeCurrency"
+            :to="TX_CCY"
+            :date="stockForm.executedAt"
+            :hidden="stockForm.feesType !== 'fixed' || stockForm.feeCurrency === TX_CCY"
+            v-model:rate-source="stockForm.feeRateSource"
+            v-model:rate="stockForm.feeExchangeRate"
+            testid="add-position-fee-fx"
+          />
           <div class="mb-4 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/50">
             <span class="text-sm text-slate-600 dark:text-slate-300">Total Cost</span>
             <span class="text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ formatCurrency(stockTotal, "USD") }}</span>
@@ -541,9 +505,36 @@ function goResearch() {
             </div>
             <div>
               <label for="opt-fees" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Transaction Fees</label>
-              <input id="opt-fees" v-model="optionForm.fees" type="number" min="0" step="any" class="input" data-testid="add-position-fees" />
+              <FeeFields
+                v-model:fees="optionForm.fees"
+                v-model:fees-type="optionForm.feesType"
+                v-model:fee-currency="optionForm.feeCurrency"
+                testid="add-position-opt"
+                input-id="opt-fees"
+              />
             </div>
           </div>
+
+          <FxRateFields
+            leg="Transaction"
+            :from="TX_CCY"
+            :to="targetCurrency"
+            :date="optionForm.tradeDate"
+            v-model:rate-source="optionForm.rateSource"
+            v-model:rate="optionForm.exchangeRate"
+            testid="add-position-opt-fx"
+          />
+
+          <FxRateFields
+            leg="Fee"
+            :from="optionForm.feeCurrency"
+            :to="TX_CCY"
+            :date="optionForm.tradeDate"
+            :hidden="optionForm.feesType !== 'fixed' || optionForm.feeCurrency === TX_CCY"
+            v-model:rate-source="optionForm.feeRateSource"
+            v-model:rate="optionForm.feeExchangeRate"
+            testid="add-position-opt-fee-fx"
+          />
           <div class="mb-4 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/50">
             <div>
               <p class="text-sm text-slate-600 dark:text-slate-300">Total Cost</p>

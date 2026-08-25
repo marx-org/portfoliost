@@ -463,6 +463,14 @@ Proposal: [fees-and-custom-fx.md](proposals/fees-and-custom-fx.md) (accepted 202
 - [x] 10.7 Available-currencies registry — contract `GET /api/currencies` (D26), mock serves from demo rates, SPA fetch-once-and-cache consumed by every currency selector
 - [ ] 10.8 Docs sweep — AGENTS.md conventions note (camelCase for new fields), cross-links between proposals
 
+### 10a. FX entry UX unification (addendum D38–D41, 2026-08-25)
+
+- [x] 10.9 Extract reusable `FeeFields.vue` + `FxRateFields.vue` (one disclosure per leg: transaction/fee) + `useTargetCurrency` composable (D38/D40); `getLatestRate(from, to, date?)`
+- [x] 10.10 Stock form (AddPositionDialog) — separate transaction + fee disclosures, custom rate prefilled from selected date (D39)
+- [x] 10.11 EditTransactionModal — same treatment
+- [x] 10.12 WalletCashModals — FX disclosures on deposit/withdraw (transaction + fee legs); transfer keeps elastic target leg (D22) and gains the fee leg
+- [x] 10.13 Options form parity — FeeFields/FxRateFields replace hardcoded-USD fee entry (D41)
+
 ## 11. Wallets & transactions module (`portfoliost-wallets`)
 
 Proposal: [wallets-module.md](proposals/wallets-module.md) (accepted 2026-08-24, decisions D16–D23). Cash-wallet domain as its own module: wallets, cash ledger transactions, unified recent-transactions feed, balance history, multicurrency (local FX store: ECB/frankfurter primary + openst/cachest fallback). Multi-user: every table and query is user-scoped (D24). No implementation started yet.
