@@ -186,7 +186,7 @@ const historyChart = computed(() => ({
     <div
       v-if="showRename"
       class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
-      @click.self="showRename = false"
+      @click.self.stop="showRename = false"
     >
       <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Rename wallet">
         <h3 class="mb-4 text-base font-semibold">Rename wallet</h3>
@@ -207,7 +207,7 @@ const historyChart = computed(() => ({
     <div
       v-if="showDeleteConfirm"
       class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
-      @click.self="showDeleteConfirm = false"
+      @click.self.stop="showDeleteConfirm = false"
     >
       <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Delete wallet">
         <h3 class="mb-4 text-base font-semibold">Delete wallet</h3>

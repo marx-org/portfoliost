@@ -150,7 +150,7 @@ const submitLabel = computed(() => (props.action === "deposit" ? "Deposit" : pro
   <div
     v-if="open"
     class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
-    @click.self="emit('close')"
+    @click.self.stop="emit('close')"
   >
     <div class="card max-h-[85vh] w-full max-w-md overflow-y-auto p-6" role="dialog" aria-modal="true" aria-label="Cash movement">
       <div class="mb-4 flex items-center justify-between">
