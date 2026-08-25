@@ -2,6 +2,7 @@ import { flushPromises, mount } from "@vue/test-utils"
 import { createPinia, setActivePinia } from "pinia"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import AddPositionDialog from "@/modules/portfolios/AddPositionDialog.vue"
+import EditPositionDialog from "@/modules/portfolios/EditPositionDialog.vue"
 import EditTransactionModal, { type EditTransaction } from "@/modules/portfolios/EditTransactionModal.vue"
 import { usePortfolioStore } from "@/stores/portfolios"
 import * as portfoliosApi from "@/api/portfolios"
@@ -359,6 +360,73 @@ describe("AddPositionDialog — multicurrency summary (plan §13 follow-up 4/6)"
     const summaryText = wrapper.find("dl").text()
     expect(summaryText).toContain("$100.00")
     expect(summaryText).not.toContain("≈")
+    wrapper.unmount()
+  })
+})
+
+describe("EditPositionDialog — fee/FX fields + multicurrency summary (plan §13 follow-up 5/6)", () => {
+  const position = () => ({
+    id: "pos1",
+    portfolioId: "p1",
+    symbol: "AAPL",
+    companyName: "Apple Inc",
+    assetType: "STOCK",
+    quantity: 10,
+    averageCostBasis: 150,
+    instrumentCurrency: "USD",
+    openedAt: "2026-08-20T00:00:00Z",
+  })
+
+  function mountDialog() {
+    const env = makeEnv()
+    return mount(EditPositionDialog, {
+      props: { open: false, portfolioId: "p1", position: position() as never },
+      global: { plugins: [env.pinia] },
+      attachTo: document.body,
+    })
+  }
+
+  beforeEach(async () => {
+    const fxMod = await import("@/api/fx")
+    vi.mocked(fxMod.getLatestRate).mockResolvedValue({ rate: 4.35, asOf: "2026-08-25" } as never)
+  })
+
+  it("renders FeeFields and FxRateFields in the add-tx form", async () => {
+    const wrapper = mountDialog()
+    await wrapper.setProps({ open: true })
+    await flushPromises()
+    // FeeFields renders fee currency select
+    expect(wrapper.find('[data-testid="edit-position-fee-currency"]').exists()).toBe(true)
+    // FxRateFields renders transaction disclosure
+    expect(wrapper.find('[data-testid="edit-position-fx-section"]').exists()).toBe(true)
+    // Multicurrency summary exists
+    expect(wrapper.find("dl").exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it("shows multicurrency summary when portfolio currency differs from instrument currency", async () => {
+    const wrapper = mountDialog()
+    await wrapper.setProps({ open: true })
+    await flushPromises()
+    await wrapper.find('[data-testid="edit-position-quantity"]').setValue("2")
+    await wrapper.find('[data-testid="edit-position-price"]').setValue("100")
+    await flushPromises()
+    await flushPromises()
+    await flushPromises()
+    const dl = wrapper.find("dl")
+    const text = dl.text()
+    // 2 × $100 = $200 → converted at 4.35 → PLN 870.00
+    expect(text).toContain("$200.00")
+    expect(text).toContain("PLN\u00A0870.00")
+    wrapper.unmount()
+  })
+
+  it("edit button opens EditTransactionModal for non-synthetic rows", async () => {
+    const wrapper = mountDialog()
+    await wrapper.setProps({ open: true })
+    await flushPromises()
+    // The mock returns empty transactions → synthetic row has no Edit button
+    expect(wrapper.findAll("button").filter((b) => b.text() === "Edit").length).toBe(0)
     wrapper.unmount()
   })
 })

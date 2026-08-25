@@ -5,12 +5,17 @@ import {
   deletePortfolioTransaction,
   getPortfolioTransactions,
   updatePortfolioPosition,
-  updatePortfolioTransaction,
 } from "@/api/portfolios"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { useWalletsStore } from "@/stores/wallets"
-import { formatCurrency, formatNumber } from "@/utils/format"
+import { formatCurrency } from "@/utils/format"
 import type { PortfolioPositions, PortfolioTransactionsPage } from "@/api/types"
+import FeeFields from "@/components/FeeFields.vue"
+import FxRateFields from "@/components/FxRateFields.vue"
+import EditTransactionModal, { type EditTransaction } from "@/modules/portfolios/EditTransactionModal.vue"
+import { useCurrenciesStore } from "@/stores/currencies"
+import { useTargetCurrency } from "@/composables/useTargetCurrency"
+import { type LatestRate } from "@/api/fx"
 
 type Tx = PortfolioTransactionsPage["items"][number]
 type Position = PortfolioPositions[number]
@@ -20,13 +25,80 @@ const emit = defineEmits<{ (e: "close"): void; (e: "saved"): void }>()
 
 const store = usePortfolioStore()
 const walletsStore = useWalletsStore()
+const currenciesStore = useCurrenciesStore()
 
 const transactions = ref<Tx[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
 const saving = ref(false)
 
-const newTx = ref({ date: new Date().toISOString().slice(0, 10), type: "BUY", quantity: "", price: "", fees: "0", cashPortfolio: "" })
+const newTx = ref({
+  date: new Date().toISOString().slice(0, 10),
+  type: "BUY",
+  quantity: "",
+  price: "",
+  fees: "0",
+  feesType: "fixed" as "fixed" | "pct",
+  feeCurrency: "USD",
+  feeRateSource: "automatic" as "automatic" | "manual",
+  feeExchangeRate: "",
+  rateSource: "automatic" as "automatic" | "manual",
+  exchangeRate: "",
+  cashPortfolio: "",
+})
+
+const portfolioStore = usePortfolioStore()
+const targetCurrency = useTargetCurrency(
+  computed(() =>
+    portfolioStore.portfolios.find((p) => p.id === props.portfolioId)?.currency ?? null,
+  ),
+)
+
+const txSuggestion = ref<LatestRate | null>(null)
+const feeSuggestion = ref<LatestRate | null>(null)
+
+function onTxSuggestion(r: LatestRate | null) { txSuggestion.value = r }
+function onFeeSuggestion(r: LatestRate | null) { feeSuggestion.value = r }
+
+const positionCostUSD = computed(() => {
+  const qty = Number(newTx.value.quantity) || 0
+  const price = Number(newTx.value.price) || 0
+  return qty * price
+})
+
+const txRateValue = computed(() => {
+  if (newTx.value.rateSource === "manual" && newTx.value.exchangeRate) return Number(newTx.value.exchangeRate)
+  return txSuggestion.value?.rate ?? null
+})
+
+const feeValue = computed(() => {
+  if (newTx.value.feesType === "pct") return (positionCostUSD.value * (Number(newTx.value.fees) || 0)) / 100
+  return Number(newTx.value.fees) || 0
+})
+
+const feeRateValue = computed(() => {
+  if (newTx.value.feeRateSource === "manual" && newTx.value.feeExchangeRate) return Number(newTx.value.feeExchangeRate)
+  return feeSuggestion.value?.rate ?? null
+})
+
+const feeInUsd = computed(() => {
+  if (newTx.value.feeCurrency === "USD") return feeValue.value
+  if (feeRateValue.value && feeValue.value) return feeValue.value * feeRateValue.value
+  return null
+})
+
+const positionCostConverted = computed(() => {
+  if (txRateValue.value == null) return null
+  return positionCostUSD.value * txRateValue.value
+})
+
+const totalCostConverted = computed(() => {
+  if (txRateValue.value == null) return null
+  const feePart = feeInUsd.value ?? 0
+  return (positionCostUSD.value + feePart) * txRateValue.value
+})
+
+const editingTx = ref<EditTransaction | null>(null)
 
 watch(
   () => props.open,
@@ -34,6 +106,8 @@ watch(
     if (!open || !props.position) return
     transactions.value = []
     error.value = null
+    txSuggestion.value = null
+    feeSuggestion.value = null
     if (!walletsStore.wallets.length) {
       await walletsStore.fetchAll()
     }
@@ -43,8 +117,15 @@ watch(
       quantity: "",
       price: "",
       fees: "0",
+      feesType: "fixed",
+      feeCurrency: props.position.instrumentCurrency ?? "USD",
+      feeRateSource: "automatic",
+      feeExchangeRate: "",
+      rateSource: "automatic",
+      exchangeRate: "",
       cashPortfolio: walletsStore.wallets[0]?.id ?? "",
     }
+    if (!currenciesStore.loaded) void currenciesStore.load()
     await load()
   },
 )
@@ -96,12 +177,13 @@ function fmtDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
 }
 
-function totalFor(tx: Tx): number {
+function totalFor(tx: Tx): string {
   const qty = tx.quantity ?? 0
   const price = tx.price ?? 0
   const fees = tx.fees ?? 0
   const rate = tx.exchangeRate ?? 1
-  return qty * price * rate + fees
+  const total = qty * price * rate + fees
+  return formatCurrency(total, tx.currency || "USD")
 }
 
 function typeLabel(type: string): string {
@@ -112,31 +194,32 @@ function isSynthetic(tx: Tx): boolean {
   return tx.id === "synthetic"
 }
 
-async function updateField(tx: Tx, patch: Partial<Tx>): Promise<void> {
-  if (isSynthetic(tx)) {
-    Object.assign(tx, patch)
-    return
+function openEditModal(tx: Tx) {
+  if (isSynthetic(tx)) return
+  editingTx.value = {
+    id: tx.id,
+    portfolioId: props.portfolioId,
+    type: tx.type,
+    instrumentSymbol: tx.instrumentSymbol,
+    instrumentName: tx.instrumentName ?? "",
+    assetType: tx.assetType ?? "STOCK",
+    quantity: tx.quantity,
+    price: tx.price,
+    fees: tx.fees ?? 0,
+    currency: tx.currency || "USD",
+    walletId: tx.walletId,
+    executedAt: tx.executedAt,
+    feeCurrency: tx.feeCurrency,
+    rateSource: tx.rateSource,
+    exchangeRate: tx.exchangeRate,
+    feeRateSource: tx.feeRateSource,
+    feeExchangeRate: tx.feeExchangeRate,
   }
-  error.value = null
-  try {
-    await updatePortfolioTransaction(props.portfolioId, tx.id, patch)
-    Object.assign(tx, patch)
-    const position = props.position
-    if (position) {
-      const open = transactions.value.filter((t) => !isSynthetic(t) && t.type !== "SELL")
-      const totalQty = open.reduce((s, t) => s + (t.quantity ?? 0), 0)
-      const totalCost = open.reduce((s, t) => s + (t.quantity ?? 0) * (t.price ?? 0) + (t.fees ?? 0), 0)
-      const avg = totalQty ? totalCost / totalQty : position.averageCostBasis
-      await updatePortfolioPosition(props.portfolioId, position.id, {
-        quantity: totalQty || position.quantity,
-        averageCostBasis: avg,
-        avgCostBasis: avg,
-        instrumentAvgCostBasis: avg,
-      })
-    }
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : "Failed to update transaction"
-  }
+}
+
+function onEditSaved() {
+  editingTx.value = null
+  load()
 }
 
 async function removeRow(tx: Tx): Promise<void> {
@@ -157,12 +240,26 @@ async function addRow(): Promise<void> {
   saving.value = true
   error.value = null
   try {
-    const created = await createPortfolioTransaction(props.portfolioId, {
+    const input: Parameters<typeof createPortfolioTransaction>[1] = {
       type: newTx.value.type,
       symbol: props.position.symbol,
       quantity: Number(newTx.value.quantity),
       price: Number(newTx.value.price),
-    })
+      fees: newTx.value.feesType === "pct" ? feeValue.value : Number(newTx.value.fees) || 0,
+      feesType: newTx.value.feesType,
+    }
+    if (newTx.value.feesType === "fixed" && newTx.value.feeCurrency !== (props.position.instrumentCurrency ?? "USD")) {
+      input.feeCurrency = newTx.value.feeCurrency
+      input.feeRateSource = newTx.value.feeRateSource
+      if (newTx.value.feeRateSource === "manual" && newTx.value.feeExchangeRate) {
+        input.feeExchangeRate = Number(newTx.value.feeExchangeRate)
+      }
+    }
+    if (newTx.value.rateSource === "manual" && newTx.value.exchangeRate) {
+      input.rateSource = "manual"
+      input.exchangeRate = Number(newTx.value.exchangeRate)
+    }
+    const created = await createPortfolioTransaction(props.portfolioId, input)
     transactions.value.push({ ...created, executedAt: new Date(newTx.value.date).toISOString() })
     const position = props.position
     if (position) {
@@ -192,24 +289,16 @@ async function close() {
   await store.fetchPositions(props.portfolioId)
   emit("close")
 }
-
-function formatSigned(v: number): string {
-  return formatCurrency(v, "USD")
-}
 </script>
 
 <template>
 
   <div v-if="open && position" class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-16" @click.self="close">
-    <div class="card max-h-[85vh] w-full max-w-3xl overflow-y-auto p-6" role="dialog" aria-modal="true" :aria-label="`Edit ${position.symbol} position`">
+    <div class="card max-h-[85vh] w-full max-w-4xl overflow-y-auto p-6" role="dialog" aria-modal="true" :aria-label="`Edit ${position.symbol} position`">
       <div class="mb-4 flex items-center justify-between">
         <h3 class="text-base font-semibold">Edit {{ position.symbol }} position</h3>
         <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="close">✕</button>
       </div>
-
-      <p class="mb-4 text-sm text-slate-500 dark:text-slate-400">
-        Changes save when you leave a field. On cross-currency rows, type the total your broker charged to set the exchange rate.
-      </p>
 
       <div class="mb-4 flex items-center justify-between rounded-xl bg-slate-50 px-4 py-2.5 dark:bg-slate-800/50">
         <div>
@@ -230,80 +319,123 @@ function formatSigned(v: number): string {
             <tr class="border-b border-slate-100 text-left text-xs uppercase text-slate-500 dark:border-slate-800 dark:text-slate-400">
               <th class="px-3 py-2 font-medium">Date</th>
               <th class="px-3 py-2 font-medium">Type</th>
-              <th class="px-3 py-2 font-medium">Quantity</th>
-              <th class="px-3 py-2 font-medium">Price per share</th>
-              <th class="px-3 py-2 font-medium">Transaction Fees</th>
-              <th class="px-3 py-2 font-medium">Exchange Rate</th>
+              <th class="px-3 py-2 font-medium">Qty</th>
+              <th class="px-3 py-2 font-medium">Price</th>
+              <th class="px-3 py-2 font-medium">Fees</th>
               <th class="px-3 py-2 font-medium">Total Cost</th>
-              <th class="px-3 py-2"></th>
+              <th class="px-3 py-2 text-right" colspan="2"></th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
             <tr v-if="loading"><td colspan="8" class="px-3 py-4 text-center text-slate-500 dark:text-slate-400">Loading...</td></tr>
             <tr v-for="tx in transactions" :key="tx.id">
               <td class="px-3 py-2">
-                <span v-if="isSynthetic(tx)" class="text-sm text-slate-700 dark:text-slate-200">{{ fmtDate(tx.executedAt) }}</span>
-                <input v-else type="date" class="input !w-auto !px-2 !py-1 text-sm" :value="tx.executedAt.slice(0, 10)" @change="updateField(tx, { executedAt: new Date(($event.target as HTMLInputElement).value).toISOString() })" />
+                <span class="text-sm text-slate-700 dark:text-slate-200">{{ fmtDate(tx.executedAt) }}</span>
               </td>
               <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ typeLabel(tx.type) }}</td>
-              <td class="px-3 py-2">
-                <input type="number" min="0" step="any" class="input !w-24 !px-2 !py-1 text-right text-sm tabular-nums" :value="tx.quantity" @change="updateField(tx, { quantity: Number(($event.target as HTMLInputElement).value) })" />
+              <td class="px-3 py-2 tabular-nums text-slate-900 dark:text-slate-100">{{ tx.quantity }}</td>
+              <td class="px-3 py-2 tabular-nums text-slate-900 dark:text-slate-100">{{ formatCurrency(tx.price, tx.currency || "USD") }}</td>
+              <td class="px-3 py-2 tabular-nums text-slate-900 dark:text-slate-100">{{ formatCurrency(tx.fees ?? 0, tx.feeCurrency || tx.currency || "USD") }}</td>
+              <td class="px-3 py-2 text-right font-medium tabular-nums text-slate-900 dark:text-slate-100">{{ totalFor(tx) }}</td>
+              <td class="px-3 py-2 text-right">
+                <button v-if="!isSynthetic(tx)" type="button" class="text-xs text-blue-600 hover:underline" @click="openEditModal(tx)">Edit</button>
               </td>
-              <td class="px-3 py-2">
-                <span class="inline-flex items-center gap-1">
-                  <input type="number" min="0" step="any" class="input !w-24 !px-2 !py-1 text-right text-sm tabular-nums" :value="tx.price" @change="updateField(tx, { price: Number(($event.target as HTMLInputElement).value) })" />
-                  <span class="text-xs text-slate-400 dark:text-slate-500">{{ tx.currency || tx.instrumentCurrency || "USD" }}</span>
-                </span>
-              </td>
-              <td class="px-3 py-2">
-                <span class="inline-flex items-center gap-1">
-                  <input type="number" min="0" step="any" class="input !w-20 !px-2 !py-1 text-right text-sm tabular-nums" :value="tx.fees ?? 0" @change="updateField(tx, { fees: Number(($event.target as HTMLInputElement).value) })" />
-                  <span class="text-xs text-slate-400 dark:text-slate-500">{{ tx.currency || tx.instrumentCurrency || "USD" }}</span>
-                </span>
-              </td>
-              <td class="px-3 py-2 text-slate-400 dark:text-slate-500">{{ (tx.exchangeRate ?? 1) === 1 ? "-" : formatNumber(tx.exchangeRate ?? 1, 4) }}</td>
-              <td class="px-3 py-2 text-right font-medium tabular-nums text-slate-900 dark:text-slate-100">{{ formatSigned(totalFor(tx)) }}</td>
               <td class="px-3 py-2 text-right">
                 <button v-if="!isSynthetic(tx)" type="button" class="text-xs text-red-600 hover:underline" aria-label="Delete Transaction" @click="removeRow(tx)">Delete</button>
               </td>
             </tr>
           </tbody>
-          <tfoot class="border-t border-slate-200 bg-slate-50 dark:border-slate-700/60 dark:bg-slate-800/50">
-            <tr>
-              <td class="px-3 py-2">
-                <input type="date" v-model="newTx.date" class="input !w-auto !px-2 !py-1 text-sm" aria-label="Date" />
-              </td>
-              <td class="px-3 py-2">
-                <select v-model="newTx.type" class="input !w-auto !px-2 !py-1 text-sm" aria-label="Type">
-                  <option value="BUY">Buy</option>
-                  <option value="SELL">Sell</option>
-                </select>
-              </td>
-              <td class="px-3 py-2">
-                <input type="number" v-model="newTx.quantity" min="0" step="any" class="input !w-24 !px-2 !py-1 text-right text-sm" aria-label="Quantity" />
-              </td>
-              <td class="px-3 py-2">
-                <span class="inline-flex items-center gap-1">
-                  <input type="number" v-model="newTx.price" min="0" step="any" class="input !w-24 !px-2 !py-1 text-right text-sm" aria-label="Price per share" />
-                  <span class="text-xs text-slate-400 dark:text-slate-500">{{ position.instrumentCurrency || "USD" }}</span>
-                </span>
-              </td>
-              <td class="px-3 py-2">
-                <input type="number" v-model="newTx.fees" min="0" step="any" class="input !w-20 !px-2 !py-1 text-right text-sm" aria-label="Transaction Fees" />
-              </td>
-              <td class="px-3 py-2">
-                <select v-model="newTx.cashPortfolio" class="input !w-40 !px-2 !py-1 text-sm" aria-label="Cash portfolio">
-                  <option value="">No linked cash</option>
-                  <option v-for="w in walletsStore.wallets" :key="w.id" :value="w.id">{{ w.name }}</option>
-                </select>
-              </td>
-              <td class="px-3 py-2 text-right">
-                <button type="button" class="btn-primary !px-3 !py-1 text-xs" :disabled="saving || !canAdd" @click="addRow">{{ saving ? "Adding..." : "Add" }}</button>
-              </td>
-              <td class="px-3 py-2"></td>
-            </tr>
-          </tfoot>
         </table>
+      </div>
+
+      <div class="mt-4 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+        <h4 class="mb-3 text-sm font-medium text-slate-700 dark:text-slate-300">Add Transaction</h4>
+        <div class="mb-3 grid grid-cols-4 gap-3">
+          <div>
+            <label class="mb-1 block text-xs text-slate-500 dark:text-slate-400">Date</label>
+            <input type="date" v-model="newTx.date" class="input !py-1.5 text-sm" aria-label="Date" />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-slate-500 dark:text-slate-400">Type</label>
+            <select v-model="newTx.type" class="input !py-1.5 text-sm" aria-label="Type">
+              <option value="BUY">Buy</option>
+              <option value="SELL">Sell</option>
+            </select>
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-slate-500 dark:text-slate-400">Quantity</label>
+            <input type="number" v-model="newTx.quantity" min="0" step="any" class="input !py-1.5 text-sm" aria-label="Quantity" data-testid="edit-position-quantity" />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-slate-500 dark:text-slate-400">Price ({{ position.instrumentCurrency || "USD" }})</label>
+            <input type="number" v-model="newTx.price" min="0" step="any" class="input !py-1.5 text-sm" aria-label="Price per share" data-testid="edit-position-price" />
+          </div>
+        </div>
+
+        <label class="mb-1 block text-xs text-slate-500 dark:text-slate-400">Transaction Fees</label>
+        <FeeFields
+          v-model:fees="newTx.fees"
+          v-model:fees-type="newTx.feesType"
+          v-model:fee-currency="newTx.feeCurrency"
+          testid="edit-position"
+        />
+
+        <FxRateFields
+          leg="Transaction"
+          :from="position.instrumentCurrency || 'USD'"
+          :to="targetCurrency"
+          :date="newTx.date"
+          v-model:rate-source="newTx.rateSource"
+          v-model:rate="newTx.exchangeRate"
+          testid="edit-position-fx"
+          @suggestion="onTxSuggestion"
+        />
+
+        <FxRateFields
+          leg="Fee"
+          :from="newTx.feeCurrency"
+          :to="position.instrumentCurrency || 'USD'"
+          :date="newTx.date"
+          :hidden="newTx.feesType !== 'fixed' || newTx.feeCurrency === (position.instrumentCurrency || 'USD')"
+          v-model:rate-source="newTx.feeRateSource"
+          v-model:rate="newTx.feeExchangeRate"
+          testid="edit-position-fee-fx"
+          @suggestion="onFeeSuggestion"
+        />
+
+        <dl class="mt-3 rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-800/50">
+          <div class="flex items-center justify-between text-sm">
+            <dt class="text-slate-600 dark:text-slate-300">Shares × Price</dt>
+            <dd class="tabular-nums text-slate-900 dark:text-slate-100">
+              {{ formatCurrency(positionCostUSD, "USD") }}
+              <template v-if="txRateValue != null"> ≈ {{ formatCurrency(positionCostConverted!, targetCurrency ?? "") }}</template>
+            </dd>
+          </div>
+          <div v-if="feeValue > 0" class="mt-1 flex items-center justify-between text-sm">
+            <dt class="text-slate-600 dark:text-slate-300">Fee ({{ newTx.feeCurrency }})</dt>
+            <dd class="tabular-nums text-slate-900 dark:text-slate-100">
+              {{ formatCurrency(feeValue, newTx.feeCurrency) }}
+              <template v-if="feeRateValue != null && newTx.feeCurrency !== (position.instrumentCurrency || 'USD')"> ≈ {{ formatCurrency(feeInUsd!, "USD") }}</template>
+            </dd>
+          </div>
+          <div class="mt-1 flex items-center justify-between border-t border-slate-200 pt-1 text-sm font-medium dark:border-slate-700">
+            <dt class="text-slate-700 dark:text-slate-200">Total Cost</dt>
+            <dd class="tabular-nums text-slate-900 dark:text-slate-100">
+              {{ formatCurrency(positionCostUSD + (feeInUsd ?? feeValue), "USD") }}
+              <template v-if="totalCostConverted != null"> ≈ {{ formatCurrency(totalCostConverted, targetCurrency ?? "") }}</template>
+            </dd>
+          </div>
+        </dl>
+
+        <div class="mt-3 flex items-center justify-between">
+          <select v-model="newTx.cashPortfolio" class="input !w-48 !py-1.5 text-sm" aria-label="Cash portfolio">
+            <option value="">No linked cash</option>
+            <option v-for="w in walletsStore.wallets" :key="w.id" :value="w.id">{{ w.name }}</option>
+          </select>
+          <button type="button" class="btn-primary !px-4 !py-1.5 text-sm" :disabled="saving || !canAdd" @click="addRow">
+            {{ saving ? "Adding..." : "Add Transaction" }}
+          </button>
+        </div>
       </div>
 
       <div class="mt-4 flex justify-end">
@@ -311,4 +443,12 @@ function formatSigned(v: number): string {
       </div>
     </div>
   </div>
+
+  <EditTransactionModal
+    v-if="editingTx"
+    :open="editingTx != null"
+    :transaction="editingTx"
+    @close="editingTx = null"
+    @saved="onEditSaved"
+  />
 </template>
