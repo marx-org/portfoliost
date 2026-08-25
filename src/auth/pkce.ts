@@ -59,6 +59,10 @@ export async function createAuthorizationUrl(config: {
     client_id: config.clientId,
     redirect_uri: config.redirectUri,
     scope: config.scope || "openid profile email groups",
+    // Force interactive re-auth on every login — without this, an active
+    // PocketID session cookie makes /authorize redirect silently and the
+    // passkey UI never appears after the first login.
+    prompt: "login",
     state,
     code_challenge: challenge,
     code_challenge_method: "S256",
