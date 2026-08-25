@@ -7,6 +7,7 @@ import { formatCurrency, formatDate } from "@/utils/format"
 import { researchSymbol } from "@/utils/research"
 import CurrencySelect from "@/components/CurrencySelect.vue"
 import { useCurrenciesStore } from "@/stores/currencies"
+import { getLatestRate, type LatestRate } from "@/api/fx"
 
 export interface EditTransaction {
   id: string
@@ -46,7 +47,7 @@ const feesType = ref<"fixed" | "pct">("fixed")
 const feeCurrency = ref("USD")
 const rateSource = ref<"automatic" | "manual">("automatic")
 const exchangeRate = ref("")
-const showFxSection = ref(false)
+const autoRate = ref<LatestRate | null>(null)
 const busy = ref(false)
 const error = ref<string | null>(null)
 
@@ -63,7 +64,8 @@ watch(
       feeCurrency.value = props.transaction.feeCurrency || props.transaction.currency || "USD"
       rateSource.value = props.transaction.rateSource === "manual" ? "manual" : "automatic"
       exchangeRate.value = props.transaction.exchangeRate != null ? String(props.transaction.exchangeRate) : ""
-      showFxSection.value = rateSource.value === "manual"
+      autoRate.value = null
+      void getLatestRate(props.transaction.currency, "USD").then((r) => (autoRate.value = r))
       if (!currenciesStore.loaded) void currenciesStore.load()
       busy.value = false
       error.value = null
@@ -204,32 +206,34 @@ function goResearch() {
           </button>
         </div>
 
-        <div class="mb-4">
-          <button type="button" class="text-xs text-slate-500 hover:text-blue-600 dark:text-slate-400" data-testid="edit-tx-fx-toggle" @click="showFxSection = !showFxSection">
-            Exchange rate {{ rateSource === "manual" ? "· custom" : "" }} {{ showFxSection ? "▾" : "▸" }}
-          </button>
-          <div v-if="showFxSection" class="mt-2 space-y-2 rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50">
-            <div class="flex gap-2">
-              <button type="button" class="btn-secondary flex-1 py-1 text-xs" :class="rateSource === 'automatic' ? '!bg-blue-600 !text-white' : ''" data-testid="edit-tx-fx-auto" @click="rateSource = 'automatic'">
+        <div class="mb-4 rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50" data-testid="edit-tx-fx-section">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">Exchange rate</span>
+            <div class="flex gap-1">
+              <button type="button" class="btn-secondary px-2 py-0.5 text-xs" :class="rateSource === 'automatic' ? '!bg-blue-600 !text-white' : ''" data-testid="edit-tx-fx-auto" @click="rateSource = 'automatic'">
                 Automatic
               </button>
-              <button type="button" class="btn-secondary flex-1 py-1 text-xs" :class="rateSource === 'manual' ? '!bg-blue-600 !text-white' : ''" data-testid="edit-tx-fx-manual" @click="rateSource = 'manual'">
+              <button type="button" class="btn-secondary px-2 py-0.5 text-xs" :class="rateSource === 'manual' ? '!bg-blue-600 !text-white' : ''" data-testid="edit-tx-fx-manual" @click="rateSource = 'manual'">
                 Custom
               </button>
             </div>
-            <div v-if="rateSource === 'manual'" class="flex items-center gap-2">
-              <input
-                v-model="exchangeRate"
-                type="number"
-                min="0"
-                step="any"
-                placeholder="e.g. 4.35"
-                class="input"
-                aria-label="Custom exchange rate (transaction currency to display currency)"
-                data-testid="edit-tx-fx-rate"
-              />
-              <span class="whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">per 1 {{ transaction.currency }}</span>
-            </div>
+          </div>
+          <p v-if="rateSource === 'automatic'" class="mt-1.5 text-xs tabular-nums text-slate-500 dark:text-slate-400">
+            <template v-if="autoRate">1 {{ transaction.currency }} = {{ autoRate.rate.toFixed(4) }} USD <span class="text-slate-400">· {{ autoRate.asOf }}</span></template>
+            <template v-else>daily market rate</template>
+          </p>
+          <div v-else class="mt-1.5 flex items-center gap-2">
+            <input
+              v-model="exchangeRate"
+              type="number"
+              min="0"
+              step="any"
+              :placeholder="autoRate ? autoRate.rate.toFixed(4) : 'e.g. 4.35'"
+              class="input"
+              aria-label="Custom exchange rate (transaction currency to display currency)"
+              data-testid="edit-tx-fx-rate"
+            />
+            <span class="whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">per 1 {{ transaction.currency }}</span>
           </div>
         </div>
 

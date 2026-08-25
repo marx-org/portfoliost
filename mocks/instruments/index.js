@@ -259,6 +259,18 @@ export function register(app) {
   })
 
   app.get("/api/logos/:symbol", (ctx) => {
-    ctx.res.sendFile(logoPath(ctx.params.symbol))
+    const path = logoPath(ctx.params.symbol)
+    try {
+      ctx.res.sendFile(path)
+    } catch {
+      // Deterministic initials placeholder for tickers without a logo file
+      const sym = String(ctx.params.symbol).split(".")[0].toUpperCase()
+      const letters = sym.slice(0, 3)
+      let hash = 0
+      for (const ch of sym) hash = (hash * 31 + ch.charCodeAt(0)) % 360
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" rx="32" fill="hsl(${hash} 45% 40%)"/><text x="32" y="39" font-family="system-ui,sans-serif" font-size="20" font-weight="600" fill="#fff" text-anchor="middle">${letters}</text></svg>`
+      ctx.res.headers.set("content-type", "image/svg+xml")
+      ctx.res.raw?.end?.(svg) ?? ctx.res.json(svg)
+    }
   })
 }

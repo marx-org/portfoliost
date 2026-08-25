@@ -88,10 +88,9 @@ describe("AddPositionDialog — fee currency & fx disclosure (§10.3)", () => {
     wrapper.unmount()
   })
 
-  it("fx disclosure defaults to automatic and hides the rate input", async () => {
+  it("fx section is always visible, defaults to automatic, hides the rate input", async () => {
     const wrapper = await openStockStep()
-    expect(wrapper.find('[data-testid="add-position-fx-rate"]').exists()).toBe(false)
-    await wrapper.find('[data-testid="add-position-fx-toggle"]').trigger("click")
+    expect(wrapper.find('[data-testid="add-position-fx-section"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="add-position-fx-rate"]').exists()).toBe(false)
     wrapper.unmount()
   })
@@ -101,7 +100,6 @@ describe("AddPositionDialog — fee currency & fx disclosure (§10.3)", () => {
       throw new Error("exit-early")
     })
     const wrapper = await openStockStep()
-    await wrapper.find('[data-testid="add-position-fx-toggle"]').trigger("click")
     await wrapper.find('[data-testid="add-position-fx-manual"]').trigger("click")
     expect(wrapper.find('[data-testid="add-position-fx-rate"]').exists()).toBe(true)
 
@@ -175,7 +173,7 @@ describe("EditTransactionModal — fee currency & fx disclosure (§10.3)", () =>
     await flushPromises()
     const sel = wrapper.find('[data-testid="edit-tx-fee-currency"]')
     expect((sel.element as HTMLSelectElement).value).toBe("USD")
-    expect(wrapper.text()).not.toContain("· custom")
+    expect(wrapper.find('[data-testid="edit-tx-fx-rate"]').exists()).toBe(false)
     wrapper.unmount()
   })
 
@@ -183,7 +181,6 @@ describe("EditTransactionModal — fee currency & fx disclosure (§10.3)", () =>
     const wrapper = mountModal(tx())
     await wrapper.setProps({ open: true })
     await flushPromises()
-    await wrapper.find('[data-testid="edit-tx-fx-toggle"]').trigger("click")
     await wrapper.find('[data-testid="edit-tx-fx-manual"]').trigger("click")
     await wrapper.find('[data-testid="edit-tx-fx-rate"]').setValue("0.92")
     await wrapper.find("form").trigger("submit")
