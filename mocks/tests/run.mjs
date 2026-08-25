@@ -402,10 +402,6 @@ async function main() {
   const snap = await request("/snaptrade/status", { token })
   check("misc.snaptrade.status", snap.status === 200 && "isRegistered" in snap.json, `got ${snap.status}`)
 
-  // ── Logos ───────────────────────────────────────────────────
-  const logo = await fetch(`http://localhost:${PORT}/api/logos/AAPL`)
-  check("logos placeholder svg", logo.status === 200 && logo.headers.get("content-type").includes("svg"), `got ${logo.status}`)
-
   // ── Fees & FX (fees-and-custom-fx §10.2 round-trips) ───────
   {
     const cur = await request("/currencies", { token })

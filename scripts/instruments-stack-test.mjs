@@ -12,6 +12,8 @@
 
 const GATEWAY = process.env.STACK_TEST_GATEWAY ?? "http://localhost:8080"
 const SYMBOL = process.env.STACK_TEST_SYMBOL ?? "AAPL"
+// WSE ticker — the long-tail case that motivated logos.md (mock 404'd on it)
+const STACK_TEST_LOGO_SYMBOL = process.env.STACK_TEST_LOGO_SYMBOL ?? "KTY.WA"
 const expectedMode = process.argv[2] ?? "any"
 if (!["real", "mock", "any"].includes(expectedMode)) {
   console.error(`usage: node scripts/instruments-stack-test.mjs [real|mock|any]`)
@@ -151,6 +153,24 @@ async function main() {
   console.log(`# detected upstream: ${detected}`)
   if (expectedMode !== "any") {
     check(`upstream mode is ${expectedMode}`, detected === expectedMode)
+  }
+
+  // ── logos (logos.md §12.4): real stack resolves via provider tier ────
+  // The mock only served hand-picked SVG files; the module always returns a
+  // usable image — provider-resolved bytes or the initials fallback.
+  for (const logoSymbol of [SYMBOL, STACK_TEST_LOGO_SYMBOL]) {
+    const res = await fetch(`${GATEWAY}/api/logos/${encodeURIComponent(logoSymbol)}`, { headers: HEADERS })
+    const contentType = res.headers.get("content-type") ?? ""
+    check(
+      `logo ${logoSymbol} renders`,
+      res.status === 200 && (contentType.startsWith("image/") || contentType.includes("svg")),
+      `got ${res.status} ${contentType}`,
+    )
+    check(
+      `logo ${logoSymbol} cacheable`,
+      (res.headers.get("cache-control") ?? "").includes("max-age"),
+      `got ${res.headers.get("cache-control")}`,
+    )
   }
 
   console.log(`\n${checks - failures}/${checks} checks passed${failures ? `, ${failures} FAILED` : ""}`)

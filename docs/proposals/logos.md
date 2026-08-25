@@ -1,6 +1,6 @@
 # Proposal: instrument logos — provider-tier resolution with permanent local store
 
-**Status**: draft (2026-08-25) — for discussion
+**Status**: accepted (2026-08-25)
 **Builds on**: [backend-topology.md](backend-topology.md) (D1–D11), [instruments-provider-module.md](instruments-provider-module.md) (D12–D15), [fees-and-custom-fx.md](fees-and-custom-fx.md) (D25–D33)
 **Scope**: replace the current `/api/logos/:symbol` (mock file lookup — 404s for most real tickers, e.g. `KTY.WA`) with a provider-resolved, **permanently cached** logo pipeline owned by the instruments module.
 
@@ -76,11 +76,15 @@ cold starts without double-storing payloads.
 
 ## Plan placement
 
-New plan section **§12 Instrument logos** (pending):
+Implemented in [plan.md](../plan.md) **§12 Instrument logos**:
 
-- [ ] 12.1 openst `equity.logo` route (FMP → yfinance → favicon chain) + stack test
-- [ ] 12.2 cachest route for logo resolution lookups (short TTL)
-- [ ] 12.3 instruments: `logos` table migration + resolve/persist/single-flight service
-- [ ] 12.4 `/api/logos/:symbol` serving local files + initials fallback; mock handler retired
-- [ ] 12.5 disc volume in compose + cluster HelmRelease persistence
-- [ ] 12.6 e2e: search a WSE ticker → logo renders (real or initials), file persisted
+- [x] 12.1 openst `equity.logo` route (FMP CDN → yfinance profile website → favicon chain) + pytest
+- [x] 12.2 cachest `OPENST_LOGO` route for logo resolution lookups (short TTL)
+- [x] 12.3 instruments: `logos` table migration + resolve/persist/single-flight service
+- [x] 12.4 `/api/logos/:symbol` serving local files + initials fallback; mock handler retired
+- [x] 12.5 disc volume in compose (bind mount `data/logos`); cluster HelmRelease persistence deferred with the module's cluster rollout (D15 scope)
+- [x] 12.6 e2e: WSE ticker renders a logo (real or initials); file persisted on disc
+
+Note (verified during implementation): FMP's legacy `financialmodelingprep.com/image/logo/{T}.png`
+path is dead (403); the chain uses the live keyless CDN `images.financialmodelingprep.com/symbol/{T}.png`.
+OpenBB's yfinance profile exposes no logo field — the favicon leg derives from `company_url`.

@@ -482,11 +482,13 @@ Proposal: [wallets-module.md](proposals/wallets-module.md) (accepted 2026-08-24,
 
 ## 12. Instrument logos (provider-resolved, permanently stored)
 
-Proposal: [logos.md](proposals/logos.md) (draft 2026-08-25, D34–D37). Resolve logos once through the provider tier (FMP → yfinance → favicon), persist binaries on disc + metadata in Postgres, serve from our own infrastructure; generated initials as terminal fallback.
+Proposal: [logos.md](proposals/logos.md) (accepted 2026-08-25, D34–D37). Resolve logos once through the provider tier, persist binaries on disc + metadata in Postgres, serve from our own infrastructure; generated initials as terminal fallback.
 
-- [ ] 12.1 openst `equity.logo` route (FMP → yfinance → favicon chain) + stack test
-- [ ] 12.2 cachest route for logo resolution lookups (short TTL)
-- [ ] 12.3 instruments: `logos` table migration + resolve/persist/single-flight service
-- [ ] 12.4 `/api/logos/:symbol` serving local files + initials fallback; mock handler retired
-- [ ] 12.5 disc volume in compose + cluster HelmRelease persistence
-- [ ] 12.6 e2e: WSE ticker search renders a logo (real or initials); file persisted on disc
+Verified provider facts (2026-08-25): FMP's legacy `financialmodelingprep.com/image/logo/{T}.png` path is dead (403) — the live keyless CDN is `images.financialmodelingprep.com/symbol/{T}.png` (covers WSE names like KTY.WA). OpenBB's yfinance profile carries **no** logo field; its `company_url` (website) feeds the favicon fallback. Google s2 favicons verified reachable from the compose network.
+
+- [x] 12.1 openst `/equity/logo/{ticker}` route: FMP CDN HEAD → yfinance profile `company_url` → favicon chain, returns `{source, remote_url}` or 404; pytest suite
+- [x] 12.2 cachest `OPENST_LOGO` route (`/logo/{ticker}`, short TTL) caching resolution lookups only — binaries never flow through cachest (D36)
+- [x] 12.3 instruments: `instruments.logos` migration (`symbol PK, source, remote_url, file, bytes, sha256, fetched_at, refresh_after`) + resolve/persist/single-flight service + adapter `fetchLogo`
+- [x] 12.4 `/api/logos/:symbol` (+`/logos/:symbol` parity alias) serving local files with immutable caching; deterministic initials SVG fallback (ported from mock), never persisted; auth-exempt (SPA `<img>` tags carry no JWT); gateway flip `API_LOGOS_URL` → instruments; mock handler retired
+- [x] 12.5 disc volume: bind mount `../portfoliost-instruments/data/logos` in compose; cluster HelmRelease persistence deferred with the module's cluster rollout (D15 scope)
+- [x] 12.6 stack-test logo checks (real/mock distinguishing) + e2e: WSE ticker renders a logo (real or initials); file persisted on disc; I10 full suite green

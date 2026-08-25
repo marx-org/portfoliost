@@ -146,6 +146,9 @@ services:
     environment:
       DATABASE_URL: postgres://portfoliost:portfoliost@postgres:5432/portfoliost
       CACHEST_URL: http://cachest:8080
+      LOGOS_DIR: /app/data/logos
+    volumes:
+      - ../portfoliost-instruments/data/logos:/app/data/logos
     depends_on:
       postgres:
         condition: service_healthy
