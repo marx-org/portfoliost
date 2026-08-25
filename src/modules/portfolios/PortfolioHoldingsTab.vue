@@ -13,6 +13,11 @@ import { formatCurrency, formatNumber, formatPercent, formatSignedCurrency } fro
 import { researchSymbol } from "@/utils/research"
 import type { PortfolioPositions } from "@/api/types"
 import EditPositionDialog from "@/modules/portfolios/EditPositionDialog.vue"
+import FeeFields from "@/components/FeeFields.vue"
+import FxRateFields from "@/components/FxRateFields.vue"
+import { useCurrenciesStore } from "@/stores/currencies"
+import { useTargetCurrency } from "@/composables/useTargetCurrency"
+import { type LatestRate } from "@/api/fx"
 
 type Position = PortfolioPositions[number]
 
@@ -33,6 +38,24 @@ const saving = ref(false)
 const actionError = ref<string | null>(null)
 
 const editPosition = ref<Position | null>(null)
+
+const currenciesStore = useCurrenciesStore()
+const targetCurrency = useTargetCurrency(
+  computed(() => store.portfolios.find((p) => p.id === id)?.currency ?? null),
+)
+
+const fees = ref("0")
+const feesType = ref<"fixed" | "pct">("fixed")
+const feeCurrency = ref("USD")
+const feeRateSource = ref<"automatic" | "manual">("automatic")
+const feeExchangeRate = ref("")
+const rateSource = ref<"automatic" | "manual">("automatic")
+const exchangeRate = ref("")
+const txSuggestion = ref<LatestRate | null>(null)
+const feeSuggestion = ref<LatestRate | null>(null)
+
+function onTxSuggestion(r: LatestRate | null) { txSuggestion.value = r }
+function onFeeSuggestion(r: LatestRate | null) { feeSuggestion.value = r }
 
 const showCustomize = ref(false)
 const sortKey = ref<string | null>(null)
@@ -196,11 +219,20 @@ function openAction(kind: ActionKind, position: Position): void {
   openMenuId.value = null
   action.value = { kind, position }
   form.value = {
-    quantity: String(position.quantity),
+    quantity: kind === "sell" ? String(position.quantity) : "",
     price: String(position.currentPrice ?? ""),
     avgCost: String(position.averageCostBasis ?? ""),
   }
-  actionError.value = null
+  fees.value = "0"
+  feesType.value = "fixed"
+  feeCurrency.value = position.instrumentCurrency ?? "USD"
+  feeRateSource.value = "automatic"
+  feeExchangeRate.value = ""
+  rateSource.value = "automatic"
+  exchangeRate.value = ""
+  txSuggestion.value = null
+  feeSuggestion.value = null
+  if (!currenciesStore.loaded) void currenciesStore.load()
 }
 
 function openEditPosition(position: Position): void {
@@ -215,6 +247,47 @@ function onEditClose() {
 function onEditSaved() {
   void store.fetchPositions(id)
 }
+
+const actionPositionCost = computed(() => {
+  if (!action.value) return 0
+  const qty = Number(form.value.quantity) || 0
+  const price = Number(form.value.price) || 0
+  return qty * price
+})
+
+const actionTxRate = computed(() => {
+  if (rateSource.value === "manual" && exchangeRate.value) return Number(exchangeRate.value)
+  return txSuggestion.value?.rate ?? null
+})
+
+const actionFeeValue = computed(() => {
+  if (feesType.value === "pct") return (actionPositionCost.value * (Number(fees.value) || 0)) / 100
+  return Number(fees.value) || 0
+})
+
+const actionFeeRate = computed(() => {
+  if (feeRateSource.value === "manual" && feeExchangeRate.value) return Number(feeExchangeRate.value)
+  return feeSuggestion.value?.rate ?? null
+})
+
+const actionFeeInUsd = computed(() => {
+  if (!action.value) return null
+  const instCcy = action.value.position.instrumentCurrency ?? "USD"
+  if (feeCurrency.value === instCcy) return actionFeeValue.value
+  if (actionFeeRate.value && actionFeeValue.value) return actionFeeValue.value * actionFeeRate.value
+  return null
+})
+
+const actionCostConverted = computed(() => {
+  if (actionTxRate.value == null) return null
+  return actionPositionCost.value * actionTxRate.value
+})
+
+const actionTotalConverted = computed(() => {
+  if (actionTxRate.value == null || !action.value) return null
+  const feePart = actionFeeInUsd.value ?? 0
+  return (actionPositionCost.value + feePart) * actionTxRate.value
+})
 
 function dialogTitle(): string {
   if (!action.value) return ""
@@ -233,9 +306,30 @@ async function submitAction(): Promise<void> {
   const { kind, position } = action.value
   const quantity = Number(form.value.quantity)
   const price = Number(form.value.price)
+  const instCcy = position.instrumentCurrency ?? "USD"
+  const dividendQty = kind === "dividend" ? (position.quantity || 1) : quantity
+  const txPayload: Parameters<typeof createPortfolioTransaction>[1] = { type: kind === "buy" ? "BUY" : kind === "sell" ? "SELL" : "DIVIDEND", symbol: position.symbol, quantity: dividendQty, price }
+  if (feesType.value === "fixed" && Number(fees.value) > 0) {
+    txPayload.fees = Number(fees.value)
+    txPayload.feesType = "fixed"
+    if (feeCurrency.value !== instCcy) {
+      txPayload.feeCurrency = feeCurrency.value
+      txPayload.feeRateSource = feeRateSource.value
+      if (feeRateSource.value === "manual" && feeExchangeRate.value) {
+        txPayload.feeExchangeRate = Number(feeExchangeRate.value)
+      }
+    }
+  } else if (feesType.value === "pct" && Number(fees.value) > 0) {
+    txPayload.fees = (quantity * price * Number(fees.value)) / 100
+    txPayload.feesType = "pct"
+  }
+  if (rateSource.value === "manual" && exchangeRate.value) {
+    txPayload.rateSource = "manual"
+    txPayload.exchangeRate = Number(exchangeRate.value)
+  }
   try {
     if (kind === "buy") {
-      await createPortfolioTransaction(id, { type: "BUY", symbol: position.symbol, quantity, price })
+      await createPortfolioTransaction(id, txPayload)
       const newQty = (position.quantity || 0) + quantity
       const newAvg = ((position.quantity || 0) * (position.averageCostBasis || 0) + quantity * price) / newQty
       await updatePortfolioPosition(id, position.id, {
@@ -246,7 +340,7 @@ async function submitAction(): Promise<void> {
       })
       notice.value = `Bought ${quantity} ${position.symbol}`
     } else if (kind === "sell") {
-      await createPortfolioTransaction(id, { type: "SELL", symbol: position.symbol, quantity, price })
+      await createPortfolioTransaction(id, txPayload)
       const remaining = (position.quantity || 0) - quantity
       if (remaining <= 0) {
         await removePortfolioPosition(id, position.id)
@@ -255,12 +349,7 @@ async function submitAction(): Promise<void> {
       }
       notice.value = `Sold ${quantity} ${position.symbol}`
     } else if (kind === "dividend") {
-      await createPortfolioTransaction(id, {
-        type: "DIVIDEND",
-        symbol: position.symbol,
-        quantity: position.quantity || 1,
-        price,
-      })
+      await createPortfolioTransaction(id, txPayload)
       notice.value = `Recorded dividend for ${position.symbol}`
     }
     await store.fetchPositions(id)
@@ -473,6 +562,65 @@ function goResearch(position: Position): void {
             class="input mb-4"
             data-testid="action-price"
           />
+
+          <label v-if="action.kind !== 'dividend'" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Transaction Fees</label>
+          <FeeFields
+            v-if="action.kind !== 'dividend'"
+            v-model:fees="fees"
+            v-model:fees-type="feesType"
+            v-model:fee-currency="feeCurrency"
+            testid="holdings-action"
+          />
+
+          <FxRateFields
+            v-if="action.kind !== 'dividend'"
+            leg="Transaction"
+            :from="action.position.instrumentCurrency || 'USD'"
+            :to="targetCurrency"
+            :date="new Date().toISOString().slice(0, 10)"
+            v-model:rate-source="rateSource"
+            v-model:rate="exchangeRate"
+            testid="holdings-action-fx"
+            @suggestion="onTxSuggestion"
+          />
+
+          <FxRateFields
+            v-if="action.kind !== 'dividend'"
+            leg="Fee"
+            :from="feeCurrency"
+            :to="action.position.instrumentCurrency || 'USD'"
+            :date="new Date().toISOString().slice(0, 10)"
+            :hidden="feesType !== 'fixed' || feeCurrency === (action.position.instrumentCurrency || 'USD')"
+            v-model:rate-source="feeRateSource"
+            v-model:rate="feeExchangeRate"
+            testid="holdings-action-fee-fx"
+            @suggestion="onFeeSuggestion"
+          />
+
+          <dl v-if="action.kind !== 'dividend'" class="mt-2 rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-800/50">
+            <div class="flex items-center justify-between text-sm">
+              <dt class="text-slate-600 dark:text-slate-300">Shares × Price</dt>
+              <dd class="tabular-nums text-slate-900 dark:text-slate-100">
+                {{ formatCurrency(actionPositionCost, action.position.instrumentCurrency || "USD") }}
+                <template v-if="actionTxRate != null"> ≈ {{ formatCurrency(actionCostConverted!, targetCurrency ?? "") }}</template>
+              </dd>
+            </div>
+            <div v-if="actionFeeValue > 0" class="mt-1 flex items-center justify-between text-sm">
+              <dt class="text-slate-600 dark:text-slate-300">Fee ({{ feeCurrency }})</dt>
+              <dd class="tabular-nums text-slate-900 dark:text-slate-100">
+                {{ formatCurrency(actionFeeValue, feeCurrency) }}
+                <template v-if="actionFeeRate != null && feeCurrency !== (action.position.instrumentCurrency || 'USD')"> ≈ {{ formatCurrency(actionFeeInUsd!, "USD") }}</template>
+              </dd>
+            </div>
+            <div class="mt-1 flex items-center justify-between border-t border-slate-200 pt-1 text-sm font-medium dark:border-slate-700">
+              <dt class="text-slate-700 dark:text-slate-200">Total Cost</dt>
+              <dd class="tabular-nums text-slate-900 dark:text-slate-100">
+                {{ formatCurrency(actionPositionCost + (actionFeeInUsd ?? actionFeeValue), action.position.instrumentCurrency || "USD") }}
+                <template v-if="actionTotalConverted != null"> ≈ {{ formatCurrency(actionTotalConverted, targetCurrency ?? "") }}</template>
+              </dd>
+            </div>
+          </dl>
+
           <p v-if="actionError" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ actionError }}</p>
           <div class="flex justify-end gap-2">
             <button type="button" class="btn-ghost" @click="action = null">Cancel</button>
