@@ -22,6 +22,27 @@ vi.mock("@/api/portfolios", async (importOriginal) => {
   }
 })
 
+vi.mock("@/api/instruments", () => ({
+  searchInstruments: vi.fn().mockResolvedValue({ instruments: [], total: 0 }),
+  getInstrumentDetail: vi.fn().mockResolvedValue({}),
+  getInstrumentProfile: vi.fn().mockResolvedValue({}),
+  getInstrumentMetrics: vi.fn().mockResolvedValue({}),
+  getInstrumentOverviewMetrics: vi.fn().mockResolvedValue({}),
+  getQuote: vi.fn().mockResolvedValue({ symbol: "AAPL", currentPrice: 123.45 }),
+  getHistory: vi.fn().mockResolvedValue({
+    symbol: "AAPL",
+    closePrices: [100, 110],
+    highPrices: [100, 110],
+    lowPrices: [100, 110],
+    openPrices: [100, 100],
+    volumes: [1, 1],
+    timestamps: [Date.parse("2026-08-20T00:00:00Z"), Date.parse("2026-08-21T00:00:00Z")],
+    status: "ok",
+    currency: "USD",
+  }),
+  getEpsSurprises: vi.fn().mockResolvedValue({}),
+}))
+
 vi.mock("@/api/wallets", async (importOriginal) => {
   const actual = await importOriginal<typeof walletsApi>()
   return {
@@ -72,6 +93,10 @@ async function openStockStep(env = makeEnv()) {
   // the stock step opens only after a search result is chosen
   ;(wrapper.findComponent({ name: "InstrumentSearchModal" }).vm as unknown as { $emit: (e: string, ...a: unknown[]) => void })
     .$emit("add", "AAPL.US", "Apple Inc")
+  await flushPromises()
+  // await the async market-price fetch triggered by onSearchAdd
+  const vm = wrapper.vm as unknown as { pendingMarketPrice: Promise<void> | null }
+  if (vm.pendingMarketPrice) await vm.pendingMarketPrice
   await flushPromises()
   return wrapper
 }
@@ -207,6 +232,61 @@ describe("EditTransactionModal — fee currency & fx disclosure (§10.3)", () =>
     const payload = mocked.updatePortfolioTransaction.mock.calls[0][2]!
     expect(payload.rateSource).toBe("automatic")
     expect(payload.exchangeRate).toBeUndefined()
+    wrapper.unmount()
+  })
+})
+
+describe("AddPositionDialog — market price suggestion (plan §13 follow-up 3/6)", () => {
+  beforeEach(async () => {
+    const mod = await import("@/api/instruments")
+    vi.mocked(mod.getQuote).mockResolvedValue({ symbol: "AAPL", currentPrice: 123.45 } as never)
+    vi.mocked(mod.getHistory).mockResolvedValue({
+      symbol: "AAPL",
+      closePrices: [100, 110],
+      highPrices: [100, 110],
+      lowPrices: [100, 110],
+      openPrices: [100, 100],
+      volumes: [1, 1],
+      timestamps: [Date.parse("2026-08-20T00:00:00Z"), Date.parse("2026-08-21T00:00:00Z")],
+      status: "ok",
+      currency: "USD",
+    } as never)
+  })
+
+  it("prefills price with the current quote and shows it in the header", async () => {
+    const { getQuote } = await import("@/api/instruments")
+    const wrapper = await openStockStep()
+    expect(vi.mocked(getQuote)).toHaveBeenCalled()
+    expect((wrapper.find('[data-testid="add-position-price"]').element as HTMLInputElement).value).toBe("123.45")
+    expect(wrapper.text()).toContain("123.45")
+    expect(wrapper.text()).toContain("current price")
+    wrapper.unmount()
+  })
+
+  it("backdated purchase shows the exchange close at that date and re-suggests", async () => {
+    const { getHistory } = await import("@/api/instruments")
+    const wrapper = await openStockStep()
+    await wrapper.find('[data-testid="add-position-date"]').setValue("2026-08-21")
+    await flushPromises()
+    // await the async market-price fetch triggered by the date watcher
+    const vm = wrapper.vm as unknown as { pendingMarketPrice: Promise<void> | null }
+    if (vm.pendingMarketPrice) await vm.pendingMarketPrice
+    await flushPromises()
+    expect(vi.mocked(getHistory)).toHaveBeenCalled()
+    expect(wrapper.text()).toContain("110")
+    expect(wrapper.text()).toContain("close on 2026-08-21")
+    expect((wrapper.find('[data-testid="add-position-price"]').element as HTMLInputElement).value).toBe("110")
+    // user override wins over the suggestion
+    await wrapper.find('[data-testid="add-position-price"]').setValue("111.5")
+    await wrapper.find('[data-testid="add-position-date"]').setValue("2026-08-20")
+    await flushPromises()
+    if (vm.pendingMarketPrice) await vm.pendingMarketPrice
+    await flushPromises()
+    await wrapper.find('[data-testid="add-position-date"]').setValue("2026-08-21")
+    await flushPromises()
+    if (vm.pendingMarketPrice) await vm.pendingMarketPrice
+    await flushPromises()
+    expect((wrapper.find('[data-testid="add-position-price"]').element as HTMLInputElement).value).toBe("111.5")
     wrapper.unmount()
   })
 })

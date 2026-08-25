@@ -38,7 +38,7 @@ const tid = props.testid ?? "fee-fields"
             :aria-label="`${tid} fee currency`"
             :testid="`${tid}-fee-currency`"
             class="!rounded-l-lg !border-0 !border-r"
-            @update:model-value="(v: string) => { emit('update:feeCurrency', v); emit('feeCurrencyChange') }"
+            @update:model-value="(v: string) => { if (v) { emit('update:feeCurrency', v); emit('feeCurrencyChange') } }"
           />
         </template>
         <span v-else class="pl-3 text-sm text-slate-500 dark:text-slate-400">%</span>

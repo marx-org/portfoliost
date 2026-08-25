@@ -6,6 +6,7 @@ import { usePortfolioStore } from "@/stores/portfolios"
 import { useWalletsStore } from "@/stores/wallets"
 import { formatCurrency } from "@/utils/format"
 import InstrumentSearchModal from "@/modules/instruments/InstrumentSearchModal.vue"
+import { getQuote, getHistory } from "@/api/instruments"
 import FeeFields from "@/components/FeeFields.vue"
 import FxRateFields from "@/components/FxRateFields.vue"
 import { useCurrenciesStore } from "@/stores/currencies"
@@ -83,6 +84,51 @@ watch(
 )
 
 const TX_CCY = "USD" // stock step prices are USD-denominated
+const marketPrice = ref<number | null>(null)
+const quotePrice = ref<number | null>(null)
+const priceTouched = ref(false)
+const pendingMarketPrice = ref<Promise<void> | null>(null)
+
+const today = () => new Date().toISOString().slice(0, 10)
+
+async function loadMarketPrice(symbol: string, date: string): Promise<void> {
+  try {
+    if (date >= today()) {
+      const q = await getQuote(symbol)
+      quotePrice.value = q.currentPrice ?? null
+      marketPrice.value = quotePrice.value
+    } else {
+      quotePrice.value = null
+      const hist = await getHistory(symbol, "daily")
+      const target = new Date(`${date}T00:00:00Z`).getTime()
+      let idx = -1
+      for (let i = 0; i < hist.timestamps.length; i++) {
+        if (hist.timestamps[i] <= target) idx = i
+        else break
+      }
+      marketPrice.value = idx >= 0 ? hist.closePrices[idx] : null
+    }
+    if (!priceTouched.value && marketPrice.value != null) {
+      stockForm.value.price = String(marketPrice.value)
+    }
+  } catch {
+    marketPrice.value = null
+  }
+}
+
+function triggerLoadMarketPrice() {
+  const p = loadMarketPrice(stockForm.value.symbol, stockForm.value.executedAt)
+  pendingMarketPrice.value = p
+  return p
+}
+
+watch(
+  () => stockForm.value.executedAt,
+  (_date) => {
+    if (step.value === "stock" && stockForm.value.symbol) void triggerLoadMarketPrice()
+  },
+)
+
 const targetCurrency = useTargetCurrency(
   computed(() => store.portfolios.find((p) => p.id === props.portfolioId)?.currency ?? null),
 )
@@ -121,6 +167,7 @@ function onSearchClose() {
 function onSearchAdd(symbol: string, name: string) {
   showSearch.value = false
   if (pendingStep === "stock") {
+    priceTouched.value = false
     stockForm.value = {
       symbol,
       name,
@@ -138,6 +185,7 @@ function onSearchAdd(symbol: string, name: string) {
     }
     step.value = "stock"
     error.value = null
+    void triggerLoadMarketPrice()
   } else if (pendingStep === "option") {
     optionPending.value = { symbol, name }
     optionForm.value = {
@@ -325,6 +373,8 @@ function goResearch() {
   close()
   if (symbol) router.push({ name: "research-overview", params: { symbol: symbol.endsWith(".US") ? symbol : `${symbol}.US` } })
 }
+
+defineExpose({ pendingMarketPrice })
 </script>
 
 <template>
@@ -378,7 +428,10 @@ function goResearch() {
           </div>
           <div class="text-right">
             <button type="button" class="text-xs text-blue-600 hover:underline" @click="goResearch">View chart</button>
-            <p class="text-sm font-medium tabular-nums text-slate-900 dark:text-slate-100">{{ formatCurrency(Number(stockForm.price) || 0, "USD") }}</p>
+            <p class="text-sm font-medium tabular-nums text-slate-900 dark:text-slate-100">
+              {{ marketPrice != null ? formatCurrency(marketPrice, "USD") : formatCurrency(Number(stockForm.price) || 0, "USD") }}
+              <span class="block text-xs font-normal text-slate-400">{{ stockForm.executedAt >= today() ? "current price" : `close on ${stockForm.executedAt}` }}</span>
+            </p>
           </div>
         </div>
         <form @submit.prevent="submitStock">
@@ -400,7 +453,7 @@ function goResearch() {
             </div>
             <div>
               <label for="stock-price" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Price per share ($)</label>
-              <input id="stock-price" v-model="stockForm.price" type="number" min="0" step="any" required class="input" data-testid="add-position-price" />
+              <input id="stock-price" v-model="stockForm.price" type="number" min="0" step="any" required class="input" data-testid="add-position-price" @input="priceTouched = true" />
             </div>
           </div>
           <label for="stock-fees" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Transaction Fees</label>
