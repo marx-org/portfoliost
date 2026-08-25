@@ -7,6 +7,7 @@ import { useWalletsStore } from "@/stores/wallets"
 import { formatCurrency } from "@/utils/format"
 import InstrumentSearchModal from "@/modules/instruments/InstrumentSearchModal.vue"
 import { getQuote, getHistory } from "@/api/instruments"
+import { type LatestRate } from "@/api/fx"
 import FeeFields from "@/components/FeeFields.vue"
 import FxRateFields from "@/components/FxRateFields.vue"
 import { useCurrenciesStore } from "@/stores/currencies"
@@ -223,6 +224,48 @@ const stockTotal = computed(() => {
   const qty = Number(stockForm.value.quantity) || 0
   const price = Number(stockForm.value.price) || 0
   return qty * price + stockFeeValue.value
+})
+
+const positionCostUSD = computed(() => {
+  const qty = Number(stockForm.value.quantity) || 0
+  const price = Number(stockForm.value.price) || 0
+  return qty * price
+})
+
+const txSuggestion = ref<LatestRate | null>(null)
+const feeSuggestion = ref<LatestRate | null>(null)
+
+const txRateValue = computed<number | null>(() => {
+  if (targetCurrency.value === TX_CCY) return null
+  if (stockForm.value.rateSource === "manual" && stockForm.value.exchangeRate) {
+    return Number(stockForm.value.exchangeRate)
+  }
+  return txSuggestion.value?.rate ?? null
+})
+
+const feeRateValue = computed<number | null>(() => {
+  if (stockFeeValue.value <= 0) return null
+  if (stockForm.value.feeCurrency === TX_CCY) return 1
+  if (stockForm.value.feeRateSource === "manual" && stockForm.value.feeExchangeRate) {
+    return Number(stockForm.value.feeExchangeRate)
+  }
+  return feeSuggestion.value?.rate ?? null
+})
+
+const feeInUsd = computed(() => {
+  if (stockForm.value.feeCurrency === TX_CCY) return stockFeeValue.value
+  if (feeRateValue.value == null) return null
+  return stockFeeValue.value * feeRateValue.value
+})
+
+const positionCostConverted = computed(() => {
+  if (txRateValue.value == null) return null
+  return positionCostUSD.value * txRateValue.value
+})
+
+const totalCostConverted = computed(() => {
+  if (txRateValue.value == null) return null
+  return stockTotal.value * txRateValue.value
 })
 
 const optionTotal = computed(() => {
@@ -473,6 +516,7 @@ defineExpose({ pendingMarketPrice })
             :date="stockForm.executedAt"
             v-model:rate-source="stockForm.rateSource"
             v-model:rate="stockForm.exchangeRate"
+            @suggestion="txSuggestion = $event"
             testid="add-position-fx"
           />
 
@@ -484,11 +528,37 @@ defineExpose({ pendingMarketPrice })
             :hidden="stockForm.feesType !== 'fixed' || stockForm.feeCurrency === TX_CCY"
             v-model:rate-source="stockForm.feeRateSource"
             v-model:rate="stockForm.feeExchangeRate"
+            @suggestion="feeSuggestion = $event"
             testid="add-position-fee-fx"
           />
-          <div class="mb-4 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/50">
-            <span class="text-sm text-slate-600 dark:text-slate-300">Total Cost</span>
-            <span class="text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ formatCurrency(stockTotal, "USD") }}</span>
+          <div class="mb-4 rounded-lg bg-slate-50 px-3 py-2 text-sm dark:bg-slate-800/50">
+            <p class="mb-1 font-medium text-slate-700 dark:text-slate-200">Summary</p>
+            <dl class="space-y-0.5 tabular-nums text-slate-600 dark:text-slate-300">
+              <div class="flex justify-between gap-3">
+                <dt>Shares × Price</dt>
+                <dd>
+                  {{ formatCurrency(positionCostUSD, "USD") }}
+                  <template v-if="txRateValue != null"> ≈ {{ formatCurrency(positionCostConverted, targetCurrency ?? "") }}</template>
+                </dd>
+              </div>
+              <div v-if="stockFeeValue > 0" class="flex justify-between gap-3">
+                <dt>Fee ({{ stockForm.feesType === "pct" ? `${stockForm.fees}%` : stockForm.feeCurrency }})</dt>
+                <dd>
+                  {{ formatCurrency(stockFeeValue, stockForm.feeCurrency) }}
+                  <template v-if="stockForm.feeCurrency !== TX_CCY">
+                    <template v-if="feeInUsd != null"> ≈ {{ formatCurrency(feeInUsd, "USD") }}</template>
+                    <template v-else> · rate pending</template>
+                  </template>
+                </dd>
+              </div>
+              <div class="flex justify-between gap-3 border-t border-slate-200 pt-0.5 dark:border-slate-700">
+                <dt class="font-medium text-slate-900 dark:text-slate-100">Total Cost</dt>
+                <dd class="font-medium text-slate-900 dark:text-slate-100">
+                  {{ formatCurrency(stockTotal, "USD") }}
+                  <template v-if="txRateValue != null"> ≈ {{ formatCurrency(totalCostConverted, targetCurrency ?? "") }}</template>
+                </dd>
+              </div>
+            </dl>
           </div>
           <p v-if="error" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ error }}</p>
           <div class="flex justify-end gap-2">

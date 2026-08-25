@@ -50,6 +50,10 @@ vi.mock("@/api/wallets", async (importOriginal) => {
     getWallets: vi.fn(),
   }
 })
+
+vi.mock("@/api/fx", () => ({
+  getLatestRate: vi.fn().mockResolvedValue({ rate: 4.35, asOf: "2026-08-25" }),
+}))
 const mocked = vi.mocked(portfoliosApi)
 const mockedWallets = vi.mocked(walletsApi)
 
@@ -287,6 +291,74 @@ describe("AddPositionDialog — market price suggestion (plan §13 follow-up 3/6
     if (vm.pendingMarketPrice) await vm.pendingMarketPrice
     await flushPromises()
     expect((wrapper.find('[data-testid="add-position-price"]').element as HTMLInputElement).value).toBe("111.5")
+    wrapper.unmount()
+  })
+})
+
+describe("AddPositionDialog — multicurrency summary (plan §13 follow-up 4/6)", () => {
+  beforeEach(async () => {
+    const mod = await import("@/api/instruments")
+    vi.mocked(mod.getQuote).mockResolvedValue({ symbol: "AAPL", currentPrice: 123.45 } as never)
+    const fxMod = await import("@/api/fx")
+    vi.mocked(fxMod.getLatestRate).mockResolvedValue({ rate: 4.35, asOf: "2026-08-25" } as never)
+  })
+
+  it("shows converted amounts when portfolio currency differs from TX_CCY", async () => {
+    const wrapper = await openStockStep()
+    await wrapper.find('[data-testid="add-position-price"]').setValue("100")
+    await flushPromises()
+    await flushPromises()
+    await flushPromises()
+    const summaryText = wrapper.find("dl").text()
+    // 1 × $100 = $100, converted at 4.35 → PLN 435.00
+    expect(summaryText).toContain("$100.00")
+    // Intl.NumberFormat uses U+00A0 between currency code and amount
+    expect(summaryText).toContain("PLN\u00A0435.00")
+    expect(summaryText).toContain("Total Cost")
+    wrapper.unmount()
+  })
+
+  it("shows fee row with cross-currency conversion when fee currency differs from USD", async () => {
+    const wrapper = await openStockStep()
+    await wrapper.find('[data-testid="add-position-price"]').setValue("100")
+    await wrapper.find('[data-testid="add-position-fees"]').setValue("5")
+    await wrapper.find('[data-testid="add-position-fee-currency"]').setValue("EUR")
+    await flushPromises()
+    const summaryText = wrapper.find("dl").text()
+    expect(summaryText).toContain("Fee (EUR)")
+    expect(summaryText).toContain("€5.00")
+    wrapper.unmount()
+  })
+
+  it("shows no ≈ conversion when portfolio currency equals TX_CCY", async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const cs = useCurrenciesStore()
+    cs.currencies = registry
+    cs.loaded = true
+    const ps = usePortfolioStore()
+    ps.portfolios = [{ id: "p1", currency: "USD" }] as never
+    mockedWallets.getWallets.mockResolvedValue([{ id: "w1", name: "Cash", balance: 1000, currency: "USD" }] as never)
+
+    const wrapper = mount(AddPositionDialog, {
+      props: { open: false, portfolioId: "p1" },
+      global: { plugins: [pinia] },
+      attachTo: document.body,
+    })
+    await wrapper.setProps({ open: true })
+    await flushPromises()
+    await wrapper.find('[data-testid="add-position-instrument"]').trigger("click")
+    ;(wrapper.findComponent({ name: "InstrumentSearchModal" }).vm as unknown as { $emit: (e: string, ...a: unknown[]) => void })
+      .$emit("add", "AAPL.US", "Apple Inc")
+    await flushPromises()
+    const vm = wrapper.vm as unknown as { pendingMarketPrice: Promise<void> | null }
+    if (vm.pendingMarketPrice) await vm.pendingMarketPrice
+    await flushPromises()
+    await wrapper.find('[data-testid="add-position-price"]').setValue("100")
+    await flushPromises()
+    const summaryText = wrapper.find("dl").text()
+    expect(summaryText).toContain("$100.00")
+    expect(summaryText).not.toContain("≈")
     wrapper.unmount()
   })
 })
