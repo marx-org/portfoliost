@@ -201,6 +201,29 @@ const router = createRouter({
             },
           ],
         },
+        {
+          path: "admin",
+          redirect: { name: "admin-system" },
+          meta: { admin: true },
+        },
+        {
+          path: "admin/system",
+          name: "admin-system",
+          component: () => import("@/modules/admin/SystemInfoView.vue"),
+          meta: { admin: true },
+        },
+        {
+          path: "admin/currencies",
+          name: "admin-currencies",
+          component: () => import("@/modules/admin/CurrencyRatesView.vue"),
+          meta: { admin: true },
+        },
+        {
+          path: "admin/users",
+          name: "admin-users",
+          component: () => import("@/modules/admin/UsersView.vue"),
+          meta: { admin: true },
+        },
       ],
     },
     {
@@ -214,6 +237,9 @@ router.beforeEach((to) => {
   const auth = useAuthStore()
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     return { name: "login", query: { redirect: to.fullPath } }
+  }
+  if (to.meta.admin && !auth.isAdmin) {
+    return { name: "investments" }
   }
   if (to.name === "login" && auth.isAuthenticated) {
     return { name: "investments" }

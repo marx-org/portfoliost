@@ -11,6 +11,7 @@ export const useAuthStore = defineStore("auth", () => {
   const error = ref<string | null>(null)
 
   const isAuthenticated = computed(() => Boolean(token.value))
+  const isAdmin = computed(() => user.value?.groups?.includes("portfoliost_admin") ?? false)
 
   // A network failure mid-login usually means the browser holds state from an
   // old session (stale token, dead backend). Force-logout locally so the next
@@ -75,5 +76,5 @@ export const useAuthStore = defineStore("auth", () => {
     }
   }
 
-  return { token, user, loading, error, isAuthenticated, login, loginWithCode, fetchMe, logout }
+  return { token, user, loading, error, isAuthenticated, isAdmin, login, loginWithCode, fetchMe, logout }
 })

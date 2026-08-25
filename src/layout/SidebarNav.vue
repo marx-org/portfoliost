@@ -36,6 +36,8 @@ function isActive(item: { to: unknown; label: string }): boolean {
   return typeof item.to !== "string" && router.currentRoute.value.name === (item.to as { name: string }).name
 }
 
+const isAdminActive = computed(() => router.currentRoute.value.path.startsWith("/en/admin"))
+
 const themeOpen = ref(false)
 const themeOptions: { value: ThemePreference; label: string; icon: string }[] = [
   { value: "light", label: "Light", icon: "sun" },
@@ -68,6 +70,21 @@ function selectTheme(value: ThemePreference) {
       >
         <span>{{ item.label }}</span>
         <span v-if="item.sublabel" class="ml-1 text-xs font-normal text-slate-400 dark:text-slate-500">/ {{ item.sublabel }}</span>
+      </router-link>
+
+      <router-link
+        v-if="auth.isAdmin"
+        to="/en/admin"
+        class="block rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+        :class="{ 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400': isAdminActive }"
+      >
+        <span class="flex items-center gap-2">
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+          Admin
+        </span>
       </router-link>
     </nav>
 
