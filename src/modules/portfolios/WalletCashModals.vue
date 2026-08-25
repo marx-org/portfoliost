@@ -86,6 +86,17 @@ const targetAmountValue = computed<number | null>(() => {
 
 const totalDebited = computed(() => amount.value + (feeInWalletCcy.value ?? 0))
 
+const dualActive = computed(() => isCrossCurrencyTransfer.value && transferRateValue.value != null)
+
+/** " ≈ X" equivalent in the other currency, driven by the live transfer rate */
+function dual(value: number, primary: "wallet" | "dest"): string {
+  if (!dualActive.value) return ""
+  const rate = transferRateValue.value!
+  const other = primary === "wallet" ? destCurrency.value : props.wallet.currency
+  const converted = primary === "wallet" ? value * rate : value / rate
+  return ` ≈ ${formatCurrency(converted, other ?? "")}`
+}
+
 const remainingBalance = computed(() => Math.max(0, availableBalance.value - totalDebited.value))
 
 const canSubmit = computed(() => {
@@ -329,7 +340,7 @@ const submitLabel = computed(() => (props.action === "deposit" ? "Deposit" : pro
           <dl class="mt-1 space-y-0.5 tabular-nums text-slate-600 dark:text-slate-300">
             <div class="flex justify-between gap-3">
               <dt>{{ action === "transfer" ? "Transfer amount" : "Amount" }}</dt>
-              <dd>{{ formatCurrency(amount || 0, wallet.currency) }}</dd>
+              <dd>{{ formatCurrency(amount || 0, wallet.currency) }}{{ dual(amount || 0, "wallet") }}</dd>
             </div>
             <div v-if="feeAmount > 0" class="flex justify-between gap-3">
               <dt>Fee ({{ feesType === "pct" ? `${fees}%` : feeCurrency }})</dt>
@@ -343,12 +354,12 @@ const submitLabel = computed(() => (props.action === "deposit" ? "Deposit" : pro
             </div>
             <div v-if="action !== 'deposit'" class="flex justify-between gap-3 border-t border-slate-200 pt-0.5 font-semibold text-slate-900 dark:text-slate-100 dark:border-slate-700">
               <dt>Total debited</dt>
-              <dd>{{ formatCurrency(totalDebited, wallet.currency) }} <span class="text-xs font-normal text-slate-400">{{ wallet.currency }}</span></dd>
+              <dd>{{ formatCurrency(totalDebited, wallet.currency) }}{{ dual(totalDebited, "wallet") }}</dd>
             </div>
             <div v-if="isCrossCurrencyTransfer" class="flex justify-between gap-3">
               <dt>Target ({{ destCurrency }})</dt>
               <dd>
-                <template v-if="targetAmountValue != null">{{ formatCurrency(targetAmountValue, destCurrency || "") }}</template>
+                <template v-if="targetAmountValue != null">{{ formatCurrency(targetAmountValue, destCurrency || "") }}{{ dual(targetAmountValue, "dest") }}</template>
                 <template v-else>—</template>
                 <span class="text-xs text-slate-400">
                   {{ transferRateValue != null ? `@ ${transferRateValue.toFixed(4)}` : "· rate pending" }}
@@ -357,7 +368,7 @@ const submitLabel = computed(() => (props.action === "deposit" ? "Deposit" : pro
             </div>
             <div v-if="action !== 'deposit'" class="flex justify-between gap-3">
               <dt>Remaining balance</dt>
-              <dd>{{ formatCurrency(remainingBalance, wallet.currency) }}</dd>
+              <dd>{{ formatCurrency(remainingBalance, wallet.currency) }}{{ dual(remainingBalance, "wallet") }}</dd>
             </div>
           </dl>
         </div>

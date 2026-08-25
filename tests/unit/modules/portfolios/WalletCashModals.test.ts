@@ -142,3 +142,44 @@ describe("WalletCashModals — fee currency & cross-currency transfer (§10.4)",
     expect(payload.to_wallet_id).toBe("w-eur")
   })
 })
+
+describe("WalletCashModals — dual-currency confirmation (§10a D39/D40)", () => {
+  it("cross-currency transfer summary shows values in both currencies, live", async () => {
+    const pinia = makeEnv()
+    const { useWalletsStore } = await import("@/stores/wallets")
+    const store = useWalletsStore()
+    store.wallets = [usdWallet, eurWallet] as never
+
+    const wrapper = mount(WalletCashModals, {
+      props: { open: false, action: "transfer", wallet: usdWallet },
+      global: { plugins: [pinia] },
+    })
+    await wrapper.setProps({ open: true })
+    await flushPromises()
+    await wrapper.find("#wc-to-wallet").setValue("w-eur")
+    await wrapper.find("#wc-amount").setValue(100)
+
+    // transfer leg resolves its reference rate → summary converts on the fly
+    const fxLeg = wrapper.findComponent({ name: "FxRateFields" })
+    ;(fxLeg.vm.$emit as (e: string, v: unknown) => void)("suggestion", { rate: 4.2, asOf: "2026-08-25" })
+    await flushPromises()
+
+    const text = wrapper.text().replace(/\u00A0/g, " ")
+    expect(text).toContain("$100.00")
+    expect(text).toContain("≈ €420.00") // amount dual (dest = EUR wallet)
+    expect(text).toContain("@ 4.2000")       // live rate annotation
+    expect(text).toContain("€420.00 ≈ $100.00") // target dual
+    expect(text).toContain("Total debited")
+    expect(text).toContain("$400.00")        // remaining (no fee)
+    expect(text).toContain("≈ €1,680.00")    // remaining dual
+  })
+
+  it("same-currency summary stays single-currency", async () => {
+    const wrapper = mountModal("transfer")
+    await wrapper.setProps({ open: true })
+    await flushPromises()
+    await wrapper.find("#wc-amount").setValue(50)
+    await flushPromises()
+    expect(wrapper.text()).not.toContain("≈")
+  })
+})
