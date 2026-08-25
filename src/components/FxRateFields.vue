@@ -56,7 +56,7 @@ watch(
 
 <template>
   <div v-if="needsConversion()" class="mb-4 rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50" :data-testid="`${tid}-section`">
-    <div class="flex items-center justify-between">
+    <div class="flex flex-wrap items-center justify-between gap-2">
       <span class="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
         {{ leg }} exchange rate <span class="normal-case text-slate-400">({{ from }} → {{ to }})</span>
       </span>

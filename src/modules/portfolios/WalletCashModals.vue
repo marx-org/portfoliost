@@ -170,7 +170,7 @@ const submitLabel = computed(() => (props.action === "deposit" ? "Deposit" : pro
     class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
     @click.self.stop="emit('close')"
   >
-    <div class="card max-h-[85vh] w-full max-w-md overflow-y-auto p-6" role="dialog" aria-modal="true" aria-label="Cash movement">
+    <div class="card max-h-[85vh] w-full max-w-2xl overflow-y-auto p-6" role="dialog" aria-modal="true" aria-label="Cash movement">
       <div class="mb-4 flex items-center justify-between">
         <h3 class="text-base font-semibold">{{ title }}</h3>
         <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="emit('close')">✕</button>
@@ -202,7 +202,7 @@ const submitLabel = computed(() => (props.action === "deposit" ? "Deposit" : pro
         <div>
           <label for="wc-amount" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Amount *</label>
           <div class="flex gap-2">
-            <div class="flex flex-1 items-center rounded-lg border border-slate-300 dark:border-slate-600 focus-within:border-blue-500">
+            <div class="flex min-w-0 flex-1 items-center rounded-lg border border-slate-300 dark:border-slate-600 focus-within:border-blue-500">
               <span class="pl-3 text-sm text-slate-500 dark:text-slate-400">{{ wallet.currency }}</span>
               <input id="wc-amount" v-model.number="amount" type="number" min="0" step="0.01" required class="input !rounded-l-none !border-0 !ring-0 focus:ring-0" placeholder="Enter amount" />
             </div>
@@ -216,7 +216,34 @@ const submitLabel = computed(() => (props.action === "deposit" ? "Deposit" : pro
           <input id="wc-date" v-model="transactionDate" type="date" class="input" />
         </div>
 
-        <div v-if="action === 'withdraw'">
+        <FxRateFields
+          leg="Transfer"
+          :from="wallet.currency"
+          :to="destCurrency ?? wallet.currency"
+          :date="transactionDate"
+          :hidden="!isCrossCurrencyTransfer"
+          v-model:rate-source="targetRateSource"
+          testid="wc-transfer-fx"
+          class="sm:col-span-2"
+        >
+          <template #manual>
+            <label for="wc-target-amount" class="mb-1 block text-xs text-slate-500 dark:text-slate-400">
+              Target amount in {{ destCurrency }} — leave empty to convert at the custom rate
+            </label>
+            <input
+              id="wc-target-amount"
+              v-model.number="manualTargetAmount"
+              type="number"
+              min="0"
+              step="any"
+              class="input"
+              placeholder="auto"
+              data-testid="wc-target-amount"
+            />
+          </template>
+        </FxRateFields>
+
+        <div v-if="action === 'withdraw'" class="sm:col-span-2">
           <label for="wc-payment" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Payment Method</label>
           <select id="wc-payment" v-model="paymentMethod" class="input">
             <option value="bank_transfer">Bank Transfer</option>
@@ -237,7 +264,7 @@ const submitLabel = computed(() => (props.action === "deposit" ? "Deposit" : pro
           />
         </div>
 
-        <div>
+        <div class="sm:col-span-2">
           <label for="wc-fees" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Fees (Optional)</label>
           <FeeFields
             v-model:fees="fees"
@@ -246,44 +273,19 @@ const submitLabel = computed(() => (props.action === "deposit" ? "Deposit" : pro
             testid="wc"
             input-id="wc-fees"
           />
+
+          <FxRateFields
+            leg="Fee"
+            :from="feeCurrency"
+            :to="wallet.currency"
+            :date="transactionDate"
+            :hidden="feesType !== 'fixed' || feeCurrency === wallet.currency"
+            v-model:rate-source="feeRateSource"
+            v-model:rate="feeExchangeRate"
+            testid="wc-fee-fx"
+            class="mt-3"
+          />
         </div>
-
-        <FxRateFields
-          leg="Fee"
-          :from="feeCurrency"
-          :to="wallet.currency"
-          :date="transactionDate"
-          :hidden="feesType !== 'fixed' || feeCurrency === wallet.currency"
-          v-model:rate-source="feeRateSource"
-          v-model:rate="feeExchangeRate"
-          testid="wc-fee-fx"
-        />
-
-        <FxRateFields
-          leg="Transfer"
-          :from="wallet.currency"
-          :to="destCurrency ?? wallet.currency"
-          :date="transactionDate"
-          :hidden="!isCrossCurrencyTransfer"
-          v-model:rate-source="targetRateSource"
-          testid="wc-transfer-fx"
-        >
-          <template #manual>
-            <label for="wc-target-amount" class="mb-1 block text-xs text-slate-500 dark:text-slate-400">
-              Target amount in {{ destCurrency }} — leave empty to convert at the custom rate
-            </label>
-            <input
-              id="wc-target-amount"
-              v-model.number="manualTargetAmount"
-              type="number"
-              min="0"
-              step="any"
-              class="input"
-              placeholder="auto"
-              data-testid="wc-target-amount"
-            />
-          </template>
-        </FxRateFields>
 
 
         <div class="rounded-lg bg-slate-50 dark:bg-slate-800/50 px-3 py-2 text-sm sm:col-span-2">
