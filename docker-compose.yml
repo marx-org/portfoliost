@@ -155,3 +155,23 @@ services:
       cachest:
         condition: service_started
     restart: unless-stopped
+
+  admin:
+    build:
+      context: ../portfoliost-admin
+      dockerfile: Dockerfile
+    container_name: portfoliost-admin
+    expose:
+      - "3000"
+    environment:
+      API_USERS_AUTH_URL: http://users-auth:3000
+      API_WALLETS_URL: http://wallets:3000
+      API_INSTRUMENTS_URL: http://instruments:3000
+      OIDC_ISSUER_URL: ${OIDC_ISSUER_URL:-http://gateway:8080}
+      OIDC_CLIENT_ID: ${ADMIN_OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${ADMIN_OIDC_CLIENT_SECRET:-}
+    depends_on:
+      - users-auth
+      - wallets
+      - instruments
+    restart: unless-stopped
