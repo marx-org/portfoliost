@@ -203,26 +203,29 @@ const router = createRouter({
         },
         {
           path: "admin",
+          component: () => import("@/modules/admin/AdminLayout.vue"),
           redirect: { name: "admin-system" },
           meta: { admin: true },
-        },
-        {
-          path: "admin/system",
-          name: "admin-system",
-          component: () => import("@/modules/admin/SystemInfoView.vue"),
-          meta: { admin: true },
-        },
-        {
-          path: "admin/currencies",
-          name: "admin-currencies",
-          component: () => import("@/modules/admin/CurrencyRatesView.vue"),
-          meta: { admin: true },
-        },
-        {
-          path: "admin/users",
-          name: "admin-users",
-          component: () => import("@/modules/admin/UsersView.vue"),
-          meta: { admin: true },
+          children: [
+            {
+              path: "system",
+              name: "admin-system",
+              component: () => import("@/modules/admin/SystemInfoView.vue"),
+              meta: { admin: true },
+            },
+            {
+              path: "currencies",
+              name: "admin-currencies",
+              component: () => import("@/modules/admin/CurrencyRatesView.vue"),
+              meta: { admin: true },
+            },
+            {
+              path: "users",
+              name: "admin-users",
+              component: () => import("@/modules/admin/UsersView.vue"),
+              meta: { admin: true },
+            },
+          ],
         },
       ],
     },

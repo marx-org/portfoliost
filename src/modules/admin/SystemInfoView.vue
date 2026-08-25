@@ -36,8 +36,6 @@ function implBadge(impl: string) {
 
 <template>
   <div>
-    <h1 class="mb-6 text-2xl font-bold text-slate-900 dark:text-slate-100">System Info</h1>
-
     <div v-if="loading && !services.length" class="text-sm text-slate-500 dark:text-slate-400">Loading...</div>
     <div v-else-if="error" class="text-sm text-red-600 dark:text-red-400">{{ error }}</div>
 

@@ -61,8 +61,6 @@ function nextPage() { if (page.value < totalPages.value) { page.value++; load() 
 
 <template>
   <div>
-    <h1 class="mb-6 text-2xl font-bold text-slate-900 dark:text-slate-100">Currency Rates</h1>
-
     <div v-if="loading && !items.length" class="text-sm text-slate-500 dark:text-slate-400">Loading...</div>
     <div v-else-if="error" class="text-sm text-red-600 dark:text-red-400">{{ error }}</div>
 
