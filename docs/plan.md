@@ -523,30 +523,30 @@ Target: apps stay stateless; the namespace-level shared instance (`redis`, pinne
 Proposal: [admin-module.md](proposals/admin-module.md) (D42–D52). Read-only admin panel: system versions, FX rates, OIDC users. No database. Backend is a new Hono+jose repo that proxies other modules' APIs. Frontend lives in the existing SPA under `/en/admin/*`, gated by `portfoliost_admin` group.
 
 ### 14.1 — Admin backend scaffold + compose wiring (D42, D51)
-- [ ] New repo `Marx2/portfoliost-admin` from users-auth skeleton (strip Drizzle, DB, seed — no database).
-- [ ] `src/index.ts`: Hono app with `/health`, `/__meta` (`{ service: "admin", impl: "real", version }`), `/internal/verify` (JWT preflight).
-- [ ] `src/auth.ts`: copy `validateJwt` + `userIdentityMiddleware` + `requireGroup("portfoliost_admin")` from users-auth.
-- [ ] `Dockerfile`: node:22-alpine, `npm ci && npm run build`, `node dist/server.js` (no migrate/seed).
-- [ ] Tests: `/health` returns 200, `/__meta` returns correct shape, `/internal/verify` 201/401, admin middleware 403 for non-admin.
-- [ ] `docker-compose.yml`: `admin` service (build `../portfoliost-admin`, expose 3000, env `API_USERS_AUTH_URL`, `API_WALLETS_URL`, `API_INSTRUMENTS_URL`, `OIDC_ISSUER_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, depends_on postgres).
-- [ ] `deploy/services.env`: add `API_ADMIN_URL=http://example-service-mock:4010` (default mock).
-- [ ] `gateway/default.conf.template`: add `location /api/admin/ { proxy_pass ${API_ADMIN_URL}; }`.
-- [ ] Verify: `docker compose up -d --build`, admin `/health` + `/__meta` reachable through gateway, full unit+mock green. Commit.
+- [x] New repo `Marx2/portfoliost-admin` from users-auth skeleton (strip Drizzle, DB, seed — no database).
+- [x] `src/index.ts`: Hono app with `/health`, `/__meta` (`{ service: "admin", impl: "real", version }`), `/internal/verify` (JWT preflight).
+- [x] `src/auth.ts`: copy `validateJwt` + `userIdentityMiddleware` + `requireGroup("portfoliost_admin")` from users-auth.
+- [x] `Dockerfile`: node:22-alpine, `npm ci && npm run build`, `node dist/server.js` (no migrate/seed).
+- [x] Tests: `/health` returns 200, `/__meta` returns correct shape, `/internal/verify` 201/401, admin middleware 403 for non-admin.
+- [x] `docker-compose.yml`: `admin` service (build `../portfoliost-admin`, expose 3000, env `API_USERS_AUTH_URL`, `API_WALLETS_URL`, `API_INSTRUMENTS_URL`, `OIDC_ISSUER_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, depends_on postgres).
+- [x] `deploy/services.env`: add `API_ADMIN_URL=http://example-service-mock:4010` (default mock).
+- [x] `gateway/default.conf.template`: add `location /api/admin/ { proxy_pass ${API_ADMIN_URL}; }`.
+- [x] Verify: `docker compose up -d --build`, admin `/health` + `/__meta` reachable through gateway, full unit+mock green. Commit.
 
 ### 14.2 — SPA router + sidebar admin entry (D43, D44, D45)
-- [ ] `src/api/admin.ts`: `http.get` wrappers for `/api/admin/system/versions`, `/api/admin/currencies/rates`, `/api/admin/users`.
-- [ ] `src/stores/auth.ts`: add `isAdmin` computed (`user.value?.groups?.includes("portfoliost_admin") ?? false`).
-- [ ] `src/router/index.ts`: add admin routes under `/en/admin` with `meta: { requiresAuth: true }`:
+- [x] `src/api/admin.ts`: `http.get` wrappers for `/api/admin/system/versions`, `/api/admin/currencies/rates`, `/api/admin/users`.
+- [x] `src/stores/auth.ts`: add `isAdmin` computed (`user.value?.groups?.includes("portfoliost_admin") ?? false`).
+- [x] `src/router/index.ts`: add admin routes under `/en/admin` with `meta: { requiresAuth: true }`:
   - `/en/admin` → redirect to `/en/admin/system`
   - `/en/admin/system` → `SystemInfoView` (lazy)
   - `/en/admin/currencies` → `CurrencyRatesView` (lazy)
   - `/en/admin/users` → `UsersView` (lazy)
-- [ ] Router guard: extend `beforeEach` — if route has `meta.admin` and `!auth.isAdmin`, redirect to `/en/investments`.
-- [ ] `src/layout/SidebarNav.vue`: add "Admin" item (`router-link to="/en/admin"`, cog/shield icon, `v-if="auth.isAdmin"`) between main nav and bottom section.
-- [ ] `src/modules/admin/SystemInfoView.vue`: empty shell (heading only).
-- [ ] `src/modules/admin/CurrencyRatesView.vue`: empty shell.
-- [ ] `src/modules/admin/UsersView.vue`: empty shell.
-- [ ] Tests: `isAdmin` computed, router guard blocks non-admin, sidebar hides for non-admin. Build + unit + mock green. Commit.
+- [x] Router guard: extend `beforeEach` — if route has `meta.admin` and `!auth.isAdmin`, redirect to `/en/investments`.
+- [x] `src/layout/SidebarNav.vue`: add "Admin" item (`router-link to="/en/admin"`, cog/shield icon, `v-if="auth.isAdmin"`) between main nav and bottom section.
+- [x] `src/modules/admin/SystemInfoView.vue`: empty shell (heading only).
+- [x] `src/modules/admin/CurrencyRatesView.vue`: empty shell.
+- [x] `src/modules/admin/UsersView.vue`: empty shell.
+- [x] Tests: `isAdmin` computed, router guard blocks non-admin, sidebar hides for non-admin. Build + unit + mock green. Commit.
 
 ### 14.3 — System versions screen (D46)
 - [x] Admin backend `GET /api/admin/system/versions`: for each configured module URL (users-auth, wallets, instruments, admin itself, openst, cachest, example-service-mock), call `GET /__meta`. Aggregate into `{ services: [{ service, version, impl }], fetchedAt }`. Unreachable → `{ version: "unreachable", impl: "unknown" }`.
@@ -582,5 +582,21 @@ Proposal: [admin-module.md](proposals/admin-module.md) (D42–D52). Read-only ad
 ### 14.7 — Docs sweep + closeout
 - [x] Update `docs/proposals/admin-module.md`: status → Implemented.
 - [x] Update `docs/plan.md`: all 14.x points marked done.
-- [ ] Update `README.md`: admin module in service table, `API_ADMIN_URL` in env table.
-- [ ] Final: full test suite green across all repos. Commit.
+- [x] Update `README.md`: admin module in service table, `API_ADMIN_URL` in env table.
+- [x] Final: full test suite green across all repos. Commit.
+
+### 14.8 — lastLogin tracking
+- [x] **Users-auth** schema: add `lastLogin: text("last_login")` column to `user_preferences`.
+- [x] **Users-auth** migration: `0003_add_last_login.sql` (auto-generated via drizzle-kit).
+- [x] **Users-auth** `POST /api/auth/token`: stamp `lastLogin` to current timestamp on every token exchange.
+- [x] **Users-auth** admin list: return `lastLogin` from `GET /api/users/admin/list`.
+- [x] **SPA** `src/api/admin.ts`: add `lastLogin: string | null` to `AdminUser` interface.
+- [x] **SPA** `UsersView.vue`: add sortable "Last Login" column (formatted date).
+- [x] Verify: build + unit tests (22/22) + docker compose. Commit + push. — users-auth `a28dd7a`, portfoliost `c915714`.
+
+### 14.9 — Secret mirroring via Kubernetes Reflector
+- [x] Deploy Reflector to `system` namespace (emberstack HelmRepository + HelmRelease v10.0.65).
+- [x] Annotate `pocket-id-static-api-key` in `networking` for auto-mirror to `pfire`.
+- [x] **Admin HelmRelease**: reference mirrored secret (`pocket-id-static-api-key` / key `token`), drop `optional: true`, bump to v1.0.3.
+- [x] Create `portfoliost-admin/README.md` documenting mirroring setup.
+- [x] Commit + push. — homelab `b30442710`.
