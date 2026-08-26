@@ -645,8 +645,8 @@ Proposal: [portfolios-module.md](proposals/portfolios-module.md) (proposed 2026-
 ### Phase G — aggregates & shares
 - [x] G1 total-metrics · held-stocks · merged/light from real data
 - [x] G2 summary-metrics + snapshot computed subsets
-- [ ] G3 shares CRUD (10-limit) + auth-exempt public route with view-count
-- [ ] G4 privacy-projection + limit tests
+- [x] G3 shares CRUD (10-limit) + auth-exempt public route with view-count
+- [x] G4 privacy-projection + limit tests
 
 ### Phase H — analytics foundation (D61, executed last)
 - [ ] H1 `value_snapshots` migration + schema test
