@@ -174,6 +174,15 @@ Returns all registered user IDs with metadata from `user_preferences`. This is t
 
 ### D48b — admin backend: users aggregation endpoint
 
+> **Amendment (2026-08-26, implemented)**: the original design (admin backend calls
+> OIDC UserInfo per user with a client-credentials token, D49) cannot work —
+> `/userinfo` returns the *token subject's* identity, and a client-credentials
+> token has no user subject. Instead, **users-auth persists the identity snapshot**
+> (email, firstName, lastName, groups) from the id_token it already decodes at
+> every token exchange, and stamps `last_login`. The admin backend's `/api/admin/users`
+> is a pure pass-through of `GET /api/users/admin/list`. D49 is dropped — no
+> second OIDC client, no static secrets, no caching layer needed.
+
 **Endpoint**: `GET /api/admin/users`
 
 The admin backend:
