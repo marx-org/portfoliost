@@ -6,7 +6,7 @@ const users = ref<AdminUser[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
 const search = ref("")
-const sortField = ref<"email" | "firstName" | "lastName" | "createdAt">("email")
+const sortField = ref<"email" | "firstName" | "lastName" | "lastLogin" | "createdAt">("email")
 const sortDir = ref<"asc" | "desc">("asc")
 
 async function load() {
@@ -83,6 +83,9 @@ function groupBadgeClass(group: string) {
               </th>
               <th class="px-4 py-2 text-left font-medium text-slate-600 dark:text-slate-300">UUID</th>
               <th class="px-4 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Groups</th>
+              <th class="cursor-pointer px-4 py-2 text-left font-medium text-slate-600 dark:text-slate-300" @click="toggleSort('lastLogin')">
+                Last Login{{ sortIcon("lastLogin") }}
+              </th>
               <th class="cursor-pointer px-4 py-2 text-left font-medium text-slate-600 dark:text-slate-300" @click="toggleSort('createdAt')">
                 Created{{ sortIcon("createdAt") }}
               </th>
@@ -108,6 +111,7 @@ function groupBadgeClass(group: string) {
                 </span>
                 <span v-if="!user.groups.length" class="text-slate-400 dark:text-slate-500">—</span>
               </td>
+              <td class="px-4 py-2 text-slate-500 dark:text-slate-400">{{ user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : "—" }}</td>
               <td class="px-4 py-2 text-slate-500 dark:text-slate-400">{{ user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "—" }}</td>
             </tr>
           </tbody>
