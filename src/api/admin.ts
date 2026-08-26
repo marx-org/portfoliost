@@ -36,6 +36,7 @@ export interface AdminUser {
   firstName: string | null
   lastName: string | null
   groups: string[]
+  lastLogin: string | null
   createdAt: string
 }
 

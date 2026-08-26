@@ -82,6 +82,7 @@ function groupBadgeClass(group: string) {
                 Name{{ sortIcon("firstName") }}
               </th>
               <th class="px-4 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Groups</th>
+              <th class="px-4 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Last Login</th>
               <th class="cursor-pointer px-4 py-2 text-left font-medium text-slate-600 dark:text-slate-300" @click="toggleSort('createdAt')">
                 Created{{ sortIcon("createdAt") }}
               </th>
@@ -103,6 +104,9 @@ function groupBadgeClass(group: string) {
                   {{ group }}
                 </span>
                 <span v-if="!user.groups.length" class="text-slate-400 dark:text-slate-500">—</span>
+              </td>
+              <td class="px-4 py-2 text-slate-500 dark:text-slate-400">
+                {{ user.lastLogin ? new Date(user.lastLogin).toLocaleString() : "—" }}
               </td>
               <td class="px-4 py-2 text-slate-500 dark:text-slate-400">{{ user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "—" }}</td>
             </tr>
