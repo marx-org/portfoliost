@@ -600,3 +600,77 @@ Proposal: [admin-module.md](proposals/admin-module.md) (D42–D52). Read-only ad
 - [x] **Admin HelmRelease**: reference mirrored secret (`pocket-id-static-api-key` / key `token`), drop `optional: true`, bump to v1.0.3.
 - [x] Create `portfoliost-admin/README.md` documenting mirroring setup.
 - [x] Commit + push. — homelab `b30442710`.
+
+## 15. Portfolio management in the wallets module (replace all portfolio mocks)
+
+Proposal: [portfolios-module.md](proposals/portfolios-module.md) (proposed 2026-08-26, D53–D64). Extends the live `portfoliost-wallets` service with a `portfolios` Postgres schema: CRUD first, then transaction actions (shared FeeFields/FxRateFields wire format), history display, aggregates/shares, flip; analytics & charting designed up front (D61–D64: value snapshots, performance/risk math, dividends/calendar/compare composition) but executed as the final phases before one cluster cutover. No new repo/container; D19 cash-movement push becomes an in-process ledger write.
+
+### Phase A — foundation
+- [ ] A1 `portfolios` pgSchema + drizzle migration (portfolios, positions, transactions, shares per D54); PGlite schema test
+- [ ] A2 dev seeds from `mocks/shared/data/raw/portfolio*.json`; seed skipped in prod
+- [ ] A3 `scripts/portfolios-stack-test.mjs` scaffold
+
+### Phase B — portfolio CRUD
+- [ ] B1 POST `/api/portfolios` (+422 rules, prefs default) · GET list · GET `/light`
+- [ ] B2 GET/PATCH `/:id` with computed metrics + position summaries (404 scoping)
+- [ ] B3 guarded DELETE (409)
+- [ ] B4 stack-test CRUD round-trips; multi-user isolation tests
+
+### Phase C — transaction actions
+- [ ] C1 POST `/:id/transactions` BUY/SELL/DIVIDEND (fee-fx via wallets `fee-fx.ts`, D56 math, 422 matrix)
+- [ ] C2 position mutation + totals in one SQL tx; FIFO fallback; synthesized opening lots
+- [ ] C3 wallet cash integration (`PORTFOLIO_*` references, balances, cross-ccy settlement)
+- [ ] C4 PATCH/DELETE transaction + full recompute (position, totals, paired wallet rows)
+- [ ] C5 position PATCH metadata-only rule + soft-close DELETE
+- [ ] C6 unit + stack-test write flows
+
+### Phase D — history display
+- [ ] D1 GET `/:id/transactions` (pagination, type/positionId filters, sort map)
+- [ ] D2 GET `/transactions` cross-portfolio feed (sortBy/sortOrder)
+- [ ] D3 export endpoint (paginated JSON)
+- [ ] D4 pagination/filter/sort parity tests
+
+### Phase E — positions & allocation reads
+- [ ] E1 positions read pipeline: quote refresh via instruments adapter (staleness/fallback) → derived fields
+- [ ] E2 `/positions/bare` + `/positions/cfd-hints`
+- [ ] E3 `/:id/allocation`
+- [ ] E4 refresh caching/fallback + derived-math tests
+
+### Phase F — flip to real
+- [ ] F1 stub audit: unimplemented endpoints answer valid empty content
+- [ ] F2 services.env/gateway change (drop `API_PORTFOLIOS_URL`, public-shares location), wallets gains `API_INSTRUMENTS_URL`
+- [ ] F3 stack-test both modes; full frontend suite green against flipped stack
+- [ ] F4 docs sweep
+
+### Phase G — aggregates & shares
+- [ ] G1 total-metrics · held-stocks · merged/light from real data
+- [ ] G2 summary-metrics + snapshot computed subsets
+- [ ] G3 shares CRUD (10-limit) + auth-exempt public route with view-count
+- [ ] G4 privacy-projection + limit tests
+
+### Phase H — analytics foundation (D61, executed last)
+- [ ] H1 `value_snapshots` migration + schema test
+- [ ] H2 snapshot service: positions × historical closes × fx carry-forward, idempotent upserts
+- [ ] H3 `src/scripts/snapshots.ts` + compose boot wiring; bounded backfill-on-read
+- [ ] H4 idempotence/gap/mid-history/multi-currency tests
+
+### Phase I — performance analytics & charting (D62)
+- [ ] I1 shared series/returns service (TWR, XIRR/MWR, annualization + withhold rules)
+- [ ] I2 GET `/:id/analytics` (+ benchmark normalization via instruments `/history`)
+- [ ] I3 promote stubs: `/merged`, `externalCapital*` wallet-deposit basis
+- [ ] I4 fixture + property tests; stack-test
+
+### Phase J — risk metrics (D63)
+- [ ] J1 GET `/:id/risk-metrics`: volatility/maxDrawdown/sharpe/sortino/calmar/win-rate
+- [ ] J2 withholding-rule and empty-history tests
+
+### Phase K — derived content (D64)
+- [ ] K1 dividends composition within holding windows
+- [ ] K2 calendar composition
+- [ ] K3 compare enrichment from instruments metrics
+- [ ] K4 summary-metrics income source switch
+
+### Phase L — cluster cutover + closeout
+- [ ] L1 homelab ingress paths → `portfoliost-wallets:3000`; separated snapshot Kubernetes Jobs (D11 job-pod pattern, not in-process scheduler)
+- [ ] L2 live verification (`/__meta`, CRUD + analytics through host); e2e green
+- [ ] L3 plan/proposal status marks; retire `mocks/portfolios/index.js`; docs sweep
