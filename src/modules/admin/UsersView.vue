@@ -81,8 +81,8 @@ function groupBadgeClass(group: string) {
               <th class="cursor-pointer px-4 py-2 text-left font-medium text-slate-600 dark:text-slate-300" @click="toggleSort('firstName')">
                 Name{{ sortIcon("firstName") }}
               </th>
+              <th class="px-4 py-2 text-left font-medium text-slate-600 dark:text-slate-300">UUID</th>
               <th class="px-4 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Groups</th>
-              <th class="px-4 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Last Login</th>
               <th class="cursor-pointer px-4 py-2 text-left font-medium text-slate-600 dark:text-slate-300" @click="toggleSort('createdAt')">
                 Created{{ sortIcon("createdAt") }}
               </th>
@@ -94,6 +94,9 @@ function groupBadgeClass(group: string) {
               <td class="px-4 py-2 text-slate-900 dark:text-slate-100">
                 {{ [user.firstName, user.lastName].filter(Boolean).join(" ") || "—" }}
               </td>
+              <td class="max-w-[16rem] truncate px-4 py-2 font-mono text-xs text-slate-500 dark:text-slate-400" :title="user.id">
+                {{ user.id }}
+              </td>
               <td class="px-4 py-2">
                 <span
                   v-for="group in user.groups"
@@ -104,9 +107,6 @@ function groupBadgeClass(group: string) {
                   {{ group }}
                 </span>
                 <span v-if="!user.groups.length" class="text-slate-400 dark:text-slate-500">—</span>
-              </td>
-              <td class="px-4 py-2 text-slate-500 dark:text-slate-400">
-                {{ user.lastLogin ? new Date(user.lastLogin).toLocaleString() : "—" }}
               </td>
               <td class="px-4 py-2 text-slate-500 dark:text-slate-400">{{ user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "—" }}</td>
             </tr>
