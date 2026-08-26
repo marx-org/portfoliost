@@ -625,10 +625,10 @@ Proposal: [portfolios-module.md](proposals/portfolios-module.md) (proposed 2026-
 - [x] C6 unit + stack-test write flows
 
 ### Phase D — history display
-- [ ] D1 GET `/:id/transactions` (pagination, type/positionId filters, sort map)
-- [ ] D2 GET `/transactions` cross-portfolio feed (sortBy/sortOrder)
-- [ ] D3 export endpoint (paginated JSON)
-- [ ] D4 pagination/filter/sort parity tests
+- [x] D1 GET `/:id/transactions` (pagination, type/positionId filters, sort map)
+- [x] D2 GET `/transactions` cross-portfolio feed (sortBy/sortOrder)
+- [x] D3 export endpoint (paginated JSON)
+- [x] D4 pagination/filter/sort parity tests
 
 ### Phase E — positions & allocation reads
 - [ ] E1 positions read pipeline: quote refresh via instruments adapter (staleness/fallback) → derived fields
