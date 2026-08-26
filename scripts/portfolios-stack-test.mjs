@@ -4,8 +4,8 @@
  * Runs against the wallets module in docker compose (host port 3002) —
  * mirrors scripts/wallets-stack-test.mjs.
  *
- * Phase A scaffold: health/meta + placeholder checks.
- * Will grow as Phases B–L ship endpoints.
+ * Phase A+B: health/meta + CRUD round-trip.
+ * Will grow as Phases C–L ship endpoints.
  *
  * Usage: node scripts/portfolios-stack-test.mjs [baseUrl]
  */
@@ -52,30 +52,60 @@ async function main() {
   const noAuth = await req("/api/portfolios")
   check("portfolios require identity", noAuth.status === 401, `got ${noAuth.status}`)
 
-  // ── Phase B: portfolio CRUD (placeholder — returns mock or 404 pre-flip) ──
-  // These checks validate the endpoint is reachable and returns a valid shape.
-  // Before the gateway flip (Phase F), the mock serves these; after flip, the
-  // real module does. The check works either way.
+  // ── Phase B: portfolio CRUD round-trip ───────────────────────────────
 
+  // Create
+  const create = await req("/api/portfolios", {
+    method: "POST",
+    headers: H,
+    body: { name: "Stack Test Portfolio", currency: "USD" },
+  })
+  check("POST /api/portfolios → 201", create.status === 201, `got ${create.status}`)
+  const pid = create.json?.id
+  check("created portfolio has id", !!pid)
+  check("created portfolio has currency USD", create.json?.currency === "USD")
+
+  // Missing currency → 422
+  const noCurrency = await req("/api/portfolios", {
+    method: "POST",
+    headers: H,
+    body: { name: "No CCY" },
+  })
+  check("POST without currency → 422", noCurrency.status === 422, `got ${noCurrency.status}`)
+
+  // List
   const list = await req("/api/portfolios", { headers: H })
-  check("GET /api/portfolios reachable", list.status === 200, `got ${list.status}`)
-  if (list.status === 200) {
-    check(
-      "portfolio list is array",
-      Array.isArray(list.json),
-      `type=${typeof list.json}`,
-    )
-  }
+  check("GET /api/portfolios → 200", list.status === 200, `got ${list.status}`)
+  check("list is array", Array.isArray(list.json), `type=${typeof list.json}`)
+  check("list contains created", list.json?.some((p) => p.id === pid))
 
+  // Light
   const light = await req("/api/portfolios/light", { headers: H })
-  check("GET /api/portfolios/light reachable", light.status === 200, `got ${light.status}`)
-  if (light.status === 200 && Array.isArray(light.json)) {
-    check(
-      "light list has id+name+currency",
-      light.json.length === 0 || (light.json[0].id && light.json[0].name && light.json[0].currency),
-      `keys=${Object.keys(light.json[0] ?? {}).join(",")}`,
-    )
-  }
+  check("GET /api/portfolios/light → 200", light.status === 200, `got ${light.status}`)
+  check("light contains created", Array.isArray(light.json) && light.json.some((p) => p.id === pid))
+
+  // Detail
+  const detail = await req(`/api/portfolios/${pid}`, { headers: H })
+  check("GET /:id → 200", detail.status === 200, `got ${detail.status}`)
+  check("detail has metrics", !!detail.json?.metrics)
+  check("detail has positions array", Array.isArray(detail.json?.positions))
+
+  // Patch
+  const patch = await req(`/api/portfolios/${pid}`, {
+    method: "PATCH",
+    headers: H,
+    body: { name: "Renamed" },
+  })
+  check("PATCH /:id → 200", patch.status === 200, `got ${patch.status}`)
+  check("name updated", patch.json?.name === "Renamed")
+
+  // Delete empty → 204
+  const del = await req(`/api/portfolios/${pid}`, { method: "DELETE", headers: H })
+  check("DELETE empty → 204", del.status === 204, `got ${del.status}`)
+
+  // Confirm gone
+  const gone = await req(`/api/portfolios/${pid}`, { headers: H })
+  check("after DELETE → 404", gone.status === 404, `got ${gone.status}`)
 
   console.log(`\n[stack] portfolios: ${passed} passed, ${failures.length} failed`)
   if (failures.length) {

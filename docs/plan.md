@@ -606,15 +606,15 @@ Proposal: [admin-module.md](proposals/admin-module.md) (D42–D52). Read-only ad
 Proposal: [portfolios-module.md](proposals/portfolios-module.md) (proposed 2026-08-26, D53–D64). Extends the live `portfoliost-wallets` service with a `portfolios` Postgres schema: CRUD first, then transaction actions (shared FeeFields/FxRateFields wire format), history display, aggregates/shares, flip; analytics & charting designed up front (D61–D64: value snapshots, performance/risk math, dividends/calendar/compare composition) but executed as the final phases before one cluster cutover. No new repo/container; D19 cash-movement push becomes an in-process ledger write.
 
 ### Phase A — foundation
-- [ ] A1 `portfolios` pgSchema + drizzle migration (portfolios, positions, transactions, shares per D54); PGlite schema test
-- [ ] A2 dev seeds from `mocks/shared/data/raw/portfolio*.json`; seed skipped in prod
-- [ ] A3 `scripts/portfolios-stack-test.mjs` scaffold
+- [x] A1 `portfolios` pgSchema + drizzle migration (portfolios, positions, transactions, shares per D54); PGlite schema test
+- [x] A2 dev seeds from `mocks/shared/data/raw/portfolio*.json`; seed skipped in prod
+- [x] A3 `scripts/portfolios-stack-test.mjs` scaffold
 
 ### Phase B — portfolio CRUD
-- [ ] B1 POST `/api/portfolios` (+422 rules, prefs default) · GET list · GET `/light`
-- [ ] B2 GET/PATCH `/:id` with computed metrics + position summaries (404 scoping)
-- [ ] B3 guarded DELETE (409)
-- [ ] B4 stack-test CRUD round-trips; multi-user isolation tests
+- [x] B1 POST `/api/portfolios` (+422 rules, prefs default) · GET list · GET `/light`
+- [x] B2 GET/PATCH `/:id` with computed metrics + position summaries (404 scoping)
+- [x] B3 guarded DELETE (409)
+- [x] B4 stack-test CRUD round-trips; multi-user isolation tests
 
 ### Phase C — transaction actions
 - [ ] C1 POST `/:id/transactions` BUY/SELL/DIVIDEND (fee-fx via wallets `fee-fx.ts`, D56 math, 422 matrix)
