@@ -640,7 +640,7 @@ Proposal: [portfolios-module.md](proposals/portfolios-module.md) (proposed 2026-
 - [x] F1 stub audit: unimplemented endpoints answer valid empty content
 - [x] F2 services.env/gateway change (drop `API_PORTFOLIOS_URL`, public-shares location), wallets gains `API_INSTRUMENTS_URL`
 - [x] F3 stack-test both modes; full frontend suite green against flipped stack
-- [ ] F4 docs sweep
+- [x] F4 docs sweep
 
 ### Phase G — aggregates & shares
 - [ ] G1 total-metrics · held-stocks · merged/light from real data
