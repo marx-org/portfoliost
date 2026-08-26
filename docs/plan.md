@@ -631,10 +631,10 @@ Proposal: [portfolios-module.md](proposals/portfolios-module.md) (proposed 2026-
 - [x] D4 pagination/filter/sort parity tests
 
 ### Phase E — positions & allocation reads
-- [ ] E1 positions read pipeline: quote refresh via instruments adapter (staleness/fallback) → derived fields
-- [ ] E2 `/positions/bare` + `/positions/cfd-hints`
-- [ ] E3 `/:id/allocation`
-- [ ] E4 refresh caching/fallback + derived-math tests
+- [x] E1 positions read pipeline: quote refresh via instruments adapter (staleness/fallback) → derived fields
+- [x] E2 `/positions/bare` + `/positions/cfd-hints`
+- [x] E3 `/:id/allocation`
+- [x] E4 refresh caching/fallback + derived-math tests
 
 ### Phase F — flip to real
 - [ ] F1 stub audit: unimplemented endpoints answer valid empty content
