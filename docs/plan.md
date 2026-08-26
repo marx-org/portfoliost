@@ -643,8 +643,8 @@ Proposal: [portfolios-module.md](proposals/portfolios-module.md) (proposed 2026-
 - [x] F4 docs sweep
 
 ### Phase G — aggregates & shares
-- [ ] G1 total-metrics · held-stocks · merged/light from real data
-- [ ] G2 summary-metrics + snapshot computed subsets
+- [x] G1 total-metrics · held-stocks · merged/light from real data
+- [x] G2 summary-metrics + snapshot computed subsets
 - [ ] G3 shares CRUD (10-limit) + auth-exempt public route with view-count
 - [ ] G4 privacy-projection + limit tests
 
