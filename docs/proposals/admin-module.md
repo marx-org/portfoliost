@@ -174,14 +174,19 @@ Returns all registered user IDs with metadata from `user_preferences`. This is t
 
 ### D48b — admin backend: users aggregation endpoint
 
-> **Amendment (2026-08-26, implemented)**: the original design (admin backend calls
-> OIDC UserInfo per user with a client-credentials token, D49) cannot work —
-> `/userinfo` returns the *token subject's* identity, and a client-credentials
-> token has no user subject. Instead, **users-auth persists the identity snapshot**
-> (email, firstName, lastName, groups) from the id_token it already decodes at
-> every token exchange, and stamps `last_login`. The admin backend's `/api/admin/users`
-> is a pure pass-through of `GET /api/users/admin/list`. D49 is dropped — no
-> second OIDC client, no static secrets, no caching layer needed.
+> **Amendment (2026-08-26, implemented)**: identity is **never stored in portfoliost**.
+> Two earlier designs were rejected: (a) per-user OIDC UserInfo calls with a
+> client-credentials token — `/userinfo` returns the *token subject's* identity and a
+> client-credentials token has no user subject; (b) persisting identity into
+> `users_auth.user_preferences` at token exchange — reverted by design decision
+> (user data stays in PocketID). The implemented design: the admin backend merges
+> users-auth rows (uuid + preference-row `createdAt`) with identity fetched **live**
+> from the **PocketID Admin API** (`GET /api/users` with `X-API-KEY` of an admin API
+> key; response includes email, names, `userGroups`, `isAdmin`). D49 is satisfied by
+> the Admin-API-key option (static key in a Kubernetes Secret), not client
+> credentials. Unconfigured/unreachable PocketID degrades identity fields to nulls.
+> `lastLogin` is not available (PocketID exposes no such field on the user DTO) and
+> was dropped from the surface.
 
 **Endpoint**: `GET /api/admin/users`
 
