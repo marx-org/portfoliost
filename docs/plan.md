@@ -637,8 +637,8 @@ Proposal: [portfolios-module.md](proposals/portfolios-module.md) (proposed 2026-
 - [x] E4 refresh caching/fallback + derived-math tests
 
 ### Phase F — flip to real
-- [ ] F1 stub audit: unimplemented endpoints answer valid empty content
-- [ ] F2 services.env/gateway change (drop `API_PORTFOLIOS_URL`, public-shares location), wallets gains `API_INSTRUMENTS_URL`
+- [x] F1 stub audit: unimplemented endpoints answer valid empty content
+- [x] F2 services.env/gateway change (drop `API_PORTFOLIOS_URL`, public-shares location), wallets gains `API_INSTRUMENTS_URL`
 - [ ] F3 stack-test both modes; full frontend suite green against flipped stack
 - [ ] F4 docs sweep
 
