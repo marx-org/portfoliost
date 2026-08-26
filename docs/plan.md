@@ -617,12 +617,12 @@ Proposal: [portfolios-module.md](proposals/portfolios-module.md) (proposed 2026-
 - [x] B4 stack-test CRUD round-trips; multi-user isolation tests
 
 ### Phase C — transaction actions
-- [ ] C1 POST `/:id/transactions` BUY/SELL/DIVIDEND (fee-fx via wallets `fee-fx.ts`, D56 math, 422 matrix)
-- [ ] C2 position mutation + totals in one SQL tx; FIFO fallback; synthesized opening lots
-- [ ] C3 wallet cash integration (`PORTFOLIO_*` references, balances, cross-ccy settlement)
-- [ ] C4 PATCH/DELETE transaction + full recompute (position, totals, paired wallet rows)
-- [ ] C5 position PATCH metadata-only rule + soft-close DELETE
-- [ ] C6 unit + stack-test write flows
+- [x] C1 POST `/:id/transactions` BUY/SELL/DIVIDEND (fee-fx via wallets `fee-fx.ts`, D56 math, 422 matrix)
+- [x] C2 position mutation + totals in one SQL tx; FIFO fallback; synthesized opening lots
+- [x] C3 wallet cash integration (`PORTFOLIO_*` references, balances, cross-ccy settlement)
+- [x] C4 PATCH/DELETE transaction + full recompute (position, totals, paired wallet rows)
+- [x] C5 position PATCH metadata-only rule + soft-close DELETE
+- [x] C6 unit + stack-test write flows
 
 ### Phase D — history display
 - [ ] D1 GET `/:id/transactions` (pagination, type/positionId filters, sort map)

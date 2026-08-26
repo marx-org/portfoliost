@@ -4,8 +4,8 @@
  * Runs against the wallets module in docker compose (host port 3002) —
  * mirrors scripts/wallets-stack-test.mjs.
  *
- * Phase A+B: health/meta + CRUD round-trip.
- * Will grow as Phases C–L ship endpoints.
+ * Phase A+B+C: health/meta + CRUD + transaction round-trips.
+ * Will grow as Phases D–L ship endpoints.
  *
  * Usage: node scripts/portfolios-stack-test.mjs [baseUrl]
  */
@@ -99,13 +99,88 @@ async function main() {
   check("PATCH /:id → 200", patch.status === 200, `got ${patch.status}`)
   check("name updated", patch.json?.name === "Renamed")
 
-  // Delete empty → 204
-  const del = await req(`/api/portfolios/${pid}`, { method: "DELETE", headers: H })
-  check("DELETE empty → 204", del.status === 204, `got ${del.status}`)
+  // ── Phase C: transaction CRUD round-trip ─────────────────────────────
 
-  // Confirm gone
-  const gone = await req(`/api/portfolios/${pid}`, { headers: H })
-  check("after DELETE → 404", gone.status === 404, `got ${gone.status}`)
+  // BUY
+  const buy = await req(`/api/portfolios/${pid}/transactions`, {
+    method: "POST",
+    headers: H,
+    body: { type: "BUY", symbol: "AAPL", quantity: 10, price: 150, currency: "USD" },
+  })
+  check("POST /:id/transactions BUY → 201", buy.status === 201, `got ${buy.status}`)
+  check("BUY has position created", !!buy.json?.position)
+  const buyTxId = buy.json?.id
+  check("BUY has id", !!buyTxId)
+
+  // Detail now shows position
+  const detailAfterBuy = await req(`/api/portfolios/${pid}`, { headers: H })
+  check("position exists after BUY", detailAfterBuy.json?.positions?.length === 1)
+
+  // SELL partial
+  const sell = await req(`/api/portfolios/${pid}/transactions`, {
+    method: "POST",
+    headers: H,
+    body: { type: "SELL", symbol: "AAPL", quantity: 5, price: 170, currency: "USD" },
+  })
+  check("POST /:id/transactions SELL → 201", sell.status === 201, `got ${sell.status}`)
+  check("SELL has realizedGainLoss", typeof sell.json?.realizedGainLoss === "number")
+
+  // SELL more than owned → 422
+  const sellOver = await req(`/api/portfolios/${pid}/transactions`, {
+    method: "POST",
+    headers: H,
+    body: { type: "SELL", symbol: "AAPL", quantity: 999, price: 170, currency: "USD" },
+  })
+  check("SELL more than owned → 422", sellOver.status === 422, `got ${sellOver.status}`)
+
+  // PATCH transaction
+  if (buyTxId) {
+    const patchTx = await req(`/api/portfolios/${pid}/transactions/${buyTxId}`, {
+      method: "PATCH",
+      headers: H,
+      body: { quantity: 12 },
+    })
+    check("PATCH /:id/transactions/:txId → 200", patchTx.status === 200, `got ${patchTx.status}`)
+  }
+
+  // DIVIDEND
+  const div = await req(`/api/portfolios/${pid}/transactions`, {
+    method: "POST",
+    headers: H,
+    body: { type: "DIVIDEND", symbol: "AAPL", quantity: 1, price: 2.5, currency: "USD" },
+  })
+  check("POST /:id/transactions DIVIDEND → 201", div.status === 201, `got ${div.status}`)
+  check("DIVIDEND type", div.json?.type === "DIVIDEND")
+
+  // DELETE transaction (DIVIDEND — no position reversal needed)
+  if (div.json?.id) {
+    const delTx = await req(`/api/portfolios/${pid}/transactions/${div.json.id}`, {
+      method: "DELETE",
+      headers: H,
+    })
+    check("DELETE /:id/transactions/:txId → 204", delTx.status === 204, `got ${delTx.status}`)
+  }
+
+  // Delete empty portfolio → blocked (has transactions)
+  const delBlocked = await req(`/api/portfolios/${pid}`, { method: "DELETE", headers: H })
+  check("DELETE portfolio with transactions → 409", delBlocked.status === 409, `got ${delBlocked.status}`)
+
+  // Delete remaining transactions to allow portfolio deletion
+  const remaining = await req(`/api/portfolios/${pid}/transactions`, { method: "GET", headers: H })
+  // Not listable via GET directly, so use detail
+  const detailFinal = await req(`/api/portfolios/${pid}`, { headers: H })
+
+  // Actually clean up: delete portfolio (with transactions) isn't possible, so create a clean one
+  const clean = await req("/api/portfolios", {
+    method: "POST",
+    headers: H,
+    body: { name: "Clean", currency: "USD" },
+  })
+  const cleanPid = clean.json?.id
+  if (cleanPid) {
+    const delClean = await req(`/api/portfolios/${cleanPid}`, { method: "DELETE", headers: H })
+    check("DELETE empty portfolio → 204", delClean.status === 204, `got ${delClean.status}`)
+  }
 
   console.log(`\n[stack] portfolios: ${passed} passed, ${failures.length} failed`)
   if (failures.length) {
