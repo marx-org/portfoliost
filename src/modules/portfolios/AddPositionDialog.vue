@@ -7,9 +7,9 @@ import { useWalletsStore } from "@/stores/wallets"
 import { formatCurrency } from "@/utils/format"
 import InstrumentSearchModal from "@/modules/instruments/InstrumentSearchModal.vue"
 import { getQuote, getHistory } from "@/api/instruments"
-import { type LatestRate } from "@/api/fx"
 import FeeFields from "@/components/FeeFields.vue"
 import FxRateFields from "@/components/FxRateFields.vue"
+import TransactionFormFields from "@/components/TransactionFormFields.vue"
 import { useCurrenciesStore } from "@/stores/currencies"
 import { useTargetCurrency } from "@/composables/useTargetCurrency"
 import type { PortfolioPositions } from "@/api/types"
@@ -48,7 +48,7 @@ const stockForm = ref({
   feeExchangeRate: "",
   rateSource: "automatic" as "automatic" | "manual",
   exchangeRate: "",
-  executedAt: new Date().toISOString().slice(0, 10),
+  date: new Date().toISOString().slice(0, 10),
   walletId: "",
 })
 const busy = ref(false)
@@ -104,7 +104,7 @@ watch(
           feeExchangeRate: "",
           rateSource: "automatic",
           exchangeRate: "",
-          executedAt: new Date().toISOString().slice(0, 10),
+          date: new Date().toISOString().slice(0, 10),
           walletId: walletsStore.wallets[0]?.id ?? "",
         }
         step.value = "stock"
@@ -152,17 +152,21 @@ async function loadMarketPrice(symbol: string, date: string): Promise<void> {
 }
 
 function triggerLoadMarketPrice() {
-  const p = loadMarketPrice(stockForm.value.symbol, stockForm.value.executedAt)
+  const p = loadMarketPrice(stockForm.value.symbol, stockForm.value.date)
   pendingMarketPrice.value = p
   return p
 }
 
 watch(
-  () => stockForm.value.executedAt,
+  () => stockForm.value.date,
   (_date) => {
     if (step.value === "stock" && stockForm.value.symbol) void triggerLoadMarketPrice()
   },
 )
+
+function onPriceInput() {
+  priceTouched.value = true
+}
 
 const targetCurrency = useTargetCurrency(
   computed(() => store.portfolios.find((p) => p.id === props.portfolioId)?.currency ?? null),
@@ -215,7 +219,7 @@ function onSearchAdd(symbol: string, name: string) {
       feeExchangeRate: "",
       rateSource: "automatic",
       exchangeRate: "",
-      executedAt: new Date().toISOString().slice(0, 10),
+      date: new Date().toISOString().slice(0, 10),
       walletId: walletsStore.wallets[0]?.id ?? "",
     }
     step.value = "stock"
@@ -252,54 +256,6 @@ const stockFeeValue = computed(() => {
   const fees = Number(stockForm.value.fees) || 0
   if (stockForm.value.feesType === "pct") return (qty * price * fees) / 100
   return fees
-})
-
-const stockTotal = computed(() => {
-  const qty = Number(stockForm.value.quantity) || 0
-  const price = Number(stockForm.value.price) || 0
-  return qty * price + stockFeeValue.value
-})
-
-const positionCostUSD = computed(() => {
-  const qty = Number(stockForm.value.quantity) || 0
-  const price = Number(stockForm.value.price) || 0
-  return qty * price
-})
-
-const txSuggestion = ref<LatestRate | null>(null)
-const feeSuggestion = ref<LatestRate | null>(null)
-
-const txRateValue = computed<number | null>(() => {
-  if (targetCurrency.value === TX_CCY) return null
-  if (stockForm.value.rateSource === "manual" && stockForm.value.exchangeRate) {
-    return Number(stockForm.value.exchangeRate)
-  }
-  return txSuggestion.value?.rate ?? null
-})
-
-const feeRateValue = computed<number | null>(() => {
-  if (stockFeeValue.value <= 0) return null
-  if (stockForm.value.feeCurrency === TX_CCY) return 1
-  if (stockForm.value.feeRateSource === "manual" && stockForm.value.feeExchangeRate) {
-    return Number(stockForm.value.feeExchangeRate)
-  }
-  return feeSuggestion.value?.rate ?? null
-})
-
-const feeInUsd = computed(() => {
-  if (stockForm.value.feeCurrency === TX_CCY) return stockFeeValue.value
-  if (feeRateValue.value == null) return null
-  return stockFeeValue.value * feeRateValue.value
-})
-
-const positionCostConverted = computed(() => {
-  if (txRateValue.value == null) return null
-  return positionCostUSD.value * txRateValue.value
-})
-
-const totalCostConverted = computed(() => {
-  if (txRateValue.value == null) return null
-  return stockTotal.value * txRateValue.value
 })
 
 const optionTotal = computed(() => {
@@ -342,7 +298,7 @@ async function submitStock() {
         positionId: position.id,
         currency: position.instrumentCurrency || "USD",
         walletId: stockForm.value.walletId || undefined,
-        executedAt: stockForm.value.executedAt ? new Date(stockForm.value.executedAt).toISOString() : undefined,
+        executedAt: stockForm.value.date ? new Date(stockForm.value.date).toISOString() : undefined,
       }
       if (stockForm.value.feesType === "fixed" && Number(stockForm.value.fees) > 0) {
         txPayload.fees = Number(stockForm.value.fees)
@@ -405,7 +361,7 @@ async function submitStock() {
             ? Number(stockForm.value.feeExchangeRate)
             : undefined,
         walletId: stockForm.value.walletId || undefined,
-        executedAt: stockForm.value.executedAt ? new Date(stockForm.value.executedAt).toISOString() : undefined,
+        executedAt: stockForm.value.date ? new Date(stockForm.value.date).toISOString() : undefined,
       })
       await store.fetchPositions(props.portfolioId)
       close()
@@ -545,117 +501,35 @@ defineExpose({ pendingMarketPrice })
           <h3 class="text-base font-semibold">{{ positionAction ? `${positionAction.kind === 'buy' ? 'Buy' : positionAction.kind === 'sell' ? 'Sell' : 'Dividend for'} ${positionAction.position.symbol}` : 'Buy Position' }}</h3>
           <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="close">✕</button>
         </div>
-        <div class="mb-4 flex items-center gap-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50">
-          <img :src="`/api/logos/${stockForm.symbol}`" :alt="stockForm.symbol" class="h-9 w-9 rounded-full bg-slate-100 dark:bg-slate-800" />
-          <div class="flex-1">
-            <p class="font-medium text-slate-900 dark:text-slate-100">
-              {{ stockForm.symbol }} <span class="text-xs font-normal text-slate-500 dark:text-slate-400">(US)</span>
-              <span class="ml-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-slate-500 dark:bg-slate-800 dark:text-slate-400">Stock</span>
-            </p>
-            <p class="text-xs text-slate-500 dark:text-slate-400">{{ stockForm.name || "—" }}</p>
-          </div>
-          <div class="text-right">
-            <button type="button" class="text-xs text-blue-600 hover:underline" @click="goResearch">View chart</button>
-            <p class="text-sm font-medium tabular-nums text-slate-900 dark:text-slate-100">
-              {{ marketPrice != null ? formatCurrency(marketPrice, "USD") : formatCurrency(Number(stockForm.price) || 0, "USD") }}
-              <span class="block text-xs font-normal text-slate-400">{{ stockForm.executedAt >= today() ? "current price" : `close on ${stockForm.executedAt}` }}</span>
-            </p>
-          </div>
-        </div>
-        <form @submit.prevent="submitStock">
-          <label for="stock-date" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Purchase Date</label>
-          <input id="stock-date" v-model="stockForm.executedAt" type="date" required class="input mb-4" data-testid="add-position-date" />
-
-          <label for="stock-wallet" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Cash portfolio</label>
-          <select id="stock-wallet" v-model="stockForm.walletId" class="input mb-4" data-testid="add-position-wallet">
-            <option v-if="!walletsStore.wallets.length" value="" disabled>Loading wallets…</option>
-            <option v-for="w in walletsStore.wallets" :key="w.id" :value="w.id">
-              {{ w.name }} ({{ formatCurrency(w.balance, w.currency) }})
-            </option>
-          </select>
-
-          <div class="mb-4 grid grid-cols-2 gap-4">
-            <div>
-              <label for="stock-qty" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Quantity</label>
-              <input id="stock-qty" v-model="stockForm.quantity" type="number" min="0.000001" step="any" required class="input" data-testid="add-position-quantity" />
+        <TransactionFormFields
+          :symbol="stockForm.symbol"
+          :name="stockForm.name"
+          :asset-type="'Stock'"
+          :country="'US'"
+          :market-price="marketPrice"
+          :price-as-of-label="stockForm.date >= today() ? 'current price' : `close on ${stockForm.date}`"
+          :wallets="walletsStore.wallets"
+          :target-currency="targetCurrency"
+          :tx-currency="TX_CCY"
+          :testid="'add-position'"
+          v-model:form="stockForm"
+          @price-input="onPriceInput"
+          @view-chart="goResearch"
+          @submit="submitStock"
+        >
+          <template #footer="{ totalCost }">
+            <p v-if="error" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ error }}</p>
+            <div class="flex justify-end gap-2">
+              <button type="button" class="btn-ghost" @click="close">Cancel</button>
+              <button type="submit" class="btn-primary" :disabled="busy || !stockForm.symbol || !Number(stockForm.quantity)">
+                {{ busy ? "Saving..." : positionAction
+                  ? `${positionAction.kind === 'buy' ? 'Buy' : positionAction.kind === 'sell' ? 'Sell' : 'Record dividend'} for ${formatCurrency(totalCost, "USD")}`
+                  : `Buy for ${formatCurrency(totalCost, "USD")}`
+                }}
+              </button>
             </div>
-            <div>
-              <label for="stock-price" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Price per share ($)</label>
-              <input id="stock-price" v-model="stockForm.price" type="number" min="0" step="any" required class="input" data-testid="add-position-price" @input="priceTouched = true" />
-            </div>
-          </div>
-          <label for="stock-fees" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Transaction Fees</label>
-          <FeeFields
-            v-model:fees="stockForm.fees"
-            v-model:fees-type="stockForm.feesType"
-            v-model:fee-currency="stockForm.feeCurrency"
-            testid="add-position"
-            input-id="stock-fees"
-            class="mb-1"
-          />
-
-          <FxRateFields
-            leg="Transaction"
-            :from="TX_CCY"
-            :to="targetCurrency"
-            :date="stockForm.executedAt"
-            v-model:rate-source="stockForm.rateSource"
-            v-model:rate="stockForm.exchangeRate"
-            @suggestion="txSuggestion = $event"
-            testid="add-position-fx"
-          />
-
-          <FxRateFields
-            leg="Fee"
-            :from="stockForm.feeCurrency"
-            :to="TX_CCY"
-            :date="stockForm.executedAt"
-            :hidden="stockForm.feesType !== 'fixed' || stockForm.feeCurrency === TX_CCY"
-            v-model:rate-source="stockForm.feeRateSource"
-            v-model:rate="stockForm.feeExchangeRate"
-            @suggestion="feeSuggestion = $event"
-            testid="add-position-fee-fx"
-          />
-          <div class="mb-4 rounded-lg bg-slate-50 px-3 py-2 text-sm dark:bg-slate-800/50">
-            <p class="mb-1 font-medium text-slate-700 dark:text-slate-200">Summary</p>
-            <dl class="space-y-0.5 tabular-nums text-slate-600 dark:text-slate-300">
-              <div class="flex justify-between gap-3">
-                <dt>Shares × Price</dt>
-                <dd>
-                  {{ formatCurrency(positionCostUSD, "USD") }}
-                  <template v-if="txRateValue != null"> ≈ {{ formatCurrency(positionCostConverted, targetCurrency ?? "") }}</template>
-                </dd>
-              </div>
-              <div v-if="stockFeeValue > 0" class="flex justify-between gap-3">
-                <dt>Fee ({{ stockForm.feesType === "pct" ? `${stockForm.fees}%` : stockForm.feeCurrency }})</dt>
-                <dd>
-                  {{ formatCurrency(stockFeeValue, stockForm.feeCurrency) }}
-                  <template v-if="stockForm.feeCurrency !== TX_CCY">
-                    <template v-if="feeInUsd != null"> ≈ {{ formatCurrency(feeInUsd, "USD") }}</template>
-                    <template v-else> · rate pending</template>
-                  </template>
-                </dd>
-              </div>
-              <div class="flex justify-between gap-3 border-t border-slate-200 pt-0.5 dark:border-slate-700">
-                <dt class="font-medium text-slate-900 dark:text-slate-100">Total Cost</dt>
-                <dd class="font-medium text-slate-900 dark:text-slate-100">
-                  {{ formatCurrency(stockTotal, "USD") }}
-                  <template v-if="txRateValue != null"> ≈ {{ formatCurrency(totalCostConverted, targetCurrency ?? "") }}</template>
-                </dd>
-              </div>
-            </dl>
-          </div>
-          <p v-if="error" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ error }}</p>
-          <div class="flex justify-end gap-2">
-            <button type="button" class="btn-ghost" @click="close">Cancel</button>
-            <button type="submit" class="btn-primary" :disabled="busy || !stockForm.symbol || !Number(stockForm.quantity)">
-              {{ busy ? "Saving..." : positionAction
-                ? `${positionAction.kind === 'buy' ? 'Buy' : positionAction.kind === 'sell' ? 'Sell' : 'Record dividend'} for ${formatCurrency(stockTotal, "USD")}`
-                : `Buy for ${formatCurrency(stockTotal, "USD")}`
-              }}
-            </button>
-          </div>
-        </form>
+          </template>
+        </TransactionFormFields>
       </div>
     </div>
 

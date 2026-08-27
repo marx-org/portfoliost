@@ -10,12 +10,11 @@ import { usePortfolioStore } from "@/stores/portfolios"
 import { useWalletsStore } from "@/stores/wallets"
 import { formatCurrency } from "@/utils/format"
 import type { PortfolioPositions, PortfolioTransactionsPage } from "@/api/types"
-import FeeFields from "@/components/FeeFields.vue"
-import FxRateFields from "@/components/FxRateFields.vue"
 import EditTransactionModal, { type EditTransaction } from "@/modules/portfolios/EditTransactionModal.vue"
 import { useCurrenciesStore } from "@/stores/currencies"
 import { useTargetCurrency } from "@/composables/useTargetCurrency"
-import { type LatestRate } from "@/api/fx"
+import { useTransactionForm } from "@/composables/useTransactionForm"
+import TransactionFormFields from "@/components/TransactionFormFields.vue"
 
 type Tx = PortfolioTransactionsPage["items"][number]
 type Position = PortfolioPositions[number]
@@ -34,7 +33,7 @@ const saving = ref(false)
 
 const newTx = ref({
   date: new Date().toISOString().slice(0, 10),
-  type: "BUY",
+  type: "BUY" as "BUY" | "SELL",
   quantity: "",
   price: "",
   fees: "0",
@@ -44,7 +43,7 @@ const newTx = ref({
   feeExchangeRate: "",
   rateSource: "automatic" as "automatic" | "manual",
   exchangeRate: "",
-  cashPortfolio: "",
+  walletId: "",
 })
 
 const portfolioStore = usePortfolioStore()
@@ -54,49 +53,7 @@ const targetCurrency = useTargetCurrency(
   ),
 )
 
-const txSuggestion = ref<LatestRate | null>(null)
-const feeSuggestion = ref<LatestRate | null>(null)
-
-function onTxSuggestion(r: LatestRate | null) { txSuggestion.value = r }
-function onFeeSuggestion(r: LatestRate | null) { feeSuggestion.value = r }
-
-const positionCostUSD = computed(() => {
-  const qty = Number(newTx.value.quantity) || 0
-  const price = Number(newTx.value.price) || 0
-  return qty * price
-})
-
-const txRateValue = computed(() => {
-  if (newTx.value.rateSource === "manual" && newTx.value.exchangeRate) return Number(newTx.value.exchangeRate)
-  return txSuggestion.value?.rate ?? null
-})
-
-const feeValue = computed(() => {
-  if (newTx.value.feesType === "pct") return (positionCostUSD.value * (Number(newTx.value.fees) || 0)) / 100
-  return Number(newTx.value.fees) || 0
-})
-
-const feeRateValue = computed(() => {
-  if (newTx.value.feeRateSource === "manual" && newTx.value.feeExchangeRate) return Number(newTx.value.feeExchangeRate)
-  return feeSuggestion.value?.rate ?? null
-})
-
-const feeInUsd = computed(() => {
-  if (newTx.value.feeCurrency === "USD") return feeValue.value
-  if (feeRateValue.value && feeValue.value) return feeValue.value * feeRateValue.value
-  return null
-})
-
-const positionCostConverted = computed(() => {
-  if (txRateValue.value == null) return null
-  return positionCostUSD.value * txRateValue.value
-})
-
-const totalCostConverted = computed(() => {
-  if (txRateValue.value == null) return null
-  const feePart = feeInUsd.value ?? 0
-  return (positionCostUSD.value + feePart) * txRateValue.value
-})
+const tf = useTransactionForm(newTx, targetCurrency)
 
 const editingTx = ref<EditTransaction | null>(null)
 
@@ -106,8 +63,6 @@ watch(
     if (!open || !props.position) return
     transactions.value = []
     error.value = null
-    txSuggestion.value = null
-    feeSuggestion.value = null
     if (!walletsStore.wallets.length) {
       await walletsStore.fetchAll()
     }
@@ -123,7 +78,7 @@ watch(
       feeExchangeRate: "",
       rateSource: "automatic",
       exchangeRate: "",
-      cashPortfolio: walletsStore.wallets[0]?.id ?? "",
+      walletId: walletsStore.wallets[0]?.id ?? "",
     }
     if (!currenciesStore.loaded) void currenciesStore.load()
     await load()
@@ -245,7 +200,7 @@ async function addRow(): Promise<void> {
       symbol: props.position.symbol,
       quantity: Number(newTx.value.quantity),
       price: Number(newTx.value.price),
-      fees: newTx.value.feesType === "pct" ? feeValue.value : Number(newTx.value.fees) || 0,
+      fees: newTx.value.feesType === "pct" ? tf.feeValue.value : Number(newTx.value.fees) || 0,
       feesType: newTx.value.feesType,
     }
     if (newTx.value.feesType === "fixed" && newTx.value.feeCurrency !== (props.position.instrumentCurrency ?? "USD")) {
@@ -259,6 +214,8 @@ async function addRow(): Promise<void> {
       input.rateSource = "manual"
       input.exchangeRate = Number(newTx.value.exchangeRate)
     }
+    input.walletId = newTx.value.walletId || undefined
+    input.executedAt = new Date(newTx.value.date).toISOString()
     const created = await createPortfolioTransaction(props.portfolioId, input)
     transactions.value.push({ ...created, executedAt: new Date(newTx.value.date).toISOString() })
     const position = props.position
@@ -350,92 +307,30 @@ async function close() {
 
       <div class="mt-4 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
         <h4 class="mb-3 text-sm font-medium text-slate-700 dark:text-slate-300">Add Transaction</h4>
-        <div class="mb-3 grid grid-cols-4 gap-3">
-          <div>
-            <label class="mb-1 block text-xs text-slate-500 dark:text-slate-400">Date</label>
-            <input type="date" v-model="newTx.date" class="input !py-1.5 text-sm" aria-label="Date" />
-          </div>
-          <div>
-            <label class="mb-1 block text-xs text-slate-500 dark:text-slate-400">Type</label>
-            <select v-model="newTx.type" class="input !py-1.5 text-sm" aria-label="Type">
-              <option value="BUY">Buy</option>
-              <option value="SELL">Sell</option>
-            </select>
-          </div>
-          <div>
-            <label class="mb-1 block text-xs text-slate-500 dark:text-slate-400">Quantity</label>
-            <input type="number" v-model="newTx.quantity" min="0" step="any" class="input !py-1.5 text-sm" aria-label="Quantity" data-testid="edit-position-quantity" />
-          </div>
-          <div>
-            <label class="mb-1 block text-xs text-slate-500 dark:text-slate-400">Price ({{ position.instrumentCurrency || "USD" }})</label>
-            <input type="number" v-model="newTx.price" min="0" step="any" class="input !py-1.5 text-sm" aria-label="Price per share" data-testid="edit-position-price" />
-          </div>
-        </div>
-
-        <label class="mb-1 block text-xs text-slate-500 dark:text-slate-400">Transaction Fees</label>
-        <FeeFields
-          v-model:fees="newTx.fees"
-          v-model:fees-type="newTx.feesType"
-          v-model:fee-currency="newTx.feeCurrency"
-          testid="edit-position"
-        />
-
-        <FxRateFields
-          leg="Transaction"
-          :from="position.instrumentCurrency || 'USD'"
-          :to="targetCurrency"
-          :date="newTx.date"
-          v-model:rate-source="newTx.rateSource"
-          v-model:rate="newTx.exchangeRate"
-          testid="edit-position-fx"
-          @suggestion="onTxSuggestion"
-        />
-
-        <FxRateFields
-          leg="Fee"
-          :from="newTx.feeCurrency"
-          :to="position.instrumentCurrency || 'USD'"
-          :date="newTx.date"
-          :hidden="newTx.feesType !== 'fixed' || newTx.feeCurrency === (position.instrumentCurrency || 'USD')"
-          v-model:rate-source="newTx.feeRateSource"
-          v-model:rate="newTx.feeExchangeRate"
-          testid="edit-position-fee-fx"
-          @suggestion="onFeeSuggestion"
-        />
-
-        <dl class="mt-3 rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-800/50">
-          <div class="flex items-center justify-between text-sm">
-            <dt class="text-slate-600 dark:text-slate-300">Shares × Price</dt>
-            <dd class="tabular-nums text-slate-900 dark:text-slate-100">
-              {{ formatCurrency(positionCostUSD, "USD") }}
-              <template v-if="txRateValue != null"> ≈ {{ formatCurrency(positionCostConverted!, targetCurrency ?? "") }}</template>
-            </dd>
-          </div>
-          <div v-if="feeValue > 0" class="mt-1 flex items-center justify-between text-sm">
-            <dt class="text-slate-600 dark:text-slate-300">Fee ({{ newTx.feeCurrency }})</dt>
-            <dd class="tabular-nums text-slate-900 dark:text-slate-100">
-              {{ formatCurrency(feeValue, newTx.feeCurrency) }}
-              <template v-if="feeRateValue != null && newTx.feeCurrency !== (position.instrumentCurrency || 'USD')"> ≈ {{ formatCurrency(feeInUsd!, "USD") }}</template>
-            </dd>
-          </div>
-          <div class="mt-1 flex items-center justify-between border-t border-slate-200 pt-1 text-sm font-medium dark:border-slate-700">
-            <dt class="text-slate-700 dark:text-slate-200">Total Cost</dt>
-            <dd class="tabular-nums text-slate-900 dark:text-slate-100">
-              {{ formatCurrency(positionCostUSD + (feeInUsd ?? feeValue), "USD") }}
-              <template v-if="totalCostConverted != null"> ≈ {{ formatCurrency(totalCostConverted, targetCurrency ?? "") }}</template>
-            </dd>
-          </div>
-        </dl>
-
-        <div class="mt-3 flex items-center justify-between">
-          <select v-model="newTx.cashPortfolio" class="input !w-48 !py-1.5 text-sm" aria-label="Cash portfolio">
-            <option value="">No linked cash</option>
-            <option v-for="w in walletsStore.wallets" :key="w.id" :value="w.id">{{ w.name }}</option>
-          </select>
-          <button type="button" class="btn-primary !px-4 !py-1.5 text-sm" :disabled="saving || !canAdd" @click="addRow">
-            {{ saving ? "Adding..." : "Add Transaction" }}
-          </button>
-        </div>
+        <TransactionFormFields
+          :symbol="position.symbol"
+          :name="position.companyName ?? ''"
+          :asset-type="position.assetType"
+          :country="'US'"
+          :market-price="position.currentPrice"
+          :price-as-of-label="'current price'"
+          :wallets="walletsStore.wallets"
+          :target-currency="targetCurrency"
+          :tx-currency="position.instrumentCurrency || 'USD'"
+          :testid="'edit-position'"
+          :show-type="true"
+          :show-view-chart="false"
+          v-model:form="newTx"
+          @submit="addRow"
+        >
+          <template #footer>
+            <div class="mt-3 flex items-center justify-end">
+              <button type="submit" class="btn-primary !px-4 !py-1.5 text-sm" :disabled="saving || !canAdd">
+                {{ saving ? "Adding..." : "Add Transaction" }}
+              </button>
+            </div>
+          </template>
+        </TransactionFormFields>
       </div>
 
       <div class="mt-4 flex justify-end">

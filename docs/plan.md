@@ -674,3 +674,10 @@ Proposal: [portfolios-module.md](proposals/portfolios-module.md) (proposed 2026-
 - [ ] L1 homelab ingress paths → `portfoliost-wallets:3000`; separated snapshot Kubernetes Jobs (D11 job-pod pattern, not in-process scheduler)
 - [ ] L2 live verification (`/__meta`, CRUD + analytics through host); e2e green
 - [ ] L3 plan/proposal status marks; retire `mocks/portfolios/index.js`; docs sweep
+
+### Phase M — transaction form deduplication
+- [x] M1 extract `useTransactionForm` composable (shared computed chain: positionCost, feeValue, txRate, feeRate, feeInUsd, costConverted, totalConverted)
+- [x] M2 extract `TransactionFormFields.vue` component (logo header + date + wallet + qty/price grid + FeeFields + FxRateFields + summary `<dl>`)
+- [x] M3 wire AddPositionDialog stock step through TransactionFormFields
+- [x] M4 wire EditPositionDialog "Add Transaction" through TransactionFormFields
+- [x] M5 build + 107 unit tests pass + 31 stack tests pass
