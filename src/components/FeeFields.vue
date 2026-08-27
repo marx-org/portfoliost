@@ -6,19 +6,18 @@ const props = defineProps<{
   feesType: "fixed" | "pct"
   feeCurrency: string
   testid?: string
-  /** id for the amount input so external <label :for> keeps working */
   inputId?: string
 }>()
 
 const emit = defineEmits<{
-  (e: "update:fees", v: string): void
+  (e: "update:fees", v: number): void
   (e: "update:feesType", v: "fixed" | "pct"): void
   (e: "update:feeCurrency", v: string): void
   (e: "feeCurrencyChange"): void
 }>()
 
 function onFeesInput(ev: Event): void {
-  emit("update:fees", (ev.target as HTMLInputElement).value)
+  emit("update:fees", Number((ev.target as HTMLInputElement).value) || 0)
 }
 
 function toggleType(): void {

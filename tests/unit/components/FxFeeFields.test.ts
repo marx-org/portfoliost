@@ -24,7 +24,7 @@ describe("FeeFields (§10a D38)", () => {
     expect(w.find('[data-testid="tx-fee-currency"]').exists()).toBe(true)
 
     await w.find('[data-testid="tx-fees"]').setValue("9.5")
-    expect(w.emitted("update:fees")![0]).toEqual(["9.5"])
+    expect(w.emitted("update:fees")![0]).toEqual([9.5])
 
     await w.find('[data-testid="tx-fees-toggle"]').trigger("click")
     expect(w.emitted("update:feesType")![0]).toEqual(["pct"])
