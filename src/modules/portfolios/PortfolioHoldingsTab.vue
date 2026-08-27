@@ -4,21 +4,12 @@ import { useRoute, useRouter } from "vue-router"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
 import { storeToRefs } from "pinia"
-import {
-  createPortfolioTransaction,
-  removePortfolioPosition,
-  updatePortfolioPosition,
-} from "@/api/portfolios"
+import { removePortfolioPosition } from "@/api/portfolios"
 import { formatCurrency, formatNumber, formatPercent, formatSignedCurrency } from "@/utils/format"
 import { researchSymbol } from "@/utils/research"
 import type { PortfolioPositions } from "@/api/types"
 import EditPositionDialog from "@/modules/portfolios/EditPositionDialog.vue"
-import FeeFields from "@/components/FeeFields.vue"
-import FxRateFields from "@/components/FxRateFields.vue"
-import { useCurrenciesStore } from "@/stores/currencies"
-import { useTargetCurrency } from "@/composables/useTargetCurrency"
-import { type LatestRate } from "@/api/fx"
-import { useWalletsStore } from "@/stores/wallets"
+import AddPositionDialog from "@/modules/portfolios/AddPositionDialog.vue"
 
 type Position = PortfolioPositions[number]
 
@@ -33,33 +24,9 @@ const openMenuId = ref<string | null>(null)
 const notice = ref<string | null>(null)
 
 type ActionKind = "buy" | "sell" | "dividend"
-const action = ref<{ kind: ActionKind; position: Position } | null>(null)
-const form = ref({ quantity: "", price: "", avgCost: "" })
-const saving = ref(false)
-const actionError = ref<string | null>(null)
+const positionAction = ref<{ kind: ActionKind; position: Position } | null>(null)
 
 const editPosition = ref<Position | null>(null)
-
-const currenciesStore = useCurrenciesStore()
-const walletsStore = useWalletsStore()
-const targetCurrency = useTargetCurrency(
-  computed(() => store.portfolios.find((p) => p.id === id)?.currency ?? null),
-)
-
-const fees = ref("0")
-const feesType = ref<"fixed" | "pct">("fixed")
-const feeCurrency = ref("USD")
-const feeRateSource = ref<"automatic" | "manual">("automatic")
-const feeExchangeRate = ref("")
-const rateSource = ref<"automatic" | "manual">("automatic")
-const exchangeRate = ref("")
-const executedAt = ref(new Date().toISOString().slice(0, 10))
-const walletId = ref("")
-const txSuggestion = ref<LatestRate | null>(null)
-const feeSuggestion = ref<LatestRate | null>(null)
-
-function onTxSuggestion(r: LatestRate | null) { txSuggestion.value = r }
-function onFeeSuggestion(r: LatestRate | null) { feeSuggestion.value = r }
 
 const showCustomize = ref(false)
 const sortKey = ref<string | null>(null)
@@ -221,31 +188,19 @@ function exportCsv() {
 
 function openAction(kind: ActionKind, position: Position): void {
   openMenuId.value = null
-  action.value = { kind, position }
-  form.value = {
-    quantity: kind === "sell" ? String(position.quantity) : "",
-    price: String(position.currentPrice ?? ""),
-    avgCost: String(position.averageCostBasis ?? ""),
-  }
-  fees.value = "0"
-  feesType.value = "fixed"
-  feeCurrency.value = position.instrumentCurrency ?? "USD"
-  feeRateSource.value = "automatic"
-  feeExchangeRate.value = ""
-  rateSource.value = "automatic"
-  exchangeRate.value = ""
-  executedAt.value = new Date().toISOString().slice(0, 10)
-  walletId.value = ""
-  txSuggestion.value = null
-  feeSuggestion.value = null
-  if (!currenciesStore.loaded) void currenciesStore.load()
-  if (!walletsStore.wallets.length) {
-    walletsStore.fetchAll().then(() => {
-      if (!walletId.value) walletId.value = walletsStore.wallets[0]?.id ?? ""
-    })
-  } else if (!walletId.value) {
-    walletId.value = walletsStore.wallets[0]?.id ?? ""
-  }
+  positionAction.value = { kind, position }
+}
+
+function onActionSaved() {
+  notice.value = positionAction.value
+    ? `${positionAction.value.kind === "buy" ? "Bought" : positionAction.value.kind === "sell" ? "Sold" : "Recorded dividend for"} ${positionAction.value!.position.symbol}`
+    : null
+  positionAction.value = null
+  void store.fetchPositions(id)
+}
+
+function onActionClose() {
+  positionAction.value = null
 }
 
 function openEditPosition(position: Position): void {
@@ -259,127 +214,6 @@ function onEditClose() {
 
 function onEditSaved() {
   void store.fetchPositions(id)
-}
-
-const actionPositionCost = computed(() => {
-  if (!action.value) return 0
-  const qty = Number(form.value.quantity) || 0
-  const price = Number(form.value.price) || 0
-  return qty * price
-})
-
-const actionTxRate = computed(() => {
-  if (rateSource.value === "manual" && exchangeRate.value) return Number(exchangeRate.value)
-  return txSuggestion.value?.rate ?? null
-})
-
-const actionFeeValue = computed(() => {
-  if (feesType.value === "pct") return (actionPositionCost.value * (Number(fees.value) || 0)) / 100
-  return Number(fees.value) || 0
-})
-
-const actionFeeRate = computed(() => {
-  if (feeRateSource.value === "manual" && feeExchangeRate.value) return Number(feeExchangeRate.value)
-  return feeSuggestion.value?.rate ?? null
-})
-
-const actionFeeInUsd = computed(() => {
-  if (!action.value) return null
-  const instCcy = action.value.position.instrumentCurrency ?? "USD"
-  if (feeCurrency.value === instCcy) return actionFeeValue.value
-  if (actionFeeRate.value && actionFeeValue.value) return actionFeeValue.value * actionFeeRate.value
-  return null
-})
-
-const selectedWalletCurrency = computed(() => {
-  const w = walletsStore.wallets.find((w) => w.id === walletId.value)
-  return w?.currency ?? null
-})
-
-const actionCostConverted = computed(() => {
-  if (actionTxRate.value == null) return null
-  return actionPositionCost.value * actionTxRate.value
-})
-
-const actionTotalConverted = computed(() => {
-  if (actionTxRate.value == null || !action.value) return null
-  const feePart = actionFeeInUsd.value ?? 0
-  return (actionPositionCost.value + feePart) * actionTxRate.value
-})
-
-function dialogTitle(): string {
-  if (!action.value) return ""
-  const map: Record<ActionKind, string> = {
-    buy: `Buy ${action.value.position.symbol}`,
-    sell: `Sell ${action.value.position.symbol}`,
-    dividend: `Dividend for ${action.value.position.symbol}`,
-  }
-  return map[action.value.kind]
-}
-
-async function submitAction(): Promise<void> {
-  if (!action.value) return
-  saving.value = true
-  actionError.value = null
-  const { kind, position } = action.value
-  const quantity = Number(form.value.quantity)
-  const price = Number(form.value.price)
-  const instCcy = position.instrumentCurrency ?? "USD"
-  const dividendQty = kind === "dividend" ? (position.quantity || 1) : quantity
-  const txPayload: Parameters<typeof createPortfolioTransaction>[1] = { type: kind === "buy" ? "BUY" : kind === "sell" ? "SELL" : "DIVIDEND", symbol: position.symbol, quantity: dividendQty, price, positionId: position.id }
-  if (walletId.value) txPayload.walletId = walletId.value
-  if (executedAt.value) txPayload.executedAt = new Date(executedAt.value).toISOString()
-  if (position.instrumentCurrency) txPayload.currency = position.instrumentCurrency
-  if (feesType.value === "fixed" && Number(fees.value) > 0) {
-    txPayload.fees = Number(fees.value)
-    txPayload.feesType = "fixed"
-    if (feeCurrency.value !== instCcy) {
-      txPayload.feeCurrency = feeCurrency.value
-      txPayload.feeRateSource = feeRateSource.value
-      if (feeRateSource.value === "manual" && feeExchangeRate.value) {
-        txPayload.feeExchangeRate = Number(feeExchangeRate.value)
-      }
-    }
-  } else if (feesType.value === "pct" && Number(fees.value) > 0) {
-    txPayload.fees = (quantity * price * Number(fees.value)) / 100
-    txPayload.feesType = "pct"
-  }
-  if (rateSource.value === "manual" && exchangeRate.value) {
-    txPayload.rateSource = "manual"
-    txPayload.exchangeRate = Number(exchangeRate.value)
-  }
-  try {
-    if (kind === "buy") {
-      await createPortfolioTransaction(id, txPayload)
-      const newQty = (position.quantity || 0) + quantity
-      const newAvg = ((position.quantity || 0) * (position.averageCostBasis || 0) + quantity * price) / newQty
-      await updatePortfolioPosition(id, position.id, {
-        quantity: newQty,
-        averageCostBasis: newAvg,
-        avgCostBasis: newAvg,
-        instrumentAvgCostBasis: newAvg,
-      })
-      notice.value = `Bought ${quantity} ${position.symbol}`
-    } else if (kind === "sell") {
-      await createPortfolioTransaction(id, txPayload)
-      const remaining = (position.quantity || 0) - quantity
-      if (remaining <= 0) {
-        await removePortfolioPosition(id, position.id)
-      } else {
-        await updatePortfolioPosition(id, position.id, { quantity: remaining })
-      }
-      notice.value = `Sold ${quantity} ${position.symbol}`
-    } else if (kind === "dividend") {
-      await createPortfolioTransaction(id, txPayload)
-      notice.value = `Recorded dividend for ${position.symbol}`
-    }
-    await store.fetchPositions(id)
-    action.value = null
-  } catch (err) {
-    actionError.value = err instanceof Error ? err.message : "Action failed"
-  } finally {
-    saving.value = false
-  }
 }
 
 async function removePosition(position: Position): Promise<void> {
@@ -546,136 +380,15 @@ function goResearch(position: Position): void {
         </table>
       </div>
       <p v-else class="px-5 py-6 text-sm text-slate-500 dark:text-slate-400">No open positions.</p>
-
-    <div
-      v-if="action"
-      class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
-      @click.self="action = null"
-    >
-      <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" :aria-label="dialogTitle()">
-        <h3 class="mb-4 text-base font-semibold">{{ dialogTitle() }}</h3>
-        <form @submit.prevent="submitAction">
-          <label v-if="action.kind !== 'dividend'" for="holdings-date" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Date</label>
-          <input
-            v-if="action.kind !== 'dividend'"
-            id="holdings-date"
-            v-model="executedAt"
-            type="date"
-            required
-            class="input mb-4"
-            data-testid="action-date"
-          />
-
-          <label v-if="action.kind !== 'dividend'" for="holdings-wallet" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Cash portfolio</label>
-          <select
-            v-if="action.kind !== 'dividend'"
-            id="holdings-wallet"
-            v-model="walletId"
-            class="input mb-4"
-            data-testid="action-wallet"
-          >
-            <option v-if="!walletsStore.wallets.length" value="" disabled>Loading wallets…</option>
-            <option v-for="w in walletsStore.wallets" :key="w.id" :value="w.id">
-              {{ w.name }} ({{ formatCurrency(w.balance, w.currency) }})
-            </option>
-          </select>
-
-          <label v-if="action.kind !== 'dividend'" for="pos-qty" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Quantity</label>
-          <input
-            v-if="action.kind !== 'dividend'"
-            id="pos-qty"
-            v-model="form.quantity"
-            type="number"
-            min="0.000001"
-            step="any"
-            required
-            class="input mb-4"
-            data-testid="action-quantity"
-          />
-          <label
-            :for="action.kind === 'dividend' ? 'pos-amount' : 'pos-price'"
-            class="mb-1 block text-sm text-slate-600 dark:text-slate-300"
-          >
-            {{ action.kind === 'dividend' ? `Amount per share (${action.position.quantity} shares)` : 'Price' }}
-          </label>
-          <input
-            :id="action.kind === 'dividend' ? 'pos-amount' : 'pos-price'"
-            v-model="form.price"
-            type="number"
-            min="0"
-            step="any"
-            required
-            class="input mb-4"
-            data-testid="action-price"
-          />
-
-          <label v-if="action.kind !== 'dividend'" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Transaction Fees</label>
-          <FeeFields
-            v-if="action.kind !== 'dividend'"
-            v-model:fees="fees"
-            v-model:fees-type="feesType"
-            v-model:fee-currency="feeCurrency"
-            testid="holdings-action"
-          />
-
-          <FxRateFields
-            v-if="action.kind !== 'dividend'"
-            leg="Transaction"
-            :from="selectedWalletCurrency || action.position.instrumentCurrency || 'USD'"
-            :to="targetCurrency"
-            :date="executedAt"
-            v-model:rate-source="rateSource"
-            v-model:rate="exchangeRate"
-            testid="holdings-action-fx"
-            @suggestion="onTxSuggestion"
-          />
-
-          <FxRateFields
-            v-if="action.kind !== 'dividend'"
-            leg="Fee"
-            :from="feeCurrency"
-            :to="action.position.instrumentCurrency || 'USD'"
-            :date="executedAt"
-            :hidden="feesType !== 'fixed' || feeCurrency === (action.position.instrumentCurrency || 'USD')"
-            v-model:rate-source="feeRateSource"
-            v-model:rate="feeExchangeRate"
-            testid="holdings-action-fee-fx"
-            @suggestion="onFeeSuggestion"
-          />
-
-          <dl v-if="action.kind !== 'dividend'" class="mt-2 rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-800/50">
-            <div class="flex items-center justify-between text-sm">
-              <dt class="text-slate-600 dark:text-slate-300">Shares × Price</dt>
-              <dd class="tabular-nums text-slate-900 dark:text-slate-100">
-                {{ formatCurrency(actionPositionCost, action.position.instrumentCurrency || "USD") }}
-                <template v-if="actionTxRate != null"> ≈ {{ formatCurrency(actionCostConverted!, targetCurrency ?? "") }}</template>
-              </dd>
-            </div>
-            <div v-if="actionFeeValue > 0" class="mt-1 flex items-center justify-between text-sm">
-              <dt class="text-slate-600 dark:text-slate-300">Fee ({{ feeCurrency }})</dt>
-              <dd class="tabular-nums text-slate-900 dark:text-slate-100">
-                {{ formatCurrency(actionFeeValue, feeCurrency) }}
-                <template v-if="actionFeeRate != null && feeCurrency !== (action.position.instrumentCurrency || 'USD')"> ≈ {{ formatCurrency(actionFeeInUsd!, "USD") }}</template>
-              </dd>
-            </div>
-            <div class="mt-1 flex items-center justify-between border-t border-slate-200 pt-1 text-sm font-medium dark:border-slate-700">
-              <dt class="text-slate-700 dark:text-slate-200">Total Cost</dt>
-              <dd class="tabular-nums text-slate-900 dark:text-slate-100">
-                {{ formatCurrency(actionPositionCost + (actionFeeInUsd ?? actionFeeValue), action.position.instrumentCurrency || "USD") }}
-                <template v-if="actionTotalConverted != null"> ≈ {{ formatCurrency(actionTotalConverted, targetCurrency ?? "") }}</template>
-              </dd>
-            </div>
-          </dl>
-
-          <p v-if="actionError" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ actionError }}</p>
-          <div class="flex justify-end gap-2">
-            <button type="button" class="btn-ghost" @click="action = null">Cancel</button>
-            <button type="submit" class="btn-primary" :disabled="saving">{{ saving ? "Saving..." : "Confirm" }}</button>
-          </div>
-        </form>
-      </div>
     </div>
-    </div>
+
+    <AddPositionDialog
+      :open="positionAction !== null"
+      :portfolio-id="id"
+      :position-action="positionAction ?? undefined"
+      @close="onActionClose"
+      @saved="onActionSaved"
+    />
 
     <EditPositionDialog
       :open="editPosition !== null"

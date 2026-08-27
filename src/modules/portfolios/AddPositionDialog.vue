@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue"
 import { useRouter } from "vue-router"
-import { createPortfolioPosition } from "@/api/portfolios"
+import { createPortfolioPosition, createPortfolioTransaction, updatePortfolioPosition, removePortfolioPosition } from "@/api/portfolios"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { useWalletsStore } from "@/stores/wallets"
 import { formatCurrency } from "@/utils/format"
@@ -12,9 +12,17 @@ import FeeFields from "@/components/FeeFields.vue"
 import FxRateFields from "@/components/FxRateFields.vue"
 import { useCurrenciesStore } from "@/stores/currencies"
 import { useTargetCurrency } from "@/composables/useTargetCurrency"
+import type { PortfolioPositions } from "@/api/types"
 
-const props = defineProps<{ open: boolean; portfolioId: string }>()
-const emit = defineEmits<{ (e: "close"): void; (e: "added"): void }>()
+type Position = PortfolioPositions[number]
+
+interface PositionAction {
+  kind: "buy" | "sell" | "dividend"
+  position: Position
+}
+
+const props = defineProps<{ open: boolean; portfolioId: string; positionAction?: PositionAction }>()
+const emit = defineEmits<{ (e: "close"): void; (e: "added"): void; (e: "saved"): void }>()
 
 const store = usePortfolioStore()
 const walletsStore = useWalletsStore()
@@ -71,14 +79,40 @@ watch(
   () => props.open,
   (open) => {
     if (open) {
-      step.value = "chooser"
       showSearch.value = false
       error.value = null
       if (!currenciesStore.loaded) void currenciesStore.load()
-      if (!walletsStore.wallets.length) {
-        walletsStore.fetchAll().then(() => {
-          if (!stockForm.value.walletId) stockForm.value.walletId = walletsStore.wallets[0]?.id || ""
-        })
+      const loadWallets = () => {
+        if (!walletsStore.wallets.length) {
+          walletsStore.fetchAll().then(() => {
+            if (!stockForm.value.walletId) stockForm.value.walletId = walletsStore.wallets[0]?.id || ""
+          })
+        }
+      }
+      if (props.positionAction) {
+        const { kind, position } = props.positionAction
+        priceTouched.value = false
+        stockForm.value = {
+          symbol: position.symbol,
+          name: position.companyName ?? "",
+          quantity: kind === "sell" ? String(position.quantity ?? "") : "1",
+          price: String(position.currentPrice ?? ""),
+          fees: "0",
+          feesType: "fixed",
+          feeCurrency: position.instrumentCurrency ?? "USD",
+          feeRateSource: "automatic",
+          feeExchangeRate: "",
+          rateSource: "automatic",
+          exchangeRate: "",
+          executedAt: new Date().toISOString().slice(0, 10),
+          walletId: walletsStore.wallets[0]?.id ?? "",
+        }
+        step.value = "stock"
+        loadWallets()
+        void triggerLoadMarketPrice()
+      } else {
+        step.value = "chooser"
+        loadWallets()
       }
     }
   },
@@ -296,36 +330,87 @@ async function submitStock() {
   busy.value = true
   error.value = null
   try {
-    await createPortfolioPosition(props.portfolioId, {
-      symbol,
-      quantity,
-      price: stockForm.value.price ? Number(stockForm.value.price) : undefined,
-      assetType: "STOCK",
-      fees: stockFeeValue.value || undefined,
-      feesType: stockForm.value.feesType,
-      feeCurrency: stockForm.value.feesType === "fixed" ? stockForm.value.feeCurrency : undefined,
-      rateSource: stockForm.value.rateSource,
-      exchangeRate:
-        stockForm.value.rateSource === "manual" && stockForm.value.exchangeRate
-          ? Number(stockForm.value.exchangeRate)
-          : undefined,
-      feeRateSource:
-        stockForm.value.feesType === "fixed" && stockForm.value.feeCurrency !== TX_CCY
-          ? stockForm.value.feeRateSource
-          : undefined,
-      feeExchangeRate:
-        stockForm.value.feesType === "fixed" &&
-        stockForm.value.feeCurrency !== TX_CCY &&
-        stockForm.value.feeRateSource === "manual" &&
-        stockForm.value.feeExchangeRate
-          ? Number(stockForm.value.feeExchangeRate)
-          : undefined,
-      walletId: stockForm.value.walletId || undefined,
-      executedAt: stockForm.value.executedAt ? new Date(stockForm.value.executedAt).toISOString() : undefined,
-    })
-    await store.fetchPositions(props.portfolioId)
-    close()
-    emit("added")
+    if (props.positionAction) {
+      const { kind, position } = props.positionAction
+      const txType = kind === "buy" ? "BUY" : kind === "sell" ? "SELL" : "DIVIDEND"
+      const txQty = kind === "dividend" ? (position.quantity || 1) : quantity
+      const txPayload: Parameters<typeof createPortfolioTransaction>[1] = {
+        type: txType,
+        symbol,
+        quantity: txQty,
+        price: Number(stockForm.value.price) || 0,
+        positionId: position.id,
+        currency: position.instrumentCurrency || "USD",
+        walletId: stockForm.value.walletId || undefined,
+        executedAt: stockForm.value.executedAt ? new Date(stockForm.value.executedAt).toISOString() : undefined,
+      }
+      if (stockForm.value.feesType === "fixed" && Number(stockForm.value.fees) > 0) {
+        txPayload.fees = Number(stockForm.value.fees)
+        txPayload.feesType = "fixed"
+        const instCcy = position.instrumentCurrency ?? "USD"
+        if (stockForm.value.feeCurrency !== instCcy) {
+          txPayload.feeCurrency = stockForm.value.feeCurrency
+          txPayload.feeRateSource = stockForm.value.feeRateSource
+          if (stockForm.value.feeRateSource === "manual" && stockForm.value.feeExchangeRate) {
+            txPayload.feeExchangeRate = Number(stockForm.value.feeExchangeRate)
+          }
+        }
+      } else if (stockForm.value.feesType === "pct" && Number(stockForm.value.fees) > 0) {
+        txPayload.fees = (txQty * Number(stockForm.value.price) * Number(stockForm.value.fees)) / 100
+        txPayload.feesType = "pct"
+      }
+      if (stockForm.value.rateSource === "manual" && stockForm.value.exchangeRate) {
+        txPayload.rateSource = "manual"
+        txPayload.exchangeRate = Number(stockForm.value.exchangeRate)
+      }
+      await createPortfolioTransaction(props.portfolioId, txPayload)
+      if (kind === "buy") {
+        const newQty = (position.quantity || 0) + quantity
+        const newAvg = ((position.quantity || 0) * (position.averageCostBasis || 0) + quantity * (Number(stockForm.value.price) || 0)) / newQty
+        await updatePortfolioPosition(props.portfolioId, position.id, { quantity: newQty, averageCostBasis: newAvg })
+      } else if (kind === "sell") {
+        const remaining = (position.quantity || 0) - quantity
+        if (remaining <= 0) {
+          await removePortfolioPosition(props.portfolioId, position.id)
+        } else {
+          await updatePortfolioPosition(props.portfolioId, position.id, { quantity: remaining })
+        }
+      }
+      await store.fetchPositions(props.portfolioId)
+      close()
+      emit("saved")
+    } else {
+      await createPortfolioPosition(props.portfolioId, {
+        symbol,
+        quantity,
+        price: stockForm.value.price ? Number(stockForm.value.price) : undefined,
+        assetType: "STOCK",
+        fees: stockFeeValue.value || undefined,
+        feesType: stockForm.value.feesType,
+        feeCurrency: stockForm.value.feesType === "fixed" ? stockForm.value.feeCurrency : undefined,
+        rateSource: stockForm.value.rateSource,
+        exchangeRate:
+          stockForm.value.rateSource === "manual" && stockForm.value.exchangeRate
+            ? Number(stockForm.value.exchangeRate)
+            : undefined,
+        feeRateSource:
+          stockForm.value.feesType === "fixed" && stockForm.value.feeCurrency !== TX_CCY
+            ? stockForm.value.feeRateSource
+            : undefined,
+        feeExchangeRate:
+          stockForm.value.feesType === "fixed" &&
+          stockForm.value.feeCurrency !== TX_CCY &&
+          stockForm.value.feeRateSource === "manual" &&
+          stockForm.value.feeExchangeRate
+            ? Number(stockForm.value.feeExchangeRate)
+            : undefined,
+        walletId: stockForm.value.walletId || undefined,
+        executedAt: stockForm.value.executedAt ? new Date(stockForm.value.executedAt).toISOString() : undefined,
+      })
+      await store.fetchPositions(props.portfolioId)
+      close()
+      emit("added")
+    }
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Failed to add position"
   } finally {
@@ -455,9 +540,9 @@ defineExpose({ pendingMarketPrice })
       class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
       @click.self="close"
     >
-      <div class="card max-h-[85vh] w-full max-w-md overflow-y-auto p-6" role="dialog" aria-modal="true" aria-label="Buy Position">
+      <div class="card max-h-[85vh] w-full max-w-md overflow-y-auto p-6" role="dialog" aria-modal="true" :aria-label="positionAction ? `${positionAction.kind} ${positionAction.position.symbol}` : 'Buy Position'">
         <div class="mb-4 flex items-center justify-between">
-          <h3 class="text-base font-semibold">Buy Position</h3>
+          <h3 class="text-base font-semibold">{{ positionAction ? `${positionAction.kind === 'buy' ? 'Buy' : positionAction.kind === 'sell' ? 'Sell' : 'Dividend for'} ${positionAction.position.symbol}` : 'Buy Position' }}</h3>
           <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="close">✕</button>
         </div>
         <div class="mb-4 flex items-center gap-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50">
@@ -564,7 +649,10 @@ defineExpose({ pendingMarketPrice })
           <div class="flex justify-end gap-2">
             <button type="button" class="btn-ghost" @click="close">Cancel</button>
             <button type="submit" class="btn-primary" :disabled="busy || !stockForm.symbol || !Number(stockForm.quantity)">
-              {{ busy ? "Adding..." : `Buy for ${formatCurrency(stockTotal, "USD")}` }}
+              {{ busy ? "Saving..." : positionAction
+                ? `${positionAction.kind === 'buy' ? 'Buy' : positionAction.kind === 'sell' ? 'Sell' : 'Record dividend'} for ${formatCurrency(stockTotal, "USD")}`
+                : `Buy for ${formatCurrency(stockTotal, "USD")}`
+              }}
             </button>
           </div>
         </form>
