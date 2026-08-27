@@ -412,6 +412,29 @@ async function main() {
       cur.json.currencies.every((c) => c.code && typeof c.minorUnits === "number")
     check("feesfx.currencies registry", okShape, `got ${cur.status}`)
 
+    const fxUsdEur = await request("/fx/latest?from=USD&to=EUR", { token })
+    check(
+      "feesfx.fx-latest direct pair",
+      fxUsdEur.status === 200 && Math.abs(fxUsdEur.json.rate - 1 / 1.08) < 1e-9 && fxUsdEur.json.asOf === "2026-08-22",
+      `got ${fxUsdEur.status} ${JSON.stringify(fxUsdEur.json).slice(0, 120)}`,
+    )
+    const fxEurUsd = await request("/fx/latest?from=EUR&to=USD&date=2026-08-27", { token })
+    check(
+      "feesfx.fx-latest date ignored (single demo close)",
+      fxEurUsd.status === 200 && Math.abs(fxEurUsd.json.rate - 1.08) < 1e-9,
+      `got ${fxEurUsd.status} ${fxEurUsd.json.rate}`,
+    )
+    const fxCross = await request("/fx/latest?from=PLN&to=GBP", { token })
+    check(
+      "feesfx.fx-latest cross pair",
+      fxCross.status === 200 && Math.abs(fxCross.json.rate - 0.85 / 4.3) < 1e-9,
+      `got ${fxCross.status} ${fxCross.json.rate}`,
+    )
+    const fxNoParams = await request("/fx/latest?from=USD", { token })
+    check("feesfx.fx-latest missing to → 400", fxNoParams.status === 400, `got ${fxNoParams.status}`)
+    const fxUnknown = await request("/fx/latest?from=BTC&to=USD", { token })
+    check("feesfx.fx-latest unknown pair → 422", fxUnknown.status === 422, `got ${fxUnknown.status}`)
+
     const usdWalletsBefore = await request("/wallets", { token })
     const createW = await request("/wallets", {
       method: "POST",

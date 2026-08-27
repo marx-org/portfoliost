@@ -247,13 +247,25 @@ date parameter (cached per from/to/date).
 ### D40 — conversion-target precedence
 
 Every disclosure states its target explicitly. Precedence:
-**portfolio `currency` / wallet `currency` → user display base currency**
-(`useTargetCurrency` composable, single source of truth). Cash movements
-always settle into the wallet currency; portfolio transactions into the
-portfolio currency — the profile base is only the fallback when no
-portfolio/wallet context exists.
+**wallet `currency` (payment currency) → portfolio `currency` → user display
+base currency** (`useTargetCurrency` composable, single source of truth). A
+transaction settles into the *wallet* it is paid from: when the wallet
+currency differs from the instrument currency the transaction FX leg manages
+that conversion; the portfolio currency is only the fallback when no wallet
+context exists. Cash movements always settle into the wallet currency; the
+profile base is the last resort.
 
 ### D41 — options form parity
 
 The options leg adopts `FeeFields`/`FxRateFields` too (fee currency was
 hardcoded USD; no rate entry) — no more per-form snowflakes.
+
+### D42 — mock `/api/fx/latest`
+
+The mock backend had no `GET /api/fx/latest` route, so automatic suggestions
+(`getLatestRate`) 404'd and resolved to `null`. `mocks/fx` now serves the
+endpoint from the demo rates: direct pairs via `crossRate`, cross pairs, and
+`asOf` carries the single demo close forward for any requested leg date
+(D20/D39 carry-forward semantics). Precedence remains: manual rate wins, else
+the daily close. `mocks/tests/run.mjs` gains 5 round-trips (direct/cross,
+date-ignored, 400/422).

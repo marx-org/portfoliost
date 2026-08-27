@@ -64,11 +64,13 @@ function makeEnv() {
   const store = useCurrenciesStore()
   store.currencies = registry
   store.loaded = true
-  // D40: portfolio currency is the conversion target for transaction legs
+  // D40: the transaction leg settles into the *wallet's* currency (payment currency);
+  // the portfolio currency is only the fallback when no wallet is selected
   const portfolios = usePortfolioStore()
   portfolios.portfolios = [{ id: "p1", currency: "PLN" }] as never
   mockedWallets.getWallets.mockResolvedValue([
     { id: "w1", userId: "u", name: "Cash USD", currency: "USD", balance: 1000, availableBalance: 1000, isDefault: false, createdAt: "", updatedAt: "" },
+    { id: "w2", userId: "u", name: "Cash PLN", currency: "PLN", balance: 4300, availableBalance: 4300, isDefault: false, createdAt: "", updatedAt: "" },
   ] as never)
   return { pinia }
 }
@@ -79,7 +81,7 @@ const registry = [
   { code: "PLN", name: "Polish Zloty", symbol: "zł", minorUnits: 2, popular: true },
 ]
 
-async function waitForOption(wrapper: Awaited<ReturnType<typeof openStockStep>>, value: string): Promise<void> {
+async function waitForOption(wrapper: { find: (sel: string) => { exists(): boolean } }, value: string): Promise<void> {
   for (let i = 0; i < 25; i++) {
     if (wrapper.find(`option[value="${value}"]`).exists()) return
     await flushPromises()
@@ -122,9 +124,21 @@ describe("AddPositionDialog — fee currency & fx disclosure (§10.3)", () => {
     wrapper.unmount()
   })
 
-  it("fx section targets the portfolio currency, defaults to automatic, hides the rate input", async () => {
+  it("hides the fx section when the wallet currency equals the transaction currency", async () => {
     const wrapper = await openStockStep()
-    expect(wrapper.find('[data-testid="add-position-fx-section"]').exists()).toBe(true) // USD → PLN (portfolio ccy)
+    await waitForOption(wrapper, "w1")
+    await wrapper.find('[data-testid="add-position-wallet"]').setValue("w1") // USD === TX_CCY
+    await flushPromises()
+    expect(wrapper.find('[data-testid="add-position-fx-section"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it("shows the fx section targeted at the wallet currency; defaults to automatic, hides the rate input", async () => {
+    const wrapper = await openStockStep()
+    await waitForOption(wrapper, "w2")
+    await wrapper.find('[data-testid="add-position-wallet"]').setValue("w2")
+    await flushPromises()
+    expect(wrapper.find('[data-testid="add-position-fx-section"]').exists()).toBe(true) // USD → PLN (wallet ccy)
     expect(wrapper.text()).toContain("USD → PLN")
     expect(wrapper.find('[data-testid="add-position-fx-rate"]').exists()).toBe(false)
     wrapper.unmount()
@@ -135,13 +149,14 @@ describe("AddPositionDialog — fee currency & fx disclosure (§10.3)", () => {
       throw new Error("exit-early")
     })
     const wrapper = await openStockStep()
+    await waitForOption(wrapper, "w2")
+    await wrapper.find('[data-testid="add-position-wallet"]').setValue("w2")
+    await flushPromises()
     await wrapper.find('[data-testid="add-position-fx-manual"]').trigger("click")
     expect(wrapper.find('[data-testid="add-position-fx-rate"]').exists()).toBe(true)
 
-    await waitForOption(wrapper, "w1")
     await wrapper.find('[data-testid="add-position-quantity"]').setValue("2")
     await wrapper.find('[data-testid="add-position-price"]').setValue("50")
-    await wrapper.find('[data-testid="add-position-wallet"]').setValue("w1")
     await wrapper.find('[data-testid="add-position-fx-rate"]').setValue("4.35")
     await wrapper.find("form").trigger("submit")
     await flushPromises()
@@ -155,10 +170,11 @@ describe("AddPositionDialog — fee currency & fx disclosure (§10.3)", () => {
 
   it("automatic mode omits exchangeRate from the payload", async () => {
     const wrapper = await openStockStep()
-    await waitForOption(wrapper, "w1")
+    await waitForOption(wrapper, "w2")
+    await wrapper.find('[data-testid="add-position-wallet"]').setValue("w2")
+    await flushPromises()
     await wrapper.find('[data-testid="add-position-quantity"]').setValue("1")
     await wrapper.find('[data-testid="add-position-price"]').setValue("10")
-    await wrapper.find('[data-testid="add-position-wallet"]').setValue("w1")
     await wrapper.find("form").trigger("submit")
     await flushPromises()
     const payload = mocked.createPortfolioPosition.mock.calls[0][1]
@@ -304,14 +320,17 @@ describe("AddPositionDialog — multicurrency summary (plan §13 follow-up 4/6)"
     vi.mocked(fxMod.getLatestRate).mockResolvedValue({ rate: 4.35, asOf: "2026-08-25" } as never)
   })
 
-  it("shows converted amounts when portfolio currency differs from TX_CCY", async () => {
+  it("shows converted amounts when the wallet currency differs from TX_CCY", async () => {
     const wrapper = await openStockStep()
+    await waitForOption(wrapper, "w2")
+    await wrapper.find('[data-testid="add-position-wallet"]').setValue("w2")
+    await flushPromises()
     await wrapper.find('[data-testid="add-position-price"]').setValue("100")
     await flushPromises()
     await flushPromises()
     await flushPromises()
     const summaryText = wrapper.find("dl").text()
-    // 1 × $100 = $100, converted at 4.35 → PLN 435.00
+    // 1 × $100 = $100, converted at 4.35 → PLN 435.00 (wallet ccy)
     expect(summaryText).toContain("$100.00")
     // Intl.NumberFormat uses U+00A0 between currency code and amount
     expect(summaryText).toContain("PLN\u00A0435.00")
@@ -331,7 +350,7 @@ describe("AddPositionDialog — multicurrency summary (plan §13 follow-up 4/6)"
     wrapper.unmount()
   })
 
-  it("shows no ≈ conversion when portfolio currency equals TX_CCY", async () => {
+  it("shows no ≈ conversion when the wallet currency equals TX_CCY", async () => {
     const pinia = createPinia()
     setActivePinia(pinia)
     const cs = useCurrenciesStore()
@@ -391,22 +410,28 @@ describe("EditPositionDialog — fee/FX fields + multicurrency summary (plan §1
     vi.mocked(fxMod.getLatestRate).mockResolvedValue({ rate: 4.35, asOf: "2026-08-25" } as never)
   })
 
-  it("renders FeeFields and FxRateFields in the add-tx form", async () => {
+  it("renders FeeFields and FxRateFields in the add-tx form when a cross-currency wallet is selected", async () => {
     const wrapper = mountDialog()
     await wrapper.setProps({ open: true })
     await flushPromises()
     // FeeFields renders fee currency select
     expect(wrapper.find('[data-testid="edit-position-fee-currency"]').exists()).toBe(true)
-    // FxRateFields renders transaction disclosure
+    // FxRateFields renders transaction disclosure once the payment wallet differs from tx ccy
+    await waitForOption(wrapper, "w2")
+    await wrapper.find('[data-testid="edit-position-wallet"]').setValue("w2")
+    await flushPromises()
     expect(wrapper.find('[data-testid="edit-position-fx-section"]').exists()).toBe(true)
     // Multicurrency summary exists
     expect(wrapper.find("dl").exists()).toBe(true)
     wrapper.unmount()
   })
 
-  it("shows multicurrency summary when portfolio currency differs from instrument currency", async () => {
+  it("shows multicurrency summary when the wallet currency differs from instrument currency", async () => {
     const wrapper = mountDialog()
     await wrapper.setProps({ open: true })
+    await flushPromises()
+    await waitForOption(wrapper, "w2")
+    await wrapper.find('[data-testid="edit-position-wallet"]').setValue("w2")
     await flushPromises()
     await wrapper.find('[data-testid="edit-position-quantity"]').setValue("2")
     await wrapper.find('[data-testid="edit-position-price"]').setValue("100")
@@ -415,7 +440,7 @@ describe("EditPositionDialog — fee/FX fields + multicurrency summary (plan §1
     await flushPromises()
     const dl = wrapper.find("dl")
     const text = dl.text()
-    // 2 × $100 = $200 → converted at 4.35 → PLN 870.00
+    // 2 × $100 = $200 → converted at 4.35 → PLN 870.00 (wallet ccy)
     expect(text).toContain("$200.00")
     expect(text).toContain("PLN\u00A0870.00")
     wrapper.unmount()

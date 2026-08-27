@@ -2,7 +2,7 @@ import { computed, type Ref } from "vue"
 import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
 
 export interface TargetCurrencyContext {
-  /** Explicit leg target — wallet currency for cash movements, portfolio currency for transactions */
+  /** Explicit leg target — wallet currency for cash movements and transaction settlement; portfolio currency as fallback */
   contextCurrency?: string | Ref<string | null | undefined>
 }
 

@@ -11,6 +11,7 @@ import * as portfoliosModule from "../portfolios/index.js"
 import * as walletsModule from "../wallets/index.js"
 import * as watchlistsModule from "../watchlists/index.js"
 import * as copilotModule from "../copilot/index.js"
+import * as fxModule from "../fx/index.js"
 import * as miscModule from "../misc/index.js"
 import { authConfig } from "../lib/auth.js"
 
@@ -45,6 +46,7 @@ const modules = [
   walletsModule,
   watchlistsModule,
   copilotModule,
+  fxModule,
   miscModule,
 ]
 for (const mod of modules) mod.register(app)

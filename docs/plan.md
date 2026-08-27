@@ -681,3 +681,5 @@ Proposal: [portfolios-module.md](proposals/portfolios-module.md) (proposed 2026-
 - [x] M3 wire AddPositionDialog stock step through TransactionFormFields
 - [x] M4 wire EditPositionDialog "Add Transaction" through TransactionFormFields
 - [x] M5 build + 107 unit tests pass + 31 stack tests pass
+- [x] M6 transaction FX leg targets the selected wallet (payment) currency, not the portfolio currency: same-currency wallet → no FX; cross-currency wallet → auto/manual rate disclosure (D40 revision; fee leg unchanged)
+- [x] M7 mock `GET /api/fx/latest` (demo-rate cross pairs, d39 carry-forward semantics) so automatic suggestions resolve instead of 404ing; wired into `mocks/fx`, 5 new mock round-trips, e2e `fees-fx.spec.ts` rewritten to wallet-driven flow (EUR wallet + deposit + cross-currency buy, market-rate prefill 0.9259, custom-fx badge)

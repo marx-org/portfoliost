@@ -42,11 +42,14 @@ const emit = defineEmits<{
 const currenciesStore = useCurrenciesStore()
 if (!currenciesStore.loaded) void currenciesStore.load()
 
-const targetCurrencyRef = computed(() => props.targetCurrency)
+const paymentCurrency = computed<string | null>(() => {
+  const wallet = props.wallets.find((w) => w.id === model.value.walletId)
+  return wallet?.currency ?? props.targetCurrency
+})
 
 const tf = useTransactionForm(
   computed(() => model.value),
-  targetCurrencyRef,
+  paymentCurrency,
 )
 </script>
 
@@ -154,7 +157,7 @@ const tf = useTransactionForm(
       <FxRateFields
         leg="Transaction"
         :from="txCurrency"
-        :to="targetCurrency ?? ''"
+        :to="paymentCurrency ?? ''"
         :date="model.date"
         v-model:rate-source="model.rateSource"
         v-model:rate="model.exchangeRate"
@@ -179,7 +182,7 @@ const tf = useTransactionForm(
           <dt class="text-slate-600 dark:text-slate-300">Shares × Price</dt>
           <dd class="tabular-nums text-slate-900 dark:text-slate-100">
             {{ formatCurrency(tf.positionCostUSD.value, "USD") }}
-            <template v-if="tf.txRateValue.value != null"> ≈ {{ formatCurrency(tf.positionCostConverted.value ?? 0, targetCurrency ?? "") }}</template>
+            <template v-if="tf.txRateValue.value != null"> ≈ {{ formatCurrency(tf.positionCostConverted.value ?? 0, paymentCurrency ?? "") }}</template>
           </dd>
         </div>
         <div v-if="tf.feeValue.value > 0" class="mt-1 flex items-center justify-between">
@@ -193,7 +196,7 @@ const tf = useTransactionForm(
           <dt class="text-slate-700 dark:text-slate-200">Total Cost</dt>
           <dd class="tabular-nums text-slate-900 dark:text-slate-100">
             {{ formatCurrency(tf.totalCost.value, "USD") }}
-            <template v-if="tf.totalCostConverted.value != null"> ≈ {{ formatCurrency(tf.totalCostConverted.value ?? 0, targetCurrency ?? "") }}</template>
+            <template v-if="tf.totalCostConverted.value != null"> ≈ {{ formatCurrency(tf.totalCostConverted.value ?? 0, paymentCurrency ?? "") }}</template>
           </dd>
         </div>
       </dl>
