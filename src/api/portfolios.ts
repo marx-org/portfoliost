@@ -50,6 +50,8 @@ export interface CreatePortfolioPositionInput {
   quantity: number
   price?: number
   averageCostBasis?: number
+  currency?: string
+  instrumentCurrency?: string
   assetType?: string
   contractSize?: number
   direction?: string

@@ -6,7 +6,7 @@ import { usePortfolioStore } from "@/stores/portfolios"
 import { useWalletsStore } from "@/stores/wallets"
 import { formatCurrency } from "@/utils/format"
 import InstrumentSearchModal from "@/modules/instruments/InstrumentSearchModal.vue"
-import { getQuote, getHistory } from "@/api/instruments"
+import { getQuote, getHistory, getInstrumentDetail } from "@/api/instruments"
 import FeeFields from "@/components/FeeFields.vue"
 import FxRateFields from "@/components/FxRateFields.vue"
 import TransactionFormFields from "@/components/TransactionFormFields.vue"
@@ -107,6 +107,7 @@ watch(
           date: new Date().toISOString().slice(0, 10),
           walletId: walletsStore.wallets[0]?.id ?? "",
         }
+        TX_CCY.value = position.instrumentCurrency ?? "USD"
         step.value = "stock"
         loadWallets()
         void triggerLoadMarketPrice()
@@ -118,13 +119,24 @@ watch(
   },
 )
 
-const TX_CCY = "USD" // stock step prices are USD-denominated
+const TX_CCY = ref("USD") // reactive: updated when instrument is selected
 const marketPrice = ref<number | null>(null)
 const quotePrice = ref<number | null>(null)
 const priceTouched = ref(false)
 const pendingMarketPrice = ref<Promise<void> | null>(null)
 
 const today = () => new Date().toISOString().slice(0, 10)
+
+async function applyInstrumentCurrency(symbol: string): Promise<void> {
+  try {
+    const detail = await getInstrumentDetail(symbol)
+    const ccy = detail.currency?.toUpperCase() || "USD"
+    TX_CCY.value = ccy
+    stockForm.value.feeCurrency = ccy
+  } catch {
+    // fallback: keep USD
+  }
+}
 
 async function loadMarketPrice(symbol: string, date: string): Promise<void> {
   try {
@@ -224,6 +236,7 @@ function onSearchAdd(symbol: string, name: string) {
     }
     step.value = "stock"
     error.value = null
+    void applyInstrumentCurrency(symbol)
     void triggerLoadMarketPrice()
   } else if (pendingStep === "option") {
     optionPending.value = { symbol, name }
@@ -341,6 +354,8 @@ async function submitStock() {
         quantity,
         price: stockForm.value.price ? Number(stockForm.value.price) : undefined,
         assetType: "STOCK",
+        currency: TX_CCY.value,
+        instrumentCurrency: TX_CCY.value,
         fees: stockFeeValue.value || undefined,
         feesType: stockForm.value.feesType,
         feeCurrency: stockForm.value.feesType === "fixed" ? stockForm.value.feeCurrency : undefined,
@@ -350,12 +365,12 @@ async function submitStock() {
             ? Number(stockForm.value.exchangeRate)
             : undefined,
         feeRateSource:
-          stockForm.value.feesType === "fixed" && stockForm.value.feeCurrency !== TX_CCY
+          stockForm.value.feesType === "fixed" && stockForm.value.feeCurrency !== TX_CCY.value
             ? stockForm.value.feeRateSource
             : undefined,
         feeExchangeRate:
           stockForm.value.feesType === "fixed" &&
-          stockForm.value.feeCurrency !== TX_CCY &&
+          stockForm.value.feeCurrency !== TX_CCY.value &&
           stockForm.value.feeRateSource === "manual" &&
           stockForm.value.feeExchangeRate
             ? Number(stockForm.value.feeExchangeRate)
@@ -399,12 +414,12 @@ async function submitOption() {
           ? Number(optionForm.value.exchangeRate)
           : undefined,
       feeRateSource:
-        optionForm.value.feesType === "fixed" && optionForm.value.feeCurrency !== TX_CCY
+        optionForm.value.feesType === "fixed" && optionForm.value.feeCurrency !== TX_CCY.value
           ? optionForm.value.feeRateSource
           : undefined,
       feeExchangeRate:
         optionForm.value.feesType === "fixed" &&
-        optionForm.value.feeCurrency !== TX_CCY &&
+        optionForm.value.feeCurrency !== TX_CCY.value &&
         optionForm.value.feeRateSource === "manual" &&
         optionForm.value.feeExchangeRate
           ? Number(optionForm.value.feeExchangeRate)
