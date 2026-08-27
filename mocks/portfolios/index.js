@@ -59,8 +59,39 @@ function positionsFor(id) {
   return positionsByPortfolio.get(id)
 }
 
+// Live price wins over the stored one — the holdings price column reflects the
+// current quote (research data), never the (possibly stale/null) DB value.
+function currentPriceFor(symbol) {
+  const research = loadResearch(symbol)
+  if (research && research.basics && typeof research.basics.price === "number") return research.basics.price
+  const fallback = loadRaw("quote_aapl.json")
+  return typeof fallback?.currentPrice === "number" ? fallback.currentPrice : 0
+}
+
+function enrichPosition(p) {
+  const price = currentPriceFor(p.symbol) ?? 0
+  const quantity = p.quantity ?? 0
+  const avg = p.averageCostBasis ?? 0
+  return {
+    ...p,
+    currentPrice: price,
+    marketValue: round2(quantity * price),
+    unrealizedGainLoss: round2(quantity * (price - avg)),
+    percentageChange: avg ? round2(((price - avg) / avg) * 100) : 0,
+  }
+}
+
+function enrichedPositions(id) {
+  const list = positionsFor(id).map(enrichPosition)
+  const total = list.reduce((s, p) => s + (p.marketValue || 0), 0)
+  for (const p of list) {
+    p.percentOfPortfolio = total ? round2(((p.marketValue || 0) / total) * 100) : 0
+  }
+  return list
+}
+
 function heldPositions(id) {
-  return positionsFor(id)
+  return enrichedPositions(id)
 }
 
 function enrichTx(tx) {
@@ -324,7 +355,7 @@ export function register(app) {
 
   app.get("/api/portfolios/:id/positions", (ctx) => {
     if (!requireAuth(ctx)) return
-    ctx.res.json(positionsFor(ctx.params.id))
+    ctx.res.json(enrichedPositions(ctx.params.id))
   })
 
   app.get("/api/portfolios/:id/positions/bare", (ctx) => {

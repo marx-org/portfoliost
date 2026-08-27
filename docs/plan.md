@@ -631,7 +631,7 @@ Proposal: [portfolios-module.md](proposals/portfolios-module.md) (proposed 2026-
 - [x] D4 pagination/filter/sort parity tests
 
 ### Phase E — positions & allocation reads
-- [x] E1 positions read pipeline: quote refresh via instruments adapter (staleness/fallback) → derived fields
+- [x] E1 positions read pipeline: quote refresh via instruments adapter (staleness/fallback) → derived fields (D58 impl: quotes.ts, refreshQuotes wired into GET positions/allocation/cfd-hints/detail/POST)
 - [x] E2 `/positions/bare` + `/positions/cfd-hints`
 - [x] E3 `/:id/allocation`
 - [x] E4 refresh caching/fallback + derived-math tests

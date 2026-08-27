@@ -219,6 +219,17 @@ async function main() {
   const positions = await request(`/portfolios/${pid}/positions`, { token })
   check("portfolios.positions", positions.status === 200 && Array.isArray(positions.json) && positions.json.length === 10, `got ${positions.status} len ${positions.json && positions.json.length}`)
   check("portfolios.position fields", isObj(positions.json[0]) && hasKeys(positions.json[0], ["id", "symbol", "quantity", "averageCostBasis", "currentPrice", "marketValue"]), JSON.stringify(positions.json[0]).slice(0, 120))
+  check(
+    "portfolios.positions live price derived (mv = qty × current, p/l = qty × (current − avg))",
+    positions.json.every((p) => p.currentPrice > 0 && p.marketValue === Math.round(p.quantity * p.currentPrice * 100) / 100 && p.unrealizedGainLoss === Math.round(p.quantity * (p.currentPrice - p.averageCostBasis) * 100) / 100),
+    `first ${positions.json[0]?.symbol} cur ${positions.json[0]?.currentPrice} mv ${positions.json[0]?.marketValue}`,
+  )
+  const seededPrice = positions.json[0]
+  check(
+    "portfolios.positions current price is live, not the stored one",
+    seededPrice.currentPrice === 740 && seededPrice.marketValue === 16280 && seededPrice.unrealizedGainLoss === 4093.98,
+    JSON.stringify({ symbol: seededPrice.symbol, cur: seededPrice.currentPrice, mv: seededPrice.marketValue, pl: seededPrice.unrealizedGainLoss }).slice(0, 160),
+  )
   const bare = await request(`/portfolios/${pid}/positions/bare`, { token })
   check("portfolios.positions.bare", bare.status === 200, `got ${bare.status}`)
   const cfd = await request(`/portfolios/${pid}/positions/cfd-hints`, { token })
@@ -253,6 +264,13 @@ async function main() {
   check("portfolios empty portfolio analytics", emptyAnalytics.status === 200 && emptyAnalytics.json.performance, `got ${emptyAnalytics.status}`)
   const addPos = await request(`/portfolios/${cid}/positions`, { method: "POST", token, body: { symbol: "MSFT", quantity: 3, price: 500 } })
   check("portfolios.positions.create → 201", addPos.status === 201 && addPos.json.symbol === "MSFT", `got ${addPos.status}`)
+  const msftRows = await request(`/portfolios/${cid}/positions`, { token })
+  const msftRow = msftRows.json.find((p) => p.symbol === "MSFT")
+  check(
+    "portfolios.positions created row uses live price (not the typed 500)", 
+    msftRow && msftRow.currentPrice === 506.06 && msftRow.marketValue === 1518.18 && msftRow.unrealizedGainLoss === 18.18,
+    `got ${JSON.stringify(msftRow || {}).slice(0, 160)}`,
+  )
   const addPosFull = await request(`/portfolios/${cid}/positions`, {
     method: "POST",
     token,
