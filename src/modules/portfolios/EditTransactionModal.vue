@@ -88,6 +88,7 @@ watch(
       }
     }
   },
+  { immediate: true },
 )
 
 const feeValue = computed(() => {
