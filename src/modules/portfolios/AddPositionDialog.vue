@@ -538,8 +538,8 @@ defineExpose({ pendingMarketPrice })
               <button type="button" class="btn-ghost" @click="close">Cancel</button>
               <button type="submit" class="btn-primary" :disabled="busy || !stockForm.symbol || !Number(stockForm.quantity)">
                 {{ busy ? "Saving..." : positionAction
-                  ? `${positionAction.kind === 'buy' ? 'Buy' : positionAction.kind === 'sell' ? 'Sell' : 'Record dividend'} for ${formatCurrency(totalCost, "USD")}`
-                  : `Buy for ${formatCurrency(totalCost, "USD")}`
+                  ? `${positionAction.kind === 'buy' ? 'Buy' : positionAction.kind === 'sell' ? 'Sell' : 'Record dividend'} for ${formatCurrency(totalCost, TX_CCY)}`
+                  : `Buy for ${formatCurrency(totalCost, TX_CCY)}`
                 }}
               </button>
             </div>
@@ -640,7 +640,7 @@ defineExpose({ pendingMarketPrice })
               <p class="text-sm text-slate-600 dark:text-slate-300">Total Cost</p>
               <p class="text-xs text-slate-400 dark:text-slate-500">Option Symbol (OCC): {{ optionSymbol() }}</p>
             </div>
-            <span class="text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ formatCurrency(optionTotal, "USD") }}</span>
+            <span class="text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ formatCurrency(optionTotal, optionForm.feeCurrency || 'USD') }}</span>
           </div>
           <p v-if="error" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ error }}</p>
           <div class="flex justify-end gap-2">

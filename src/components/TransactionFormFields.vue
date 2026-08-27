@@ -50,6 +50,7 @@ const paymentCurrency = computed<string | null>(() => {
 const tf = useTransactionForm(
   computed(() => model.value),
   paymentCurrency,
+  computed(() => props.txCurrency),
 )
 </script>
 
@@ -68,7 +69,7 @@ const tf = useTransactionForm(
         <div class="text-right">
           <button v-if="showViewChart !== false" type="button" class="text-xs text-blue-600 hover:underline" @click="emit('view-chart')">View chart</button>
           <p class="text-sm font-medium tabular-nums text-slate-900 dark:text-slate-100">
-            {{ marketPrice != null ? formatCurrency(marketPrice, "USD") : "—" }}
+            {{ marketPrice != null ? formatCurrency(marketPrice, txCurrency) : "—" }}
             <span class="block text-xs font-normal text-slate-400">{{ priceAsOfLabel }}</span>
           </p>
         </div>
@@ -158,6 +159,7 @@ const tf = useTransactionForm(
         leg="Transaction"
         :from="txCurrency"
         :to="paymentCurrency ?? ''"
+        :hidden="!paymentCurrency || paymentCurrency === txCurrency"
         :date="model.date"
         v-model:rate-source="model.rateSource"
         v-model:rate="model.exchangeRate"
@@ -181,7 +183,7 @@ const tf = useTransactionForm(
         <div class="flex items-center justify-between">
           <dt class="text-slate-600 dark:text-slate-300">Shares × Price</dt>
           <dd class="tabular-nums text-slate-900 dark:text-slate-100">
-            {{ formatCurrency(tf.positionCostUSD.value, "USD") }}
+            {{ formatCurrency(tf.positionCostUSD.value, tf.instrCcy.value) }}
             <template v-if="tf.txRateValue.value != null"> ≈ {{ formatCurrency(tf.positionCostConverted.value ?? 0, paymentCurrency ?? "") }}</template>
           </dd>
         </div>
@@ -189,13 +191,13 @@ const tf = useTransactionForm(
           <dt class="text-slate-600 dark:text-slate-300">Fee ({{ model.feeCurrency }})</dt>
           <dd class="tabular-nums text-slate-900 dark:text-slate-100">
             {{ formatCurrency(tf.feeValue.value, model.feeCurrency) }}
-            <template v-if="tf.feeRateValue.value != null && model.feeCurrency !== txCurrency"> ≈ {{ formatCurrency(tf.feeInUsd.value ?? 0, "USD") }}</template>
+            <template v-if="tf.feeRateValue.value != null && model.feeCurrency !== txCurrency"> ≈ {{ formatCurrency(tf.feeInUsd.value ?? 0, txCurrency) }}</template>
           </dd>
         </div>
         <div class="mt-1 flex items-center justify-between border-t border-slate-200 pt-1 font-medium dark:border-slate-700">
           <dt class="text-slate-700 dark:text-slate-200">Total Cost</dt>
           <dd class="tabular-nums text-slate-900 dark:text-slate-100">
-            {{ formatCurrency(tf.totalCost.value, "USD") }}
+            {{ formatCurrency(tf.totalCost.value, tf.instrCcy.value) }}
             <template v-if="tf.totalCostConverted.value != null"> ≈ {{ formatCurrency(tf.totalCostConverted.value ?? 0, paymentCurrency ?? "") }}</template>
           </dd>
         </div>

@@ -53,7 +53,11 @@ const targetCurrency = useTargetCurrency(
   ),
 )
 
-const tf = useTransactionForm(newTx, targetCurrency)
+const tf = useTransactionForm(
+  newTx,
+  targetCurrency,
+  computed(() => props.position?.instrumentCurrency ?? "USD"),
+)
 
 const editingTx = ref<EditTransaction | null>(null)
 
@@ -113,7 +117,7 @@ async function load() {
           synthesizedOpeningLot: false,
           executedAt: props.position.openedAt ?? new Date().toISOString(),
           createdAt: props.position.openedAt ?? new Date().toISOString(),
-          displayCurrency: "USD",
+          displayCurrency: props.position.instrumentCurrency ?? "USD",
           convertedTotalAmount: (props.position.quantity ?? 0) * (props.position.averageCostBasis ?? 0),
           convertedPrice: props.position.averageCostBasis ?? 0,
           convertedFees: 0,
