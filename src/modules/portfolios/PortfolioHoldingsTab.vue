@@ -18,6 +18,7 @@ import FxRateFields from "@/components/FxRateFields.vue"
 import { useCurrenciesStore } from "@/stores/currencies"
 import { useTargetCurrency } from "@/composables/useTargetCurrency"
 import { type LatestRate } from "@/api/fx"
+import { useWalletsStore } from "@/stores/wallets"
 
 type Position = PortfolioPositions[number]
 
@@ -40,6 +41,7 @@ const actionError = ref<string | null>(null)
 const editPosition = ref<Position | null>(null)
 
 const currenciesStore = useCurrenciesStore()
+const walletsStore = useWalletsStore()
 const targetCurrency = useTargetCurrency(
   computed(() => store.portfolios.find((p) => p.id === id)?.currency ?? null),
 )
@@ -51,6 +53,8 @@ const feeRateSource = ref<"automatic" | "manual">("automatic")
 const feeExchangeRate = ref("")
 const rateSource = ref<"automatic" | "manual">("automatic")
 const exchangeRate = ref("")
+const executedAt = ref(new Date().toISOString().slice(0, 10))
+const walletId = ref("")
 const txSuggestion = ref<LatestRate | null>(null)
 const feeSuggestion = ref<LatestRate | null>(null)
 
@@ -230,9 +234,18 @@ function openAction(kind: ActionKind, position: Position): void {
   feeExchangeRate.value = ""
   rateSource.value = "automatic"
   exchangeRate.value = ""
+  executedAt.value = new Date().toISOString().slice(0, 10)
+  walletId.value = ""
   txSuggestion.value = null
   feeSuggestion.value = null
   if (!currenciesStore.loaded) void currenciesStore.load()
+  if (!walletsStore.wallets.length) {
+    walletsStore.fetchAll().then(() => {
+      if (!walletId.value) walletId.value = walletsStore.wallets[0]?.id ?? ""
+    })
+  } else if (!walletId.value) {
+    walletId.value = walletsStore.wallets[0]?.id ?? ""
+  }
 }
 
 function openEditPosition(position: Position): void {
@@ -278,6 +291,11 @@ const actionFeeInUsd = computed(() => {
   return null
 })
 
+const selectedWalletCurrency = computed(() => {
+  const w = walletsStore.wallets.find((w) => w.id === walletId.value)
+  return w?.currency ?? null
+})
+
 const actionCostConverted = computed(() => {
   if (actionTxRate.value == null) return null
   return actionPositionCost.value * actionTxRate.value
@@ -308,7 +326,10 @@ async function submitAction(): Promise<void> {
   const price = Number(form.value.price)
   const instCcy = position.instrumentCurrency ?? "USD"
   const dividendQty = kind === "dividend" ? (position.quantity || 1) : quantity
-  const txPayload: Parameters<typeof createPortfolioTransaction>[1] = { type: kind === "buy" ? "BUY" : kind === "sell" ? "SELL" : "DIVIDEND", symbol: position.symbol, quantity: dividendQty, price }
+  const txPayload: Parameters<typeof createPortfolioTransaction>[1] = { type: kind === "buy" ? "BUY" : kind === "sell" ? "SELL" : "DIVIDEND", symbol: position.symbol, quantity: dividendQty, price, positionId: position.id }
+  if (walletId.value) txPayload.walletId = walletId.value
+  if (executedAt.value) txPayload.executedAt = new Date(executedAt.value).toISOString()
+  if (position.instrumentCurrency) txPayload.currency = position.instrumentCurrency
   if (feesType.value === "fixed" && Number(fees.value) > 0) {
     txPayload.fees = Number(fees.value)
     txPayload.feesType = "fixed"
@@ -534,6 +555,31 @@ function goResearch(position: Position): void {
       <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" :aria-label="dialogTitle()">
         <h3 class="mb-4 text-base font-semibold">{{ dialogTitle() }}</h3>
         <form @submit.prevent="submitAction">
+          <label v-if="action.kind !== 'dividend'" for="holdings-date" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Date</label>
+          <input
+            v-if="action.kind !== 'dividend'"
+            id="holdings-date"
+            v-model="executedAt"
+            type="date"
+            required
+            class="input mb-4"
+            data-testid="action-date"
+          />
+
+          <label v-if="action.kind !== 'dividend'" for="holdings-wallet" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Cash portfolio</label>
+          <select
+            v-if="action.kind !== 'dividend'"
+            id="holdings-wallet"
+            v-model="walletId"
+            class="input mb-4"
+            data-testid="action-wallet"
+          >
+            <option v-if="!walletsStore.wallets.length" value="" disabled>Loading wallets…</option>
+            <option v-for="w in walletsStore.wallets" :key="w.id" :value="w.id">
+              {{ w.name }} ({{ formatCurrency(w.balance, w.currency) }})
+            </option>
+          </select>
+
           <label v-if="action.kind !== 'dividend'" for="pos-qty" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Quantity</label>
           <input
             v-if="action.kind !== 'dividend'"
@@ -575,9 +621,9 @@ function goResearch(position: Position): void {
           <FxRateFields
             v-if="action.kind !== 'dividend'"
             leg="Transaction"
-            :from="action.position.instrumentCurrency || 'USD'"
+            :from="selectedWalletCurrency || action.position.instrumentCurrency || 'USD'"
             :to="targetCurrency"
-            :date="new Date().toISOString().slice(0, 10)"
+            :date="executedAt"
             v-model:rate-source="rateSource"
             v-model:rate="exchangeRate"
             testid="holdings-action-fx"
@@ -589,7 +635,7 @@ function goResearch(position: Position): void {
             leg="Fee"
             :from="feeCurrency"
             :to="action.position.instrumentCurrency || 'USD'"
-            :date="new Date().toISOString().slice(0, 10)"
+            :date="executedAt"
             :hidden="feesType !== 'fixed' || feeCurrency === (action.position.instrumentCurrency || 'USD')"
             v-model:rate-source="feeRateSource"
             v-model:rate="feeExchangeRate"

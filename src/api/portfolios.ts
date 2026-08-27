@@ -103,6 +103,9 @@ export async function createPortfolioTransaction(
     exchangeRate?: number
     feeRateSource?: "automatic" | "manual"
     feeExchangeRate?: number
+    walletId?: string
+    positionId?: string
+    executedAt?: string
   },
 ): Promise<PortfolioTransactionsPage["items"][number]> {
   return http.post<PortfolioTransactionsPage["items"][number]>(`/api/portfolios/${id}/transactions`, input)
