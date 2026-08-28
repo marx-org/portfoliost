@@ -4,6 +4,7 @@ import { getAllTransactions, deletePortfolioTransaction } from "@/api/portfolios
 import { formatCurrency, formatDateTime, formatNumber } from "@/utils/format"
 import { researchSymbol } from "@/utils/research"
 import FeeCell from "@/components/FeeCell.vue"
+import DualCurrencyCell from "@/components/DualCurrencyCell.vue"
 import type { PortfoliosTransactions } from "@/api/types"
 import InvestmentsTabs from "@/modules/portfolios/InvestmentsTabs.vue"
 import TransactionsSubTabs from "@/modules/portfolios/TransactionsSubTabs.vue"
@@ -150,6 +151,12 @@ function amountOf(tx: Tx): number {
   return tx.type.toUpperCase() === "BUY" ? -gross : gross
 }
 
+function convertedAmountOf(tx: Tx): number | null {
+  if (tx.convertedTotalAmount == null) return null
+  const gross = (tx.convertedTotalAmount ?? 0) + (tx.convertedFees ?? 0)
+  return tx.type.toUpperCase() === "BUY" ? -gross : gross
+}
+
 function openEdit(tx: Tx) {
   editing.value = tx
 }
@@ -255,13 +262,32 @@ async function submitDelete() {
               <td class="px-5 py-3 text-slate-600 dark:text-slate-300">{{ tx.portfolioName || "—" }}</td>
               <td class="px-5 py-3 font-medium text-slate-900 dark:text-slate-100">{{ typeLabel(tx.type) }}</td>
               <td class="px-5 py-3 text-right tabular-nums">{{ formatNumber(tx.quantity) }}</td>
-              <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(tx.price) }}</td>
+              <td class="px-5 py-3 text-right tabular-nums">
+                <DualCurrencyCell
+                  :primary="tx.price"
+                  :primary-currency="tx.instrumentCurrency ?? tx.currency"
+                  :converted="tx.convertedPrice"
+                  :display-currency="tx.displayCurrency"
+                />
+              </td>
               <td class="px-5 py-3">{{ tx.instrumentCurrency }}</td>
               <td class="px-5 py-3 text-right text-slate-600 tabular-nums dark:text-slate-300">
-                <FeeCell :fees="tx.fees" :fee-currency="tx.feeCurrency" :fallback-currency="tx.currency" :rate-source="tx.rateSource" />
+                <FeeCell
+                  :fees="tx.fees"
+                  :fee-currency="tx.feeCurrency"
+                  :fallback-currency="tx.currency"
+                  :rate-source="tx.rateSource"
+                  :converted-fees="tx.convertedFees"
+                  :display-currency="tx.displayCurrency"
+                />
               </td>
               <td class="px-5 py-3 text-right font-medium tabular-nums" :class="amountOf(tx) < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-700 dark:text-green-400'">
-                {{ formatCurrency(amountOf(tx)) }}
+                <DualCurrencyCell
+                  :primary="amountOf(tx)"
+                  :primary-currency="tx.currency"
+                  :converted="convertedAmountOf(tx)"
+                  :display-currency="tx.displayCurrency"
+                />
               </td>
               <td class="px-5 py-3 text-slate-400 dark:text-slate-500">-</td>
               <td class="px-5 py-3">
@@ -295,7 +321,7 @@ async function submitDelete() {
               <td class="px-5 py-3"></td>
               <td class="px-5 py-3"></td>
               <td class="px-5 py-3 text-right font-medium tabular-nums" :class="groupAmount(g.items) < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-700 dark:text-green-400'">
-                {{ formatCurrency(groupAmount(g.items)) }}
+                {{ formatCurrency(groupAmount(g.items), g.items[0]?.displayCurrency ?? 'USD') }}
               </td>
               <td class="px-5 py-3"></td>
               <td class="px-5 py-3"></td>

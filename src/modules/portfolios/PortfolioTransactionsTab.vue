@@ -5,6 +5,7 @@ import { getPortfolioTransactions, deletePortfolioTransaction } from "@/api/port
 import { formatCurrency, formatDate, formatNumber } from "@/utils/format"
 import { researchSymbol } from "@/utils/research"
 import FeeCell from "@/components/FeeCell.vue"
+import DualCurrencyCell from "@/components/DualCurrencyCell.vue"
 import type { PortfolioTransactionsPage } from "@/api/types"
 import EditTransactionModal from "@/modules/portfolios/EditTransactionModal.vue"
 import ConfirmDeleteModal from "@/modules/portfolios/ConfirmDeleteModal.vue"
@@ -86,6 +87,11 @@ async function submitDelete() {
 
 function costOf(tx: Tx): number {
   return (tx.totalAmount ?? 0) + (tx.fees ?? 0)
+}
+
+function convertedCostOf(tx: Tx): number | null {
+  if (tx.convertedTotalAmount == null) return null
+  return (tx.convertedTotalAmount ?? 0) + (tx.convertedFees ?? 0)
 }
 
 type GroupMode = "none" | "assetType" | "sector" | "country"
@@ -186,10 +192,31 @@ function groupAmount(items: Tx[]): number {
                 <p class="text-xs text-slate-500 dark:text-slate-400">{{ tx.instrumentName }}</p>
               </td>
               <td class="px-5 py-3 text-right tabular-nums">{{ formatNumber(tx.quantity) }}</td>
-              <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(tx.price) }}</td>
-              <td class="px-5 py-3 text-right font-medium tabular-nums">{{ formatCurrency(costOf(tx)) }}</td>
+              <td class="px-5 py-3 text-right tabular-nums">
+                <DualCurrencyCell
+                  :primary="tx.price"
+                  :primary-currency="tx.instrumentCurrency ?? tx.currency"
+                  :converted="tx.convertedPrice"
+                  :display-currency="tx.displayCurrency"
+                />
+              </td>
+              <td class="px-5 py-3 text-right font-medium tabular-nums">
+                <DualCurrencyCell
+                  :primary="costOf(tx)"
+                  :primary-currency="tx.currency"
+                  :converted="convertedCostOf(tx)"
+                  :display-currency="tx.displayCurrency"
+                />
+              </td>
               <td class="px-5 py-3 text-right text-slate-600 tabular-nums dark:text-slate-300">
-                <FeeCell :fees="tx.fees" :fee-currency="tx.feeCurrency" :fallback-currency="tx.currency" :rate-source="tx.rateSource" />
+                <FeeCell
+                  :fees="tx.fees"
+                  :fee-currency="tx.feeCurrency"
+                  :fallback-currency="tx.currency"
+                  :rate-source="tx.rateSource"
+                  :converted-fees="tx.convertedFees"
+                  :display-currency="tx.displayCurrency"
+                />
               </td>
               <td class="px-5 py-3">
                 <div class="flex justify-end gap-1">
@@ -218,7 +245,7 @@ function groupAmount(items: Tx[]): number {
               <td class="px-5 py-3"></td>
               <td class="px-5 py-3"></td>
               <td class="px-5 py-3"></td>
-              <td class="px-5 py-3 text-right font-medium tabular-nums">{{ formatCurrency(groupAmount(g.items)) }}</td>
+              <td class="px-5 py-3 text-right font-medium tabular-nums">{{ formatCurrency(groupAmount(g.items), g.items[0]?.displayCurrency ?? 'USD') }}</td>
               <td class="px-5 py-3"></td>
               <td class="px-5 py-3"></td>
             </tr>
