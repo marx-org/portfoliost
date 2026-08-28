@@ -137,11 +137,13 @@ export async function getPortfolioTransactions(
   id: string,
   page = 1,
   limit = 20,
+  sortBy = "date",
+  sortOrder: "asc" | "desc" = "desc",
   positionId?: string,
 ): Promise<PaginatedResponse<PortfolioTransactionsPage["items"][number]>> {
   const position = positionId ? `&positionId=${encodeURIComponent(positionId)}` : ""
   return http.get<PaginatedResponse<PortfolioTransactionsPage["items"][number]>>(
-    `/api/portfolios/${id}/transactions?page=${page}&limit=${limit}${position}`,
+    `/api/portfolios/${id}/transactions?page=${page}&limit=${limit}&sortBy=${sortBy}&sortOrder=${sortOrder}${position}`,
   )
 }
 
