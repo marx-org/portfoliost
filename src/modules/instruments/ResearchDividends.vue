@@ -24,6 +24,9 @@ onMounted(async () => {
 
 const history = computed(() => data.value?.history ?? [])
 
+/** Instrument's native currency — from first dividend row; fallback USD */
+const instrCcy = computed(() => history.value[0]?.currency ?? "USD")
+
 const stats = computed(() => {
   const rows = history.value
   if (!rows.length) return null
@@ -45,7 +48,7 @@ const chartOptions = computed(() => ({
   dataLabels: {
     enabled: false,
   },
-  yaxis: { labels: { formatter: (v: number) => `$${v.toFixed(2)}` } },
+  yaxis: { labels: { formatter: (v: number) => formatCurrency(v, instrCcy.value) } },
   grid: { borderColor: "#e2e8f0" },
 }))
 
@@ -68,11 +71,11 @@ function dateLabel(d: string): string {
         </div>
         <div class="card p-6">
           <p class="text-sm text-slate-500 dark:text-slate-400">Cumulative ({{ history[0]?.year }}–{{ stats.latestYear }})</p>
-          <p class="text-2xl font-semibold">{{ formatCurrency(stats.total) }}</p>
+          <p class="text-2xl font-semibold">{{ formatCurrency(stats.total, instrCcy) }}</p>
         </div>
         <div class="card p-6">
           <p class="text-sm text-slate-500 dark:text-slate-400">Latest ({{ stats.latestYear }})</p>
-          <p class="text-2xl font-semibold">{{ formatCurrency(stats.latest) }}</p>
+          <p class="text-2xl font-semibold">{{ formatCurrency(stats.latest, instrCcy) }}</p>
         </div>
       </div>
 

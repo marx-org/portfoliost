@@ -28,6 +28,8 @@ const earnings = computed(() => data.value?.earnings ?? [])
 const exDividend = computed(() => data.value?.exDividend ?? [])
 const dividends = computed(() => data.value?.dividend ?? [])
 
+/** Instrument's native currency from the calendar response; fallback USD */
+const instrCcy = computed(() => (data.value as Record<string, unknown> | null)?.currency as string ?? "USD")
 const isUpcoming = (d: string) => new Date(`${d}T00:00:00`).getTime() >= today
 
 const upcomingEarnings = computed(() => earnings.value.filter((e) => isUpcoming(e.date)))
@@ -71,7 +73,7 @@ function dateLabel(d: string): string {
                 <p class="font-medium">{{ e.title ?? "Ex-Dividend" }}</p>
                 <p class="text-xs text-slate-500 dark:text-slate-400">{{ dateLabel(e.date) }}</p>
               </div>
-              <span class="font-semibold text-green-700 dark:text-green-400">{{ formatCurrency(e.amount) }}</span>
+              <span class="font-semibold text-green-700 dark:text-green-400">{{ formatCurrency(e.amount, instrCcy) }}</span>
             </li>
           </ul>
           <p v-else class="text-sm text-slate-500 dark:text-slate-400">No upcoming ex-dividend dates.</p>
@@ -85,7 +87,7 @@ function dateLabel(d: string): string {
                 <p class="font-medium">{{ e.title ?? "Dividend" }}</p>
                 <p class="text-xs text-slate-500 dark:text-slate-400">{{ dateLabel(e.date) }}</p>
               </div>
-              <span class="font-semibold text-green-700 dark:text-green-400">{{ formatCurrency(e.amount) }}</span>
+              <span class="font-semibold text-green-700 dark:text-green-400">{{ formatCurrency(e.amount, instrCcy) }}</span>
             </li>
           </ul>
           <p v-else class="text-sm text-slate-500 dark:text-slate-400">No upcoming dividend dates.</p>

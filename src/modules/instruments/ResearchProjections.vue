@@ -43,6 +43,9 @@ const data = ref<Projections | null>(null)
 const error = ref<string | null>(null)
 const loading = ref(true)
 
+/** Instrument's native currency from the projections response; fallback USD */
+const instrCcy = computed(() => (data.value as Record<string, unknown> | null)?.currency as string ?? "USD")
+
 onMounted(async () => {
   try {
     data.value = (await getProjections(symbol)) as unknown as Projections
@@ -97,11 +100,11 @@ function targetPosition(pt: PriceTarget): { left: string; right: string } {
           <h2 class="mb-4 text-base font-semibold">Price Target</h2>
           <div class="flex items-end gap-6">
             <div>
-              <p class="text-2xl font-semibold">{{ formatCurrency(data.priceTarget.current) }}</p>
+              <p class="text-2xl font-semibold">{{ formatCurrency(data.priceTarget.current, instrCcy) }}</p>
               <p class="text-xs text-slate-500 dark:text-slate-400">Current price</p>
             </div>
             <div>
-              <p class="text-lg font-medium">{{ formatCurrency(data.priceTarget.mean) }}</p>
+              <p class="text-lg font-medium">{{ formatCurrency(data.priceTarget.mean, instrCcy) }}</p>
               <p class="text-xs text-slate-500 dark:text-slate-400">Mean target</p>
             </div>
           </div>
@@ -112,8 +115,8 @@ function targetPosition(pt: PriceTarget): { left: string; right: string } {
             ></div>
           </div>
           <div class="mt-2 flex justify-between text-xs text-slate-500 dark:text-slate-400">
-            <span>{{ formatCurrency(data.priceTarget.low) }}</span>
-            <span>{{ formatCurrency(data.priceTarget.high) }}</span>
+            <span>{{ formatCurrency(data.priceTarget.low, instrCcy) }}</span>
+            <span>{{ formatCurrency(data.priceTarget.high, instrCcy) }}</span>
           </div>
           <p class="mt-4 text-xs text-slate-500 dark:text-slate-400">Updated {{ formatDate(data.priceTarget.lastUpdated) }}</p>
         </div>

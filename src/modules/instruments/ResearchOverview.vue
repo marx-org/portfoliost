@@ -76,6 +76,11 @@ const visibleParagraphs = computed(() => (showFullDescription.value ? descriptio
 
 const priceTarget = computed(() => metrics.value?.priceTarget ?? null)
 
+/** Instrument's native currency — from profile or quote; fallback USD */
+const instrCcy = computed(() =>
+  (profile.value?.currency ?? quote.value?.currency ?? "USD").toUpperCase()
+)
+
 const latestEarningsCall = computed(() => {
   if (!irEvents.value.length) return null
   const transcripts = irEvents.value.filter((e) => "audioUrl" in e && (e.title ?? "").toLowerCase().includes("earnings call"))
@@ -135,7 +140,7 @@ const valuationNtmStats = computed(() => {
   if (!tv) return []
   return [
     stat("PEG", formatNumber(tv.pegRatio)),
-    stat("Price Target", formatCurrency(tv.priceTarget)),
+    stat("Price Target", formatCurrency(tv.priceTarget, instrCcy.value)),
   ]
 })
 
@@ -157,7 +162,7 @@ const dividendStats = computed(() => {
   return [
     stat("Yield", formatPercent(tv.dividendYield)),
     stat("Payout Ratio", formatPercent(tv.payoutRatio)),
-    stat("DPS", formatCurrency(tv.dividendPerShare)),
+    stat("DPS", formatCurrency(tv.dividendPerShare, instrCcy.value)),
     stat("DPS Growth 5Yr", formatPercent(tv.dpsGrowth5yr)),
   ]
 })
@@ -223,12 +228,12 @@ const targetSpread = computed(() => {
             <h2 class="text-lg font-semibold">{{ symbol }}</h2>
             <span class="text-sm text-slate-500 dark:text-slate-400">{{ profile?.name }}</span>
           </div>
-          <p v-if="quote?.currentPrice" class="text-sm">
-            <span class="font-semibold">{{ formatCurrency(quote.currentPrice) }}</span>
-            <span :class="quote.change >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'" class="ml-2">
-              {{ quote.change >= 0 ? "+" : "" }}{{ formatCurrency(quote.change) }} ({{ formatPercent(quote.percentChange) }})
-            </span>
-          </p>
+           <p v-if="quote?.currentPrice" class="text-sm">
+             <span class="font-semibold">{{ formatCurrency(quote.currentPrice, instrCcy) }}</span>
+             <span :class="quote.change >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'" class="ml-2">
+               {{ quote.change >= 0 ? "+" : "" }}{{ formatCurrency(quote.change, instrCcy) }} ({{ formatPercent(quote.percentChange) }})
+             </span>
+           </p>
         </div>
       </div>
 
@@ -253,19 +258,19 @@ const targetSpread = computed(() => {
         <div class="flex flex-wrap gap-6 text-sm">
           <div>
             <p class="text-slate-500 dark:text-slate-400">Low</p>
-            <p class="font-semibold">{{ formatCurrency(priceTarget.targetLow) }}</p>
+             <p class="font-semibold">{{ formatCurrency(priceTarget.targetLow, instrCcy) }}</p>
           </div>
-          <div>
-            <p class="text-slate-500 dark:text-slate-400">Mean</p>
-            <p class="font-semibold">{{ formatCurrency(priceTarget.targetMean) }}</p>
+           <div>
+             <p class="text-slate-500 dark:text-slate-400">Mean</p>
+             <p class="font-semibold">{{ formatCurrency(priceTarget.targetMean, instrCcy) }}</p>
           </div>
-          <div>
-            <p class="text-slate-500 dark:text-slate-400">Median</p>
-            <p class="font-semibold">{{ formatCurrency(priceTarget.targetMedian) }}</p>
+           <div>
+             <p class="text-slate-500 dark:text-slate-400">Median</p>
+             <p class="font-semibold">{{ formatCurrency(priceTarget.targetMedian, instrCcy) }}</p>
           </div>
-          <div>
-            <p class="text-slate-500 dark:text-slate-400">High</p>
-            <p class="font-semibold">{{ formatCurrency(priceTarget.targetHigh) }}</p>
+           <div>
+             <p class="text-slate-500 dark:text-slate-400">High</p>
+             <p class="font-semibold">{{ formatCurrency(priceTarget.targetHigh, instrCcy) }}</p>
           </div>
         </div>
         <div class="relative mt-4 h-2 rounded-full bg-slate-200 dark:bg-slate-700/70">
@@ -273,10 +278,10 @@ const targetSpread = computed(() => {
           <div
             class="absolute top-1/2 h-3.5 w-1 -translate-y-1/2 rounded bg-slate-700"
             :style="{ left: `calc(${targetSpread.pct}% - 2px)` }"
-            :title="`Current ${formatCurrency(targetSpread.current)}`"
+            :title="`Current ${formatCurrency(targetSpread.current, instrCcy)}`"
           ></div>
         </div>
-        <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">Current price: {{ formatCurrency(targetSpread.current) }}</p>
+        <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">Current price: {{ formatCurrency(targetSpread.current, instrCcy) }}</p>
       </div>
 
       <div class="card p-6">
