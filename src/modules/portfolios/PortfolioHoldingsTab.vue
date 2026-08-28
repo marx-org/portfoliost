@@ -10,6 +10,8 @@ import { researchSymbol } from "@/utils/research"
 import type { PortfolioPositions } from "@/api/types"
 import EditPositionDialog from "@/modules/portfolios/EditPositionDialog.vue"
 import AddPositionDialog from "@/modules/portfolios/AddPositionDialog.vue"
+import DualCurrencyCell from "@/components/DualCurrencyCell.vue"
+import DualCurrencyPnlCell from "@/components/DualCurrencyPnlCell.vue"
 
 type Position = PortfolioPositions[number]
 
@@ -315,15 +317,46 @@ function goResearch(position: Position): void {
                 </td>
               </template>
               <td v-if="visibleColumns.includes('quantity')" class="px-5 py-3 text-right tabular-nums">{{ formatNumber(pos.quantity, 0) }}</td>
-              <td v-if="visibleColumns.includes('avgCost')" class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(pos.averageCostBasis, displayCurrency) }}</td>
-              <td v-if="visibleColumns.includes('price')" class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(pos.currentPrice, displayCurrency) }}</td>
-              <td v-if="visibleColumns.includes('marketValue')" class="px-5 py-3 text-right tabular-nums">
-                <p>{{ formatCurrency(pos.marketValue, displayCurrency) }}</p>
-                <p class="text-xs text-slate-400 dark:text-slate-500">Cost {{ formatCurrency(pos.totalCostBasis, displayCurrency) }}</p>
+              <td v-if="visibleColumns.includes('avgCost')" class="px-5 py-3 text-right tabular-nums">
+                <DualCurrencyCell
+                  :primary="pos.averageCostBasis"
+                  :primary-currency="pos.instrumentCurrency"
+                  :converted="(pos as any).convertedAverageCostBasis"
+                  :display-currency="displayCurrency"
+                />
               </td>
-              <td v-if="visibleColumns.includes('unrealized')" class="px-5 py-3 text-right tabular-nums" :class="gainClass(pos.unrealizedGainLoss)">
-                <p>{{ formatSignedCurrency(pos.unrealizedGainLoss, displayCurrency) }}</p>
-                <p class="text-xs font-normal" :class="gainClass(pos.percentageChange)">({{ formatPercent(pos.percentageChange) }})</p>
+              <td v-if="visibleColumns.includes('price')" class="px-5 py-3 text-right tabular-nums">
+                <DualCurrencyCell
+                  :primary="pos.currentPrice"
+                  :primary-currency="pos.instrumentCurrency"
+                  :converted="(pos as any).convertedCurrentPrice"
+                  :display-currency="displayCurrency"
+                />
+              </td>
+              <td v-if="visibleColumns.includes('marketValue')" class="px-5 py-3 text-right tabular-nums">
+                <DualCurrencyCell
+                  :primary="pos.marketValue"
+                  :primary-currency="pos.instrumentCurrency"
+                  :converted="(pos as any).convertedMarketValue"
+                  :display-currency="displayCurrency"
+                />
+                <p class="text-xs text-slate-400 dark:text-slate-500">
+                  Cost <DualCurrencyCell
+                    :primary="pos.totalCostBasis"
+                    :primary-currency="pos.instrumentCurrency"
+                    :converted="(pos as any).convertedTotalCostBasis"
+                    :display-currency="displayCurrency"
+                  />
+                </p>
+              </td>
+              <td v-if="visibleColumns.includes('unrealized')" class="px-5 py-3 text-right tabular-nums">
+                <DualCurrencyPnlCell
+                  :primary="pos.unrealizedGainLoss"
+                  :primary-currency="pos.instrumentCurrency"
+                  :converted="(pos as any).convertedUnrealizedGainLoss"
+                  :display-currency="displayCurrency"
+                  :percent="pos.percentageChange"
+                />
               </td>
               <td v-if="visibleColumns.includes('weight')" class="px-5 py-3 text-right tabular-nums">{{ formatPercent(pos.percentOfPortfolio) }}</td>
               <td class="px-5 py-3 text-right">
