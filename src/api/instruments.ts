@@ -54,6 +54,15 @@ export interface HistoryCompareSeries {
   timestamps: number[]
 }
 
+export async function getHistoricalClose(symbol: string, date: string): Promise<number | null> {
+  try {
+    const res = await http.get<{ price: number | null }>(`/api/instruments/${symbol}/price?date=${date}`)
+    return res.price ?? null
+  } catch {
+    return null
+  }
+}
+
 export async function getHistory(
   symbol: string,
   resolution: "daily" | "monthly" = "daily",

@@ -30,6 +30,7 @@ vi.mock("@/api/instruments", () => ({
   getInstrumentMetrics: vi.fn().mockResolvedValue({}),
   getInstrumentOverviewMetrics: vi.fn().mockResolvedValue({}),
   getQuote: vi.fn().mockResolvedValue({ symbol: "AAPL", currentPrice: 123.45 }),
+  getHistoricalClose: vi.fn().mockResolvedValue(110),
   getHistory: vi.fn().mockResolvedValue({
     symbol: "AAPL",
     closePrices: [100, 110],
@@ -261,17 +262,11 @@ describe("AddPositionDialog — market price suggestion (plan §13 follow-up 3/6
   beforeEach(async () => {
     const mod = await import("@/api/instruments")
     vi.mocked(mod.getQuote).mockResolvedValue({ symbol: "AAPL", currentPrice: 123.45 } as never)
-    vi.mocked(mod.getHistory).mockResolvedValue({
-      symbol: "AAPL",
-      closePrices: [100, 110],
-      highPrices: [100, 110],
-      lowPrices: [100, 110],
-      openPrices: [100, 100],
-      volumes: [1, 1],
-      timestamps: [Date.parse("2026-08-20T00:00:00Z"), Date.parse("2026-08-21T00:00:00Z")],
-      status: "ok",
-      currency: "USD",
-    } as never)
+    vi.mocked(mod.getHistoricalClose).mockImplementation(async (_sym, date) => {
+      if (date === "2026-08-21") return 110
+      if (date === "2026-08-20") return 100
+      return null
+    })
   })
 
   it("prefills price with the current quote and shows it in the header", async () => {
@@ -285,7 +280,7 @@ describe("AddPositionDialog — market price suggestion (plan §13 follow-up 3/6
   })
 
   it("backdated purchase shows the exchange close at that date and re-suggests", async () => {
-    const { getHistory } = await import("@/api/instruments")
+    const { getHistoricalClose } = await import("@/api/instruments")
     const wrapper = await openStockStep()
     await wrapper.find('[data-testid="add-position-date"]').setValue("2026-08-21")
     await flushPromises()
@@ -293,7 +288,7 @@ describe("AddPositionDialog — market price suggestion (plan §13 follow-up 3/6
     const vm = wrapper.vm as unknown as { pendingMarketPrice: Promise<void> | null }
     if (vm.pendingMarketPrice) await vm.pendingMarketPrice
     await flushPromises()
-    expect(vi.mocked(getHistory)).toHaveBeenCalled()
+    expect(vi.mocked(getHistoricalClose)).toHaveBeenCalled()
     expect(wrapper.text()).toContain("110")
     expect(wrapper.text()).toContain("close on 2026-08-21")
     expect((wrapper.find('[data-testid="add-position-price"]').element as HTMLInputElement).value).toBe("110")

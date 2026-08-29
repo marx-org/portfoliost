@@ -20,6 +20,7 @@ const props = withDefaults(defineProps<{
   country?: string
   marketPrice: number | null
   priceAsOfLabel: string
+  priceLoading?: boolean
   wallets: Wallets
   targetCurrency: string | null
   txCurrency: string
@@ -69,7 +70,8 @@ const tf = useTransactionForm(
         <div class="text-right">
           <button v-if="showViewChart !== false" type="button" class="text-xs text-blue-600 hover:underline" @click="emit('view-chart')">View chart</button>
           <p class="text-sm font-medium tabular-nums text-slate-900 dark:text-slate-100">
-            {{ marketPrice != null ? formatCurrency(marketPrice, txCurrency) : "—" }}
+            <span v-if="priceLoading" class="inline-block h-4 w-16 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+            <template v-else>{{ marketPrice != null ? formatCurrency(marketPrice, txCurrency) : "—" }}</template>
             <span class="block text-xs font-normal text-slate-400">{{ priceAsOfLabel }}</span>
           </p>
         </div>

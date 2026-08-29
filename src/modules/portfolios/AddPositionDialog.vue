@@ -6,7 +6,7 @@ import { usePortfolioStore } from "@/stores/portfolios"
 import { useWalletsStore } from "@/stores/wallets"
 import { formatCurrency } from "@/utils/format"
 import InstrumentSearchModal from "@/modules/instruments/InstrumentSearchModal.vue"
-import { getQuote, getHistory, getInstrumentDetail } from "@/api/instruments"
+import { getQuote, getHistoricalClose, getInstrumentDetail } from "@/api/instruments"
 import FeeFields from "@/components/FeeFields.vue"
 import FxRateFields from "@/components/FxRateFields.vue"
 import TransactionFormFields from "@/components/TransactionFormFields.vue"
@@ -123,6 +123,7 @@ const TX_CCY = ref("USD") // reactive: updated when instrument is selected
 const marketPrice = ref<number | null>(null)
 const quotePrice = ref<number | null>(null)
 const priceTouched = ref(false)
+const priceLoading = ref(false)
 const pendingMarketPrice = ref<Promise<void> | null>(null)
 
 const today = () => new Date().toISOString().slice(0, 10)
@@ -139,6 +140,8 @@ async function applyInstrumentCurrency(symbol: string): Promise<void> {
 }
 
 async function loadMarketPrice(symbol: string, date: string): Promise<void> {
+  priceLoading.value = true
+  marketPrice.value = null  // clear stale price while fetching
   try {
     if (date >= today()) {
       const q = await getQuote(symbol)
@@ -146,20 +149,15 @@ async function loadMarketPrice(symbol: string, date: string): Promise<void> {
       marketPrice.value = quotePrice.value
     } else {
       quotePrice.value = null
-      const hist = await getHistory(symbol, "daily")
-      const target = new Date(`${date}T00:00:00Z`).getTime()
-      let idx = -1
-      for (let i = 0; i < hist.timestamps.length; i++) {
-        if (hist.timestamps[i] <= target) idx = i
-        else break
-      }
-      marketPrice.value = idx >= 0 ? hist.closePrices[idx] : null
+      marketPrice.value = await getHistoricalClose(symbol, date)
     }
     if (!priceTouched.value && marketPrice.value != null) {
       stockForm.value.price = String(marketPrice.value)
     }
   } catch {
     marketPrice.value = null
+  } finally {
+    priceLoading.value = false
   }
 }
 
@@ -522,7 +520,8 @@ defineExpose({ pendingMarketPrice })
           :asset-type="'Stock'"
           :country="'US'"
           :market-price="marketPrice"
-          :price-as-of-label="stockForm.date >= today() ? 'current price' : `close on ${stockForm.date}`"
+          :price-loading="priceLoading"
+          :price-as-of-label="priceLoading ? 'fetching price…' : stockForm.date >= today() ? 'current price' : `close on ${stockForm.date}`"
           :wallets="walletsStore.wallets"
           :target-currency="targetCurrency"
           :tx-currency="TX_CCY"
