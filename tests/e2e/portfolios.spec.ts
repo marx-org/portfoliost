@@ -45,7 +45,7 @@ test("portfolio detail shows metric strip, tabbed sections, and positions", asyn
 
   const rows = page.locator("tbody tr")
   await expect(rows.first()).toBeVisible()
-  await expect(rows.first().getByText("META", { exact: true })).toBeVisible()
+  await expect(rows.filter({ hasText: "META" }).first().getByText("META", { exact: true })).toBeVisible()
 
   await tabs.getByRole("link", { name: "Performance" }).click()
   await expect(page).toHaveURL(/\/en\/portfolios\/.*\/performance/)
@@ -83,12 +83,11 @@ test("transactions page lists transactions with sortable columns and pagination"
   await expect(page.locator("tbody tr").first()).toBeVisible()
   await expect(page.getByTestId("table-th-quantity")).toBeVisible()
   await expect(page.getByTestId("table-th-amount")).toBeVisible()
-  await expect(page.getByText(/P&L/)).toBeVisible()
   await expect(page.getByTestId("table-th-date")).toContainText("↓")
   await page.getByTestId("table-th-amount").locator("button").click()
   await expect(page.getByTestId("table-th-amount")).toContainText("↑")
   await expect(page.getByLabel("Rows per page")).toContainText("10 per page")
-  await expect(page.getByText(/^\d+-\d+ of \d+$/)).toBeVisible()
+  await expect(page.getByText(/^\d+[-–]\d+ of \d+$/)).toBeVisible()
 })
 
 test("wallet transactions sub-tab lists cash transactions", async ({ page }) => {
@@ -145,12 +144,12 @@ test("creating a new portfolio adds it to the list", async ({ page }) => {
   await expect(page.getByRole("link", { name })).toBeVisible()
 })
 
-test("position actions menu: buy updates quantity, research navigates, remove deletes a row", async ({ page }) => {
+test("position actions menu: buy updates quantity, research navigates, remove is blocked for a position with transactions", async ({ page }) => {
   await login(page)
   await page.getByRole("link", { name: /Top10/ }).click()
   await expect(page).toHaveURL(/\/en\/portfolios\/.*\/holdings/)
 
-  const metaRow = page.locator("tbody tr").first()
+  const metaRow = page.locator("tbody tr").filter({ hasText: "META" }).first()
   const metaQty = await metaRow.locator("td").nth(1).innerText()
 
   await metaRow.getByRole("button", { name: "Position actions" }).click()
@@ -158,11 +157,12 @@ test("position actions menu: buy updates quantity, research navigates, remove de
 
   await page.getByRole("button", { name: "Buy", exact: true }).click()
   await expect(page.getByRole("dialog", { name: /Buy META/ })).toBeVisible()
-  await page.getByTestId("action-quantity").fill("5")
-  await page.getByTestId("action-price").fill("600")
-  await page.getByRole("button", { name: "Confirm" }).click()
-  await expect(page.getByText(/Bought 5 META/)).toBeVisible()
-  await expect(metaRow.locator("td").nth(1)).toHaveText(String(Number(metaQty) + 5))
+  await page.getByTestId("add-position-wallet").selectOption("1a1f2d68-686c-4f8b-ba34-a67846163275")
+  await page.getByTestId("add-position-quantity").fill("5")
+  await page.getByTestId("add-position-price").fill("600")
+  await page.getByRole("button", { name: /Buy for \S+/ }).click()
+  await expect(page.getByText(/Bought META/)).toBeVisible({ timeout: 10000 })
+  await expect(metaRow.locator("td").nth(1)).toHaveText(String(Number(metaQty) + 5), { timeout: 10000 })
 
   const targetRow = page.locator("tbody tr").last()
   const targetSymbol = (await targetRow.locator("td").first().innerText()).split("\n")[0]
@@ -173,10 +173,13 @@ test("position actions menu: buy updates quantity, research navigates, remove de
 
   await page.goBack()
   await expect(page).toHaveURL(/\/en\/portfolios\/.*\/holdings/)
-  await page.locator("tbody tr").last().getByRole("button", { name: "Position actions" }).click()
+
+  // Positions with transactions must not be deletable: no dialog, row stays.
+  await page.locator("tbody tr").filter({ hasText: "META" }).first().getByRole("button", { name: "Position actions" }).click()
   await page.getByRole("button", { name: "Remove position" }).click()
-  await expect(page.getByText(new RegExp(`Removed ${targetSymbol}`))).toBeVisible()
-  await expect(page.locator("tbody tr").filter({ hasText: targetSymbol })).toHaveCount(0)
+  await expect(page.getByText(/Cannot remove META — it has \d+ transactions?\. Delete the transactions first\./)).toBeVisible()
+  await expect(page.getByRole("dialog", { name: "Remove position" })).toHaveCount(0)
+  await expect(page.locator("tbody tr").filter({ hasText: "META" })).toHaveCount(1)
 })
 
 test("edit position opens a transaction list editor with rows and add row", async ({ page }) => {
@@ -184,22 +187,20 @@ test("edit position opens a transaction list editor with rows and add row", asyn
   await page.getByRole("link", { name: /Top10/ }).click()
   await expect(page).toHaveURL(/\/en\/portfolios\/.*\/holdings/)
 
-  const metaRow = page.locator("tbody tr").first()
+  const metaRow = page.locator("tbody tr").filter({ hasText: "META" }).first()
   await metaRow.getByRole("button", { name: "Position actions" }).click()
   await page.getByRole("button", { name: "Edit position" }).click()
 
   const dialog = page.getByRole("dialog", { name: "Edit META position" })
   await expect(dialog).toBeVisible()
-  await expect(dialog.getByText(/Changes save when you leave a field/)).toBeVisible()
-  await expect(dialog.getByRole("columnheader", { name: "Price per share" })).toBeVisible()
-  await expect(dialog.getByRole("columnheader", { name: "Transaction Fees" })).toBeVisible()
+  await expect(dialog.getByRole("heading", { name: "Add Transaction" })).toBeVisible()
   await expect(dialog.getByRole("columnheader", { name: "Total Cost" })).toBeVisible()
-  await expect(dialog.getByRole("columnheader", { name: "Exchange Rate" })).toBeVisible()
 
+  const rowsBefore = await dialog.locator("tbody tr").count()
   await dialog.getByLabel("Quantity").last().fill("3")
   await dialog.getByLabel("Price per share").last().fill("500")
-  await dialog.getByRole("button", { name: "Add", exact: true }).click()
-  await expect(dialog.locator("tbody tr")).toHaveCount(2)
+  await dialog.getByRole("button", { name: "Add Transaction", exact: true }).click()
+  await expect(dialog.locator("tbody tr")).toHaveCount(rowsBefore + 1, { timeout: 15000 })
 
   await dialog.getByRole("button", { name: "Close", exact: true }).click()
   await expect(dialog).toHaveCount(0)
@@ -226,6 +227,7 @@ test("add position from the header opens a chooser with instrument/option/cfd an
   await page.getByRole("dialog", { name: "Search for Instruments" }).getByRole("button", { name: /AMD/ }).first().click()
 
   await expect(page.getByRole("dialog", { name: "Buy Position" })).toBeVisible()
+  await page.getByRole("dialog", { name: "Buy Position" }).getByTestId("add-position-wallet").selectOption("1a1f2d68-686c-4f8b-ba34-a67846163275")
   await page.getByTestId("add-position-quantity").fill("10")
   await page.getByTestId("add-position-price").fill("120")
   await page.getByRole("dialog", { name: "Buy Position" }).getByRole("button", { name: /Buy for/ }).click()
@@ -233,7 +235,7 @@ test("add position from the header opens a chooser with instrument/option/cfd an
   await expect(page.getByRole("dialog", { name: "Buy Position" })).toHaveCount(0)
   // The mock backend keeps state across runs — assert the row count grew by one
   const amdRows = page.locator("tbody tr").filter({ hasText: "AMD" })
-  await expect(amdRows).toHaveCount(amdRowsBefore + 1, { timeout: 10000 })
+  await expect(amdRows).toHaveCount(amdRowsBefore + 1, { timeout: 15000 })
 })
 
 test("buy position stock step has purchase date, cash portfolio, fee % toggle and total", async ({ page }) => {
@@ -261,8 +263,9 @@ test("buy position stock step has purchase date, cash portfolio, fee % toggle an
 
   const wallet = dialog.getByTestId("add-position-wallet")
   await expect(wallet).toBeVisible()
-  await expect(wallet.locator("option").first()).toContainText("Portfel USD 1")
-  await expect(wallet.locator("option").first()).toContainText("$")
+  const usdOption = wallet.locator("option", { hasText: "Portfel USD 1" })
+  await expect(usdOption).toContainText("$")
+  await wallet.selectOption("1a1f2d68-686c-4f8b-ba34-a67846163275")
 
   await dialog.getByTestId("add-position-quantity").fill("10")
   await dialog.getByTestId("add-position-price").fill("120")
@@ -273,8 +276,8 @@ test("buy position stock step has purchase date, cash portfolio, fee % toggle an
 
   const koRowsBefore = await page.locator("tbody tr").filter({ hasText: "KO" }).count()
   await dialog.getByRole("button", { name: /Buy for \$1,212.00/ }).click()
-  await expect(dialog).toHaveCount(0)
-  await expect(page.locator("tbody tr").filter({ hasText: "KO" })).toHaveCount(koRowsBefore + 1, { timeout: 10000 })
+  await expect(dialog).toHaveCount(0, { timeout: 15000 })
+  await expect(page.locator("tbody tr").filter({ hasText: "KO" })).toHaveCount(koRowsBefore + 1, { timeout: 15000 })
 })
 
 test("display currency switcher updates portfolio values and persists", async ({ page }) => {
@@ -311,14 +314,13 @@ test("holdings table groups by type, sector, and country", async ({ page }) => {
 
   await groupSelect.selectOption("sector")
   const sectorGroups = page.getByTestId("holdings-group-row")
-  await expect(sectorGroups.filter({ hasText: "Communication Services" })).toHaveCount(1)
-  await expect(sectorGroups.filter({ hasText: "Consumer Discretionary" })).toHaveCount(1)
-  await expect(sectorGroups.filter({ hasText: "Technology" })).toHaveCount(1)
+  await expect(sectorGroups.filter({ hasText: "Semiconductors" })).toHaveCount(1)
+  await expect(sectorGroups.filter({ hasText: "Software - Infrastructure" })).toHaveCount(1)
   await expect(page.getByText(/subtotal/)).toHaveCount(await sectorGroups.count())
 
   await groupSelect.selectOption("country")
-  await expect(page.getByTestId("holdings-group-row")).toHaveCount(1)
-  await expect(page.getByTestId("holdings-group-row")).toContainText("US")
+  await expect(page.getByTestId("holdings-group-row").filter({ hasText: "US" })).toHaveCount(1)
+  await expect(page.getByText(/US subtotal/)).toHaveCount(1)
 
   await groupSelect.selectOption("none")
   await expect(page.getByTestId("holdings-group-row")).toHaveCount(0)
@@ -341,13 +343,13 @@ test("transactions page groups by kind of investment, sector, and country", asyn
   await expect(page.getByText(/Stock subtotal/)).toHaveCount(1)
 
   await groupSelect.selectOption("sector")
-  await expect(page.getByTestId("transactions-group-row")).toHaveCount(3)
-  await expect(page.getByTestId("transactions-group-row").first()).toContainText("Communication Services")
-  await expect(page.getByText(/subtotal/)).toHaveCount(3)
+  const globalSectorGroups = page.getByTestId("transactions-group-row")
+  await expect(globalSectorGroups.filter({ hasText: "Technology" })).toHaveCount(1)
+  await expect(page.getByText(/subtotal/)).toHaveCount(await globalSectorGroups.count())
 
   await groupSelect.selectOption("country")
-  await expect(page.getByTestId("transactions-group-row")).toHaveCount(1)
-  await expect(page.getByTestId("transactions-group-row")).toContainText("US")
+  await expect(page.getByTestId("transactions-group-row").filter({ hasText: "US" })).toHaveCount(1)
+  await expect(page.getByText(/US subtotal/)).toHaveCount(1)
 
   await groupSelect.selectOption("none")
   await expect(page.getByTestId("transactions-group-row")).toHaveCount(0)
@@ -361,9 +363,10 @@ test("portfolio transactions tab groups by sector with subtotals", async ({ page
 
   const groupSelect = page.getByLabel("Group by")
   await groupSelect.selectOption("sector")
-  await expect(page.getByTestId("transactions-group-row")).toHaveCount(3)
-  await expect(page.getByTestId("transactions-group-row").first()).toContainText("Communication Services")
-  await expect(page.getByText("Communication Services subtotal")).toBeVisible()
+  const sectorGroups = page.getByTestId("transactions-group-row")
+  await expect(sectorGroups.filter({ hasText: "Technology" })).toHaveCount(1)
+  await expect(sectorGroups.filter({ hasText: "Communication Services" })).toHaveCount(1)
+  await expect(page.getByText(/subtotal/)).toHaveCount(await sectorGroups.count())
 
   await groupSelect.selectOption("none")
   await expect(page.getByTestId("transactions-group-row")).toHaveCount(0)

@@ -4,12 +4,13 @@ import { useRoute, useRouter } from "vue-router"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
 import { storeToRefs } from "pinia"
-import { removePortfolioPosition } from "@/api/portfolios"
+import { removePortfolioPosition, getPortfolioTransactions } from "@/api/portfolios"
 import { formatCurrency, formatNumber, formatPercent, formatSignedCurrency } from "@/utils/format"
 import { researchSymbol } from "@/utils/research"
 import type { PortfolioPositions } from "@/api/types"
 import EditPositionDialog from "@/modules/portfolios/EditPositionDialog.vue"
 import AddPositionDialog from "@/modules/portfolios/AddPositionDialog.vue"
+import ConfirmDeleteModal from "@/modules/portfolios/ConfirmDeleteModal.vue"
 import DualCurrencyCell from "@/components/DualCurrencyCell.vue"
 import DualCurrencyPnlCell from "@/components/DualCurrencyPnlCell.vue"
 
@@ -24,6 +25,11 @@ const id = String(route.params.id)
 
 const openMenuId = ref<string | null>(null)
 const notice = ref<string | null>(null)
+const noticeError = ref<string | null>(null)
+
+const removeTarget = ref<Position | null>(null)
+const removeBusy = ref(false)
+const removeError = ref<string | null>(null)
 
 type ActionKind = "buy" | "sell" | "dividend"
 const positionAction = ref<{ kind: ActionKind; position: Position } | null>(null)
@@ -218,14 +224,37 @@ function onEditSaved() {
   void store.fetchPositions(id)
 }
 
-async function removePosition(position: Position): Promise<void> {
+async function openRemoveConfirm(position: Position): Promise<void> {
   openMenuId.value = null
+  notice.value = null
+  noticeError.value = null
   try {
-    await removePortfolioPosition(id, position.id)
-    await store.fetchPositions(id)
-    notice.value = `Removed ${position.symbol}`
+    const page = await getPortfolioTransactions(id, 1, 1, "date", "desc", position.id)
+    if (page.total > 0) {
+      noticeError.value = `Cannot remove ${position.symbol} — it has ${page.total} transaction${page.total === 1 ? "" : "s"}. Delete the transactions first.`
+      return
+    }
+    removeError.value = null
+    removeTarget.value = position
   } catch (err) {
-    notice.value = err instanceof Error ? err.message : "Failed to remove position"
+    noticeError.value = err instanceof Error ? err.message : "Failed to check position transactions"
+  }
+}
+
+async function confirmRemovePosition(): Promise<void> {
+  if (!removeTarget.value) return
+  const target = removeTarget.value
+  removeBusy.value = true
+  removeError.value = null
+  try {
+    await removePortfolioPosition(id, target.id)
+    removeTarget.value = null
+    await store.fetchPositions(id)
+    notice.value = `Removed ${target.symbol}`
+  } catch (err) {
+    removeError.value = err instanceof Error ? err.message : "Failed to remove position"
+  } finally {
+    removeBusy.value = false
   }
 }
 
@@ -270,6 +299,7 @@ function goResearch(position: Position): void {
       </div>
 
       <p v-if="notice" class="border-b border-slate-100 dark:border-slate-800 bg-green-50 dark:bg-green-500/10 px-5 py-2 text-sm text-green-700 dark:text-green-400">{{ notice }}</p>
+      <p v-if="noticeError" class="border-b border-slate-100 dark:border-slate-800 bg-red-50 dark:bg-red-500/10 px-5 py-2 text-sm text-red-700 dark:text-red-400">{{ noticeError }}</p>
 
       <div v-if="positions.length" class="overflow-x-auto">
         <table class="w-full text-sm">
@@ -381,7 +411,7 @@ function goResearch(position: Position): void {
                       <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="openAction('dividend', pos)">Dividend</button>
                       <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="openEditPosition(pos)">Edit position</button>
                       <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="goResearch(pos)">Research</button>
-                      <button type="button" class="block w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10" @click="removePosition(pos)">Remove position</button>
+                      <button type="button" class="block w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10" @click="openRemoveConfirm(pos)">Remove position</button>
                     </div>
                   </template>
                 </div>
@@ -429,6 +459,16 @@ function goResearch(position: Position): void {
       :position="editPosition"
       @close="onEditClose"
       @saved="onEditSaved"
+    />
+
+    <ConfirmDeleteModal
+      :open="!!removeTarget"
+      title="Remove position"
+      :message="removeTarget ? `This permanently deletes ${removeTarget.symbol} from this portfolio. This cannot be undone.` : ''"
+      :busy="removeBusy"
+      :error="removeError"
+      @close="removeTarget = null"
+      @confirm="confirmRemovePosition"
     />
   </div>
 </template>

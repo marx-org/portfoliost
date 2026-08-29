@@ -345,9 +345,9 @@ async function submitStock() {
           await updatePortfolioPosition(props.portfolioId, position.id, { quantity: remaining })
         }
       }
-      await store.fetchPositions(props.portfolioId)
-      close()
       emit("saved")
+      close()
+      await store.fetchPositions(props.portfolioId)
     } else {
       await createPortfolioPosition(props.portfolioId, {
         symbol,
@@ -378,9 +378,9 @@ async function submitStock() {
         walletId: stockForm.value.walletId || undefined,
         executedAt: stockForm.value.date ? new Date(stockForm.value.date).toISOString() : undefined,
       })
-      await store.fetchPositions(props.portfolioId)
-      close()
       emit("added")
+      close()
+      await store.fetchPositions(props.portfolioId)
     }
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Failed to add position"
@@ -511,7 +511,7 @@ defineExpose({ pendingMarketPrice })
       class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
       @click.self="close"
     >
-      <div class="card max-h-[85vh] w-full max-w-md overflow-y-auto p-6" role="dialog" aria-modal="true" :aria-label="positionAction ? `${positionAction.kind} ${positionAction.position.symbol}` : 'Buy Position'">
+      <div class="card max-h-[85vh] w-full max-w-md overflow-y-auto p-6" role="dialog" aria-modal="true" :aria-label="positionAction ? `${positionAction.kind === 'buy' ? 'Buy' : positionAction.kind === 'sell' ? 'Sell' : 'Dividend'} ${positionAction.position.symbol}` : 'Buy Position'">
         <div class="mb-4 flex items-center justify-between">
           <h3 class="text-base font-semibold">{{ positionAction ? `${positionAction.kind === 'buy' ? 'Buy' : positionAction.kind === 'sell' ? 'Sell' : 'Dividend for'} ${positionAction.position.symbol}` : 'Buy Position' }}</h3>
           <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="close">✕</button>

@@ -330,12 +330,22 @@ async function main() {
     const srcUpdated = destWallet.json.find((w) => w.id === walletId)
     check("wallets.transfer debits source", srcUpdated && srcUpdated.balance === Math.round((srcBalanceBefore - 102) * 100) / 100, `got ${JSON.stringify(srcUpdated).slice(0, 120)}`)
     const delWallet = await request(`/wallets/${destId}`, { method: "DELETE", token })
-    check("wallets.transfer cleanup delete", delWallet.status === 204, `got ${delWallet.status}`)
+    check(
+      "wallets.transfer dest wallet delete → 409 (has transactions)",
+      delWallet.status === 409 && /cannot be deleted/.test(delWallet.json.message),
+      `got ${delWallet.status} ${JSON.stringify(delWallet.json).slice(0, 80)}`,
+    )
   }
+  const emptyWall = await request("/wallets", { method: "POST", token, body: { name: "Empty deletable", currency: "USD" } })
+  const emptyWallId = emptyWall.json.id
+  const delEmpty = await request(`/wallets/${emptyWallId}`, { method: "DELETE", token })
+  check("wallets.empty wallet delete → 204", delEmpty.status === 204, `got ${delEmpty.status}`)
+  const delSeed = await request(`/wallets/${walletId}`, { method: "DELETE", token })
+  check("wallets.seeded wallet delete → 409", delSeed.status === 409, `got ${delSeed.status}`)
   const recent = await request("/wallets/recent-transactions?page=1&limit=10&sortBy=date&sortOrder=desc", { token })
   check("wallets.recent-transactions", recent.status === 200 && isObj(recent.json) && Array.isArray(recent.json.data) && isObj(recent.json.meta), `got ${recent.status}`)
   check("wallets.recent-transactions fields", recent.status === 200 && hasKeys(recent.json.data[0], ["id", "walletId", "walletName", "type", "displayLabel", "amount", "date"]), JSON.stringify(recent.json.data && recent.json.data[0]).slice(0, 120))
-  check("wallets.recent-transactions total", recent.status === 200 && recent.json.meta.total === 18, `total ${recent.json.meta && recent.json.meta.total}`)
+  check("wallets.recent-transactions total", recent.status === 200 && recent.json.meta.total === 19, `total ${recent.json.meta && recent.json.meta.total}`)
   const recentPg = await request("/wallets/recent-transactions?page=2&limit=5&sortBy=date&sortOrder=desc", { token })
   check("wallets.recent-transactions paginated", recentPg.status === 200 && recentPg.json.meta.page === 2 && recentPg.json.data.length === 5, `len ${recentPg.json.data.length} page ${recentPg.json.meta.page}`)
   const recentSorted = await request("/wallets/recent-transactions?page=1&limit=11&sortBy=amount&sortOrder=asc", { token })
@@ -347,7 +357,7 @@ async function main() {
   const delTx = await request(`/wallets/transactions/${investTx.id}`, { method: "DELETE", token })
   check("wallets.recent DELETE", delTx.status === 204, `got ${delTx.status}`)
   const afterDelete = await request("/wallets/recent-transactions?page=1&limit=11&sortBy=date&sortOrder=desc", { token })
-  check("wallets.recent DELETE tombstones", afterDelete.status === 200 && afterDelete.json.meta.total === 17 && !afterDelete.json.data.some((t) => t.id === investTx.id), `total ${afterDelete.json.meta.total}`)
+  check("wallets.recent DELETE tombstones", afterDelete.status === 200 && afterDelete.json.meta.total === 18 && !afterDelete.json.data.some((t) => t.id === investTx.id), `total ${afterDelete.json.meta.total}`)
   const seedTx = (await request(`/wallets/${walletId}/transactions`, { token })).json.items.find((t) => t.id.startsWith("seed-"))
   const patchedSeed = await request(`/wallets/transactions/${seedTx.id}`, { method: "PATCH", token, body: { type: "WITHDRAWAL", amount: 50, description: "Edited" } })
   check("wallets.detail PATCH returns signed recent shape", patchedSeed.status === 200 && patchedSeed.json.displayLabel === "Withdrawal", `got ${patchedSeed.status} ${patchedSeed.json.displayLabel}`)
@@ -553,8 +563,11 @@ async function main() {
       `items ${(usdTxs.json?.items || []).length}`,
     )
 
-    // cleanup created wallets so other tests see seed state
-    for (const id of [eurId, usdId]) await request(`/wallets/${id}`, { method: "DELETE", token })
+    // cleanup: created wallets hold transactions, so delete is blocked (mirrors real module)
+    for (const id of [eurId, usdId]) {
+      const del = await request(`/wallets/${id}`, { method: "DELETE", token })
+      check("feesfx.created wallet delete → 409 (has transactions)", del.status === 409, `got ${del.status}`)
+    }
 
     // portfolio transaction with manual rate drives converted outputs
     const portfolios = await request("/portfolios", { token })

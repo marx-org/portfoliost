@@ -16,7 +16,7 @@ test("watchlists: create, add item, and remove item", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Watchlists" })).toBeVisible()
   await page.getByRole("button", { name: "New watchlist" }).first().click()
   await page.getByRole("textbox", { name: "Name" }).fill(name)
-  await page.getByRole("button", { name: "Create" }).click()
+  await page.getByRole("dialog", { name: "Create watchlist" }).getByRole("button", { name: "Create", exact: true }).click()
 
   const card = page.locator(".card", { hasText: name })
   await expect(card).toBeVisible()
@@ -38,7 +38,7 @@ test("watchlists: rejects an unknown symbol", async ({ page }) => {
 
   await page.getByRole("button", { name: "New watchlist" }).first().click()
   await page.getByRole("textbox", { name: "Name" }).fill(name)
-  await page.getByRole("button", { name: "Create" }).click()
+  await page.getByRole("dialog", { name: "Create watchlist" }).getByRole("button", { name: "Create", exact: true }).click()
 
   const card = page.locator(".card", { hasText: name })
   await card.getByLabel("Add symbol").fill("ZZZZ")
@@ -57,7 +57,7 @@ test("wallets: shows balance and deposits cash", async ({ page }) => {
 
   await page.getByRole("button", { name: "Deposit" }).first().click()
   const dialog = page.getByRole("dialog", { name: "Cash movement" })
-  await dialog.getByRole("spinbutton", { name: "Amount" }).fill("100")
+  await dialog.locator("#wc-amount").fill("100")
   await dialog.getByRole("button", { name: "Deposit", exact: true }).click()
   await expect(dialog).not.toBeVisible()
 
@@ -81,7 +81,7 @@ test("wallets: creates a new wallet", async ({ page }) => {
 test("wallets: History opens wallet detail screen", async ({ page }) => {
   await login(page)
 
-  await page.getByRole("button", { name: "History", exact: true }).first().click()
+  await page.locator(".card", { hasText: "Portfel USD 1" }).first().getByRole("button", { name: "History", exact: true }).click()
   await expect(page).toHaveURL(/\/en\/portfolios\/wallets\/1a1f2d68-686c-4f8b-ba34-a67846163275/)
 
   await expect(page.getByRole("heading", { name: "Portfel USD 1" })).toBeVisible()
@@ -132,4 +132,44 @@ test("wallets: clicking the wallet card opens wallet detail screen", async ({ pa
 
   await page.locator(".card", { hasText: "Portfel USD 1" }).first().click()
   await expect(page).toHaveURL(/\/en\/portfolios\/wallets\/1a1f2d68-686c-4f8b-ba34-a67846163275/)
+})
+
+test("wallets: delete is blocked for a wallet with transactions and redirected to the wallets page", async ({ page }) => {
+  await login(page)
+
+  await page.locator(".card", { hasText: "Portfel USD 1" }).first().getByRole("button", { name: "History", exact: true }).click()
+  await expect(page).toHaveURL(/\/en\/portfolios\/wallets\/1a1f2d68-686c-4f8b-ba34-a67846163275/)
+
+  await page.getByRole("button", { name: "Delete wallet" }).click()
+  const confirm = page.getByRole("dialog", { name: "Delete wallet" })
+  await expect(confirm).toBeVisible()
+  await confirm.getByRole("button", { name: "Delete", exact: true }).click()
+
+  await expect(page).toHaveURL(/\/en\/wallets/)
+  await expect(page.getByText(/was not deleted/)).toBeVisible()
+  await expect(page.locator(".card", { hasText: "Portfel USD 1" })).toBeVisible()
+})
+
+test("wallets: a wallet without transactions can be deleted", async ({ page }) => {
+  const name = `E2E Deletable ${Date.now()}`
+  await login(page)
+  await page.goto("/en/wallets")
+
+  await page.getByRole("button", { name: "New wallet" }).first().click()
+  const createDialog = page.getByRole("dialog", { name: "Create wallet" })
+  await createDialog.getByRole("textbox", { name: "Name" }).fill(name)
+  await createDialog.getByRole("button", { name: "Create" }).click()
+  await expect(page.locator(".card", { hasText: name })).toBeVisible()
+
+  await page.goto("/en/investments")
+  await page.locator(".card", { hasText: name }).getByRole("button", { name: "History", exact: true }).first().click()
+  await expect(page).toHaveURL(/\/en\/portfolios\/wallets\/.*/)
+
+  await page.getByRole("button", { name: "Delete wallet" }).click()
+  const confirm = page.getByRole("dialog", { name: "Delete wallet" })
+  await confirm.getByRole("button", { name: "Delete", exact: true }).click()
+
+  await expect(page).toHaveURL(/\/en\/investments/)
+  await page.goto("/en/wallets")
+  await expect(page.locator(".card", { hasText: name })).toHaveCount(0)
 })

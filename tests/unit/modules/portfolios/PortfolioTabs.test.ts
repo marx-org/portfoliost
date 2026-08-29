@@ -70,22 +70,69 @@ describe("PortfolioHoldingsTab", () => {
     expect(wrapper.text()).toContain("No open positions")
   })
 
-  it("opens the actions menu and removes a position", async () => {
+  it("opens the actions menu and blocks removing a position with transactions", async () => {
+    mocked.getPortfolioTransactions.mockResolvedValue({
+      items: [],
+      total: 2,
+      page: 1,
+      limit: 1,
+      totalPages: 1,
+      hasNext: false,
+      hasPrevious: false,
+    } as never)
+
     const wrapper = mount(PortfolioHoldingsTab)
     await flushPromises()
 
     await wrapper.get("button[aria-label='Position actions']").trigger("click")
     expect(wrapper.text()).toContain("Remove position")
 
-    mocked.removePortfolioPosition.mockResolvedValue({ isOpen: false } as never)
-    mocked.getPortfolioPositions.mockResolvedValue([])
-
     const buttons = wrapper.findAll("button")
     const remove = buttons.find((b) => b.text() === "Remove position")
     await remove!.trigger("click")
     await flushPromises()
 
+    expect(mocked.getPortfolioTransactions).toHaveBeenCalledWith("p1", 1, 1, "date", "desc", "pos1")
+    expect(mocked.removePortfolioPosition).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain("Cannot remove META")
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain("Meta Platforms Inc")
+  })
+
+  it("confirms before removing a transaction-free position", async () => {
+    mocked.getPortfolioTransactions.mockResolvedValue({
+      items: [],
+      total: 0,
+      page: 1,
+      limit: 1,
+      totalPages: 1,
+      hasNext: false,
+      hasPrevious: false,
+    } as never)
+    mocked.removePortfolioPosition.mockResolvedValue({ isOpen: false } as never)
+    mocked.getPortfolioPositions
+      .mockResolvedValueOnce([position() as never])
+      .mockResolvedValueOnce([])
+
+    const wrapper = mount(PortfolioHoldingsTab)
+    await flushPromises()
+
+    await wrapper.get("button[aria-label='Position actions']").trigger("click")
+    const buttons = wrapper.findAll("button")
+    const remove = buttons.find((b) => b.text() === "Remove position")
+    await remove!.trigger("click")
+    await flushPromises()
+
+    const dialog = wrapper.get('[role="dialog"]')
+    expect(dialog.text()).toContain("Remove position")
+    expect(dialog.text()).toContain("This permanently deletes META")
+
+    const del = dialog.findAll("button").find((b) => b.text() === "Delete")
+    await del!.trigger("click")
+    await flushPromises()
+
     expect(mocked.removePortfolioPosition).toHaveBeenCalledWith("p1", "pos1")
+    expect(wrapper.text()).toContain("Removed META")
     expect(wrapper.text()).toContain("No open positions")
   })
 })
@@ -122,9 +169,9 @@ describe("PortfolioTransactionsTab", () => {
     const wrapper = mount(PortfolioTransactionsTab)
     await flushPromises()
 
-    expect(wrapper.text()).toContain("BUY")
+    expect(wrapper.text()).toContain("Buy")
     expect(wrapper.text()).toContain("META")
     expect(wrapper.text()).toContain("5,500.00")
-    expect(mocked.getPortfolioTransactions).toHaveBeenCalledWith("p1", 1, 20)
+    expect(mocked.getPortfolioTransactions).toHaveBeenCalledWith("p1", 1, 20, "date", "desc")
   })
 })

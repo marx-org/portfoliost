@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue"
 import { useRouter } from "vue-router"
 import { useWalletsStore } from "@/stores/wallets"
+import { ApiError } from "@/api/client"
 import { getWalletBalanceHistory } from "@/api/wallets"
 import { formatCurrency, formatDate, formatNumber } from "@/utils/format"
 import WalletCashModals from "@/modules/portfolios/WalletCashModals.vue"
@@ -96,11 +97,18 @@ function openDelete() {
 async function submitDelete() {
   deleteBusy.value = true
   deleteError.value = null
+  const target = props.wallet
   try {
-    await store.remove(props.wallet.id)
+    await store.remove(target.id)
     showDeleteConfirm.value = false
-    notice.value = `Deleted ${props.wallet.name}`
+    notice.value = `Deleted ${target.name}`
   } catch (err) {
+    if (err instanceof ApiError && err.status === 409) {
+      showDeleteConfirm.value = false
+      store.setDeleteNotice(`"${target.name}" was not deleted — it has transactions. Delete its transactions first to remove the wallet.`)
+      router.push({ name: "wallets" })
+      return
+    }
     deleteError.value = err instanceof Error ? err.message : "Failed to delete wallet"
   } finally {
     deleteBusy.value = false

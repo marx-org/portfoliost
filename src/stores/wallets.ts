@@ -10,6 +10,7 @@ export const useWalletsStore = defineStore("wallets", () => {
   const transactions = ref<PaginatedCashTransactions | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
+  const deleteNotice = ref<string | null>(null)
 
   async function fetchAll(): Promise<void> {
     loading.value = true
@@ -72,5 +73,30 @@ export const useWalletsStore = defineStore("wallets", () => {
     await fetchAll()
   }
 
-  return { wallets, totalBalance, transactions, loading, error, fetchAll, create, fetchTransactions, deposit, withdraw, transfer, rename, remove }
+  function setDeleteNotice(message: string | null): void {
+    deleteNotice.value = message
+  }
+
+  function clearDeleteNotice(): void {
+    deleteNotice.value = null
+  }
+
+  return {
+    wallets,
+    totalBalance,
+    transactions,
+    loading,
+    error,
+    deleteNotice,
+    fetchAll,
+    create,
+    fetchTransactions,
+    deposit,
+    withdraw,
+    transfer,
+    rename,
+    remove,
+    setDeleteNotice,
+    clearDeleteNotice,
+  }
 })

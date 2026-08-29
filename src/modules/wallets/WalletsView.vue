@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue"
+import { computed, onMounted, onUnmounted, ref } from "vue"
 import { useWalletsStore } from "@/stores/wallets"
 import CurrencySelect from "@/components/CurrencySelect.vue"
 import { useCurrenciesStore } from "@/stores/currencies"
@@ -32,6 +32,8 @@ const history = ref<Array<{ date: string; balance: number }>>([])
 const historyError = ref<string | null>(null)
 
 onMounted(load)
+
+onUnmounted(() => store.clearDeleteNotice())
 
 async function load() {
   loading.value = true
@@ -125,6 +127,7 @@ const historyChart = computed(() => ({
     </div>
 
     <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
+    <p v-if="store.deleteNotice" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ store.deleteNotice }}</p>
     <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading wallets...</p>
 
     <div v-if="store.totalBalance && !loading" class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">

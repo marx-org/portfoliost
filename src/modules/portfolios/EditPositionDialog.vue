@@ -94,7 +94,7 @@ async function load() {
   loading.value = true
   error.value = null
   try {
-    const res = await getPortfolioTransactions(props.portfolioId, 1, 50, props.position.id)
+    const res = await getPortfolioTransactions(props.portfolioId, 1, 50, "date", "desc", props.position.id)
     transactions.value = res.items
     if (!res.items.length) {
       transactions.value = [
@@ -204,6 +204,7 @@ async function addRow(): Promise<void> {
       symbol: props.position.symbol,
       quantity: Number(newTx.value.quantity),
       price: Number(newTx.value.price),
+      currency: props.position.instrumentCurrency ?? "USD",
       fees: newTx.value.feesType === "pct" ? tf.feeValue.value : Number(newTx.value.fees) || 0,
       feesType: newTx.value.feesType,
     }
@@ -219,28 +220,54 @@ async function addRow(): Promise<void> {
       input.exchangeRate = Number(newTx.value.exchangeRate)
     }
     input.walletId = newTx.value.walletId || undefined
-    input.executedAt = new Date(newTx.value.date).toISOString()
-    const created = await createPortfolioTransaction(props.portfolioId, input)
-    transactions.value.push({ ...created, executedAt: new Date(newTx.value.date).toISOString() })
-    const position = props.position
-    if (position) {
-      const open = transactions.value.filter((t) => !isSynthetic(t) && t.type !== "SELL")
-      const totalQty = open.reduce((s, t) => s + (t.quantity ?? 0), 0)
-      const totalCost = open.reduce((s, t) => s + (t.quantity ?? 0) * (t.price ?? 0) + (t.fees ?? 0), 0)
-      const avg = totalQty ? totalCost / totalQty : position.averageCostBasis
-      await updatePortfolioPosition(props.portfolioId, position.id, {
-        quantity: totalQty || position.quantity,
-        averageCostBasis: avg,
-        avgCostBasis: avg,
-        instrumentAvgCostBasis: avg,
-      })
+    const iso = new Date(newTx.value.date).toISOString()
+    input.executedAt = iso
+
+    // Optimistic push — row appears instantly while the server processes the request
+    const provisionalId = `pending-${Date.now()}`
+    transactions.value.push({
+      id: provisionalId,
+      type: input.type,
+      quantity: input.quantity,
+      price: input.price,
+      currency: input.currency,
+      fees: input.fees,
+      feeCurrency: input.feeCurrency ?? input.currency,
+      executedAt: iso,
+    } as unknown as Tx)
+
+    try {
+      const created = await createPortfolioTransaction(props.portfolioId, input)
+      // Swap provisional row with the confirmed server row
+      const idx = transactions.value.findIndex((t) => t.id === provisionalId)
+      if (idx !== -1) transactions.value.splice(idx, 1)
+      transactions.value.push({ ...created, executedAt: iso })
+      const position = props.position
+      if (position) {
+        const open = transactions.value.filter((t) => !isSynthetic(t) && t.type !== "SELL")
+        const totalQty = open.reduce((s, t) => s + (t.quantity ?? 0), 0)
+        const totalCost = open.reduce((s, t) => s + (t.quantity ?? 0) * (t.price ?? 0) + (t.fees ?? 0), 0)
+        const avg = totalQty ? totalCost / totalQty : position.averageCostBasis
+        await updatePortfolioPosition(props.portfolioId, position.id, {
+          quantity: totalQty || position.quantity,
+          averageCostBasis: avg,
+          avgCostBasis: avg,
+          instrumentAvgCostBasis: avg,
+        })
+      }
+      newTx.value.quantity = ""
+      newTx.value.price = ""
+      newTx.value.fees = "0"
+    } catch (err) {
+      // Roll back the optimistic row on failure
+      const idx = transactions.value.findIndex((t) => t.id === provisionalId)
+      if (idx !== -1) transactions.value.splice(idx, 1)
+      error.value = err instanceof Error ? err.message : "Failed to add transaction"
+    } finally {
+      saving.value = false
     }
-    newTx.value.quantity = ""
-    newTx.value.price = ""
-    newTx.value.fees = "0"
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Failed to add transaction"
-  } finally {
     saving.value = false
   }
 }

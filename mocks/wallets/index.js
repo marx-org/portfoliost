@@ -147,6 +147,16 @@ function resolveWallet(id) {
   return wallets.get(id) || null
 }
 
+// Mirrors the real wallets module (`assertDeletable`): a wallet with any cash or
+// investment (portfolio) ledger row cannot be deleted. Tombstoned recent txs
+// (recentOverrides == null) stop counting, so deleting them first unlocks delete.
+function walletHasTransactions(id) {
+  seedCashTransactions()
+  const cash = (cashTx.get(id) || []).some((tx) => !recentOverrides.has(tx.id) || recentOverrides.get(tx.id) !== null)
+  if (cash) return true
+  return (loadRaw("portfolios_transactions.json")?.items ?? []).some((t) => t.walletId === id)
+}
+
 function allWallets() {
   const merged = []
   const seen = new Set()
@@ -221,6 +231,9 @@ export function register(app) {
     if (!requireAuth(ctx)) return
     const wallet = resolveWallet(ctx.params.id)
     if (!wallet) return ctx.res.status(404).json({ error: "NotFound", message: "Wallet not found" })
+    if (walletHasTransactions(ctx.params.id)) {
+      return ctx.res.status(409).json({ error: "Conflict", message: "Wallet has transactions and cannot be deleted" })
+    }
     walletOverrides.set(ctx.params.id, null)
     cashTx.delete(ctx.params.id)
     ctx.res.status(204).end()
