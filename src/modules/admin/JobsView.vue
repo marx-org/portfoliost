@@ -94,15 +94,13 @@ async function loadLog() {
 // ── Status polling ────────────────────────────────────────────────────────────
 
 const pollers = new Map<StooqDataset, ReturnType<typeof setInterval>>()
-const MAX_POLL_MS = 5 * 60 * 1000 // stop after 5 minutes
-const pollStart  = new Map<StooqDataset, number>()
 
 function startPolling(dataset: StooqDataset) {
   stopPolling(dataset)
-  pollStart.set(dataset, Date.now())
+  // Poll every 30 s — imports take hours, no timeout.
   pollers.set(
     dataset,
-    setInterval(() => pollStatus(dataset), 5_000),
+    setInterval(() => pollStatus(dataset), 30_000),
   )
 }
 
@@ -113,12 +111,6 @@ function stopPolling(dataset: StooqDataset) {
 }
 
 async function pollStatus(dataset: StooqDataset) {
-  if (Date.now() - (pollStart.get(dataset) ?? 0) > MAX_POLL_MS) {
-    stopPolling(dataset)
-    states.value[dataset].phase = "failed"
-    states.value[dataset].errorMsg = "Timed out waiting for job to complete"
-    return
-  }
   try {
     const status: StooqImportStatusResponse = await getStooqImportStatus(dataset)
     applyStatus(dataset, status)
