@@ -29,13 +29,38 @@ known split dates with no price cliffs). This means stooq historical data and op
 (which also returns adjusted prices) are on the same scale — no adjustment needed at the boundary
 for normal operation.
 
-Available datasets and expected tables after full import:
+Available datasets and tables — the full stooq catalogue. Each zip maps to a separate table:
 
-| Dataset | Table | Coverage |
-|---|---|---|
-| USA daily | `daily_us` | 1984 → last import, ~27M rows confirmed |
-| Poland daily | `daily_pl` | TBD after import |
-| World daily | `daily_world` | TBD after import |
+| Region | Timeframe | Stooq zip | Table |
+|---|---|---|---|
+| World | Daily | `d_world_txt.zip` | `daily_world` |
+| World | Hourly | `h_world_txt.zip` | `hourly_world` |
+| World | 5-min | `5_world_txt.zip` | `5min_world` |
+| U.S. | Daily | `d_us_txt.zip` | `daily_us` |
+| U.S. | Hourly | `h_us_txt.zip` | `hourly_us` |
+| U.S. | 5-min | `5_us_txt.zip` | `5min_us` |
+| U.K. | Daily | `d_uk_txt.zip` | `daily_uk` |
+| U.K. | Hourly | `h_uk_txt.zip` | `hourly_uk` |
+| U.K. | 5-min | `5_uk_txt.zip` | `5min_uk` |
+| Japan | Daily | `d_jp_txt.zip` | `daily_jp` |
+| Hong Kong | Daily | `d_hk_txt.zip` | `daily_hk` |
+| Hong Kong | Hourly | `h_hk_txt.zip` | `hourly_hk` |
+| Hong Kong | 5-min | `5_hk_txt.zip` | `5min_hk` |
+| Poland | Daily | `d_pl_txt.zip` | `daily_pl` |
+| Poland | Hourly | `h_pl_txt.zip` | `hourly_pl` |
+| Poland | 5-min | `5_pl_txt.zip` | `5min_pl` |
+| Hungary | Daily | `d_hu_txt.zip` | `daily_hu` |
+| Hungary | Hourly | `h_hu_txt.zip` | `hourly_hu` |
+| Hungary | 5-min | `5_hu_txt.zip` | `5min_hu` |
+| Macroeconomy | Daily | `d_macro_txt.zip` | `daily_macro` |
+
+The initial three tables (`daily_us`, `daily_pl`, `daily_world`) from the original design are
+a subset. The `stooq_daily_us`, `stooq_daily_pl`, `stooq_daily_world` foreign tables and the
+`price_bars_all` view cover **daily EOD data only** — the hourly and 5-min tables are imported
+for completeness but are not used by the price history endpoint in this phase.
+
+A separate Kubernetes Job is created per dataset on import. See `admin-jobs-stooq-upload.md`
+for the upload + import flow.
 
 **Key infrastructure facts:**
 - Both `stooq` and `portfoliost` DBs are on the same Postgres instance (`postgres-pfire-primary`)
@@ -364,7 +389,7 @@ what the import job thought it loaded.
 
 ```sql
 CREATE TABLE instruments.stooq_import_log (
-  dataset      TEXT PRIMARY KEY,   -- 'daily_us' | 'daily_pl' | 'daily_world'
+  dataset      TEXT PRIMARY KEY,   -- matches StooqDataset enum: 'daily_us' | 'daily_pl' | 'daily_world' | 'hourly_us' | ... (all 20)
   latest_date  DATE,               -- MAX(date) confirmed from foreign table after cleanup
   imported_at  TIMESTAMPTZ,        -- when the post-import hook was called
   rows_deleted INTEGER             -- overflow rows cleaned up in this run
@@ -443,24 +468,27 @@ Reviewed candidates (applied/dismissed) are shown in a collapsed history section
 
 A new "Jobs" tab is added to the admin section (`/en/admin/jobs`).
 
-Displays a static list of known background jobs. Each job shows:
+Displays one card per stooq dataset. Each card has:
 - Name and description
-- Last run timestamp and status (success / failed / never run) — from a `job_log` table
-  populated when jobs complete (future work)
-- **Run** button — **disabled for now**, wired up when job management is implemented
+- Last run timestamp and status (success / failed / never run) — from `stooq_import_log`
+- **File upload input** — admin selects a `.zip` downloaded from stooq.pl
+- **Run Import button** — uploads the file and triggers a Kubernetes Job via jobshot
 
 Initial job list for the pfire namespace:
 
-| Job | Description | Last run | Status | Action |
-|---|---|---|---|---|
-| stooq-downloader-us | Download USA daily data from stooq.pl | — | — | Run (disabled) |
-| stooq-downloader-pl | Download Poland daily data from stooq.pl | — | — | Run (disabled) |
-| stooq-downloader-world | Download World daily data from stooq.pl | — | — | Run (disabled) |
-| stooq-importer | Import downloaded stooq zip files into Postgres via pgloader | — | — | Run (disabled) |
+| Job | Description | Target table |
+|---|---|---|
+| USA daily import | Import `d_us_txt.zip` via pgloader | `daily_us` |
+| Poland daily import | Import `d_pl_txt.zip` via pgloader | `daily_pl` |
+| World daily import | Import `d_world_txt.zip` via pgloader | `daily_world` |
 
-The list is static configuration for now — no dynamic job discovery. Additional jobs are
-added here as they are created. Job execution infrastructure (k8s Job triggering via API)
-is a separate workstream.
+The "Run Import" button is **enabled** when a file is selected and no import job is currently
+running for that dataset. Status is polled every 5 seconds while a job is active. After a
+successful import, the post-import hook in portfoliost-instruments fires automatically to
+clean up overflow rows and update `stooq_import_log`.
+
+Full design for this tab (upload flow, jobshot integration, volume strategy, cluster changes)
+is in `admin-jobs-stooq-upload.md`.
 
 ---
 

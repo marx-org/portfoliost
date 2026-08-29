@@ -175,6 +175,9 @@ services:
       OIDC_ISSUER_URL: ${OIDC_ISSUER_URL:-http://gateway:8080}
       OIDC_CLIENT_ID: ${ADMIN_OIDC_CLIENT_ID:-}
       OIDC_CLIENT_SECRET: ${ADMIN_OIDC_CLIENT_SECRET:-}
+      # N — stooq import jobs (jobshot not in local compose; UI will fail gracefully at Run step)
+      API_JOBSHOT_URL: ${API_JOBSHOT_URL:-}
+      STOOQ_UPLOAD_DIR: /tmp/stooq-uploads
     depends_on:
       - users-auth
       - wallets

@@ -225,6 +225,12 @@ const router = createRouter({
               component: () => import("@/modules/admin/UsersView.vue"),
               meta: { admin: true },
             },
+            {
+              path: "jobs",
+              name: "admin-jobs",
+              component: () => import("@/modules/admin/JobsView.vue"),
+              meta: { admin: true },
+            },
           ],
         },
       ],

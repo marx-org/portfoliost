@@ -648,20 +648,9 @@ Proposal: [portfolios-module.md](proposals/portfolios-module.md) (proposed 2026-
 - [x] G3 shares CRUD (10-limit) + auth-exempt public route with view-count
 - [x] G4 privacy-projection + limit tests
 
-### Phase H — analytics foundation (D61, executed last)
+### Phase H — price data warehouse + value snapshots + analytics chart (D61)
+
 - [x] H1 `value_snapshots` migration + schema test — table exists in `0001_colorful_iron_patriot.sql`, 0 rows in cluster
-- [ ] H2 snapshot service: positions × historical closes × fx carry-forward, idempotent upserts
-- [ ] H3 `src/scripts/snapshots.ts` + compose boot wiring; bounded backfill-on-read
-- [ ] H4 idempotence/gap/mid-history/multi-currency tests
-
-**Assessment (2026-08-28):** Phase H alone is not enough to make the portfolio chart work.
-`GET /:id/analytics` is a permanent stub returning `{ performance: [], benchmarks: [] }`; the frontend
-reads `analytics.performance?.timeSeries` which is `undefined` → `series = []` → "Loading chart..."
-forever. Phase I (specifically I2) is also required. Replace H2–H4 + I1–I2 with the concrete steps
-below (H′) which describe exactly what is needed; the original H/I language above covers the
-production-grade version after the chart is working.
-
-### Phase H′ — price data warehouse + value snapshots + analytics chart
 
 **Context from investigation (2026-08-28):**
 
@@ -713,9 +702,9 @@ Stooq download job should run monthly to keep the floor moving.
 
 ---
 
-#### H′1 — price_bars table in portfoliost-instruments
+- [ ] H2 — price_bars table in portfoliost-instruments
 
-Add to `instruments` schema in portfoliost-instruments:
+  Add to `instruments` schema in portfoliost-instruments:
 
 ```sql
 instruments.price_bars(
@@ -740,11 +729,11 @@ instruments.price_bar_metadata(
 )
 ```
 
-Drizzle migration. Unit test: schema compiles, upsert is idempotent.
+  Drizzle migration. Unit test: schema compiles, upsert is idempotent.
 
-#### H′2 — price history read endpoint in portfoliost-instruments
+- [ ] H3 — price history read endpoint in portfoliost-instruments
 
-`GET /api/instruments/:symbol/price-bars?from=YYYY-MM-DD&to=YYYY-MM-DD`
+  `GET /api/instruments/:symbol/price-bars?from=YYYY-MM-DD&to=YYYY-MM-DD`
 
 Logic:
 1. Check `price_bar_metadata` for symbol. Compute gap = `[from, to] \ [earliest_date, latest_date]`.
@@ -760,20 +749,20 @@ Logic:
 Stooq ticker mapping: strip exchange suffix from our symbol format → append `.US`.
 Non-US: use symbol as-is to openst (it handles the suffix natively).
 
-Note: stooq `latest_date` is determined once at startup or cached with 1h TTL
-(`SELECT MAX(date) FROM daily` via PostgREST count endpoint or metadata query).
+  Note: stooq `latest_date` is determined once at startup or cached with 1h TTL
+  (`SELECT MAX(date) FROM daily` via PostgREST count endpoint or metadata query).
 
-#### H′3 — passive write-through from existing quote fetches
+- [ ] H4 — passive write-through from existing quote fetches
 
-In `portfoliost-instruments`, when a `/quote` or `/history` response is served from openst,
+  In `portfoliost-instruments`, when a `/quote` or `/history` response is served from openst,
 also write the returned daily bars to `price_bars` (upsert). This means price_bars accumulates
 data organically from normal usage without any explicit backfill trigger for well-queried symbols.
 
-This is cheap: the data is already fetched, the upsert is a background write.
+  This is cheap: the data is already fetched, the upsert is a background write.
 
-#### H′4 — snapshot-on-read: today's value_snapshots row
+- [ ] H5 — snapshot-on-read: today's value_snapshots row
 
-In `portfoliost-wallets`, inside `refreshQuotes()` (already called on every GET /positions),
+  In `portfoliost-wallets`, inside `refreshQuotes()` (already called on every GET /positions),
 after persisting position quote fields, compute and upsert today's portfolio value:
 
 ```
@@ -781,18 +770,18 @@ portfolioValue = Σ pos.marketValue × fx(pos.instrumentCurrency → portfolio.b
 invested       = Σ pos.totalCostBasis × fx(pos.instrumentCurrency → portfolio.baseCurrency)
 ```
 
-Upsert: `INSERT INTO value_snapshots ... ON CONFLICT (portfolio_id, snapshot_date) DO UPDATE`.
-Uses `latestRates()` which already works. No scheduler needed.
+  Upsert: `INSERT INTO value_snapshots ... ON CONFLICT (portfolio_id, snapshot_date) DO UPDATE`.
+  Uses `latestRates()` which already works. No scheduler needed.
 
-#### H′5 — backfill job: historical value_snapshots
+- [ ] H6 — backfill job: historical value_snapshots
 
-A k8s Job (CronJob or on-demand via portfoliost-wallets triggering it) that:
+  A k8s Job (CronJob or on-demand via portfoliost-wallets triggering it) that:
 
 1. For the target portfolio, query `MIN(executed_at)` from `portfolioTransactions` → `firstTxDate`.
 2. Build the holdings timeline: for each calendar day from `firstTxDate` to yesterday, compute
    `qty_held(symbol, date)` from cumulative BUY/SELL transactions up to that date.
 3. For each symbol needed, call portfoliost-instruments `GET /price-bars?from=firstTxDate&to=yesterday`
-   (H′2 above — serves from price_bars, filling from stooq+openst if needed).
+  (H3 above — serves from price_bars, filling from stooq+openst if needed).
 4. For each day: `value = Σ qty_held(sym, day) × price(sym, day) × fx(instrCcy → baseCurrency)`.
    Price carry-forward: if no bar for a day (weekend/holiday), use last known close.
    FX: `latestRates()` (current rate — acceptable approximation for 1–3 month history windows).
@@ -800,17 +789,17 @@ A k8s Job (CronJob or on-demand via portfoliost-wallets triggering it) that:
 6. Update `backfill_status` in a `portfolio_backfill_metadata` table
    (or inline in the analytics response flag).
 
-Job is triggered asynchronously from `GET /:id/analytics` when `value_snapshots` has < 2 rows.
-Returns 202-equivalent response with `backfillStatus: "pending"` immediately.
-On re-request while job is running: return whatever rows exist + `backfillStatus: "pending"`.
-On completion: `backfillStatus: "complete"`.
+  Job is triggered asynchronously from `GET /:id/analytics` when `value_snapshots` has < 2 rows.
+  Returns 202-equivalent response with `backfillStatus: "pending"` immediately.
+  On re-request while job is running: return whatever rows exist + `backfillStatus: "pending"`.
+  On completion: `backfillStatus: "complete"`.
 
-Bounded: never writes future dates. If job fails mid-run, existing rows are preserved (idempotent
-upserts); next trigger resumes from gap.
+  Bounded: never writes future dates. If job fails mid-run, existing rows are preserved (idempotent
+  upserts); next trigger resumes from gap.
 
-#### H′6 — wire GET /:id/analytics
+- [ ] H7 — wire GET /:id/analytics
 
-Replace the permanent stub in `portfoliost-wallets routes/portfolios.ts`:
+  Replace the permanent stub in `portfoliost-wallets routes/portfolios.ts`:
 
 1. Check `value_snapshots` row count for portfolio.
 2. If < 2 rows: trigger backfill job async, return `{ backfillStatus: "pending", performance: { timeSeries: [] }, benchmarks: [] }`.
@@ -833,22 +822,22 @@ Replace the permanent stub in `portfoliost-wallets routes/portfolios.ts`:
    }
    ```
    `monthlyReturns`: group by `YYYY-MM`, `(last_value / first_value - 1) × 100` per month.
-5. Sufficient for: `PortfolioCard` sparkline (reads `timeSeries`) + `PortfolioPerformanceTab`
-   equity + monthly bar charts.
+  5. Sufficient for: `PortfolioCard` sparkline (reads `timeSeries`) + `PortfolioPerformanceTab`
+     equity + monthly bar charts.
 
-#### H′7 — frontend: polling + loading banner
+- [ ] H8 — frontend: polling + loading banner
 
-In `PortfolioCard.vue` and `PortfolioPerformanceTab.vue`:
+  In `PortfolioCard.vue` and `PortfolioPerformanceTab.vue`:
 
 - If `analytics.backfillStatus === "pending"`: show subtle banner
   "Historical data is loading, chart will update in a moment"
 - Poll `GET /:id/analytics` every 5s while `backfillStatus !== "complete"`
-- Stop polling on `complete` or after 5 minutes (failure guard)
-- Render whatever `timeSeries` points exist immediately — even 1 point beats "Loading chart..."
+  - Stop polling on `complete` or after 5 minutes (failure guard)
+  - Render whatever `timeSeries` points exist immediately — even 1 point beats "Loading chart..."
 
-#### H′8 — tests
+- [ ] H9 — tests
 
-`portfoliost-instruments`:
+  `portfoliost-instruments`:
 - `price-bars.test.ts`: stooq ticker mapping (AAPL → AAPL.US), gap detection logic, upsert
   idempotence, circuit breaker (no retry within 1h on failure), weekend carry-forward
 - `price-bars-stooq.test.ts`: mock PostgREST response → correct rows in price_bars
@@ -857,35 +846,36 @@ In `PortfolioCard.vue` and `PortfolioPerformanceTab.vue`:
 - `snapshots.test.ts`: today snapshot with 2 USD positions; multi-currency (PLN, EUR);
   backfill with 3 positions over 10 days; timeframe filter; empty portfolio → `timeSeries: []`
 
-#### H′9 — stooq download job cadence (homelab)
+- [ ] H10 — stooq download job cadence (homelab)
 
-Add a monthly CronJob in homelab that runs stooq-downloader + stooq-importer-pgloader.
-This keeps the stooq floor within ~30 days of today, limiting the openst tail to 1 month
-for US stocks. Document in homelab README.
+  Add a monthly CronJob in homelab that runs stooq-downloader + stooq-importer-pgloader.
+  This keeps the stooq floor within ~30 days of today, limiting the openst tail to 1 month
+  for US stocks. Document in homelab README.
 
 ---
 
-### Phase H′ execution order
+H5 alone makes the chart show today's single data point — unblocks basic smoke-testing.
+H7 makes the sparkline and performance chart fully functional.
+H6+H3 together are the bulk of the work.
+
+### Phase H execution order
 
 ```
-H′1  price_bars schema + migration (portfoliost-instruments)
-H′2  price history read endpoint with stooq + openst layering
-H′3  passive write-through from existing quote/history fetches
-H′4  snapshot-on-read in refreshQuotes (portfoliost-wallets)   ← chart shows today's dot
-H′5  backfill job: historical value_snapshots
-H′6  wire GET /:id/analytics                                   ← chart shows full history
-H′7  frontend polling + loading banner
-H′8  tests
-H′9  stooq monthly CronJob (homelab)
+H1   value_snapshots migration + schema test
+H2   price_bars schema + migration (portfoliost-instruments)
+H3   price history read endpoint with stooq + openst layering
+H4   passive write-through from existing quote/history fetches
+H5   snapshot-on-read in refreshQuotes (portfoliost-wallets)   ← chart shows today's dot
+H6   backfill job: historical value_snapshots
+H7   wire GET /:id/analytics                                   ← chart shows full history
+H8   frontend polling + loading banner
+H9   tests
+H10  stooq monthly CronJob (homelab)
 ```
-
-H′4 alone makes the chart show today's single data point — unblocks basic smoke-testing.
-H′6 makes the sparkline and performance chart fully functional.
-H′5+H′2 together are the bulk of the work.
 
 ### Phase I — performance analytics & charting (D62)
 - [ ] I1 shared series/returns service (TWR, XIRR/MWR, annualization + withhold rules)
-- [ ] I2 GET `/:id/analytics` (+ benchmark normalization via instruments `/history`) — superseded by H′3 for the basic chart; I2 adds TWR/MWR/sharpe/benchmark overlay on top
+- [ ] I2 GET `/:id/analytics` (+ benchmark normalization via instruments `/history`) — superseded by H4 for the basic chart; I2 adds TWR/MWR/sharpe/benchmark overlay on top
 - [ ] I3 promote stubs: `/merged`, `externalCapital*` wallet-deposit basis
 - [ ] I4 fixture + property tests; stack-test
 
@@ -913,3 +903,23 @@ H′5+H′2 together are the bulk of the work.
 - [x] M6 transaction FX leg targets the selected wallet (payment) currency, not the portfolio currency: same-currency wallet → no FX; cross-currency wallet → auto/manual rate disclosure (D40 revision; fee leg unchanged)
 - [x] M7 mock `GET /api/fx/latest` (demo-rate cross pairs, d39 carry-forward semantics) so automatic suggestions resolve instead of 404ing; wired into `mocks/fx`, 5 new mock round-trips, e2e `fees-fx.spec.ts` rewritten to wallet-driven flow (EUR wallet + deposit + cross-currency buy, market-rate prefill 0.9259, custom-fx badge)
 - [x] M8 wire real wallets module into docker compose (all `/api/portfolios` + `/api/wallets` routes → `portfoliost-wallets:3000`); e2e suite fully green against real module. Fixes: share-seeding `::jsonb` cast; wallet seed balance 10 000 (ledger-consistent); `AddPositionDialog` aria-label capitalisation + emit-before-close ordering; `EditPositionDialog` positionId filter arg order + currency in addRow payload + optimistic row push; e2e: en-dash paginator regex, explicit wallet selection (Portfel USD 1 by value), `add-position-*` testids, presence-based grouping assertions, `Create watchlist` dialog-scoped button, `workers: 1` for deterministic shared-DB runs, 15 s timeouts on real-module-backed assertions, upstream-OHLCV-dependent chart tests skip gracefully when provider unavailable. Build ✓ · 109 unit ✓ · 162 mock ✓ · 52 e2e pass / 4 skip (chart data; infrastructure) / 0 fail.
+
+---
+
+### Phase N — Admin Jobs tab: stooq zip upload + import
+
+Design: `docs/proposals/admin-jobs-stooq-upload.md`
+
+Adds a working "Jobs" tab to the admin panel where an admin can upload a stooq bulk-download
+zip and trigger a Kubernetes Job (via jobshot) that ingests it into the `stooq` database.
+Covers all 20 stooq dataset types (daily/hourly/5-min × all regions). Uses the PGO
+auto-created `postgres-pfire-pguser-postgres` secret — no new SOPS entries needed.
+portfoliost-admin handles the upload directly (writes to shared PVC), jobshot is only used
+for K8s Job creation with volumes/volumeMounts pass-through (minimal jobshot change).
+
+- [ ] N1 — contracts: add `StooqDataset` enum + upload/run/status/log schemas + 4 admin paths to `openapi.yaml`; bump minor version
+- [ ] N2 — jobshot: add `volumes: job.volumes || []` + `volumeMounts: job.volumeMounts || []` to `runK8sJob`; extend `Job` interface; bump image
+- [ ] N3 — homelab: add `stooq-upload-pvc` (1 Gi RWX Longhorn); add PVC mount + `JOBSHOT_URL` + `STOOQ_UPLOAD_DIR` to portfoliost-admin HelmRelease; Flux reconcile
+- [ ] N4 — portfoliost-admin: upload route (multer diskStorage → PVC), run route (build job spec + call jobshot), status route (proxy jobshot), log route (read stooq_import_log); admin JWT guard; unit + mock tests
+- [ ] N5 — frontend: `JobsView.vue` (20 dataset cards grouped by region), `/en/admin/jobs` route, "Jobs" tab in `AdminLayout.vue`, `src/api/adminJobs.ts`, XHR upload progress, status polling; mocks; e2e
+- [ ] N6 — integration: docker compose rebuild; smoke test with `d_pl_txt.zip`; full suite green; commit

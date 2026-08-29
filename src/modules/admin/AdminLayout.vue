@@ -4,9 +4,10 @@ import { useRoute } from "vue-router"
 const route = useRoute()
 
 const tabs = [
-  { name: "admin-system", label: "System" },
+  { name: "admin-system",     label: "System" },
   { name: "admin-currencies", label: "Currency Rates" },
-  { name: "admin-users", label: "Users" },
+  { name: "admin-users",      label: "Users" },
+  { name: "admin-jobs",       label: "Jobs" },
 ]
 </script>
 
