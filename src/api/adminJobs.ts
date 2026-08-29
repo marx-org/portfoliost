@@ -55,12 +55,13 @@ export function uploadStooqZip(
 ): Promise<StooqImportUploadResponse> {
   return new Promise((resolve, reject) => {
     const token = localStorage.getItem("portfoliost_token") ?? ""
+    // dataset goes in the query string so the server can read it before
+    // touching the multipart body (avoids buffering the file to get the field)
     const form = new FormData()
-    form.append("dataset", dataset)
     form.append("file", file)
 
     const xhr = new XMLHttpRequest()
-    xhr.open("POST", "/api/admin/jobs/stooq-import/upload")
+    xhr.open("POST", `/api/admin/jobs/stooq-import/upload?dataset=${encodeURIComponent(dataset)}`)
     if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`)
 
     xhr.upload.addEventListener("progress", (e) => {
