@@ -146,7 +146,7 @@ async function submitDelete() {
   } catch (err) {
     if (err instanceof ApiError && err.status === 409) {
       showDeleteConfirm.value = false
-      store.setDeleteNotice(`"${target.name}" was not deleted — it has transactions. Delete its transactions first to remove the wallet.`)
+      store.setDeleteNotice(err.message)
       router.push({ name: "wallets" })
       return
     }
