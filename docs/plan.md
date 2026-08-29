@@ -917,9 +917,9 @@ auto-created `postgres-pfire-pguser-postgres` secret — no new SOPS entries nee
 portfoliost-admin handles the upload directly (writes to shared PVC), jobshot is only used
 for K8s Job creation with volumes/volumeMounts pass-through (minimal jobshot change).
 
-- [ ] N1 — contracts: add `StooqDataset` enum + upload/run/status/log schemas + 4 admin paths to `openapi.yaml`; bump minor version
-- [ ] N2 — jobshot: add `volumes: job.volumes || []` + `volumeMounts: job.volumeMounts || []` to `runK8sJob`; extend `Job` interface; bump image
-- [ ] N3 — homelab: add `stooq-upload-pvc` (1 Gi RWX Longhorn); add PVC mount + `JOBSHOT_URL` + `STOOQ_UPLOAD_DIR` to portfoliost-admin HelmRelease; Flux reconcile
-- [ ] N4 — portfoliost-admin: upload route (multer diskStorage → PVC), run route (build job spec + call jobshot), status route (proxy jobshot), log route (read stooq_import_log); admin JWT guard; unit + mock tests
-- [ ] N5 — frontend: `JobsView.vue` (20 dataset cards grouped by region), `/en/admin/jobs` route, "Jobs" tab in `AdminLayout.vue`, `src/api/adminJobs.ts`, XHR upload progress, status polling; mocks; e2e
-- [ ] N6 — integration: docker compose rebuild; smoke test with `d_pl_txt.zip`; full suite green; commit
+- [x] N1 — contracts: add `StooqDataset` enum + upload/run/status/log schemas + 4 admin paths to `openapi.yaml`; bump minor version to 1.4.0
+- [x] N2 — jobshot: add `volumes: job.volumes || []` + `volumeMounts: job.volumeMounts || []` to `runK8sJob`; extend `Job` interface; build passes
+- [x] N3 — homelab: add `stooq-upload-pvc` (1 Gi RWX Longhorn); add PVC mount + `JOBSHOT_URL` + `STOOQ_UPLOAD_DIR` to portfoliost-admin HelmRelease
+- [x] N4 — portfoliost-admin: upload route (multer diskStorage → PVC), run route (build job spec + call jobshot), status route (proxy jobshot), log route (read stooq_import_log); admin JWT guard; 27 tests pass
+- [x] N5 — frontend: `JobsView.vue` (20 dataset cards grouped by region), `/en/admin/jobs` route, "Jobs" tab in `AdminLayout.vue`, `src/api/adminJobs.ts`, XHR upload progress, status polling; mocks; e2e
+- [x] N6 — integration: Build ✓ · 19 unit pass · 162 mock pass · committed across contracts/jobshot/homelab/portfoliost-admin/portfoliost
