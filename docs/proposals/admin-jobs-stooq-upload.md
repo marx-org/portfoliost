@@ -1,7 +1,8 @@
 # Admin Jobs Tab — Stooq Zip Upload & Import
 
 Date: 2026-08-29  
-Status: Draft — agreed in discussion, pending implementation
+Last updated: 2026-08-30  
+Status: **Implemented and deployed** (portfoliost-admin v1.0.19, jobshot 1.6.1)
 
 ---
 
@@ -38,8 +39,7 @@ trigger a Kubernetes Job that ingests it into the `stooq` database.
 ## Stooq zip file types and target tables
 
 Stooq publishes bulk-download archives for multiple regions and timeframes. Each zip maps to
-a separate table in the `stooq` database. This extends the three-table model from
-`price-data-architecture.md` to the full stooq catalogue:
+a separate table in the `stooq` database:
 
 | Region | Timeframe | Stooq folder | Expected zip name | Target table | Approx. size |
 |---|---|---|---|---|---|
@@ -56,7 +56,7 @@ a separate table in the `stooq` database. This extends the three-table model fro
 | Hong Kong | Daily | `hk` | `d_hk_txt.zip` | `daily_hk` | ~104 MB |
 | Hong Kong | Hourly | `hk` | `h_hk_txt.zip` | `hourly_hk` | ~42 MB |
 | Hong Kong | 5-min | `hk` | `5_hk_txt.zip` | `5min_hk` | ~51 MB |
-| Poland | Daily | `pl` | `d_pl_txt.zip` | `daily_pl` | ~191 MB |
+| Poland | Daily | `pl` | `d_pl_txt.zip` | `daily_pl` | ~200 MB zip / ~1.4 GB extracted |
 | Poland | Hourly | `pl` | `h_pl_txt.zip` | `hourly_pl` | ~29 MB |
 | Poland | 5-min | `pl` | `5_pl_txt.zip` | `5min_pl` | ~28 MB |
 | Hungary | Daily | `hu` | `d_hu_txt.zip` | `daily_hu` | ~1.7 MB |
@@ -64,157 +64,18 @@ a separate table in the `stooq` database. This extends the three-table model fro
 | Hungary | 5-min | `hu` | `5_hu_txt.zip` | `5min_hu` | ~0.8 MB |
 | Macroeconomy | Daily | `macro` | `d_macro_txt.zip` | `daily_macro` | ~0.9 MB |
 
-**Maximum expected file size: ~1 GB** (U.S. 5-min at ~595 MB; the 1 GB limit provides safe headroom).
+**Zip structure:** Each zip contains one CSV file per ticker (e.g. `AAPL.US.txt`), nested in
+subdirectories by region/exchange. `daily_pl` contains ~13,000 files. pgloader extracts the
+zip to its own temp directory (not the PVC) and streams each file sequentially.
 
-The `dataset` identifier sent by the admin UI is derived from the table name (e.g. `daily_us`,
-`hourly_world`). The target table name is specified as an env var passed to the import Job —
-it does not depend on the filename uploaded by the user.
+**CSV schema:** `<TICKER>,<PER>,<DATE>,<TIME>,<OPEN>,<HIGH>,<LOW>,<CLOSE>,<VOL>,<OPENINT>`
 
-**`price-data-architecture.md` must be updated** to extend the foreign table list from three
-entries to the full set above. The `price_bars_all` view routing logic (country_code →
-stooq table) will also cover hourly and 5-min tables for the analytics engine.
+**Important:** `VOL` (volume) and `OPENINT` can be floating-point values (e.g.
+`6337948.989247318`) — these must be stored as `NUMERIC(28,8)`, not `BIGINT`.
 
----
-
-## Contracts-first approach
-
-New API endpoints must be defined in `portfoliost-contracts` (`@marx2/contracts`, at
-`/Users/marx/prv/pfire/portfoliost-contracts`) before implementation. The OpenAPI spec
-(`openapi.yaml`) currently has no admin paths. A new `/admin/jobs` path group is added as
-part of this feature.
-
-Schemas and paths to add to `openapi.yaml`:
-
-```yaml
-# Schemas
-StooqDataset:
-  type: string
-  enum:
-    - daily_us
-    - hourly_us
-    - 5min_us
-    - daily_world
-    - hourly_world
-    - 5min_world
-    - daily_uk
-    - hourly_uk
-    - 5min_uk
-    - daily_jp
-    - daily_hk
-    - hourly_hk
-    - 5min_hk
-    - daily_pl
-    - hourly_pl
-    - 5min_pl
-    - daily_hu
-    - hourly_hu
-    - 5min_hu
-    - daily_macro
-
-StooqImportUploadResponse:
-  type: object
-  required: [uploadId, dataset, sizeBytes]
-  properties:
-    uploadId:   { type: string, format: uuid }
-    dataset:    { $ref: '#/components/schemas/StooqDataset' }
-    sizeBytes:  { type: integer }
-
-StooqImportRunRequest:
-  type: object
-  required: [dataset, uploadId]
-  properties:
-    dataset:  { $ref: '#/components/schemas/StooqDataset' }
-    uploadId: { type: string, format: uuid }
-
-StooqImportRunResponse:
-  type: object
-  required: [jobName, namespace, status]
-  properties:
-    jobName:   { type: string }
-    namespace: { type: string }
-    status:    { type: string, enum: [Running, Succeeded, Failed, NotFound] }
-
-StooqImportStatusResponse:
-  type: object
-  required: [dataset, jobName, status]
-  properties:
-    dataset:  { $ref: '#/components/schemas/StooqDataset' }
-    jobName:  { type: string }
-    status:   { type: string, enum: [Running, Succeeded, Failed, NotFound] }
-    details:
-      type: object
-      properties:
-        active:    { type: integer }
-        succeeded: { type: integer }
-        failed:    { type: integer }
-
-StooqImportLogEntry:
-  type: object
-  required: [dataset]
-  properties:
-    dataset:    { $ref: '#/components/schemas/StooqDataset' }
-    latestDate: { type: string, format: date, nullable: true }
-    importedAt: { type: string, format: date-time, nullable: true }
-    rowsDeleted:{ type: integer, nullable: true }
-
-# Paths
-/admin/jobs/stooq-import/upload:
-  post:
-    summary: Upload a stooq zip file for import
-    security: [{ bearerAuth: [] }]
-    requestBody:
-      content:
-        multipart/form-data:
-          schema:
-            type: object
-            required: [dataset, file]
-            properties:
-              dataset: { $ref: '#/components/schemas/StooqDataset' }
-              file: { type: string, format: binary }
-    responses:
-      '200': { content: { application/json: { schema: { $ref: '#/components/schemas/StooqImportUploadResponse' } } } }
-      '400': { description: Invalid dataset or file type }
-      '413': { description: File exceeds 1 GB limit }
-
-/admin/jobs/stooq-import/run:
-  post:
-    summary: Trigger a stooq import Kubernetes Job
-    security: [{ bearerAuth: [] }]
-    requestBody:
-      content:
-        application/json:
-          schema: { $ref: '#/components/schemas/StooqImportRunRequest' }
-    responses:
-      '200': { content: { application/json: { schema: { $ref: '#/components/schemas/StooqImportRunResponse' } } } }
-      '404': { description: Upload not found }
-      '409': { description: Job already running }
-
-/admin/jobs/stooq-import/status:
-  get:
-    summary: Get current status of a stooq import job
-    security: [{ bearerAuth: [] }]
-    parameters:
-      - name: dataset
-        in: query
-        required: true
-        schema: { $ref: '#/components/schemas/StooqDataset' }
-    responses:
-      '200': { content: { application/json: { schema: { $ref: '#/components/schemas/StooqImportStatusResponse' } } } }
-
-/admin/jobs/stooq-import/log:
-  get:
-    summary: Get last import log for all stooq datasets
-    security: [{ bearerAuth: [] }]
-    responses:
-      '200':
-        content:
-          application/json:
-            schema:
-              type: array
-              items: { $ref: '#/components/schemas/StooqImportLogEntry' }
-```
-
-The contracts package is bumped with a minor version before implementation begins.
+**Split adjustments:** Stooq retroactively adjusts historical OHLCV for all tickers when a
+split occurs. Every import is a full replacement — there is no incremental format and no value
+in caching extracted CSVs between imports.
 
 ---
 
@@ -223,216 +84,258 @@ The contracts package is bumped with a minor version before implementation begin
 ```
 Admin browser
   │
-  ├─ 1. Admin selects dataset (e.g. daily_us) + zip file
+  ├─ 1. Admin selects dataset (e.g. daily_pl) + zip file
   │
-  ├─ 2. POST /api/admin/jobs/stooq-import/upload
-  │      multipart/form-data: { dataset: "daily_us", file: <zip> }
+  ├─ 2. POST /api/admin/jobs/stooq-import/upload?dataset=daily_pl
+  │      multipart/form-data: { file: <zip> }
+  │      dataset is a query param (read before touching multipart body)
   │      → portfoliost-admin
-  │           → streams file to stooq-upload-pvc (1 Gi Longhorn RWX)
-  │              mounted at /tmp/stooq-uploads in portfoliost-admin pod
-  │              stored as daily_us-<uuid>.zip
+  │           → busboy streams file to hostPath PVC on kaczka
+  │              /tmp/stooq-uploads/daily_pl-<uuid>.zip
   │              returns { uploadId, dataset, sizeBytes }
   │
   ├─ 3. POST /api/admin/jobs/stooq-import/run
-  │      { dataset: "daily_us", uploadId }
+  │      { dataset: "daily_pl", uploadId }
   │      → portfoliost-admin
-  │           → POST jobshot /api/run-job  (job spec with volumes — see below)
+  │           → POST jobshot /api/run-job  (job spec with volumes, nodeSelector)
   │                → jobshot BatchV1Api.createNamespacedJob(...)
   │                   returns { jobName, namespace }
   │
-  └─ 4. GET /api/admin/jobs/stooq-import/status?dataset=daily_us
+  └─ 4. GET /api/admin/jobs/stooq-import/status?dataset=daily_pl  (every 30s, no timeout)
            → portfoliost-admin → jobshot GET /api/job-status/:jobName?namespace=pfire
-              → { status: "Running"|"Succeeded"|"Failed", ... }
+              → { status: "Running"|"Succeeded"|"Failed"|"NotFound" }
 ```
 
-### jobshot integration
+### Upload: busboy streaming, dataset as query param
 
-jobshot (`ghcr.io/marx2/jobshot`) is already deployed in the `pfire` namespace and exposes:
+`multer` was replaced with `busboy` + Node.js `pipeline()` to stream the zip directly to disk
+with zero heap allocation. The `dataset` param is read from the URL query string
+(`?dataset=daily_pl`) before touching the multipart body — this avoids any need to parse the
+body to get the dataset value before streaming starts.
 
-- `POST /api/run-job` — creates a K8s BatchV1 Job from a JSON job spec
-- `GET /api/job-status/:jobName?namespace=<ns>` — polls job status
+### Volume strategy: hostPath on kaczka
 
-portfoliost-admin calls jobshot's cluster-internal service:
-`JOBSHOT_URL=http://jobshot.pfire.svc:3000` (env var, configured in HelmRelease).
+The original design used a Longhorn RWX PVC. This was changed to a **hostPath PV** on node
+`kaczka` for better I/O throughput (direct NVMe, no Longhorn engine overhead).
 
-### File upload: portfoliost-admin writes directly to shared PVC
+- `kaczka` has the most free disk: ~120 GB free of 232 GB (45% used)
+- `kura` (where Postgres runs) was 85% full — unsuitable
+- Both the portfoliost-admin pod and the pgloader Job pod are pinned to `kaczka` via
+  `nodeSelector: kubernetes.io/hostname: kaczka`
 
-The upload endpoint lives on **portfoliost-admin**, not on jobshot. portfoliost-admin
-mounts the shared `stooq-upload-pvc` and writes the uploaded file directly to it. There is
-no intermediate upload to jobshot — jobshot is only called at step 3 (run-job) to create
-the K8s Job that will read the already-written file.
+| Resource | Value |
+|---|---|
+| PV name | `stooq-upload-pv` |
+| PVC name | `stooq-upload-pvc` |
+| Host path | `/var/lib/stooq-uploads` on `kaczka` |
+| Capacity | 2 Gi |
+| Access mode | ReadWriteMany |
+| Storage class | `""` (hostPath, no provisioner) |
 
-This design:
-- Keeps jobshot unchanged (no new upload endpoint needed)
-- Avoids double-copying the file through jobshot's pod memory
-- The pgloader Job pod also mounts the same PVC and reads the file directly
+### Import Kubernetes Job
 
-### Volume strategy
-
-A `stooq-upload-pvc` PVC (1 Gi, Longhorn `ReadWriteMany`) is created in the `pfire` namespace.
-`ReadWriteMany` is needed because portfoliost-admin and the pgloader Job pod may both need
-the volume mounted at the same time (admin pod writes, job pod reads).
-
-| Pod | Mount path | Access |
-|---|---|---|
-| portfoliost-admin Deployment | `/tmp/stooq-uploads` | ReadWrite (stores uploaded zip) |
-| pgloader Job pod | `/tmp/stooq-uploads` | ReadOnly sufficient (reads zip, then deletes) |
-
-portfoliost-admin stores files as `<dataset>-<uploadId>.zip` (e.g. `daily_us-abc123.zip`)
-to avoid collisions between simultaneous uploads for different datasets.
-
-### Import Kubernetes Job spec
-
-portfoliost-admin sends the following job definition to `POST jobshot /api/run-job`.
-**jobshot already supports `volumes` and `volumeMounts` pass-through** — the `run-job`
-handler passes the full job body to `runK8sJob`, which needs a one-line extension to include
-`job.volumes` and `job.volumeMounts` in the pod spec (see "jobshot changes required" below).
+portfoliost-admin sends the following to jobshot `/api/run-job`:
 
 ```json
 {
-  "name": "stooq-importer-daily-us",
+  "name": "stooq-importer-daily-pl",
   "namespace": "pfire",
   "container": "dimitri/pgloader:ccl.latest",
   "entrypoint": ["/bin/sh"],
-  "parameters": [
-    "-c",
-    "UPLOAD_ID=daily_us-abc123 TARGET_TABLE=daily_us; trap 'rm -f /tmp/stooq-uploads/${UPLOAD_ID}.zip' EXIT; cat > /tmp/import.load <<'EOF'\nLOAD ARCHIVE\n  FROM /tmp/stooq-uploads/${UPLOAD_ID}.zip\n  INTO postgres://postgres:$(SECRET_POSTGRESQL_PASSWORD)@postgres-pfire-primary.pfire.svc:5432/stooq\n  LOAD CSV FROM ALL FILENAMES MATCHING ~/./\n  INTO postgres://postgres:$(SECRET_POSTGRESQL_PASSWORD)@postgres-pfire-primary.pfire.svc:5432/stooq\n    TARGET TABLE ${TARGET_TABLE}\n    TARGET COLUMNS (ticker, period, date, time, open, high, low, close, volume, openint)\n  WITH truncate, skip header = 1, fields terminated by ',', fields not enclosed,\n    batch concurrency = 1, workers = 2, concurrency = 1, disable triggers\n  SET work_mem to '512 MB', maintenance_work_mem to '1024 MB';\nEOF\npgloader --debug /tmp/import.load"
-  ],
+  "parameters": ["-c", "<shell script>"],
   "secretName": "postgres-pfire-pguser-postgres",
-  "volumes": [
-    {
-      "name": "stooq-upload",
-      "persistentVolumeClaim": { "claimName": "stooq-upload-pvc" }
-    }
-  ],
-  "volumeMounts": [
-    {
-      "name": "stooq-upload",
-      "mountPath": "/tmp/stooq-uploads"
-    }
-  ],
-  "resources": {
-    "requests": { "cpu": "500m", "memory": "1Gi" },
-    "limits":   { "cpu": "2",   "memory": "2Gi" }
-  }
+  "volumes": [{ "name": "stooq-upload", "persistentVolumeClaim": { "claimName": "stooq-upload-pvc" } }],
+  "volumeMounts": [{ "name": "stooq-upload", "mountPath": "/tmp/stooq-uploads" }],
+  "nodeSelector": { "kubernetes.io/hostname": "kaczka" },
+  "resources": { "requests": { "cpu": "500m", "memory": "1Gi" }, "limits": { "cpu": "2000m", "memory": "4Gi" } }
 }
 ```
 
-### Postgres credentials: reuse PGO auto-created secret
+`backoffLimit` is set to `0` in jobshot — failed jobs never auto-restart. A failed import must
+be re-triggered manually from the UI after fixing the root cause.
 
-Crunchy PGO automatically creates a secret **`postgres-pfire-pguser-postgres`** in the `pfire`
-namespace for the `postgres` superuser. This secret already contains:
+### pgloader shell script (two-phase)
+
+The job runs a shell script with two pgloader invocations:
+
+**Phase 1 — bulk load into staging table:**
 
 ```
-host, port, dbname, user, password, uri, pgbouncer-uri, verifier
+set -e
+LOAD ARCHIVE
+  FROM <zip>
+  INTO postgres://postgres:$password@postgres-pfire-primary.pfire.svc:5432/stooq
+  BEFORE LOAD DO
+    $$ DROP TABLE IF EXISTS daily_pl_new; $$,
+    $$ CREATE UNLOGGED TABLE daily_pl_new (...); $$
+  LOAD CSV
+    FROM ALL FILENAMES MATCHING ~/./
+    INTO <dsn>
+      TARGET TABLE daily_pl_new
+      TARGET COLUMNS (ticker, period, date, time, open, high, low, close, volume, openint)
+    WITH no truncate,
+      skip header = 1,
+      fields terminated by ',',
+      fields not enclosed,
+      batch size = 100 MB,
+      batch concurrency = 4,
+      workers = 8,
+      concurrency = 2,
+      disable triggers
+    SET work_mem to '512 MB',
+        maintenance_work_mem to '1024 MB',
+        synchronous_commit to 'off',
+        statement_timeout to '0',
+        lock_timeout to '0',
+        idle_in_transaction_session_timeout to '0',
+        tcp_keepalives_idle to '60',
+        tcp_keepalives_interval to '10',
+        tcp_keepalives_count to '6';
 ```
 
-The `password` key holds the postgres superuser password. Since the `stooq` database is owned
-by the `postgres` user (as defined in `postgrescluster-pfire.yaml`), this secret is sufficient
-for the pgloader import.
+**Phase 2 — post-load: SET LOGGED, build PK, atomic swap:**
 
-The job spec uses `secretName: "postgres-pfire-pguser-postgres"` — jobshot injects it as
-`envFrom: [{ secretRef: { name: "postgres-pfire-pguser-postgres" } }]`. The pgloader load
-script references `$(password)` (the key name from the PGO secret) as the password in the
-connection string.
+Uses a second pgloader invocation (`LOAD CSV FROM INLINE`) with a single dummy row to execute
+post-load SQL via `BEFORE LOAD DO`. This avoids any dependency on `psql` (not available in
+the pgloader image — apt sources are broken on Debian Bullseye).
 
-**No new SOPS secrets or manually managed Kubernetes Secrets are required.**
+Zero-row `INLINE` crashes pgloader (known NIL type bug), so a real `pgloader_dummy` table is
+created and one dummy row is loaded. `AFTER LOAD DO` drops it.
+
+```
+LOAD CSV
+  FROM INLINE
+  INTO <dsn>
+  TARGET TABLE pgloader_dummy
+  BEFORE LOAD DO
+    $$ DROP TABLE IF EXISTS pgloader_dummy; $$,
+    $$ CREATE TABLE pgloader_dummy (x int); $$,
+    $$ SET maintenance_work_mem = '2GB'; $$,
+    $$ SET statement_timeout = 0; $$,
+    $$ ALTER TABLE daily_pl_new SET LOGGED; $$,
+    $$ ALTER TABLE daily_pl_new ADD PRIMARY KEY (ticker, date, time); $$,
+    $$ DO $swap$ BEGIN
+         DROP TABLE IF EXISTS daily_pl;
+         ALTER TABLE daily_pl_new RENAME TO daily_pl;
+       END $swap$; $$
+  AFTER LOAD DO
+    $$ DROP TABLE IF EXISTS pgloader_dummy; $$
+  WITH skip header = 0, fields terminated by ',';
+1
+```
+
+**Why staging table + atomic swap:**
+- `daily_pl` (the live table) stays queryable via `postgres_fdw` throughout the entire import
+- Downtime window is the single `DO $swap$` block — sub-millisecond
+- `UNLOGGED` table during load skips WAL entirely (~3-5x faster inserts)
+- `ALTER TABLE ... SET LOGGED` before going live makes it durable
+- `ADD PRIMARY KEY` after full load — single index build over complete dataset vs. incremental
+  updates per batch (orders of magnitude faster for 20M+ rows)
+
+**Tested locally** with pgloader 3.6.10 + postgres:16 in docker-compose on Apple Silicon
+(native pgloader via Homebrew — the `dimitri/pgloader:ccl.latest` Docker image cannot run on
+arm64 due to an SBCL/Rosetta signal handling bug).
+
+### Postgres credentials
+
+The PGO-managed secret `postgres-pfire-pguser-postgres` is injected via `envFrom`. The shell
+variable `$password` (the key name in the secret) is used directly in the DSN:
+`postgres://postgres:$password@postgres-pfire-primary.pfire.svc:5432/stooq`
+
+No new SOPS secrets or manually managed Kubernetes Secrets are required.
 
 ---
 
-## Frontend: Admin Jobs tab
+## Performance tuning
 
-Adds `JobsView.vue` to `src/modules/admin/` and `/en/admin/jobs` route to the router.
+### pgloader settings
 
-### Tab layout
-
-```
-┌─ System ──── Currency Rates ──── Users ──── Jobs ┐
-│                                                   │
-│  Stooq Import Jobs                               │
-│  ─────────────────────────────────────────────── │
-│                                                   │
-│  [USA — Daily]                          daily_us  │
-│  Last run: 2026-08-28 14:32  ● Succeeded         │
-│  ┌──────────────────────────────┐ ┌────────────┐  │
-│  │  Choose file…  d_us_txt.zip │ │ Run Import │  │
-│  └──────────────────────────────┘ └────────────┘  │
-│                                                   │
-│  [USA — Hourly]                        hourly_us  │
-│  Last run: never                    Status: —    │
-│  ┌──────────────────────────────┐ ┌────────────┐  │
-│  │  Choose file…               │ │ Run Import │  │
-│  └──────────────────────────────┘ └────────────┘  │
-│                                                   │
-│  [USA — 5-min]                          5min_us  │
-│  …                                               │
-│  (and so on for all 20 datasets)                 │
-│                                                   │
-└───────────────────────────────────────────────────┘
-```
-
-Datasets are grouped by region (World, U.S., U.K., Japan, Hong Kong, Poland, Hungary,
-Macroeconomy) with a section header per group. Within each group, timeframes appear in order:
-Daily, Hourly, 5-min.
-
-### Import button states
-
-| State | Enabled? | Label |
+| Setting | Value | Reason |
 |---|---|---|
-| No file selected | No (disabled) | "Run Import" |
-| File selected, no job running | Yes | "Run Import" |
-| Upload in progress | No | "Uploading… 42%" |
-| Job running (polling) | No | "Running…" |
-| Job succeeded | Yes (re-run) | "Run Import" |
-| Job failed | Yes (retry) | "Run Import" |
+| `CREATE UNLOGGED TABLE` | staging table only | Skips WAL during bulk insert — 3-5x faster |
+| `ALTER TABLE SET LOGGED` | before ADD PRIMARY KEY | Durable before going live |
+| `synchronous_commit = off` | pgloader session | No WAL flush wait per batch commit |
+| `batch size = 100 MB` | pgloader | Fewer COPY round-trips; 8 workers × 100 MB = 800 MB peak |
+| `workers = 8, concurrency = 2` | pgloader | More parallel COPY streams |
+| `maintenance_work_mem = 2 GB` | psql post-load step | Faster single-pass PK index build |
+| `statement_timeout = 0` | pgloader + post-load | No per-statement kill during long COPY |
+| `tcp_keepalives_idle = 60` | pgloader | Prevents network from killing idle COPY connection |
+| Pod memory limit | 4 Gi | 8 workers × 100 MB batches + runtime headroom |
 
-### Status badge
+### Postgres cluster tuning (applied 2026-08-30)
 
-Polled every 5 seconds while a job is active. Uses jobshot status values:
-`Running` / `Succeeded` / `Failed` / `—` (no previous run).
+Applied via `patroni.dynamicConfiguration.postgresql.parameters` in `postgrescluster-pfire.yaml`.
+Requires pod restart (applied after the daily_pl import was complete):
 
-Last-run timestamp and status come from `stooq_import_log` (updated by the
-portfoliost-instruments post-import hook), fetched on tab load via
-`GET /api/admin/jobs/stooq-import/log`.
+| Parameter | Old | New | Reason |
+|---|---|---|---|
+| `shared_buffers` | 128 MB (default) | 2 GB | Larger page cache; fewer dirty page writeouts to Longhorn |
+| `effective_cache_size` | unset | 8 GB | Planner hint (no RAM cost) |
+| `wal_buffers` | 4 MB | 32 MB | WAL writes batched larger before flush |
+| `max_wal_size` | 1 GB | 4 GB | Checkpoints 4× less frequent under bulk load |
+| `min_wal_size` | 80 MB | 512 MB | Pre-allocated WAL segments |
+| `wal_compression` | off | on | Reduces WAL I/O volume ~3×, no RAM cost |
+| Pod memory request | unset | 2 Gi | Scheduler now reserves RAM for Postgres |
+| Pod memory limit | unset | 5 Gi | Covers shared_buffers + working memory + connections |
+
+**Note:** Postgres runs on `kura` (85% full disk, Longhorn PVC) — this is the primary
+performance bottleneck. The Postgres data PVC is Longhorn on `kura`; every write goes through
+the Longhorn engine. Moving Postgres to `kaczka` was considered but not done (non-trivial PGO
+migration). The tuning above mitigates but does not eliminate this bottleneck.
+
+**Observed import performance (daily_pl, ~24.7M rows, 1.4 GB extracted):**
+- Extraction: ~15 seconds (200 MB zip → 1.4 GB, ~13,000 files)
+- Bulk load (COPY): ~8 hours (Longhorn on kura bottleneck; UNLOGGED + no index active)
+- Post-load (ADD PRIMARY KEY + rename): a few minutes
+
+---
+
+## Status polling
+
+The UI polls `GET /api/admin/jobs/stooq-import/status?dataset=...` every **30 seconds**
+with **no timeout**. Imports take hours; the browser tab can be closed and reopened. Polling
+stops only when the job reaches `Succeeded`, `Failed`, or disappears after having been
+`Running` (jobshot cleans up completed jobs).
+
+The previous 5-minute timeout (`MAX_POLL_MS`) was removed — it caused the UI to show
+"Timed out" while the Kubernetes job was still running normally.
 
 ---
 
 ## API endpoints
 
-Defined in contracts (`openapi.yaml`) first — see "Contracts-first approach" section.
-
 ### Upload
 
 ```
-POST /api/admin/jobs/stooq-import/upload
+POST /api/admin/jobs/stooq-import/upload?dataset=<StooqDataset>
 Authorization: Bearer <admin JWT>
 Content-Type: multipart/form-data
-Fields: dataset (StooqDataset), file (.zip binary)
+Fields: file (.zip binary)
 
 200: { uploadId, dataset, sizeBytes }
 400: { error: "Invalid dataset" } | { error: "File must be a .zip archive" }
 413: { error: "File exceeds 1 GB limit" }
 ```
 
-portfoliost-admin uses `multer` diskStorage, writing to `/tmp/stooq-uploads/<dataset>-<uuid>.zip`
-(the PVC mount). File content is streamed directly to disk — never buffered to memory.
+`dataset` is a **query param** (not a form field) so the server can validate before touching
+the multipart body. Uses `busboy` + `pipeline()` for zero-copy streaming to disk.
 
 ### Run
 
 ```
 POST /api/admin/jobs/stooq-import/run
 Authorization: Bearer <admin JWT>
-Body: { dataset: "daily_us", uploadId: "<uuid>" }
+Body: { dataset: "daily_pl", uploadId: "<uuid>" }
 
-200: { jobName: "stooq-importer-daily-us", namespace: "pfire", status: "Running" }
+200: { jobName: "stooq-importer-daily-pl", namespace: "pfire", status: "Running" }
 404: { error: "Upload not found. Upload the file first." }
-409: { error: "A stooq-importer-daily-us job is already running" }
+409: { error: "A stooq-importer-daily-pl job is already running" }
 ```
 
 ### Status
 
 ```
-GET /api/admin/jobs/stooq-import/status?dataset=daily_us
+GET /api/admin/jobs/stooq-import/status?dataset=daily_pl
 Authorization: Bearer <admin JWT>
 
 200: { dataset, jobName, status: "Running"|"Succeeded"|"Failed"|"NotFound", details: { active, succeeded, failed } }
@@ -447,228 +350,146 @@ Authorization: Bearer <admin JWT>
 200: [ { dataset, latestDate, importedAt, rowsDeleted }, ... ]  — one entry per dataset
 ```
 
-Reads from `stooq_import_log` in portfoliost-instruments (via internal service call or shared
-DB access).
-
 ---
 
-## jobshot changes required
+## jobshot changes
 
-jobshot currently does **not** pass `volumes` or `volumeMounts` from the job definition into
-the K8s Job pod spec. This is the only jobshot change needed — a minimal two-line addition to
-`runK8sJob` in `server.js`:
+jobshot was extended in two stages:
+
+**v1.5.0 → v1.6.0:** Added `volumes`, `volumeMounts`, and `nodeSelector` pass-through to the
+K8s Job pod spec in `runK8sJob`:
 
 ```js
-// server.js — runK8sJob (current spec.template.spec)
-spec: {
-  containers: [{
-    // ... existing fields
-    volumeMounts: job.volumeMounts || [],   // ADD THIS LINE
-  }],
-  volumes: job.volumes || [],               // ADD THIS LINE
-  imagePullSecrets: [{ name: 'regcred' }],
-  restartPolicy: 'Never',
-}
+volumeMounts: job.volumeMounts ? job.volumeMounts : undefined,
+volumes:      job.volumes      ? job.volumes      : undefined,
+nodeSelector: job.nodeSelector ? job.nodeSelector : undefined,
 ```
 
-**No upload endpoint, no PVC mount on the jobshot Deployment, no multer dependency** — these
-are not needed because portfoliost-admin handles the upload directly.
-
-The `configLoader.ts` `Job` interface is extended with:
-```typescript
-volumes?:      object[];   // K8s V1Volume array (passed through as-is)
-volumeMounts?: object[];   // K8s V1VolumeMount array (passed through as-is)
-```
-
-jobshot image is bumped via semantic-release after this change.
+**v1.6.0 → v1.6.1:** `backoffLimit` changed from `1` to `0` — failed jobs never auto-restart.
 
 ---
 
-## Cluster changes (homelab GitOps repo)
+## Cluster resources (homelab GitOps)
 
-### New PVC: `stooq-upload-pvc`
+### PV + PVC: hostPath on kaczka
 
 ```yaml
-# cluster/apps/pfire/stooq-upload-pvc.yaml
+# stooq-upload-pvc.yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: stooq-upload-pv
+spec:
+  capacity: { storage: 2Gi }
+  accessModes: [ReadWriteMany]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  hostPath:
+    path: /var/lib/stooq-uploads
+    type: DirectoryOrCreate
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values: [kaczka]
+---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: stooq-upload-pvc
   namespace: pfire
 spec:
-  storageClassName: longhorn
+  storageClassName: ""
+  volumeName: stooq-upload-pv
   accessModes: [ReadWriteMany]
-  resources:
-    requests:
-      storage: 1Gi
+  resources: { requests: { storage: 2Gi } }
 ```
 
-1 Gi is sufficient: largest expected file is ~600 MB; only one file per dataset lives on the
-PVC at any time (deleted by the Job on EXIT).
+### portfoliost-admin HelmRelease
 
-### portfoliost-admin Deployment: add PVC mount
+Key settings (current, v1.0.19):
+- `nodeSelector: kubernetes.io/hostname: kaczka`
+- `memory limit: 512Mi` (busboy streaming; file never enters heap)
+- `STOOQ_UPLOAD_DIR: /tmp/stooq-uploads`
+- `API_JOBSHOT_URL: http://jobshot.pfire.svc.cluster.local:3000`
+- PVC mount: `stooq-upload-pvc` → `/tmp/stooq-uploads`
 
-```yaml
-# In portfoliost-admin HelmRelease / Deployment
-volumes:
-  - name: stooq-upload
-    persistentVolumeClaim:
-      claimName: stooq-upload-pvc
-containers:
-  - name: portfoliost-admin
-    volumeMounts:
-      - name: stooq-upload
-        mountPath: /tmp/stooq-uploads
-    env:
-      - name: JOBSHOT_URL
-        value: http://jobshot.pfire.svc:3000
-      - name: STOOQ_UPLOAD_DIR
-        value: /tmp/stooq-uploads
-```
+### nginx ingress
 
-### Existing stooq-importer CronJob
-
-Left in place as a fallback for NFS-backed imports. No conflict: jobshot uses job names
-`stooq-importer-<dataset>` (e.g. `stooq-importer-daily-us`), which differ from the existing
-CronJob name `stooq-importer`.
-
-### No new SOPS secrets
-
-The PGO-managed secret `postgres-pfire-pguser-postgres` already exists in the `pfire`
-namespace. No SOPS extension, no new Secret manifests.
+`nginx.ingress.kubernetes.io/proxy-body-size: "1100m"` on the portfoliost ingress — raised
+from the default 1 MB to allow zip uploads up to ~1 GB.
 
 ---
 
-## Implementation plan
+## Known issues / lessons learned
 
-### Step N1 — contracts: add admin/jobs paths + schemas
+### `psql` not available in pgloader image
 
-1. Add `StooqDataset` enum, upload/run/status/log schemas, and four paths to `openapi.yaml`
-   in `portfoliost-contracts`
-2. Bump contracts package minor version
-3. Update `@marx2/contracts` reference in portfoliost and portfoliost-admin
+The `dimitri/pgloader:ccl.latest` image (Debian Bullseye) does not include `psql`, and its
+apt sources have stale GPG keys making runtime `apt-get install` unreliable. Post-load SQL
+(SET LOGGED, ADD PRIMARY KEY, atomic rename) is run via a second `pgloader` invocation using
+`LOAD CSV FROM INLINE`.
 
-### Step N2 — jobshot: volumes pass-through
+### Zero-row INLINE crashes pgloader
 
-1. Add `volumeMounts: job.volumeMounts || []` and `volumes: job.volumes || []` to `runK8sJob`
-   in `server.js`
-2. Extend `configLoader.ts` `Job` interface with `volumes?` + `volumeMounts?`
-3. Build + smoke test
-4. Push new image via semantic-release
+`LOAD CSV FROM INLINE` with no data rows crashes pgloader with `NIL is not of type NUMBER`
+(known bug). Workaround: create a real `pgloader_dummy (x int)` table in `BEFORE LOAD DO`,
+insert one dummy row in the inline section, drop the table in `AFTER LOAD DO`.
 
-### Step N3 — homelab: PVC + portfoliost-admin volume mount + jobshot URL env
+### FINALLY DO not supported in LOAD ARCHIVE
 
-1. Add `stooq-upload-pvc.yaml` to `cluster/apps/pfire/`
-2. Add PVC volume + mount + `JOBSHOT_URL` + `STOOQ_UPLOAD_DIR` to portfoliost-admin HelmRelease
-3. Update `kustomization.yaml`
-4. Flux reconcile + verify PVC bound
+Despite appearing in pgloader docs, `FINALLY DO` is not a valid top-level clause in
+`LOAD ARCHIVE`. The grammar only accepts `BEFORE LOAD DO`, `EXECUTE`, and `LOAD` after the
+archive `FROM`/`INTO` clauses.
 
-### Step N4 — portfoliost-admin: upload + run API routes
+### UNLOGGED table wiped on Postgres restart
 
-1. Add `multer` with diskStorage to portfoliost-admin
-2. Implement `POST /api/admin/jobs/stooq-import/upload`
-   - Validate `dataset` against enum; reject non-.zip files; enforce 1 GB limit
-   - Stream to `/tmp/stooq-uploads/<dataset>-<uuid>.zip`
-   - Return `{ uploadId, dataset, sizeBytes }`
-3. Implement `POST /api/admin/jobs/stooq-import/run`
-   - Verify file exists on PVC (otherwise 404)
-   - Check jobshot for existing running job (409 if running)
-   - Build pgloader job spec (dataset → TARGET_TABLE mapping, volume/volumeMount, secretName)
-   - POST to `JOBSHOT_URL/api/run-job`
-4. Implement `GET /api/admin/jobs/stooq-import/status` (proxy to jobshot)
-5. Implement `GET /api/admin/jobs/stooq-import/log` (read stooq_import_log)
-6. Admin JWT guard on all routes
-7. Unit tests + mock API tests
+`UNLOGGED` tables are truncated automatically when Postgres restarts (crash recovery). The
+Postgres config change (shared_buffers etc.) was applied while an import was in progress,
+causing a pod restart and loss of ~9 hours of imported data. Lesson: apply config changes
+that require a Postgres restart only when no import job is running.
 
-### Step N5 — portfoliost frontend: Jobs tab
+### busboy finish event race
 
-1. Add `src/modules/admin/JobsView.vue` (20 dataset cards, grouped by region)
-2. Add `/en/admin/jobs` route + admin guard
-3. Add "Jobs" tab to `AdminLayout.vue` nav
-4. Add `src/api/adminJobs.ts`: `uploadStooqZip`, `runStooqImport`, `getStooqImportStatus`, `getStooqImportLog`
-5. Use `XMLHttpRequest` for upload (exposes `progress` event; `fetch` does not)
-6. Status polling: `setInterval` every 5s while status is `Running`; stop on `Succeeded`/`Failed`
-7. Mock responses in `mocks/` for all four endpoints
-8. E2E: upload mock, run mock, status poll mock
+`busboy`'s `finish` event fires when multipart parsing completes, but before `pipeline()` has
+finished flushing to disk. The original code used a single `resolved` flag for both "file
+part seen" and "pipeline done", causing false "No file received" errors. Fixed by separating
+`fileReceived` (set on `file` event) from `settled` (set when pipeline resolves/rejects).
 
-### Step N6 — integration test + cluster deploy
+### volume/openint: BIGINT → NUMERIC(28,8)
 
-1. Build portfoliost + portfoliost-admin docker images
-2. Push + update HelmReleases
-3. `docker compose up --build` + full test suite green
-4. Smoke test with `d_pl_txt.zip` (smallest real dataset, ~28–191 MB depending on timeframe)
+Stooq encodes some volume and openint values as floats (e.g. `6337948.989247318`). BIGINT
+rejects these with error `22P02`. Schema uses `NUMERIC(28,8)` for both columns.
 
----
+### pgloader here-doc escaping
 
-## Data flow on import
-
-```
-Admin browser
-  1. Selects "Poland — Daily" + file d_pl_txt.zip (191 MB)
-  2. POST /api/admin/jobs/stooq-import/upload { dataset: "daily_pl", file }
-     → portfoliost-admin multer writes to /tmp/stooq-uploads/daily_pl-abc123.zip (on PVC)
-     ← { uploadId: "abc123", dataset: "daily_pl", sizeBytes: 200000000 }
-  3. POST /api/admin/jobs/stooq-import/run { dataset: "daily_pl", uploadId: "abc123" }
-     → portfoliost-admin POST jobshot /api/run-job {
-         name: "stooq-importer-daily-pl",
-         container: "dimitri/pgloader:ccl.latest",
-         entrypoint: ["/bin/sh"],
-         parameters: ["-c", "... pgloader /tmp/import.load"],
-         secretName: "postgres-pfire-pguser-postgres",
-         volumes: [{ name: "stooq-upload", persistentVolumeClaim: { claimName: "stooq-upload-pvc" } }],
-         volumeMounts: [{ name: "stooq-upload", mountPath: "/tmp/stooq-uploads" }]
-       }
-     → jobshot creates K8s Job "stooq-importer-daily-pl" in pfire namespace
-     ← { jobName: "stooq-importer-daily-pl", namespace: "pfire", status: "Running" }
-  4. pgloader Job pod:
-     - Mounts stooq-upload-pvc at /tmp/stooq-uploads
-     - Reads $(password) from envFrom: postgres-pfire-pguser-postgres secret
-     - trap removes /tmp/stooq-uploads/daily_pl-abc123.zip on EXIT
-     - Runs pgloader: LOAD ARCHIVE FROM zip INTO stooq; TARGET TABLE daily_pl; WITH truncate
-  5. pgloader success: (curl to portfoliost-instruments not possible in ccl image without curl;
-     see open item 5 — alternative: polling the job status from portfoliost-admin post-completion)
-  6. portfoliost-instruments post-import hook fires:
-     - MAX(date) FROM stooq_daily_pl
-     - Cleanup overflow rows, split adjustments, split candidates
-     - Upsert stooq_import_log { dataset: "daily_pl", latestDate, importedAt, rowsDeleted }
-  7. UI polls /api/admin/jobs/stooq-import/status?dataset=daily_pl every 5s
-     → shows "Succeeded"
-     → refresh /api/admin/jobs/stooq-import/log → shows latestDate
-```
+Inside a shell here-doc (`<< EOF`), single quotes are literal — no escaping is needed or
+valid. The original `\\'` sequences produced `\'` in the shell script which pgloader rejected
+with `OPTION-TERMINATED-BY` parse errors. Fixed to bare `','` and `'512 MB'`.
 
 ---
 
 ## Open items
 
-1. **Longhorn RWX availability** — verify that the cluster's Longhorn version supports
-   `ReadWriteMany`. If not, use an NFS-backed PVC (same pattern as `nfs-pfire-stooq-rw-pvc`
-   with a dedicated small export on the Synology NAS).
+1. **stooq_import_log for all 20 datasets** — `price-data-architecture.md` defines
+   `stooq_import_log.dataset` with values `daily_us`, `daily_pl`, `daily_world` only. Extend
+   to the full 20-entry StooqDataset enum when the instruments module is updated.
 
-2. **`curl` in `dimitri/pgloader:ccl.latest`** — the CCL pgloader image is Debian-based and
-   likely includes curl, but must be verified. If absent, the post-import notification to
-   portfoliost-instruments cannot be sent from the pgloader container. Alternative: portfoliost-admin
-   polls the job status and fires the post-import hook itself after detecting `Succeeded`.
+2. **Post-import hook** — the portfoliost-instruments post-import hook
+   (`POST /internal/stooq-imported`) is not yet called from the import job. Currently the log
+   endpoint returns nulls for `latestDate`/`importedAt`/`rowsDeleted`. The hook should be
+   triggered by portfoliost-admin after detecting job `Succeeded` status.
 
-3. **PGO secret key name** — the `postgres-pfire-pguser-postgres` secret uses key `password`
-   (not `SECRET_POSTGRESQL_PASS`). The pgloader load script must reference `$(password)` —
-   the shell-substitution syntax for the env var injected from the secret. Verify the exact key
-   name by inspecting the live secret: `kubectl get secret postgres-pfire-pguser-postgres -n pfire -o jsonpath='{.data}' | base64 -d`.
+3. **Postgres on kura (85% full disk)** — the primary performance bottleneck. Longhorn on a
+   nearly-full disk with high fragmentation makes every write slow. Moving Postgres to `kaczka`
+   would require a PGO cluster migration (non-trivial). Monitor disk usage and consider
+   expanding the Longhorn volume or migrating when the import of larger datasets (daily_world,
+   daily_us) becomes unacceptably slow.
 
-4. **pgloader load script quoting** — the inline `-c` shell argument with heredoc becomes
-   unwieldy for large scripts. Preferred approach: portfoliost-admin writes
-   `<dataset>-<uuid>.load` to `/tmp/stooq-uploads/` alongside the zip, then the pgloader
-   command is simply `pgloader --debug /tmp/stooq-uploads/<dataset>-<uuid>.load`. This also
-   avoids shell quoting issues with variable substitution in the pgloader DSN.
-
-5. **Multiple simultaneous imports for different datasets** — the PVC is shared across all
-   datasets. Each file has a unique `<dataset>-<uuid>.zip` name so concurrent uploads for
-   different datasets do not collide. Each dataset has its own job name so jobshot
-   de-duplicates correctly. Only one import per dataset can run at a time; imports for
-   different datasets can run concurrently.
-
-6. **stooq_import_log for non-daily tables** — `price-data-architecture.md` defines
-   `stooq_import_log.dataset` with values `daily_us`, `daily_pl`, `daily_world` only. This
-   must be extended to the full 20-entry StooqDataset enum when the instruments module is
-   updated. The post-import hook (`POST /internal/stooq-imported`) must also accept a
-   `dataset` query param to identify which table was imported, rather than inferring it from
-   table scans.
+4. **pgloader image replacement** — `dimitri/pgloader:ccl.latest` has a broken apt environment
+   and cannot run on arm64. Consider building a custom image based on it with `postgresql-client`
+   baked in at build time (fixing the `psql not found` issue cleanly), or switching to the
+   pgloader apt package on `postgres:16-alpine` when a maintained pgloader image for arm64
+   becomes available.
