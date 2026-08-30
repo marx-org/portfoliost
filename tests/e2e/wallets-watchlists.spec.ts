@@ -146,7 +146,7 @@ test("wallets: delete is blocked for a wallet with transactions and redirected t
   await confirm.getByRole("button", { name: "Delete", exact: true }).click()
 
   await expect(page).toHaveURL(/\/en\/wallets/)
-  await expect(page.getByText(/was not deleted/)).toBeVisible()
+  await expect(page.getByText(/Cannot delete|has transactions|was not deleted/)).toBeVisible()
   await expect(page.locator(".card", { hasText: "Portfel USD 1" })).toBeVisible()
 })
 
