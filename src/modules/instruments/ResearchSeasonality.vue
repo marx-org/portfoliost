@@ -11,7 +11,7 @@ const years = ref(5)
 const metric = ref<(typeof metricOptions)[number]>("avg")
 const loading = ref(false)
 const error = ref<string | null>(null)
-const monthly = ref<Array<{ month: string; return_pct: number }>>([])
+const monthly = ref<Array<{ month: string; return_pct: number | null }>>([])
 
 async function load() {
   loading.value = true
@@ -30,8 +30,8 @@ watch([years, metric], load, { immediate: true })
 
 const chartOptions = computed(() => ({
   chart: { type: "bar" as const, height: 300, toolbar: { show: false } },
-  colors: monthly.value.map((m) => (m.return_pct >= 0 ? "#16a34a" : "#dc2626")),
-  series: [{ name: "Return", data: monthly.value.map((m) => m.return_pct) }],
+  colors: monthly.value.map((m) => ((m.return_pct ?? 0) >= 0 ? "#16a34a" : "#dc2626")),
+  series: [{ name: "Return", data: monthly.value.map((m) => m.return_pct ?? 0) }],
   xaxis: { categories: monthly.value.map((m) => m.month) },
   plotOptions: { bar: { columnWidth: "55%", borderRadius: 3 } },
   dataLabels: {

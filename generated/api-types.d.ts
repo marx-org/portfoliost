@@ -1634,6 +1634,104 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/jobs/stooq-import/upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload a stooq zip file for import
+         * @description Streams a stooq bulk-download zip to the shared upload volume.
+         *     Returns an uploadId used to trigger the import job.
+         *     Maximum file size: 1 GB.
+         */
+        post: operations["uploadStooqZip"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/jobs/stooq-import/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Trigger a stooq import Kubernetes Job
+         * @description Creates a Kubernetes Job (via jobshot) that runs pgloader against the
+         *     previously uploaded zip file. The job is named stooq-importer-<dataset>.
+         */
+        post: operations["runStooqImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/jobs/stooq-import/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get current status of a stooq import job */
+        get: operations["getStooqImportStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/jobs/stooq-import/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get last import log for all stooq datasets */
+        get: operations["getStooqImportLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List users with identity and access metadata
+         * @description Returns users with access metadata (groups, last login) merged with
+         *     identity (email, name) resolved from the identity provider.
+         */
+        get: operations["listAdminUsers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1905,7 +2003,7 @@ export interface components {
         InstrumentProfile: {
             ticker?: string;
             name?: string;
-            country?: string;
+            country?: string | null;
             countryCode?: string | null;
             isin?: string | null;
             currency?: string;
@@ -1996,7 +2094,7 @@ export interface components {
             enterpriseValue?: number;
             sharesOutstanding?: number;
             revenue?: number;
-            employees?: number;
+            employees?: number | null;
             cash?: number;
             netDebt?: number;
             revenueGrowth3yr?: number;
@@ -2130,6 +2228,7 @@ export interface components {
             }[];
         };
         CalendarData: {
+            currency?: string;
             earnings?: {
                 date: string;
                 title?: string;
@@ -2173,7 +2272,7 @@ export interface components {
             metric?: string;
             monthly_returns?: {
                 month: string;
-                return_pct: number;
+                return_pct: number | null;
             }[];
         };
         EPSSurprises: {
@@ -2195,12 +2294,13 @@ export interface components {
             time?: string;
         };
         ProjectionsData: {
+            currency?: string;
             priceTarget?: {
                 lastUpdated?: string;
-                low?: number;
-                mean?: number;
-                current?: number;
-                high?: number;
+                low?: number | null;
+                mean?: number | null;
+                current?: number | null;
+                high?: number | null;
             };
             recommendation?: {
                 period?: string;
@@ -2237,10 +2337,10 @@ export interface components {
         IRTranscript: {
             id?: string;
             symbol?: string;
-            year?: number;
-            quarter?: number;
+            year?: number | null;
+            quarter?: number | null;
             title?: string;
-            time?: string;
+            time?: string | null;
             participant?: Record<string, never>[];
             audio?: string | null;
             transcript?: Record<string, never>[];
@@ -2265,6 +2365,7 @@ export interface components {
             fcfMargin?: number;
             netIncome?: number;
             revenue?: number;
+            sharesOutstanding?: number;
             currency?: string;
         };
         ChartingPreset: {
@@ -2881,6 +2982,85 @@ export interface components {
         SnapTradeStatus: {
             isRegistered?: boolean;
             connectionsCount?: number;
+        };
+        /**
+         * @description Identifies a stooq bulk-download dataset (region + timeframe)
+         * @enum {string}
+         */
+        StooqDataset: "daily_world" | "hourly_world" | "5min_world" | "daily_us" | "hourly_us" | "5min_us" | "daily_uk" | "hourly_uk" | "5min_uk" | "daily_jp" | "daily_hk" | "hourly_hk" | "5min_hk" | "daily_pl" | "hourly_pl" | "5min_pl" | "daily_hu" | "hourly_hu" | "5min_hu" | "daily_macro";
+        StooqImportUploadResponse: {
+            /** Format: uuid */
+            uploadId: string;
+            dataset: components["schemas"]["StooqDataset"];
+            /** @description Size of the uploaded file in bytes */
+            sizeBytes: number;
+        };
+        StooqImportRunRequest: {
+            dataset: components["schemas"]["StooqDataset"];
+            /** Format: uuid */
+            uploadId: string;
+        };
+        StooqImportRunResponse: {
+            /** @description Kubernetes Job name, e.g. stooq-importer-daily-us */
+            jobName: string;
+            namespace: string;
+            /** @enum {string} */
+            status: "Running" | "Succeeded" | "Failed" | "NotFound";
+        };
+        StooqImportStatusResponse: {
+            dataset: components["schemas"]["StooqDataset"];
+            jobName: string;
+            /** @enum {string} */
+            status: "Running" | "Succeeded" | "Failed" | "NotFound";
+            details?: {
+                active?: number;
+                succeeded?: number;
+                failed?: number;
+            };
+        };
+        StooqImportLogEntry: {
+            dataset: components["schemas"]["StooqDataset"];
+            /**
+             * Format: date
+             * @description MAX(date) confirmed from foreign table after last import
+             */
+            latestDate?: string | null;
+            /**
+             * Format: date-time
+             * @description Timestamp of the last successful import hook call
+             */
+            importedAt?: string | null;
+            /** @description Overflow rows cleaned up in the last run */
+            rowsDeleted?: number | null;
+        };
+        AdminUser: {
+            /**
+             * Format: uuid
+             * @description User's stable id (PocketID subject / portfoliost user id)
+             */
+            id: string;
+            /** Format: email */
+            email?: string | null;
+            firstName?: string | null;
+            lastName?: string | null;
+            /** @description Group memberships for authorization */
+            groups: string[];
+            /**
+             * Format: date-time
+             * @description Last successful authentication (null if never logged in)
+             */
+            lastLogin: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        AdminUserListResponse: {
+            items: components["schemas"]["AdminUser"][];
+            pagination: {
+                total: number;
+                page: number;
+                per_page: number;
+                total_pages: number;
+            };
         };
     };
     responses: never;
@@ -5244,6 +5424,181 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SnapTradeStatus"];
+                };
+            };
+        };
+    };
+    uploadStooqZip: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    dataset: components["schemas"]["StooqDataset"];
+                    /**
+                     * Format: binary
+                     * @description The stooq zip archive to import
+                     */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Upload accepted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StooqImportUploadResponse"];
+                };
+            };
+            /** @description Invalid dataset or file type */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description File exceeds 1 GB limit */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    runStooqImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StooqImportRunRequest"];
+            };
+        };
+        responses: {
+            /** @description Job started */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StooqImportRunResponse"];
+                };
+            };
+            /** @description Upload not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Import job already running */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getStooqImportStatus: {
+        parameters: {
+            query: {
+                dataset: components["schemas"]["StooqDataset"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Job status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StooqImportStatusResponse"];
+                };
+            };
+        };
+    };
+    getStooqImportLog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One entry per dataset */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StooqImportLogEntry"][];
+                };
+            };
+        };
+    };
+    listAdminUsers: {
+        parameters: {
+            query?: {
+                page?: number;
+                per_page?: number;
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated admin user list */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserListResponse"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not a portfoliost_admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

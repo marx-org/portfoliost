@@ -1,4 +1,5 @@
 import { http } from "./client"
+import type { components } from "../../generated/api-types"
 
 export interface ServiceVersion {
   service: string
@@ -30,20 +31,9 @@ export interface FxRatesResponse {
   pagination: Pagination
 }
 
-export interface AdminUser {
-  id: string
-  email: string | null
-  firstName: string | null
-  lastName: string | null
-  groups: string[]
-  lastLogin: string | null
-  createdAt: string
-}
-
-export interface UsersResponse {
-  items: AdminUser[]
-  pagination: Pagination
-}
+// Contract-typed admin user (from @marx2/contracts /api/admin/users).
+export type AdminUser = components["schemas"]["AdminUser"]
+export type UsersResponse = components["schemas"]["AdminUserListResponse"]
 
 export function fetchSystemVersions(): Promise<SystemVersionsResponse> {
   return http.get<SystemVersionsResponse>("/api/admin/system/versions")

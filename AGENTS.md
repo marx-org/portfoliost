@@ -34,6 +34,7 @@ Do not build or wire these sections from example-service:
 
 ## Conventions
 
+- **Contract enforcement is a must.** Every API response the SPA or a backend module returns must be typed against the shared `@marx2/contracts` spec (generated `components` types / zod-openapi from the contract), so a shape drift fails the build. Hand-written response types that duplicate the contract are not allowed. Update the contract in `portfoliost-contracts` first when changing the wire shape, publish, then regenerate/enforce in consumers.
 - New API wire fields use camelCase even where legacy schemas are snake_case (see `docs/proposals/fees-and-custom-fx.md` D29).
 - FX conversion math must go through `@marx2/contracts/fx` — never re-implement cross-rate/settlement formulas locally (D27).
 - Currency selectors are fed exclusively by the `/api/currencies` registry (`useCurrenciesStore`); never hardcode currency lists.
