@@ -35,7 +35,10 @@ Do not build or wire these sections from example-service:
 
 ## Conventions
 
-- **Contract enforcement is a must.** Every API response the SPA or a backend module returns must be typed against the shared `@marx2/contracts` spec (generated `components` types / zod-openapi from the contract), so a shape drift fails the build. Hand-written response types that duplicate the contract are not allowed. Update the contract in `portfoliost-contracts` first when changing the wire shape, publish, then regenerate/enforce in consumers.
+- **Contract enforcement is a must.** Every API response the SPA or a backend module returns must be typed against the shared `@marx2/contracts` spec (generated `components` types), so a shape drift fails the build. Hand-written response types that duplicate the contract are not allowed.
+  - **Workflow**: edit `openapi.yaml` in `portfoliost-contracts` → push to `main` → CI auto-bumps the patch version (git tag is the source of truth; `package.json` is written by CI, never by hand) → creates a matching GitHub Release + publishes `@marx2/contracts@<version>` to GitHub Packages → run `NODE_AUTH_TOKEN=$(gh auth token) npm install @marx2/contracts@<new-version>` in each consumer repo → run `npm run gen:types` in repos that have it (`portfoliost`, `portfoliost-admin`, `portfoliost-instruments`) → commit updated `package-lock.json` and `generated/api-types.d.ts`.
+  - **Installing**: all consumer repos have `@marx2:registry=https://npm.pkg.github.com` in `.npmrc`; `NODE_AUTH_TOKEN` must be set to a GitHub PAT (or `GITHUB_TOKEN` in CI) with `read:packages` scope.
+  - **Enforcement**: `import type { components } from "../../generated/api-types"` — use `components["schemas"]["Foo"]` directly; never redefine shapes locally.
 - New API wire fields use camelCase even where legacy schemas are snake_case (see `docs/proposals/fees-and-custom-fx.md` D29).
 - FX conversion math must go through `@marx2/contracts/fx` — never re-implement cross-rate/settlement formulas locally (D27).
 - Currency selectors are fed exclusively by the `/api/currencies` registry (`useCurrenciesStore`); never hardcode currency lists.
