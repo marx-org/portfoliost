@@ -217,6 +217,18 @@ The `/login` route still exists and the router guard still redirects unauthentic
 
 The login page can detect which mode it's in by checking if `VITE_OIDC_CLIENT_ID` is set (or a similar env var). If set → show OIDC button. If not → show mock form.
 
+### Parametrized Visibility of User/Password Login
+
+The email/password form is gated by a runtime flag `passwordLoginEnabled`, so it can be hidden in production (where PocketID/passkey is the only login path) while remaining available for local dev and e2e tests.
+
+- **Runtime config** (`src/runtime-config.ts` → `isPasswordLoginEnabled()`): reads `window.__OIDC_CONFIG__.passwordLoginEnabled` (a boolean, injected by the docker entrypoint) with a fallback to the `VITE_PASSWORD_LOGIN_ENABLED` build-time env (`"true"`/`"1"`).
+- **Engine** (`scripts/docker-entrypoint.sh`): writes `passwordLoginEnabled: ${PASSWORD_LOGIN_ENABLED:-false}` into the generated `runtime-config.js`.
+- **UI** (`LoginView.vue`): the passkey button is always rendered (when OIDC is configured). The email/password form, "Sign In" button, and "Create one" account link render **only** when `passwordLoginEnabled` is true.
+- **Defaults**:
+  - `docker-compose.yml` sets `PASSWORD_LOGIN_ENABLED=true` (and `VITE_PASSWORD_LOGIN_ENABLED=true` build arg) so local dev + e2e can log in with the mock credentials.
+  - Cluster/Kubernetes omits the env, so `passwordLoginEnabled` defaults to `false` and only passkey login shows.
+- **e2e**: specs log in via the visible email/password form (`data-testid="email"` / `data-testid="password"` / `data-testid="signin"`), which works because compose enables the flag.
+
 ### PKCE Helpers
 
 Need a small utility for PKCE:

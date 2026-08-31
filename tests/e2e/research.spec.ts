@@ -68,7 +68,7 @@ test("overview shows extended statistics and EPS 5Q combobox", async ({ page }) 
 
 test("research shows quick-switch logo row", async ({ page }) => {
   await openResearch(page, "overview")
-  await page.getByRole("navigation", { name: "Quick symbol switch" }).getByRole("link", { name: /NVDA/ }).click()
+  await page.getByRole("navigation", { name: "Recent searches" }).getByRole("button", { name: /NVDA/ }).click()
   await expect(page).toHaveURL(/\/en\/research\/NVDA\.US\/overview/)
   await expect(page.getByRole("heading", { name: "NVDA", exact: true }).first()).toBeVisible({ timeout: 15000 })
 })
@@ -185,7 +185,7 @@ test("search modal opens and navigates to a popular symbol", async ({ page }) =>
   await page.getByRole("button", { name: /Search for a stock/ }).click()
   await expect(page.getByRole("dialog")).toBeVisible({ timeout: 15000 })
 
-  await page.getByRole("button", { name: "MSFT", exact: true }).click()
+  await page.getByRole("dialog").getByRole("button", { name: "MSFT", exact: true }).click()
   await expect(page).toHaveURL(/\/en\/research\/MSFT\.US\/overview/)
   await expect(page.getByRole("heading", { name: "MSFT", exact: true }).first()).toBeVisible({ timeout: 15000 })
 })

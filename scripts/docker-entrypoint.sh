@@ -5,6 +5,7 @@ cat > /app/dist/runtime-config.js <<EOF
 window.__OIDC_CONFIG__ = {
   issuerUrl: "${OIDC_ISSUER_URL:-}",
   clientId: "${OIDC_CLIENT_ID:-}",
+  passwordLoginEnabled: ${PASSWORD_LOGIN_ENABLED:-false},
 };
 EOF
 exec "$@"

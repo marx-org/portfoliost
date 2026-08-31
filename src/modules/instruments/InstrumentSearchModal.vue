@@ -2,7 +2,9 @@
 import { computed, ref, watch } from "vue"
 import { useRouter } from "vue-router"
 import { useInstrumentsStore } from "@/stores/instruments"
+import { useRecentSearchesStore } from "@/stores/recentSearches"
 import { researchSymbol } from "@/utils/research"
+import RecentSearchesBar from "@/modules/instruments/RecentSearchesBar.vue"
 
 const props = withDefaults(defineProps<{ open: boolean; mode?: "navigate" | "add"; title?: string }>(), {
   mode: "navigate",
@@ -11,20 +13,11 @@ const props = withDefaults(defineProps<{ open: boolean; mode?: "navigate" | "add
 const emit = defineEmits<{ (e: "close"): void; (e: "add", symbol: string, name: string): void }>()
 
 const store = useInstrumentsStore()
+const recentSearches = useRecentSearchesStore()
 const router = useRouter()
 const query = ref("")
 
 let debounceTimer: ReturnType<typeof setTimeout> | undefined
-
-watch(
-  () => props.open,
-  (open) => {
-    if (open) {
-      query.value = ""
-      store.resetSearch()
-    }
-  },
-)
 
 watch(query, (value) => {
   clearTimeout(debounceTimer)
@@ -45,9 +38,8 @@ const MAX_RENDERED = 50
 const renderedResults = computed(() => store.searchResults.slice(0, MAX_RENDERED))
 const hiddenCount = computed(() => Math.max(0, store.searchResults.length - MAX_RENDERED))
 
-const popular = ["AAPL", "GOOGL", "MSFT", "AMZN", "TSLA", "SPY", "QQQ"]
-
 function openResult(symbol: string, name = "") {
+  void recentSearches.record(symbol)
   emit("close")
   if (props.mode === "add") {
     emit("add", symbol, name)
@@ -88,18 +80,8 @@ function onKeydown(e: KeyboardEvent) {
           />
 
           <div v-if="query.trim().length < 1" class="mt-4">
-            <p class="text-sm text-slate-500 dark:text-slate-400">Popular searches</p>
-            <div class="mt-2 flex flex-wrap gap-2">
-              <button
-                v-for="symbol in popular"
-                :key="symbol"
-                type="button"
-                class="btn-secondary text-xs"
-                @click="openResult(symbol)"
-              >
-                {{ symbol }}
-              </button>
-            </div>
+            <p class="text-sm text-slate-500 dark:text-slate-400">Recent searches</p>
+            <RecentSearchesBar variant="chips" class="mt-2" @select="openResult" />
           </div>
 
           <div v-else-if="store.searching" class="mt-4 text-sm text-slate-500 dark:text-slate-400">Searching...</div>

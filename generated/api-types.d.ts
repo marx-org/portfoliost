@@ -1817,11 +1817,15 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
             isDemoUser: boolean;
+            /** @description User's last 10 searched stock symbols, most recent first */
+            recentSearches?: string[];
         };
         UpdateProfileRequest: {
             firstName?: string | null;
             lastName?: string | null;
             language?: string;
+            /** @description User's last 10 searched stock symbols, most recent first */
+            recentSearches?: string[];
         };
         UserPreferences: {
             /** Format: uuid */

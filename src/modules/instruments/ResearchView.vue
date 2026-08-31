@@ -1,16 +1,20 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue"
-import { useRoute } from "vue-router"
+import { useRoute, useRouter } from "vue-router"
 import InstrumentSearchModal from "@/modules/instruments/InstrumentSearchModal.vue"
+import RecentSearchesBar from "@/modules/instruments/RecentSearchesBar.vue"
 import { getInstrumentProfile } from "@/api/instruments"
 import { useWatchlistsStore } from "@/stores/watchlists"
+import { useRecentSearchesStore } from "@/stores/recentSearches"
 import { baseSymbol, researchSymbol } from "@/utils/research"
 import type { InstrumentsProfile } from "@/api/types"
 
 const route = useRoute()
+const router = useRouter()
 const routeSymbol = computed(() => String(route.params.symbol).toUpperCase())
 const symbol = computed(() => baseSymbol(routeSymbol.value))
 const watchlists = useWatchlistsStore()
+const recentSearches = useRecentSearchesStore()
 const showSearch = ref(false)
 const profile = ref<InstrumentsProfile | null>(null)
 const watchlistStatus = ref<string | null>(null)
@@ -28,9 +32,14 @@ const tabs = [
   { name: "research-dividends", label: "Dividends" },
 ]
 
-const quickSymbols = ["MSFT", "NVDA", "META", "AAPL", "TSLA", "AMZN", "GOOGL", "NFLX"]
+function goToSymbol(symbol: string) {
+  const routeTarget = symbol.includes(".") ? symbol.toUpperCase() : researchSymbol(symbol)
+  router.push({ name: String(route.name), params: { symbol: routeTarget } })
+}
 
 onMounted(async () => {
+  void recentSearches.load()
+  void recentSearches.record(symbol.value)
   try {
     profile.value = await getInstrumentProfile(routeSymbol.value)
   } catch {
@@ -41,6 +50,7 @@ onMounted(async () => {
 // Same-route navigation (quick switcher / search) only changes the param —
 // refetch the header profile when it does.
 watch(routeSymbol, async (sym) => {
+  void recentSearches.record(baseSymbol(sym))
   profile.value = null
   try {
     profile.value = await getInstrumentProfile(sym)
@@ -101,18 +111,7 @@ async function addToWatchlist(): Promise<void> {
 
     <p v-if="watchlistStatus" class="mb-4 rounded-lg bg-blue-50 dark:bg-blue-500/10 px-3 py-2 text-sm text-blue-700 dark:text-blue-400">{{ watchlistStatus }}</p>
 
-    <div role="navigation" aria-label="Quick symbol switch" class="mb-6 flex items-center gap-1 overflow-x-auto">
-      <router-link
-        v-for="s in quickSymbols"
-        :key="s"
-        :to="{ name: String(route.name), params: { symbol: researchSymbol(s) } }"
-        class="flex shrink-0 flex-col items-center gap-1 rounded-lg px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800"
-        :class="symbol === s ? 'bg-slate-100 dark:bg-slate-800' : ''"
-      >
-        <img :src="`/api/logos/${s}`" :alt="s" class="h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800" />
-        <span class="text-[10px] font-medium text-slate-600 dark:text-slate-300">{{ s }}</span>
-      </router-link>
-    </div>
+    <RecentSearchesBar class="mb-6" :active-symbol="symbol" @select="goToSymbol" />
 
     <nav aria-label="Research tabs" class="mb-6 flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-slate-700/60">
       <router-link

@@ -12,6 +12,9 @@ ENV VITE_OIDC_ISSUER_URL=$VITE_OIDC_ISSUER_URL
 ARG VITE_OIDC_CLIENT_ID=""
 ENV VITE_OIDC_CLIENT_ID=$VITE_OIDC_CLIENT_ID
 
+ARG VITE_PASSWORD_LOGIN_ENABLED=""
+ENV VITE_PASSWORD_LOGIN_ENABLED=$VITE_PASSWORD_LOGIN_ENABLED
+
 COPY package.json package-lock.json ./
 COPY index.html vite.config.ts tailwind.config.js postcss.config.js tsconfig.json tsconfig.node.json ./
 COPY public/ public/

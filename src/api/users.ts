@@ -1,23 +1,8 @@
 import { http } from "./client"
+import type { components } from "@/api/types"
 
-export interface UserProfile {
-  id: string
-  email: string
-  firstName: string
-  lastName: string
-  avatarUrl: string | null
-  groups: string[]
-  language: string
-  createdAt: string
-  updatedAt: string
-  isDemoUser: boolean
-}
-
-export interface UpdateUserProfileInput {
-  firstName?: string
-  lastName?: string
-  language?: string
-}
+export type UserProfile = components["schemas"]["UserProfile"]
+export type UpdateUserProfileInput = components["schemas"]["UpdateProfileRequest"]
 
 export async function getUserProfile(): Promise<UserProfile> {
   return http.get<UserProfile>("/api/users/profile")
