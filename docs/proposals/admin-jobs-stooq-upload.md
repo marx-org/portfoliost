@@ -213,6 +213,7 @@ LOAD CSV
     $$ SET maintenance_work_mem = '2GB'; $$,
     $$ SET statement_timeout = 0; $$,
     $$ ALTER TABLE daily_pl_new SET LOGGED; $$,
+    $$ DELETE FROM daily_pl_new WHERE ctid IN (SELECT ctid FROM (SELECT ctid, row_number() OVER (PARTITION BY ticker, date, time ORDER BY ctid) AS rn FROM daily_pl_new) sub WHERE rn > 1); $$,
     $$ ALTER TABLE daily_pl_new ADD PRIMARY KEY (ticker, date, time); $$,
     $$ DO $swap$ BEGIN
          DROP TABLE IF EXISTS daily_pl;
@@ -283,10 +284,11 @@ performance bottleneck. The Postgres data PVC is Longhorn on `kura`; every write
 the Longhorn engine. Moving Postgres to `kaczka` was considered but not done (non-trivial PGO
 migration). The tuning above mitigates but does not eliminate this bottleneck.
 
-**Observed import performance (daily_pl, ~24.7M rows, 1.4 GB extracted):**
+**Observed import performance (daily_pl, ~24.7M rows, 1.4 GB extracted, 2026-08-31):**
 - Extraction: ~15 seconds (200 MB zip → 1.4 GB, ~13,000 files)
 - Bulk load (COPY): ~8 hours (Longhorn on kura bottleneck; UNLOGGED + no index active)
-- Post-load (ADD PRIMARY KEY + rename): a few minutes
+- Post-load (SET LOGGED + dedup + ADD PRIMARY KEY + rename): ~3 minutes
+- Final row count: 24,733,409 (1987-01-02 → 2026-08-28)
 
 ---
 
@@ -462,6 +464,18 @@ part seen" and "pipeline done", causing false "No file received" errors. Fixed b
 
 Stooq encodes some volume and openint values as floats (e.g. `6337948.989247318`). BIGINT
 rejects these with error `22P02`. Schema uses `NUMERIC(28,8)` for both columns.
+
+### Duplicate rows from cross-file tickers (2026-08-31)
+
+Stooq zips can include the same ticker in more than one CSV file (e.g. `daily_pl.zip` contained
+ENGP in two separate files, producing 8 exact-duplicate rows). `ADD PRIMARY KEY` aborts with
+`23505` if any `(ticker, date, time)` tuple appears more than once.
+
+Fix: a `DELETE ... WHERE ctid IN (...)` dedup step was added to the post-load script between
+`SET LOGGED` and `ADD PRIMARY KEY` (`src/jobs.ts`, portfoliost-admin v1.0.20). The `daily_pl`
+import that failed on this date was recovered manually by running the three post-load steps
+directly against the Postgres pod; the final table contains 24,733,409 rows (1987-01-02 to
+2026-08-28).
 
 ### pgloader here-doc escaping
 
