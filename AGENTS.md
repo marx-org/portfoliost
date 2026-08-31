@@ -18,7 +18,8 @@ Guidelines for working in this repo (example-service.ai parity build).
 - **Mock where the real API is unavailable.** The `mocks/gateway` serves all `/api` routes; frontend code talks to the same endpoints example-service would. Keep mock responses faithful to the real API contracts.
 - **Step-test-commit discipline.** Every plan step must prove itself with a test before it counts: run the step's tests (unit plus docker-compose level — including standalone-service compose for provider repos like openst/cachest), and only when all pass mark the step `[x]` in `docs/plan.md`, commit that step, then move on. One step = one commit.
 - **Provider tier first.** New module data comes from cachest/openst. If data is missing, extend openst first (OpenBB likely covers it), expose it through cachest, and keep the translation adapter inside the owning module (proposal D2). Extend docker compose so every new service is testable locally.
-- **New backend modules follow [docs/MODULARISATION.md](docs/MODULARISATION.md)**: separate repo per module, same stack as `portfoliost-users-auth` (Hono + Drizzle + Postgres + PGlite + jose), playbook naming.
+- **New backend modules follow [docs/MODULARISATION.md](docs/MODULARISATION.md)**: separate repo per module, same stack as `portfoliost-users-auth` (Hono + Drizzle + Postgres + PGlite + jose), playbook naming. Backend modules: `openst`, `cachest`, `portfoliost-admin`, `portfoliost-users-auth`, `portfoliost-instruments`, `portfoliost-wallets`, `portfoliost-contracts`.
+- **Docker images build in GitHub via GHA.** Every backend module pushes its image to `ghcr.io` on push to `main` through `.github/workflows/docker-image.yml` (build on PR, tag + patch-bump `v*` release + push on merge to `main`). The contracts module (`portfoliost-contracts`) is also built via GHA through `release.yml`. Keep each module's workflow, Dockerfile, and `APP_VERSION` build-arg in sync.
 
 ## Example service sections to skip
 
