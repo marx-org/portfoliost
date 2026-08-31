@@ -24,6 +24,7 @@ services:
         VITE_OIDC_ISSUER_URL: ${VITE_OIDC_ISSUER_URL:-http://localhost:4010}
         VITE_OIDC_CLIENT_ID: ${VITE_OIDC_CLIENT_ID:-mock-client}
         VITE_PASSWORD_LOGIN_ENABLED: ${VITE_PASSWORD_LOGIN_ENABLED:-true}
+        NODE_AUTH_TOKEN: ${NODE_AUTH_TOKEN:-}
     container_name: portfoliost
     ports:
       - "3000:80"
@@ -53,6 +54,8 @@ services:
     build:
       context: ../portfoliost-users-auth
       dockerfile: Dockerfile
+      args:
+        NODE_AUTH_TOKEN: ${NODE_AUTH_TOKEN:-}
     container_name: users-auth
     expose:
       - "3000"
@@ -126,6 +129,8 @@ services:
     build:
       context: ../portfoliost-wallets
       dockerfile: Dockerfile
+      args:
+        NODE_AUTH_TOKEN: ${NODE_AUTH_TOKEN:-}
     container_name: portfoliost-wallets
     ports:
       - "3002:3000"
@@ -147,6 +152,8 @@ services:
     build:
       context: ../portfoliost-instruments
       dockerfile: Dockerfile
+      args:
+        NODE_AUTH_TOKEN: ${NODE_AUTH_TOKEN:-}
     container_name: portfoliost-instruments
     expose:
       - "3000"
@@ -167,6 +174,8 @@ services:
     build:
       context: ../portfoliost-admin
       dockerfile: Dockerfile
+      args:
+        NODE_AUTH_TOKEN: ${NODE_AUTH_TOKEN:-}
     container_name: portfoliost-admin
     expose:
       - "3000"
@@ -184,11 +193,12 @@ services:
       API_JOBSHOT_URL: ${API_JOBSHOT_URL:-}
       STOOQ_UPLOAD_DIR: /tmp/stooq-uploads
     depends_on:
-      - users-auth
-      - wallets
-      - instruments
+      users-auth:
+        condition: service_started
+      wallets:
+        condition: service_started
+      instruments:
+        condition: service_started
       postgres:
         condition: service_healthy
-      - wallets
-      - instruments
     restart: unless-stopped

@@ -24,7 +24,7 @@ COPY src/ src/
 COPY generated/ generated/
 COPY mocks/shared/data/universe.json mocks/shared/data/universe.json
 
-RUN NPM_CONFIG_//npm.pkg.github.com/:_authToken="${NODE_AUTH_TOKEN}" npm ci && npm run build
+RUN sed -i "s|\${NODE_AUTH_TOKEN}|${NODE_AUTH_TOKEN}|g" .npmrc && npm ci && rm .npmrc && npm run build
 
 # ---- serve stage ----
 FROM node:22-alpine
