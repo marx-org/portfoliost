@@ -97,10 +97,10 @@ const pollers = new Map<StooqDataset, ReturnType<typeof setInterval>>()
 
 function startPolling(dataset: StooqDataset) {
   stopPolling(dataset)
-  // Poll every 30 s — imports take hours, no timeout.
+  // Poll every 60 s — backend keeps jobshot status fresh via its own poller (D53).
   pollers.set(
     dataset,
-    setInterval(() => pollStatus(dataset), 30_000),
+    setInterval(() => pollStatus(dataset), 60_000),
   )
 }
 
@@ -215,7 +215,7 @@ function statusBadge(dataset: StooqDataset): { label: string; cls: string } | nu
   return { label: "Succeeded", cls: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" }
 }
 
-function formatDate(iso: string | null): string {
+function formatDate(iso: string | null | undefined): string {
   if (!iso) return "—"
   return new Date(iso).toLocaleString()
 }

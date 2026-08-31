@@ -176,6 +176,7 @@ services:
       API_INSTRUMENTS_URL: http://instruments:3000
       API_OPENST_URL: http://openst:8080
       API_CACHEST_URL: http://cachest:8080
+      DATABASE_URL: postgres://portfoliost:portfoliost@postgres:5432/portfoliost
       OIDC_ISSUER_URL: ${OIDC_ISSUER_URL:-http://gateway:8080}
       OIDC_CLIENT_ID: ${ADMIN_OIDC_CLIENT_ID:-}
       OIDC_CLIENT_SECRET: ${ADMIN_OIDC_CLIENT_SECRET:-}
@@ -184,6 +185,10 @@ services:
       STOOQ_UPLOAD_DIR: /tmp/stooq-uploads
     depends_on:
       - users-auth
+      - wallets
+      - instruments
+      postgres:
+        condition: service_healthy
       - wallets
       - instruments
     restart: unless-stopped

@@ -1,8 +1,17 @@
 import { http } from "./client"
+import type { components } from "../../generated/api-types"
 
-// ── Types ────────────────────────────────────────────────────────────────────
+// ── Contract types (generated from @marx2/contracts openapi.yaml) ─────────────
 
-export const STOOQ_DATASETS = [
+export type StooqDataset            = components["schemas"]["StooqDataset"]
+export type StooqImportUploadResponse = components["schemas"]["StooqImportUploadResponse"]
+export type StooqImportRunResponse  = components["schemas"]["StooqImportRunResponse"]
+export type StooqImportStatusResponse = components["schemas"]["StooqImportStatusResponse"]
+export type StooqImportLogEntry     = components["schemas"]["StooqImportLogEntry"]
+
+// STOOQ_DATASETS drives the UI dataset list; kept in sync with the contract enum.
+// TypeScript will error here if this array diverges from StooqDataset.
+export const STOOQ_DATASETS: readonly StooqDataset[] = [
   "daily_world", "hourly_world", "5min_world",
   "daily_us",    "hourly_us",    "5min_us",
   "daily_uk",    "hourly_uk",    "5min_uk",
@@ -12,34 +21,6 @@ export const STOOQ_DATASETS = [
   "daily_hu",    "hourly_hu",    "5min_hu",
   "daily_macro",
 ] as const
-
-export type StooqDataset = (typeof STOOQ_DATASETS)[number]
-
-export interface StooqImportUploadResponse {
-  uploadId: string
-  dataset: StooqDataset
-  sizeBytes: number
-}
-
-export interface StooqImportRunResponse {
-  jobName: string
-  namespace: string
-  status: "Running" | "Succeeded" | "Failed" | "NotFound"
-}
-
-export interface StooqImportStatusResponse {
-  dataset: StooqDataset
-  jobName: string
-  status: "Running" | "Succeeded" | "Failed" | "NotFound"
-  details: { active: number; succeeded: number; failed: number } | null
-}
-
-export interface StooqImportLogEntry {
-  dataset: StooqDataset
-  latestDate: string | null
-  importedAt: string | null
-  rowsDeleted: number | null
-}
 
 // ── API functions ─────────────────────────────────────────────────────────────
 
