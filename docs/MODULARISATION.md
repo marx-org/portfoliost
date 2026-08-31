@@ -46,6 +46,13 @@ reinvent.
 - [ ] Rebrand: package name, `/__meta` service string, server log line.
 - [ ] Implement endpoints against the mock contract (`@marx2/contracts`);
       port handler logic from `mocks/` where applicable; unit tests green.
+- [ ] **Enforce `@marx2/contracts` types** (mandatory — see AGENTS.md):
+  - Add `openapi-typescript@7` to `devDependencies`
+  - Add `"gen:types": "openapi-typescript node_modules/@marx2/contracts/openapi.yaml -o src/generated/api-types.d.ts"` script
+  - Run `npm run gen:types` → commits `src/generated/api-types.d.ts`
+  - In every route file: `import type { components } from "../generated/api-types.js"`
+  - Annotate every `c.json(...)` success response: `c.json(payload satisfies components["schemas"]["Foo"])`
+  - `tsc` must pass clean — shape drift is a build error, not a runtime surprise
 - [ ] Push to main → CI creates `vX.Y.Z` release + image.
 
 ### 2. Database (schema-per-module, D6)
@@ -120,6 +127,36 @@ curl -sk https://portfoliost.k.homylab.com/api/<area>/...
 
 Verify either way with `GET /__meta` on the module and a real-vs-mock
 distinguishing request through the gateway/host.
+
+## Contract enforcement status
+
+All backend modules generate types from `@marx2/contracts` and annotate route
+responses with `satisfies`. Shape drift is a **build error**.
+
+| Module | `src/generated/api-types.d.ts` | `satisfies` annotations |
+| --- | --- | --- |
+| `portfoliost-users-auth` | ✓ | `AuthResponse`, `MeResponse`, `UserProfile`, `UserPreferences`, `AdminUserListResponse` |
+| `portfoliost-wallets` | ✓ | `CashWallet`, `WalletsTotalBalance`, `CurrenciesResponse`, `Portfolio`, `PortfolioTotalMetrics`, `HeldStocks`, `CashTransaction` |
+| `portfoliost-admin` | ✓ | admin route responses |
+| `portfoliost-instruments` | ✓ | instrument route responses |
+
+**Pattern** (copy from any of the above modules):
+
+```ts
+// src/routes/foo.ts
+import type { components } from "../generated/api-types.js"
+type Foo = components["schemas"]["Foo"]
+
+routes.get("/foo", async (c) => {
+  const payload = buildPayload()
+  return c.json(payload satisfies Foo)
+})
+```
+
+Rules:
+- Never hand-write a type that duplicates a contract schema — use `components["schemas"]["X"]` directly.
+- Use `satisfies`, not `as` — `as` suppresses errors, `satisfies` surfaces them.
+- Regenerate after every `@marx2/contracts` version bump: `npm run gen:types`.
 
 ## Ops lessons learned (first extraction)
 
