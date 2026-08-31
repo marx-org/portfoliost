@@ -471,8 +471,8 @@ A new "Jobs" tab is added to the admin section (`/en/admin/jobs`).
 Displays one card per stooq dataset. Each card has:
 - Name and description
 - Last run timestamp and status (success / failed / never run) — from `stooq_import_log`
-- **File upload input** — admin selects a `.zip` downloaded from stooq.pl
-- **Run Import button** — uploads the file and triggers a Kubernetes Job via jobshot
+- **Run import** — admin selects a `.zip` downloaded from stooq.pl, uploads the file and triggers a
+  Kubernetes Job via jobshot
 
 Initial job list for the pfire namespace:
 
@@ -481,6 +481,8 @@ Initial job list for the pfire namespace:
 | USA daily import | Import `d_us_txt.zip` via pgloader | `daily_us` |
 | Poland daily import | Import `d_pl_txt.zip` via pgloader | `daily_pl` |
 | World daily import | Import `d_world_txt.zip` via pgloader | `daily_world` |
+
+see `admin-jobs-stooq-upload.md` for the full list of 20 datasets.
 
 The "Run Import" button is **enabled** when a file is selected and no import job is currently
 running for that dataset. Status is polled every 5 seconds while a job is active. After a

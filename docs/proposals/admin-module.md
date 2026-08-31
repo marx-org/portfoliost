@@ -3,7 +3,7 @@
 **Status**: Implemented
 **Date**: 2026-08-25
 **Builds on**: [backend-topology.md](backend-topology.md) (D1–D11), [wallets-module.md](wallets-module.md) (D16–D24), [fees-and-custom-fx.md](fees-and-custom-fx.md) (D25–D41), [MODULARISATION.md](../MODULARISATION.md)
-**Scope**: admin panel as a backend module + in-app SPA routes. Surfaces system versions, FX rate data, and registered OIDC users for operators. Gated by OIDC group membership (`portfoliost_admin`). No database — reads data through module APIs and OIDC UserInfo.
+**Scope**: admin panel as a backend module + in-app SPA routes. Surfaces system versions, FX rate data, and registered OIDC users for operators. Gated by OIDC group membership (`portfoliost_admin`). Reads most data through module APIs and OIDC UserInfo, and (since D53) owns a small `admin.job_run` table tracking long-running job status.
 
 ## Context
 
@@ -21,8 +21,8 @@ The user profile already carries `groups: string[]` from the OIDC token (auth pr
 | Compose service / container | `admin` |
 | K8s HelmRelease/controller | `portfoliost-admin` |
 | Env key | `API_ADMIN_URL` |
-| Postgres schema | none (module owns no tables) |
-| Stack | Hono + jose (copy users-auth skeleton, no Drizzle needed initially) |
+| Postgres schema | `admin` (since D53 — single `job_run` table for job-status tracking) |
+| Stack | Hono + jose + Drizzle (job-status table via D53) |
 | Standard routes | `/health`, `/__meta`, `/internal/verify` |
 
 Gateway routes `/api/admin/*` → `API_ADMIN_URL`. Auth identical to other modules (JWT JWKS validation).
@@ -262,6 +262,7 @@ admin:
     API_USERS_AUTH_URL: "http://users-auth:3000"
     API_WALLETS_URL: "http://wallets:3000"
     API_INSTRUMENTS_URL: "http://instruments:3000"
+    DATABASE_URL: "${DATABASE_URL:-postgres://portfoliost:portfoliost@postgres:5432/portfoliost}"
     OIDC_ISSUER_URL: "${VITE_OIDC_ISSUER_URL:-}"
     OIDC_CLIENT_ID: "${ADMIN_OIDC_CLIENT_ID:-}"
     OIDC_CLIENT_SECRET: "${ADMIN_OIDC_CLIENT_SECRET:-}"
@@ -269,7 +270,8 @@ admin:
     - postgres
 ```
 
-No `DATABASE_URL` — the admin module reads no database directly. All data comes through module APIs.
+`DATABASE_URL` is required since D53 (the admin schema's `job_run` table). All other
+admin data still comes through module APIs.
 
 Add to `deploy/services.env`:
 
@@ -290,6 +292,63 @@ location /api/admin/ {
 
 The admin module owns no database tables. All data comes through module API calls (wallets for FX rates, users-auth for user IDs) and the OIDC provider (user identity). The admin schema is **not created** — the module follows the schema-per-module convention (D6) by simply not needing one. If the admin module later acquires its own data (audit logs, feature flags), a schema can be added at that point.
 
+### D53 — admin DB schema for long-running job tracking (amendment)
+
+> **Amendment (2026-08-31)**: D52's "no database" stance is partially reversed.
+> D46–D48 still read cross-module data through module APIs (no admin-read boundary
+> crossing). But the **Jobs tab** needs to survive browser sessions: imports run for up
+> to ~8 hours, far longer than an OIDC session token is valid, so the *UI* cannot be the
+> thing that keeps polling jobshot. The admin backend now owns one small table that
+> records the live status of long-running jobs, tracked by a backend poller
+> independent of any browser session. This is the admin module's first (and only) owned
+> table; the admin schema is created for it.
+
+**Schema**: `admin.job_run` — general enough to cover any job kind, not just stooq
+(per the general-name preference):
+
+```sql
+CREATE TABLE admin.job_run (
+  name        TEXT PRIMARY KEY,            -- k8s Job name, e.g. stooq-importer-daily-pl
+  namespace   TEXT NOT NULL,               -- k8s namespace, e.g. pfire
+  kind        TEXT NOT NULL DEFAULT 'stooq_import',
+  param       TEXT,                        -- job-specific discriminator (stooq: dataset id)
+  status      TEXT NOT NULL,               -- Running | Succeeded | Failed | NotFound
+  details     JSONB,                       -- { active, succeeded, failed } pod counts
+  started_at  TIMESTAMPTZ,
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+- One row per logical long-running job (keyed by k8s Job name). Because only one job
+  may run per dataset at a time, the row holds the *current/last* status; a new run
+  overwrites it (upsert on trigger).
+- **Lifecycle**: `POST .../run` (or `POST .../upload`) transitions the app from the
+  original jobs API in `admin-jobs-stooq-upload.md`. On a successful trigger, the admin
+  backend upserts a `Running` row (`started_at` = now). A background poller then keeps it
+  fresh. On `Succeeded`/`Failed` the poller stops writing but leaves the terminal status
+  in place until the next run.
+- **Backend poller** (server-side, not UI): a `setInterval` in the admin backend polls
+  every 60 s. Each tick it selects all `Running` (or recently-active) `job_run` rows and
+  calls jobshot `GET /api/job-status/:name?namespace=...` for each; it persists **only on
+  status change** (status or `details`), updating `updated_at`. Because the poller runs in
+  the backend, it keeps polling even when no browser session is open — the user can log
+  back in hours later and still see an accurate live status.
+- **`/status` reads the DB**: `GET /api/admin/jobs/stooq-import/status?dataset=...` now
+  returns the persisted `job_run` row instead of proxying jobshot live. A reconnecting UI
+  gets fresh data immediately with zero jobshot round-trips.
+- **Stack**: follows the MODULARISATION.md playbook — Drizzle + postgres-js in prod,
+  PGlite migrations in tests, `/admin` schema behind `pgSchema("admin")`, `db:migrate` at
+  boot, `DATABASE_URL` from shared Postgres (same least-privilege user as other modules).
+
+Compose wiring (local stack): the `admin` service gains `DATABASE_URL` and `depends_on:
+postgres`, matching the other DB-backed modules. The `postgres` service is already in the
+local compose file.
+
+> **Out of scope (this amendment)**: the `stooq_import_log` *outcome* table (coverage
+> dates, overflow cleanup stats) still lives in the instruments schema and is produced by
+> the portfoliost-instruments post-import hook — see `price-data-architecture.md`. This
+> amendment only adds the *live job-status* tracker; the two are complementary.
+
 ## Implementation order
 
 | Step | Scope | Depends on |
@@ -300,6 +359,7 @@ The admin module owns no database tables. All data comes through module API call
 | 4 | Wallets module: admin FX rates endpoint (D47) + admin backend proxy + frontend table | D47 |
 | 5 | Users-auth module: admin users list endpoint (D48) + admin backend OIDC enrichment (D48b) + frontend table | D48, D48b, D49 |
 | 6 | Admin API authorization middleware on admin, wallets, users-auth (D50) | D50 |
+| 7 | Admin DB (D53): `admin.job_run` schema + Drizzle + backend job-status poller (see `admin-jobs-stooq-upload.md`) | D53 |
 
 ## Risks / Considerations
 

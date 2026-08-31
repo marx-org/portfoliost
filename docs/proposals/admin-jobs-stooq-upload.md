@@ -101,9 +101,11 @@ Admin browser
   │                → jobshot BatchV1Api.createNamespacedJob(...)
   │                   returns { jobName, namespace }
   │
-  └─ 4. GET /api/admin/jobs/stooq-import/status?dataset=daily_pl  (every 30s, no timeout)
-           → portfoliost-admin → jobshot GET /api/job-status/:jobName?namespace=pfire
-              → { status: "Running"|"Succeeded"|"Failed"|"NotFound" }
+  └─ 4. GET /api/admin/jobs/stooq-import/status?dataset=daily_pl  (UI polls every 60s)
+         → portfoliost-admin reads persisted status from admin.job_run (no jobshot round-trip)
+         → the admin backend keeps polling jobshot in the background every 60 s
+            GET /api/job-status/:jobName?namespace=pfire for active jobs, persisting on change
+            → { status: "Running"|"Succeeded"|"Failed"|"NotFound" }
 ```
 
 ### Upload: busboy streaming, dataset as query param
@@ -294,13 +296,44 @@ migration). The tuning above mitigates but does not eliminate this bottleneck.
 
 ## Status polling
 
-The UI polls `GET /api/admin/jobs/stooq-import/status?dataset=...` every **30 seconds**
-with **no timeout**. Imports take hours; the browser tab can be closed and reopened. Polling
-stops only when the job reaches `Succeeded`, `Failed`, or disappears after having been
-`Running` (jobshot cleans up completed jobs).
+**Status polling is backend-driven** (amended 2026-08-31, D53 in `admin-module.md`).
 
-The previous 5-minute timeout (`MAX_POLL_MS`) was removed — it caused the UI to show
-"Timed out" while the Kubernetes job was still running normally.
+Imports run for up to ~8 hours (see observed daily_pl timings) — far longer than an OIDC
+session token is valid. The original design polled jobshot from the UI, but when the
+browser session expires (or the tab is closed) that polling died with it, so a re-login a
+few hours later saw a stale/"never ran" view even though the job was still going.
+
+The fix moves the polling loop into the admin backend:
+
+### Backend poller (jobshot ← admin)
+
+- The admin backend runs a `setInterval` that fires every **60 s**.
+- Each tick it selects every `admin.job_run` row still in `Running` (or otherwise active)
+  from the DB and calls jobshot `GET /api/job-status/:name?namespace=...` for each.
+- It persists **only when status or pod details change**, updating `updated_at`.
+- Because this loop lives in the backend process, it keeps polling whether or not anyone
+  has a browser open. A job that started hours ago is still tracked when the operator
+  logs back in.
+- On `Succeeded` / `Failed` the poller stops updating the row but leaves the terminal
+  status persisted; the next run for that dataset overwrites it (upsert).
+
+### Backend persistence (`admin.job_run`)
+
+Triggering a job upserts a `Running` row (`started_at = now`). The terminal status is
+kept in the row after completion, so `/status` remains authoritative until the next run.
+
+### UI reads the backend (not jobshot)
+
+- `GET /api/admin/jobs/stooq-import/status?dataset=...` returns the persisted
+  `admin.job_run` row — **no live jobshot proxy**.
+- The UI polls this endpoint every **60 s** (was 30 s), with no timeout. It stops only
+  when the status is `Succeeded` or `Failed`.
+- After a session expiry + re-login, the Jobs tab simply re-reads `/status` and renders
+  the persisted (still-current) status.
+
+The previous designs — a UI-side 5-minute timeout (`MAX_POLL_MS`, removed earlier because
+it showed "Timed out" during a long healthy job) and the fully UI-driven 30 s poll — are
+both superseded by the backend poller.
 
 ---
 
@@ -342,6 +375,9 @@ Authorization: Bearer <admin JWT>
 
 200: { dataset, jobName, status: "Running"|"Succeeded"|"Failed"|"NotFound", details: { active, succeeded, failed } }
 ```
+
+Responses are read from the persisted `admin.job_run` row (kept fresh by the backend
+poller), not proxied live to jobshot. A missing row behaves as `NotFound`.
 
 ### Log
 
@@ -489,12 +525,15 @@ with `OPTION-TERMINATED-BY` parse errors. Fixed to bare `','` and `'512 MB'`.
 
 1. **stooq_import_log for all 20 datasets** — `price-data-architecture.md` defines
    `stooq_import_log.dataset` with values `daily_us`, `daily_pl`, `daily_world` only. Extend
-   to the full 20-entry StooqDataset enum when the instruments module is updated.
+   to the full 20-entry StooqDataset enum when the instruments module is updated. This is
+   the *outcome* log (coverage dates, overflow cleanup) and stays in the instruments
+   schema — it is distinct from the new `admin.job_run` live-status table (D53).
 
 2. **Post-import hook** — the portfoliost-instruments post-import hook
    (`POST /internal/stooq-imported`) is not yet called from the import job. Currently the log
    endpoint returns nulls for `latestDate`/`importedAt`/`rowsDeleted`. The hook should be
-   triggered by portfoliost-admin after detecting job `Succeeded` status.
+   triggered by portfoliost-admin after the backend poller detects job `Succeeded` status
+   (the poller already has a clean terminal-status signal from jobshot).
 
 3. **Postgres on kura (85% full disk)** — the primary performance bottleneck. Longhorn on a
    nearly-full disk with high fragmentation makes every write slow. Moving Postgres to `kaczka`
