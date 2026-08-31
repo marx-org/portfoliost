@@ -387,16 +387,21 @@ WHERE date <= '2026-08-28'
 This way the cleanup is always consistent with what stooq actually contains, regardless of
 what the import job thought it loaded.
 
-```sql
-CREATE TABLE instruments.stooq_import_log (
-  dataset      TEXT PRIMARY KEY,   -- matches StooqDataset enum: 'daily_us' | 'daily_pl' | 'daily_world' | 'hourly_us' | ... (all 20)
-  latest_date  DATE,               -- MAX(date) confirmed from foreign table after cleanup
-  imported_at  TIMESTAMPTZ,        -- when the post-import hook was called
-  rows_deleted INTEGER             -- overflow rows cleaned up in this run
-);
-```
+> **Superseded (2026-08-31)**: `instruments.stooq_import_log` was never implemented.
+> Its columns (`latest_date`, `imported_at`, `rows_deleted`) are now part of
+> `admin.job_run` (D53 in `admin-module.md`). The `/log` endpoint reads from
+> `admin.job_run` directly — no instruments table or cross-module call needed.
+> The post-import hook, when wired, will write to `admin.job_run` instead.
 
----
+```sql
+-- SUPERSEDED — not implemented; replaced by admin.job_run columns (D53)
+-- CREATE TABLE instruments.stooq_import_log (
+--   dataset      TEXT PRIMARY KEY,
+--   latest_date  DATE,
+--   imported_at  TIMESTAMPTZ,
+--   rows_deleted INTEGER
+-- );
+```
 
 ## Ticker mapping
 

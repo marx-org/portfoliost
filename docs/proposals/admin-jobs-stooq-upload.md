@@ -388,6 +388,11 @@ Authorization: Bearer <admin JWT>
 200: [ { dataset, latestDate, importedAt, rowsDeleted }, ... ]  — one entry per dataset
 ```
 
+Reads from `admin.job_run` — no call to portfoliost-instruments. One entry per
+`StooqDataset`; datasets with no `job_run` row appear as all-null entries.
+`importedAt` = `started_at` (job trigger time) until the post-import hook updates it.
+`latestDate` and `rowsDeleted` are null until the post-import hook is wired.
+
 ---
 
 ## jobshot changes
@@ -523,17 +528,17 @@ with `OPTION-TERMINATED-BY` parse errors. Fixed to bare `','` and `'512 MB'`.
 
 ## Open items
 
-1. **stooq_import_log for all 20 datasets** — `price-data-architecture.md` defines
-   `stooq_import_log.dataset` with values `daily_us`, `daily_pl`, `daily_world` only. Extend
-   to the full 20-entry StooqDataset enum when the instruments module is updated. This is
-   the *outcome* log (coverage dates, overflow cleanup) and stays in the instruments
-   schema — it is distinct from the new `admin.job_run` live-status table (D53).
+1. **stooq_import_log — superseded** — the previously proposed `instruments.stooq_import_log`
+   table was never implemented and is no longer needed. `admin.job_run` now carries
+   `latest_date` and `rows_deleted` columns alongside the live status. The `/log` endpoint
+   reads from `admin.job_run` directly — no cross-module call required.
 
-2. **Post-import hook** — the portfoliost-instruments post-import hook
-   (`POST /internal/stooq-imported`) is not yet called from the import job. Currently the log
-   endpoint returns nulls for `latestDate`/`importedAt`/`rowsDeleted`. The hook should be
-   triggered by portfoliost-admin after the backend poller detects job `Succeeded` status
-   (the poller already has a clean terminal-status signal from jobshot).
+2. **Post-import hook** — `POST /api/instruments/internal/stooq-imported` is not yet called
+   after a successful import. Until it is wired, `latestDate` and `rowsDeleted` remain null
+   in `/log` responses, and `importedAt` is served from `started_at` (job trigger time).
+   When the hook is built it should write `latest_date` and `rows_deleted` directly to the
+   `admin.job_run` row (via a new admin internal endpoint, or by having the poller call
+   instruments after detecting `Succeeded`).
 
 3. **Postgres on kura (85% full disk)** — the primary performance bottleneck. Longhorn on a
    nearly-full disk with high fragmentation makes every write slow. Moving Postgres to `kaczka`

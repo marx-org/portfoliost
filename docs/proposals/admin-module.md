@@ -21,7 +21,7 @@ The user profile already carries `groups: string[]` from the OIDC token (auth pr
 | Compose service / container | `admin` |
 | K8s HelmRelease/controller | `portfoliost-admin` |
 | Env key | `API_ADMIN_URL` |
-| Postgres schema | `admin` (since D53 — single `job_run` table for job-status tracking) |
+| Postgres schema | `admin` (since D53 — `job_run` table: live status + post-import outcome columns) |
 | Stack | Hono + jose + Drizzle (job-status table via D53) |
 | Standard routes | `/health`, `/__meta`, `/internal/verify` |
 
@@ -315,9 +315,17 @@ CREATE TABLE admin.job_run (
   status      TEXT NOT NULL,               -- Running | Succeeded | Failed | NotFound
   details     JSONB,                       -- { active, succeeded, failed } pod counts
   started_at  TIMESTAMPTZ,
-  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  -- Written by the post-import hook once it is wired (currently null):
+  latest_date DATE,                        -- MAX(date) confirmed from stooq foreign table
+  rows_deleted INTEGER                     -- overflow rows cleaned up in this run
 );
 ```
+
+`latest_date` and `rows_deleted` replace the previously proposed `stooq_import_log` table
+(which was never implemented). The `/log` endpoint reads `admin.job_run` directly — no
+cross-module call to instruments is needed. `importedAt` in the log response is served from
+`started_at` (job trigger time) until the post-import hook writes confirmed data.
 
 - One row per logical long-running job (keyed by k8s Job name). Because only one job
   may run per dataset at a time, the row holds the *current/last* status; a new run
@@ -343,11 +351,6 @@ CREATE TABLE admin.job_run (
 Compose wiring (local stack): the `admin` service gains `DATABASE_URL` and `depends_on:
 postgres`, matching the other DB-backed modules. The `postgres` service is already in the
 local compose file.
-
-> **Out of scope (this amendment)**: the `stooq_import_log` *outcome* table (coverage
-> dates, overflow cleanup stats) still lives in the instruments schema and is produced by
-> the portfoliost-instruments post-import hook — see `price-data-architecture.md`. This
-> amendment only adds the *live job-status* tracker; the two are complementary.
 
 ## Implementation order
 
