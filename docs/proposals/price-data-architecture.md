@@ -116,10 +116,15 @@ cross-database access. No data duplication, no sync jobs. Stooq truncate-and-rel
 immediately visible through foreign tables.
 
 The cluster is managed by Crunchy Data PGO (PostgresCluster CRD). PGO supports a
-`databaseInitSQL` field that runs a SQL script automatically on every pod startup — the
-correct declarative approach for extension management. This lives in the homelab GitOps repo
-alongside the cluster definition, is version-controlled, and is re-applied automatically if
-the pod is ever recreated.
+`databaseInitSQL` field that runs a SQL script **once at cluster creation time** — it does
+**not** run on every pod startup. This lives in the homelab GitOps repo alongside the cluster
+definition, is version-controlled, and configures extension management declaratively for any
+new cluster built from this spec.
+
+> Caveat: because `databaseInitSQL` runs only at init, the script alone does not re-apply to an
+> existing live cluster. The SQL is written idempotent (`IF NOT EXISTS`, guarded `DO` blocks), so
+> it can be applied manually to a pre-existing cluster with `kubectl cp + psql -f`, which is how
+> the current production cluster was brought up to date.
 
 The init SQL is packaged into a Kubernetes ConfigMap and referenced in
 `postgrescluster-pfire.yaml`:
@@ -131,32 +136,52 @@ spec:
     key: init.sql
 ```
 
-`init.sql` content (added to the homelab repo):
+`init.sql` content (in the homelab repo, `cluster/apps/pfire/pfire-init-sql.yaml`):
 
 ```sql
 \c portfoliost
 
 CREATE EXTENSION IF NOT EXISTS postgres_fdw;
 
-CREATE SERVER IF NOT EXISTS stooq_server
-  FOREIGN DATA WRAPPER postgres_fdw
-  OPTIONS (dbname 'stooq', host 'localhost');
+-- CREATE SERVER / CREATE USER MAPPING have no IF NOT EXISTS in PostgreSQL;
+-- guard them with DO blocks to stay idempotent.
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_foreign_server WHERE srvname='stooq_server') THEN
+    CREATE SERVER stooq_server
+      FOREIGN DATA WRAPPER postgres_fdw
+      OPTIONS (dbname 'stooq', host '/tmp/postgres');
+  END IF;
+END $$;
 
--- Password may not be needed if local connections use trust/peer auth;
--- verify against pg_hba.conf before hardcoding credentials here.
-CREATE USER MAPPING IF NOT EXISTS FOR portfoliost
-  SERVER stooq_server
-  OPTIONS (user 'postgres', password '<postgres-superuser-password>');
+-- Same Postgres instance: connect over the local socket and authenticate as the local
+-- superuser via pg_hba `local all "postgres" "peer"`. No password in the repo. The
+-- password_required=false user-mapping option opts postgres_fdw out of demanding a password
+-- (peer auth already validated the OS user); cluster TCP auth (md5) is left untouched.
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_user_mappings
+                 WHERE srvname='stooq_server'
+                   AND umuser = 'portfoliost'::regrole) THEN
+    CREATE USER MAPPING FOR portfoliost
+      SERVER stooq_server
+      OPTIONS (user 'postgres', password_required 'false');
+  END IF;
+END $$;
 
-CREATE FOREIGN TABLE IF NOT EXISTS instruments.stooq_daily_us (
-  ticker TEXT, date DATE, open NUMERIC, high NUMERIC,
-  low NUMERIC, close NUMERIC, volume BIGINT
-) SERVER stooq_server OPTIONS (schema_name 'public', table_name 'daily_us');
+CREATE FOREIGN TABLE IF NOT EXISTS instruments.stooq_daily_pl (
+  ticker TEXT NOT NULL, period TEXT NOT NULL, date DATE NOT NULL,
+  time TEXT NOT NULL DEFAULT '000000', open NUMERIC(20,8), high NUMERIC(20,8),
+  low NUMERIC(20,8), close NUMERIC(20,8), volume NUMERIC(28,8), openint NUMERIC(28,8)
+) SERVER stooq_server OPTIONS (schema_name 'public', table_name 'daily_pl');
 
--- Same for daily_pl, daily_world (exact table names confirmed after import)
+-- Same for daily_us, daily_jp, daily_world, daily_uk, daily_hk, daily_hu, daily_macro
 ```
 
-All `IF NOT EXISTS` guards make the script idempotent — safe to re-run on every pod startup.
+Note that `CREATE FOREIGN TABLE IF NOT EXISTS` is the only "IF NOT EXISTS" that PostgreSQL
+actually supports here — `CREATE SERVER` and `CREATE USER MAPPING` require the `DO`-block guard
+shown above. Because the source stooq tables already carry a primary-key btree index on
+`(ticker, date, "time")`, postgres_fdw pushes `WHERE ticker = ...` quals down to the remote, so
+per-ticker lookups over the 24M+ row tables hit the index (measured ~277 ms on `daily_pl`).
+Full-market unqualified scans remain slow and should be avoided.
 
 ### Overflow table (instruments.price_bars)
 
