@@ -44,6 +44,12 @@ Legend: `[ ]` pending · `[x]` done
 
 # Plan
 
+## 0. Database preparation
+
+- [x] enable `postgres_fdw` extension
+- [x] make sure all stooq tables are available in the `stooq` DB on the same Postgres instance
+- [x] mapp all stooq tables as foreign tables in `portfoliost-instruments` DB
+
 ## 1. Portfolio analytics — price data warehouse + value snapshots (§15 Phase H)
 
 Proposal: [price-data-architecture.md](proposals/price-data-architecture.md).
