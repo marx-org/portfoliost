@@ -7,27 +7,32 @@ Legend: `[ ]` pending · `[x]` done
 
 ---
 
-## 1. Testing strategy — mock phase-out (from §6 archive)
+# General rules
 
-### 1.1 First endpoint migration
-- [ ] Pick endpoint to migrate (suggestion: `GET /api/users/preferences`).
-- [ ] Implement in `portfoliost-backend`.
+## Testing strategy, mocking, and migration
+
+### Endpoint migration approach
+
+- [ ] Pick endpoint to migrate (for example: `GET /api/users/preferences`).
+- [ ] Implement in respective module, for example `portfoliost-backend`.
 - [ ] Write backend unit tests.
 - [ ] Add seed data if needed.
-- [ ] Switch gateway route in `deploy/services.env`: `API_USERS_URL` → `http://portfoliost-backend:3000`.
+- [ ] Switch gateway route to respective module, for example `deploy/services.env`:
+  `API_USERS_URL` → `http://portfoliost-backend:3000`.
 - [ ] Add E2E test for the endpoint.
 - [ ] Delete mock handler.
 - [ ] Verify: build + unit + mock + e2e. Commit.
 
-### 1.2 Subsequent endpoints
-- [ ] `/api/auth/*` + `/api/users/*` (partially done — auth + users routes exist).
-- [ ] `/api/portfolios/*`
-- [ ] `/api/wallets/*`
+### Subsequent endpoints
+
+- [X] `/api/auth/*` + `/api/users/*`
+- [X] `/api/portfolios/*`
+- [X] `/api/wallets/*`
 - [ ] `/api/watchlists/*`
-- [ ] `/api/instruments/*`
+- [X] `/api/instruments/*`
 - [ ] `/api/charting/*`
 
-### 1.3 Mock removal
+### Final mock removal steps
 - [ ] Delete `mocks/` directory.
 - [ ] Remove `example-service-mock` service from `docker-compose.yml`.
 - [ ] Remove `Dockerfile.mock`.
@@ -37,14 +42,9 @@ Legend: `[ ]` pending · `[x]` done
 
 ---
 
-## 2. Fees & FX docs sweep (from §10 archive)
+# Plan
 
-### 2.1 Docs sweep
-- [ ] AGENTS.md conventions note (camelCase for new fields), cross-links between proposals.
-
----
-
-## 3. Portfolio analytics — price data warehouse + value snapshots (§15 Phase H)
+## 1. Portfolio analytics — price data warehouse + value snapshots (§15 Phase H)
 
 Proposal: [price-data-architecture.md](proposals/price-data-architecture.md).
 
@@ -70,7 +70,7 @@ H9   tests
 H10  stooq post-import hook + admin Market Data tab
 ```
 
-### 3.1 (H2) — price_bars schema, foreign tables, and unified view
+### 1.1 (H2) — price_bars schema, foreign tables, and unified view
 
 In `portfoliost-instruments`, add to `instruments` schema via Drizzle migration:
 
@@ -140,7 +140,7 @@ CREATE TABLE instruments.split_adjustments (
 
 Unit test: schema compiles, upsert into `price_bars` is idempotent, VIEW returns rows from both sources.
 
-### 3.2 (H3) — price history read endpoint
+### 1.2 (H3) — price history read endpoint
 
 `GET /api/instruments/:symbol/price-bars?from=YYYY-MM-DD&to=YYYY-MM-DD`
 
@@ -158,11 +158,11 @@ Ticker routing (via `exchange_reference` + `ticker_reference` — no hardcoded m
 - Polish symbol (WSE) → stooq `daily_pl`, format TBC
 - German/other → stooq `daily_world`, format TBC
 
-### 3.3 (H4) — passive write-through from existing quote/history fetches
+### 1.3 (H4) — passive write-through from existing quote/history fetches
 
 In `portfoliost-instruments`, when a `/quote` or `/history` response is served from openst, also upsert the returned daily bars to `price_bars` as a background write. Cheap: data already fetched. Accumulates price_bars organically for well-queried symbols.
 
-### 3.4 (H5) — snapshot-on-read in refreshQuotes
+### 1.4 (H5) — snapshot-on-read in refreshQuotes
 
 In `portfoliost-wallets`, inside `refreshQuotes()` (called on every `GET /positions`), after persisting quote fields, compute and upsert today's value snapshot:
 
@@ -175,7 +175,7 @@ invested       = Σ pos.totalCostBasis × fx(pos.instrumentCurrency → portfoli
 
 Uses existing `latestRates()`. No scheduler needed. Makes chart show today's single data point.
 
-### 3.5 (H6) — backfill job: historical value_snapshots
+### 1.5 (H6) — backfill job: historical value_snapshots
 
 Triggered asynchronously from `GET /:id/analytics` when `value_snapshots` has < 2 rows for a portfolio.
 
@@ -188,7 +188,7 @@ Triggered asynchronously from `GET /:id/analytics` when `value_snapshots` has < 
 
 Job triggered async from analytics endpoint; returns `{ backfillStatus: "pending" }` immediately while job runs.
 
-### 3.6 (H7) — wire GET /:id/analytics
+### 1.6 (H7) — wire GET /:id/analytics
 
 Replace permanent stub in `portfoliost-wallets routes/portfolios.ts`:
 
@@ -214,7 +214,7 @@ Replace permanent stub in `portfoliost-wallets routes/portfolios.ts`:
    `monthlyReturns`: group by `YYYY-MM`, `(last_value / first_value - 1) × 100` per month.
 5. Feeds `PortfolioCard` sparkline + `PortfolioPerformanceTab` equity/monthly bar charts.
 
-### 3.7 (H8) — frontend: polling + loading banner
+### 1.7 (H8) — frontend: polling + loading banner
 
 In `PortfolioCard.vue` and `PortfolioPerformanceTab.vue`:
 - If `analytics.backfillStatus === "pending"`: show subtle banner "Historical data is loading, chart will update in a moment".
@@ -222,7 +222,7 @@ In `PortfolioCard.vue` and `PortfolioPerformanceTab.vue`:
 - Stop polling on `"complete"` or after 5 minutes (failure guard).
 - Render whatever `timeSeries` points exist immediately — even 1 point beats "Loading chart...".
 
-### 3.8 (H9) — tests
+### 1.8 (H9) — tests
 
 `portfoliost-instruments`:
 - `price-bars.test.ts`: stooq ticker mapping, gap detection, upsert idempotence, circuit breaker (no retry within 1h on failure), weekend carry-forward, split boundary detection (clean ratio → `split_candidates`, ambiguous → `split_candidates` with `suggested_factor=NULL`, within 0.85–1.15 → no action).
@@ -231,7 +231,7 @@ In `PortfolioCard.vue` and `PortfolioPerformanceTab.vue`:
 `portfoliost-wallets`:
 - `snapshots.test.ts`: today snapshot with 2 USD positions; multi-currency (PLN, EUR); backfill with 3 positions over 10 days; timeframe filter; empty portfolio → `timeSeries: []`.
 
-### 3.9 (H10) — post-import hook + admin Market Data tab
+### 1.9 (H10) — post-import hook + admin Market Data tab
 
 **Post-import hook** `POST /api/instruments/internal/stooq-imported`:
 - Query `MAX(date)` from each foreign table (`stooq_daily_us`, `stooq_daily_pl`, `stooq_daily_world`).
@@ -251,44 +251,44 @@ In `PortfolioCard.vue` and `PortfolioPerformanceTab.vue`:
 
 ---
 
-## 4. Portfolio analytics — performance, risk, derived content, cluster (§15 Phases I–L)
+## 2. Portfolio analytics — performance, risk, derived content, cluster (§15 Phases I–L)
 
-### 4.1 (I1) Shared series/returns service
+### 2.1 (I1) Shared series/returns service
 - [ ] TWR, XIRR/MWR, annualization + withhold rules.
 
-### 4.2 (I2) Enhanced analytics endpoint
+### 2.2 (I2) Enhanced analytics endpoint
 - [ ] `GET /:id/analytics` with TWR/MWR/sharpe/benchmark overlay (on top of H7 basic chart).
 - [ ] Benchmark normalization via instruments `/history`.
 
-### 4.3 (I3) Stubs promotion
+### 2.3 (I3) Stubs promotion
 - [ ] `/merged`, `externalCapital*` wallet-deposit basis.
 
-### 4.4 (I4) Tests
+### 2.4 (I4) Tests
 - [ ] Fixture + property tests; stack-test.
 
-### 4.5 (J1) Risk metrics endpoint
+### 2.5 (J1) Risk metrics endpoint
 - [ ] `GET /:id/risk-metrics`: volatility / maxDrawdown / sharpe / sortino / calmar / win-rate.
 
-### 4.6 (J2) Risk tests
+### 2.6 (J2) Risk tests
 - [ ] Withholding-rule and empty-history tests.
 
-### 4.7 (K1) Dividends composition
+### 2.7 (K1) Dividends composition
 - [ ] Dividends composition within holding windows.
 
-### 4.8 (K2) Calendar composition
+### 2.8 (K2) Calendar composition
 - [ ] Calendar composition.
 
-### 4.9 (K3) Compare enrichment
+### 2.9 (K3) Compare enrichment
 - [ ] Compare enrichment from instruments metrics.
 
-### 4.10 (K4) Summary-metrics income source switch
+### 2.10 (K4) Summary-metrics income source switch
 
-### 4.11 (L1) Cluster cutover
+### 2.11 (L1) Cluster cutover
 - [ ] Homelab ingress paths → `portfoliost-wallets:3000`.
 - [ ] Separated snapshot Kubernetes Jobs (D11 job-pod pattern, not in-process scheduler).
 
-### 4.12 (L2) Live verification
+### 2.12 (L2) Live verification
 - [ ] `/__meta`, CRUD + analytics through host; e2e green.
 
-### 4.13 (L3) Closeout
+### 2.13 (L3) Closeout
 - [ ] plan/proposal status marks; retire `mocks/portfolios/index.js`; docs sweep.
