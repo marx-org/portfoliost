@@ -180,16 +180,17 @@ Stores prices that stooq does not cover:
 CREATE TABLE instruments.price_bars (
   symbol   TEXT         NOT NULL,   -- system format: AAPL, KRU.WA, RHM.DE
   date     DATE         NOT NULL,
-  open     NUMERIC(20,8),
-  high     NUMERIC(20,8),
-  low      NUMERIC(20,8),
   close    NUMERIC(20,8) NOT NULL,
-  volume   BIGINT,
-  currency CHAR(3),
   source   TEXT         NOT NULL DEFAULT 'openst',
   PRIMARY KEY (symbol, date)        -- covers MAX/MIN(date) WHERE symbol = ? efficiently
 );
 ```
+
+Design rationale: only `close` is stored because no downstream consumer uses OHLCV fields.
+All charts render close-price line/area series. Portfolio analytics (value, performance,
+risk metrics) are derived from close prices. If a future consumer needs high/low/volume,
+the upstream sources (stooq OHLCV, openst `/price/ohlcv`) already provide them — extend
+the table and view at that point.
 
 ### Split adjustments tables
 
@@ -236,24 +237,20 @@ CREATE VIEW instruments.price_bars_all AS
     replace(s.ticker, '.US', '') AS symbol,
     s.date,
     s.close * COALESCE(adj.factor, 1) AS close,
-    s.open  * COALESCE(adj.factor, 1) AS open,
-    s.high  * COALESCE(adj.factor, 1) AS high,
-    s.low   * COALESCE(adj.factor, 1) AS low,
-    s.volume,
     'stooq' AS source
   FROM instruments.stooq_daily_us s
   LEFT JOIN instruments.split_adjustments adj ON replace(s.ticker, '.US', '') = adj.symbol
   UNION ALL
   -- Stooq PL (ticker format TBC after import)
-  SELECT <mapping> AS symbol, date, open, high, low, close, volume, 'stooq' AS source
+  SELECT <mapping> AS symbol, date, close, 'stooq' AS source
   FROM instruments.stooq_daily_pl
   UNION ALL
   -- Stooq world (ticker format TBC after import)
-  SELECT <mapping> AS symbol, date, open, high, low, close, volume, 'stooq' AS source
+  SELECT <mapping> AS symbol, date, close, 'stooq' AS source
   FROM instruments.stooq_daily_world
   UNION ALL
   -- Overflow: recent tail and symbols not in stooq
-  SELECT symbol, date, open, high, low, close, volume, source
+  SELECT symbol, date, close, source
   FROM instruments.price_bars;
 ```
 

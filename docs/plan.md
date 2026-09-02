@@ -55,7 +55,9 @@ Legend: `[ ]` pending · `[x]` done
 Proposal: [price-data-architecture.md](proposals/price-data-architecture.md).
 
 Architecture summary:
-- `portfoliost-instruments` gains foreign tables (`stooq_daily_us/pl/world`) via `postgres_fdw` pointing at the existing `stooq` DB on the same Postgres instance.
+
+- `portfoliost-instruments` gains multiple foreign tables (`stooq_daily_us/pl/world`) via
+  `postgres_fdw` pointing at the existing `stooq` DB on the same Postgres instance.
 - `instruments.price_bars` stores overflow prices (recent tail + symbols not in stooq).
 - `instruments.price_bars_all` VIEW unifies stooq foreign tables + overflow in one SQL call.
 - `instruments.price_bar_metadata` tracks circuit-breaker state per symbol.
@@ -85,12 +87,7 @@ In `portfoliost-instruments`, add to `instruments` schema via Drizzle migration:
 CREATE TABLE instruments.price_bars (
   symbol   TEXT         NOT NULL,   -- system format: AAPL, KRU.WA, RHM.DE
   date     DATE         NOT NULL,
-  open     NUMERIC(20,8),
-  high     NUMERIC(20,8),
-  low      NUMERIC(20,8),
   close    NUMERIC(20,8) NOT NULL,
-  volume   BIGINT,
-  currency CHAR(3),
   source   TEXT         NOT NULL DEFAULT 'openst',
   PRIMARY KEY (symbol, date)
 );
