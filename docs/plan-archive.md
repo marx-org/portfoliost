@@ -710,10 +710,10 @@ Stooq download job should run monthly to keep the floor moving.
 instruments.price_bars(
   symbol        TEXT NOT NULL,          -- native symbol as used in our system (AAPL, KRU.WA, RHM.DE)
   date          DATE NOT NULL,
-  open          NUMERIC(20,8),
-  high          NUMERIC(20,8),
-  low           NUMERIC(20,8),
-  close         NUMERIC(20,8) NOT NULL,
+  open          NUMERIC(28,8),
+  high          NUMERIC(28,8),
+  low           NUMERIC(28,8),
+  close         NUMERIC(28,8) NOT NULL,
   volume        BIGINT,
   currency      CHAR(3) NOT NULL,       -- instrument native currency
   source        TEXT NOT NULL,          -- 'stooq' | 'openst'

@@ -494,6 +494,13 @@ part seen" and "pipeline done", causing false "No file received" errors. Fixed b
 Stooq encodes some volume and openint values as floats (e.g. `6337948.989247318`). BIGINT
 rejects these with error `22P02`. Schema uses `NUMERIC(28,8)` for both columns.
 
+### OHLC: NUMERIC(20,8) → NUMERIC(28,8)
+
+Some stooq US prices overflow `NUMERIC(20,8)` (max ~10^12). Values like
+`1030826300000` exceed this, producing error `22003: numeric field overflow`. Schema uses
+`NUMERIC(28,8)` for all OHLC columns (matching volume/openint) to support prices up to
+10^20.
+
 ### Duplicate rows from cross-file tickers (2026-08-31)
 
 Stooq zips can include the same ticker in more than one CSV file (e.g. `daily_pl.zip` contained

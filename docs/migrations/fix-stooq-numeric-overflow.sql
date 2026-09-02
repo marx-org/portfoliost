@@ -1,0 +1,39 @@
+-- Migration: widen OHLC columns from NUMERIC(20,8) to NUMERIC(28,8)
+--
+-- Status: APPLIED against production (postgres-pfire, 2026-09-02).
+--
+-- Two problems were fixed:
+--   1. Copy/COPY into staging table overflowed NUMERIC(20,8) (max ~10^12)
+--      for OHLC. Fixed in portfoliost-admin/src/jobs.ts (DDL now uses
+--      NUMERIC(28,8)) AND here for already-loaded live/foreign tables.
+--   2. PostgreSQL cannot `ALTER COLUMN TYPE` on a foreign table, and the
+--      postgres_fdw local column type is independent of the remote. So the
+--      foreign tables must be DROPPED and RECREATED. They hold no local data
+--      (all rows live in the stooq DB), so drop/recreate loses nothing.
+--
+-- APPLIED IN PRODUCTION (for record). Do not re-run blindly.
+
+-- ============================================================
+-- PART 1 — stooq DB: widen live tables in place (regular tables)
+-- ============================================================
+-- \c stooq
+-- All 8 live tables widened in place (non-destructive, keeps 100M+ rows):
+--   daily_us, daily_pl, daily_world, daily_uk, daily_hk,
+--   daily_hu, daily_macro, daily_jp
+-- ALTER TABLE <t> ALTER COLUMN open TYPE NUMERIC(28,8),
+--                 ALTER COLUMN high TYPE NUMERIC(28,8),
+--                 ALTER COLUMN low  TYPE NUMERIC(28,8),
+--                 ALTER COLUMN close TYPE NUMERIC(28,8);
+
+-- ============================================================
+-- PART 2 — portfoliost DB: recreate all 8 foreign tables
+-- ============================================================
+-- \c portfoliost
+-- DROP FOREIGN TABLE IF EXISTS instruments.stooq_daily_<X>;
+-- CREATE FOREIGN TABLE instruments.stooq_daily_<X> ( ... NUMERIC(28,8) ... )
+--   SERVER stooq_server OPTIONS (schema_name 'public', table_name 'daily_<X>');
+-- for X in us, pl, world, uk, hk, hu, macro, jp.
+--
+-- NOTE: run the CREATE as the owning role so the table is owned correctly,
+-- then re-apply grants (drop/recreate resets ownership to the creating role):
+--   GRANT SELECT ON instruments.stooq_daily_* TO portfoliost;

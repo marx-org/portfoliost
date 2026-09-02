@@ -87,7 +87,7 @@ In `portfoliost-instruments`, add to `instruments` schema via Drizzle migration:
 CREATE TABLE instruments.price_bars (
   symbol   TEXT         NOT NULL,   -- system format: AAPL, KRU.WA, RHM.DE
   date     DATE         NOT NULL,
-  close    NUMERIC(20,8) NOT NULL,
+  close    NUMERIC(28,8) NOT NULL,
   source   TEXT         NOT NULL DEFAULT 'openst',
   PRIMARY KEY (symbol, date)
 );
@@ -108,9 +108,9 @@ CREATE TABLE instruments.split_candidates (
   symbol               TEXT         NOT NULL,
   detected_at          DATE         NOT NULL,
   last_stooq_date      DATE,
-  last_stooq_close     NUMERIC(20,8),
+  last_stooq_close     NUMERIC(28,8),
   first_overflow_date  DATE,
-  first_overflow_close NUMERIC(20,8),
+  first_overflow_close NUMERIC(28,8),
   ratio                NUMERIC(10,6),
   suggested_factor     NUMERIC(10,6),
   suggested_ratio      TEXT,

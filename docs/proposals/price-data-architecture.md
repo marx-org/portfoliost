@@ -156,8 +156,8 @@ END $$;
 
 CREATE FOREIGN TABLE IF NOT EXISTS instruments.stooq_daily_pl (
   ticker TEXT NOT NULL, period TEXT NOT NULL, date DATE NOT NULL,
-  time TEXT NOT NULL DEFAULT '000000', open NUMERIC(20,8), high NUMERIC(20,8),
-  low NUMERIC(20,8), close NUMERIC(20,8), volume NUMERIC(28,8), openint NUMERIC(28,8)
+  time TEXT NOT NULL DEFAULT '000000', open NUMERIC(28,8), high NUMERIC(28,8),
+  low NUMERIC(28,8), close NUMERIC(28,8), volume NUMERIC(28,8), openint NUMERIC(28,8)
 ) SERVER stooq_server OPTIONS (schema_name 'public', table_name 'daily_pl');
 
 -- Same for daily_us, daily_jp, daily_world, daily_uk, daily_hk, daily_hu, daily_macro
@@ -180,7 +180,7 @@ Stores prices that stooq does not cover:
 CREATE TABLE instruments.price_bars (
   symbol   TEXT         NOT NULL,   -- system format: AAPL, KRU.WA, RHM.DE
   date     DATE         NOT NULL,
-  close    NUMERIC(20,8) NOT NULL,
+  close    NUMERIC(28,8) NOT NULL,
   source   TEXT         NOT NULL DEFAULT 'openst',
   PRIMARY KEY (symbol, date)        -- covers MAX/MIN(date) WHERE symbol = ? efficiently
 );
@@ -202,9 +202,9 @@ CREATE TABLE instruments.split_candidates (
   symbol               TEXT         NOT NULL,
   detected_at          DATE         NOT NULL,
   last_stooq_date      DATE,
-  last_stooq_close     NUMERIC(20,8),
+  last_stooq_close     NUMERIC(28,8),
   first_overflow_date  DATE,
-  first_overflow_close NUMERIC(20,8),
+  first_overflow_close NUMERIC(28,8),
   ratio                NUMERIC(10,6),
   suggested_factor     NUMERIC(10,6),  -- NULL if ambiguous (not a clean split ratio)
   suggested_ratio      TEXT,           -- '4:1', '2:1', etc. or NULL
