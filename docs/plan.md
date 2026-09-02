@@ -78,9 +78,19 @@ H9   tests
 H10  stooq post-import hook + admin Market Data tab
 ```
 
-### 1.1 (H2) — price_bars schema, foreign tables, and unified view
+### 1.1 (H2) — price_bars schema, foreign tables, and unified view — [x] DONE
 
 In `portfoliost-instruments`, add to `instruments` schema via Drizzle migration:
+
+- [x] Migration 0003: `price_bars`, `price_bar_metadata`, `split_candidates`, `split_adjustments`.
+- [x] Guarded `price_bars_all` view over all eight stooq daily datasets + overflow.
+- [x] homelab `pfire-init-sql` ConfigMap wired into `postgrescluster-pfire.yaml` (8 FDW foreign tables).
+- [x] docker-compose `pricebars-sim` one-shot (post_fdw stand-in, self-verifies the view).
+- [x] Unit tests (`src/db/price-bars.test.ts`) + build + 91 tests green.
+- [x] Released to prod: `portfoliost-instruments` v1.0.17 (CI → ghcr + tag/release), helmrelease v1.0.16→v1.0.17, Flux reconciled, rollout complete.
+- [x] Prod verified: migration 0003 applied, view created over foreign tables, FDW pushdown query returns rows (AAPL 10,577).
+
+In the `instruments` schema:
 
 **`instruments.price_bars`** — overflow table (recent tail + symbols not in stooq):
 ```sql
@@ -147,9 +157,19 @@ Unit test (`src/db/price-bars.test.ts`): schema compiles, upsert into `price_bar
 
 **Performance note** — the single-view read approach is kept (no per-ticker table routing yet); a candidate optimization (ticker-routed single-table reads) is documented at the end of `docs/proposals/price-data-architecture.md` to re-evaluate if the real imported data is too slow.
 
-### 1.2 (H3) — price history read endpoint
+### 1.2 (H3) — price history read endpoint — [ ] PENDING
 
 `GET /api/instruments/:symbol/price-bars?from=YYYY-MM-DD&to=YYYY-MM-DD`
+
+- [ ] Wire route `GET /api/instruments/:symbol/price-bars`.
+- [ ] Query `price_bars_all` for range; detect gap (`MAX(date)` vs today > 3 days).
+- [ ] Circuit breaker via `price_bar_metadata` (failed + >1h → serve stale with `{ stale: true }`).
+- [ ] Fetch missing days from cachest → openst via `fetchOhlcv`, upsert into `price_bars`, update `price_bar_metadata`.
+- [ ] Split boundary check on first overflow write.
+- [ ] Return complete series incl. `stale` flag.
+- [ ] Contract-typed response against `@marx2/contracts`.
+- [ ] Unit tests (ticker mapping, gap, upsert idempotence, circuit breaker, carry-forward, split detection).
+- [ ] docker-compose verification against `pricebars-sim` + e2e; mark done; commit.
 
 Logic:
 1. Query `price_bars_all` for requested range (one SQL call — covers stooq + overflow).
@@ -165,12 +185,14 @@ Ticker routing (via `exchange_reference` + `ticker_reference` — no hardcoded m
 - Polish symbol (WSE) → stooq `daily_pl`, format TBC
 - German/other → stooq `daily_world`, format TBC
 
-### 1.3 (H4) — passive write-through from existing quote/history fetches
+### 1.3 (H4) — passive write-through from existing quote/history fetches — [ ] PENDING
 
+- [ ] Background upsert of returned daily bars to `price_bars` on `/quote` / `/history` (openst-served).
 In `portfoliost-instruments`, when a `/quote` or `/history` response is served from openst, also upsert the returned daily bars to `price_bars` as a background write. Cheap: data already fetched. Accumulates price_bars organically for well-queried symbols.
 
-### 1.4 (H5) — snapshot-on-read in refreshQuotes
+### 1.4 (H5) — snapshot-on-read in refreshQuotes — [ ] PENDING
 
+- [ ] Compute + upsert today's value snapshot in `refreshQuotes()` (`portfoliost-wallets`).
 In `portfoliost-wallets`, inside `refreshQuotes()` (called on every `GET /positions`), after persisting quote fields, compute and upsert today's value snapshot:
 
 ```
@@ -182,8 +204,9 @@ invested       = Σ pos.totalCostBasis × fx(pos.instrumentCurrency → portfoli
 
 Uses existing `latestRates()`. No scheduler needed. Makes chart show today's single data point.
 
-### 1.5 (H6) — backfill job: historical value_snapshots
+### 1.5 (H6) — backfill job: historical value_snapshots — [ ] PENDING
 
+- [ ] Async backfill triggered from `GET /:id/analytics` when `value_snapshots` < 2 rows.
 Triggered asynchronously from `GET /:id/analytics` when `value_snapshots` has < 2 rows for a portfolio.
 
 1. Query `MIN(executed_at)` from `portfolioTransactions` → `firstTxDate`.
@@ -195,8 +218,9 @@ Triggered asynchronously from `GET /:id/analytics` when `value_snapshots` has < 
 
 Job triggered async from analytics endpoint; returns `{ backfillStatus: "pending" }` immediately while job runs.
 
-### 1.6 (H7) — wire GET /:id/analytics
+### 1.6 (H7) — wire GET /:id/analytics — [ ] PENDING
 
+- [ ] Replace stub: snapshot row-count gate → async backfill trigger / read + timeframe filter + monthly returns.
 Replace permanent stub in `portfoliost-wallets routes/portfolios.ts`:
 
 1. Check `value_snapshots` row count for portfolio.
@@ -221,40 +245,40 @@ Replace permanent stub in `portfoliost-wallets routes/portfolios.ts`:
    `monthlyReturns`: group by `YYYY-MM`, `(last_value / first_value - 1) × 100` per month.
 5. Feeds `PortfolioCard` sparkline + `PortfolioPerformanceTab` equity/monthly bar charts.
 
-### 1.7 (H8) — frontend: polling + loading banner
+### 1.7 (H8) — frontend: polling + loading banner — [ ] PENDING
 
 In `PortfolioCard.vue` and `PortfolioPerformanceTab.vue`:
-- If `analytics.backfillStatus === "pending"`: show subtle banner "Historical data is loading, chart will update in a moment".
-- Poll `GET /:id/analytics` every 5s while `backfillStatus !== "complete"`.
-- Stop polling on `"complete"` or after 5 minutes (failure guard).
-- Render whatever `timeSeries` points exist immediately — even 1 point beats "Loading chart...".
+- [ ] If `analytics.backfillStatus === "pending"`: show subtle banner "Historical data is loading, chart will update in a moment".
+- [ ] Poll `GET /:id/analytics` every 5s while `backfillStatus !== "complete"`.
+- [ ] Stop polling on `"complete"` or after 5 minutes (failure guard).
+- [ ] Render whatever `timeSeries` points exist immediately — even 1 point beats "Loading chart...".
 
-### 1.8 (H9) — tests
+### 1.8 (H9) — tests — [ ] PENDING
 
 `portfoliost-instruments`:
-- `price-bars.test.ts`: stooq ticker mapping, gap detection, upsert idempotence, circuit breaker (no retry within 1h on failure), weekend carry-forward, split boundary detection (clean ratio → `split_candidates`, ambiguous → `split_candidates` with `suggested_factor=NULL`, within 0.85–1.15 → no action).
-- `price-bars-stooq.test.ts`: mock PostgREST / foreign table response → correct rows in `price_bars`.
+- [ ] `price-bars.test.ts`: stooq ticker mapping, gap detection, upsert idempotence, circuit breaker (no retry within 1h on failure), weekend carry-forward, split boundary detection (clean ratio → `split_candidates`, ambiguous → `split_candidates` with `suggested_factor=NULL`, within 0.85–1.15 → no action).
+- [ ] `price-bars-stooq.test.ts`: mock PostgREST / foreign table response → correct rows in `price_bars`.
 
 `portfoliost-wallets`:
-- `snapshots.test.ts`: today snapshot with 2 USD positions; multi-currency (PLN, EUR); backfill with 3 positions over 10 days; timeframe filter; empty portfolio → `timeSeries: []`.
+- [ ] `snapshots.test.ts`: today snapshot with 2 USD positions; multi-currency (PLN, EUR); backfill with 3 positions over 10 days; timeframe filter; empty portfolio → `timeSeries: []`.
 
-### 1.9 (H10) — post-import hook + admin Market Data tab
+### 1.9 (H10) — post-import hook + admin Market Data tab — [ ] PENDING
 
 **Post-import hook** `POST /api/instruments/internal/stooq-imported`:
-- Query `MAX(date)` from each foreign table (`stooq_daily_us`, `stooq_daily_pl`, `stooq_daily_world`).
-- For each table, delete `price_bars` overflow rows up to `MAX(date)` for covered symbols.
-- Delete now-redundant `split_adjustments` rows for those symbols up to `MAX(date)`.
-- Auto-dismiss pending `split_candidates` for those symbols.
-- Write to `admin.job_run` (import log — supersedes the originally planned `stooq_import_log`; see architecture doc note).
-- Refresh in-memory stooq floor date cache.
+- [ ] Query `MAX(date)` from each foreign table (`stooq_daily_us`, `stooq_daily_pl`, `stooq_daily_world`).
+- [ ] For each table, delete `price_bars` overflow rows up to `MAX(date)` for covered symbols.
+- [ ] Delete now-redundant `split_adjustments` rows for those symbols up to `MAX(date)`.
+- [ ] Auto-dismiss pending `split_candidates` for those symbols.
+- [ ] Write to `admin.job_run` (import log — supersedes the originally planned `stooq_import_log`; see architecture doc note).
+- [ ] Refresh in-memory stooq floor date cache.
 
 **Admin Market Data tab** (`/en/admin/market-data`):
 
-*Stooq datasets panel* — one row per dataset (daily_us, daily_pl, daily_world): Dataset / Latest date / Imported at / Overflow rows cleaned. Data from `admin.job_run`.
+- [ ] *Stooq datasets panel* — one row per dataset (daily_us, daily_pl, daily_world): Dataset / Latest date / Imported at / Overflow rows cleaned. Data from `admin.job_run`.
 
-*Split candidates panel* — all `split_candidates` rows with `status='pending'`, ordered by `detected_at DESC`: Symbol / Detected / Last stooq close / First overflow close / Ratio / Suggested / Actions (Apply / Dismiss / Apply custom). Reviewed candidates in collapsed history section.
+- [ ] *Split candidates panel* — all `split_candidates` rows with `status='pending'`, ordered by `detected_at DESC`: Symbol / Detected / Last stooq close / First overflow close / Ratio / Suggested / Actions (Apply / Dismiss / Apply custom). Reviewed candidates in collapsed history section.
 
-*Overflow summary* — total `price_bars` rows + breakdown by symbol (top 10 by count).
+- [ ] *Overflow summary* — total `price_bars` rows + breakdown by symbol (top 10 by count).
 
 ---
 
