@@ -11,7 +11,7 @@ Status: **Implemented and deployed** (portfoliost-admin v1.0.19, jobshot 1.6.1)
 The `stooq-importer` CronJob that loads stooq bulk-download zip files into Postgres currently
 requires manual cluster-level intervention to run with a different source file. The existing
 job is configured to read from a fixed NFS path (`/home/stooq/data/usa_daily.zip`) and targets
-only the USA daily dataset. To import other zip types (UK, Japan, hourly data, etc.), an
+only the USA daily dataset. To import other zip types (UK, Japan, other regions, etc.), an
 operator must SSH in, copy the file to NFS, patch the ConfigMap, and manually trigger the
 CronJob — a multi-step, error-prone process inaccessible from the admin UI.
 
@@ -29,7 +29,7 @@ trigger a Kubernetes Job that ingests it into the `stooq` database.
 | Admin Jobs tab UI with upload + trigger per dataset | Scheduling / CronJob automation |
 | Temporary file upload to shared PVC (1 GB max) | Permanent NFS storage of uploaded zips |
 | Kubernetes Job creation via jobshot backend | Modifying the stooq-downloader CronJob |
-| All stooq dataset types (daily, hourly, 5-min; all regions) | Incremental / append import mode |
+| All stooq dataset types (daily; all regions) | Incremental / append import mode |
 | Import status polling in the UI | Email/push notifications on job completion |
 | Cleanup of the temp file after import | Broker import, news, alerts (per AGENTS.md exclusions) |
 | Contracts-first: new endpoints defined in openapi.yaml first | — |
@@ -38,30 +38,18 @@ trigger a Kubernetes Job that ingests it into the `stooq` database.
 
 ## Stooq zip file types and target tables
 
-Stooq publishes bulk-download archives for multiple regions and timeframes. Each zip maps to
+Stooq publishes bulk-download archives for all regions. Each zip maps to
 a separate table in the `stooq` database:
 
 | Region | Timeframe | Stooq folder | Expected zip name | Target table | Approx. size |
 |---|---|---|---|---|---|
 | World | Daily | `world` | `d_world_txt.zip` | `daily_world` | ~183 MB |
-| World | Hourly | `world` | `h_world_txt.zip` | `hourly_world` | ~245 MB |
-| World | 5-min | `world` | `5_world_txt.zip` | `5min_world` | ~450 MB |
 | U.S. | Daily | `us` | `d_us_txt.zip` | `daily_us` | ~517 MB |
-| U.S. | Hourly | `us` | `h_us_txt.zip` | `hourly_us` | ~437 MB |
-| U.S. | 5-min | `us` | `5_us_txt.zip` | `5min_us` | ~595 MB |
 | U.K. | Daily | `uk` | `d_uk_txt.zip` | `daily_uk` | ~157 MB |
-| U.K. | Hourly | `uk` | `h_uk_txt.zip` | `hourly_uk` | ~171 MB |
-| U.K. | 5-min | `uk` | `5_uk_txt.zip` | `5min_uk` | ~177 MB |
 | Japan | Daily | `jp` | `d_jp_txt.zip` | `daily_jp` | ~219 MB |
 | Hong Kong | Daily | `hk` | `d_hk_txt.zip` | `daily_hk` | ~104 MB |
-| Hong Kong | Hourly | `hk` | `h_hk_txt.zip` | `hourly_hk` | ~42 MB |
-| Hong Kong | 5-min | `hk` | `5_hk_txt.zip` | `5min_hk` | ~51 MB |
 | Poland | Daily | `pl` | `d_pl_txt.zip` | `daily_pl` | ~200 MB zip / ~1.4 GB extracted |
-| Poland | Hourly | `pl` | `h_pl_txt.zip` | `hourly_pl` | ~29 MB |
-| Poland | 5-min | `pl` | `5_pl_txt.zip` | `5min_pl` | ~28 MB |
 | Hungary | Daily | `hu` | `d_hu_txt.zip` | `daily_hu` | ~1.7 MB |
-| Hungary | Hourly | `hu` | `h_hu_txt.zip` | `hourly_hu` | ~1.0 MB |
-| Hungary | 5-min | `hu` | `5_hu_txt.zip` | `5min_hu` | ~0.8 MB |
 | Macroeconomy | Daily | `macro` | `d_macro_txt.zip` | `daily_macro` | ~0.9 MB |
 
 **Zip structure:** Each zip contains one CSV file per ticker (e.g. `AAPL.US.txt`), nested in

@@ -29,35 +29,22 @@ known split dates with no price cliffs). This means stooq historical data and op
 (which also returns adjusted prices) are on the same scale — no adjustment needed at the boundary
 for normal operation.
 
-Available datasets and tables — the full stooq catalogue. Each zip maps to a separate table:
+Available datasets and tables — daily stooq catalogue. Each zip maps to a separate table:
 
 | Region | Timeframe | Stooq zip | Table |
 |---|---|---|---|
 | World | Daily | `d_world_txt.zip` | `daily_world` |
-| World | Hourly | `h_world_txt.zip` | `hourly_world` |
-| World | 5-min | `5_world_txt.zip` | `5min_world` |
 | U.S. | Daily | `d_us_txt.zip` | `daily_us` |
-| U.S. | Hourly | `h_us_txt.zip` | `hourly_us` |
-| U.S. | 5-min | `5_us_txt.zip` | `5min_us` |
 | U.K. | Daily | `d_uk_txt.zip` | `daily_uk` |
-| U.K. | Hourly | `h_uk_txt.zip` | `hourly_uk` |
-| U.K. | 5-min | `5_uk_txt.zip` | `5min_uk` |
 | Japan | Daily | `d_jp_txt.zip` | `daily_jp` |
 | Hong Kong | Daily | `d_hk_txt.zip` | `daily_hk` |
-| Hong Kong | Hourly | `h_hk_txt.zip` | `hourly_hk` |
-| Hong Kong | 5-min | `5_hk_txt.zip` | `5min_hk` |
 | Poland | Daily | `d_pl_txt.zip` | `daily_pl` |
-| Poland | Hourly | `h_pl_txt.zip` | `hourly_pl` |
-| Poland | 5-min | `5_pl_txt.zip` | `5min_pl` |
 | Hungary | Daily | `d_hu_txt.zip` | `daily_hu` |
-| Hungary | Hourly | `h_hu_txt.zip` | `hourly_hu` |
-| Hungary | 5-min | `5_hu_txt.zip` | `5min_hu` |
 | Macroeconomy | Daily | `d_macro_txt.zip` | `daily_macro` |
 
 The initial three tables (`daily_us`, `daily_pl`, `daily_world`) from the original design are
 a subset. The `stooq_daily_us`, `stooq_daily_pl`, `stooq_daily_world` foreign tables and the
-`price_bars_all` view cover **daily EOD data only** — the hourly and 5-min tables are imported
-for completeness but are not used by the price history endpoint in this phase.
+`price_bars_all` view cover **daily EOD data only** — only the daily datasets are imported.
 
 A separate Kubernetes Job is created per dataset on import. See `admin-jobs-stooq-upload.md`
 for the upload + import flow.
@@ -512,7 +499,7 @@ Initial job list for the pfire namespace:
 | Poland daily import | Import `d_pl_txt.zip` via pgloader | `daily_pl` |
 | World daily import | Import `d_world_txt.zip` via pgloader | `daily_world` |
 
-see `admin-jobs-stooq-upload.md` for the full list of 20 datasets.
+see `admin-jobs-stooq-upload.md` for the full list of daily datasets.
 
 The "Run Import" button is **enabled** when a file is selected and no import job is currently
 running for that dataset. Status is polled every 5 seconds while a job is active. After a

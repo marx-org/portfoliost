@@ -22,24 +22,12 @@ interface DatasetMeta {
 
 const DATASET_META: DatasetMeta[] = [
   { id: "daily_world",  label: "World — Daily",     description: "d_world_txt.zip → daily_world",  group: "World" },
-  { id: "hourly_world", label: "World — Hourly",    description: "h_world_txt.zip → hourly_world", group: "World" },
-  { id: "5min_world",   label: "World — 5-min",     description: "5_world_txt.zip → 5min_world",   group: "World" },
   { id: "daily_us",     label: "U.S. — Daily",      description: "d_us_txt.zip → daily_us",        group: "U.S." },
-  { id: "hourly_us",    label: "U.S. — Hourly",     description: "h_us_txt.zip → hourly_us",       group: "U.S." },
-  { id: "5min_us",      label: "U.S. — 5-min",      description: "5_us_txt.zip → 5min_us",         group: "U.S." },
   { id: "daily_uk",     label: "U.K. — Daily",      description: "d_uk_txt.zip → daily_uk",        group: "U.K." },
-  { id: "hourly_uk",    label: "U.K. — Hourly",     description: "h_uk_txt.zip → hourly_uk",       group: "U.K." },
-  { id: "5min_uk",      label: "U.K. — 5-min",      description: "5_uk_txt.zip → 5min_uk",         group: "U.K." },
   { id: "daily_jp",     label: "Japan — Daily",     description: "d_jp_txt.zip → daily_jp",        group: "Japan" },
   { id: "daily_hk",     label: "Hong Kong — Daily", description: "d_hk_txt.zip → daily_hk",        group: "Hong Kong" },
-  { id: "hourly_hk",    label: "Hong Kong — Hourly",description: "h_hk_txt.zip → hourly_hk",       group: "Hong Kong" },
-  { id: "5min_hk",      label: "Hong Kong — 5-min", description: "5_hk_txt.zip → 5min_hk",         group: "Hong Kong" },
   { id: "daily_pl",     label: "Poland — Daily",    description: "d_pl_txt.zip → daily_pl",        group: "Poland" },
-  { id: "hourly_pl",    label: "Poland — Hourly",   description: "h_pl_txt.zip → hourly_pl",       group: "Poland" },
-  { id: "5min_pl",      label: "Poland — 5-min",    description: "5_pl_txt.zip → 5min_pl",         group: "Poland" },
   { id: "daily_hu",     label: "Hungary — Daily",   description: "d_hu_txt.zip → daily_hu",        group: "Hungary" },
-  { id: "hourly_hu",    label: "Hungary — Hourly",  description: "h_hu_txt.zip → hourly_hu",       group: "Hungary" },
-  { id: "5min_hu",      label: "Hungary — 5-min",   description: "5_hu_txt.zip → 5min_hu",         group: "Hungary" },
   { id: "daily_macro",  label: "Macroeconomy",      description: "d_macro_txt.zip → daily_macro",  group: "Macro" },
 ]
 
