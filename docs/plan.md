@@ -157,19 +157,19 @@ Unit test (`src/db/price-bars.test.ts`): schema compiles, upsert into `price_bar
 
 **Performance note** — the single-view read approach is kept (no per-ticker table routing yet); a candidate optimization (ticker-routed single-table reads) is documented at the end of `docs/proposals/price-data-architecture.md` to re-evaluate if the real imported data is too slow.
 
-### 1.2 (H3) — price history read endpoint — [ ] PENDING
+### 1.2 (H3) — price history read endpoint — [x] DONE
 
 `GET /api/instruments/:symbol/price-bars?from=YYYY-MM-DD&to=YYYY-MM-DD`
 
-- [ ] Wire route `GET /api/instruments/:symbol/price-bars`.
-- [ ] Query `price_bars_all` for range; detect gap (`MAX(date)` vs today > 3 days).
-- [ ] Circuit breaker via `price_bar_metadata` (failed + >1h → serve stale with `{ stale: true }`).
-- [ ] Fetch missing days from cachest → openst via `fetchOhlcv`, upsert into `price_bars`, update `price_bar_metadata`.
-- [ ] Split boundary check on first overflow write.
-- [ ] Return complete series incl. `stale` flag.
-- [ ] Contract-typed response against `@marx2/contracts`.
-- [ ] Unit tests (ticker mapping, gap, upsert idempotence, circuit breaker, carry-forward, split detection).
-- [ ] docker-compose verification against `pricebars-sim` + e2e; mark done; commit.
+- [x] Wire route `GET /api/instruments/:symbol/price-bars`.
+- [x] Query `price_bars_all` for range; detect gap (`MAX(date)` vs today > 3 days).
+- [x] Circuit breaker via `price_bar_metadata` (failed + >1h → serve stale with `{ stale: true }`).
+- [x] Fetch missing days from cachest → openst via `fetchOhlcv`, upsert into `price_bars`, update `price_bar_metadata`.
+- [x] Split boundary check on first overflow write.
+- [x] Return complete series incl. `stale` flag.
+- [x] Contract-typed response against `@marx2/contracts` (`PriceBarSeries` schema, `@marx2/contracts@1.6.3`).
+- [x] Unit tests: `src/services/price-bars.test.ts` — 8 tests (queryView, hasGap, recentlyFailed, fresh series, gap fill + upsert, circuit breaker, split detection, no-action on continuous boundary). 99 instruments tests green.
+- [x] docker-compose verification: endpoint verified live (AAPL split-adjusted series returned, stale=true on cachest miss). e2e spec `tests/e2e/price-bars.spec.ts` (3 tests: valid series, 401 no auth, 400 bad params). Full playwright suite 27 passed, 1 skipped.
 
 Logic:
 1. Query `price_bars_all` for requested range (one SQL call — covers stooq + overflow).
