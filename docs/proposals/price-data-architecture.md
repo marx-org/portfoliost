@@ -660,3 +660,54 @@ after which the row is treated as final and not overwritten.
 5. `postgres_fdw` user mapping: verify whether local connections between `portfoliost` and
    `stooq` databases use trust/peer auth (no password needed) or require the postgres
    superuser password. Affects the `databaseInitSQL` content in the homelab repo.
+
+---
+
+## Potential improvement (not implemented) — ticker-routed single-table reads
+
+**Status: considered, not adopted yet.** The current design reads through the single
+`price_bars_all` view. This section records a candidate optimization to re-evaluate only
+after the real system shows whether the view is fast enough.
+
+### Why `UNION ALL` may be slow
+
+A query against `price_bars_all` (a `UNION ALL` over 8 stooq branches + overflow) makes
+Postgres evaluate every arm and merge results:
+
+- It pushes the `WHERE` filter into each arm, but non-matching arms still cost a remote
+  round-trip over the FDW, on top of the merge.
+- The US arm derives `symbol` with `replace(ticker, '.US', '')`, so a
+  `WHERE symbol = '<sym>'` becomes `WHERE replace(ticker,'.US','') = '<sym>'` — a
+  non-sargable expression. postgres_fdw cannot push that down in an index-useful form, so
+  the remote falls back to scanning (it cannot use the `(ticker, date, time)` index).
+- A combined view has no combined index; the per-arm indexes do not "add up" across a
+  `UNION ALL`.
+
+This is fine for full-market or multi-symbol/range scans (e.g. backfill whole portfolios in
+H6), where touching every source at once is deliberate. It is the single-symbol hot path
+(`GET /api/instruments/:symbol/price-bars`, H3) where the overhead concentrates.
+
+### The candidate optimization
+
+Route each symbol to exactly one stooq table **before** querying, instead of scanning all
+arms:
+
+1. Resolve `symbol → { table, ticker }` via `ticker_reference` + `exchange_reference`
+   (the same data the design already uses for routing; US → `daily_us`, ticker `AAPL.US`;
+   PL → `daily_pl`; etc. — exact non-US formats from the open items above).
+2. Query **that one table**: `SELECT ... WHERE ticker = ? AND date BETWEEN ? AND ?`
+   — sargable, index-only, single remote round-trip.
+3. UNION with the overflow branch
+   (`SELECT ... FROM price_bars WHERE symbol = ? AND date BETWEEN ? AND ?`).
+4. Keep `price_bars_all` as a fallback for symbols that cannot be routed to a stooq table
+   (→ overflow-only) and for cross-market bulk scans.
+
+This fixes the `replace(.US)` sargability issue for free and replaces a 9-arm scan with
+two cheap indexed scans.
+
+### Decision gate
+
+Adopt this only if real measurements (on the cluster against the imported stooq data) show
+the `price_bars_all` approach is too slow for the H3 hot path — e.g. per-query latency on a
+typical `price-bars?from=&to=` call exceeds an acceptable budget. The single-view design is
+kept until then for simplicity and a single source of truth.

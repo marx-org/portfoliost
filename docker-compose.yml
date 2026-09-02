@@ -170,6 +170,27 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  # H2 — docker-compose stand-in for the production postgres_fdw stooq tables.
+  # postgres_fdw is unavailable locally, so this one-shot creates plain local
+  # stooq_daily_* tables + the unified price_bars_all view (post-migration) so
+  # the H3+ read path can be exercised against the local stack. Never runs in
+  # the cluster (not wired there); idempotent, exits after seeding.
+  pricebars-sim:
+    build:
+      context: ../portfoliost-instruments
+      dockerfile: Dockerfile
+      args:
+        NODE_AUTH_TOKEN: ${NODE_AUTH_TOKEN:-}
+    command: ["node", "dist/scripts/price-bars-sim.js"]
+    environment:
+      DATABASE_URL: postgres://portfoliost:portfoliost@postgres:5432/portfoliost
+    depends_on:
+      instruments:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   admin:
     build:
       context: ../portfoliost-admin

@@ -67,7 +67,7 @@ Architecture summary:
 Phase H execution order:
 
 ```
-H2   price_bars schema + foreign tables + view (portfoliost-instruments)
+H2   price_bars schema + foreign tables + view (portfoliost-instruments) [x]
 H3   price history read endpoint with stooq + openst layering
 H4   passive write-through from existing quote/history fetches
 H5   snapshot-on-read in refreshQuotes (portfoliost-wallets)   ← chart shows today's dot
@@ -129,19 +129,23 @@ CREATE TABLE instruments.split_adjustments (
 );
 ```
 
-**postgres_fdw setup** — homelab `databaseInitSQL` ConfigMap (`pfire-init-sql`) added to `postgrescluster-pfire.yaml`:
+**postgres_fdw setup** — homelab `databaseInitSQL` ConfigMap (`pfire-init-sql`) wired into `postgrescluster-pfire.yaml`:
 - Install `postgres_fdw` extension in `portfoliost` DB.
 - Create `stooq_server` pointing at `stooq` DB on `localhost`.
 - Create user mapping for `portfoliost` role.
-- Create foreign tables `instruments.stooq_daily_us`, `instruments.stooq_daily_pl`, `instruments.stooq_daily_world`.
-- All `IF NOT EXISTS` — idempotent on pod restart.
+- Create foreign tables for **all eight stooq daily datasets**: `daily_us`, `daily_pl`, `daily_jp`, `daily_world`, `daily_uk`, `daily_hk`, `daily_hu`, `daily_macro` (as `instruments.stooq_daily_*`).
+- All `IF NOT EXISTS` — idempotent on cluster bootstrap / pod restart.
 
-**`instruments.price_bars_all`** VIEW — unifies all sources:
+**`instruments.price_bars_all`** VIEW — unifies all sources (created *guarded* in migration 0003, so no plain local stooq tables are created in prod to collide with the FDW foreign tables):
 - `stooq_daily_us`: `replace(ticker, '.US', '')` as symbol, split adjustment applied via LEFT JOIN on `split_adjustments`.
-- `stooq_daily_pl`, `stooq_daily_world`: ticker mapping TBC after import (exact format verified from data).
+- `stooq_daily_pl`, `stooq_daily_uk`, `stooq_daily_jp`, `stooq_daily_hk`, `stooq_daily_hu`, `stooq_daily_world`, `stooq_daily_macro`: ticker passthrough (exact mapping TBC after import).
 - `price_bars` overflow: direct.
 
-Unit test: schema compiles, upsert into `price_bars` is idempotent, VIEW returns rows from both sources.
+**docker-compose simulation** — postgres_fdw is unavailable locally, so the `pricebars-sim` one-shot service (idempotent, post-migration) creates plain stand-in `stooq_daily_*` tables + the same view, seeds a few rows, and self-verifies the view unifies US (split-adjusted), world (passthrough) and overflow rows. PGlite unit tests use the same stand-in DDL (`src/db/price-bars.ts`).
+
+Unit test (`src/db/price-bars.test.ts`): schema compiles, upsert into `price_bars` is idempotent, VIEW returns rows from both stooq + overflow sources, split-adjusted close applied.
+
+**Performance note** — the single-view read approach is kept (no per-ticker table routing yet); a candidate optimization (ticker-routed single-table reads) is documented at the end of `docs/proposals/price-data-architecture.md` to re-evaluate if the real imported data is too slow.
 
 ### 1.2 (H3) — price history read endpoint
 
