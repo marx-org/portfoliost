@@ -185,10 +185,12 @@ Ticker routing (via `exchange_reference` + `ticker_reference` — no hardcoded m
 - Polish symbol (WSE) → stooq `daily_pl`, format TBC
 - German/other → stooq `daily_world`, format TBC
 
-### 1.3 (H4) — passive write-through from existing quote/history fetches — [ ] PENDING
+### 1.3 (H4) — passive write-through from existing quote/history fetches — [x] DONE
 
-- [ ] Background upsert of returned daily bars to `price_bars` on `/quote` / `/history` (openst-served).
-In `portfoliost-instruments`, when a `/quote` or `/history` response is served from openst, also upsert the returned daily bars to `price_bars` as a background write. Cheap: data already fetched. Accumulates price_bars organically for well-queried symbols.
+- [x] `backgroundUpsertBars(db, symbol, rows)` added to `src/services/price-bars.ts` — fire-and-forget, errors swallowed, invalid rows filtered.
+- [x] Hooked into `/:symbol/history` after `fetchOhlcv` returns rows (11-year daily window).
+- [x] Hooked into `/:symbol/price?date=` after `fetchOhlcv` returns rows.
+- [x] 3 unit tests: persists bars, idempotent update, silently skips invalid rows. 102 instruments tests green.
 
 ### 1.4 (H5) — snapshot-on-read in refreshQuotes — [ ] PENDING
 
