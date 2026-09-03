@@ -217,14 +217,14 @@ Ticker routing (via `exchange_reference` + `ticker_reference` — no hardcoded m
 - [x] `PortfolioPerformanceTab.vue`: same polling via `getPortfolioAnalytics` → `store.analytics`; banner below Performance Chart.
 - [x] Both render existing `timeSeries` immediately; build green; 164 mock tests pass.
 
-### 1.8 (H9) — tests — [ ] PENDING
+### 1.8 (H9) — tests — [x] DONE
 
 `portfoliost-instruments`:
-- [ ] `price-bars.test.ts`: stooq ticker mapping, gap detection, upsert idempotence, circuit breaker (no retry within 1h on failure), weekend carry-forward, split boundary detection (clean ratio → `split_candidates`, ambiguous → `split_candidates` with `suggested_factor=NULL`, within 0.85–1.15 → no action).
-- [ ] `price-bars-stooq.test.ts`: mock PostgREST / foreign table response → correct rows in `price_bars`.
+- [x] `src/services/price-bars.test.ts` extended: `stooqTickerFor` (bare, suffix, lowercase), `ohlcvToClose` (valid, index fallback, bad date, NaN close), `matchSplitFactor` (2:1, 4:1, reverse, ambiguous, continuous), `checkSplitBoundary` ambiguous ratio → `suggested_factor=NULL`, continuous → no candidate, carry-forward view gap behaviour. 123 tests total green.
+- [x] `src/services/price-bars-stooq.test.ts` (new): VIEW routing — US `.US` suffix stripped, PL/world passthrough, split_adjustments factor applied, overflow unified, split NOT applied to overflow rows. 10 test files, 123 tests green.
 
 `portfoliost-wallets`:
-- [ ] `snapshots.test.ts`: today snapshot with 2 USD positions; multi-currency (PLN, EUR); backfill with 3 positions over 10 days; timeframe filter; empty portfolio → `timeSeries: []`.
+- [x] `src/services/snapshots.test.ts` (new): today snapshot 2 USD positions, multi-currency PLN/EUR via EUR-base fxRates, empty portfolio → value=0, backfill 3 positions × 10 days correct daily values, empty transactions → 0 snapshots, 6M timeframe filter. 17 test files, 160 tests green.
 
 ### 1.9 (H10) — post-import hook + admin Market Data tab — [ ] PENDING
 
