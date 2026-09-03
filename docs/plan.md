@@ -206,40 +206,16 @@ Ticker routing (via `exchange_reference` + `ticker_reference` — no hardcoded m
 - [x] `GET /:id/analytics` replaced stub: < 2 snapshot rows → trigger backfill void + return `{backfillStatus:"pending"}`; otherwise read snapshots filtered by timeframe (6M/1Y/2Y/ALL), compute totalValue/totalReturn/monthlyReturns, return full series.
 - [x] 10 unit tests: calendarDays, buildPriceMap carry-forward, single-symbol upsert, weekend carry, idempotency, status transitions. 154 wallets tests green.
 
-### 1.6 (H7) — wire GET /:id/analytics — [ ] PENDING
+### 1.6 (H7) — wire GET /:id/analytics — [x] DONE
 
-- [ ] Replace stub: snapshot row-count gate → async backfill trigger / read + timeframe filter + monthly returns.
-Replace permanent stub in `portfoliost-wallets routes/portfolios.ts`:
+- [x] Analytics stub replaced in `portfoliost-wallets/src/routes/portfolios.ts`: backfill trigger + snapshot read + timeframe filter (6M/1Y/2Y/ALL) + monthlyReturns + backfillStatus. (Implemented as part of step 1.5/H6.)
 
-1. Check `value_snapshots` row count for portfolio.
-2. If < 2 rows: trigger backfill job async, return `{ backfillStatus: "pending", performance: { timeSeries: [] }, benchmarks: [] }`.
-3. Otherwise: read `value_snapshots` ordered by `snapshot_date ASC`, filter by timeframe (`6M`/`1Y`/`2Y`/`ALL`).
-4. Return:
-   ```json
-   {
-     "timeframe": "6M",
-     "backfillStatus": "complete",
-     "performance": {
-       "timeSeries":         [{ "date": "YYYY-MM-DD", "value": 12345.67 }],
-       "totalValue":         12345.67,
-       "totalInvested":      11000.00,
-       "totalReturn":        1345.67,
-       "totalReturnPercent": 12.23,
-       "monthlyReturns":     [{ "month": "YYYY-MM", "returnPercent": 3.2 }]
-     },
-     "benchmarks": []
-   }
-   ```
-   `monthlyReturns`: group by `YYYY-MM`, `(last_value / first_value - 1) × 100` per month.
-5. Feeds `PortfolioCard` sparkline + `PortfolioPerformanceTab` equity/monthly bar charts.
+### 1.7 (H8) — frontend: polling + loading banner — [x] DONE
 
-### 1.7 (H8) — frontend: polling + loading banner — [ ] PENDING
-
-In `PortfolioCard.vue` and `PortfolioPerformanceTab.vue`:
-- [ ] If `analytics.backfillStatus === "pending"`: show subtle banner "Historical data is loading, chart will update in a moment".
-- [ ] Poll `GET /:id/analytics` every 5s while `backfillStatus !== "complete"`.
-- [ ] Stop polling on `"complete"` or after 5 minutes (failure guard).
-- [ ] Render whatever `timeSeries` points exist immediately — even 1 point beats "Loading chart...".
+- [x] `@marx2/contracts@1.6.4`: `backfillStatus` + `timeframe` added to `PortfolioAnalytics`; SPA types regenerated.
+- [x] `PortfolioCard.vue`: `backfillPending` ref + `startPolling()`/`stopPolling()` — polls every 5s, stops on `complete` or after 5 min; banner shown while pending; `onUnmounted` cleanup.
+- [x] `PortfolioPerformanceTab.vue`: same polling via `getPortfolioAnalytics` → `store.analytics`; banner below Performance Chart.
+- [x] Both render existing `timeSeries` immediately; build green; 164 mock tests pass.
 
 ### 1.8 (H9) — tests — [ ] PENDING
 

@@ -781,6 +781,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/instruments/{symbol}/price-bars": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Instrument symbol, e.g. AAPL or AAPL.US */
+                symbol: components["parameters"]["symbol"];
+            };
+            cookie?: never;
+        };
+        /** Daily close-price series for a symbol over a date range (stooq + overflow) */
+        get: operations["getPriceBars"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/instruments/{symbol}/investor-relations": {
         parameters: {
             query?: never;
@@ -2331,6 +2351,14 @@ export interface components {
             price?: number;
             currency?: string;
         };
+        PriceBarSeries: {
+            symbol: string;
+            timeframe: string;
+            stale: boolean;
+            currency?: string | null;
+            dates: string[];
+            closes: number[];
+        };
         InvestorRelationEvent: {
             type?: string;
             id?: string;
@@ -2550,6 +2578,9 @@ export interface components {
             logo?: string | null;
         };
         PortfolioAnalytics: {
+            /** @enum {string|null} */
+            backfillStatus?: "pending" | "complete" | "failed" | null;
+            timeframe?: string;
             performance?: {
                 totalValue?: number;
                 totalInvested?: number;
@@ -4123,6 +4154,32 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HistoricalPrice"];
+                };
+            };
+        };
+    };
+    getPriceBars: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+            };
+            header?: never;
+            path: {
+                /** @description Instrument symbol, e.g. AAPL or AAPL.US */
+                symbol: components["parameters"]["symbol"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Daily close-price series */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceBarSeries"];
                 };
             };
         };

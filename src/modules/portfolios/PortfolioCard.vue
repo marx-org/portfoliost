@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue"
+import { computed, onMounted, onUnmounted, ref } from "vue"
 import { useRouter } from "vue-router"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { deletePortfolio, getPortfolioAnalytics, getPortfolioPositions, updatePortfolio } from "@/api/portfolios"
@@ -25,6 +25,7 @@ const series = ref<number[]>([])
 const chartError = ref(false)
 const openMenu = ref(false)
 const notice = ref<string | null>(null)
+const backfillPending = ref(false)
 
 const showRename = ref(false)
 const renameName = ref(props.portfolio.name)
@@ -35,13 +36,47 @@ const showDeleteConfirm = ref(false)
 const deleteBusy = ref(false)
 const deleteError = ref<string | null>(null)
 
+let pollTimer: ReturnType<typeof setInterval> | null = null
+let pollDeadline = 0
+
+function stopPolling() {
+  if (pollTimer !== null) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+
+function startPolling() {
+  stopPolling()
+  pollDeadline = Date.now() + 5 * 60 * 1000 // 5-minute guard
+  pollTimer = setInterval(async () => {
+    if (Date.now() > pollDeadline) { stopPolling(); return }
+    try {
+      const analytics = await getPortfolioAnalytics(props.portfolio.id, timeframe.value)
+      series.value = (analytics.performance?.timeSeries ?? []).map((p) => p.value ?? 0)
+      if (analytics.backfillStatus !== "pending") {
+        backfillPending.value = false
+        stopPolling()
+      }
+    } catch { stopPolling() }
+  }, 5000)
+}
+
 onMounted(() => loadChart())
+onUnmounted(() => stopPolling())
 
 async function loadChart() {
   chartError.value = false
   try {
     const analytics = await getPortfolioAnalytics(props.portfolio.id, timeframe.value)
     series.value = (analytics.performance?.timeSeries ?? []).map((p) => p.value ?? 0)
+    if (analytics.backfillStatus === "pending") {
+      backfillPending.value = true
+      startPolling()
+    } else {
+      backfillPending.value = false
+      stopPolling()
+    }
   } catch {
     chartError.value = true
   }
@@ -235,6 +270,9 @@ async function exportPositions(format: "csv" | "xml" | "json") {
       <div v-else class="flex h-[90px] items-center justify-center">
         <p class="text-xs text-slate-400 dark:text-slate-500">Loading chart...</p>
       </div>
+      <p v-if="backfillPending" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+        Historical data is loading, chart will update in a moment.
+      </p>
     </div>
 
     <div class="mt-4 grid grid-cols-3 gap-2 text-sm">

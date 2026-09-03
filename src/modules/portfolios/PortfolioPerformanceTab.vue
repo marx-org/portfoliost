@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue"
+import { computed, onMounted, onUnmounted, ref } from "vue"
 import { useRoute } from "vue-router"
 import { usePortfolioStore } from "@/stores/portfolios"
-import { getPortfolioRiskMetrics } from "@/api/portfolios"
+import { getPortfolioAnalytics, getPortfolioRiskMetrics } from "@/api/portfolios"
 import { formatPercent, formatSignedCurrency } from "@/utils/format"
 import type { PortfolioAnalyticsTimeframe } from "@/api/portfolios"
 
@@ -11,6 +11,7 @@ const store = usePortfolioStore()
 const id = String(route.params.id)
 const riskMetrics = ref<Record<string, number | null> | null>(null)
 const showCustomTimeframe = ref(false)
+const backfillPending = ref(store.analytics?.backfillStatus === "pending")
 
 const timeframes: Array<{ value: PortfolioAnalyticsTimeframe; label: string }> = [
   { value: "6M", label: "6M" },
@@ -19,16 +20,52 @@ const timeframes: Array<{ value: PortfolioAnalyticsTimeframe; label: string }> =
   { value: "ALL", label: "ALL" },
 ]
 
+let pollTimer: ReturnType<typeof setInterval> | null = null
+let pollDeadline = 0
+
+function stopPolling() {
+  if (pollTimer !== null) { clearInterval(pollTimer); pollTimer = null }
+}
+
+function startPolling() {
+  stopPolling()
+  pollDeadline = Date.now() + 5 * 60 * 1000
+  pollTimer = setInterval(async () => {
+    if (Date.now() > pollDeadline) { stopPolling(); return }
+    try {
+      const analytics = await getPortfolioAnalytics(id, store.analyticsTimeframe)
+      store.analytics = analytics
+      if (analytics.backfillStatus !== "pending") {
+        backfillPending.value = false
+        stopPolling()
+      }
+    } catch { stopPolling() }
+  }, 5000)
+}
+
 onMounted(async () => {
   try {
     riskMetrics.value = (await getPortfolioRiskMetrics(id)) as Record<string, number | null> | null
   } catch {
     riskMetrics.value = null
   }
+  if (store.analytics?.backfillStatus === "pending") {
+    backfillPending.value = true
+    startPolling()
+  }
 })
+
+onUnmounted(() => stopPolling())
 
 async function changeTimeframe(timeframe: PortfolioAnalyticsTimeframe) {
   await store.setTimeframe(timeframe, id)
+  if (store.analytics?.backfillStatus === "pending") {
+    backfillPending.value = true
+    startPolling()
+  } else {
+    backfillPending.value = false
+    stopPolling()
+  }
 }
 
 const equityOptions = computed(() => {
@@ -110,6 +147,9 @@ const performers = computed(() => {
       </div>
       <component :is="'apexchart'" v-if="equityOptions.series[0].data.length" :options="equityOptions" :series="equityOptions.series" />
       <p v-else class="text-sm text-slate-500 dark:text-slate-400">No analytics available.</p>
+      <p v-if="backfillPending" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+        Historical data is loading, chart will update in a moment.
+      </p>
     </div>
 
     <div class="card p-6">
