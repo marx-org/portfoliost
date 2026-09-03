@@ -199,19 +199,12 @@ Ticker routing (via `exchange_reference` + `ticker_reference` — no hardcoded m
 - [x] Falls back to `rate=1` when FX table unavailable or pair missing.
 - [x] 3 unit tests: correct sums, idempotent upsert, full `refreshQuotes` integration (snapshot row written after quote persist). 144 wallets tests green.
 
-### 1.5 (H6) — backfill job: historical value_snapshots — [ ] PENDING
+### 1.5 (H6) — backfill job: historical value_snapshots — [x] DONE
 
-- [ ] Async backfill triggered from `GET /:id/analytics` when `value_snapshots` < 2 rows.
-Triggered asynchronously from `GET /:id/analytics` when `value_snapshots` has < 2 rows for a portfolio.
-
-1. Query `MIN(executed_at)` from `portfolioTransactions` → `firstTxDate`.
-2. For each calendar day from `firstTxDate` to yesterday, compute `qty_held(symbol, date)` from cumulative BUY/SELL.
-3. Call portfoliost-instruments `GET /price-bars?from=firstTxDate&to=yesterday` per symbol (H3 serves from `price_bars_all`, filling from stooq + openst if needed).
-4. For each day: `value = Σ qty_held × price(day) × fx(instrCcy → baseCurrency)`. Price carry-forward on weekends/holidays (last known close). FX via `latestRates()`.
-5. Bulk upsert into `value_snapshots`. Idempotent.
-6. Track status in a `portfolio_backfill_metadata` table (or inline in analytics response flag).
-
-Job triggered async from analytics endpoint; returns `{ backfillStatus: "pending" }` immediately while job runs.
+- [x] `portfolio_backfill_metadata` table added to schema + migration `0002_square_sunspot.sql`.
+- [x] `src/services/backfill.ts`: `runBackfill()` — queries MIN(executed_at), builds daily qty_held from BUY/SELL, fetches price series per symbol via instruments `GET /price-bars`, carry-forward on gaps, bulk-upserts `value_snapshots` in chunks of 100; `getBackfillStatus()`; `toDateStr()` normalises PGlite Date/string timestamps.
+- [x] `GET /:id/analytics` replaced stub: < 2 snapshot rows → trigger backfill void + return `{backfillStatus:"pending"}`; otherwise read snapshots filtered by timeframe (6M/1Y/2Y/ALL), compute totalValue/totalReturn/monthlyReturns, return full series.
+- [x] 10 unit tests: calendarDays, buildPriceMap carry-forward, single-symbol upsert, weekend carry, idempotency, status transitions. 154 wallets tests green.
 
 ### 1.6 (H7) — wire GET /:id/analytics — [ ] PENDING
 
