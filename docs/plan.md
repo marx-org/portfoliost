@@ -226,23 +226,25 @@ Ticker routing (via `exchange_reference` + `ticker_reference` — no hardcoded m
 `portfoliost-wallets`:
 - [x] `src/services/snapshots.test.ts` (new): today snapshot 2 USD positions, multi-currency PLN/EUR via EUR-base fxRates, empty portfolio → value=0, backfill 3 positions × 10 days correct daily values, empty transactions → 0 snapshots, 6M timeframe filter. 17 test files, 160 tests green.
 
-### 1.9 (H10) — post-import hook + admin Market Data tab — [ ] PENDING
+### 1.9 (H10) — post-import hook + admin Market Data tab — [x] DONE
 
-**Post-import hook** `POST /api/instruments/internal/stooq-imported`:
-- [ ] Query `MAX(date)` from each foreign table (`stooq_daily_us`, `stooq_daily_pl`, `stooq_daily_world`).
-- [ ] For each table, delete `price_bars` overflow rows up to `MAX(date)` for covered symbols.
-- [ ] Delete now-redundant `split_adjustments` rows for those symbols up to `MAX(date)`.
-- [ ] Auto-dismiss pending `split_candidates` for those symbols.
-- [ ] Write to `admin.job_run` (import log — supersedes the originally planned `stooq_import_log`; see architecture doc note).
-- [ ] Refresh in-memory stooq floor date cache.
+**Post-import hook** `POST /internal/stooq-imported` on instruments:
+- [x] `src/services/stooq-import-hook.ts`: `runPostImportHook()` — MAX(date) from stooq table, deletes superseded `price_bars` overflow rows, deletes `split_adjustments`, auto-dismisses `split_candidates`, writes `latestDate`/`rowsDeleted` to `admin.job_run`.
+- [x] Route registered in `src/index.ts`; called fire-and-forget from admin job poller on `Succeeded` transition.
+- [x] 6 unit tests: dataset/table mapping, US rows deleted + kept, split_candidates dismissed, empty table returns null, PL passthrough. 129 instruments tests green.
 
-**Admin Market Data tab** (`/en/admin/market-data`):
+**Admin market-data endpoints** (new `src/market-data.ts` in portfoliost-admin):
+- [x] `GET /api/admin/market-data/split-candidates` — pending first, history collapsed.
+- [x] `POST /api/admin/market-data/split-candidates/:symbol/apply` — inserts `split_adjustments`, marks applied.
+- [x] `POST /api/admin/market-data/split-candidates/:symbol/dismiss` — marks dismissed.
+- [x] `GET /api/admin/market-data/overflow-summary` — total + top-10 symbols.
+- [x] Wired via `registerMarketDataRoutes(admin)` + `setMarketDataDb(db)` in server.ts.
 
-- [ ] *Stooq datasets panel* — one row per dataset (daily_us, daily_pl, daily_world): Dataset / Latest date / Imported at / Overflow rows cleaned. Data from `admin.job_run`.
-
-- [ ] *Split candidates panel* — all `split_candidates` rows with `status='pending'`, ordered by `detected_at DESC`: Symbol / Detected / Last stooq close / First overflow close / Ratio / Suggested / Actions (Apply / Dismiss / Apply custom). Reviewed candidates in collapsed history section.
-
-- [ ] *Overflow summary* — total `price_bars` rows + breakdown by symbol (top 10 by count).
+**SPA: Admin Market Data tab**:
+- [x] `@marx2/contracts@1.6.5`: `SplitCandidate`, `OverflowSummary` schemas + 4 market-data paths + stooq-imported hook path.
+- [x] `src/api/admin.ts`: `fetchSplitCandidates`, `applySplitCandidate`, `dismissSplitCandidate`, `fetchOverflowSummary`, `fetchStooqImportLog`.
+- [x] `src/modules/admin/MarketDataView.vue`: Stooq datasets panel, split candidates panel (Apply/Dismiss actions + custom factor input + history section), overflow summary table.
+- [x] Route `admin-market-data` + nav link "Market Data" in AdminLayout. Build green; 164 mock tests pass.
 
 ---
 

@@ -231,6 +231,12 @@ const router = createRouter({
               component: () => import("@/modules/admin/JobsView.vue"),
               meta: { admin: true },
             },
+            {
+              path: "market-data",
+              name: "admin-market-data",
+              component: () => import("@/modules/admin/MarketDataView.vue"),
+              meta: { admin: true },
+            },
           ],
         },
       ],
