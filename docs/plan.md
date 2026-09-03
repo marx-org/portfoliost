@@ -192,19 +192,12 @@ Ticker routing (via `exchange_reference` + `ticker_reference` — no hardcoded m
 - [x] Hooked into `/:symbol/price?date=` after `fetchOhlcv` returns rows.
 - [x] 3 unit tests: persists bars, idempotent update, silently skips invalid rows. 102 instruments tests green.
 
-### 1.4 (H5) — snapshot-on-read in refreshQuotes — [ ] PENDING
+### 1.4 (H5) — snapshot-on-read in refreshQuotes — [x] DONE
 
-- [ ] Compute + upsert today's value snapshot in `refreshQuotes()` (`portfoliost-wallets`).
-In `portfoliost-wallets`, inside `refreshQuotes()` (called on every `GET /positions`), after persisting quote fields, compute and upsert today's value snapshot:
-
-```
-portfolioValue = Σ pos.marketValue × fx(pos.instrumentCurrency → portfolio.baseCurrency)
-invested       = Σ pos.totalCostBasis × fx(pos.instrumentCurrency → portfolio.baseCurrency)
-```
-
-`INSERT INTO value_snapshots ... ON CONFLICT (portfolio_id, snapshot_date) DO UPDATE`
-
-Uses existing `latestRates()`. No scheduler needed. Makes chart show today's single data point.
+- [x] `snapshotPortfolioValue(db, portfolioId, liveValues, now)` added to `src/services/quotes.ts` — computes `Σ marketValue × fx` and `Σ (avg × qty) × fx`; upserts into `value_snapshots` ON CONFLICT DO UPDATE.
+- [x] Called fire-and-forget (`void ... .catch(() => undefined)`) at the end of `refreshQuotes`, using live `marketValue` collected during the per-position loop (not stale DB rows).
+- [x] Falls back to `rate=1` when FX table unavailable or pair missing.
+- [x] 3 unit tests: correct sums, idempotent upsert, full `refreshQuotes` integration (snapshot row written after quote persist). 144 wallets tests green.
 
 ### 1.5 (H6) — backfill job: historical value_snapshots — [ ] PENDING
 
