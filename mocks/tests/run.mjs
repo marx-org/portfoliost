@@ -216,6 +216,14 @@ async function main() {
   }
   const aBench = await request(`/portfolios/${pid}/analytics?timeframe=ALL&benchmark=SPY`, { token })
   check("portfolios.analytics with benchmark", aBench.status === 200 && Array.isArray(aBench.json.benchmarks), `got ${aBench.status}`)
+  const aMultibench = await request(`/portfolios/${pid}/analytics?timeframe=1Y&benchmarks=SPY,QQQ,IWM`, { token })
+  check(
+    "portfolios.analytics plural benchmarks",
+    aMultibench.status === 200 && (aMultibench.json.benchmarks || []).map((b) => b.symbol).join(",") === "SPY,QQQ,IWM",
+    `got ${aMultibench.status} ${(aMultibench.json.benchmarks || []).map((b) => b.symbol)}`,
+  )
+  const aNoBench = await request(`/portfolios/${pid}/analytics?timeframe=1Y`, { token })
+  check("portfolios.analytics default benchmarks empty", Array.isArray(aNoBench.json.benchmarks) && aNoBench.json.benchmarks.length === 0, `len ${(aNoBench.json.benchmarks || []).length}`)
   const positions = await request(`/portfolios/${pid}/positions`, { token })
   check("portfolios.positions", positions.status === 200 && Array.isArray(positions.json) && positions.json.length === 10, `got ${positions.status} len ${positions.json && positions.json.length}`)
   check("portfolios.position fields", isObj(positions.json[0]) && hasKeys(positions.json[0], ["id", "symbol", "quantity", "averageCostBasis", "currentPrice", "marketValue"]), JSON.stringify(positions.json[0]).slice(0, 120))

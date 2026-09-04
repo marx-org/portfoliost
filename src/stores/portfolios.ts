@@ -11,6 +11,8 @@ export const usePortfolioStore = defineStore("portfolios", () => {
   const positions = ref<PortfolioPositions>([])
   const analytics = ref<PortfolioAnalytics | null>(null)
   const analyticsTimeframe = ref<portfoliosApi.PortfolioAnalyticsTimeframe>("1Y")
+  const analyticsBenchmarks = ref<string[]>(["SPY"])
+  const analyticsReturnType = ref<portfoliosApi.PortfolioBenchmarkCalcType>("timeWeighted")
   const loading = ref(false)
   const error = ref<string | null>(null)
 
@@ -40,7 +42,7 @@ export const usePortfolioStore = defineStore("portfolios", () => {
         portfoliosApi.getPortfolioDetail(id),
         portfoliosApi.getPortfolioSummaryMetrics(id),
         portfoliosApi.getPortfolioPositions(id),
-        portfoliosApi.getPortfolioAnalytics(id, analyticsTimeframe.value),
+        portfoliosApi.getPortfolioAnalytics(id, analyticsTimeframe.value, analyticsBenchmarks.value, analyticsReturnType.value),
       ])
       detail.value = detailData
       summaryMetrics.value = metrics
@@ -66,7 +68,25 @@ export const usePortfolioStore = defineStore("portfolios", () => {
   async function setTimeframe(timeframe: portfoliosApi.PortfolioAnalyticsTimeframe, id: string): Promise<void> {
     analyticsTimeframe.value = timeframe
     try {
-      analytics.value = await portfoliosApi.getPortfolioAnalytics(id, timeframe)
+      analytics.value = await portfoliosApi.getPortfolioAnalytics(id, timeframe, analyticsBenchmarks.value, analyticsReturnType.value)
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : "Failed to load analytics"
+    }
+  }
+
+  async function setBenchmarks(benchmarks: string[], id: string): Promise<void> {
+    analyticsBenchmarks.value = [...benchmarks]
+    try {
+      analytics.value = await portfoliosApi.getPortfolioAnalytics(id, analyticsTimeframe.value, benchmarks, analyticsReturnType.value)
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : "Failed to load analytics"
+    }
+  }
+
+  async function setReturnType(calcType: portfoliosApi.PortfolioBenchmarkCalcType, id: string): Promise<void> {
+    analyticsReturnType.value = calcType
+    try {
+      analytics.value = await portfoliosApi.getPortfolioAnalytics(id, analyticsTimeframe.value, analyticsBenchmarks.value, calcType)
     } catch (err) {
       error.value = err instanceof Error ? err.message : "Failed to load analytics"
     }
@@ -95,12 +115,16 @@ export const usePortfolioStore = defineStore("portfolios", () => {
     positions,
     analytics,
     analyticsTimeframe,
+    analyticsBenchmarks,
+    analyticsReturnType,
     loading,
     error,
     fetchAll,
     fetchDetail,
     fetchPositions,
     setTimeframe,
+    setBenchmarks,
+    setReturnType,
     createPortfolio,
     reset,
   }

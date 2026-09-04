@@ -129,8 +129,16 @@ export async function deletePortfolioTransaction(id: string, txId: string): Prom
   return http.delete<void>(`/api/portfolios/${id}/transactions/${txId}`)
 }
 
-export async function getPortfolioAnalytics(id: string, timeframe: PortfolioAnalyticsTimeframe = "1Y"): Promise<PortfolioAnalytics1Y> {
-  return http.get<PortfolioAnalytics1Y>(`/api/portfolios/${id}/analytics?timeframe=${timeframe}`)
+export type PortfolioBenchmarkCalcType = "moneyWeighted" | "timeWeighted" | "simple"
+
+export async function getPortfolioAnalytics(
+  id: string,
+  timeframe: PortfolioAnalyticsTimeframe = "1Y",
+  benchmarks: string[] = [],
+  calcType: PortfolioBenchmarkCalcType = "timeWeighted",
+): Promise<PortfolioAnalytics1Y> {
+  const bench = benchmarks.length ? `&benchmarks=${encodeURIComponent(benchmarks.join(","))}` : ""
+  return http.get<PortfolioAnalytics1Y>(`/api/portfolios/${id}/analytics?timeframe=${timeframe}${bench}&benchmarkCalcType=${calcType}`)
 }
 
 export async function getPortfolioTransactions(

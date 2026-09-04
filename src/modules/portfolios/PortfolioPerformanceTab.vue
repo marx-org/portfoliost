@@ -3,8 +3,9 @@ import { computed, onMounted, onUnmounted, ref } from "vue"
 import { useRoute } from "vue-router"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { getPortfolioAnalytics, getPortfolioRiskMetrics } from "@/api/portfolios"
+import type { PortfolioBenchmarkCalcType, PortfolioAnalyticsTimeframe } from "@/api/portfolios"
 import { formatPercent, formatSignedCurrency } from "@/utils/format"
-import type { PortfolioAnalyticsTimeframe } from "@/api/portfolios"
+import InstrumentSearchModal from "@/modules/instruments/InstrumentSearchModal.vue"
 
 const route = useRoute()
 const store = usePortfolioStore()
@@ -20,6 +21,39 @@ const timeframes: Array<{ value: PortfolioAnalyticsTimeframe; label: string }> =
   { value: "ALL", label: "ALL" },
 ]
 
+const benchmarkOptions = [
+  { symbol: "SPY", name: "S&P 500" },
+  { symbol: "QQQ", name: "Nasdaq 100" },
+  { symbol: "DIA", name: "Dow Jones" },
+  { symbol: "IWM", name: "Russell 2000" },
+  { symbol: "VTI", name: "Total Stock Market" },
+  { symbol: "EFA", name: "EAFE" },
+  { symbol: "AGG", name: "Aggregate Bond" },
+]
+
+const returnTypeOptions: Array<{ value: PortfolioBenchmarkCalcType; label: string }> = [
+  { value: "timeWeighted", label: "Time-Weighted Return (TWR)" },
+  { value: "moneyWeighted", label: "Money-Weighted Return (cumulative)" },
+  { value: "simple", label: "Simple Return" },
+]
+
+const customizeOpen = ref(false)
+const showAddBenchmark = ref(false)
+
+function toggleBenchmark(symbol: string) {
+  const current = new Set(store.analyticsBenchmarks)
+  if (current.has(symbol)) current.delete(symbol)
+  else current.add(symbol)
+  void store.setBenchmarks([...current], id)
+}
+
+function addBenchmark(symbol: string, _name: string) {
+  showAddBenchmark.value = false
+  const current = new Set(store.analyticsBenchmarks)
+  current.add(symbol)
+  void store.setBenchmarks([...current], id)
+}
+
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let pollDeadline = 0
 
@@ -33,7 +67,7 @@ function startPolling() {
   pollTimer = setInterval(async () => {
     if (Date.now() > pollDeadline) { stopPolling(); return }
     try {
-      const analytics = await getPortfolioAnalytics(id, store.analyticsTimeframe)
+      const analytics = await getPortfolioAnalytics(id, store.analyticsTimeframe, store.analyticsBenchmarks, store.analyticsReturnType)
       store.analytics = analytics
       if (analytics.backfillStatus !== "pending") {
         backfillPending.value = false
@@ -71,17 +105,21 @@ async function changeTimeframe(timeframe: PortfolioAnalyticsTimeframe) {
 const equityOptions = computed(() => {
   const series = store.analytics?.performance?.timeSeries ?? []
   const values = series.map((p) => [new Date(p.date ?? "").getTime(), p.value ?? 0])
-  const bench = store.analytics?.benchmarks?.[0]
-  const benchSeries = (bench?.timeSeries ?? []).map((p) => [new Date(p.date ?? "").getTime(), p.value ?? 0])
+  const benchmarks = store.analytics?.benchmarks ?? []
+  const palette = ["#94a3b8", "#f59e0b", "#ec4899", "#8b5cf6", "#10b981"]
+  const benchSeriesCols = benchmarks.map((_, i) => palette[i % palette.length])
   return {
     chart: { type: "line" as const, height: 300, toolbar: { show: false }, zoom: { enabled: false } },
-    colors: ["#2563eb", "#94a3b8"],
+    colors: ["#2563eb", ...benchSeriesCols],
     series: [
       { name: "Portfolio", data: values },
-      { name: bench?.name ?? "Benchmark", data: benchSeries },
+      ...benchmarks.map((b) => ({
+        name: b.name || b.symbol || "Benchmark",
+        data: (b.timeSeries ?? []).map((p) => [new Date(p.date ?? "").getTime(), p.value ?? 0]),
+      })),
     ],
     xaxis: { type: "datetime" as const, labels: { datetimeUTC: false } },
-    stroke: { width: [2, 1], dashArray: [0, 4] },
+    stroke: { width: [2, ...benchmarks.map(() => 1)], dashArray: [0, ...benchmarks.map(() => 4)] },
     dataLabels: { enabled: false },
   }
 })
@@ -130,9 +168,9 @@ const performers = computed(() => {
 <template>
   <div class="space-y-6">
     <div class="card p-6">
-      <div class="mb-3 flex items-center justify-between">
+      <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 class="text-base font-semibold">Performance Chart</h2>
-        <div class="flex gap-1">
+        <div class="flex flex-wrap items-center gap-1">
           <button
             v-for="tf in timeframes"
             :key="tf.value"
@@ -142,6 +180,9 @@ const performers = computed(() => {
             @click="changeTimeframe(tf.value)"
           >
             {{ tf.label }}
+          </button>
+          <button type="button" class="btn-secondary text-xs" data-testid="perf-controls-customize" @click="customizeOpen = true">
+            Customize
           </button>
         </div>
       </div>
@@ -216,4 +257,65 @@ const performers = computed(() => {
       </div>
     </div>
   </div>
+
+  <div v-if="customizeOpen" class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-16" @click.self="customizeOpen = false">
+    <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Chart controls">
+      <div class="mb-4 flex items-center justify-between">
+        <h3 class="text-base font-semibold">Chart controls</h3>
+        <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="customizeOpen = false">✕</button>
+      </div>
+
+      <div class="space-y-5">
+        <div>
+          <p class="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">Return Type</p>
+          <select
+            class="input w-full"
+            :value="store.analyticsReturnType"
+            data-testid="perf-controls-return-type"
+            @change="store.setReturnType(($event.target as HTMLSelectElement).value as PortfolioBenchmarkCalcType, id)"
+          >
+            <option v-for="opt in returnTypeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+          </select>
+        </div>
+
+        <div>
+          <div class="mb-2 flex items-center justify-between">
+            <p class="text-sm font-medium text-slate-700 dark:text-slate-300">Benchmarks</p>
+            <button
+              type="button"
+              class="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
+              data-testid="perf-controls-add-benchmark"
+              @click="showAddBenchmark = true"
+            >
+              Add Custom Benchmark
+            </button>
+          </div>
+          <div class="space-y-2">
+            <label v-for="opt in benchmarkOptions" :key="opt.symbol" class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+              <input
+                type="checkbox"
+                class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                :checked="store.analyticsBenchmarks.includes(opt.symbol)"
+                @change="toggleBenchmark(opt.symbol)"
+              />
+              <span class="text-sm text-slate-800 dark:text-slate-200">{{ opt.name }}</span>
+              <span class="ml-auto text-xs text-slate-400">{{ opt.symbol }}</span>
+            </label>
+          </div>
+          <p class="mt-3 text-xs text-slate-500 dark:text-slate-400" data-testid="perf-controls-benchmarks">
+            Selected: {{ store.analyticsBenchmarks.length ? store.analyticsBenchmarks.join(", ") : "None" }}
+          </p>
+        </div>
+
+        <div>
+          <p class="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">Positions</p>
+          <div class="rounded-lg bg-slate-50 dark:bg-slate-800/50 px-3 py-2 text-sm text-slate-700 dark:text-slate-300">
+            {{ store.positions.length ? `${store.positions.length} selected` : "All selected" }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <InstrumentSearchModal :open="showAddBenchmark" mode="add" title="Add Custom Benchmark" @close="showAddBenchmark = false" @add="addBenchmark" />
 </template>

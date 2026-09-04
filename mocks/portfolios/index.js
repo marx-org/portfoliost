@@ -2,6 +2,7 @@ import { requireAuth } from "../lib/auth.js"
 import { resolveFeeFx } from "../lib/demo-fx.js"
 import { loadRaw, loadResearch, normalize } from "../lib/data.js"
 import { paginatePage, uuid, nowIso } from "../lib/http.js"
+import { benchmarkSeries, benchmarkSymbols } from "./benchmarks.js"
 
 const created = new Map()
 const positionsByPortfolio = new Map()
@@ -348,9 +349,18 @@ export function register(app) {
   app.get("/api/portfolios/:id/analytics", (ctx) => {
     if (!requireAuth(ctx)) return
     const timeframe = timelineFor(ctx.query.timeframe)
-    const file = ctx.query.benchmark ? "portfolio_analytics_all_bench.json" : ANALYTICS_BY_TIMEFRAME[timeframe]
     const emptyFile = EMPTY_BY_TIMEFRAME[timeframe]
-    ctx.res.json(withDataFile(ctx.params.id, file, emptyFile))
+    const base = withDataFile(ctx.params.id, ANALYTICS_BY_TIMEFRAME[timeframe], emptyFile)
+
+    const benchParam = ctx.query.benchmarks ?? ctx.query.benchmark
+    const wanted = benchParam
+      ? String(benchParam).split(",").map((s) => s.trim().toUpperCase()).filter(Boolean)
+      : []
+    const available = benchmarkSymbols()
+    const symbols = wanted.filter((s) => available.includes(s))
+    const benchmarks = symbols.map((s) => benchmarkSeries(s, timeframe))
+
+    ctx.res.json({ ...base, benchmarks })
   })
 
   app.get("/api/portfolios/:id/positions", (ctx) => {
