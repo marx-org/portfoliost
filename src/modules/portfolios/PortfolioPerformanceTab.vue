@@ -180,17 +180,23 @@ const performers = computed(() => {
             type="button"
             class="btn-secondary text-xs"
             :class="store.analyticsTimeframe === tf.value ? 'bg-blue-600 text-white' : ''"
+            :disabled="store.analyticsLoading"
             @click="changeTimeframe(tf.value)"
           >
             {{ tf.label }}
           </button>
-          <button type="button" class="btn-secondary text-xs" data-testid="perf-controls-customize" @click="customizeOpen = true">
+          <button type="button" class="btn-secondary text-xs" data-testid="perf-controls-customize" :disabled="store.analyticsLoading" @click="customizeOpen = true">
             Customize
           </button>
         </div>
       </div>
-      <component :is="'apexchart'" v-if="equityOptions.series[0].data.length" :options="equityOptions" :series="equityOptions.series" />
-      <p v-else class="text-sm text-slate-500 dark:text-slate-400">No analytics available.</p>
+      <div class="relative">
+        <component :is="'apexchart'" v-if="equityOptions.series[0].data.length" :options="equityOptions" :series="equityOptions.series" />
+        <p v-else class="text-sm text-slate-500 dark:text-slate-400">No analytics available.</p>
+        <div v-if="store.analyticsLoading" class="absolute inset-0 flex items-center justify-center rounded-lg bg-white/70 dark:bg-slate-900/70">
+          <span class="text-sm font-medium text-slate-500 dark:text-slate-400">Refreshing...</span>
+        </div>
+      </div>
       <p v-if="backfillPending" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
         Historical data is loading, chart will update in a moment.
       </p>

@@ -23,6 +23,7 @@ const timeframes: Array<{ value: PortfolioAnalyticsTimeframe; label: string }> =
 const timeframe = ref<PortfolioAnalyticsTimeframe>("6M")
 const series = ref<number[]>([])
 const chartError = ref(false)
+const chartLoading = ref(false)
 const openMenu = ref(false)
 const notice = ref<string | null>(null)
 const backfillPending = ref(false)
@@ -67,6 +68,7 @@ onUnmounted(() => stopPolling())
 
 async function loadChart() {
   chartError.value = false
+  chartLoading.value = true
   try {
     const analytics = await getPortfolioAnalytics(props.portfolio.id, timeframe.value)
     series.value = (analytics.performance?.timeSeries ?? []).map((p) => p.value ?? 0)
@@ -79,6 +81,8 @@ async function loadChart() {
     }
   } catch {
     chartError.value = true
+  } finally {
+    chartLoading.value = false
   }
 }
 
@@ -254,21 +258,27 @@ async function exportPositions(format: "csv" | "xml" | "json") {
             type="button"
             class="rounded px-1.5 py-0.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
             :class="timeframe === tf.value ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400' : ''"
+            :disabled="chartLoading"
             @click="changeTimeframe(tf.value)"
           >
             {{ tf.label }}
           </button>
         </div>
       </div>
-      <component
-        :is="'apexchart'"
-        v-if="series.length"
-        :options="sparkOptions"
-        :series="sparkOptions.series"
-      />
-      <p v-else-if="chartError" class="py-6 text-center text-xs text-slate-400 dark:text-slate-500">Chart unavailable</p>
-      <div v-else class="flex h-[90px] items-center justify-center">
-        <p class="text-xs text-slate-400 dark:text-slate-500">Loading chart...</p>
+      <div class="relative">
+        <component
+          :is="'apexchart'"
+          v-if="series.length"
+          :options="sparkOptions"
+          :series="sparkOptions.series"
+        />
+        <p v-else-if="chartError" class="py-6 text-center text-xs text-slate-400 dark:text-slate-500">Chart unavailable</p>
+        <div v-else class="flex h-[90px] items-center justify-center">
+          <p class="text-xs text-slate-400 dark:text-slate-500">Loading chart...</p>
+        </div>
+        <div v-if="chartLoading && series.length" class="absolute inset-0 flex items-center justify-center rounded bg-white/70 dark:bg-slate-900/70">
+          <span class="text-xs font-medium text-slate-500 dark:text-slate-400">Refreshing...</span>
+        </div>
       </div>
       <p v-if="backfillPending" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
         Historical data is loading, chart will update in a moment.

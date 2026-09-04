@@ -14,6 +14,7 @@ export const usePortfolioStore = defineStore("portfolios", () => {
   const analyticsBenchmarks = ref<string[]>(["SPY"])
   const analyticsReturnType = ref<portfoliosApi.PortfolioBenchmarkCalcType>("timeWeighted")
   const loading = ref(false)
+  const analyticsLoading = ref(false)
   const error = ref<string | null>(null)
 
   async function fetchAll(): Promise<void> {
@@ -67,28 +68,37 @@ export const usePortfolioStore = defineStore("portfolios", () => {
 
   async function setTimeframe(timeframe: portfoliosApi.PortfolioAnalyticsTimeframe, id: string): Promise<void> {
     analyticsTimeframe.value = timeframe
+    analyticsLoading.value = true
     try {
       analytics.value = await portfoliosApi.getPortfolioAnalytics(id, timeframe, analyticsBenchmarks.value, analyticsReturnType.value)
     } catch (err) {
       error.value = err instanceof Error ? err.message : "Failed to load analytics"
+    } finally {
+      analyticsLoading.value = false
     }
   }
 
   async function setBenchmarks(benchmarks: string[], id: string): Promise<void> {
     analyticsBenchmarks.value = [...benchmarks]
+    analyticsLoading.value = true
     try {
       analytics.value = await portfoliosApi.getPortfolioAnalytics(id, analyticsTimeframe.value, benchmarks, analyticsReturnType.value)
     } catch (err) {
       error.value = err instanceof Error ? err.message : "Failed to load analytics"
+    } finally {
+      analyticsLoading.value = false
     }
   }
 
   async function setReturnType(calcType: portfoliosApi.PortfolioBenchmarkCalcType, id: string): Promise<void> {
     analyticsReturnType.value = calcType
+    analyticsLoading.value = true
     try {
       analytics.value = await portfoliosApi.getPortfolioAnalytics(id, analyticsTimeframe.value, analyticsBenchmarks.value, calcType)
     } catch (err) {
       error.value = err instanceof Error ? err.message : "Failed to load analytics"
+    } finally {
+      analyticsLoading.value = false
     }
   }
 
@@ -118,6 +128,7 @@ export const usePortfolioStore = defineStore("portfolios", () => {
     analyticsBenchmarks,
     analyticsReturnType,
     loading,
+    analyticsLoading,
     error,
     fetchAll,
     fetchDetail,
