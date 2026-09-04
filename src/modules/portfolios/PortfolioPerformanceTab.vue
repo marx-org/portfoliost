@@ -40,18 +40,54 @@ const returnTypeOptions: Array<{ value: PortfolioBenchmarkCalcType; label: strin
 const customizeOpen = ref(false)
 const showAddBenchmark = ref(false)
 
-function toggleBenchmark(symbol: string) {
-  const current = new Set(store.analyticsBenchmarks)
+// Draft state — local to the modal, only committed on Apply
+const draftBenchmarks = ref<string[]>([])
+const draftReturnType = ref<PortfolioBenchmarkCalcType>("timeWeighted")
+
+const knownSymbols = new Set(benchmarkOptions.map((o) => o.symbol))
+const customDraftBenchmarks = computed(() => draftBenchmarks.value.filter((s) => !knownSymbols.has(s)))
+
+function openCustomize() {
+  draftBenchmarks.value = [...store.analyticsBenchmarks]
+  draftReturnType.value = store.analyticsReturnType
+  customizeOpen.value = true
+}
+
+function closeCustomize() {
+  customizeOpen.value = false
+}
+
+function toggleDraftBenchmark(symbol: string) {
+  const current = new Set(draftBenchmarks.value)
   if (current.has(symbol)) current.delete(symbol)
   else current.add(symbol)
-  void store.setBenchmarks([...current], id)
+  draftBenchmarks.value = [...current]
+}
+
+function removeDraftBenchmark(symbol: string) {
+  draftBenchmarks.value = draftBenchmarks.value.filter((s) => s !== symbol)
 }
 
 function addBenchmark(symbol: string, _name: string) {
   showAddBenchmark.value = false
-  const current = new Set(store.analyticsBenchmarks)
+  const current = new Set(draftBenchmarks.value)
   current.add(symbol)
-  void store.setBenchmarks([...current], id)
+  draftBenchmarks.value = [...current]
+}
+
+async function applyCustomize() {
+  customizeOpen.value = false
+  const benchmarksChanged = JSON.stringify([...draftBenchmarks.value].sort()) !== JSON.stringify([...store.analyticsBenchmarks].sort())
+  const returnTypeChanged = draftReturnType.value !== store.analyticsReturnType
+  if (benchmarksChanged && returnTypeChanged) {
+    // update both — setBenchmarks will use the already-updated returnType after we set it first
+    store.analyticsReturnType = draftReturnType.value
+    await store.setBenchmarks(draftBenchmarks.value, id)
+  } else if (benchmarksChanged) {
+    await store.setBenchmarks(draftBenchmarks.value, id)
+  } else if (returnTypeChanged) {
+    await store.setReturnType(draftReturnType.value, id)
+  }
 }
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
@@ -185,7 +221,7 @@ const performers = computed(() => {
           >
             {{ tf.label }}
           </button>
-          <button type="button" class="btn-secondary text-xs" data-testid="perf-controls-customize" :disabled="store.analyticsLoading" @click="customizeOpen = true">
+          <button type="button" class="btn-secondary text-xs" data-testid="perf-controls-customize" :disabled="store.analyticsLoading" @click="openCustomize">
             Customize
           </button>
         </div>
@@ -267,21 +303,20 @@ const performers = computed(() => {
     </div>
   </div>
 
-  <div v-if="customizeOpen" class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-16" @click.self="customizeOpen = false">
+  <div v-if="customizeOpen" class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-16" @click.self="closeCustomize">
     <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Chart controls">
       <div class="mb-4 flex items-center justify-between">
         <h3 class="text-base font-semibold">Chart controls</h3>
-        <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="customizeOpen = false">✕</button>
+        <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="closeCustomize">✕</button>
       </div>
 
       <div class="space-y-5">
         <div>
           <p class="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">Return Type</p>
           <select
+            v-model="draftReturnType"
             class="input w-full"
-            :value="store.analyticsReturnType"
             data-testid="perf-controls-return-type"
-            @change="store.setReturnType(($event.target as HTMLSelectElement).value as PortfolioBenchmarkCalcType, id)"
           >
             <option v-for="opt in returnTypeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
           </select>
@@ -296,7 +331,7 @@ const performers = computed(() => {
               data-testid="perf-controls-add-benchmark"
               @click="showAddBenchmark = true"
             >
-              Add Custom Benchmark
+              Add Custom
             </button>
           </div>
           <div class="space-y-2">
@@ -304,15 +339,22 @@ const performers = computed(() => {
               <input
                 type="checkbox"
                 class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                :checked="store.analyticsBenchmarks.includes(opt.symbol)"
-                @change="toggleBenchmark(opt.symbol)"
+                :checked="draftBenchmarks.includes(opt.symbol)"
+                @change="toggleDraftBenchmark(opt.symbol)"
               />
               <span class="text-sm text-slate-800 dark:text-slate-200">{{ opt.name }}</span>
               <span class="ml-auto text-xs text-slate-400">{{ opt.symbol }}</span>
             </label>
           </div>
+          <div v-if="customDraftBenchmarks.length" class="mt-2 space-y-1">
+            <p class="text-xs font-medium text-slate-500 dark:text-slate-400">Custom</p>
+            <div v-for="sym in customDraftBenchmarks" :key="sym" class="flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+              <span class="text-sm text-slate-800 dark:text-slate-200">{{ sym }}</span>
+              <button type="button" class="ml-2 text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300" aria-label="Remove benchmark" @click="removeDraftBenchmark(sym)">Remove</button>
+            </div>
+          </div>
           <p class="mt-3 text-xs text-slate-500 dark:text-slate-400" data-testid="perf-controls-benchmarks">
-            Selected: {{ store.analyticsBenchmarks.length ? store.analyticsBenchmarks.join(", ") : "None" }}
+            Selected: {{ draftBenchmarks.length ? draftBenchmarks.join(", ") : "None" }}
           </p>
         </div>
 
@@ -322,6 +364,11 @@ const performers = computed(() => {
             {{ store.positions.length ? `${store.positions.length} selected` : "All selected" }}
           </div>
         </div>
+      </div>
+
+      <div class="mt-6 flex justify-end gap-2">
+        <button type="button" class="btn-ghost" @click="closeCustomize">Cancel</button>
+        <button type="button" class="btn-primary" @click="applyCustomize">Apply</button>
       </div>
     </div>
   </div>
