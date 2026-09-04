@@ -104,7 +104,10 @@ async function changeTimeframe(timeframe: PortfolioAnalyticsTimeframe) {
 
 const equityOptions = computed(() => {
   const series = store.analytics?.performance?.timeSeries ?? []
-  const values = series.map((p) => [new Date(p.date ?? "").getTime(), p.value ?? 0])
+  const firstVal = series[0]?.value ?? 0
+  const normalized = firstVal > 0
+    ? series.map((p) => [new Date(p.date ?? "").getTime(), Math.round(((p.value ?? 0) / firstVal) * 10000) / 100])
+    : series.map((p) => [new Date(p.date ?? "").getTime(), p.value ?? 0])
   const benchmarks = store.analytics?.benchmarks ?? []
   const palette = ["#94a3b8", "#f59e0b", "#ec4899", "#8b5cf6", "#10b981"]
   const benchSeriesCols = benchmarks.map((_, i) => palette[i % palette.length])
@@ -112,7 +115,7 @@ const equityOptions = computed(() => {
     chart: { type: "line" as const, height: 300, toolbar: { show: false }, zoom: { enabled: false } },
     colors: ["#2563eb", ...benchSeriesCols],
     series: [
-      { name: "Portfolio", data: values },
+      { name: "Portfolio", data: normalized },
       ...benchmarks.map((b) => ({
         name: b.name || b.symbol || "Benchmark",
         data: (b.timeSeries ?? []).map((p) => [new Date(p.date ?? "").getTime(), p.value ?? 0]),
