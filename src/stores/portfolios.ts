@@ -90,16 +90,10 @@ export const usePortfolioStore = defineStore("portfolios", () => {
     }
   }
 
-  async function setReturnType(calcType: portfoliosApi.PortfolioBenchmarkCalcType, id: string): Promise<void> {
+  // Return type is purely client-side: the analytics response already contains
+  // all three pre-computed series (cumulativeTwr/Mwr/Simple). No refetch needed.
+  function setReturnType(calcType: portfoliosApi.PortfolioBenchmarkCalcType): void {
     analyticsReturnType.value = calcType
-    analyticsLoading.value = true
-    try {
-      analytics.value = await portfoliosApi.getPortfolioAnalytics(id, analyticsTimeframe.value, analyticsBenchmarks.value, calcType)
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : "Failed to load analytics"
-    } finally {
-      analyticsLoading.value = false
-    }
   }
 
   async function createPortfolio(input: { name: string; description?: string; strategy?: string; currency?: string; walletId?: string }): Promise<void> {

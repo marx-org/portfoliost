@@ -79,14 +79,11 @@ async function applyCustomize() {
   customizeOpen.value = false
   const benchmarksChanged = JSON.stringify([...draftBenchmarks.value].sort()) !== JSON.stringify([...store.analyticsBenchmarks].sort())
   const returnTypeChanged = draftReturnType.value !== store.analyticsReturnType
-  if (benchmarksChanged && returnTypeChanged) {
-    // update both — setBenchmarks will use the already-updated returnType after we set it first
-    store.analyticsReturnType = draftReturnType.value
+  if (returnTypeChanged) {
+    store.setReturnType(draftReturnType.value)
+  }
+  if (benchmarksChanged) {
     await store.setBenchmarks(draftBenchmarks.value, id)
-  } else if (benchmarksChanged) {
-    await store.setBenchmarks(draftBenchmarks.value, id)
-  } else if (returnTypeChanged) {
-    await store.setReturnType(draftReturnType.value, id)
   }
 }
 
@@ -140,10 +137,21 @@ async function changeTimeframe(timeframe: PortfolioAnalyticsTimeframe) {
 
 const equityOptions = computed(() => {
   const series = store.analytics?.performance?.timeSeries ?? []
-  const firstVal = series[0]?.value ?? 0
-  const normalized = firstVal > 0
-    ? series.map((p) => [new Date(p.date ?? "").getTime(), Math.round(((p.value ?? 0) / firstVal) * 10000) / 100])
-    : series.map((p) => [new Date(p.date ?? "").getTime(), p.value ?? 0])
+  const rt = store.analyticsReturnType
+
+  // Pick the pre-computed indexed series matching the selected return type.
+  // Falls back to normalising raw value if columns are null (e.g. before first recompute).
+  const toPoint = (p: typeof series[number]): [number, number] => {
+    const ts = new Date(p.date ?? "").getTime()
+    if (rt === "timeWeighted" && p.cumulativeTwr != null) return [ts, p.cumulativeTwr]
+    if (rt === "moneyWeighted" && p.cumulativeMwr != null) return [ts, p.cumulativeMwr]
+    if (rt === "simple" && p.cumulativeSimple != null) return [ts, p.cumulativeSimple]
+    // fallback: normalise raw value to index of 100
+    const firstVal = series[0]?.value ?? 0
+    return [ts, firstVal > 0 ? Math.round(((p.value ?? 0) / firstVal) * 10000) / 100 : (p.value ?? 0)]
+  }
+
+  const normalized = series.map(toPoint)
   const benchmarks = store.analytics?.benchmarks ?? []
   const palette = ["#94a3b8", "#f59e0b", "#ec4899", "#8b5cf6", "#10b981"]
   const benchSeriesCols = benchmarks.map((_, i) => palette[i % palette.length])
