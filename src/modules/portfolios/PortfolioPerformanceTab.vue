@@ -186,8 +186,14 @@ const monthlyOptions = computed(() => {
     colors: ["#2563eb"],
     series: [{ name: "Return %", data: returns.map((m) => m.returnPercent) }],
     xaxis: { categories: returns.map((m) => m.month) },
+    yaxis: {
+      labels: { formatter: (v: number) => `${Math.round(v)}%` },
+    },
     plotOptions: { bar: { columnWidth: "50%", borderRadius: 3 } },
     dataLabels: { enabled: false },
+    tooltip: {
+      y: { formatter: (v: number) => `${v.toFixed(2)}%` },
+    },
   }
 })
 
