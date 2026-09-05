@@ -145,19 +145,26 @@ Reuse the existing instrument search component used by Add Position / watchlists
 
 ---
 
-## Implementation order (one step = one commit, per AGENTS.md)
+## Status (as of 2026-09-05)
 
-1. **Contracts first** (per directive "remember to update contracts first"): edit `openapi.yaml` (benchmark item `returnPercent`/`volatility`, new calc-type param), push to `main`, CI publishes a new `@marx2/contracts` version from the git tag, install in `portfoliost-wallets` + `portfoliost`, `npm run gen:types`.
-2. Backend (`portfoliost-wallets`): wire `benchmarks` + calc type into the analytics handler + unit tests.
-3. SPA: Customize dialog parity + store/API wiring; fix the poll dropping `benchmarks`.
-4. Mock/tests + e2e.
-5. Rebuild docker stack (`gateway` DNS note below), verify end-to-end in Playwright, commit per repo.
+- **Contracts (D47)** — done: `openapi.yaml` benchmark item `returnPercent`/`volatility` + calc-type param, published via git tag → `npm run gen:types` in the consumer repos.
+- **Backend (D48/D50)** — done in `portfoliost-wallets`: analytics serves contract-typed benchmark series; benchmark lines now **transaction-mirroring** (D50); unit tests in `src/routes/analytics.test.ts`.
+- **SPA (D49)** — done: Customize dialog (standard benchmark picker + add-custom ticker via the instrument search component), return-type selector that refetches on change (`setReturnType`), backfill-poll refetch keeps the `benchmarks` param; the phantom "Benchmark" legend line was removed.
+- **Monthly returns + Returns Chart** — done 2026-09-05: flow-adjusted TWR month-over-month bars; `%`-formatted axes.
+- **Chart heights** — done 2026-09-05: pinned via the `vue3-apexcharts` `height` prop (equity 300 / Returns 220), so the charts no longer resize between loads.
+
+### Not built / deferred (decided to skip for now)
+
+- **"Based on" sub-option** (External Capital vs Cost Basis) — not wired; it would only affect the portfolio line for the non-TWR modes. Deferred.
+- **Positions selector narrowing** — the Customize dialog only stores the selection; the analytic series always use all open positions. Deferred.
+- **Moving `mocks/` to the live path** — `/api/portfolios` stays routed to the `wallets` module in the dockerized stack; the example-service-mock benchmark generator remains a secondary reference (direct mock tests only). Skipped.
+- **Proportional target-allocation benchmarks** (scale each cash flow by the portfolio's allocation to a sub-benchmark) — not planned; the mirror deploys 100% of every flow into each benchmark.
 
 ## Backend calculation — current implementation (as of 2026-09-05)
 
 ### Where the numbers come from
 
-`GET /api/portfolios/{id}/analytics` (`portfoliost-wallets/src/routes/portfolios.ts:761`) does three things:
+`GET /api/portfolios/{id}/analytics` (`portfoliost-wallets/src/routes/portfolios.ts`, analytics handler) does three things:
 
 1. **Portfolio line** — plain SELECT over `value_snapshots` filtered to the timeframe window, returning the pre-computed indexed columns `cumulativeTwr` / `cumulativeMwr` / `cumulativeSimple` (see `returnColumns.ts`, below). The client picks one of these three to plot.
 2. **Benchmark lines** — for each requested ticker calls `buildBenchmarkSeries` (`portfoliost-wallets/src/services/backfill.ts`), which **mirrors the portfolio's cash flows into the benchmark instrument** (D50 — see the next section). Unknown tickers are dropped (never 4xx).
@@ -185,8 +192,6 @@ Consequences of mirroring:
 - The three return-type modes now **differ for the benchmark** too (a mid-window BUY dilutes the TWR line vs. the pure index, and MWR captures the contribution timing), which is why the SPA refetches on Return-Type change.
 - With no transactions in the window the mirror degenerates to the pure price index (`seed × close/close0`), preserving the pre-D50 behaviour.
 
-Extensive follow-up if proportional *target-allocation* benchmarks were ever wanted: scale each cash flow by the portfolio's allocation to the sub-benchmark as of the transaction date (not implemented).
-
 ---
 
 ## Difference between the return-type comparison modes (TWR / MWR / Simple)
@@ -205,15 +210,13 @@ Shorthand:
 - **TWR** = "how did the *money that was invested* perform, isolating my timing" → the fair apples-to-apples line for the benchmark overlay.
 - **MWR** = "what did *my actual invested money* earn, including the timing of my contributions."
 
-So TWR is the correct default for comparing against a benchmark because it neutralizes your deposit schedule — but note this is orthogonal to the transaction-mirroring gap above: even TWR here is computed against the *portfolio's own* snapshots, not against a benchmark that mirrors the same cash flows.
+So **TWR is the correct default** for comparing against a benchmark: it neutralizes your deposit schedule on both the portfolio line and (since D50) the mirror-mirrored benchmark line, making the overlay apples-to-apples.
 
 ---
 
 ## Chart Y-axis (what the performance chart actually plots)
 
-The performance equity-curve chart (`PortfolioPerformanceTab.vue`, `equityOptions` at line 138) currently has **no `yaxis` formatter and no tooltip formatter** — it renders the raw indexed number with no unit.
-
-What the Y-axis actually represents:
+The performance equity-curve chart (`PortfolioPerformanceTab.vue`, `equityOptions`) renders the selected index column as a bare number with no unit. What the Y-axis actually represents:
 
 - It is **not cash** and **not a single currency amount**. It is an **indexed return line** whose values are the selected `cumulativeTwr` / `cumulativeMwr` / `cumulativeSimple` column, starting at **100** (= initial value, or the "$0 invested" baseline), e.g. `112` means +12% relative to the start of the window.
 - The portfolio's own line is benchmarked / normalized to 100, and the overlaid benchmark lines are also normalized to 100, so both overlay regardless of absolute price or currency.
@@ -222,3 +225,41 @@ What the Y-axis actually represents:
 **Fix applied (SPA, 2026-09-05):** `equityOptions` now sets `yaxis: { title: { text: "Index (start = 100)" }, labels: { formatter: (v) => v.toFixed(2) } }` and a matching shared tooltip `y.formatter` (`${v.toFixed(2)} (indexed, start = 100)`), so the chart unambiguously reads as a performance index (%) rather than a currency amount. The values plotted remain the unitless indexed columns (`cumulativeTwr` / `cumulativeMwr` / `cumulativeSimple`), not cash.
 
 **Returns Chart (bar), fixed 2026-09-05:** monthly bars are **flow-adjusted** — `buildMonthlyReturns` (`portfoliost-wallets/src/routes/portfolios.ts`) chains the stored `cumulativeTwr` index month-over-month (`Π` of the flow-neutral sub-period returns) instead of naive `(lastValue/firstValue − 1)` growth, so a mid-month deposit no longer inflates the bar (a $50k deposit with flat TWR reads +2%, not +5000%). The SPA `monthlyOptions` now formats the y-axis (`${Math.round(v)}%`) and tooltip (`${v.toFixed(2)}%`) instead of rendering raw 15-decimal floats.
+
+---
+
+## Background history recalculation on transaction changes (planned & implemented 2026-09-05)
+
+### Problem
+
+`value_snapshots` (the source of the performance chart) are only built by the **backfill** job, which is auto-triggered from the analytics route only when a portfolio has **fewer than 2 snapshots** (`portfoliost-wallets/src/routes/portfolios.ts`, analytics handler). Creating, editing or deleting a transaction adjusts positions and `recomputePortfolioTotals`, but **never touches `value_snapshots`** — so the chart keeps showing stale history (e.g. after deleting all transactions, the old series stays).
+
+### Design goals (user guidance)
+
+1. **Never one recalculation per transaction.** A future broker-import of thousands of transactions must not re-run the whole history N times — that would saturate the pod (price-bar fetches + full series rebuild).
+2. **A new transaction change should kill an in-flight recalculation and start over** — a stale pass must never be the last writer.
+3. **Grace period** to coalesce bursts: changes arriving within a window collapse into one run.
+4. Latest state wins; the pipeline is idempotent and restart-safe.
+
+### Approach
+
+**Per-portfolio debounced + coalescing queue** (`services/recalc-queue.ts`, in-process; the module runs a single replica, and a replica's "double run" from multi-replica is harmless because the pass is idempotent):
+
+- Transaction mutations (POST / PATCH / DELETE in `routes/portfolio-transactions.ts`) call `notifyTransactionsChanged(db, portfolioId, authToken)` — a fire-and-forget signal, no awaited work in the request path.
+- Each portfolio keeps a small in-process job record `{ token, running, controller, timer }`:
+  - **not running** → (re)arm a **grace timer** (`RECALC_GRACE_MS`, default 3000) — reset on every mutation, so a continuous burst runs **once**, 3s after it quietens.
+  - **already running** → `AbortController.abort()` the in-flight pass (**kill**) and arm the grace timer; a fresh pass starts after the deadline.
+- The run loop recomputes, then **restarts after another grace window if it was aborted mid-run** (bounded restart cap as a livelock safety valve, then falling back to the grace timer).
+- Completed (non-aborted) runs delete the job record — the next mutation starts a new cycle.
+
+**Replace semantics** (`recalcPortfolioHistory`, `services/backfill.ts`), deliberately different from the analytics `runBackfill` (which **upserts** so it can never shrink stale rows):
+
+1. `computeSnapshotBatch(...)` — the first-backfill steps extracted into their own abort-aware function: first BUY/SELL date, per-symbol cumulative daily quantity from transactions, price bars per symbol, FX → base currency, daily `net_flow` via `dailyNetCashFlows`.
+2. **Atomically `DELETE` all `value_snapshots` for the portfolio, then `INSERT` the fresh batch** (one transaction). Empty batch (no BUY/SELL left) ⇒ snapshots cleared → the chart shows "No analytics available".
+3. `recomputeReturnColumns` recomputes `cumulativeTwr/Mwr/Simple`; `portfolio_backfill_metadata` is set `pending` → `complete` (reused, so the SPA's "Historical data is loading" notice stays truthful).
+
+**Abort safety:** the `AbortSignal` is threaded through the price-bar fetches and checked before the DB write (delete+insert). An aborted pass **never commits** a partial/stale series; `RecalcAbortedError` is swallowed silently — the queue restarts instead of marking the backfill `failed`.
+
+**Implementation status**: backend done 2026-09-05. `recalc-queue.ts` (grace coalescing + kill/restart + livelock valve), `recalcPortfolioHistory` + `computeSnapshotBatch` in `backfill.ts`, and `notifyTransactionsChanged` wired into POST / PATCH / DELETE `/:id/transactions` plus POST/DELETE `/:id/positions` (they insert/delete BUY/SELL rows too). Tests: `services/recalc-queue.test.ts` (coalescing, kill-and-restart, per-portfolio independence) and `services/backfill.test.ts` (replace semantics, full-clear on delete-all, abort-never-writes). Deployment pending — ships in the next `portfoliost-wallets` release; the SPA `RECALC_GRACE_MS` default (3000) is a pod env override.
+
+**Remaining gaps (known, out of scope until explicitly picked up):** a `PATCH /positions` quantity edit is still not reflected in history (backfill derives history purely from transactions); snapshots' `invested` column uses the current open positions' cost basis (static per day — H9 refinement).
