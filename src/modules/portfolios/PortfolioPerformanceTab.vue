@@ -156,7 +156,7 @@ const equityOptions = computed(() => {
   const palette = ["#94a3b8", "#f59e0b", "#ec4899", "#8b5cf6", "#10b981"]
   const benchSeriesCols = benchmarks.map((_, i) => palette[i % palette.length])
   return {
-    chart: { type: "line" as const, height: 300, toolbar: { show: false }, zoom: { enabled: false } },
+    chart: { type: "line" as const, toolbar: { show: false }, zoom: { enabled: false } },
     colors: ["#2563eb", ...benchSeriesCols],
     series: [
       { name: "Portfolio", data: normalized },
@@ -182,7 +182,7 @@ const equityOptions = computed(() => {
 const monthlyOptions = computed(() => {
   const returns = store.analytics?.performance?.monthlyReturns ?? []
   return {
-    chart: { type: "bar" as const, height: 220, toolbar: { show: false } },
+    chart: { type: "bar" as const, toolbar: { show: false } },
     colors: ["#2563eb"],
     series: [{ name: "Return %", data: returns.map((m) => m.returnPercent) }],
     xaxis: { categories: returns.map((m) => m.month) },
@@ -249,7 +249,7 @@ const performers = computed(() => {
         </div>
       </div>
       <div class="relative">
-        <component :is="'apexchart'" v-if="equityOptions.series[0].data.length" :options="equityOptions" :series="equityOptions.series" />
+        <component :is="'apexchart'" v-if="equityOptions.series[0].data.length" :options="equityOptions" :series="equityOptions.series" height="300" />
         <p v-else class="text-sm text-slate-500 dark:text-slate-400">No analytics available.</p>
         <div v-if="store.analyticsLoading" class="absolute inset-0 flex items-center justify-center rounded-lg bg-white/70 dark:bg-slate-900/70">
           <span class="text-sm font-medium text-slate-500 dark:text-slate-400">Refreshing...</span>
@@ -284,7 +284,7 @@ const performers = computed(() => {
 
     <div class="card p-6">
       <h2 class="mb-3 text-base font-semibold">Returns Chart</h2>
-      <component :is="'apexchart'" v-if="monthlyOptions.series[0].data.length" :options="monthlyOptions" :series="monthlyOptions.series" />
+      <component :is="'apexchart'" v-if="monthlyOptions.series[0].data.length" :options="monthlyOptions" :series="monthlyOptions.series" height="220" />
       <p v-else class="text-sm text-slate-500 dark:text-slate-400">No monthly data available.</p>
     </div>
 
