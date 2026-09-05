@@ -15,6 +15,9 @@ const showCustomTimeframe = ref(false)
 const backfillPending = ref(store.analytics?.backfillStatus === "pending")
 
 const timeframes: Array<{ value: PortfolioAnalyticsTimeframe; label: string }> = [
+  { value: "1W", label: "1W" },
+  { value: "1M", label: "1M" },
+  { value: "3M", label: "3M" },
   { value: "6M", label: "6M" },
   { value: "1Y", label: "1Y" },
   { value: "2Y", label: "2Y" },

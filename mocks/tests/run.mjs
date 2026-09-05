@@ -210,7 +210,7 @@ async function main() {
   check("portfolios.detail", detail2.status === 200 && detail2.json.id === pid, `got ${detail2.status}`)
   const summaryMetrics = await request(`/portfolios/${pid}/summary-metrics`, { token })
   check("portfolios.summary-metrics", summaryMetrics.status === 200 && "totalValue" in summaryMetrics.json, `got ${summaryMetrics.status}`)
-  for (const tf of ["6M", "1Y", "2Y", "ALL"]) {
+  for (const tf of ["1W", "1M", "3M", "6M", "1Y", "2Y", "ALL"]) {
     const a = await request(`/portfolios/${pid}/analytics?timeframe=${tf}`, { token })
     check(`portfolios.analytics ${tf}`, a.status === 200 && a.json.performance && isObj(a.json.performance), `got ${a.status}`)
   }

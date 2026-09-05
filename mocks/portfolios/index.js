@@ -23,6 +23,9 @@ function initTxs() {
 }
 
 const ANALYTICS_BY_TIMEFRAME = {
+  "1W": "portfolio_analytics_6M.json",
+  "1M": "portfolio_analytics_6M.json",
+  "3M": "portfolio_analytics_6M.json",
   "6M": "portfolio_analytics_6M.json",
   "1Y": "portfolio_analytics_1Y.json",
   "2Y": "portfolio_analytics_2Y.json",
@@ -30,6 +33,9 @@ const ANALYTICS_BY_TIMEFRAME = {
 }
 
 const EMPTY_BY_TIMEFRAME = {
+  "1W": "empty_portfolio_analytics.json",
+  "1M": "empty_portfolio_analytics.json",
+  "3M": "empty_portfolio_analytics.json",
   "6M": "empty_portfolio_analytics.json",
   "1Y": "empty_portfolio_analytics.json",
   "2Y": "empty_portfolio_analytics.json",

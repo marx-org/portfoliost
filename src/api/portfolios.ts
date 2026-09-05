@@ -23,7 +23,7 @@ export interface PaginatedResponse<T> {
   hasPrevious: boolean
 }
 
-export type PortfolioAnalyticsTimeframe = "6M" | "1Y" | "2Y" | "ALL"
+export type PortfolioAnalyticsTimeframe = "1W" | "1M" | "3M" | "6M" | "1Y" | "2Y" | "ALL"
 
 export async function getPortfolios(): Promise<PortfoliosSummaries> {
   return http.get<PortfoliosSummaries>("/api/portfolios")
