@@ -100,6 +100,8 @@ Key facts about the benchmark series:
 
 For a pure instrument benchmark (an arbitrary ticker) there are no cash flows, so **Simple, TWR and MWR collapse to the same indexed price line**: `value(d) = close(d) / close(d0) × 100`. The three return-type modes therefore differ only for the **portfolio's own** line (which already has distinct `cumulativeMwr` / `cumulativeTwr` / `simpleReturnPercent` series), matching example-service where changing Return Type does not refetch.
 
+> **Superseded by D50 (2026-09-05)** for benchmarks: once the benchmark mirrors the portfolio's cash flows, the modes no longer collapse for the benchmark either, and the SPA refetches on Return-Type change. This section remains as the original design record.
+
 Return-type values are expressed as an enum in the contract: `moneyWeighted | timeWeighted | simple` (default `timeWeighted`).
 
 ### D47 — contract (`portfoliost-contracts/openapi.yaml`)
@@ -151,7 +153,70 @@ Reuse the existing instrument search component used by Add Position / watchlists
 4. Mock/tests + e2e.
 5. Rebuild docker stack (`gateway` DNS note below), verify end-to-end in Playwright, commit per repo.
 
-## Operational notes
+## Backend calculation — current implementation (as of 2026-09-05)
 
-- The nginx gateway resolves compose service names at runtime; after recreating a backend container, the gateway can 502 on stale DNS and needs `docker compose restart gateway`.
-- In the dockerized stack the SPA's analytics hits the **wallets** module, not example-service-mock — account for this when testing (see Context §3).
+### Where the numbers come from
+
+`GET /api/portfolios/{id}/analytics` (`portfoliost-wallets/src/routes/portfolios.ts:761`) does three things:
+
+1. **Portfolio line** — plain SELECT over `value_snapshots` filtered to the timeframe window, returning the pre-computed indexed columns `cumulativeTwr` / `cumulativeMwr` / `cumulativeSimple` (see `returnColumns.ts`, below). The client picks one of these three to plot.
+2. **Benchmark lines** — for each requested ticker calls `buildBenchmarkSeries` (`portfoliost-wallets/src/services/backfill.ts`), which **mirrors the portfolio's cash flows into the benchmark instrument** (D50 — see the next section). Unknown tickers are dropped (never 4xx).
+3. **Return-type switch refetches.** Because the benchmark line now depends on the calculation type, the `benchmarkCalcType` query param is sent on every analytics request and `setReturnType` in the store refetches. The portfolio's own three cumulative columns are still all pre-computed and returned; only the benchmark series is rendered per-param.
+
+### HOW THE BENCHMARK IS CALCULATED (D50 — transaction-mirroring)
+
+> The benchmark replays the **portfolio's actual daily cash flows** into the benchmark instrument: a portfolio BUY deploys the same cash amount into the benchmark, a SELL releases the same cash amount (fractional benchmark units allowed).
+
+Daily flow per transaction (`services/cashFlows.ts`, `dailyNetCashFlows`):
+- **BUY** → `+ (quantity × price + feesSettled)` — cash deployed into the market
+- **SELL** → `− (quantity × price − feesSettled)` — cash released from the market
+- Amounts are converted to the portfolio's **base currency** via the latest `fx_rates` snapshot (`convert` from `@marx2/contracts/fx`; rate=1 fallback), and aggregated per calendar day. `DIVIDEND` transactions are excluded (they neither deploy nor release capital in this model).
+
+Mirror construction (`buildBenchmarkSeries`):
+- Seed: at the window start, the portfolio's invested capital (`firstRow.invested`) is deployed into the benchmark at that day's close → `units(day0) = seed / close(day0)`.
+- Each later day: `units(d) = max(0, units(d−1) + flow(d) / close(d))` — a buy increases units, a sell decreases them (partial units allowed, floor at 0).
+- Benchmark closes are carried forward across weekends/holidays (`buildPriceMap`) and converted to the portfolio's base currency when the benchmark `currency` differs.
+- `mirrorValue(d) = units(d) × close(d)`.
+- The returned `timeSeries` is the **selected return-type column** computed on the mirror by the *same* builders as the portfolio's own snapshots (`buildTwr` / `buildMwr` / `buildSimple` from `returnColumns.ts`), so the overlay is apples-to-apples. `returnPercent` = last column − 100.
+- `volatility` stays a property of the raw price series (annualized daily log-return stddev × √252 × 100).
+
+Consequences of mirroring:
+- The benchmark is **no longer identical for every portfolio** — it now answers "given my actual buy/sell schedule, how would my money have done if parked in the benchmark?".
+- The three return-type modes now **differ for the benchmark** too (a mid-window BUY dilutes the TWR line vs. the pure index, and MWR captures the contribution timing), which is why the SPA refetches on Return-Type change.
+- With no transactions in the window the mirror degenerates to the pure price index (`seed × close/close0`), preserving the pre-D50 behaviour.
+
+Extensive follow-up if proportional *target-allocation* benchmarks were ever wanted: scale each cash flow by the portfolio's allocation to the sub-benchmark as of the transaction date (not implemented).
+
+---
+
+## Difference between the return-type comparison modes (TWR / MWR / Simple)
+
+The three `<type>` values change how the **portfolio's** own line is built, and — since D50 (transaction-mirroring) — the **benchmark** lines too. `returnColumns.ts` computes the portfolio columns after every `value_snapshots` write:
+
+| Mode | Value written to column | Formula | What it answers / behaviour with cash flows |
+| --- | --- | --- | --- |
+| **Simple** (`simple`) | `cumulativeSimple` | `V(d)/V(d0) × 100` (`buildSimple`, `returnColumns.ts:20`) | Naive "dividend-free growth of the account value". **Ignores cash flows** — a deposit mid-period inflates the ending value and inflates the return, so it overstates performance when money is added over time. Only meaningful when the account has no deposits/withdrawals. |
+| **TWR** (`timeWeighted`) — default | `cumulativeTwr` | Chain-linked daily sub-period returns: `HPR_t = V_t/(V_{t-1} + netFlow_t) − 1; cum = Π(1+HPR)` (`buildTwr`, `returnColumns.ts:30`) | **Removes the effect of external cash flows.** Each day the portfolio return is computed on the capital *present at the start of that day* (deposits added to the denominator the day they arrive). Best for comparing a *manager's* skill / the benchmark, because your own deposits don't distort the number. |
+| **MWR** (`moneyWeighted`) | `cumulativeMwr` | XIRR on the cash-flow list `[−V₀, −flow₁, …, +V_last]`, then de-annualized per point: `(1+r)^(t/365)` (`buildMwr` + `xirr`, `returnColumns.ts:50,74`) | Dollar-weighted; **includes the effect of cash-flow timing**. A rate such that these cash flows yield the observed final value. Rewards/penalizes the timing of your own deposits/withdrawals (e.g. adding money right before a rally boosts MWR). Equivalent to an IRR. |
+| **Based on** sub-option (External Capital vs Cost Basis) | — | Currently not wired; only affects the portfolio line when not TWR | Determines which basis flows are measured against; out of scope until wired. |
+
+Shorthand:
+- **Simple** = value growth, cash flows distort it.
+- **TWR** = "how did the *money that was invested* perform, isolating my timing" → the fair apples-to-apples line for the benchmark overlay.
+- **MWR** = "what did *my actual invested money* earn, including the timing of my contributions."
+
+So TWR is the correct default for comparing against a benchmark because it neutralizes your deposit schedule — but note this is orthogonal to the transaction-mirroring gap above: even TWR here is computed against the *portfolio's own* snapshots, not against a benchmark that mirrors the same cash flows.
+
+---
+
+## Chart Y-axis (what the performance chart actually plots)
+
+The performance equity-curve chart (`PortfolioPerformanceTab.vue`, `equityOptions` at line 138) currently has **no `yaxis` formatter and no tooltip formatter** — it renders the raw indexed number with no unit.
+
+What the Y-axis actually represents:
+
+- It is **not cash** and **not a single currency amount**. It is an **indexed return line** whose values are the selected `cumulativeTwr` / `cumulativeMwr` / `cumulativeSimple` column, starting at **100** (= initial value, or the "$0 invested" baseline), e.g. `112` means +12% relative to the start of the window.
+- The portfolio's own line is benchmarked / normalized to 100, and the overlaid benchmark lines are also normalized to 100, so both overlay regardless of absolute price or currency.
+- Because it is a unitless index, it is **independent of currency** — it is a percentage-scale line (index-of-100), not a currency value. Currency (portfolio/display currency) matters only for the *absolute* underlying values (`value`, `invested`), not for the plotted indexed line.
+
+**Fix applied (SPA, 2026-09-05):** `equityOptions` now sets `yaxis: { title: { text: "Index (start = 100)" }, labels: { formatter: (v) => v.toFixed(2) } }` and a matching shared tooltip `y.formatter` (`${v.toFixed(2)} (indexed, start = 100)`), so the chart unambiguously reads as a performance index (%) rather than a currency amount. The values plotted remain the unitless indexed columns (`cumulativeTwr` / `cumulativeMwr` / `cumulativeSimple`), not cash.

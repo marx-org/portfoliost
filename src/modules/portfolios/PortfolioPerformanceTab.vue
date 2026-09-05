@@ -80,7 +80,7 @@ async function applyCustomize() {
   const benchmarksChanged = JSON.stringify([...draftBenchmarks.value].sort()) !== JSON.stringify([...store.analyticsBenchmarks].sort())
   const returnTypeChanged = draftReturnType.value !== store.analyticsReturnType
   if (returnTypeChanged) {
-    store.setReturnType(draftReturnType.value)
+    await store.setReturnType(draftReturnType.value, id)
   }
   if (benchmarksChanged) {
     await store.setBenchmarks(draftBenchmarks.value, id)
@@ -166,6 +166,14 @@ const equityOptions = computed(() => {
       })),
     ],
     xaxis: { type: "datetime" as const, labels: { datetimeUTC: false } },
+    yaxis: {
+      labels: { formatter: (v: number) => String(Math.round(v * 100) / 100) },
+      title: { text: "Index (start = 100)" },
+    },
+    tooltip: {
+      shared: true,
+      y: { formatter: (v: number) => `${v.toFixed(2)} (indexed, start = 100)` },
+    },
     stroke: { width: [2, ...benchmarks.map(() => 1)], dashArray: [0, ...benchmarks.map(() => 4)] },
     dataLabels: { enabled: false },
   }
