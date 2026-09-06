@@ -22,7 +22,7 @@
     "test:stack:portfolios": "node scripts/portfolios-stack-test.mjs"
   },
   "dependencies": {
-    "@marx2/contracts": "^1.6.9",
+    "@marx2/contracts": "^1.6.10",
     "apexcharts": "^5.10.0",
     "pinia": "^2.1.7",
     "vue": "^3.4.31",
