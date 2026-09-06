@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue"
+import { computed, onMounted, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
@@ -13,6 +13,10 @@ import AddPositionDialog from "@/modules/portfolios/AddPositionDialog.vue"
 import ConfirmDeleteModal from "@/modules/portfolios/ConfirmDeleteModal.vue"
 import DualCurrencyCell from "@/components/DualCurrencyCell.vue"
 import DualCurrencyPnlCell from "@/components/DualCurrencyPnlCell.vue"
+import LabelFilterBar from "@/components/LabelFilterBar.vue"
+import LabelChips from "@/components/LabelChips.vue"
+import LabelManagerDialog from "@/components/LabelManagerDialog.vue"
+import LabelPickerPopover from "@/components/LabelPickerPopover.vue"
 
 type Position = PortfolioPositions[number]
 
@@ -26,6 +30,11 @@ const id = String(route.params.id)
 const openMenuId = ref<string | null>(null)
 const notice = ref<string | null>(null)
 const noticeError = ref<string | null>(null)
+
+const labelFilter = ref<string[]>([])
+const manageLabelsOpen = ref(false)
+const pickerOpen = ref(false)
+const pickerPosition = ref<PortfolioPositions[number] | null>(null)
 
 const removeTarget = ref<Position | null>(null)
 const removeBusy = ref(false)
@@ -101,7 +110,13 @@ const allColumns: ColumnDef[] = [
 
 const visibleColumns = ref<string[]>(allColumns.map((c) => c.key))
 
-onMounted(() => store.fetchPositions(id))
+onMounted(() => {
+  void store.fetchPositions(id, labelFilter.value)
+})
+
+watch(labelFilter, () => {
+  void store.fetchPositions(id, labelFilter.value)
+})
 
 const positions = computed(() => {
   const open = store.positions.filter((p) => p.isOpen)
@@ -262,6 +277,18 @@ function goResearch(position: Position): void {
   openMenuId.value = null
   router.push({ name: "research-overview", params: { symbol: researchSymbol(position.symbol) } })
 }
+
+function openLabelPicker(position: Position): void {
+  openMenuId.value = null
+  pickerPosition.value = position
+  pickerOpen.value = true
+}
+
+function onPickerSaved() {
+  pickerPosition.value = null
+  pickerOpen.value = false
+  void store.fetchPositions(id, labelFilter.value)
+}
 </script>
 
 <template>
@@ -296,6 +323,10 @@ function goResearch(position: Position): void {
             </template>
           </div>
         </div>
+      </div>
+
+      <div class="border-b border-slate-100 dark:border-slate-800 px-5 py-2">
+        <LabelFilterBar v-model="labelFilter" @manage="manageLabelsOpen = true" />
       </div>
 
       <p v-if="notice" class="border-b border-slate-100 dark:border-slate-800 bg-green-50 dark:bg-green-500/10 px-5 py-2 text-sm text-green-700 dark:text-green-400">{{ notice }}</p>
@@ -342,6 +373,7 @@ function goResearch(position: Position): void {
                       </router-link>
                       <p class="text-xs text-slate-500 dark:text-slate-400">{{ pos.companyName }}</p>
                       <p class="text-[11px] text-slate-400 dark:text-slate-500">{{ assetLabel(pos) }}</p>
+                      <LabelChips v-if="pos.labels?.length" :labels="pos.labels" :max="4" class="mt-1" />
                     </div>
                   </div>
                 </td>
@@ -411,6 +443,7 @@ function goResearch(position: Position): void {
                       <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="openAction('dividend', pos)">Dividend</button>
                       <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="openEditPosition(pos)">Edit position</button>
                       <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="goResearch(pos)">Research</button>
+                      <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="openLabelPicker(pos)">Set labels...</button>
                       <button type="button" class="block w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10" @click="openRemoveConfirm(pos)">Remove position</button>
                     </div>
                   </template>
@@ -470,5 +503,18 @@ function goResearch(position: Position): void {
       @close="removeTarget = null"
       @confirm="confirmRemovePosition"
     />
+
+    <LabelManagerDialog :open="manageLabelsOpen" @close="manageLabelsOpen = false" />
+
+    <div v-if="pickerPosition" class="relative">
+      <LabelPickerPopover
+        :open="pickerOpen"
+        :entity-id="pickerPosition.id"
+        entity-kind="position"
+        :current-labels="pickerPosition.labels ?? []"
+        @close="pickerOpen = false"
+        @saved="onPickerSaved"
+      />
+    </div>
   </div>
 </template>

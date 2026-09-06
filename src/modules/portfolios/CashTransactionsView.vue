@@ -1,11 +1,15 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue"
+import { onMounted, ref, watch } from "vue"
 import { getAllWalletTransactions, updateWalletTransaction, deleteWalletTransaction } from "@/api/wallets"
 import { formatCurrency, formatDateTime } from "@/utils/format"
 import type { RecentCashTransaction } from "@/api/wallets"
 import InvestmentsTabs from "@/modules/portfolios/InvestmentsTabs.vue"
 import TransactionsSubTabs from "@/modules/portfolios/TransactionsSubTabs.vue"
 import ConfirmDeleteModal from "@/modules/portfolios/ConfirmDeleteModal.vue"
+import LabelFilterBar from "@/components/LabelFilterBar.vue"
+import LabelChips from "@/components/LabelChips.vue"
+import LabelManagerDialog from "@/components/LabelManagerDialog.vue"
+import LabelPickerPopover from "@/components/LabelPickerPopover.vue"
 
 type Tx = RecentCashTransaction
 
@@ -31,11 +35,16 @@ const deleteTarget = ref<Tx | null>(null)
 const deleteBusy = ref(false)
 const deleteError = ref<string | null>(null)
 
+const labelFilter = ref<string[]>([])
+const manageLabelsOpen = ref(false)
+const pickerOpen = ref(false)
+const pickerTx = ref<Tx | null>(null)
+
 async function load(targetPage = page.value) {
   loading.value = true
   error.value = null
   try {
-    const res = await getAllWalletTransactions(targetPage, pageSize.value, sortBy.value, sortOrder.value)
+    const res = await getAllWalletTransactions(targetPage, pageSize.value, sortBy.value, sortOrder.value, labelFilter.value.length ? labelFilter.value : undefined)
     transactions.value = res.data ?? []
     total.value = res.meta?.total ?? 0
     page.value = res.meta?.page ?? 1
@@ -47,7 +56,11 @@ async function load(targetPage = page.value) {
   }
 }
 
-onMounted(() => load())
+onMounted(() => {
+  load()
+})
+
+watch(labelFilter, () => load(1))
 
 function toggleSort(key: string) {
   if (sortBy.value === key) {
@@ -146,6 +159,17 @@ async function submitDelete() {
     deleteBusy.value = false
   }
 }
+
+function openLabelPicker(tx: Tx) {
+  pickerTx.value = tx
+  pickerOpen.value = true
+}
+
+function onPickerSaved() {
+  pickerTx.value = null
+  pickerOpen.value = false
+  load()
+}
 </script>
 
 <template>
@@ -162,6 +186,10 @@ async function submitDelete() {
     <p v-if="notice" class="mb-4 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700 dark:bg-green-500/10 dark:text-green-400">{{ notice }}</p>
     <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-400">{{ error }}</p>
     <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading transactions...</p>
+
+    <div class="mb-3 flex flex-wrap items-center gap-2">
+      <LabelFilterBar v-model="labelFilter" @manage="manageLabelsOpen = true" />
+    </div>
 
     <div v-if="!loading && !error" class="card overflow-hidden">
       <div v-if="transactions.length" class="overflow-x-auto">
@@ -201,12 +229,23 @@ async function submitDelete() {
               <td class="px-5 py-3 whitespace-nowrap text-slate-600 dark:text-slate-300">{{ formatDateTime(tx.date) }}</td>
               <td class="px-5 py-3 text-slate-900 dark:text-slate-100">{{ tx.walletName || "—" }}</td>
               <td class="px-5 py-3 text-slate-600 dark:text-slate-300">{{ tx.displayLabel }}</td>
-              <td class="px-5 py-3 text-slate-600 dark:text-slate-300">{{ tx.description || "—" }}</td>
+              <td class="px-5 py-3 text-slate-600 dark:text-slate-300">
+                <div>{{ tx.description || "—" }}</div>
+                <LabelChips v-if="tx.labels?.length" :labels="tx.labels" :max="3" class="mt-1" />
+              </td>
               <td class="px-5 py-3 text-right font-medium tabular-nums" :class="amountValue(tx) < 0 ? 'text-red-600' : 'text-green-700'">
                 {{ formatCurrency(amountValue(tx), tx.currency) }}
               </td>
               <td class="px-5 py-3">
                 <div class="flex justify-end gap-1">
+                  <button
+                    type="button"
+                    class="btn-ghost px-2 py-1 text-xs"
+                    aria-label="Set labels"
+                    @click="openLabelPicker(tx)"
+                  >
+                    Labels
+                  </button>
                   <button
                     type="button"
                     class="btn-ghost px-2 py-1 text-xs"
@@ -335,5 +374,19 @@ async function submitDelete() {
       @close="deleteTarget = null"
       @confirm="submitDelete"
     />
+
+    <LabelManagerDialog :open="manageLabelsOpen" @close="manageLabelsOpen = false" />
+
+    <div v-if="pickerTx" class="relative inline-block">
+      <LabelPickerPopover
+        :open="pickerOpen"
+        :entity-id="pickerTx.id"
+        entity-kind="cash-transaction"
+        :wallet-id="pickerTx.walletId"
+        :current-labels="pickerTx.labels ?? []"
+        @close="pickerOpen = false"
+        @saved="onPickerSaved"
+      />
+    </div>
   </div>
 </template>

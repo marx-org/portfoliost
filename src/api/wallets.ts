@@ -69,9 +69,11 @@ export async function getAllWalletTransactions(
   limit = 10,
   sortBy = "date",
   sortOrder: "asc" | "desc" = "desc",
+  labelIds?: string[],
 ): Promise<RecentCashTransactionsPage> {
+  const labels = labelIds?.length ? `&labels=${encodeURIComponent(labelIds.join(","))}` : ""
   return http.get<RecentCashTransactionsPage>(
-    `/api/wallets/recent-transactions?page=${page}&limit=${limit}&sortBy=${sortBy}&sortOrder=${sortOrder}`,
+    `/api/wallets/recent-transactions?page=${page}&limit=${limit}&sortBy=${sortBy}&sortOrder=${sortOrder}${labels}`,
   )
 }
 

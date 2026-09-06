@@ -57,9 +57,9 @@ export const usePortfolioStore = defineStore("portfolios", () => {
     }
   }
 
-  async function fetchPositions(id: string): Promise<void> {
+  async function fetchPositions(id: string, labelIds?: string[]): Promise<void> {
     try {
-      positions.value = await portfoliosApi.getPortfolioPositions(id)
+      positions.value = await portfoliosApi.getPortfolioPositions(id, labelIds)
     } catch (err) {
       error.value = err instanceof Error ? err.message : "Failed to load positions"
       throw err

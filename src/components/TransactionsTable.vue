@@ -11,12 +11,17 @@
  *   global    adds: Portfolio name, Instrument Currency badge
  *   portfolio adds: (none — same columns minus Portfolio/Ccy)
  */
-import { computed, onMounted, ref } from "vue"
+import { computed, onMounted, ref, watch } from "vue"
 import { getAllTransactions, getPortfolioTransactions, deletePortfolioTransaction } from "@/api/portfolios"
 import { formatCurrency, formatDate, formatDateTime, formatNumber } from "@/utils/format"
 import { researchSymbol } from "@/utils/research"
 import FeeCell from "@/components/FeeCell.vue"
 import DualCurrencyCell from "@/components/DualCurrencyCell.vue"
+import LabelFilterBar from "@/components/LabelFilterBar.vue"
+import LabelChips from "@/components/LabelChips.vue"
+import LabelManagerDialog from "@/components/LabelManagerDialog.vue"
+import LabelPickerPopover from "@/components/LabelPickerPopover.vue"
+import type { EntityKind } from "@/components/LabelPickerPopover.vue"
 import EditTransactionModal from "@/modules/portfolios/EditTransactionModal.vue"
 import ConfirmDeleteModal from "@/modules/portfolios/ConfirmDeleteModal.vue"
 import type { PortfoliosTransactions, PortfolioTransactionsPage } from "@/api/types"
@@ -45,6 +50,12 @@ const pageSizes = [10, 20, 50, 100]
 
 const sortBy    = ref("date")
 const sortOrder = ref<"asc" | "desc">("desc")
+
+const labelFilter  = ref<string[]>([])
+const manageLabelsOpen = ref(false)
+const pickerOpen   = ref(false)
+const pickerTx     = ref<Tx | null>(null)
+const pickerKind   = ref<EntityKind>("transaction")
 
 // ── Sortable columns (shared) ─────────────────────────────────────────
 
@@ -106,7 +117,7 @@ async function load(targetPage = page.value) {
   try {
     let res: { items: Tx[]; total: number; page: number; totalPages: number }
     if (props.mode === "global") {
-      res = await getAllTransactions(targetPage, pageSize.value, sortBy.value, sortOrder.value) as typeof res
+      res = await getAllTransactions(targetPage, pageSize.value, sortBy.value, sortOrder.value, labelFilter.value.length ? labelFilter.value : undefined) as typeof res
     } else {
       res = await getPortfolioTransactions(
         props.portfolioId!,
@@ -114,6 +125,8 @@ async function load(targetPage = page.value) {
         pageSize.value,
         sortBy.value,
         sortOrder.value,
+        undefined,
+        labelFilter.value.length ? labelFilter.value : undefined,
       ) as typeof res
     }
     transactions.value = res.items
@@ -128,6 +141,8 @@ async function load(targetPage = page.value) {
 }
 
 onMounted(() => load())
+
+watch(labelFilter, () => load(1))
 
 // ── Sort ──────────────────────────────────────────────────────────────
 
@@ -238,6 +253,20 @@ async function submitDelete() {
   }
 }
 
+// ── Labels ─────────────────────────────────────────────────────────────
+
+function openLabelPicker(tx: Tx) {
+  pickerTx.value = tx
+  pickerKind.value = "transaction"
+  pickerOpen.value = true
+}
+
+function onPickerSaved() {
+  pickerTx.value = null
+  pickerOpen.value = false
+  load()
+}
+
 // ── Column count for group colspan ────────────────────────────────────
 
 const colCount = computed(() =>
@@ -261,6 +290,10 @@ const colCount = computed(() =>
           <option v-for="m in groupModes" :key="m.value" :value="m.value">{{ m.label }}</option>
         </select>
       </label>
+    </div>
+
+    <div class="border-b border-slate-100 dark:border-slate-800 px-5 py-2">
+      <LabelFilterBar v-model="labelFilter" @manage="manageLabelsOpen = true" />
     </div>
 
     <!-- Notices -->
@@ -337,6 +370,7 @@ const colCount = computed(() =>
                       </span>
                     </span>
                     <span class="block text-xs text-slate-500 dark:text-slate-400">{{ tx.instrumentName }}</span>
+                    <LabelChips v-if="tx.labels?.length" :labels="tx.labels" :max="3" class="mt-0.5" />
                   </span>
                 </router-link>
               </td>
@@ -393,6 +427,7 @@ const colCount = computed(() =>
               <td class="px-5 py-3">
                 <div class="flex justify-end gap-1">
                   <button type="button" class="btn-ghost px-2 py-1 text-xs" aria-label="Edit transaction" @click="openEdit(tx)">Edit</button>
+                  <button type="button" class="btn-ghost px-2 py-1 text-xs" aria-label="Set labels" @click="openLabelPicker(tx)">Labels</button>
                   <button
                     type="button"
                     class="btn-ghost px-2 py-1 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10"
@@ -459,5 +494,19 @@ const colCount = computed(() =>
       @close="deleteTarget = null"
       @confirm="submitDelete"
     />
+
+    <LabelManagerDialog :open="manageLabelsOpen" @close="manageLabelsOpen = false" />
+
+    <div v-if="pickerTx" class="relative inline-block">
+      <LabelPickerPopover
+        :open="pickerOpen"
+        :entity-id="pickerTx.id"
+        :entity-kind="pickerKind"
+        :portfolio-id="pickerTx.portfolioId"
+        :current-labels="(pickerTx as PortfolioTx).labels ?? []"
+        @close="pickerOpen = false"
+        @saved="onPickerSaved"
+      />
+    </div>
   </div>
 </template>

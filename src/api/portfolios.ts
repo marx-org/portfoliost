@@ -41,8 +41,9 @@ export async function getPortfolioSummaryMetrics(id: string): Promise<PortfolioS
   return http.get<PortfolioSummaryMetrics>(`/api/portfolios/${id}/summary-metrics`)
 }
 
-export async function getPortfolioPositions(id: string): Promise<PortfolioPositions> {
-  return http.get<PortfolioPositions>(`/api/portfolios/${id}/positions`)
+export async function getPortfolioPositions(id: string, labelIds?: string[]): Promise<PortfolioPositions> {
+  const labels = labelIds?.length ? `?labels=${encodeURIComponent(labelIds.join(","))}` : ""
+  return http.get<PortfolioPositions>(`/api/portfolios/${id}/positions${labels}`)
 }
 
 export interface CreatePortfolioPositionInput {
@@ -148,10 +149,12 @@ export async function getPortfolioTransactions(
   sortBy = "date",
   sortOrder: "asc" | "desc" = "desc",
   positionId?: string,
+  labelIds?: string[],
 ): Promise<PaginatedResponse<PortfolioTransactionsPage["items"][number]>> {
   const position = positionId ? `&positionId=${encodeURIComponent(positionId)}` : ""
+  const labels = labelIds?.length ? `&labels=${encodeURIComponent(labelIds.join(","))}` : ""
   return http.get<PaginatedResponse<PortfolioTransactionsPage["items"][number]>>(
-    `/api/portfolios/${id}/transactions?page=${page}&limit=${limit}&sortBy=${sortBy}&sortOrder=${sortOrder}${position}`,
+    `/api/portfolios/${id}/transactions?page=${page}&limit=${limit}&sortBy=${sortBy}&sortOrder=${sortOrder}${position}${labels}`,
   )
 }
 
@@ -184,9 +187,11 @@ export async function getAllTransactions(
   limit = 10,
   sortBy = "date",
   sortOrder: "asc" | "desc" = "desc",
+  labelIds?: string[],
 ): Promise<PaginatedResponse<PortfolioTransactionsPage["items"][number]>> {
+  const labels = labelIds?.length ? `&labels=${encodeURIComponent(labelIds.join(","))}` : ""
   return http.get<PaginatedResponse<PortfolioTransactionsPage["items"][number]>>(
-    `/api/portfolios/transactions?page=${page}&limit=${limit}&sortBy=${sortBy}&sortOrder=${sortOrder}`,
+    `/api/portfolios/transactions?page=${page}&limit=${limit}&sortBy=${sortBy}&sortOrder=${sortOrder}${labels}`,
   )
 }
 

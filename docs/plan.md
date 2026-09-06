@@ -320,12 +320,12 @@ Proposal: [benchmarks.md](proposals/benchmarks.md) (D46–D50).
 - [x] **3.4 Backend: set-labels + serialization** — `src/routes/position-labels.ts`, `transaction-labels.ts`, `wallet-transaction-labels.ts` (replace semantics, D67/D68); shared `src/services/labels.ts`; serialize `labels` in `positionWire`/`serializeTx` (portfolio-transactions), `history.ts` wallet-tx/recent-transactions serializers, `transactions.ts` `serializeTx` (`labels: []`).
 - [x] **3.5 Backend: filtering** — `?labels=` comma-separated AND filter (entity must have all labels) wired into portfolio-transactions (positions + tx + cross-portfolio), history.ts (wallet-tx + recent-transactions) via shared `attachLabelCondition`/`entityIdsWithAllLabels`.
 - [x] **3.6 Backend: tests** — `src/routes/labels.test.ts` (19 tests): CRUD + palette wrapping, unique-name 409 (fixed PGlite `err.cause` detection), D24 scoping 404s, replace semantics on all three entity types, alphabetical sorting, AND filtering. 246 wallets tests green.
-- [ ] **3.7 SPA: contract types** — install bumped `@marx2/contracts`, run `gen:types`.
-- [ ] **3.8 SPA: labelColors utility** — shared palette mapping (hex to Tailwind class pairs).
-- [ ] **3.9 SPA: LabelBadge component** — shared badge component with `+N` overflow.
-- [ ] **3.10 SPA: LabelManager dialog** — CRUD UI for labels.
-- [ ] **3.11 SPA: set-label popover** — per-row label assignment in holdings + transactions + cash-transactions tables.
-- [ ] **3.12 SPA: label filter** — multi-select chip filter in `PortfolioHoldingsTab` + `TransactionsTable` + `CashTransactionsView`.
-- [ ] **3.13 SPA: tests** — vitest unit tests for components + Playwright e2e for full flow.
+- [x] **3.7 SPA: contract types** — install bumped `@marx2/contracts`, run `gen:types`.
+- [x] **3.8 SPA: labelColors utility** — shared palette mapping (hex to Tailwind class pairs).
+- [x] **3.9 SPA: LabelBadge component** — shared badge component with `+N` overflow.
+- [x] **3.10 SPA: LabelManager dialog** — CRUD UI for labels.
+- [x] **3.11 SPA: set-label popover** — per-row label assignment in holdings + transactions + cash-transactions tables.
+- [x] **3.12 SPA: label filter** — multi-select chip filter in `PortfolioHoldingsTab` + `TransactionsTable` + `CashTransactionsView`.
+- [x] **3.13 SPA: tests** — vitest unit tests for components + Playwright e2e for full flow.
 - [ ] **3.14 Integration test** — docker-compose end-to-end: create label → assign to position/transaction/cash-transaction → verify filter.
 

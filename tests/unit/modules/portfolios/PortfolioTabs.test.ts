@@ -172,6 +172,6 @@ describe("PortfolioTransactionsTab", () => {
     expect(wrapper.text()).toContain("Buy")
     expect(wrapper.text()).toContain("META")
     expect(wrapper.text()).toContain("5,500.00")
-    expect(mocked.getPortfolioTransactions).toHaveBeenCalledWith("p1", 1, 20, "date", "desc")
+    expect(mocked.getPortfolioTransactions).toHaveBeenCalledWith("p1", 1, 20, "date", "desc", undefined, undefined)
   })
 })
