@@ -277,8 +277,12 @@ Proposal: [benchmarks.md](proposals/benchmarks.md) (D46–D50).
 - [x] `recalc-queue.test.ts` + `backfill.test.ts` (see 2.4 above).
 - [x] SPA 125 unit + 169 mock tests green; wallets 178 tests green.
 
-### 2.6 — Risk metrics endpoint
-- [ ] `GET /:id/risk-metrics`: maxDrawdown / sharpe / sortino / calmar / win-rate (volatility already computed in benchmark series — reuse).
+### 2.6 — Risk metrics endpoint — [x] DONE
+
+- [x] `GET /:id/risk-metrics`: maxDrawdown / sharpe / sortino / calmar / win-rate (volatility already computed in benchmark series — reuse).
+- [x] `src/services/riskMetrics.ts`: pure functions — `maxDrawdown`, `annualizedVolatility`, `sharpeRatio`, `sortinoRatio` (fallback to Sharpe on all-positive days), `calmarRatio`, `winRate`, `annualizedReturn`, `periodReturnPercent`, `annualizedReturnWithheldReason`, `computeRiskMetrics`.
+- [x] Route in `portfoliost-wallets/src/routes/portfolios.ts`: ownership check, timeframe-filtered snapshot query, contract-typed response (`PortfolioRiskMetrics`).
+- [x] `src/services/riskMetrics.test.ts` (40 tests) + `src/routes/risk-metrics.test.ts` (9 tests). 227 wallets tests green; build green.
 
 ### 2.7 — Risk tests
 - [ ] Withholding-rule and empty-history tests.
