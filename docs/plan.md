@@ -310,3 +310,22 @@ Proposal: [benchmarks.md](proposals/benchmarks.md) (D46–D50).
 ### 2.14 — Closeout
 - [ ] plan/proposal status marks; retire `mocks/portfolios/index.js`; docs sweep.
 
+---
+
+# 3. Labels (proposal `docs/proposals/labels.md`, D65–D72)
+
+- [x] **3.1 Contract** — `Label`/`LabelInput`/`SetLabelsRequest` schemas + `labels` arrays on `Position`/`Transaction`/`CashTransaction`/`RecentCashTransaction` + 7 endpoints (GET/POST `/labels`, PATCH/DELETE `/labels/{id}`, POST set-labels for position/portfolio-tx/wallet-tx) + `labels` query param on 4 listing endpoints in `openapi.yaml`. Published `@marx2/contracts@1.6.10` (commit `cedfbd8`). Installed in wallets + regenerated `api-types.d.ts`.
+- [x] **3.2 Backend: migration** — `labels`, `position_labels`, `transaction_labels`, `wallet_transaction_labels` tables + indexes in `src/db/schema.ts`; `drizzle/0004_silky_gorgon.sql`; fixed stale snapshot chain (commit `48c8017`).
+- [x] **3.3 Backend: labels CRUD** — `src/routes/labels.ts` GET/POST/PATCH/DELETE `/labels` with zod validation, 409 on duplicate name, 404 on foreign label (D24 scoping), `nextPaletteColor()` auto-assign (D66).
+- [x] **3.4 Backend: set-labels + serialization** — `src/routes/position-labels.ts`, `transaction-labels.ts`, `wallet-transaction-labels.ts` (replace semantics, D67/D68); shared `src/services/labels.ts`; serialize `labels` in `positionWire`/`serializeTx` (portfolio-transactions), `history.ts` wallet-tx/recent-transactions serializers, `transactions.ts` `serializeTx` (`labels: []`).
+- [x] **3.5 Backend: filtering** — `?labels=` comma-separated AND filter (entity must have all labels) wired into portfolio-transactions (positions + tx + cross-portfolio), history.ts (wallet-tx + recent-transactions) via shared `attachLabelCondition`/`entityIdsWithAllLabels`.
+- [ ] **3.6 Backend: tests** — PGLite unit tests for labels CRUD, set-labels (all three entity types), filtering (AND), alphabetical ordering.
+- [ ] **3.7 SPA: contract types** — install bumped `@marx2/contracts`, run `gen:types`.
+- [ ] **3.8 SPA: labelColors utility** — shared palette mapping (hex to Tailwind class pairs).
+- [ ] **3.9 SPA: LabelBadge component** — shared badge component with `+N` overflow.
+- [ ] **3.10 SPA: LabelManager dialog** — CRUD UI for labels.
+- [ ] **3.11 SPA: set-label popover** — per-row label assignment in holdings + transactions + cash-transactions tables.
+- [ ] **3.12 SPA: label filter** — multi-select chip filter in `PortfolioHoldingsTab` + `TransactionsTable` + `CashTransactionsView`.
+- [ ] **3.13 SPA: tests** — vitest unit tests for components + Playwright e2e for full flow.
+- [ ] **3.14 Integration test** — docker-compose end-to-end: create label → assign to position/transaction/cash-transaction → verify filter.
+
