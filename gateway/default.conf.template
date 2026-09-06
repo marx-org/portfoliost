@@ -55,6 +55,8 @@ server {
     location /api/conversations  { proxy_pass ${API_COPILOT_URL}; }
     location /api/chatbot/       { proxy_pass ${API_COPILOT_URL}; }
     location /api/exchange-rates { proxy_pass ${API_EXCHANGE_RATES_URL}; }
+    location /api/fx/            { proxy_pass ${API_WALLETS_URL}; }
+    location /api/currencies     { proxy_pass ${API_WALLETS_URL}; }
     location /api/admin          { proxy_pass ${API_ADMIN_URL}; }
 
     # OIDC discovery + JWKS are served by the users-auth module.
