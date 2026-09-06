@@ -319,7 +319,7 @@ Proposal: [benchmarks.md](proposals/benchmarks.md) (D46–D50).
 - [x] **3.3 Backend: labels CRUD** — `src/routes/labels.ts` GET/POST/PATCH/DELETE `/labels` with zod validation, 409 on duplicate name, 404 on foreign label (D24 scoping), `nextPaletteColor()` auto-assign (D66).
 - [x] **3.4 Backend: set-labels + serialization** — `src/routes/position-labels.ts`, `transaction-labels.ts`, `wallet-transaction-labels.ts` (replace semantics, D67/D68); shared `src/services/labels.ts`; serialize `labels` in `positionWire`/`serializeTx` (portfolio-transactions), `history.ts` wallet-tx/recent-transactions serializers, `transactions.ts` `serializeTx` (`labels: []`).
 - [x] **3.5 Backend: filtering** — `?labels=` comma-separated AND filter (entity must have all labels) wired into portfolio-transactions (positions + tx + cross-portfolio), history.ts (wallet-tx + recent-transactions) via shared `attachLabelCondition`/`entityIdsWithAllLabels`.
-- [ ] **3.6 Backend: tests** — PGLite unit tests for labels CRUD, set-labels (all three entity types), filtering (AND), alphabetical ordering.
+- [x] **3.6 Backend: tests** — `src/routes/labels.test.ts` (19 tests): CRUD + palette wrapping, unique-name 409 (fixed PGlite `err.cause` detection), D24 scoping 404s, replace semantics on all three entity types, alphabetical sorting, AND filtering. 246 wallets tests green.
 - [ ] **3.7 SPA: contract types** — install bumped `@marx2/contracts`, run `gen:types`.
 - [ ] **3.8 SPA: labelColors utility** — shared palette mapping (hex to Tailwind class pairs).
 - [ ] **3.9 SPA: LabelBadge component** — shared badge component with `+N` overflow.
