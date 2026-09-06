@@ -327,5 +327,5 @@ Proposal: [benchmarks.md](proposals/benchmarks.md) (D46–D50).
 - [x] **3.11 SPA: set-label popover** — per-row label assignment in holdings + transactions + cash-transactions tables.
 - [x] **3.12 SPA: label filter** — multi-select chip filter in `PortfolioHoldingsTab` + `TransactionsTable` + `CashTransactionsView`.
 - [x] **3.13 SPA: tests** — vitest unit tests for components + Playwright e2e for full flow.
-- [ ] **3.14 Integration test** — docker-compose end-to-end: create label → assign to position/transaction/cash-transaction → verify filter.
+- [x] **3.14 Integration test** — docker-compose end-to-end: create label → assign to position/transaction/cash-transaction → verify filter.
 

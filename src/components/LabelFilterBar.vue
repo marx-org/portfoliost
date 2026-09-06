@@ -24,7 +24,7 @@ function toggle(id: string) {
 </script>
 
 <template>
-  <div class="flex flex-wrap items-center gap-2">
+  <div class="flex flex-wrap items-center gap-2" data-testid="label-filter-bar">
     <span class="text-xs font-medium uppercase text-slate-400 dark:text-slate-500">Labels</span>
     <LabelBadge
       v-for="l in labels"
