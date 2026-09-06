@@ -212,7 +212,10 @@ const currentDrawdownPercent = computed(() => {
 
 const maxDrawdownPercent = computed(() => {
   const v = riskMetrics.value?.["maxDrawdown"]
-  return typeof v === "number" ? -v * 100 : null
+  // Backend returns a negative fraction (e.g. -0.40); multiply by 100 to get
+  // percentage. Do NOT negate — drawdown is inherently negative and is shown
+  // in red alongside currentDrawdown which is also negative.
+  return typeof v === "number" ? v * 100 : null
 })
 
 function gainClass(value: number | undefined): string {
