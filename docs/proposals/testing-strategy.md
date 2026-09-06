@@ -194,9 +194,16 @@ Seed data should mirror what a real user would have — not exhaustive edge case
 
 ### Current State
 
-All gateway routes point to `example-service-mock`. The real backend runs in compose against the volatile Postgres but is not yet wired into the gateway.
+`example-service-mock` is **retired from production**. In the cluster (Flux repo `Marx2/homelab`), the `portfoliost` ingress routes every live endpoint to real backend modules (`users-auth`, `wallets`, `instruments`, `admin`) via explicit paths, and the `/api` catch-all to `example-service-mock:4010` has been removed. The `mocks` HelmRelease is deleted.
 
-> **Resolved blocker**: KrakenD CE stripped query strings even when `querystring_params` was configured — the cause of the long-standing charting e2e failure (`/api/charting/compare?symbols=`). Fixed by replacing KrakenD with an nginx gateway (`docs/proposals/backend-topology.md`, D1); nginx forwards query strings natively. Phase 2 is unblocked.
+`example-service-mock` now exists **only in docker-compose** as test/dev tooling:
+
+- Local dev + E2E in the `portfoliost` repo (`docker-compose.yml` `example-service-mock` service, `Dockerfile.mock`), backed by `deploy/services.env` route mappings.
+- Mock contract tests (`npm run test:mock`).
+
+Endpoints that were previously served by the mock and have **no real backend yet** — watchlists, research-compare charting, per-symbol news (`/api/news/*`), public-share viewing (`/api/public/portfolios/*`), and notifications — are deliberately **unmigrated and return 404 in prod**. They are not routed to any module until a real backend is built.
+
+Migration of the remaining paths to real modules is picked up later (watchlists/charting per the endpoint groups below); no new mock code is written.
 
 ### Migration Flow Per Endpoint
 
@@ -242,14 +249,20 @@ Until then, keep both test suites. The mock contract tests catch regressions in 
 ### End State
 
 ```
-Current:                          Target:
-┌──────────┐                      ┌──────────┐
-│  gateway │                      │  gateway │
-└────┬─────┘                      └────┬─────┘
-     │                                 │
-     ├─→ example-service-mock (all)             ├─→ real modules (all)
-     └─→ real modules (users-auth)    │
-                                        └─→ example-service-mock (DELETED)
+Current (prod):
+┌──────────┐
+│  gateway │
+└────┬─────┘
+     ├─→ real modules (auth/users, wallets, instruments, admin)
+     └─→ (unmigrated watchlists/charting/news/public/notifications → 404)
+example-service-mock NOT deployed in cluster (docker-compose only, tests-only)
+
+Target (docker-compose, for tests):
+┌──────────┐
+│  gateway │
+└────┬─────┘
+     ├─→ real modules (all)
+     └─→ example-service-mock (tests-only stand-in until last endpoint migrates)
 ```
 
 ## Implementation Status
