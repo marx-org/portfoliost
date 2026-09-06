@@ -50,7 +50,7 @@ Legend: `[ ]` pending · `[x]` done
 - [x] make sure all stooq tables are available in the `stooq` DB on the same Postgres instance
 - [x] mapp all stooq tables as foreign tables in `portfoliost-instruments` DB
 
-## 1. Portfolio analytics — price data warehouse + value snapshots (§15 Phase H)
+## 1. Portfolio analytics — price data warehouse + value snapshots
 
 Proposal: [price-data-architecture.md](proposals/price-data-architecture.md).
 
@@ -64,21 +64,7 @@ Architecture summary:
 - Split detection tables (`split_candidates`, `split_adjustments`) handle stooq/overflow boundary discontinuities.
 - `value_snapshots` in `portfoliost-wallets` (migration already done — 0 rows) feeds the analytics endpoint.
 
-Phase H execution order:
-
-```
-H2   price_bars schema + foreign tables + view (portfoliost-instruments) [x]
-H3   price history read endpoint with stooq + openst layering
-H4   passive write-through from existing quote/history fetches
-H5   snapshot-on-read in refreshQuotes (portfoliost-wallets)   ← chart shows today's dot
-H6   backfill job: historical value_snapshots
-H7   wire GET /:id/analytics                                   ← chart shows full history
-H8   frontend polling + loading banner
-H9   tests
-H10  stooq post-import hook + admin Market Data tab
-```
-
-### 1.1 (H2) — price_bars schema, foreign tables, and unified view — [x] DONE
+### 1.1 — price_bars schema, foreign tables, and unified view — [x] DONE
 
 In `portfoliost-instruments`, add to `instruments` schema via Drizzle migration:
 
@@ -157,7 +143,7 @@ Unit test (`src/db/price-bars.test.ts`): schema compiles, upsert into `price_bar
 
 **Performance note** — the single-view read approach is kept (no per-ticker table routing yet); a candidate optimization (ticker-routed single-table reads) is documented at the end of `docs/proposals/price-data-architecture.md` to re-evaluate if the real imported data is too slow.
 
-### 1.2 (H3) — price history read endpoint — [x] DONE
+### 1.2 — price history read endpoint — [x] DONE
 
 `GET /api/instruments/:symbol/price-bars?from=YYYY-MM-DD&to=YYYY-MM-DD`
 
@@ -185,39 +171,39 @@ Ticker routing (via `exchange_reference` + `ticker_reference` — no hardcoded m
 - Polish symbol (WSE) → stooq `daily_pl`, format TBC
 - German/other → stooq `daily_world`, format TBC
 
-### 1.3 (H4) — passive write-through from existing quote/history fetches — [x] DONE
+### 1.3 — passive write-through from existing quote/history fetches — [x] DONE
 
 - [x] `backgroundUpsertBars(db, symbol, rows)` added to `src/services/price-bars.ts` — fire-and-forget, errors swallowed, invalid rows filtered.
 - [x] Hooked into `/:symbol/history` after `fetchOhlcv` returns rows (11-year daily window).
 - [x] Hooked into `/:symbol/price?date=` after `fetchOhlcv` returns rows.
 - [x] 3 unit tests: persists bars, idempotent update, silently skips invalid rows. 102 instruments tests green.
 
-### 1.4 (H5) — snapshot-on-read in refreshQuotes — [x] DONE
+### 1.4 — snapshot-on-read in refreshQuotes — [x] DONE
 
 - [x] `snapshotPortfolioValue(db, portfolioId, liveValues, now)` added to `src/services/quotes.ts` — computes `Σ marketValue × fx` and `Σ (avg × qty) × fx`; upserts into `value_snapshots` ON CONFLICT DO UPDATE.
 - [x] Called fire-and-forget (`void ... .catch(() => undefined)`) at the end of `refreshQuotes`, using live `marketValue` collected during the per-position loop (not stale DB rows).
 - [x] Falls back to `rate=1` when FX table unavailable or pair missing.
 - [x] 3 unit tests: correct sums, idempotent upsert, full `refreshQuotes` integration (snapshot row written after quote persist). 144 wallets tests green.
 
-### 1.5 (H6) — backfill job: historical value_snapshots — [x] DONE
+### 1.5 — backfill job: historical value_snapshots — [x] DONE
 
 - [x] `portfolio_backfill_metadata` table added to schema + migration `0002_square_sunspot.sql`.
 - [x] `src/services/backfill.ts`: `runBackfill()` — queries MIN(executed_at), builds daily qty_held from BUY/SELL, fetches price series per symbol via instruments `GET /price-bars`, carry-forward on gaps, bulk-upserts `value_snapshots` in chunks of 100; `getBackfillStatus()`; `toDateStr()` normalises PGlite Date/string timestamps.
 - [x] `GET /:id/analytics` replaced stub: < 2 snapshot rows → trigger backfill void + return `{backfillStatus:"pending"}`; otherwise read snapshots filtered by timeframe (6M/1Y/2Y/ALL), compute totalValue/totalReturn/monthlyReturns, return full series.
 - [x] 10 unit tests: calendarDays, buildPriceMap carry-forward, single-symbol upsert, weekend carry, idempotency, status transitions. 154 wallets tests green.
 
-### 1.6 (H7) — wire GET /:id/analytics — [x] DONE
+### 1.6 — wire GET /:id/analytics — [x] DONE
 
-- [x] Analytics stub replaced in `portfoliost-wallets/src/routes/portfolios.ts`: backfill trigger + snapshot read + timeframe filter (6M/1Y/2Y/ALL) + monthlyReturns + backfillStatus. (Implemented as part of step 1.5/H6.)
+- [x] Analytics stub replaced in `portfoliost-wallets/src/routes/portfolios.ts`: backfill trigger + snapshot read + timeframe filter (6M/1Y/2Y/ALL) + monthlyReturns + backfillStatus. (Implemented as part of step 1.5.)
 
-### 1.7 (H8) — frontend: polling + loading banner — [x] DONE
+### 1.7 — frontend: polling + loading banner — [x] DONE
 
 - [x] `@marx2/contracts@1.6.4`: `backfillStatus` + `timeframe` added to `PortfolioAnalytics`; SPA types regenerated.
 - [x] `PortfolioCard.vue`: `backfillPending` ref + `startPolling()`/`stopPolling()` — polls every 5s, stops on `complete` or after 5 min; banner shown while pending; `onUnmounted` cleanup.
 - [x] `PortfolioPerformanceTab.vue`: same polling via `getPortfolioAnalytics` → `store.analytics`; banner below Performance Chart.
 - [x] Both render existing `timeSeries` immediately; build green; 164 mock tests pass.
 
-### 1.8 (H9) — tests — [x] DONE
+### 1.8 — tests — [x] DONE
 
 `portfoliost-instruments`:
 - [x] `src/services/price-bars.test.ts` extended: `stooqTickerFor` (bare, suffix, lowercase), `ohlcvToClose` (valid, index fallback, bad date, NaN close), `matchSplitFactor` (2:1, 4:1, reverse, ambiguous, continuous), `checkSplitBoundary` ambiguous ratio → `suggested_factor=NULL`, continuous → no candidate, carry-forward view gap behaviour. 123 tests total green.
@@ -226,7 +212,7 @@ Ticker routing (via `exchange_reference` + `ticker_reference` — no hardcoded m
 `portfoliost-wallets`:
 - [x] `src/services/snapshots.test.ts` (new): today snapshot 2 USD positions, multi-currency PLN/EUR via EUR-base fxRates, empty portfolio → value=0, backfill 3 positions × 10 days correct daily values, empty transactions → 0 snapshots, 6M timeframe filter. 17 test files, 160 tests green.
 
-### 1.9 (H10) — post-import hook + admin Market Data tab — [x] DONE
+### 1.9 — post-import hook + admin Market Data tab — [x] DONE
 
 **Post-import hook** `POST /internal/stooq-imported` on instruments:
 - [x] `src/services/stooq-import-hook.ts`: `runPostImportHook()` — MAX(date) from stooq table, deletes superseded `price_bars` overflow rows, deletes `split_adjustments`, auto-dismisses `split_candidates`, writes `latestDate`/`rowsDeleted` to `admin.job_run`.
@@ -248,44 +234,75 @@ Ticker routing (via `exchange_reference` + `ticker_reference` — no hardcoded m
 
 ---
 
-## 2. Portfolio analytics — performance, risk, derived content, cluster (§15 Phases I–L)
+## 2. Portfolio analytics — performance, risk, derived content, cluster
 
-### 2.1 (I1) Shared series/returns service
-- [ ] TWR, XIRR/MWR, annualization + withhold rules.
+Proposal: [benchmarks.md](proposals/benchmarks.md) (D46–D50).
 
-### 2.2 (I2) Enhanced analytics endpoint
-- [ ] `GET /:id/analytics` with TWR/MWR/sharpe/benchmark overlay (on top of H7 basic chart).
-- [ ] Benchmark normalization via instruments `/history`.
+### 2.1 — Shared series/returns service — [x] DONE
 
-### 2.3 (I3) Stubs promotion
-- [ ] `/merged`, `externalCapital*` wallet-deposit basis.
+- [x] `returnColumns.ts` (`buildTwr`, `buildMwr`, `buildSimple`, `buildMonthlyReturns`) — flow-aware TWR chain-link, XIRR/MWR, simple indexed return.
+- [x] `cashFlows.ts` (`dailyNetCashFlows`) — BUY/SELL daily net flow with FX conversion; DIVIDEND excluded.
+- [x] Annualized daily log-return volatility (√252 × stddev) computed per benchmark series in `buildBenchmarkSeries`.
+- [x] `recomputeReturnColumns` called after every snapshot write / recalc.
 
-### 2.4 (I4) Tests
-- [ ] Fixture + property tests; stack-test.
+### 2.2 — Enhanced analytics endpoint — [x] DONE
 
-### 2.5 (J1) Risk metrics endpoint
-- [ ] `GET /:id/risk-metrics`: volatility / maxDrawdown / sharpe / sortino / calmar / win-rate.
+- [x] `GET /:id/analytics` serves contract-typed `cumulativeTwr` / `cumulativeMwr` / `cumulativeSimple` per snapshot point + `benchmarks[]` (D47/D48).
+- [x] Benchmark lines: **transaction-mirroring** (D50) — portfolio cash flows replayed into the benchmark instrument; `buildBenchmarkSeries` in `services/backfill.ts`.
+- [x] `benchmarkCalcType` query param threaded through; unknown tickers dropped (never 4xx).
+- [x] `timeframeCutoff` exported; handles `1W` (days), `1M`/`3M`/`6M`/`1Y`/`2Y` (calendar), `ALL`.
+- [x] Contract updated (`@marx2/contracts` v1.6.7–1.6.9): `returnPercent`/`volatility` on benchmark items, `cumulativeMwr`/`cumulativeTwr` on perf points, `1W` added to timeframe enum.
+- [x] Unit tests in `src/routes/analytics.test.ts` (10 tests).
 
-### 2.6 (J2) Risk tests
+### 2.3 — SPA: Customize dialog + return-type selector — [x] DONE
+
+- [x] `PortfolioPerformanceTab.vue`: **Customize** (Chart controls) dialog — standard benchmark picker (SPY/QQQ/DIA/IWM/VTI/EFA/AGG) + **Add Custom Benchmark** via instrument search component; **Return Type** selector (MWR/TWR/Simple); `setReturnType` refetches on change; backfill-poll refetch keeps `benchmarks` param.
+- [x] Phantom "Benchmark" legend line removed.
+- [x] `PortfolioAnalyticsTimeframe` union extended to `"1W"|"1M"|"3M"|"6M"|"1Y"|"2Y"|"ALL"` (7 buttons in `PortfolioPerformanceTab.vue` + `PortfolioCard.vue`).
+- [x] Y-axis labelled `"Index (start = 100)"` with `v.toFixed(2)` formatter; tooltip updated.
+- [x] Monthly Returns bar chart: flow-adjusted month-over-month TWR, `%`-formatted axes.
+- [x] Chart heights pinned (equity 300 / Returns 220).
+- [x] Mock: `ANALYTICS_BY_TIMEFRAME` + `EMPTY_BY_TIMEFRAME` extended for 1W/1M/3M; mock-test loop covers all 7 timeframes (169 tests).
+
+### 2.4 — Background history recalc queue — [x] DONE
+
+- [x] `services/recalc-queue.ts`: per-portfolio debounce+coalescing queue (`RECALC_GRACE_MS` 3000 ms), AbortController kill+restart, livelock valve (MAX_RESTARTS=10 → fallback timer), `__resetRecalcQueueForTests`.
+- [x] `recalcPortfolioHistory` + `computeSnapshotBatch` in `services/backfill.ts`: abort-aware, atomic DELETE+INSERT (replace semantics — clears on no BUY/SELL).
+- [x] `notifyTransactionsChanged` wired into POST/PATCH/DELETE `/:id/transactions` + POST/DELETE `/:id/positions`.
+- [x] Tests: `services/recalc-queue.test.ts` (coalescing, kill+restart, per-portfolio independence), `services/backfill.test.ts` (replace/clear/abort-never-writes). Full suite 178 pass.
+
+### 2.5 — Tests — [x] DONE
+
+- [x] `analytics.test.ts` (10 tests: timeframe cutoffs 1W/1M/3M/6M/1Y/2Y/ALL, benchmark series, no-ticker returns `[]`, drop unknown ticker).
+- [x] `recalc-queue.test.ts` + `backfill.test.ts` (see 2.4 above).
+- [x] SPA 125 unit + 169 mock tests green; wallets 178 tests green.
+
+### 2.6 — Risk metrics endpoint
+- [ ] `GET /:id/risk-metrics`: maxDrawdown / sharpe / sortino / calmar / win-rate (volatility already computed in benchmark series — reuse).
+
+### 2.7 — Risk tests
 - [ ] Withholding-rule and empty-history tests.
 
-### 2.7 (K1) Dividends composition
+### 2.8 — Dividends composition
 - [ ] Dividends composition within holding windows.
 
-### 2.8 (K2) Calendar composition
+### 2.9 — Calendar composition
 - [ ] Calendar composition.
 
-### 2.9 (K3) Compare enrichment
+### 2.10 — Compare enrichment
 - [ ] Compare enrichment from instruments metrics.
 
-### 2.10 (K4) Summary-metrics income source switch
+### 2.11 — Summary-metrics / income source switch
+- [ ] Wire "Based on" sub-option (External Capital vs Cost Basis) for non-TWR modes (deferred per D49).
+- [ ] Positions selector narrowing — pass position subset to backend analytic series (deferred per D49).
 
-### 2.11 (L1) Cluster cutover
+### 2.12 — Cluster cutover
 - [ ] Homelab ingress paths → `portfoliost-wallets:3000`.
 - [ ] Separated snapshot Kubernetes Jobs (D11 job-pod pattern, not in-process scheduler).
 
-### 2.12 (L2) Live verification
+### 2.13 — Live verification
 - [ ] `/__meta`, CRUD + analytics through host; e2e green.
 
-### 2.13 (L3) Closeout
+### 2.14 — Closeout
 - [ ] plan/proposal status marks; retire `mocks/portfolios/index.js`; docs sweep.
+

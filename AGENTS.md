@@ -1,12 +1,23 @@
 # AGENTS.md
 
-Guidelines for working in this repo (example-service.ai parity build).
+Portfoliost-specific guidelines (parent `../AGENTS.md` has shared rules).
+
+## UI guidelines
+
+- **Parity with example-service is the starting point.** `app.example-service.ai` is the source of truth for UI, pages, copy, and behavior. When implementing a page, replicate example-service's layout, wording, and interactions as closely as the mock data allows.
+- **Compare against example-service with Playwright.** Use Playwright to open the current project and `app.example-service.ai` side by side (snapshots, a11y trees, screenshots) to diff pages before/after changes. Browser-based comparison is the preferred way to find gaps.
+- **Operate in example-service freely to explore flows.** It is allowed to make operations in `app.example-service.ai` (clicking, filling forms, adding positions, etc.) to inspect behavior — as long as you never modify the **Top10** portfolio. To experiment, create a throwaway test portfolio in example-service and do changes in it instead.
+- **Replace premium features with real content.** Where example-service gates a feature behind a premium plan, ship a working non-gated version with reasonable guessed content instead of a paywall (e.g. AI portfolio insights, statistics).
+- **Currency selectors are fed exclusively by the `/api/currencies` registry (`useCurrenciesStore`); never hardcode currency lists.**
+- FX conversion math must go through `@marx2/contracts/fx` — never re-implement cross-rate/settlement formulas locally (D27).
+
+## Tech stack
+
+- Vue 3 `<script setup lang="ts">` SFCs; Pinia stores; `vue-router`; Tailwind utility classes (`card`, `btn-primary`, `btn-secondary`, `btn-ghost`, `btn-danger`, `input`, `label`).
+- API client functions live in `src/api/<domain>.ts` with explicit return types.
 
 ## Working guidelines
 
-- **Parity with example-service is the goal.** `app.example-service.ai` is the source of truth for UI, pages, copy, and behavior. When implementing a page, replicate example-service's layout, wording, and interactions as closely as the mock data allows.
-- **Compare against example-service with Playwright.** Use Playwright to open the current project and `app.example-service.ai` side by side (snapshots, a11y trees, screenshots) to diff pages before/after changes. Browser-based comparison is the preferred way to find gaps.
-- **Operate in example-service freely to explore flows.** It is allowed to make operations in `app.example-service.ai` (clicking, filling forms, adding positions, etc.) to inspect behavior — as long as you never modify the **Top10** portfolio. To experiment, create a throwaway test portfolio in example-service and do changes in it instead.
 - **Commit after every step.** A change is only "done" once the full suite passes and it is committed — do not batch multiple plan steps into one commit. Run:
   - `npm run build` (includes `vue-tsc --noEmit`)
   - `npm run test` (vitest unit tests)
@@ -14,12 +25,6 @@ Guidelines for working in this repo (example-service.ai parity build).
   - `npm run test:e2e` (Playwright, against docker compose)
 - **Use docker compose.** `docker compose up -d --build` runs the app (`:8080`) and the mock backend (`:4010`). E2E tests run against the dockerized stack, so rebuild the `portfoliost` container after frontend changes.
 - **Keep the API similar to example-service.** Endpoint paths, request/response shapes, and error formats should mirror the real example-service API (see `docs/api/example-service-real-api.yaml`, `docs/api/EXAMPLE_SERVICE_API.md`). Mock endpoints live in `mocks/` with seeded data in `mocks/shared/data/raw/`; regenerate seeds with `npm run mock:seed` after changing raw data.
-- **Replace premium features with real content.** Where example-service gates a feature behind a premium plan, ship a working non-gated version with reasonable guessed content instead of a paywall (e.g. AI portfolio insights, statistics).
-- **Mock where the real API is unavailable.** The `mocks/gateway` serves all `/api` routes; frontend code talks to the same endpoints example-service would. Keep mock responses faithful to the real API contracts.
-- **Step-test-commit discipline.** Every plan step must prove itself with a test before it counts: run the step's tests (unit plus docker-compose level — including standalone-service compose for provider repos like openst/cachest), and only when all pass mark the step `[x]` in `docs/plan.md`, commit that step, then move on. One step = one commit.
-- **Provider tier first.** New module data comes from cachest/openst. If data is missing, extend openst first (OpenBB likely covers it), expose it through cachest, and keep the translation adapter inside the owning module (proposal D2). Extend docker compose so every new service is testable locally.
-- **New backend modules follow [docs/MODULARISATION.md](docs/MODULARISATION.md)**: separate repo per module, same stack as `portfoliost-users-auth` (Hono + Drizzle + Postgres + PGlite + jose), playbook naming. Backend modules: `openst`, `cachest`, `portfoliost-admin`, `portfoliost-users-auth`, `portfoliost-instruments`, `portfoliost-wallets`, `portfoliost-contracts`.
-- **Docker images build in GitHub via GHA.** Every backend module pushes its image to `ghcr.io` on push to `main` through `.github/workflows/docker-image.yml` (build on PR, tag + patch-bump `v*` release + push on merge to `main`). The contracts module (`portfoliost-contracts`) is also built via GHA through `release.yml`. Keep each module's workflow, Dockerfile, and `APP_VERSION` build-arg in sync.
 
 ## Example service sections to skip
 
@@ -32,18 +37,3 @@ Do not build or wire these sections from example-service:
 - Import from broker
 - Alerts (bell/badge/notifications)
 - Payments / billing
-
-## Conventions
-
-- **Contract enforcement is a must.** Every API response the SPA or a backend module returns must be typed against the shared `@marx2/contracts` spec (generated `components` types), so a shape drift fails the build. Hand-written response types that duplicate the contract are not allowed.
-  - **Workflow**: edit `openapi.yaml` in `portfoliost-contracts` → push to `main` → CI auto-bumps the patch version (git tag is the source of truth; `package.json` is written by CI, never by hand) → creates a matching GitHub Release + publishes `@marx2/contracts@<version>` to GitHub Packages → run `NODE_AUTH_TOKEN=$(gh auth token) npm install @marx2/contracts@<new-version>` in each consumer repo → run `npm run gen:types` in repos that have it (`portfoliost`, `portfoliost-admin`, `portfoliost-instruments`) → commit updated `package-lock.json` and `generated/api-types.d.ts`.
-  - **Installing**: all consumer repos have `@marx2:registry=https://npm.pkg.github.com` in `.npmrc`; `NODE_AUTH_TOKEN` must be set to a GitHub PAT (or `GITHUB_TOKEN` in CI) with `read:packages` scope.
-  - **Enforcement**: `import type { components } from "../../generated/api-types"` — use `components["schemas"]["Foo"]` directly; never redefine shapes locally.
-- New API wire fields use camelCase even where legacy schemas are snake_case (see `docs/proposals/fees-and-custom-fx.md` D29).
-- FX conversion math must go through `@marx2/contracts/fx` — never re-implement cross-rate/settlement formulas locally (D27).
-- Currency selectors are fed exclusively by the `/api/currencies` registry (`useCurrenciesStore`); never hardcode currency lists.
-
-
-- Vue 3 `<script setup lang="ts">` SFCs; Pinia stores; `vue-router`; Tailwind utility classes (`card`, `btn-primary`, `btn-secondary`, `btn-ghost`, `btn-danger`, `input`, `label`).
-- API client functions live in `src/api/<domain>.ts` with explicit return types.
-- Track long-running work in `docs/plan.md`; mark steps `[x]` only after they are verified with the full test suite and committed.
