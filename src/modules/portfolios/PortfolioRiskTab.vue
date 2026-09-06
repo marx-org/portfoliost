@@ -32,7 +32,7 @@ function riskRow(key: string, format: (v: number) => string): string {
       </div>
       <div class="rounded-lg bg-slate-50 dark:bg-slate-800/50 p-4">
         <dt class="text-sm text-slate-500 dark:text-slate-400">Max Drawdown</dt>
-        <dd class="mt-1 text-xl font-semibold tabular-nums">{{ riskRow("maxDrawdown", (v) => `-${formatPercent(v)}`) }}</dd>
+        <dd class="mt-1 text-xl font-semibold tabular-nums">{{ riskRow("maxDrawdown", (v) => `-${formatPercent(Math.abs(v))}`) }}</dd>
       </div>
       <div class="rounded-lg bg-slate-50 dark:bg-slate-800/50 p-4">
         <dt class="text-sm text-slate-500 dark:text-slate-400">Sharpe Ratio</dt>
