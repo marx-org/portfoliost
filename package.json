@@ -25,6 +25,7 @@
     "@marx2/contracts": "^1.6.12",
     "apexcharts": "^5.10.0",
     "pinia": "^2.1.7",
+    "postgres": "^3.4.7",
     "vue": "^3.4.31",
     "vue-router": "^4.4.0",
     "vue3-apexcharts": "^1.8.0"

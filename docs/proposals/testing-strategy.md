@@ -94,14 +94,14 @@ const url = process.env.DATABASE_URL || "postgres://portfoliost:portfoliost@loca
 |-------------|---------------|----------|------------|---------|
 | Backend unit tests | n/a (hardcoded) | Embedded Postgres (PGlite), in-process | Fresh per test; real migrations from `drizzle/` | No — each test creates its own data |
 | Frontend unit tests | n/a (mocked API) | No database | - | No |
-| Docker Compose (dev/E2E) | `postgres://...@postgres:5432/portfoliost` | `postgres:17-alpine`, tmpfs data dir | Volatile — fresh database on every start | Yes — `db:migrate && db:seed` in container CMD |
+| Docker Compose (dev/E2E) | `postgres://...@postgres:5432/portfoliost` | `postgres:17-alpine`, tmpfs data dir | Volatile — fresh database on every start | Yes — `mock-db-seed` one-shot service (D76) |
 | Cluster (production) | secret referencing existing cluster Postgres | Existing cluster instance | Persistent — survives restarts | No — auto-provisions per user on first auth |
 
 ### Why Volatile in Docker Compose
 
 - **Reproducibility**: Every `docker compose up --build` starts from a known state
 - **No stale data**: Development databases accumulate cruft; volatile means fresh start
-- **Seed consistency**: Test fixtures are loaded from `seed/` files, not ad-hoc manual inserts
+- **Seed consistency**: Test fixtures are loaded from `mocks/db-seed/` (D76), not ad-hoc manual inserts
 - **Fast iteration**: No need to manually reset or migrate — just rebuild
 
 The tmpfs mount keeps the container lightweight while behaving exactly like the production engine.
@@ -114,79 +114,71 @@ The tmpfs mount keeps the container lightweight while behaving exactly like the 
 
 ## Seed System
 
-### Design
+### Design (D73/D76)
+
+Seeds are **mock-only** demo fixtures. Module images ship zero seeding code.
 
 ```
-portfoliost-users-auth/
-  seed/
-    001_user_preferences.sql
-    002_*.sql                         # future tables
-    run.mjs                           # runner script
+portfoliost/mocks/db-seed/
+  run.mjs                          # entry: FX + wallet → portfolio → user prefs → ticker reference
+  constants.mjs                    # fixed IDs and Top10 fixtures (deterministic E2E snapshots)
+  wallets.mjs                      # parity cash wallet + demo FX rates
+  portfolios.mjs                   # Top10 portfolio + share + positions + transactions
+  user-preferences.mjs             # test user preferences
+  ticker-reference.mjs             # CSV parser + batched upsert from bundled CSVs
+  instruments/ticker_reference.csv
+  instruments/venues.csv
+  instruments/mic_yahoo_suffixes.csv
 ```
 
-### Seed Runner
-
-A lightweight script (`src/db/seed.ts`) that:
-1. Checks if `user_preferences` already has rows (`SELECT COUNT(*)`)
-2. If empty, applies all `.sql` files in `seed/` in order
-3. If not empty, skips seeding entirely
-
-```ts
-import postgres from "postgres"
-
-export async function seed(dbUrl: string, seedDir: string) {
-  const sql = postgres(dbUrl, { max: 1 })
-  const rows = await sql`SELECT COUNT(*)::int AS count FROM user_preferences`
-  if (rows[0].count > 0) return false // skip
-  const files = (await readdir(seedDir)).filter((f) => f.endsWith(".sql")).sort()
-  for (const file of files) {
-    await sql.unsafe(await readFile(join(seedDir, file), "utf-8"))
-  }
-  await sql.end()
-  return true
-}
-```
-
-### npm Script
-
-```json
-"db:seed": "node seed/run.mjs"
-```
+The `mock-db-seed` compose service runs as a one-shot after all module containers
+report healthy (their `/health` answers only after `db:migrate` — schema guaranteed).
 
 ### Docker Compose Integration
 
-The backend Dockerfile CMD runs migrations then seeds before starting the server:
+```yaml
+mock-db-seed:
+  build: { context: ".", dockerfile: Dockerfile.mock }
+  command: ["node", "mocks/db-seed/run.mjs"]
+  environment:
+    DATABASE_URL: postgres://portfoliost:portfoliost@postgres:5432/portfoliost
+    SEED_PORTFOLIOS: "true"
+  depends_on:
+    postgres:    { condition: service_healthy }
+    users-auth:  { condition: service_healthy }
+    wallets:     { condition: service_healthy }
+    instruments: { condition: service_healthy }
+  restart: "no"
+```
+
+Module container CMD is simply:
 
 ```dockerfile
-CMD ["sh", "-c", "npm run db:migrate && npm run db:seed && node dist/server.js"]
+CMD ["sh", "-c", "npm run db:migrate && node dist/server.js"]
 ```
 
-Seeding is safe everywhere because:
-- The seed check skips when data exists (persistent environments)
-- All seed SQL is idempotent (`ON CONFLICT (user_id) DO NOTHING`)
-- In compose the database is empty on every start, so fixtures load deterministically — this is intentional and required by E2E tests
+### Seed Rules
 
-### Seed File Format
-
-All seed files use idempotent Postgres SQL:
-
-```sql
--- seed/001_user_preferences.sql
-INSERT INTO user_preferences (user_id, language, ui_preferences, created_at, updated_at)
-VALUES
-  ('test-user-001', 'en', '{"chartTimeframe":"1M","tableColumns":["name","value"]}'::jsonb, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z'),
-  ('test-user-002', 'de', '{"chartTimeframe":"1Y","tableColumns":["name","value","gain"]}'::jsonb, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')
-ON CONFLICT (user_id) DO NOTHING;
-```
-
-Timestamps are fixed ISO literals — deterministic fixtures, stable snapshots.
+- All seed files are idempotent (row-count check / `ON CONFLICT DO NOTHING`).
+- Fixed IDs and ISO timestamps for stable E2E snapshots.
+- When a schema change touches a seeded table, update `mocks/db-seed/` in the same commit.
+- **Seeds never run in the cluster.** `tickerref-sync --url` and FX/first-user
+  self-provisioning repopulate reference data after a fresh DB recreate.
 
 ### What Gets Seeded
 
 | Table | Seed purpose | Notes |
 |-------|-------------|-------|
-| `user_preferences` | Default prefs for test users | Sufficient for settings/onboarding E2E tests |
-| Future tables | Realistic fixtures per endpoint | Added as new endpoints are migrated |
+| `wallets.fx_rates` | Demo FX rates so currency selectors work before first real import | EUR-based demo closes |
+| `wallets.wallets` | Parity cash wallet (Portfel USD 1, $10 000 balance) | Required FK for portfolio |
+| `wallets.wallet_transactions` | 5 transactions that sum to the seeded balance | |
+| `portfolios.portfolios` | Top10 portfolio | |
+| `portfolios.positions` | 10 BUY positions (Top10 stocks) | |
+| `portfolios.transactions` | 10 BUY transactions | |
+| `portfolios.shares` | 1 public share link for Top10 | |
+| `users_auth.user_preferences` | 2 test users | |
+| `instruments.ticker_reference` | ~61 700 tickers from bundled CSV | Gated by row-count check |
+| `instruments.exchange_reference` | ~87 exchanges | |
 
 Seed data should mirror what a real user would have — not exhaustive edge cases (those belong in unit tests).
 

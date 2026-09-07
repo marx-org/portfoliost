@@ -140,9 +140,6 @@ services:
       INSTRUMENTS_URL: http://instruments:3000
       # dev identity resolution for opaque mock tokens (never used in cluster)
       AUTH_ME_URL: http://example-service-mock:4010
-      # parity Top10 portfolio seed for the local/e2e stack (cluster deploys
-      # set this themselves and default to SEED_PORTFOLIOS=false from the image)
-      SEED_PORTFOLIOS: "true"
     depends_on:
       postgres:
         condition: service_healthy
@@ -223,3 +220,19 @@ services:
       postgres:
         condition: service_healthy
     restart: unless-stopped
+
+  # D76 — one-shot seed service. Depends on all module containers being healthy
+  # (their /health answers only after db:migrate, so every module schema exists
+  # before any seed runs). Seeds are mock-only and never run in the cluster.
+  mock-db-seed:
+    build: { context: ".", dockerfile: Dockerfile.mock }
+    command: ["node", "mocks/db-seed/run.mjs"]
+    environment:
+      DATABASE_URL: postgres://portfoliost:portfoliost@postgres:5432/portfoliost
+      SEED_PORTFOLIOS: "true"
+    depends_on:
+      postgres:   { condition: service_healthy }
+      users-auth: { condition: service_healthy }
+      wallets:    { condition: service_healthy }
+      instruments: { condition: service_healthy }
+    restart: "no"

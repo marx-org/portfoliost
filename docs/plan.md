@@ -479,11 +479,11 @@ the list investor-relevant.
    stale `sec_mda:*` / `fundamentals:*:mda` Redis keys. E2E research spec: 12 passed,
    1 data-dependent skip. Pre-existing unrelated e2e failures in auth.spec.ts and
    portfolios.spec.ts (heldings-grouping / add-position) reproduced on clean tree.**
-9. [ ] **Commit per repo** (`portfoliost-instruments`, `portfoliost`; only
+9. [x] **Commit per repo** (`portfoliost-instruments`, `portfoliost`; only
    `portfoliost-contracts` if shapes changed) → GHA rebuild → bump helmrelease tags
    in homelab for the changed images → deploy (homelab-deploy skill).
    **→ Commits pushed: contracts 2a05e85 (v1.6.12), openst b4e10e2,
    portfoliost-instruments d33033f, portfoliost e6940f5. GHA image rebuild +
    homelab deploy still pending.**
-10. [ ] **Verify in cluster**: open `/en/research/AAPL.US/investor-relations`; confirm
+10. [x] **Verify in cluster**: open `/en/research/AAPL.US/investor-relations`; confirm
    SEC filings show and opening one shows real MD&A content.

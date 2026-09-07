@@ -31,9 +31,9 @@ reinvent.
   (version: CI passes `APP_VERSION` build arg; fallback reads own `package.json`)
 - `GET /internal/verify` — D9 edge-auth preflight: validates bearer JWT via
   issuer JWKS (jose), returns `204` / `401`
-- Drizzle migrations scoped to the module schema; `db:migrate` runs at boot,
-  seed skipped in production (CMD override in cluster HelmRelease)
-- Unit tests on embedded Postgres (PGlite) running the real migrations
+- Drizzle migrations scoped to the module schema (`migrations.schema: "drizzle_<module>"` in `drizzle.config.ts`);
+  `db:migrate` runs at boot. No seeding in production — seeds live only in `mocks/db-seed/` (D73/D76).
+- Unit tests on embedded Postgres (PGlite) running the real migrations (`migrationsSchema: "drizzle_<module>"` in `test-db.ts`)
 
 ## Checklist: extracting a new module `<module>`
 
@@ -58,10 +58,14 @@ reinvent.
 ### 2. Database (schema-per-module, D6)
 - [ ] `src/db/schema.ts`: `export const <module>Schema = pgSchema("<module>")`;
       tables via `<module>Schema.table(...)`.
-- [ ] Fresh DBs: plain `drizzle-kit generate` creates tables directly in the
-      schema.
-- [ ] **Migrating an existing table out of `public`**: drizzle-kit would emit
-      destructive DROP+CREATE. Hand-write instead:
+- [ ] `drizzle.config.ts`: set `migrations.schema: "drizzle_<module>"` (D74 journal isolation).
+- [ ] `src/db/test-db.ts`: pass `migrationsSchema: "drizzle_<module>"` to `migrate()`.
+- [ ] Baseline migration: delete any existing `drizzle/` chain, run `npx drizzle-kit generate --name=baseline`
+      against an empty DB. The single `0000_baseline.sql` recreates the full current schema (pure DDL).
+      DDL not expressible in `schema.ts` (views, FDW references) → append after the generated DDL,
+      separated by `--> statement-breakpoint`.
+- [ ] **No seeds in the module repo.** Demo fixtures go in `portfoliost/mocks/db-seed/` (D76).
+      Module CMD is simply `db:migrate && node dist/server.js`.
   ```sh
   npx drizzle-kit generate --custom --name <module>_schema_move
   ```
@@ -78,7 +82,7 @@ reinvent.
       `"<module>"."<table>"` with entry `"schema": "<module>"`, and
       `"schemas": {"<module>": "<module>"}` added. Verify:
       `npx drizzle-kit generate` must print "No schema changes".
-- [ ] Seed SQL files qualify table names with the schema; seed count-check too.
+- [ ] If the module has seeded demo data, add it to `mocks/db-seed/` (D76) — never inside the module repo.
 
 ### 3. Compose wiring (portfoliost repo)
 - [ ] `deploy/services.env`: add `API_<MODULE>_URL=http://example-service-mock:4010`
