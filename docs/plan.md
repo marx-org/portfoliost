@@ -385,3 +385,102 @@ if (!lastDbMigration || Number(lastDbMigration.created_at) < migration.folderMil
 - [ ] Verify in browser: the sparkline renders on `/en/investments` and period buttons switch the series; `PortfolioPerformanceTab` chart populates too.
 - Note: no mock seeding needed — the example-service-mock `portfolio_analytics_*.json` files are not used by this endpoint; data comes from transactions → backfill → `value_snapshots`.
 
+
+---
+
+# 5. SEC investor-relations wiring (pick up here)
+
+Goal: surface the SEC data now exposed by openst/cachest (added 2026-09-07) in the
+SPA Research → Investor Relations tab, replacing the current stub/dummy transcript
+with real SEC content. Nginx ingress is already correct (routes `/api/instruments`
+→ `portfoliost-instruments`; no cluster change needed).
+
+## Background / status (verified)
+
+`docs/openst-coverage.md` (section "Covered by openst today" + "Next steps") is the
+ground truth. openst now exposes via `openbb-sec==1.6.7`, all keyless (SEC EDGAR):
+
+| Instrument need | openst route | cachest proxy | OpenBB cmd |
+|---|---|---|---|
+| insider trading (Form 4) | `/equity/ownership/{t}` | `/ownership/{t}` | `ownership.insider_trading` |
+| institutional (Form 13F) | `/equity/ownership/institutional/{t}` | `/ownership/institutional/{t}` | `ownership.form_13f` |
+| SEC filings (10-K/10-Q/8-K) | `/equity/filings/{t}` | `/filings/{t}` | `fundamental.filings` |
+| MD&A text | `/equity/fundamentals/{t}/mda` | `/fundamentals/{t}/mda` | `fundamental.management_discussion_analysis` |
+
+Instruments backend adapter `src/adapters/cachest.ts` **already has** `fetchFilings`,
+`fetchMda`, `fetchInsiderTrading`, `fetchInstitutionalOwnership` (added previously)
+but **nothing consumes them yet** — no route/service imports them.
+
+Current instruments IR code (no SEC yet):
+- `src/routes/instruments.ts:749` `GET /:symbol/investor-relations` → derives events
+  from real reported quarters via `toInvestorRelations()` (real data, but `audioUrl`
+  is always null).
+- `src/routes/instruments.ts:772` `GET /:symbol/investor-relations/:eventId/transcript`
+  → `toIrTranscript()` returns a **structured empty stub** (`transcript: []`,
+  `participant: []`).
+
+SPA (`portfoliost` repo):
+- `src/modules/instruments/ResearchInvestorRelations.vue` lists events; renders an
+  "Audio" link only when `event.audioUrl` exists (real backend → never shown) and an
+  "Open" link when `event.url` exists (never set). **No transcript/document view.**
+- `src/api/instruments.ts:121` `getTranscript()` is defined but **never called** by
+  any component (return type is `Promise<unknown>`, not typed to contract).
+- `src/modules/instruments/ResearchOverview.vue:334` "Open transcript" button just
+  routes to `research-ir` (the list), not to a transcript view.
+- Mock dummy data lives in `mocks/shared/data/raw/ir_transcript.json` (full Q&A
+  transcript for AAPL) and `ir_events_aapl.json`; mock server
+  `mocks/instruments/index.js:245` serves them. This is the "dummy data" to replace.
+
+## Design decision (confirm before coding)
+
+The contract `InvestorRelationEvent` (`type,id,title,date,year,quarter,symbol,audioUrl`)
+and `IRTranscript` (`id,symbol,year,quarter,title,time,participant,audio,transcript`)
+are Q&A-earnings-call shaped. SEC provides **filings** (documents w/ URLs) + **MD&A**
+(text), not Q&A audio. Two viable approaches — pick one:
+
+- **A (recommended): map filings+MD&A into existing shapes.** Add SEC filing events
+  (10-K/10-Q/8-K) as `InvestorRelationEvent` entries (reuse `type`, set `url`-ish
+  info via title/date) alongside derived earnings calls; make the transcript endpoint
+  serve MD&A text. May need small contract additions (e.g. `reportUrl`, `formType` on
+  the event and a `body`/`text` field on the transcript) — requires the
+  `@marx2/contracts` bump workflow if shapes change.
+- **B: keep Q&A transcript concept, leave SEC out of transcripts.** Only wire
+  `getTranscript()` to render whatever the backend returns and add a filings list to
+  the IR tab using existing `url`/`reportUrl` fields. Smaller, but transcripts stay
+  empty.
+
+## Steps
+
+1. [ ] Decide approach A vs B with the owner; if shapes change, edit
+   `portfoliost-contracts/openapi.yaml` (`InvestorRelationEvent` / `IRTranscript`),
+   push → CI bumps `@marx2/contracts` → `NODE_AUTH_TOKEN=$(gh auth token) npm install
+   @marx2/contracts@<new>` in `portfoliost` and `portfoliost-instruments` → run
+   `npm run gen:types` in both → commit updated `package-lock.json` +
+   `generated/api-types.d.ts`.
+2. [ ] **Instruments backend**: import `fetchFilings`/`fetchMda` from
+   `src/adapters/cachest.ts`; extend `toInvestorRelations()` (or a sibling translator
+   in `src/adapters/translate.ts`) to blend SEC filing events. Catch cachest
+   `UpstreamError`/404 gracefully (filings may be missing for some tickers).
+3. [ ] **Instruments backend**: extend `toIrTranscript()` (or new fn) to return real
+   MD&A text from `fetchMda()` instead of the empty stub; map into the `IRTranscript`
+   contract shape. Wire the `/investor-relations/:eventId/transcript` route to call
+   `fetchMda`.
+4. [ ] **Instruments backend tests** (`src/routes/instruments.test.ts`): mock
+   `fetchFilings`/`fetchMda` in the cachest mock (lines ~27) and add coverage for the
+   new event blend + real transcript.
+5. [ ] **SPA**: build a transcript/document view component (e.g.
+   `ResearchInvestorRelationsTranscript.vue` or a route) that calls `getTranscript()`
+   (type it against `components["schemas"]["IRTranscript"]`) and renders participants
+   + transcript/speaker blocks (see `ir_transcript.json` for the shape to render).
+6. [ ] **SPA**: in `ResearchInvestorRelations.vue`, link each transcript/filing event
+   to the new view (replace the dead Audio/Open links). In `ResearchOverview.vue`,
+   point "Open transcript" at the new view.
+7. [ ] **SPA tests**: vitest for the new components + API; update mock server if the
+   contract shape changed; add Playwright e2e for IR → open transcript.
+8. [ ] **Verify full portfoliost suite** (`npm run build`, `npm run test`,
+   `npm run test:mock`, `npm run test:e2e`) + instruments (`npm run build`/`test`).
+9. [ ] **Commit per repo** (`portfoliost-instruments`, `portfoliost`; only
+   `portfoliost-contracts` if shapes changed) → GHA rebuild → bump helmrelease tags
+   in homelab for the changed images → deploy (homelab-deploy skill).
+10. [ ] **Verify in cluster**: open `/en/research/AAPL.US/investor-relations`; confirm
+   SEC filings show and opening one shows real MD&A content.

@@ -57,3 +57,11 @@ MD&A, but a true Q&A audio transcript is still out of tier.
   research key entitlements before adding it to any fallback chain beyond dividends.
 - **nasdaq**: provider arg-shape mismatch for calendars in 4.7.1 (validation error).
 - **calendar windows**: unfiltered calls are free; anything symbol-scoped is premium.
+
+---
+
+## Next steps
+
+See [docs/plan.md](plan.md) section **SEC investor-relations wiring** for the
+full description of what to build on top of this coverage (backend wiring of
+filings/MD&A into `portfoliost-instruments` + SPA UI surface).
