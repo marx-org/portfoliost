@@ -225,8 +225,7 @@ services:
   # (their /health answers only after db:migrate, so every module schema exists
   # before any seed runs). Seeds are mock-only and never run in the cluster.
   mock-db-seed:
-    build: { context: ".", dockerfile: Dockerfile.mock }
-    command: ["node", "mocks/db-seed/run.mjs"]
+    build: { context: ".", dockerfile: Dockerfile.db-seed }
     environment:
       DATABASE_URL: postgres://portfoliost:portfoliost@postgres:5432/portfoliost
       SEED_PORTFOLIOS: "true"
