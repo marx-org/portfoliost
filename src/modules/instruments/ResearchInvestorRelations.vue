@@ -3,6 +3,9 @@ import { computed, onMounted, ref } from "vue"
 import { useRoute } from "vue-router"
 import { getInvestorRelations } from "@/api/instruments"
 import { formatDateTime } from "@/utils/format"
+import { researchSymbol } from "@/utils/research"
+
+type IrEventFilter = "all" | "transcript" | "press-release"
 
 interface IrEvent {
   type: string
@@ -11,9 +14,10 @@ interface IrEvent {
   date: string
   symbol: string
   year?: number
-  quarter?: number
-  audioUrl?: string
-  url?: string
+  quarter?: number | null
+  audioUrl?: string | null
+  reportUrl?: string | null
+  formType?: string | null
 }
 
 const route = useRoute()
@@ -22,7 +26,7 @@ const symbol = String(route.params.symbol).toUpperCase()
 const events = ref<IrEvent[]>([])
 const error = ref<string | null>(null)
 const loading = ref(true)
-const filter = ref<"all" | "transcript" | "press-release">("all")
+const filter = ref<IrEventFilter>("all")
 
 onMounted(async () => {
   try {
@@ -43,10 +47,6 @@ const types = computed(() => {
   for (const e of events.value) counts.set(e.type, (counts.get(e.type) ?? 0) + 1)
   return [...counts.entries()]
 })
-
-function setFilter(type: string) {
-  if (type === "all" || type === "transcript" || type === "press-release") filter.value = type
-}
 </script>
 
 <template>
@@ -70,7 +70,7 @@ function setFilter(type: string) {
           type="button"
           class="btn-secondary text-xs"
           :class="filter === type ? 'bg-blue-600 text-white' : ''"
-          @click="setFilter(type)"
+          @click="filter = type as IrEventFilter"
         >
           {{ type }} ({{ count }})
         </button>
@@ -83,21 +83,25 @@ function setFilter(type: string) {
             <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
               {{ formatDateTime(event.date) }}
               <template v-if="event.year"> &middot; {{ event.year }}Q{{ event.quarter }}</template>
+              <template v-if="event.formType"> &middot; {{ event.formType }}</template>
             </p>
           </div>
           <span class="shrink-0 rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-xs font-medium text-slate-600 dark:text-slate-300">{{ event.type }}</span>
           <a
-            v-if="event.type === 'transcript' && event.audioUrl"
-            :href="event.audioUrl"
+            v-if="event.reportUrl"
+            :href="event.reportUrl"
             target="_blank"
             rel="noopener"
             class="btn-ghost shrink-0 text-xs"
           >
-            Audio
+            Filing
           </a>
-          <a v-else-if="event.url" :href="event.url" target="_blank" rel="noopener" class="btn-ghost shrink-0 text-xs">
+          <router-link
+            :to="{ name: 'research-ir-transcript', params: { symbol: researchSymbol(symbol), eventId: event.id } }"
+            class="btn-ghost shrink-0 text-xs"
+          >
             Open
-          </a>
+          </router-link>
         </li>
       </ul>
 

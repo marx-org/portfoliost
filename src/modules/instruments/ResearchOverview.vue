@@ -83,8 +83,8 @@ const instrCcy = computed(() =>
 
 const latestEarningsCall = computed(() => {
   if (!irEvents.value.length) return null
-  const transcripts = irEvents.value.filter((e) => "audioUrl" in e && (e.title ?? "").toLowerCase().includes("earnings call"))
-  return transcripts[0] ?? (irEvents.value[0] as { title: string; date: string } | null)
+  const transcripts = irEvents.value.filter((e) => e.type === "transcript" && (e.title ?? "").toLowerCase().includes("earnings call"))
+  return transcripts[0] ?? (irEvents.value[0] as { id: string; title: string; date: string } | null)
 })
 
 const profileStats = computed(() => {
@@ -332,7 +332,10 @@ const targetSpread = computed(() => {
             <p class="text-xs text-slate-500 dark:text-slate-400">{{ latestEarningsCall.date }}</p>
           </div>
           <router-link
-            :to="{ name: 'research-ir', params: { symbol: researchSymbol(symbol) } }"
+            :to="{
+              name: 'research-ir-transcript',
+              params: { symbol: researchSymbol(symbol), eventId: latestEarningsCall.id },
+            }"
             class="btn-secondary text-sm"
           >
             Open transcript

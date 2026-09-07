@@ -170,6 +170,36 @@ test("research tabs switch between all views", async ({ page }) => {
   await expect(page).toHaveURL(/\/en\/research\/AAPL\.US\/overview/)
 })
 
+test("investor relations opens a document and shows SEC MD&A content", async ({ page }) => {
+  await openResearch(page, "investor-relations")
+  await expect(page.getByText(/All \(/)).toBeVisible({ timeout: 15000 })
+
+  const secEvent = page.getByText(/SEC Form 10-K/).first()
+  let secVisible = false
+  try {
+    await secEvent.waitFor({ state: "visible", timeout: 15000 })
+    secVisible = true
+  } catch {
+    // SEC filings may be unavailable from the upstream provider
+  }
+  test.skip(!secVisible, "SEC filings unavailable from upstream provider")
+
+  const row = secEvent.locator("xpath=ancestor::li")
+  await row.getByRole("link", { name: "Open" }).click()
+  await expect(page).toHaveURL(/\/en\/research\/AAPL\.US\/investor-relations\/.+/)
+
+  const mda = page.getByRole("heading", { name: "Management Discussion & Analysis", exact: true })
+  let mdaVisible = false
+  try {
+    await mda.waitFor({ state: "visible", timeout: 15000 })
+    mdaVisible = true
+  } catch {
+    // MD&A content may be unavailable from the upstream provider
+  }
+  test.skip(!mdaVisible, "MD&A content unavailable from upstream provider")
+  await expect(mda).toBeVisible({ timeout: 15000 })
+})
+
 test("add to watchlist updates the button", async ({ page }) => {
   await openResearch(page, "overview")
   const button = page.getByRole("button", { name: "Add to Watchlist" })

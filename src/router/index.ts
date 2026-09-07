@@ -175,6 +175,11 @@ const router = createRouter({
               component: () => import("@/modules/instruments/ResearchInvestorRelations.vue"),
             },
             {
+              path: "investor-relations/:eventId",
+              name: "research-ir-transcript",
+              component: () => import("@/modules/instruments/ResearchInvestorRelationsTranscript.vue"),
+            },
+            {
               path: "ownership",
               name: "research-ownership",
               component: () => import("@/modules/instruments/ResearchOwnership.vue"),

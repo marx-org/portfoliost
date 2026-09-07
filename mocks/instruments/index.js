@@ -246,11 +246,50 @@ export function register(app) {
     if (!requireAuth(ctx)) return
     const symbol = getSymbol(ctx)
     const events = loadRaw("ir_events_aapl.json")
-    ctx.res.json(events.map((e) => (symbol === "AAPL" ? e : { ...e, symbol })))
+    const IR_FORMS = /^(10-[KQ]|8-K|20-F|6-K)$/
+    // Keep investor-relevant SEC forms (10-K/10-Q/8-K) and natty events;
+    // map SEC report filings to the backend's press-release event shape.
+    const mapped = []
+    for (const e of events) {
+      const base = { ...e, symbol }
+      if (e.type === "filing" && e.title) {
+        const formMatch = String(e.title).match(/Form\s+([\d-]+[A-Z]?)\s*\(/)
+        const form = formMatch ? formMatch[1] : null
+        if (!form || !IR_FORMS.test(form)) continue
+        mapped.push({
+          ...base,
+          type: "press-release",
+          formType: form,
+          reportUrl: e.url ?? null,
+          id: `${symbol}_${form}_${e.id}`,
+        })
+        continue
+      }
+      mapped.push(base)
+    }
+    ctx.res.json(mapped)
   })
 
   app.get("/api/instruments/:symbol/investor-relations/:eventId/transcript", (ctx) => {
     if (!requireAuth(ctx)) return
-    ctx.res.json(loadRaw("ir_transcript.json"))
+    const symbol = getSymbol(ctx)
+    const eventId = String(ctx.params.eventId ?? "")
+    const transcript = loadRaw("ir_transcript.json")
+    const formMatch = eventId.match(/_([\d-]+[A-Z]?)_/)
+    if (formMatch && /^10-[KQ]$|^8-K$/.test(formMatch[1])) {
+      return ctx.res.json({
+        id: eventId,
+        symbol,
+        year: Number(eventId.match(/_(\d{4})/)?.[1]) || null,
+        quarter: null,
+        title: `${symbol} - Management Discussion & Analysis`,
+        time: null,
+        participant: [],
+        audio: null,
+        transcript: [],
+        body: `${symbol}'s Management Discussion & Analysis covers the company's financial condition and results of operations for the reported period, including revenue by category and geography, gross margin drivers, operating expenses, and liquidity. Demand for the company's products and services remained robust during the quarter, with the installed base of active devices reaching an all-time high.`,
+      })
+    }
+    ctx.res.json(transcript)
   })
 }

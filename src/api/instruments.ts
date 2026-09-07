@@ -118,8 +118,10 @@ export async function getInvestorRelations(symbol: string): Promise<IrEventsAapl
   return http.get<IrEventsAapl>(`/api/instruments/${symbol}/investor-relations`)
 }
 
-export async function getTranscript(symbol: string, eventId: string): Promise<unknown> {
-  return http.get<unknown>(`/api/instruments/${symbol}/investor-relations/${eventId}/transcript`)
+type IRTranscript = components["schemas"]["IRTranscript"]
+
+export async function getTranscript(symbol: string, eventId: string): Promise<IRTranscript> {
+  return http.get<IRTranscript>(`/api/instruments/${symbol}/investor-relations/${eventId}/transcript`)
 }
 
 export interface NewsPageResponse {

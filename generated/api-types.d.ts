@@ -2550,6 +2550,8 @@ export interface components {
             quarter?: number | null;
             symbol?: string;
             audioUrl?: string | null;
+            reportUrl?: string | null;
+            formType?: string | null;
         };
         IRTranscript: {
             id?: string;
@@ -2558,9 +2560,17 @@ export interface components {
             quarter?: number | null;
             title?: string;
             time?: string | null;
-            participant?: Record<string, never>[];
+            participant?: components["schemas"]["IRTranscriptParticipant"][];
             audio?: string | null;
-            transcript?: Record<string, never>[];
+            transcript?: components["schemas"]["IRTranscriptBlock"][];
+            body?: string | null;
+        };
+        IRTranscriptParticipant: {
+            name?: string;
+        };
+        IRTranscriptBlock: {
+            name?: string;
+            speech?: string[];
         };
         ResearchCompare: {
             symbol?: string;
