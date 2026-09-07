@@ -329,3 +329,59 @@ Proposal: [benchmarks.md](proposals/benchmarks.md) (D46–D50).
 - [x] **3.13 SPA: tests** — vitest unit tests for components + Playwright e2e for full flow.
 - [x] **3.14 Integration test** — docker-compose end-to-end: create label → assign to position/transaction/cash-transaction → verify filter.
 
+---
+
+# 4. Portfolio-card sparkline: period buttons "don't work" (investigation)
+
+## Symptom
+
+The small performance chart on the main page (`src/modules/portfolios/PortfolioCard.vue`) never renders — it stays on "Loading chart... / Historical data is loading" regardless of the period button clicked (`1W/1M/3M/6M/1Y/2Y/ALL`). The full chart in `PortfolioPerformanceTab.vue` is affected the same way (shows "No analytics available") — it only appears to "work" because its buttons/state react; the chart itself is empty too.
+
+## What the buttons actually do (verified live)
+
+- The card's `@click.stop` on the button row (line 257) does prevent the click from bubbling to the card's `goToDetail` — no navigation happens.
+- `changeTimeframe()` (line 92) sets the local `timeframe` ref and calls `loadChart()` → `getPortfolioAnalytics(id, timeframe)`.
+- Network shows the correct per-period requests fire, e.g. `?timeframe=6M` then after clicking `1W` → `?timeframe=1W`. The active-button highlight (`bg-blue-50 text-blue-700`) also updates.
+- So the frontend is fine; the chart is empty because the backend always returns:
+  `{"timeframe":"1W","backfillStatus":"pending","performance":{"timeSeries":[]},...}`.
+
+## Backend root cause
+
+`/api/portfolios/:id/analytics` is served by **`portfoliost-wallets`** (gateway `API_PORTFOLIOS_URL=http://wallets:3000`), not the example-service-mock. In `src/routes/portfolios.ts` the endpoint returns "pending + empty" when `value_snapshots` has < 2 rows and triggers a fire-and-forget backfill (`src/services/backfill.ts` `runBackfill`).
+
+The backfill **computes** a full daily series but the bulk INSERT **fails**. From `portfolios.portfolio_backfill_metadata.error_message`:
+
+```
+Failed query: insert into "portfolios"."value_snapshots"
+("portfolio_id","snapshot_date","value","invested","net_flow",
+ "cumulative_twr","cumulative_mwr","cumulative_simple") ...
+```
+
+The running DB's `value_snapshots` table has only 5 columns (`portfolio_id, snapshot_date, value, invested, net_flow`) — the 3 return-type columns from migration `0003_return_columns.sql` are missing:
+
+```sql
+ALTER TABLE "portfolios"."value_snapshots" ADD COLUMN "cumulative_twr" numeric(20, 8);
+ALTER TABLE "portfolios"."value_snapshots" ADD COLUMN "cumulative_mwr" numeric(20, 8);
+ALTER TABLE "portfolios"."value_snapshots" ADD COLUMN "cumulative_simple" numeric(20, 8);
+```
+
+## Why migration 0003 was skipped (drizzle ordering bug)
+
+`drizzle/meta/_journal.json` entry `idx: 3` (`0003_return_columns`) has `when: 1757060000000` (≈ Sep 2025) while `0004_silky_gorgon` has `when: 1788717226995`. In `drizzle-orm/pg-core/dialect.cjs` the migrator applies a migration only when:
+
+```js
+if (!lastDbMigration || Number(lastDbMigration.created_at) < migration.folderMillis) { ... }
+```
+
+`lastDbMigration` is picked by `order by created_at desc limit 1` = 0004. Since `0003.folderMillis < 0004.created_at`, 0003 is **never applied** on any DB that already has 0004. A fresh DB applies everything in idx order so it would work there — only existing/already-migrated DBs hit this.
+
+`drizzle_wallets.__drizzle_migrations` confirms: hashes for 0000 (`811e90e9`), 0001 (`308f9a83`), 0002 (`df934ed4`), 0004 (`19e7157b`) are present; 0003 (`e942fb64`) is absent.
+
+## How to fix
+
+- [ ] Fix `drizzle/meta/_journal.json`: set `0003_return_columns`.`when` to a value **greater** than `0004_silky_gorgon` (`1788717226995`) so the migrator picks it up (e.g. `1789000000000`).
+- [ ] Re-apply migrations: `docker exec portfoliost-wallets npm run db:migrate` (wallets entrypoint runs this on every start, so `docker compose restart wallets` also works). Verify `\d portfolios.value_snapshots` then includes `cumulative_twr/mwr/simple`.
+- [ ] Re-trigger backfill: backend fires it automatically on the next `/analytics` call because the stored status is `failed` (not `pending`) and still `n < 2`; a page reload suffices. Confirm `value_snapshots` is populated and `portfolio_backfill_metadata.status = complete`.
+- [ ] Verify in browser: the sparkline renders on `/en/investments` and period buttons switch the series; `PortfolioPerformanceTab` chart populates too.
+- Note: no mock seeding needed — the example-service-mock `portfolio_analytics_*.json` files are not used by this endpoint; data comes from transactions → backfill → `value_snapshots`.
+
