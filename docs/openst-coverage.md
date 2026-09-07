@@ -1,7 +1,8 @@
-# openst provider coverage (verified 2026-08-23)
+# openst provider coverage (verified 2026-09-07)
 
-Ground truth from probing **OpenBB 4.7.1** inside the openst image with the current
-keys (`FMP_API_KEY` starter tier, yfinance, sec; intrinio key present but broken).
+Ground truth from probing **OpenBB 4.7.2** (with `openbb-sec==1.6.7` pinned) inside
+the openst image with the current keys (`FMP_API_KEY` starter tier, yfinance, sec;
+intrinio key present but broken). sec is keyless (SEC EDGAR).
 
 ## Covered by openst today
 
@@ -17,29 +18,38 @@ keys (`FMP_API_KEY` starter tier, yfinance, sec; intrinio key present but broken
 | calendar (dividends) | `/equity/calendar/dividend?start&end` | `calendar.dividend` | fmp only | declaration/ex-div/record/payment dates |
 | dividends (existing) | `/dividend/yield/{t}`, `/dividend/history/{t}` | `fundamental.metrics`, `fundamental.dividends` | yfinance, fmp, … | unchanged |
 | search | `/equity/search/{q}` | `equity.search` | sec | returns `{cik,name,symbol}` |
+| insider trading | `/equity/ownership/{t}` | `ownership.insider_trading` | sec | Form 4 (director/officer buys & sells); keyless |
+| institutional ownership | `/equity/ownership/institutional/{t}` | `ownership.form_13f` | sec | Form 13F quarterly holdings; SEC-only, keyless |
+| filings | `/equity/filings/{t}` | `fundamental.filings` | sec | EDGAR filing index (10-K, 10-Q, 8-K) + report URLs |
+| management discussion | `/equity/fundamentals/{t}/mda` | `fundamental.management_discussion_analysis` | sec | MD&A text from latest 10-K/10-Q; SEC-only |
+
+All four SEC surfaces are keyless (SEC EDGAR). cachest proxies them at
+`/ownership/{t}`, `/ownership/institutional/{t}`, `/filings/{t}`,
+`/fundamentals/{t}/mda`.
 
 ## Missing — needs research
 
-Status after I8b (2026-08-23): four of the five gaps were closed by deriving
-content inside the instruments module; only ownership still waits on a
-provider.
+Status after SEC wiring (2026-09-07): the ownership gap is closed via SEC 13F;
+investor-relations transcripts can now be partially sourced from SEC filings +
+MD&A, but a true Q&A audio transcript is still out of tier.
 
 1. **eps-surprises** (`/:symbol/eps-surprises`) — RESOLVED by derivation
    (I8b): quarterly income statements give actual EPS/revenue; estimates use
    the prior-year quarter as a baseline. True analyst estimates still need an
    FMP upgrade or Finnhub.
-2. **institutional ownership** (`/:symbol/ownership`) — STILL OPEN.
-   `ownership.institutional` fmp → 402 Restricted; intrinio v2 key returns 401.
-   Real module serves valid empty content meanwhile. Research: FMP upgrade,
-   SEC 13F filings (`ownership.form_13f`), intrinio entitlements.
+2. **institutional ownership** (`/:symbol/ownership`) — RESOLVED via SEC 13F
+   (`ownership.form_13f`) exposed at openst `/equity/ownership/institutional/{t}` /
+   cachest `/ownership/institutional/{t}`. Insider trading (Form 4) also covered.
 3. **peers** (`/:symbol/peers`) — RESOLVED by composition (I8b): same-sector
    compare rows over a curated large-cap candidate pool with live sector
    profiles. FMP `stock_peers` remains the research path for true broker peers.
 4. **seasonality** (`/:symbol/seasonality`) — RESOLVED in module (I8b):
    monthly last-closes from multi-year OHLCV → avg/median/min/max.
-5. **investor-relations events / transcripts** — RESOLVED partially (I8b):
-   events derived from real reported quarters; transcript endpoint returns a
-   structured stub (`fundamental.transcript` is FMP-only/premium, no audio).
+5. **investor-relations events / transcripts** — PARTIALLY RESOLVED (2026-09-07):
+   events derived from real reported quarters; SEC filings now give the
+   underlying documents (10-K/10-Q/8-K + report URLs) and MD&A supplies the
+   management discussion text. A true earnings-call Q&A **audio transcript**
+   (`fundamental.transcript`) is still FMP-only/premium — no audio in tier.
 
 ## Provider quirks worth remembering
 
