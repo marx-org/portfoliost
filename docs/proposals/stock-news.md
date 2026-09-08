@@ -47,16 +47,23 @@ compose smoke `GET /news/company/AAPL?limit=3` returned 3 polygon articles with 
 `limit`/date validation verified. Two fixes found against the real API: OpenBB's kwarg is
 `symbol` (not `ticker`), and pandas turns `symbols=None` into NaN (normalized to `[]`).
 
-### N2 — cachest: cached news route
+### N2 — cachest: cached news route — **done (2026-09-08, cachest `e1b705e`)** ✅
 
 Config-only addition in `config.yaml`:
 ```yaml
-- path: /news/company/{ticker}
+- name: OPENST_NEWS
+  path: /news/company/{ticker}
   url: http://openst:8080/news/company/{ticker}
   cache_ttl: 3600      # 1h fresh
   stale_ttl: 86400     # 24h stale fallback
   fetch_interval: 300
+  fetch_max_wait: 4
 ```
+
+**Verified**: cachest suite green (63 passed incl. `test_real_config_has_company_news_route`)
+and a compose cache HIT/MISS header check against the rebuilt openst N1 endpoint —
+first `GET /news/company/AAPL` returned `X-Cache: MISS` (50 real polygon articles via
+openst), second returned `X-Cache: HIT`.
 
 ### N3 — instruments: news_articles table
 
