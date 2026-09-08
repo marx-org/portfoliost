@@ -162,7 +162,7 @@ function openEdit(tx: CashTransaction) {
     type: tx.type,
     amount: Math.abs(tx.amount),
     description: tx.description ?? "",
-    date: tx.createdAt.slice(0, 10),
+    date: tx.transaction_date ?? tx.createdAt.slice(0, 10),
     fees: tx.fees ?? 0,
     feesType: "fixed",
     feeCurrency: tx.feeCurrency ?? tx.currency ?? "USD",
@@ -274,7 +274,7 @@ function signedAmount(tx: CashTransaction): number {
 
 const recentTransactions = computed(() => {
   const items = [...(store.transactions?.items ?? [])].sort((a, b) =>
-    (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0),
+    ((a.transaction_date ?? a.createdAt) < (b.transaction_date ?? b.createdAt) ? 1 : (a.transaction_date ?? a.createdAt) > (b.transaction_date ?? b.createdAt) ? -1 : 0),
   )
   let running = wallet.value?.balance ?? 0
   const rows: Array<{ tx: CashTransaction; balance: number }> = []
@@ -414,7 +414,7 @@ function exportHistory() {
             </thead>
             <tbody>
               <tr v-for="{ tx, balance } in recentTransactions" :key="tx.id" class="border-b border-slate-100 dark:border-slate-800 last:border-0">
-                <td class="py-2.5 pr-4 text-slate-600 dark:text-slate-300">{{ formatDate(tx.createdAt) }}</td>
+                <td class="py-2.5 pr-4 text-slate-600 dark:text-slate-300">{{ formatDate(tx.transaction_date ?? tx.createdAt) }}</td>
                 <td class="py-2.5 pr-4 font-medium">
                   {{ typeLabel(tx.type) }}
                   <FeeCell

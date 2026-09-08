@@ -378,6 +378,9 @@ export function register(app) {
     const found = recentCashTransactions().find((tx) => tx.id === txId)
     if (!found) return ctx.res.status(404).json({ error: "NotFound", message: "Transaction not found" })
     const body = { ...(ctx.body || {}) }
+    if (body.date && !body.transaction_date) {
+      body.transaction_date = body.date
+    }
     if (body.type) {
       const t = String(body.type).toUpperCase()
       body.type = t
