@@ -53,7 +53,9 @@ Config-only addition in `config.yaml`:
 ```yaml
 - name: OPENST_NEWS
   path: /news/company/{ticker}
-  url: http://openst:8080/news/company/{ticker}
+  url: http://openst:8080/news/company/{ticker}?start_date={start_date}&limit={limit}
+  query_params: [start_date, limit]   # added in N4 (cachest dbd310e) so the instruments
+                                      # incremental window reaches openst
   cache_ttl: 3600      # 1h fresh
   stale_ttl: 86400     # 24h stale fallback
   fetch_interval: 300
@@ -65,7 +67,7 @@ and a compose cache HIT/MISS header check against the rebuilt openst N1 endpoint
 first `GET /news/company/AAPL` returned `X-Cache: MISS` (50 real polygon articles via
 openst), second returned `X-Cache: HIT`.
 
-### N3 — instruments: news_articles table
+### N3 — instruments: news_articles table — **done (2026-09-08, instruments `13f0dd9`)** ✅
 
 New Drizzle table in `src/db/schema.ts` (schema `instruments`), migration via
 `npm run db:generate`:
@@ -86,7 +88,7 @@ CREATE INDEX idx_news_published ON instruments.news_articles (published_at DESC)
 CREATE INDEX idx_news_expires   ON instruments.news_articles (expires_at);
 ```
 
-### N4 — instruments: news service (incremental sync + on-read purge)
+### N4 — instruments: news service (incremental sync + on-read purge) — **done (2026-09-08, instruments `81e9b91`)** ✅
 
 `src/services/news.ts`:
 
@@ -97,9 +99,9 @@ getNewsForTicker(ticker, limit):
   3. round watermark DOWN to the nearest hour bucket
      (granularity = NEWS_SYNC_GRANULARITY_HOURS, default 1; 0 = exact timestamp)
   4. start_date = (watermark_hour OR now - 10 days).date()     # 10 days on first fetch
-  5. GET CACHEST_URL/news/company/{ticker}?start_date={start_date}
+  5. GET CACHEST_URL/news/company/{ticker}?start_date={start_date}&limit={NEWS_FETCH_LIMIT}
   6. UPSERT ... ON CONFLICT (url) DO UPDATE
-       SET symbols = array_union(symbols, new.symbols), expires_at = now + NEWS_EXPIRY_DAYS
+       SET symbols = <symbols ∪ new.symbols>, expires_at = now + NEWS_EXPIRY_DAYS
   7. RETURN SELECT * WHERE ticker ∈ symbols ORDER BY published_at DESC LIMIT {limit}
 ```
 
@@ -107,6 +109,14 @@ getNewsForTicker(ticker, limit):
   store (default 90 days); on-read purge removes only expired rows.
 - Minute/hour rounding of the watermark avoids seconds-drift gaps while keeping the sync
   window small; the caller caps how many articles are persisted per fetch.
+- Adapter `fetchCompanyNews`/`translateCompanyNews` in `src/adapters/cachest.ts`: maps
+  openst `{date,title,text,url,symbols,source}` → DB columns, falls back to the fetch
+  ticker when the provider omits `symbols`, drops records without url/title/date.
+- **Deviation from N2 config (cachest `dbd310e`)**: `OPENST_NEWS` declares
+  `query_params: [start_date, limit]` + URL placeholders so the incremental sync window
+  reaches openst (cachest only forwards declared params). Instruments always sends both.
+- **Deviation (PGlite)**: `symbols` union uses `(select array_agg(distinct s) from
+  unnest(symbols || excluded.symbols) s)` instead of PG16 `array_union` — PGlite lacks it.
 
 ### N5 — instruments: news routes
 
