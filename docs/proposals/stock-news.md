@@ -31,7 +31,7 @@ SPA → gateway (instruments) → portfoliost-instruments module
 **Not in scope**: world news, news insights, livestreams, market contexts, standalone news
 dashboard (future work), schema tightening of `NewsArticle` (keeps opaque items today).
 
-### N1 — openst: company news endpoint
+### N1 — openst: company news endpoint — **done (2026-09-08, openst `86193f9`)** ✅
 
 `GET /news/company/{ticker}?limit=&start_date=&end_date=&provider=` backed by
 `get_company_news()` in `src/openbb_client.py`, following the existing provider-fallback
@@ -39,6 +39,13 @@ pattern (`COMPANY_NEWS_PROVIDERS = ["polygon", "fmp", "yfinance"]`, `_single_rec
 style). Records map to `{date, title, text, url, symbols, source}`. Note OpenBB's
 `CompanyNewsQueryParams` is day-granularity (`start_date`/`end_date` are date type), so
 incremental sync relies on the URL-primary-key dedup to absorb overlap.
+
+**Verified**: `tests/test_get_company_news.py` (14 tests, mocked obb) + route tests in
+`tests/test_main.py` green via `docker compose --profile test run --rm test`; real-API
+compose smoke `GET /news/company/AAPL?limit=3` returned 3 polygon articles with mapped
+`{date, title, text, url, symbols, source}`; date filters, unknown-ticker 404 and
+`limit`/date validation verified. Two fixes found against the real API: OpenBB's kwarg is
+`symbol` (not `ticker`), and pandas turns `symbols=None` into NaN (normalized to `[]`).
 
 ### N2 — cachest: cached news route
 
