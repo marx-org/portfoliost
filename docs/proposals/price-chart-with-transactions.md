@@ -207,7 +207,7 @@ The `defaultShowTransactions` prop ensures the overlay opens pre-checked since s
 Each step = one commit. Mark `[x]` when done.
 
 ```
-[ ] Step 1 — Contract: add `instrumentSymbol` query param to getAllTransactions and getPortfolioTransactions in openapi.yaml; publish new @marx2/contracts version
+[x] Step 1 — Contract: add `instrumentSymbol` query param to getAllTransactions and getPortfolioTransactions in openapi.yaml; publish new @marx2/contracts version
 [ ] Step 2 — Backend: implement `instrumentSymbol` WHERE filter in portfoliost-wallets route handler for both endpoints
 [ ] Step 3 — Mock: add `instrumentSymbol` client-side filter to both mock endpoints in portfoliost/mocks/portfolios/index.js
 [ ] Step 4 — Consumer update: npm install @marx2/contracts@<new-version> + npm run gen:types; add typed `instrumentSymbol?` param to getAllTransactions and getPortfolioTransactions in src/api/portfolios.ts; verify build
