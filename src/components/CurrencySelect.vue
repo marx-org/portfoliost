@@ -2,11 +2,16 @@
 import { onMounted } from "vue"
 import { useCurrenciesStore } from "../stores/currencies"
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   modelValue: string
   ariaLabel?: string
   testid?: string
-}>()
+  allowEmpty?: boolean
+  emptyLabel?: string
+}>(), {
+  allowEmpty: false,
+  emptyLabel: "All",
+})
 
 const emit = defineEmits<{ (e: "update:modelValue", value: string): void }>()
 
@@ -28,6 +33,7 @@ function onSelect(event: Event): void {
     :data-testid="props.testid"
     @change="onSelect"
   >
+    <option v-if="props.allowEmpty" value="">{{ props.emptyLabel }}</option>
     <option v-for="c in store.options" :key="c.code" :value="c.code">{{ c.code }}</option>
   </select>
 </template>

@@ -1,5 +1,6 @@
 import { requireAuth } from "../lib/auth.js"
 import { nowIso, uuid } from "../lib/http.js"
+import { DEMO_RATES, DEMO_FX_DATE } from "../lib/demo-fx.js"
 
 const DATASETS = [
   "daily_world",
@@ -25,6 +26,32 @@ const jobLog    = new Map()  // dataset  → { latestDate, importedAt, rowsDelet
 jobLog.set("daily_us", { latestDate: "2026-08-28", importedAt: "2026-08-28T14:32:00Z", rowsDeleted: 142 })
 
 export function register(app) {
+  // GET /api/admin/currencies/rates — paged EUR-based reference rates (D47).
+  // Mirrors the wallets module admin endpoint shape (AdminFxRatesResponse).
+  app.get("/api/admin/currencies/rates", (ctx) => {
+    if (!requireAuth(ctx)) return
+    const page = Math.max(1, parseInt(ctx.query.page ?? "1", 10))
+    const perPage = Math.min(200, Math.max(1, parseInt(ctx.query.per_page ?? "50", 10)))
+    const quote = String(ctx.query.quote_currency ?? "").toUpperCase()
+    const dateFrom = ctx.query.date_from
+    const dateTo = ctx.query.date_to
+
+    const all = Object.entries(DEMO_RATES)
+      .filter(([ccy]) => !quote || ccy === quote)
+      .map(([quoteCurrency, rate]) => ({
+        date: DEMO_FX_DATE,
+        baseCurrency: "EUR",
+        quoteCurrency,
+        rate,
+      }))
+      .filter((r) => (!dateFrom || r.date >= dateFrom) && (!dateTo || r.date <= dateTo))
+
+    const total = all.length
+    const totalPages = Math.ceil(total / perPage)
+    const items = all.slice((page - 1) * perPage, page * perPage)
+    ctx.res.json({ items, pagination: { total, page, per_page: perPage, total_pages: totalPages } })
+  })
+
   // POST /api/admin/jobs/stooq-import/upload
   app.post("/api/admin/jobs/stooq-import/upload", (ctx) => {
     if (!requireAuth(ctx)) return

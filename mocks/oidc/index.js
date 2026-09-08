@@ -137,6 +137,7 @@ export function register(app) {
         lastName: "",
         language: "en",
         role: "user",
+        groups: ["portfoliost_admin"],
         isDemoUser: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),

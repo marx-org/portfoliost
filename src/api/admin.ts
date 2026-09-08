@@ -7,35 +7,20 @@ export interface ServiceVersion {
   impl: "real" | "mock" | "unknown"
 }
 
-export interface SystemVersionsResponse {
-  services: ServiceVersion[]
-  fetchedAt: string
-}
-
-export interface FxRateItem {
-  date: string
-  baseCurrency: string
-  quoteCurrency: string
-  rate: number
-}
-
-export interface Pagination {
-  total: number
-  page: number
-  per_page: number
-  total_pages: number
-}
-
-export interface FxRatesResponse {
-  items: FxRateItem[]
-  pagination: Pagination
-}
-
 // Contract-typed admin user (from @marx2/contracts /api/admin/users).
 export type AdminUser = components["schemas"]["AdminUser"]
 export type UsersResponse = components["schemas"]["AdminUserListResponse"]
 export type SplitCandidate = components["schemas"]["SplitCandidate"]
 export type OverflowSummary = components["schemas"]["OverflowSummary"]
+
+export interface SystemVersionsResponse {
+  services: ServiceVersion[]
+  fetchedAt: string
+}
+
+// Contract-typed admin FX rate listing (from @marx2/contracts /admin/currencies/rates).
+export type FxRateItem = components["schemas"]["AdminFxRate"]
+export type FxRatesResponse = components["schemas"]["AdminFxRatesResponse"]
 
 export function fetchSystemVersions(): Promise<SystemVersionsResponse> {
   return http.get<SystemVersionsResponse>("/api/admin/system/versions")

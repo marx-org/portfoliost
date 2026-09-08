@@ -475,6 +475,21 @@ async function main() {
     const fxUnknown = await request("/fx/latest?from=BTC&to=USD", { token })
     check("feesfx.fx-latest unknown pair → 422", fxUnknown.status === 422, `got ${fxUnknown.status}`)
 
+    const adminFx = await request("/admin/currencies/rates", { token })
+    check(
+      "adminfx.requires admin auth",
+      adminFx.status === 200 && Array.isArray(adminFx.json?.items) && adminFx.json?.pagination?.total >= 10,
+      `got ${adminFx.status} ${JSON.stringify(adminFx.json || {}).slice(0, 120)}`,
+    )
+    const adminFxUsd = await request("/admin/currencies/rates?quote_currency=usd", { token })
+    check(
+      "adminfx.quote filter case-insensitive",
+      adminFxUsd.status === 200 &&
+        adminFxUsd.json.items.length === 1 &&
+        adminFxUsd.json.items[0].quoteCurrency === "USD",
+      `got ${adminFxUsd.status} ${JSON.stringify(adminFxUsd.json || {}).slice(0, 120)}`,
+    )
+
     const usdWalletsBefore = await request("/wallets", { token })
     const createW = await request("/wallets", {
       method: "POST",
