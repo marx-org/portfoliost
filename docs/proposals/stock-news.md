@@ -118,25 +118,40 @@ getNewsForTicker(ticker, limit):
 - **Deviation (PGlite)**: `symbols` union uses `(select array_agg(distinct s) from
   unnest(symbols || excluded.symbols) s)` instead of PG16 `array_union` — PGlite lacks it.
 
-### N5 — instruments: news routes
+### N5 — instruments: news routes — **done (2026-09-08, instruments `bc73c5e`)** ✅
 
-In `src/routes/instruments.ts`, both JWT-protected and returning `NewsArticleList`
+In `src/routes/instruments.ts`, JWT-protected and returning `NewsArticleList`
 (`{data, pagination}`) per contract:
 
-- `GET /news/articles?ticker=AAPL&limit=20` → `N4` single ticker.
-- `GET /portfolios/:id/news?limit=50` → load portfolio holdings, run `N4` per ticker in
-  parallel (`Promise.allSettled`), merge, dedup by URL, sort desc,
-  cap at `PORTFOLIO_NEWS_TICKER_LIMIT`.
+- `GET /news/articles?ticker=AAPL&limit=20` → `N4` single ticker. Tick‌er-less calls
+  (e.g. SPA `getAllNews`) return the most recent stored rows — no provider fan-out.
+- **Deviation (module boundaries)**: the `/portfolios/:id/news` route lives in the
+  wallets module, not here. Instruments owns the News domain only; it must never read
+  `portfolios.positions` (wallets-private schema). The wallets module fans out over its
+  own holdings and calls instruments `/news/articles` per ticker (see N6).
 
-### N6 — wallets: wire stub to instruments
+### N6 — wallets: fan-out over holdings, wired to instruments — **done (2026-09-08, wallets `f08720c`)** ✅
 
-In `src/routes/portfolios.ts`, replace the `{articles: [], total: 0}` stub with a proxy to
-`API_INSTRUMENTS_URL/portfolios/:id/news`.
+In `src/routes/portfolios.ts`, replace the `{articles: [], total: 0}` stub with a
+`NewsArticleList` fan-out:
+
+- Load owned portfolio holdings (`portfolios.positions`, own schema), distinct open
+  symbols only.
+- Run `GET API_INSTRUMENTS_URL/api/news/articles?ticker={symbol}&limit={NEWS_FETCH_LIMIT}`
+  per ticker in parallel (`Promise.allSettled`) — same cross-module HTTP pattern as
+  `refreshQuotes` (`src/services/quotes.ts`), forwarding the caller's `Authorization`.
+- Merge, dedup by `url`, sort `published_at` desc, cap at `PORTFOLIO_NEWS_TICKER_LIMIT`.
+- `getPortfolioNews` is a Portfolios-domain op in the contract; gate `/api/portfolios/:id/news`
+  already routes to wallets, so no gateway change needed for it.
 
 ### N7 — gateway: reroute /api/news off the mock
 
 In `deploy/services.env`: `API_NEWS_URL=http://example-service-mock:4010` →
 `API_NEWS_URL=http://instruments:3000`.
+
+**done (2026-09-08)** ✅ — verified full-stack through the gateway:
+`GET /api/news/articles?ticker=AAPL` returns real articles from instruments/cachest/openst
+(invested positions fan-out through `/api/portfolios/:id/news`).
 
 ## Configuration
 
