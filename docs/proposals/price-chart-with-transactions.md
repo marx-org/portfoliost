@@ -214,7 +214,7 @@ Each step = one commit. Mark `[x]` when done.
 [x] Step 5 — Extract shared component: copy ResearchPriceChart.vue → src/components/PriceChart.vue; add portfolioId/defaultShowTransactions/maxTransactions props; drop positionId; update ResearchOverview.vue import; delete old file; verify build
 [x] Step 6 — Add "Transactions" checkbox + portfolio selector (Research) + transaction fetch wiring (D3–D5)
 [x] Step 7 — Transaction markers: compute annotations.points from buy/sell transactions in visible range; integrate into chartOptions (D6)
-[ ] Step 8 — Extended tooltip: replace shared tooltip with custom renderer showing buy/sell details (D7)
+[x] Step 8 — Extended tooltip: replace shared tooltip with custom renderer showing buy/sell details (D7)
 [ ] Step 9 — FIFO avg cost + Low/High reference lines: compute yaxis annotations from visible range; hide in Percent/Drawdowns modes (D8)
 [ ] Step 10 — "View chart" in Holdings tab: menu item + modal + PriceChart with defaultShowTransactions=true (D9)
 [ ] Step 11 — Tests & cleanup: vitest unit tests for FIFO cost basis logic, annotation computation, date-index mapping; full suite (npm run build && npm run test && npm run test:mock && npm run test:e2e)

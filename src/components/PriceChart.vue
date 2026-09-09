@@ -4,6 +4,7 @@ import { getHistory } from "@/api/instruments"
 import type { HistoryCompareSeries } from "@/api/instruments"
 import { getAllTransactions, getPortfolioTransactions } from "@/api/portfolios"
 import { usePortfolioStore } from "@/stores/portfolios"
+import { formatCurrency, formatNumber } from "@/utils/format"
 import type { components } from "../../generated/api-types"
 
 type Transaction = components["schemas"]["Transaction"]
@@ -266,6 +267,41 @@ const transactionAnnotations = computed(() => {
   return points
 })
 
+function tooltipCustom({ series, dataPointIndex, w }: {
+  series: number[][]
+  dataPointIndex: number
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  w: any
+}): string {
+  const n = timestamps.value.length
+  const startIdx = n - slicePoints.value
+  const lines: string[] = []
+  for (let s = 0; s < w.config.series.length; s++) {
+    const name = w.config.series[s].name ?? ""
+    const value = series[s]?.[dataPointIndex]
+    const formatted = typeof value === "number" ? (mode.value === "Price" ? formatCurrency(value) : `${value.toFixed(2)}%`) : "—"
+    lines.push(`<div class="apexcharts-tooltip-series-group"><span>${name}: ${formatted}</span></div>`)
+  }
+  let txHtml = ""
+  if (showTransactions.value && dataPointIndex >= 0 && startIdx >= 0 && startIdx + dataPointIndex < n) {
+    const dateStr = isoDate(timestamps.value[startIdx + dataPointIndex] * 1000)
+    const txGroup = txByDate.value.get(dateStr)
+    if (txGroup && txGroup.length) {
+      const rows = txGroup
+        .map((tx) => {
+          const isBuy = tx.type === "buy"
+          const icon = isBuy ? "▲" : "▼"
+          const label = isBuy ? "Buy" : "Sell"
+          const fee = tx.fees ? ` (fees ${formatCurrency(tx.fees, tx.currency)})` : ""
+          return `<div>${icon} ${label} ${formatNumber(tx.quantity)} @ ${formatCurrency(tx.price, tx.priceCurrency)} = ${formatCurrency(tx.totalAmount, tx.currency)}${fee}</div>`
+        })
+        .join("")
+      txHtml = `<div class="apexcharts-tooltip-transactions"><div><strong>Transactions:</strong></div>${rows}</div>`
+    }
+  }
+  return `<div class="apexcharts-tooltip-custom">${lines.join("")}${txHtml}</div>`
+}
+
 const chartOptions = computed(() => ({
   chart: {
     type: "area" as const,
@@ -293,7 +329,7 @@ const chartOptions = computed(() => ({
   legend: { position: "top" as const, horizontalAlign: "right" as const },
   grid: { borderColor: "#e2e8f0" },
   annotations: { points: transactionAnnotations.value },
-  tooltip: { shared: true },
+  tooltip: { custom: tooltipCustom },
 }))
 
 const summary = computed(() => {

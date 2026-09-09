@@ -222,4 +222,44 @@ describe("PriceChart", () => {
     const points = (wrapper.vm as unknown as { chartOptions: { annotations: { points: unknown[] } } }).chartOptions.annotations.points
     expect(points.length).toBe(0)
   })
+
+  it("wires a custom tooltip function", async () => {
+    const wrapper = await mountTxChart([])
+    const custom = (wrapper.vm as unknown as { chartOptions: { tooltip: { custom: unknown } } }).chartOptions.tooltip.custom
+    expect(typeof custom).toBe("function")
+  })
+
+  it("renders transaction rows in the tooltip on dates with transactions", async () => {
+    const date = makeHistory().timestamps[0]
+    const wrapper = await mountTxChart([
+      { id: "t1", type: "buy", executedAt: new Date(date * 1000).toISOString() },
+    ])
+    const vm = wrapper.vm as unknown as {
+      chartOptions: { tooltip: { custom: (args: { series: number[][]; dataPointIndex: number; w: { config: { series: { name: string }[] } } }) => string } }
+    }
+    const args = {
+      series: [[100]],
+      dataPointIndex: 0,
+      w: { config: { series: [{ name: "AAPL" }] } },
+    }
+    const html = vm.chartOptions.tooltip.custom(args)
+    expect(html).toContain("Transactions:")
+    expect(html).toContain("Buy")
+    expect(html).toContain("@")
+  })
+
+  it("does not render a transactions section on dates without transactions", async () => {
+    const wrapper = await mountTxChart([])
+    const vm = wrapper.vm as unknown as {
+      chartOptions: { tooltip: { custom: (args: { series: number[][]; dataPointIndex: number; w: { config: { series: { name: string }[] } } }) => string } }
+    }
+    const args = {
+      series: [[100]],
+      dataPointIndex: 1,
+      w: { config: { series: [{ name: "AAPL" }] } },
+    }
+    const html = vm.chartOptions.tooltip.custom(args)
+    expect(html).toContain("AAPL")
+    expect(html).not.toContain("Transactions:")
+  })
 })
