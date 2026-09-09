@@ -150,7 +150,21 @@ Each step is a single commit. Mark `[x]` after the step's tests pass and the com
 
 ---
 
-### Step 1 — Simplify `researchSymbol`, delete `baseSymbol` and `symbolExchange` [ ]
+### Step 1 — Update OpenAPI contract [ ]
+
+File: `portfoliost-contracts/openapi.yaml`
+
+- Update the `instrumentSymbol` query parameter description on both transaction list operations (`GET /portfolios/transactions` and `GET /portfolios/{portfolioId}/transactions`) to:
+  `"Filter by instrument symbol. Must be in canonical form: bare ticker for US listings (AAPL, SAP), Yahoo venue suffix for others (SAP.DE, SNT.WA). Case-insensitive exact match."`
+- Check whether `InstrumentSearchResult` has a `countryCode` field — if missing, add it (needed for Step 5 search UI enrichment).
+- Check whether `InstrumentDetail.id` has any `.US` format constraint — it should be a plain `string` (needed for Step 7).
+- Bump the patch version per the contracts workflow. Then in each consumer repo: `NODE_AUTH_TOKEN=$(gh auth token) npm install @marx2/contracts@<new-version>` and `npm run gen:types`.
+
+Tests: `npm run build` in all consumer repos after installing the new contracts version.
+
+---
+
+### Step 2 — Simplify `researchSymbol`, delete `baseSymbol` and `symbolExchange` [ ]
 
 File: `portfoliost/src/utils/research.ts`
 
@@ -168,7 +182,7 @@ Tests: `npm run build` in `portfoliost/`
 
 ---
 
-### Step 2 — Fix `ResearchView.vue` [ ]
+### Step 3 — Fix `ResearchView.vue` [ ]
 
 File: `portfoliost/src/modules/instruments/ResearchView.vue`
 
@@ -183,7 +197,7 @@ Tests: `npm run build` in `portfoliost/`
 
 ---
 
-### Step 3 — Fix `ResearchCompare.vue` [ ]
+### Step 4 — Fix `ResearchCompare.vue` [ ]
 
 File: `portfoliost/src/modules/instruments/ResearchCompare.vue`
 
@@ -195,32 +209,31 @@ Tests: `npm run build` in `portfoliost/`
 
 ---
 
-### Step 4 — Fix `InstrumentSearchModal.vue` [ ]
+### Step 5 — Fix `InstrumentSearchModal.vue` [ ]
 
 File: `portfoliost/src/modules/instruments/InstrumentSearchModal.vue`
 
 - In `openResult()`: remove the dot-check + `researchSymbol()` call. Use the symbol from the search result directly — it is already in canonical form from the backend (`SAP.DE`, `SAP`, `SNT.WA`).
 - Add `recentSearches.record(symbol)` inside `openResult()` when mode is `"navigate"`, and inside the `add` emit when mode is `"add"`. This is the ONLY place recent searches are recorded (D5).
 - Import `useRecentSearchesStore` if not already imported.
-- Enrich the result card template: show exchange and country below the instrument name (e.g. `NYSE · US`, `XETRA · DE`). Both fields are already in the search response (`result.exchange`, `result.countryCode`). Check `portfoliost-contracts/openapi.yaml` `InstrumentSearchResult` schema — if `countryCode` is missing, add it (then `npm run gen:types` in `portfoliost/`).
+- Enrich the result card template: show exchange and country below the instrument name (e.g. `NYSE · US`, `XETRA · DE`). Both fields are already in the search response (`result.exchange`, `result.countryCode`).
 
 Tests: `npm run build && npm run test && npm run test:mock` in `portfoliost/`
 
 ---
 
-### Step 5 — Remove `.US` hardcode from `toInstrumentDetail` [ ]
+### Step 6 — Remove `.US` hardcode from `toInstrumentDetail` [ ]
 
 File: `portfoliost-instruments/src/adapters/translate.ts`
 
 - Line ~77: `id: \`${symbol.toUpperCase()}.US\`` → change to `id: symbol.toUpperCase()`
-- Check `portfoliost-contracts/openapi.yaml` `InstrumentDetail.id` — confirm it is a plain `string` with no `.US` format constraint.
 - Update any test assertions that expect `id` to end in `.US`.
 
 Tests: `npm run build && npm run test` in `portfoliost-instruments/`
 
 ---
 
-### Step 6 — Update `symbol.ts` comment [ ]
+### Step 7 — Update `symbol.ts` comment [ ]
 
 File: `portfoliost-instruments/src/adapters/symbol.ts`
 
@@ -237,7 +250,7 @@ Tests: `npm run build` in `portfoliost-instruments/`
 
 ---
 
-### Step 7 — Add ISIN search to `searchTickerReference` [ ]
+### Step 8 — Add ISIN search to `searchTickerReference` [ ]
 
 File: `portfoliost-instruments/src/db/tickerref-queries.ts`
 
@@ -253,7 +266,7 @@ Tests: `npm run build && npm run test` in `portfoliost-instruments/`
 
 ---
 
-### Step 8 — Remove OR-match from wallets transaction filter [ ]
+### Step 9 — Remove OR-match from wallets transaction filter [ ]
 
 File: `portfoliost-wallets/src/routes/portfolio-transactions.ts`
 
@@ -274,19 +287,6 @@ File: `portfoliost-wallets/src/routes/portfolio-transactions.test.ts`
 - Remove the "Base symbol matches the venue-qualified variant across portfolios" assertion (~line 886) from the global transactions test. Replace it with a test that confirms `SAP` does NOT match `SAP.DE` (exact match only).
 
 Tests: `npm run build && npm run test` in `portfoliost-wallets/`
-
----
-
-### Step 9 — Update OpenAPI contract `instrumentSymbol` description [ ]
-
-File: `portfoliost-contracts/openapi.yaml`
-
-- Update the `instrumentSymbol` query parameter description on both transaction list operations (`GET /portfolios/transactions` and `GET /portfolios/{portfolioId}/transactions`) to:
-  `"Filter by instrument symbol. Must be in canonical form: bare ticker for US listings (AAPL, SAP), Yahoo venue suffix for others (SAP.DE, SNT.WA). Case-insensitive exact match."`
-- If `InstrumentSearchResult` was missing `countryCode` (found in Step 4), add it here in the same bump.
-- Bump the patch version per the contracts workflow. Then in each consumer repo: `NODE_AUTH_TOKEN=$(gh auth token) npm install @marx2/contracts@<new-version>` and `npm run gen:types`.
-
-Tests: `npm run build` in all consumer repos after installing the new contracts version.
 
 ---
 
