@@ -2,8 +2,18 @@
 import { computed, onMounted, ref, watch } from "vue"
 import { getHistory } from "@/api/instruments"
 import type { HistoryCompareSeries } from "@/api/instruments"
+import { getAllTransactions, getPortfolioTransactions } from "@/api/portfolios"
+import { usePortfolioStore } from "@/stores/portfolios"
+import type { components } from "../../generated/api-types"
 
-const props = defineProps<{ symbol: string }>()
+type Transaction = components["schemas"]["Transaction"]
+
+const props = defineProps<{
+  symbol: string
+  portfolioId?: string | null
+  defaultShowTransactions?: boolean
+  maxTransactions?: number
+}>()
 
 type Timeframe = "1D" | "5D" | "1W" | "1M" | "3M" | "6M" | "1Y" | "3Y" | "5Y" | "10Y" | "YTD" | "MAX"
 type Mode = "Price" | "Percent" | "Drawdowns"
@@ -31,6 +41,50 @@ const prices = ref<number[]>([])
 const bench = ref<HistoryCompareSeries | null>(null)
 const loadedCompare = ref<CompareKey>("none")
 
+const portfolioStore = usePortfolioStore()
+const showTransactions = ref(props.defaultShowTransactions ?? false)
+const txPortfolioId = ref<string | "all">("all")
+const transactions = ref<Transaction[]>([])
+const transactionsLoading = ref(false)
+const transactionsError = ref<string | null>(null)
+const hasMoreTransactions = ref(false)
+const maxTxs = ref(props.maxTransactions ?? 500)
+
+async function fetchTransactions(): Promise<void> {
+  transactionsLoading.value = true
+  transactionsError.value = null
+  try {
+    const limit = maxTxs.value
+    const symbol = props.symbol
+    let result
+    if (props.portfolioId) {
+      result = await getPortfolioTransactions(props.portfolioId, 1, limit, "date", "asc", undefined, undefined, symbol)
+    } else if (txPortfolioId.value !== "all") {
+      result = await getPortfolioTransactions(txPortfolioId.value, 1, limit, "date", "asc", undefined, undefined, symbol)
+    } else {
+      result = await getAllTransactions(1, limit, "date", "asc", undefined, symbol)
+    }
+    transactions.value = result.items
+    hasMoreTransactions.value = result.hasNext
+  } catch (err) {
+    transactionsError.value = err instanceof Error ? err.message : "Failed to load transactions"
+    transactions.value = []
+    hasMoreTransactions.value = false
+  } finally {
+    transactionsLoading.value = false
+  }
+}
+
+function toggleTransactions(checked: boolean): void {
+  showTransactions.value = checked
+  if (checked) {
+    fetchTransactions()
+  } else {
+    transactions.value = []
+    hasMoreTransactions.value = false
+  }
+}
+
 async function load(compareKey: CompareKey) {
   loading.value = true
   error.value = null
@@ -50,6 +104,19 @@ async function load(compareKey: CompareKey) {
 onMounted(() => load("none"))
 watch(compare, (k) => {
   if (k !== loadedCompare.value) load(k)
+})
+
+watch(
+  () => props.symbol,
+  () => {
+    if (showTransactions.value) fetchTransactions()
+  },
+)
+watch(timeframe, () => {
+  if (showTransactions.value) fetchTransactions()
+})
+watch(txPortfolioId, () => {
+  if (showTransactions.value) fetchTransactions()
 })
 
 const slicePoints = computed(() => {
@@ -250,6 +317,25 @@ function downloadCsv(): void {
         </div>
       </div>
 
+      <label class="flex cursor-pointer items-center gap-1.5 select-none">
+        <input
+          type="checkbox"
+          class="h-3.5 w-3.5 accent-blue-600"
+          :checked="showTransactions"
+          @change="toggleTransactions(($event.target as HTMLInputElement).checked)"
+        />
+        <span>Transactions</span>
+      </label>
+
+      <select
+        v-if="!portfolioId && showTransactions"
+        v-model="txPortfolioId"
+        class="rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-2 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200"
+      >
+        <option value="all">All portfolios</option>
+        <option v-for="p in portfolioStore.portfolios" :key="p.id" :value="p.id">{{ p.name }}</option>
+      </select>
+
       <div v-if="summary" class="ml-auto flex items-center gap-4 text-sm">
         <span class="text-slate-500 dark:text-slate-400">Total Chg</span>
         <span class="font-semibold" :class="summary.change >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
@@ -287,6 +373,12 @@ function downloadCsv(): void {
 
     <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
     <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading price history...</p>
+
+    <p v-if="showTransactions && transactionsError" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ transactionsError }}</p>
+    <p v-if="showTransactions && transactionsLoading" class="text-sm text-slate-500 dark:text-slate-400">Loading transactions...</p>
+    <p v-if="showTransactions && !transactionsLoading && hasMoreTransactions" class="text-sm text-slate-500 dark:text-slate-400">
+      Showing first {{ maxTxs }} transactions &mdash; some may be missing.
+    </p>
 
     <div v-if="fullscreen" class="fixed inset-0 z-50 overflow-auto bg-white dark:bg-slate-900 p-6" @dblclick="fullscreen = false">
       <div class="mb-3 flex items-center justify-between">

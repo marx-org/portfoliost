@@ -143,7 +143,7 @@ function makeQuote(): QuoteAapl {
 function mountOverview() {
   return mount(ResearchOverview, {
     global: {
-      stubs: { apexchart: true, ResearchPriceChart: true, ResearchSeasonality: true },
+      stubs: { apexchart: true, PriceChart: true, ResearchSeasonality: true },
     },
   })
 }

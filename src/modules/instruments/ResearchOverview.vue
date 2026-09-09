@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from "vue"
 import { useRoute } from "vue-router"
 import * as instrumentsApi from "@/api/instruments"
 import StatGroup from "@/components/StatGroup.vue"
-import ResearchPriceChart from "@/modules/instruments/ResearchPriceChart.vue"
+import PriceChart from "@/components/PriceChart.vue"
 import ResearchSeasonality from "@/modules/instruments/ResearchSeasonality.vue"
 import type { InstrumentsMetrics, InstrumentsOverviewMetrics, InstrumentsProfile, IrEventsAapl, QuoteAapl } from "@/api/types"
 import { formatCompact, formatCurrency, formatNumber, formatPercent } from "@/utils/format"
@@ -372,7 +372,7 @@ const targetSpread = computed(() => {
         </div>
       </div>
 
-      <ResearchPriceChart :symbol="symbol" />
+      <PriceChart :symbol="symbol" />
     </template>
   </div>
 </template>

@@ -1,13 +1,22 @@
 import { flushPromises, mount } from "@vue/test-utils"
 import { describe, expect, it, vi } from "vitest"
-import ResearchPriceChart from "@/modules/instruments/ResearchPriceChart.vue"
+import { createPinia } from "pinia"
+import PriceChart from "@/components/PriceChart.vue"
 import { getHistory } from "@/api/instruments"
+import { getAllTransactions, getPortfolioTransactions } from "@/api/portfolios"
 
 vi.mock("@/api/instruments", () => ({
   getHistory: vi.fn(),
 }))
 
+vi.mock("@/api/portfolios", () => ({
+  getAllTransactions: vi.fn(),
+  getPortfolioTransactions: vi.fn(),
+}))
+
 const mockedGetHistory = vi.mocked(getHistory)
+const mockedGetAllTransactions = vi.mocked(getAllTransactions)
+const mockedGetPortfolioTransactions = vi.mocked(getPortfolioTransactions)
 
 function makeHistory() {
   return {
@@ -23,17 +32,29 @@ function makeHistory() {
   }
 }
 
-function mountChart() {
-  return mount(ResearchPriceChart, {
-    props: { symbol: "AAPL" },
-    global: { stubs: { apexchart: true } },
+function makeTxPage(items = []) {
+  return { items, total: items.length, page: 1, limit: 500, totalPages: 1, hasNext: false, hasPrevious: false }
+}
+
+function mountChart(props = {}) {
+  return mount(PriceChart, {
+    props: { symbol: "AAPL", ...props },
+    global: { plugins: [createPinia()], stubs: { apexchart: true } },
   })
 }
 
-describe("ResearchPriceChart", () => {
+async function checkTransactions(wrapper: ReturnType<typeof mountChart>) {
+  const cb = wrapper.find('input[type="checkbox"]')
+  await cb.setValue(true)
+  await flushPromises()
+}
+
+describe("PriceChart", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockedGetHistory.mockResolvedValue(makeHistory())
+    mockedGetAllTransactions.mockResolvedValue(makeTxPage([]))
+    mockedGetPortfolioTransactions.mockResolvedValue(makeTxPage([]))
   })
 
   it("fetches daily history for the symbol", async () => {
@@ -84,5 +105,49 @@ describe("ResearchPriceChart", () => {
     expect(text).toContain("Total Chg")
     expect(text).toContain("CAGR")
     expect(text).toContain("Powered by Example service")
+  })
+
+  it("renders a Transactions checkbox that is unchecked by default", async () => {
+    const wrapper = mountChart()
+    await flushPromises()
+    const cb = wrapper.find('input[type="checkbox"]')
+    expect(cb.exists()).toBe(true)
+    expect((cb.element as HTMLInputElement).checked).toBe(false)
+  })
+
+  it("checks the Transactions checkbox when defaultShowTransactions is true", async () => {
+    const wrapper = mountChart({ defaultShowTransactions: true })
+    await flushPromises()
+    const cb = wrapper.find('input[type="checkbox"]')
+    expect((cb.element as HTMLInputElement).checked).toBe(true)
+  })
+
+  it("fetches across all portfolios when no portfolioId is given (Research context)", async () => {
+    const wrapper = mountChart()
+    await flushPromises()
+    await checkTransactions(wrapper)
+    expect(mockedGetAllTransactions).toHaveBeenCalledWith(1, 500, "date", "asc", undefined, "AAPL")
+    expect(mockedGetPortfolioTransactions).not.toHaveBeenCalled()
+  })
+
+  it("fetches from the given portfolio when portfolioId prop is present", async () => {
+    const wrapper = mountChart({ portfolioId: "p1" })
+    await flushPromises()
+    await checkTransactions(wrapper)
+    expect(mockedGetPortfolioTransactions).toHaveBeenCalledWith("p1", 1, 500, "date", "asc", undefined, undefined, "AAPL")
+    expect(mockedGetAllTransactions).not.toHaveBeenCalled()
+  })
+
+  it("unchecking the Transactions checkbox clears transactions", async () => {
+    const wrapper = mountChart()
+    await flushPromises()
+    await checkTransactions(wrapper)
+    expect(mockedGetAllTransactions).toHaveBeenCalledTimes(1)
+
+    const cb = wrapper.find('input[type="checkbox"]')
+    await cb.setValue(false)
+    await flushPromises()
+
+    expect((wrapper.vm as unknown as { transactions: unknown[] }).transactions).toEqual([])
   })
 })
