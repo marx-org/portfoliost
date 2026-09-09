@@ -130,6 +130,17 @@ function portfolioTransactions(id) {
   return { items, total: items.length }
 }
 
+function filterTransactionsBySymbol(items, symbol) {
+  if (!symbol) return items
+  const q = String(symbol).toUpperCase()
+  return items.filter((t) => String(t.instrumentSymbol ?? "").toUpperCase() === q)
+}
+
+function filterTransactions(items, symbol) {
+  const filtered = filterTransactionsBySymbol(items, symbol)
+  return { items: filtered, total: filtered.length }
+}
+
 const TX_SORT_FIELDS = {
   symbol: "instrumentSymbol",
   date: "executedAt",
@@ -286,7 +297,11 @@ export function register(app) {
 
   app.get("/api/portfolios/transactions", (ctx) => {
     if (!requireAuth(ctx)) return
-    ctx.res.json(transactionsPage(ctx, allTransactions()))
+    let data = allTransactions()
+    if (ctx.query.instrumentSymbol) {
+      data = filterTransactions(data.items, ctx.query.instrumentSymbol)
+    }
+    ctx.res.json(transactionsPage(ctx, data))
   })
 
   app.post("/api/portfolios", (ctx) => {
@@ -461,6 +476,9 @@ export function register(app) {
     if (ctx.query.positionId) {
       data = { items: data.items.filter((t) => t.positionId === ctx.query.positionId), total: 0 }
       data.total = data.items.length
+    }
+    if (ctx.query.instrumentSymbol) {
+      data = filterTransactions(data.items, ctx.query.instrumentSymbol)
     }
     ctx.res.json(transactionsPage(ctx, data))
   })

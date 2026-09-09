@@ -255,6 +255,25 @@ async function main() {
   check("portfolios.transactions dividend filter", txsDiv.status === 200 && txsDiv.json.total === 0, `got ${txsDiv.status} total ${txsDiv.json && txsDiv.json.total}`)
   const txsExport = await request(`/portfolios/${pid}/transactions/export?format=csv`, { token })
   check("portfolios.transactions export", txsExport.status === 200 && Array.isArray(txsExport.json.items), `got ${txsExport.status}`)
+  const feedAll = await request("/portfolios/transactions?page=1&limit=100", { token })
+  const feedMsft = await request("/portfolios/transactions?page=1&limit=100&instrumentSymbol=msft", { token })
+  const expectedMsft = feedAll.json.items.filter((t) => t.instrumentSymbol === "MSFT").length
+  check(
+    "portfolios.transactions feed instrumentSymbol filter (case-insensitive)",
+    feedMsft.status === 200 &&
+      feedMsft.json.total === expectedMsft &&
+      expectedMsft >= 1 &&
+      feedMsft.json.items.every((t) => t.instrumentSymbol === "MSFT"),
+    `got ${feedMsft.status} total ${feedMsft.json.total} expected ${expectedMsft}`,
+  )
+  const pidMsft = await request(`/portfolios/${pid}/transactions?page=1&limit=100&instrumentSymbol=msft`, { token })
+  check(
+    "portfolios.transactions per-portfolio instrumentSymbol filter (case-insensitive)",
+    pidMsft.status === 200 && pidMsft.json.total === 1 && pidMsft.json.items[0].instrumentSymbol === "MSFT",
+    `got ${pidMsft.status} total ${pidMsft.json.total}`,
+  )
+  const pidNone = await request(`/portfolios/${pid}/transactions?page=1&limit=100&instrumentSymbol=aapl`, { token })
+  check("portfolios.transactions instrumentSymbol no match → empty", pidNone.status === 200 && pidNone.json.total === 0, `got ${pidNone.status} total ${pidNone.json.total}`)
   const snapshot = await request(`/portfolios/${pid}/snapshot`, { token })
   check("portfolios.snapshot", snapshot.status === 200 && snapshot.json.allocation && Array.isArray(snapshot.json.allocation.bySector), `got ${snapshot.status}`)
   const risk = await request(`/portfolios/${pid}/risk-metrics`, { token })
