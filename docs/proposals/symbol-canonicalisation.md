@@ -222,7 +222,7 @@ Tests: `npm run build && npm run test && npm run test:mock` in `portfoliost/`
 
 ---
 
-### Step 6 — Remove `.US` hardcode from `toInstrumentDetail` [ ]
+### Step 6 — Remove `.US` hardcode from `toInstrumentDetail` [x]
 
 File: `portfoliost-instruments/src/adapters/translate.ts`
 
