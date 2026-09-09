@@ -227,6 +227,86 @@ const txByDate = computed<Map<string, Transaction[]>>(() => {
   return map
 })
 
+const fifoReferenceLines = computed(() => {
+  if (!showTransactions.value || mode.value !== "Price") return []
+  if (transactions.value.length === 0) return []
+
+  const n = timestamps.value.length
+  const count = slicePoints.value
+  const startIdx = n - count
+  const startTs = timestamps.value[startIdx]
+  const endTs = timestamps.value[n - 1]
+
+  const buyPrices: number[] = []
+  const lots: Array<{ qty: number; price: number }> = []
+  let remainingQty = 0
+  let totalCost = 0
+
+  for (const tx of transactions.value) {
+    const txTs = new Date(tx.executedAt).getTime() / 1000
+    if (txTs < startTs || txTs > endTs) continue
+
+    if (tx.type === "buy") {
+      buyPrices.push(tx.price)
+      lots.push({ qty: tx.quantity, price: tx.price })
+      remainingQty += tx.quantity
+      totalCost += tx.quantity * tx.price
+    } else if (tx.type === "sell") {
+      let sellQty = tx.quantity
+      while (sellQty > 0 && lots.length > 0) {
+        const lot = lots[0]
+        if (lot.qty <= sellQty) {
+          totalCost -= lot.qty * lot.price
+          remainingQty -= lot.qty
+          sellQty -= lot.qty
+          lots.shift()
+        } else {
+          totalCost -= sellQty * lot.price
+          remainingQty -= sellQty
+          lot.qty -= sellQty
+          sellQty = 0
+        }
+      }
+    }
+  }
+
+  const lines: Array<{
+    y: number
+    borderColor: string
+    strokeDashArray: number
+    label: { borderColor: string; style: { color: string; background: string }; text: string }
+  }> = []
+
+  const low = Math.min(...buyPrices)
+  const high = Math.max(...buyPrices)
+
+  if (remainingQty > 0) {
+    const avgCost = totalCost / remainingQty
+    lines.push({
+      y: avgCost,
+      borderColor: "#2563eb",
+      strokeDashArray: 6,
+      label: { borderColor: "#2563eb", style: { color: "#fff", background: "#2563eb" }, text: `Avg $${avgCost.toFixed(2)}` },
+    })
+  }
+
+  lines.push({
+    y: low,
+    borderColor: "#16a34a",
+    strokeDashArray: 4,
+    label: { borderColor: "#16a34a", style: { color: "#fff", background: "#16a34a" }, text: `Low $${low.toFixed(2)}` },
+  })
+
+  lines.push({
+    y: high,
+    borderColor: "#dc2626",
+    strokeDashArray: 4,
+    label: { borderColor: "#dc2626", style: { color: "#fff", background: "#dc2626" }, text: `High $${high.toFixed(2)}` },
+  })
+
+  return lines
+})
+
 const transactionAnnotations = computed(() => {
   if (!showTransactions.value) return []
   const n = timestamps.value.length
@@ -328,7 +408,7 @@ const chartOptions = computed(() => ({
   fill: { type: "gradient" as const, gradient: { opacityFrom: 0.25, opacityTo: 0 } },
   legend: { position: "top" as const, horizontalAlign: "right" as const },
   grid: { borderColor: "#e2e8f0" },
-  annotations: { points: transactionAnnotations.value },
+    annotations: { points: transactionAnnotations.value, yaxis: fifoReferenceLines.value },
   tooltip: { custom: tooltipCustom },
 }))
 
