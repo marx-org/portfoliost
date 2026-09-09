@@ -233,7 +233,7 @@ Tests: `npm run build && npm run test` in `portfoliost-instruments/`
 
 ---
 
-### Step 7 — Update `symbol.ts` comment [ ]
+### Step 7 — Update `symbol.ts` comment [x]
 
 File: `portfoliost-instruments/src/adapters/symbol.ts`
 
