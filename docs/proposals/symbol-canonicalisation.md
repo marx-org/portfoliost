@@ -82,16 +82,19 @@ The search response (`InstrumentSearchResponse`) already carries `isin` through 
 
 ### D8 — Transaction matching (wallets + PriceChart)
 
-The wallets OR-match introduced in the in-flight fix is kept:
+All stored `instrumentSymbol` values must be in canonical form (D1). There is no legacy data to handle — the cluster transactions are wiped on deploy. No base-symbol OR-match, no prefix fallback.
+
+Both wallets filter conditions (`GET /portfolios/{id}/transactions` and `GET /portfolios/transactions`) use plain case-insensitive exact match:
 
 ```sql
 upper(instrument_symbol) = upper(?)
-OR upper(instrument_symbol) LIKE upper(?) || '.%'
 ```
 
-This handles legacy transactions that may have been stored with mixed formats (e.g. `SAP.US`, bare `SAP`). New transactions stored after this change will always use the canonical form (D1).
+The existing base-symbol OR-match (`LIKE upper(?) || '.%'`) in `portfoliost-wallets/src/routes/portfolio-transactions.ts` is removed. The corresponding tests that assert `SAP` matches `SAP.DE` are replaced with exact-match tests.
 
-`PriceChart.vue` client-side scoping replaces the exact-match filter with a base-prefix match consistent with the wallets query: `tx.instrumentSymbol.toUpperCase() === symbol || tx.instrumentSymbol.toUpperCase().startsWith(symbol + '.')` where `symbol` is the base ticker extracted from `routeSymbol`.
+The mock `filterTransactionsBySymbol` in `portfoliost/mocks/portfolios/index.js` already uses exact match — no change needed there.
+
+`PriceChart.vue` client-side scoping also uses exact match: `tx.instrumentSymbol.toUpperCase() === props.symbol.toUpperCase()`. Since all stored symbols are canonical, a `SAP.DE` chart fetches with `instrumentSymbol=SAP.DE` and the stored transactions say `SAP.DE` — they match directly.
 
 ---
 
@@ -113,12 +116,14 @@ This handles legacy transactions that may have been stored with mixed formats (e
 | `portfoliost/src/modules/instruments/ResearchView.vue` | Use `routeSymbol` directly everywhere; remove `baseSymbol` import; fix `recentSearches.record` call (D5) |
 | `portfoliost/src/modules/instruments/ResearchCompare.vue` | Pass `routeSymbol` to `getInstrumentPeers`; remove `baseSymbol` import |
 | `portfoliost/src/modules/instruments/InstrumentSearchModal.vue` | Record recent search on explicit select; pass symbol as-is (no `researchSymbol` post-processing); enrich result card UI with exchange + country |
-| `portfoliost/src/components/PriceChart.vue` | Replace client-side exact-match scoping with base-prefix match (D8) |
+| `portfoliost/src/components/PriceChart.vue` | Keep exact-match scoping — canonical symbols align directly (D8) |
+| `portfoliost-wallets/src/routes/portfolio-transactions.ts` | Remove OR-match; revert to plain case-insensitive exact match on both filter sites (D8) |
+| `portfoliost-wallets/src/routes/portfolio-transactions.test.ts` | Replace base-symbol OR-match tests with exact-match tests (D8) |
 | `portfoliost-instruments/src/db/tickerref-queries.ts` | Add ISIN exact-match branch to `searchTickerReference` WHERE clause (D7) |
 | `portfoliost-instruments/src/adapters/translate.ts` | Remove `.US` hardcode from `toInstrumentDetail` `id` field |
 | `portfoliost-instruments/src/adapters/symbol.ts` | Update comment (remove `AAPL.US` example) |
-| `portfoliost-contracts/openapi.yaml` | Update `instrumentSymbol` param description to document base-prefix matching |
-| `portfoliost/mocks/portfolios/index.js` | Update `filterTransactionsBySymbol` to use base-prefix match |
+| `portfoliost-contracts/openapi.yaml` | Update `instrumentSymbol` param description: exact match, canonical form required |
+| `portfoliost/mocks/portfolios/index.js` | Already exact match — no change needed |
 
 ---
 
@@ -248,51 +253,36 @@ Tests: `npm run build && npm run test` in `portfoliost-instruments/`
 
 ---
 
-### Step 8 — Fix `PriceChart.vue` client-side scoping [ ]
+### Step 8 — Remove OR-match from wallets transaction filter [ ]
 
-File: `portfoliost/src/components/PriceChart.vue`
+File: `portfoliost-wallets/src/routes/portfolio-transactions.ts`
 
-- Find `scopedTransactions` computed (~line 234). Replace exact match:
+- There are two filter sites — per-portfolio (`GET /portfolios/{id}/transactions`, ~line 1067) and global (`GET /portfolios/transactions`, ~line 1582). Both currently use:
   ```ts
-  String(tx.instrumentSymbol ?? "").toUpperCase() === props.symbol.toUpperCase()
+  sql`upper(${portfolioTransactions.instrumentSymbol}) = upper(${instrumentSymbol})
+      or (upper(${portfolioTransactions.instrumentSymbol}) like upper(${instrumentSymbol}) || '.%')`
   ```
-  with base-prefix match:
+- Replace both with plain exact match:
   ```ts
-  const base = props.symbol.toUpperCase().split(".")[0]
-  const txSym = String(tx.instrumentSymbol ?? "").toUpperCase()
-  return txSym === base || txSym === props.symbol.toUpperCase() || txSym.startsWith(base + ".")
+  sql`upper(${portfolioTransactions.instrumentSymbol}) = upper(${instrumentSymbol})`
   ```
-  Matches: `SAP` stored tx on a `SAP.DE` chart; `SAP.DE` tx on a `SAP.DE` chart; legacy `SAP.US` tx on a `SAP` chart.
+- No legacy data exists — cluster transactions are wiped on deploy.
 
-Tests: `npm run build && npm run test` in `portfoliost/`
+File: `portfoliost-wallets/src/routes/portfolio-transactions.test.ts`
+
+- Remove the test "base instrumentSymbol matches venue variants (SAP → SAP.DE)" (~line 727) entirely.
+- Remove the "Base symbol matches the venue-qualified variant across portfolios" assertion (~line 886) from the global transactions test. Replace it with a test that confirms `SAP` does NOT match `SAP.DE` (exact match only).
+
+Tests: `npm run build && npm run test` in `portfoliost-wallets/`
 
 ---
 
-### Step 9 — Fix wallets mock `filterTransactionsBySymbol` [ ]
-
-File: `portfoliost/mocks/portfolios/index.js`
-
-- Find `filterTransactionsBySymbol` (~line 133). Replace exact match:
-  ```js
-  String(t.instrumentSymbol ?? "").toUpperCase() === q
-  ```
-  with base-prefix match:
-  ```js
-  const base = q.split(".")[0]
-  const sym = String(t.instrumentSymbol ?? "").toUpperCase()
-  return sym === q || sym === base || sym.startsWith(base + ".")
-  ```
-
-Tests: `npm run test:mock` in `portfoliost/`
-
----
-
-### Step 10 — Update OpenAPI contract `instrumentSymbol` description [ ]
+### Step 9 — Update OpenAPI contract `instrumentSymbol` description [ ]
 
 File: `portfoliost-contracts/openapi.yaml`
 
 - Update the `instrumentSymbol` query parameter description on both transaction list operations (`GET /portfolios/transactions` and `GET /portfolios/{portfolioId}/transactions`) to:
-  `"Filter by instrument symbol. Canonical form: bare ticker for US listings (AAPL, SAP), Yahoo venue suffix for others (SAP.DE, SNT.WA). When the value is a bare base ticker, all venue-qualified variants are also matched (SAP matches SAP, SAP.DE, SAP.US). Case-insensitive."`
+  `"Filter by instrument symbol. Must be in canonical form: bare ticker for US listings (AAPL, SAP), Yahoo venue suffix for others (SAP.DE, SNT.WA). Case-insensitive exact match."`
 - If `InstrumentSearchResult` was missing `countryCode` (found in Step 4), add it here in the same bump.
 - Bump the patch version per the contracts workflow. Then in each consumer repo: `NODE_AUTH_TOKEN=$(gh auth token) npm install @marx2/contracts@<new-version>` and `npm run gen:types`.
 
@@ -306,8 +296,10 @@ Tests: `npm run build` in all consumer repos after installing the new contracts 
 - [ ] Clicking `SAP.DE` in search navigates to `/research/SAP.DE`, not `/research/SAP.US`
 - [ ] Recent searches after clicking `SAP.DE` records `"SAP.DE"`, not `"SAP"`
 - [ ] `/research/SAP.DE` display label shows `SAP.DE`, not `SAP`
-- [ ] Price chart on `/research/SAP.DE` shows SAP.DE transactions (not empty)
+- [ ] Price chart on `/research/SAP.DE` shows SAP.DE transactions (not empty); filtering by `SAP` returns nothing
+- [ ] Filtering transactions by `SAP` does NOT return `SAP.DE` transactions (exact match only)
 - [ ] Pasting ISIN `DE0007164600` in search returns SAP listings
 - [ ] No `.US` suffix appears anywhere in the UI, URLs, or API responses for US listings
 - [ ] `npm run build && npm run test && npm run test:mock && npm run test:e2e` pass in `portfoliost/`
 - [ ] `npm run build && npm run test` pass in `portfoliost-instruments/`
+- [ ] `npm run build && npm run test` pass in `portfoliost-wallets/`
