@@ -53,6 +53,22 @@ function parseMicSuffixes(csv) {
     .map(r => ({ operatingMic: r.operating_mic, yahooSuffix: r.yahoo_suffix || null }))
 }
 
+/**
+ * Builds `($1,$2,...),($3,...)` VALUES clause + flattened params for multi-row
+ * inserts. Avoids postgres.js's ${sql(rows)} value fragment, which mis-treats
+ * nested arrays as identifiers in 3.4.x releases (crashes on escape callback).
+ */
+function multiValues(rows) {
+  const colCount = rows[0].length
+  const clause = rows
+    .map((_, i) => {
+      const start = i * colCount + 1
+      return `(${Array.from({ length: colCount }, (_, j) => `$${start + j}`).join(",")})`
+    })
+    .join(",")
+  return { clause, params: rows.flat() }
+}
+
 export async function seedTickerReference(sql) {
   const [{ count }] = await sql`SELECT count(*)::int AS count FROM instruments.ticker_reference`
   if (count > 0) {
@@ -65,24 +81,26 @@ export async function seedTickerReference(sql) {
     for (let i = 0; i < rows.length; i += BATCH_SIZE) {
       const batch = rows.slice(i, i + BATCH_SIZE).filter(r => r.listing_key && r.ticker)
       if (batch.length === 0) continue
-      await sql`
+      const { clause, params } = multiValues(batch.map(r => [
+        r.listing_key,
+        r.ticker.toUpperCase(),
+        r.exchange,
+        r.name,
+        r.asset_type,
+        r.stock_sector || null,
+        r.etf_category || null,
+        r.country || null,
+        r.country_code || null,
+        r.isin || null,
+        r.aliases || null,
+      ]))
+      await sql.unsafe(`
         INSERT INTO instruments.ticker_reference
           (listing_key, ticker, exchange, name, asset_type, stock_sector, etf_category,
            country, country_code, isin, aliases)
-        SELECT * FROM ${sql(batch.map(r => [
-          r.listing_key,
-          r.ticker.toUpperCase(),
-          r.exchange,
-          r.name,
-          r.asset_type,
-          r.stock_sector || null,
-          r.etf_category || null,
-          r.country || null,
-          r.country_code || null,
-          r.isin || null,
-          r.aliases || null,
-        ]))} AS t(listing_key, ticker, exchange, name, asset_type, stock_sector,
-          etf_category, country, country_code, isin, aliases)
+        SELECT * FROM (VALUES ${clause})
+          AS t(listing_key, ticker, exchange, name, asset_type, stock_sector,
+            etf_category, country, country_code, isin, aliases)
         ON CONFLICT (listing_key) DO UPDATE SET
           ticker = EXCLUDED.ticker,
           exchange = EXCLUDED.exchange,
@@ -95,7 +113,7 @@ export async function seedTickerReference(sql) {
           isin = EXCLUDED.isin,
           aliases = EXCLUDED.aliases,
           updated_at = now()
-      `
+      `, params)
       total += batch.length
     }
     console.log(`[db-seed] ticker_reference: inserted ${total} tickers`)
@@ -113,22 +131,24 @@ export async function seedTickerReference(sql) {
   const venues = parseCsv(venuesCsv).filter(v => v.exchange_code)
   if (venues.length === 0) return
 
-  await sql`
-    INSERT INTO instruments.exchange_reference
-      (exchange_code, operating_mic, canonical_name, country_code, yahoo_suffix)
-    SELECT * FROM ${sql(venues.map(v => [
+  const { clause: vClause, params: vParams } = multiValues(venues.map(v => [
       v.exchange_code.toUpperCase(),
       v.operating_mic || null,
       v.canonical_name || null,
       v.country_code || null,
       suffixByMic.get((v.operating_mic || "").toUpperCase()) ?? null,
-    ]))} AS t(exchange_code, operating_mic, canonical_name, country_code, yahoo_suffix)
+    ]))
+  await sql.unsafe(`
+    INSERT INTO instruments.exchange_reference
+      (exchange_code, operating_mic, canonical_name, country_code, yahoo_suffix)
+    SELECT * FROM (VALUES ${vClause})
+      AS t(exchange_code, operating_mic, canonical_name, country_code, yahoo_suffix)
     ON CONFLICT (exchange_code) DO UPDATE SET
       operating_mic = EXCLUDED.operating_mic,
       canonical_name = EXCLUDED.canonical_name,
       country_code = EXCLUDED.country_code,
       yahoo_suffix = EXCLUDED.yahoo_suffix,
       updated_at = now()
-  `
+  `, vParams)
   console.log(`[db-seed] exchange_reference: inserted ${venues.length} exchanges`)
 }
