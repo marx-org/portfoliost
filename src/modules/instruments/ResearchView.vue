@@ -6,13 +6,11 @@ import RecentSearchesBar from "@/modules/instruments/RecentSearchesBar.vue"
 import { getInstrumentProfile } from "@/api/instruments"
 import { useWatchlistsStore } from "@/stores/watchlists"
 import { useRecentSearchesStore } from "@/stores/recentSearches"
-import { researchSymbol } from "@/utils/research"
 import type { InstrumentsProfile } from "@/api/types"
 
 const route = useRoute()
 const router = useRouter()
 const routeSymbol = computed(() => String(route.params.symbol).toUpperCase())
-const symbol = computed(() => routeSymbol.value)
 const watchlists = useWatchlistsStore()
 const recentSearches = useRecentSearchesStore()
 const showSearch = ref(false)
@@ -32,14 +30,12 @@ const tabs = [
   { name: "research-dividends", label: "Dividends" },
 ]
 
-function goToSymbol(symbol: string) {
-  const routeTarget = symbol.includes(".") ? symbol.toUpperCase() : researchSymbol(symbol)
-  router.push({ name: String(route.name), params: { symbol: routeTarget } })
+function goToSymbol(s: string) {
+  router.push({ name: String(route.name), params: { symbol: s.toUpperCase() } })
 }
 
 onMounted(async () => {
   void recentSearches.load()
-  void recentSearches.record(symbol.value)
   try {
     profile.value = await getInstrumentProfile(routeSymbol.value)
   } catch {
@@ -50,7 +46,6 @@ onMounted(async () => {
 // Same-route navigation (quick switcher / search) only changes the param —
 // refetch the header profile when it does.
 watch(routeSymbol, async (sym) => {
-  void recentSearches.record(sym)
   profile.value = null
   try {
     profile.value = await getInstrumentProfile(sym)
@@ -60,7 +55,7 @@ watch(routeSymbol, async (sym) => {
 })
 
 const inWatchlist = computed(() =>
-  watchlists.watchlists.some((w) => w.items?.some((i) => i.symbol?.toUpperCase() === symbol.value)),
+  watchlists.watchlists.some((w) => w.items?.some((i) => i.symbol?.toUpperCase() === routeSymbol.value)),
 )
 
 async function addToWatchlist(): Promise<void> {
@@ -74,11 +69,11 @@ async function addToWatchlist(): Promise<void> {
       await watchlists.create("My Watchlist")
     }
     const target = watchlists.watchlists[0]
-    const already = target.items?.some((i) => i.symbol?.toUpperCase() === symbol.value)
+    const already = target.items?.some((i) => i.symbol?.toUpperCase() === routeSymbol.value)
     if (!already) {
-      await watchlists.addItem(target.id, symbol.value)
+      await watchlists.addItem(target.id, routeSymbol.value)
     }
-    watchlistStatus.value = `Added ${symbol.value} to ${target.name}`
+    watchlistStatus.value = `Added ${routeSymbol.value} to ${target.name}`
   } catch (err) {
     watchlistStatus.value = err instanceof Error ? err.message : "Failed to add to watchlist"
   } finally {
@@ -92,9 +87,9 @@ async function addToWatchlist(): Promise<void> {
   <div>
     <div class="mb-6 flex flex-wrap items-center gap-3">
       <router-link to="/en/investments" class="btn-ghost">&larr; Go back</router-link>
-      <img :src="`/api/logos/${symbol}`" :alt="symbol" class="h-9 w-9 rounded-full bg-slate-100 dark:bg-slate-800" />
+      <img :src="`/api/logos/${routeSymbol}`" :alt="routeSymbol" class="h-9 w-9 rounded-full bg-slate-100 dark:bg-slate-800" />
       <div>
-        <h1 class="text-2xl font-semibold">{{ symbol }}</h1>
+        <h1 class="text-2xl font-semibold">{{ routeSymbol }}</h1>
         <p v-if="profile?.name" class="text-sm text-slate-500 dark:text-slate-400">{{ profile.name }}</p>
       </div>
       <span class="rounded-full bg-slate-200 dark:bg-slate-700/70 px-2 py-0.5 text-xs font-medium text-slate-600 dark:text-slate-300">{{ routeSymbol }}</span>
@@ -111,7 +106,7 @@ async function addToWatchlist(): Promise<void> {
 
     <p v-if="watchlistStatus" class="mb-4 rounded-lg bg-blue-50 dark:bg-blue-500/10 px-3 py-2 text-sm text-blue-700 dark:text-blue-400">{{ watchlistStatus }}</p>
 
-    <RecentSearchesBar class="mb-6" :active-symbol="symbol" @select="goToSymbol" />
+    <RecentSearchesBar class="mb-6" :active-symbol="routeSymbol" @select="goToSymbol" />
 
     <nav aria-label="Research tabs" class="mb-6 flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-slate-700/60">
       <router-link
@@ -125,7 +120,7 @@ async function addToWatchlist(): Promise<void> {
       </router-link>
     </nav>
 
-    <router-view :key="symbol" />
+    <router-view :key="routeSymbol" />
 
     <InstrumentSearchModal :open="showSearch" @close="showSearch = false" />
   </div>

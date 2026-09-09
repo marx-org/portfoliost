@@ -182,7 +182,7 @@ Tests: `npm run build` in `portfoliost/`
 
 ---
 
-### Step 3 — Fix `ResearchView.vue` [ ]
+### Step 3 — Fix `ResearchView.vue` [x]
 
 File: `portfoliost/src/modules/instruments/ResearchView.vue`
 
@@ -197,7 +197,7 @@ Tests: `npm run build` in `portfoliost/`
 
 ---
 
-### Step 4 — Fix `ResearchCompare.vue` [ ]
+### Step 4 — Fix `ResearchCompare.vue` [x]
 
 File: `portfoliost/src/modules/instruments/ResearchCompare.vue`
 
