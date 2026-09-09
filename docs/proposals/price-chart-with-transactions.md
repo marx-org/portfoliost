@@ -216,7 +216,7 @@ Each step = one commit. Mark `[x]` when done.
 [x] Step 7 — Transaction markers: compute annotations.points from buy/sell transactions in visible range; integrate into chartOptions (D6)
 [x] Step 8 — Extended tooltip: replace shared tooltip with custom renderer showing buy/sell details (D7)
 [x] Step 9 — FIFO avg cost + Low/High reference lines: compute yaxis annotations from visible range; hide in Percent/Drawdowns modes (D8)
-[ ] Step 10 — "View chart" in Holdings tab: menu item + modal + PriceChart with defaultShowTransactions=true (D9)
+[x] Step 10 — "View chart" in Holdings tab: menu item + modal + PriceChart with defaultShowTransactions=true (D9)
 [ ] Step 11 — Tests & cleanup: vitest unit tests for FIFO cost basis logic, annotation computation, date-index mapping; full suite (npm run build && npm run test && npm run test:mock && npm run test:e2e)
 ```
 

@@ -17,6 +17,7 @@ import LabelFilterBar from "@/components/LabelFilterBar.vue"
 import LabelChips from "@/components/LabelChips.vue"
 import LabelManagerDialog from "@/components/LabelManagerDialog.vue"
 import LabelPickerPopover from "@/components/LabelPickerPopover.vue"
+import PriceChart from "@/components/PriceChart.vue"
 
 type Position = PortfolioPositions[number]
 
@@ -278,6 +279,13 @@ function goResearch(position: Position): void {
   router.push({ name: "research-overview", params: { symbol: researchSymbol(position.symbol) } })
 }
 
+const chartPosition = ref<Position | null>(null)
+
+function openChartView(position: Position): void {
+  openMenuId.value = null
+  chartPosition.value = position
+}
+
 function openLabelPicker(position: Position): void {
   openMenuId.value = null
   pickerPosition.value = position
@@ -443,6 +451,7 @@ function onPickerSaved() {
                       <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="openAction('dividend', pos)">Dividend</button>
                       <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="openEditPosition(pos)">Edit position</button>
                       <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="goResearch(pos)">Research</button>
+                      <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="openChartView(pos)">View chart</button>
                       <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="openLabelPicker(pos)">Set labels...</button>
                       <button type="button" class="block w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10" @click="openRemoveConfirm(pos)">Remove position</button>
                     </div>
@@ -514,6 +523,18 @@ function onPickerSaved() {
         :current-labels="pickerPosition.labels ?? []"
         @close="pickerOpen = false"
         @saved="onPickerSaved"
+      />
+    </div>
+
+    <div v-if="chartPosition" class="fixed inset-0 z-50 overflow-auto bg-white dark:bg-slate-900 p-6">
+      <div class="mb-3 flex items-center justify-between">
+        <h2 class="text-base font-semibold">{{ chartPosition.symbol }} — {{ chartPosition.companyName }}</h2>
+        <button type="button" class="btn-secondary text-sm" @click="chartPosition = null">Close</button>
+      </div>
+      <PriceChart
+        :symbol="chartPosition.symbol"
+        :portfolio-id="id"
+        :default-show-transactions="true"
       />
     </div>
   </div>
