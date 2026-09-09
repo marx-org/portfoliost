@@ -227,9 +227,16 @@ function txType(tx: Transaction): string {
   return (tx.type ?? "").toUpperCase()
 }
 
+// Only transactions belonging to the charted instrument count for markers,
+// tooltips, and the Low/High/Avg reference lines. This guards against any
+// other instrument's transactions leaking into the feed.
+const scopedTransactions = computed<Transaction[]>(() =>
+  transactions.value.filter((tx) => String(tx.instrumentSymbol ?? "").toUpperCase() === props.symbol.toUpperCase()),
+)
+
 const txByDate = computed<Map<string, Transaction[]>>(() => {
   const map = new Map<string, Transaction[]>()
-  for (const tx of transactions.value) {
+  for (const tx of scopedTransactions.value) {
     const type = txType(tx)
     if (type !== "BUY" && type !== "SELL") continue
     const key = isoDate(new Date(tx.executedAt).getTime())
@@ -249,7 +256,7 @@ const txByDate = computed<Map<string, Transaction[]>>(() => {
 
 const fifoReferenceLines = computed(() => {
   if (!showTransactions.value || mode.value !== "Price") return []
-  if (transactions.value.length === 0) return []
+  if (scopedTransactions.value.length === 0) return []
 
   const n = timestamps.value.length
   const count = slicePoints.value
@@ -262,7 +269,7 @@ const fifoReferenceLines = computed(() => {
   let remainingQty = 0
   let totalCost = 0
 
-  for (const tx of transactions.value) {
+  for (const tx of scopedTransactions.value) {
     const txTs = new Date(tx.executedAt).getTime() / 1000
     if (txTs < startTs || txTs > endTs) continue
 

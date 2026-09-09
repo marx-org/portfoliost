@@ -49,7 +49,7 @@ async function checkTransactions(wrapper: ReturnType<typeof mountChart>) {
   await flushPromises()
 }
 
-function makeTx(tx: { id: string; type: string; executedAt: string; quantity?: number; price?: number }) {
+function makeTx(tx: { id: string; type: string; executedAt: string; quantity?: number; price?: number; instrumentSymbol?: string }) {
   const qty = tx.quantity ?? 10
   const price = tx.price ?? 180
   return {
@@ -59,7 +59,7 @@ function makeTx(tx: { id: string; type: string; executedAt: string; quantity?: n
     walletId: "w1",
     positionId: null,
     type: tx.type,
-    instrumentSymbol: "AAPL",
+    instrumentSymbol: tx.instrumentSymbol ?? "AAPL",
     instrumentName: "Apple",
     quantity: qty,
     price,
@@ -332,6 +332,26 @@ describe("PriceChart", () => {
     expect(lines.find((l) => l.borderColor === "#2563eb")).toBeUndefined()
     expect(lines.find((l) => l.borderColor === "#16a34a")!.y).toBe(100)
     expect(lines.find((l) => l.borderColor === "#dc2626")!.y).toBe(100)
+  })
+
+  it("ignores transactions from other instruments for reference lines and markers", async () => {
+    const d = makeHistory().timestamps
+    const ownIso = new Date(d[0] * 1000).toISOString()
+    const own = makeTx({ id: "own", type: "BUY", executedAt: ownIso, quantity: 10, price: 271.01, instrumentSymbol: "AAPL" })
+    const other = makeTx({ id: "other", type: "BUY", executedAt: ownIso, quantity: 10, price: 89, instrumentSymbol: "SAP.DE" })
+    mockedGetPortfolioTransactions.mockResolvedValue(makeTxPage([own, other]))
+    const wrapper = mountChart({ portfolioId: "p1" })
+    await flushPromises()
+    await checkTransactions(wrapper)
+    await flushPromises()
+
+    const lines = refLinesOf(wrapper)
+    // Only the AAPL buy counts -> Low === High === 271.01 (overlap).
+    expect(lines.find((l) => l.borderColor === "#16a34a")!.y).toBe(271.01)
+    expect(lines.find((l) => l.borderColor === "#dc2626")!.y).toBe(271.01)
+
+    const points = (wrapper.vm as unknown as { chartOptions: { annotations: { points: unknown[] } } }).chartOptions.annotations.points
+    expect(points.length).toBe(1)
   })
 
   it("hides reference lines in Percent mode", async () => {
