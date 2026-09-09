@@ -266,7 +266,7 @@ Tests: `npm run build && npm run test` in `portfoliost-instruments/`
 
 ---
 
-### Step 9 — Remove OR-match from wallets transaction filter [ ]
+### Step 9 — Remove OR-match from wallets transaction filter [x]
 
 File: `portfoliost-wallets/src/routes/portfolio-transactions.ts`
 
