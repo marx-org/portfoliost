@@ -250,7 +250,7 @@ Tests: `npm run build` in `portfoliost-instruments/`
 
 ---
 
-### Step 8 — Add ISIN search to `searchTickerReference` [ ]
+### Step 8 — Add ISIN search to `searchTickerReference` [x]
 
 File: `portfoliost-instruments/src/db/tickerref-queries.ts`
 
