@@ -3,7 +3,6 @@ import { computed, ref, watch } from "vue"
 import { useRouter } from "vue-router"
 import { useInstrumentsStore } from "@/stores/instruments"
 import { useRecentSearchesStore } from "@/stores/recentSearches"
-import { researchSymbol } from "@/utils/research"
 import RecentSearchesBar from "@/modules/instruments/RecentSearchesBar.vue"
 
 const props = withDefaults(defineProps<{ open: boolean; mode?: "navigate" | "add"; title?: string }>(), {
@@ -45,10 +44,7 @@ function openResult(symbol: string, name = "") {
     emit("add", symbol, name)
     return
   }
-  // TICKERDB results arrive venue-qualified (SNT.WA) — use as-is. Bare
-  // symbols (mock source, popular list) get the legacy ".US" suffix.
-  const route = symbol.includes(".") ? symbol.toUpperCase() : researchSymbol(symbol)
-  router.push({ name: "research-overview", params: { symbol: route } })
+  router.push({ name: "research-overview", params: { symbol: symbol.toUpperCase() } })
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -99,6 +95,9 @@ function onKeydown(e: KeyboardEvent) {
                 <span class="flex-1">
                   <span class="block text-sm font-medium text-slate-900 dark:text-slate-100">{{ result.symbol }}</span>
                   <span class="block text-xs text-slate-500 dark:text-slate-400">{{ result.name }}</span>
+                  <span v-if="result.exchange || result.countryCode" class="block text-[10px] text-slate-400 dark:text-slate-500">
+                    {{ result.exchange }}<template v-if="result.exchange && result.countryCode"> · </template>{{ result.countryCode }}
+                  </span>
                 </span>
                 <span class="rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium uppercase text-slate-500 dark:text-slate-400">
                   {{ result.type }}

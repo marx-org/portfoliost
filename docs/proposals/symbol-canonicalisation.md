@@ -209,7 +209,7 @@ Tests: `npm run build` in `portfoliost/`
 
 ---
 
-### Step 5 — Fix `InstrumentSearchModal.vue` [ ]
+### Step 5 — Fix `InstrumentSearchModal.vue` [x]
 
 File: `portfoliost/src/modules/instruments/InstrumentSearchModal.vue`
 

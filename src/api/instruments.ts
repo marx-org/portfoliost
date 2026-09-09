@@ -15,6 +15,7 @@ export interface InstrumentSearchResult {
   name: string
   type: string
   exchange: string
+  countryCode: string | null
   source: string
 }
 

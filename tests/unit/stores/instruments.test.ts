@@ -29,7 +29,7 @@ describe("instruments store", () => {
   it("stores results after a successful search", async () => {
     mocked.searchInstruments.mockResolvedValue({
       count: 1,
-      results: [{ symbol: "AAPL", name: "Apple Inc", type: "Common Stock", exchange: "NASDAQ", source: "FINNHUB" }],
+      results: [{ symbol: "AAPL", name: "Apple Inc", type: "Common Stock", exchange: "NASDAQ", countryCode: "US", source: "FINNHUB" }],
     })
 
     const store = useInstrumentsStore()
@@ -55,7 +55,7 @@ describe("instruments store", () => {
   it("resets state", async () => {
     mocked.searchInstruments.mockResolvedValue({
       count: 1,
-      results: [{ symbol: "MSFT", name: "Microsoft", type: "Common Stock", exchange: "NASDAQ", source: "FINNHUB" }],
+      results: [{ symbol: "MSFT", name: "Microsoft", type: "Common Stock", exchange: "NASDAQ", countryCode: "US", source: "FINNHUB" }],
     })
 
     const store = useInstrumentsStore()
