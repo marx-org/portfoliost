@@ -300,6 +300,7 @@ Tests: `npm run build && npm run test` in `portfoliost-wallets/`
 - [ ] Filtering transactions by `SAP` does NOT return `SAP.DE` transactions (exact match only)
 - [ ] Pasting ISIN `DE0007164600` in search returns SAP listings
 - [ ] No `.US` suffix appears anywhere in the UI, URLs, or API responses for US listings
-- [ ] `npm run build && npm run test && npm run test:mock && npm run test:e2e` pass in `portfoliost/`
+- [ ] `npm run build && npm run test && npm run test:mock` pass in `portfoliost/`
 - [ ] `npm run build && npm run test` pass in `portfoliost-instruments/`
 - [ ] `npm run build && npm run test` pass in `portfoliost-wallets/`
+- [ ] `docker compose up -d --build` starts cleanly; `npm run test:e2e` passes against the stack
