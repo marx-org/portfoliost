@@ -32,7 +32,7 @@ function makeHistory() {
   }
 }
 
-function makeTxPage(items = []) {
+function makeTxPage(items: ReturnType<typeof makeTx>[] = []) {
   return { items, total: items.length, page: 1, limit: 500, totalPages: 1, hasNext: false, hasPrevious: false }
 }
 
@@ -47,6 +47,45 @@ async function checkTransactions(wrapper: ReturnType<typeof mountChart>) {
   const cb = wrapper.find('input[type="checkbox"]')
   await cb.setValue(true)
   await flushPromises()
+}
+
+function makeTx(tx: { id: string; type: string; executedAt: string }) {
+  return {
+    id: tx.id,
+    portfolioId: "p1",
+    portfolioName: "P1",
+    walletId: "w1",
+    positionId: null,
+    type: tx.type,
+    instrumentSymbol: "AAPL",
+    instrumentName: "Apple",
+    quantity: 10,
+    price: 180,
+    fees: 0,
+    totalAmount: 1800,
+    currency: "USD",
+    priceCurrency: "USD",
+    instrumentCurrency: "USD",
+    assetType: "equity",
+    isGift: false,
+    synthesizedOpeningLot: false,
+    executedAt: tx.executedAt,
+    createdAt: tx.executedAt,
+    displayCurrency: "USD",
+    convertedTotalAmount: 1800,
+    convertedPrice: 180,
+    convertedFees: 0,
+    labels: undefined,
+  }
+}
+
+async function mountTxChart(txs: { id: string; type: string; executedAt: string }[]) {
+  mockedGetPortfolioTransactions.mockResolvedValue(makeTxPage(txs.map(makeTx)))
+  const wrapper = mountChart({ portfolioId: "p1" })
+  await flushPromises()
+  await checkTransactions(wrapper)
+  await flushPromises()
+  return wrapper
 }
 
 describe("PriceChart", () => {
@@ -149,5 +188,38 @@ describe("PriceChart", () => {
     await flushPromises()
 
     expect((wrapper.vm as unknown as { transactions: unknown[] }).transactions).toEqual([])
+  })
+
+  it("renders transaction markers when transactions are checked", async () => {
+    const date = makeHistory().timestamps[0]
+    const wrapper = await mountTxChart([
+      { id: "t1", type: "buy", executedAt: new Date(date * 1000).toISOString() },
+    ])
+    const opts = (wrapper.vm as unknown as { chartOptions: { annotations: { points: unknown[] } } }).chartOptions
+    expect(opts.annotations.points.length).toBe(1)
+    const p = opts.annotations.points[0] as { x: number; offsetY: number; marker: { fillColor: string } }
+    expect(p.x).toBe(0)
+    expect(p.offsetY).toBe(0)
+    expect(p.marker.fillColor).toBe("#16a34a")
+  })
+
+  it("stacks multiple same-date transactions with vertical offsets", async () => {
+    const date = makeHistory().timestamps[2]
+    const iso = new Date(date * 1000).toISOString()
+    const wrapper = await mountTxChart([
+      { id: "t1", type: "buy", executedAt: iso },
+      { id: "t2", type: "sell", executedAt: iso },
+      { id: "t3", type: "buy", executedAt: iso },
+    ])
+    const points = (wrapper.vm as unknown as { chartOptions: { annotations: { points: { x: number; offsetY: number }[] } } }).chartOptions.annotations.points
+    expect(points.length).toBe(3)
+    expect(points.map((p) => p.offsetY)).toEqual([0, -8, -16])
+  })
+
+  it("does not render markers outside the visible range", async () => {
+    const future = new Date("2030-01-01T12:00:00Z").toISOString()
+    const wrapper = await mountTxChart([{ id: "t1", type: "buy", executedAt: future }])
+    const points = (wrapper.vm as unknown as { chartOptions: { annotations: { points: unknown[] } } }).chartOptions.annotations.points
+    expect(points.length).toBe(0)
   })
 })

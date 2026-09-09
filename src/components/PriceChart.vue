@@ -200,6 +200,72 @@ const series = computed(() => {
   return { dates, data: out }
 })
 
+function isoDate(ms: number): string {
+  const d = new Date(ms)
+  const m = `${d.getMonth() + 1}`.padStart(2, "0")
+  const day = `${d.getDate()}`.padStart(2, "0")
+  return `${d.getFullYear()}-${m}-${day}`
+}
+
+const txByDate = computed<Map<string, Transaction[]>>(() => {
+  const map = new Map<string, Transaction[]>()
+  for (const tx of transactions.value) {
+    if (tx.type !== "buy" && tx.type !== "sell") continue
+    const key = isoDate(new Date(tx.executedAt).getTime())
+    const group = map.get(key)
+    if (group) group.push(tx)
+    else map.set(key, [tx])
+  }
+  for (const group of map.values()) {
+    group.sort((a, b) => {
+      const typeDiff = (a.type === "buy" ? 0 : 1) - (b.type === "buy" ? 0 : 1)
+      if (typeDiff !== 0) return typeDiff
+      return new Date(a.executedAt).getTime() - new Date(b.executedAt).getTime()
+    })
+  }
+  return map
+})
+
+const transactionAnnotations = computed(() => {
+  if (!showTransactions.value) return []
+  const n = timestamps.value.length
+  const startIdx = n - slicePoints.value
+  if (startIdx < 0) return []
+  const startDateStr = isoDate(timestamps.value[startIdx] * 1000)
+  const endDateStr = isoDate(timestamps.value[n - 1] * 1000)
+  const dateIndexMap = new Map<string, number>()
+  series.value.dates.forEach((_, i) => {
+    const iso = isoDate(timestamps.value[startIdx + i] * 1000)
+    if (!dateIndexMap.has(iso)) dateIndexMap.set(iso, i)
+  })
+  const points: Array<{
+    x: number
+    y: number
+    marker: { size: number; fillColor: string; strokeColor: string }
+    label: { borderColor: string; style: { color: string; background: string }; text: string }
+    offsetY: number
+  }> = []
+  for (const [dateStr, group] of txByDate.value) {
+    if (dateStr < startDateStr || dateStr > endDateStr) continue
+    const index = dateIndexMap.get(dateStr)
+    if (index === undefined) continue
+    const lineValue = series.value.data[0]?.data?.[index]
+    if (typeof lineValue !== "number") continue
+    group.forEach((tx, i) => {
+      const isBuy = tx.type === "buy"
+      const color = isBuy ? "#16a34a" : "#dc2626"
+      points.push({
+        x: index,
+        y: lineValue,
+        marker: { size: 5, fillColor: color, strokeColor: color },
+        label: { borderColor: color, style: { color: "#fff", background: color }, text: isBuy ? "▲" : "▼" },
+        offsetY: -8 * i || 0,
+      })
+    })
+  }
+  return points
+})
+
 const chartOptions = computed(() => ({
   chart: {
     type: "area" as const,
@@ -226,6 +292,7 @@ const chartOptions = computed(() => ({
   fill: { type: "gradient" as const, gradient: { opacityFrom: 0.25, opacityTo: 0 } },
   legend: { position: "top" as const, horizontalAlign: "right" as const },
   grid: { borderColor: "#e2e8f0" },
+  annotations: { points: transactionAnnotations.value },
   tooltip: { shared: true },
 }))
 

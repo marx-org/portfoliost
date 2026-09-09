@@ -213,7 +213,7 @@ Each step = one commit. Mark `[x]` when done.
 [x] Step 4 — Consumer update: npm install @marx2/contracts@<new-version> + npm run gen:types; add typed `instrumentSymbol?` param to getAllTransactions and getPortfolioTransactions in src/api/portfolios.ts; verify build
 [x] Step 5 — Extract shared component: copy ResearchPriceChart.vue → src/components/PriceChart.vue; add portfolioId/defaultShowTransactions/maxTransactions props; drop positionId; update ResearchOverview.vue import; delete old file; verify build
 [x] Step 6 — Add "Transactions" checkbox + portfolio selector (Research) + transaction fetch wiring (D3–D5)
-[ ] Step 7 — Transaction markers: compute annotations.points from buy/sell transactions in visible range; integrate into chartOptions (D6)
+[x] Step 7 — Transaction markers: compute annotations.points from buy/sell transactions in visible range; integrate into chartOptions (D6)
 [ ] Step 8 — Extended tooltip: replace shared tooltip with custom renderer showing buy/sell details (D7)
 [ ] Step 9 — FIFO avg cost + Low/High reference lines: compute yaxis annotations from visible range; hide in Percent/Drawdowns modes (D8)
 [ ] Step 10 — "View chart" in Holdings tab: menu item + modal + PriceChart with defaultShowTransactions=true (D9)
