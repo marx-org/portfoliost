@@ -150,7 +150,7 @@ Each step is a single commit. Mark `[x]` after the step's tests pass and the com
 
 ---
 
-### Step 1 — Update OpenAPI contract [ ]
+### Step 1 — Update OpenAPI contract [x]
 
 File: `portfoliost-contracts/openapi.yaml`
 
