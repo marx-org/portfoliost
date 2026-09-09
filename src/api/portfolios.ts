@@ -1,5 +1,5 @@
 import { http } from "./client"
-import type { components } from "../../generated/api-types"
+import type { components, operations } from "../../generated/api-types"
 
 type PortfolioDetail = components["schemas"]["PortfolioDetail"]
 type PortfolioSummaryMetrics = components["schemas"]["PortfolioSummaryMetrics"]
@@ -12,6 +12,8 @@ type PortfolioAllocation = components["schemas"]["PortfolioSnapshot"]["allocatio
 type PortfolioDividends = components["schemas"]["DividendsData"]
 type PortfolioCalendar = components["schemas"]["CalendarData"]
 type PortfolioNews = components["schemas"]["NewsArticleList"]
+type GetAllTransactionsQuery = NonNullable<operations["getAllTransactions"]["parameters"]["query"]>
+type GetPortfolioTransactionsQuery = NonNullable<operations["getPortfolioTransactions"]["parameters"]["query"]>
 
 export interface PaginatedResponse<T> {
   items: T[]
@@ -150,11 +152,13 @@ export async function getPortfolioTransactions(
   sortOrder: "asc" | "desc" = "desc",
   positionId?: string,
   labelIds?: string[],
+  instrumentSymbol?: GetPortfolioTransactionsQuery["instrumentSymbol"],
 ): Promise<PaginatedResponse<PortfolioTransactionsPage["items"][number]>> {
   const position = positionId ? `&positionId=${encodeURIComponent(positionId)}` : ""
   const labels = labelIds?.length ? `&labels=${encodeURIComponent(labelIds.join(","))}` : ""
+  const symbol = instrumentSymbol ? `&instrumentSymbol=${encodeURIComponent(instrumentSymbol)}` : ""
   return http.get<PaginatedResponse<PortfolioTransactionsPage["items"][number]>>(
-    `/api/portfolios/${id}/transactions?page=${page}&limit=${limit}&sortBy=${sortBy}&sortOrder=${sortOrder}${position}${labels}`,
+    `/api/portfolios/${id}/transactions?page=${page}&limit=${limit}&sortBy=${sortBy}&sortOrder=${sortOrder}${position}${labels}${symbol}`,
   )
 }
 
@@ -188,10 +192,12 @@ export async function getAllTransactions(
   sortBy = "date",
   sortOrder: "asc" | "desc" = "desc",
   labelIds?: string[],
+  instrumentSymbol?: GetAllTransactionsQuery["instrumentSymbol"],
 ): Promise<PaginatedResponse<PortfolioTransactionsPage["items"][number]>> {
   const labels = labelIds?.length ? `&labels=${encodeURIComponent(labelIds.join(","))}` : ""
+  const symbol = instrumentSymbol ? `&instrumentSymbol=${encodeURIComponent(instrumentSymbol)}` : ""
   return http.get<PaginatedResponse<PortfolioTransactionsPage["items"][number]>>(
-    `/api/portfolios/transactions?page=${page}&limit=${limit}&sortBy=${sortBy}&sortOrder=${sortOrder}${labels}`,
+    `/api/portfolios/transactions?page=${page}&limit=${limit}&sortBy=${sortBy}&sortOrder=${sortOrder}${labels}${symbol}`,
   )
 }
 

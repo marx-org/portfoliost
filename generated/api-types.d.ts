@@ -4737,6 +4737,8 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 /** @description Comma-separated label ids; AND filter (entity must have all) */
                 labels?: string;
+                /** @description Filter by instrument symbol (e.g. AAPL). Case-insensitive. */
+                instrumentSymbol?: string;
             };
             header?: never;
             path?: never;
@@ -5035,6 +5037,8 @@ export interface operations {
                 positionId?: string;
                 /** @description Comma-separated label ids; AND filter (entity must have all) */
                 labels?: string;
+                /** @description Filter by instrument symbol (e.g. AAPL). Case-insensitive. */
+                instrumentSymbol?: string;
             };
             header?: never;
             path: {
