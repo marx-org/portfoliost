@@ -277,6 +277,8 @@ const fifoReferenceLines = computed(() => {
     label: { borderColor: string; style: { color: string; background: string }; text: string }
   }> = []
 
+  if (buyPrices.length === 0) return lines
+
   const low = Math.min(...buyPrices)
   const high = Math.max(...buyPrices)
 

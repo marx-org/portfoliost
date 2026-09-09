@@ -49,7 +49,9 @@ async function checkTransactions(wrapper: ReturnType<typeof mountChart>) {
   await flushPromises()
 }
 
-function makeTx(tx: { id: string; type: string; executedAt: string }) {
+function makeTx(tx: { id: string; type: string; executedAt: string; quantity?: number; price?: number }) {
+  const qty = tx.quantity ?? 10
+  const price = tx.price ?? 180
   return {
     id: tx.id,
     portfolioId: "p1",
@@ -59,10 +61,10 @@ function makeTx(tx: { id: string; type: string; executedAt: string }) {
     type: tx.type,
     instrumentSymbol: "AAPL",
     instrumentName: "Apple",
-    quantity: 10,
-    price: 180,
+    quantity: qty,
+    price,
     fees: 0,
-    totalAmount: 1800,
+    totalAmount: qty * price,
     currency: "USD",
     priceCurrency: "USD",
     instrumentCurrency: "USD",
@@ -72,20 +74,24 @@ function makeTx(tx: { id: string; type: string; executedAt: string }) {
     executedAt: tx.executedAt,
     createdAt: tx.executedAt,
     displayCurrency: "USD",
-    convertedTotalAmount: 1800,
-    convertedPrice: 180,
+    convertedTotalAmount: qty * price,
+    convertedPrice: price,
     convertedFees: 0,
     labels: undefined,
   }
 }
 
-async function mountTxChart(txs: { id: string; type: string; executedAt: string }[]) {
+async function mountTxChart(txs: { id: string; type: string; executedAt: string; quantity?: number; price?: number }[]) {
   mockedGetPortfolioTransactions.mockResolvedValue(makeTxPage(txs.map(makeTx)))
   const wrapper = mountChart({ portfolioId: "p1" })
   await flushPromises()
   await checkTransactions(wrapper)
   await flushPromises()
   return wrapper
+}
+
+function refLinesOf(wrapper: ReturnType<typeof mountChart>) {
+  return (wrapper.vm as unknown as { chartOptions: { annotations: { yaxis: Array<{ y: number; borderColor: string; strokeDashArray: number }> } } }).chartOptions.annotations.yaxis
 }
 
 describe("PriceChart", () => {
@@ -261,5 +267,80 @@ describe("PriceChart", () => {
     const html = vm.chartOptions.tooltip.custom(args)
     expect(html).toContain("AAPL")
     expect(html).not.toContain("Transactions:")
+  })
+
+  it("computes FIFO avg cost + Low/High lines for buys in the visible range", async () => {
+    const d = makeHistory().timestamps
+    const wrapper = await mountTxChart([
+      { id: "b1", type: "buy", executedAt: new Date(d[0] * 1000).toISOString(), quantity: 10, price: 100 },
+      { id: "b2", type: "buy", executedAt: new Date(d[1] * 1000).toISOString(), quantity: 10, price: 200 },
+      { id: "s1", type: "sell", executedAt: new Date(d[2] * 1000).toISOString(), quantity: 5, price: 150 },
+    ])
+    const lines = refLinesOf(wrapper)
+    // FIFO: after buying 10@100 + 10@200, selling 5 -> sells 5 of the 100 lot first.
+    // remaining: 5@100 + 10@200 = 15 qty, totalCost = 5*100 + 10*200 = 2500, avg = 2500/15 = 166.67
+    const avg = lines.find((l) => l.borderColor === "#2563eb")
+    expect(avg).toBeDefined()
+    expect(avg!.y).toBeCloseTo(166.67, 1)
+    expect(avg!.strokeDashArray).toBe(6)
+    const low = lines.find((l) => l.borderColor === "#16a34a")
+    const high = lines.find((l) => l.borderColor === "#dc2626")
+    expect(low!.y).toBe(100)
+    expect(low!.strokeDashArray).toBe(4)
+    expect(high!.y).toBe(200)
+    expect(high!.strokeDashArray).toBe(4)
+  })
+
+  it("omits the Avg line when the position is fully sold in range but keeps Low/High", async () => {
+    const d = makeHistory().timestamps
+    const wrapper = await mountTxChart([
+      { id: "b1", type: "buy", executedAt: new Date(d[0] * 1000).toISOString(), quantity: 10, price: 100 },
+      { id: "s1", type: "sell", executedAt: new Date(d[1] * 1000).toISOString(), quantity: 10, price: 150 },
+    ])
+    const lines = refLinesOf(wrapper)
+    expect(lines.find((l) => l.borderColor === "#2563eb")).toBeUndefined()
+    expect(lines.find((l) => l.borderColor === "#16a34a")!.y).toBe(100)
+    expect(lines.find((l) => l.borderColor === "#dc2626")!.y).toBe(100)
+  })
+
+  it("hides reference lines in Percent mode", async () => {
+    const d = makeHistory().timestamps
+    const wrapper = await mountTxChart([
+      { id: "b1", type: "buy", executedAt: new Date(d[0] * 1000).toISOString(), quantity: 10, price: 100 },
+    ])
+    const percent = wrapper.findAll("button").find((b) => b.text() === "Percent")!
+    await percent.trigger("click")
+    await flushPromises()
+    expect(refLinesOf(wrapper)).toEqual([])
+  })
+
+  it("shows no reference lines when Transactions is unchecked", async () => {
+    const wrapper = mountChart()
+    await flushPromises()
+    expect(refLinesOf(wrapper)).toEqual([])
+  })
+
+  it("ignores transactions outside the visible range for reference lines", async () => {
+    const wrapper = await mountTxChart([
+      { id: "b1", type: "buy", executedAt: new Date("2030-01-01T12:00:00Z").toISOString(), quantity: 10, price: 300 },
+    ])
+    // Buy date is outside the visible range -> no Low/High/Avg lines.
+    expect(refLinesOf(wrapper)).toEqual([])
+  })
+
+  it("runs FIFO correctly across partial sells over multiple lots", async () => {
+    const d = makeHistory().timestamps
+    const wrapper = await mountTxChart([
+      { id: "b1", type: "buy", executedAt: new Date(d[0] * 1000).toISOString(), quantity: 10, price: 50 },
+      { id: "b2", type: "buy", executedAt: new Date(d[1] * 1000).toISOString(), quantity: 10, price: 100 },
+      { id: "s1", type: "sell", executedAt: new Date(d[2] * 1000).toISOString(), quantity: 12, price: 90 },
+      { id: "s2", type: "sell", executedAt: new Date(d[3] * 1000).toISOString(), quantity: 4, price: 95 },
+    ])
+    const lines = refLinesOf(wrapper)
+    const avg = lines.find((l) => l.borderColor === "#2563eb")
+    // Lots: 10@50, 10@100. Sell 12 -> drains 10@50 + 2@100 -> remaining 8@100.
+    // Sell 4 -> drains 4@100 -> remaining 4@100. totalCost = 4*100 = 400, qty 4, avg = 100.
+    expect(avg).toBeDefined()
+    expect(avg!.y).toBe(100)
   })
 })
