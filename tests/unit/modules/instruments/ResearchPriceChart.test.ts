@@ -199,13 +199,13 @@ describe("PriceChart", () => {
   it("renders transaction markers when transactions are checked", async () => {
     const date = makeHistory().timestamps[0]
     const wrapper = await mountTxChart([
-      { id: "t1", type: "buy", executedAt: new Date(date * 1000).toISOString() },
+      { id: "t1", type: "BUY", executedAt: new Date(date * 1000).toISOString() },
     ])
     const opts = (wrapper.vm as unknown as { chartOptions: { annotations: { points: unknown[] } } }).chartOptions
     expect(opts.annotations.points.length).toBe(1)
-    const p = opts.annotations.points[0] as { x: number; offsetY: number; marker: { fillColor: string } }
+    const p = opts.annotations.points[0] as { x: number; marker: { fillColor: string; offsetY: number } }
     expect(p.x).toBe(0)
-    expect(p.offsetY).toBe(0)
+    expect(p.marker.offsetY).toBe(0)
     expect(p.marker.fillColor).toBe("#16a34a")
   })
 
@@ -213,20 +213,51 @@ describe("PriceChart", () => {
     const date = makeHistory().timestamps[2]
     const iso = new Date(date * 1000).toISOString()
     const wrapper = await mountTxChart([
-      { id: "t1", type: "buy", executedAt: iso },
-      { id: "t2", type: "sell", executedAt: iso },
-      { id: "t3", type: "buy", executedAt: iso },
+      { id: "t1", type: "BUY", executedAt: iso },
+      { id: "t2", type: "SELL", executedAt: iso },
+      { id: "t3", type: "BUY", executedAt: iso },
     ])
-    const points = (wrapper.vm as unknown as { chartOptions: { annotations: { points: { x: number; offsetY: number }[] } } }).chartOptions.annotations.points
+    const points = (wrapper.vm as unknown as { chartOptions: { annotations: { points: { marker: { offsetY: number } }[] } } }).chartOptions.annotations.points
     expect(points.length).toBe(3)
-    expect(points.map((p) => p.offsetY)).toEqual([0, -8, -16])
+    expect(points.map((p) => p.marker.offsetY)).toEqual([0, -8, -16])
+  })
+
+  it("handles uppercase API transaction types for markers and FIFO lines", async () => {
+    const date = makeHistory().timestamps[0]
+    const iso = new Date(date * 1000).toISOString()
+    const wrapper = await mountTxChart([
+      { id: "t1", type: "BUY", executedAt: iso, quantity: 10, price: 180 },
+      { id: "t2", type: "SELL", executedAt: iso, quantity: 5, price: 200 },
+    ])
+    const opts = (wrapper.vm as unknown as { chartOptions: { annotations: { points: { marker: { fillColor: string } }[]; yaxis: { y: number }[] } } }).chartOptions.annotations
+    // Both transactions on the same date produce two markers (buys before sells).
+    expect(opts.points.length).toBe(2)
+    expect(opts.points[0].marker.fillColor).toBe("#16a34a")
+    expect(opts.points[1].marker.fillColor).toBe("#dc2626")
+    // FIFO on the visible range yields Avg + Low/High lines.
+    expect(opts.yaxis.length).toBe(3)
   })
 
   it("does not render markers outside the visible range", async () => {
     const future = new Date("2030-01-01T12:00:00Z").toISOString()
-    const wrapper = await mountTxChart([{ id: "t1", type: "buy", executedAt: future }])
+    const wrapper = await mountTxChart([{ id: "t1", type: "BUY", executedAt: future }])
     const points = (wrapper.vm as unknown as { chartOptions: { annotations: { points: unknown[] } } }).chartOptions.annotations.points
     expect(points.length).toBe(0)
+  })
+
+  it("snaps transactions on non-trading days to the nearest bar", async () => {
+    const timestamps = [1754870400, 1754956800, 1755043200, 1755216000, 1755302400]
+    mockedGetHistory.mockResolvedValue({ ...makeHistory(), timestamps })
+    const gapDate = new Date((timestamps[2] + 86400) * 1000).toISOString()
+    const wrapper = await mountTxChart([{ id: "t1", type: "BUY", executedAt: gapDate }])
+    const points = (wrapper.vm as unknown as { chartOptions: { annotations: { points: { x: number }[] } } }).chartOptions.annotations.points
+    expect(points.length).toBe(1)
+    expect(points[0].x).toBe(2)
+    const vm = wrapper.vm as unknown as {
+      chartOptions: { tooltip: { custom: (args: { series: number[][]; dataPointIndex: number; w: { config: { series: { name: string }[] } } }) => string } }
+    }
+    const html = vm.chartOptions.tooltip.custom({ series: [[100]], dataPointIndex: 2, w: { config: { series: [{ name: "AAPL" }] } } })
+    expect(html).toContain("Transactions:")
   })
 
   it("wires a custom tooltip function", async () => {
@@ -238,7 +269,7 @@ describe("PriceChart", () => {
   it("renders transaction rows in the tooltip on dates with transactions", async () => {
     const date = makeHistory().timestamps[0]
     const wrapper = await mountTxChart([
-      { id: "t1", type: "buy", executedAt: new Date(date * 1000).toISOString() },
+      { id: "t1", type: "BUY", executedAt: new Date(date * 1000).toISOString() },
     ])
     const vm = wrapper.vm as unknown as {
       chartOptions: { tooltip: { custom: (args: { series: number[][]; dataPointIndex: number; w: { config: { series: { name: string }[] } } }) => string } }
@@ -272,9 +303,9 @@ describe("PriceChart", () => {
   it("computes FIFO avg cost + Low/High lines for buys in the visible range", async () => {
     const d = makeHistory().timestamps
     const wrapper = await mountTxChart([
-      { id: "b1", type: "buy", executedAt: new Date(d[0] * 1000).toISOString(), quantity: 10, price: 100 },
-      { id: "b2", type: "buy", executedAt: new Date(d[1] * 1000).toISOString(), quantity: 10, price: 200 },
-      { id: "s1", type: "sell", executedAt: new Date(d[2] * 1000).toISOString(), quantity: 5, price: 150 },
+      { id: "b1", type: "BUY", executedAt: new Date(d[0] * 1000).toISOString(), quantity: 10, price: 100 },
+      { id: "b2", type: "BUY", executedAt: new Date(d[1] * 1000).toISOString(), quantity: 10, price: 200 },
+      { id: "s1", type: "SELL", executedAt: new Date(d[2] * 1000).toISOString(), quantity: 5, price: 150 },
     ])
     const lines = refLinesOf(wrapper)
     // FIFO: after buying 10@100 + 10@200, selling 5 -> sells 5 of the 100 lot first.
@@ -294,8 +325,8 @@ describe("PriceChart", () => {
   it("omits the Avg line when the position is fully sold in range but keeps Low/High", async () => {
     const d = makeHistory().timestamps
     const wrapper = await mountTxChart([
-      { id: "b1", type: "buy", executedAt: new Date(d[0] * 1000).toISOString(), quantity: 10, price: 100 },
-      { id: "s1", type: "sell", executedAt: new Date(d[1] * 1000).toISOString(), quantity: 10, price: 150 },
+      { id: "b1", type: "BUY", executedAt: new Date(d[0] * 1000).toISOString(), quantity: 10, price: 100 },
+      { id: "s1", type: "SELL", executedAt: new Date(d[1] * 1000).toISOString(), quantity: 10, price: 150 },
     ])
     const lines = refLinesOf(wrapper)
     expect(lines.find((l) => l.borderColor === "#2563eb")).toBeUndefined()
@@ -306,7 +337,7 @@ describe("PriceChart", () => {
   it("hides reference lines in Percent mode", async () => {
     const d = makeHistory().timestamps
     const wrapper = await mountTxChart([
-      { id: "b1", type: "buy", executedAt: new Date(d[0] * 1000).toISOString(), quantity: 10, price: 100 },
+      { id: "b1", type: "BUY", executedAt: new Date(d[0] * 1000).toISOString(), quantity: 10, price: 100 },
     ])
     const percent = wrapper.findAll("button").find((b) => b.text() === "Percent")!
     await percent.trigger("click")
@@ -322,7 +353,7 @@ describe("PriceChart", () => {
 
   it("ignores transactions outside the visible range for reference lines", async () => {
     const wrapper = await mountTxChart([
-      { id: "b1", type: "buy", executedAt: new Date("2030-01-01T12:00:00Z").toISOString(), quantity: 10, price: 300 },
+      { id: "b1", type: "BUY", executedAt: new Date("2030-01-01T12:00:00Z").toISOString(), quantity: 10, price: 300 },
     ])
     // Buy date is outside the visible range -> no Low/High/Avg lines.
     expect(refLinesOf(wrapper)).toEqual([])
@@ -331,10 +362,10 @@ describe("PriceChart", () => {
   it("runs FIFO correctly across partial sells over multiple lots", async () => {
     const d = makeHistory().timestamps
     const wrapper = await mountTxChart([
-      { id: "b1", type: "buy", executedAt: new Date(d[0] * 1000).toISOString(), quantity: 10, price: 50 },
-      { id: "b2", type: "buy", executedAt: new Date(d[1] * 1000).toISOString(), quantity: 10, price: 100 },
-      { id: "s1", type: "sell", executedAt: new Date(d[2] * 1000).toISOString(), quantity: 12, price: 90 },
-      { id: "s2", type: "sell", executedAt: new Date(d[3] * 1000).toISOString(), quantity: 4, price: 95 },
+      { id: "b1", type: "BUY", executedAt: new Date(d[0] * 1000).toISOString(), quantity: 10, price: 50 },
+      { id: "b2", type: "BUY", executedAt: new Date(d[1] * 1000).toISOString(), quantity: 10, price: 100 },
+      { id: "s1", type: "SELL", executedAt: new Date(d[2] * 1000).toISOString(), quantity: 12, price: 90 },
+      { id: "s2", type: "SELL", executedAt: new Date(d[3] * 1000).toISOString(), quantity: 4, price: 95 },
     ])
     const lines = refLinesOf(wrapper)
     const avg = lines.find((l) => l.borderColor === "#2563eb")

@@ -76,9 +76,20 @@ async function fetchTransactions(): Promise<void> {
   }
 }
 
+async function ensurePortfoliosLoaded(): Promise<void> {
+  if (!props.portfolioId && portfolioStore.portfolios.length === 0) {
+    try {
+      await portfolioStore.fetchAll()
+    } catch {
+      // Non-fatal: the selector simply stays on "All portfolios".
+    }
+  }
+}
+
 function toggleTransactions(checked: boolean): void {
   showTransactions.value = checked
   if (checked) {
+    void ensurePortfoliosLoaded()
     fetchTransactions()
   } else {
     transactions.value = []
@@ -102,7 +113,10 @@ async function load(compareKey: CompareKey) {
   }
 }
 
-onMounted(() => load("none"))
+onMounted(() => {
+  load("none")
+  if (showTransactions.value) void ensurePortfoliosLoaded()
+})
 watch(compare, (k) => {
   if (k !== loadedCompare.value) load(k)
 })
@@ -208,10 +222,16 @@ function isoDate(ms: number): string {
   return `${d.getFullYear()}-${m}-${day}`
 }
 
+// The API returns transaction types as uppercase ("BUY" | "SELL" | "DIVIDEND").
+function txType(tx: Transaction): string {
+  return (tx.type ?? "").toUpperCase()
+}
+
 const txByDate = computed<Map<string, Transaction[]>>(() => {
   const map = new Map<string, Transaction[]>()
   for (const tx of transactions.value) {
-    if (tx.type !== "buy" && tx.type !== "sell") continue
+    const type = txType(tx)
+    if (type !== "BUY" && type !== "SELL") continue
     const key = isoDate(new Date(tx.executedAt).getTime())
     const group = map.get(key)
     if (group) group.push(tx)
@@ -219,7 +239,7 @@ const txByDate = computed<Map<string, Transaction[]>>(() => {
   }
   for (const group of map.values()) {
     group.sort((a, b) => {
-      const typeDiff = (a.type === "buy" ? 0 : 1) - (b.type === "buy" ? 0 : 1)
+      const typeDiff = (txType(a) === "BUY" ? 0 : 1) - (txType(b) === "BUY" ? 0 : 1)
       if (typeDiff !== 0) return typeDiff
       return new Date(a.executedAt).getTime() - new Date(b.executedAt).getTime()
     })
@@ -246,12 +266,13 @@ const fifoReferenceLines = computed(() => {
     const txTs = new Date(tx.executedAt).getTime() / 1000
     if (txTs < startTs || txTs > endTs) continue
 
-    if (tx.type === "buy") {
+    const type = txType(tx)
+    if (type === "BUY") {
       buyPrices.push(tx.price)
       lots.push({ qty: tx.quantity, price: tx.price })
       remainingQty += tx.quantity
       totalCost += tx.quantity * tx.price
-    } else if (tx.type === "sell") {
+    } else if (type === "SELL") {
       let sellQty = tx.quantity
       while (sellQty > 0 && lots.length > 0) {
         const lot = lots[0]
@@ -309,11 +330,13 @@ const fifoReferenceLines = computed(() => {
   return lines
 })
 
-const transactionAnnotations = computed(() => {
-  if (!showTransactions.value) return []
+interface BarTxEntry { index: number; group: Transaction[] }
+
+const barDateTxMap = computed<Map<string, BarTxEntry[]>>(() => {
+  const map = new Map<string, BarTxEntry[]>()
   const n = timestamps.value.length
   const startIdx = n - slicePoints.value
-  if (startIdx < 0) return []
+  if (startIdx < 0) return map
   const startDateStr = isoDate(timestamps.value[startIdx] * 1000)
   const endDateStr = isoDate(timestamps.value[n - 1] * 1000)
   const dateIndexMap = new Map<string, number>()
@@ -321,30 +344,56 @@ const transactionAnnotations = computed(() => {
     const iso = isoDate(timestamps.value[startIdx + i] * 1000)
     if (!dateIndexMap.has(iso)) dateIndexMap.set(iso, i)
   })
+  function nearestBarIndex(dateStr: string): number | undefined {
+    const targetMs = Date.parse(dateStr + "T00:00:00Z")
+    let best: { i: number; dist: number } | null = null
+    for (let i = 0; i < series.value.dates.length; i++) {
+      const dist = Math.abs(timestamps.value[startIdx + i] * 1000 - targetMs)
+      if (best === null || dist < best.dist) best = { i, dist }
+    }
+    if (best && best.dist <= 7 * 86400_000) return best.i
+    return undefined
+  }
+  for (const [dateStr, group] of txByDate.value) {
+    if (dateStr < startDateStr || dateStr > endDateStr) continue
+    const index = dateIndexMap.get(dateStr) ?? nearestBarIndex(dateStr)
+    if (index === undefined) continue
+    const barDate = isoDate(timestamps.value[startIdx + index] * 1000)
+    const entries = map.get(barDate)
+    if (entries) {
+      const last = entries[entries.length - 1]
+      if (last.index === index) last.group.push(...group)
+      else entries.push({ index, group })
+    } else {
+      map.set(barDate, [{ index, group }])
+    }
+  }
+  return map
+})
+
+const transactionAnnotations = computed(() => {
+  if (!showTransactions.value) return []
   const points: Array<{
     x: number
     y: number
-    marker: { size: number; fillColor: string; strokeColor: string }
+    marker: { size: number; fillColor: string; strokeColor: string; offsetY: number }
     label: { borderColor: string; style: { color: string; background: string }; text: string }
-    offsetY: number
   }> = []
-  for (const [dateStr, group] of txByDate.value) {
-    if (dateStr < startDateStr || dateStr > endDateStr) continue
-    const index = dateIndexMap.get(dateStr)
-    if (index === undefined) continue
-    const lineValue = series.value.data[0]?.data?.[index]
-    if (typeof lineValue !== "number") continue
-    group.forEach((tx, i) => {
-      const isBuy = tx.type === "buy"
-      const color = isBuy ? "#16a34a" : "#dc2626"
-      points.push({
-        x: index,
-        y: lineValue,
-        marker: { size: 5, fillColor: color, strokeColor: color },
-        label: { borderColor: color, style: { color: "#fff", background: color }, text: isBuy ? "▲" : "▼" },
-        offsetY: -8 * i || 0,
+  for (const entries of barDateTxMap.value.values()) {
+    for (const { index, group } of entries) {
+      const lineValue = series.value.data[0]?.data?.[index]
+      if (typeof lineValue !== "number") continue
+      group.forEach((tx, i) => {
+        const isBuy = txType(tx) === "BUY"
+        const color = isBuy ? "#16a34a" : "#dc2626"
+        points.push({
+          x: index,
+          y: lineValue,
+          marker: { size: 5, fillColor: color, strokeColor: color, offsetY: i === 0 ? 0 : -8 * i },
+          label: { borderColor: color, style: { color: "#fff", background: color }, text: isBuy ? "▲" : "▼" },
+        })
       })
-    })
+    }
   }
   return points
 })
@@ -367,11 +416,12 @@ function tooltipCustom({ series, dataPointIndex, w }: {
   let txHtml = ""
   if (showTransactions.value && dataPointIndex >= 0 && startIdx >= 0 && startIdx + dataPointIndex < n) {
     const dateStr = isoDate(timestamps.value[startIdx + dataPointIndex] * 1000)
-    const txGroup = txByDate.value.get(dateStr)
-    if (txGroup && txGroup.length) {
-      const rows = txGroup
+    const entries = barDateTxMap.value.get(dateStr)
+    if (entries && entries.length) {
+      const rows = entries
+        .flatMap((e) => e.group)
         .map((tx) => {
-          const isBuy = tx.type === "buy"
+          const isBuy = txType(tx) === "BUY"
           const icon = isBuy ? "▲" : "▼"
           const label = isBuy ? "Buy" : "Sell"
           const fee = tx.fees ? ` (fees ${formatCurrency(tx.fees, tx.currency)})` : ""
