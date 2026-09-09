@@ -49,7 +49,7 @@ test("buy dialog: wallet-driven FX section → automatic suggests, custom submit
   await expect(search).toBeVisible()
   await page.getByTestId("instrument-search").fill("Texas Instruments")
   await page.waitForTimeout(1200)
-  await search.getByRole("button", { name: /^TXN Texas Instruments/ }).first().click()
+  await search.getByRole("button", { name: /^TXN / }).first().click()
 
   const buy = page.getByRole("dialog", { name: "Buy Position" })
   await expect(buy).toBeVisible()

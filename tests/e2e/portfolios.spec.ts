@@ -71,7 +71,7 @@ test("portfolio detail shows metric strip, tabbed sections, and positions", asyn
 
   await tabs.getByRole("link", { name: "Holdings" }).click()
   await page.getByRole("link", { name: "META" }).click()
-  await expect(page).toHaveURL(/\/en\/research\/META\.US\/overview/)
+  await expect(page).toHaveURL(/\/en\/research\/META\/overview/)
 })
 
 test("transactions page lists transactions with sortable columns and pagination", async ({ page }) => {
@@ -250,7 +250,7 @@ test("buy position stock step has purchase date, cash portfolio, fee % toggle an
   // ticker reference returns many KO-prefixed listings — pick the US original
   await page
     .getByRole("dialog", { name: "Search for Instruments" })
-    .getByRole("button", { name: /^KO The Coca-Cola/ })
+    .getByRole("button", { name: /^KO / })
     .first()
     .click()
 

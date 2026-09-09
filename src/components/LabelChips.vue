@@ -11,7 +11,7 @@ const overflowTitle = computed(() => props.labels.map((l) => l.name).join(", "))
 </script>
 
 <template>
-  <div class="flex flex-wrap items-center gap-1" :title="overflowTitle">
+  <div class="flex flex-wrap items-center gap-1" :title="overflow.length ? overflowTitle : undefined">
     <LabelBadge v-for="l in visible" :key="l.id" :label="l" @click="emit('badgeClick', l)" />
     <span
       v-if="overflow.length"
