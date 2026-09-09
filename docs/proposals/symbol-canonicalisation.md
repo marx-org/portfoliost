@@ -292,15 +292,23 @@ Tests: `npm run build && npm run test` in `portfoliost-wallets/`
 
 ## Verification checklist
 
-- [ ] Search "SAP" returns both `SAP` (NYSE) and `SAP.DE` (XETRA) as separate results with exchange and country shown
-- [ ] Clicking `SAP.DE` in search navigates to `/research/SAP.DE`, not `/research/SAP.US`
-- [ ] Recent searches after clicking `SAP.DE` records `"SAP.DE"`, not `"SAP"`
-- [ ] `/research/SAP.DE` display label shows `SAP.DE`, not `SAP`
-- [ ] Price chart on `/research/SAP.DE` shows SAP.DE transactions (not empty); filtering by `SAP` returns nothing
-- [ ] Filtering transactions by `SAP` does NOT return `SAP.DE` transactions (exact match only)
-- [ ] Pasting ISIN `DE0007164600` in search returns SAP listings
-- [ ] No `.US` suffix appears anywhere in the UI, URLs, or API responses for US listings
-- [ ] `npm run build && npm run test && npm run test:mock` pass in `portfoliost/`
-- [ ] `npm run build && npm run test` pass in `portfoliost-instruments/`
-- [ ] `npm run build && npm run test` pass in `portfoliost-wallets/`
-- [ ] `docker compose up -d --build` starts cleanly; `npm run test:e2e` passes against the stack
+- [x] Search "SAP" returns both `SAP` (NYSE) and `SAP.DE` (XETRA) as separate results with exchange and country shown
+- [x] Clicking `SAP.DE` in search navigates to `/research/SAP.DE`, not `/research/SAP.US`
+- [x] Recent searches after clicking `SAP.DE` records `"SAP.DE"`, not `"SAP"`
+- [x] `/research/SAP.DE` display label shows `SAP.DE`, not `SAP`
+- [x] Price chart on `/research/SAP.DE` shows SAP.DE transactions (not empty); filtering by `SAP` returns nothing
+- [x] Filtering transactions by `SAP` does NOT return `SAP.DE` transactions (exact match only)
+- [x] Pasting ISIN `DE0007164600` in search returns SAP listings
+- [x] No `.US` suffix appears anywhere in the UI, URLs, or API responses for US listings
+- [x] `npm run build && npm run test && npm run test:mock` pass in `portfoliost/` (185 unit, 174 mock, build clean)
+- [x] `npm run build && npm run test` pass in `portfoliost-instruments/` (183)
+- [x] `npm run build && npm run test` pass in `portfoliost-wallets/` (258)
+- [x] `docker compose up -d --build` starts cleanly; `npm run test:e2e` passes against the stack (57/60; details follow)
+- [ ] **Pre-existing e2e failures (not caused by canonicalisation; deferred):**
+  - `auth.spec.ts:3` — asserts the login form is hidden, but stack default is `VITE_PASSWORD_LOGIN_ENABLED=true` (e2e login helpers depend on it)
+  - `portfolios.spec.ts:302` — country group renders mock field `"United States"`; test expects `"US"`
+  - `price-bars.spec.ts:25` — sim returns duplicate per-date rows (raw + split-adjusted closes); test `indexOf` hits the raw closes
+
+Note: `mock-db-seed` used to abort at `ticker_reference` on postgres.js 3.4.x (the
+`${sql(rows)}` value fragment is mis-treated as identifiers, crashing `escape()`),
+which silently broke the `test:e2e` reset gate — fixed in `bc98440`.
