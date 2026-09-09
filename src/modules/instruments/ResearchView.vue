@@ -6,13 +6,13 @@ import RecentSearchesBar from "@/modules/instruments/RecentSearchesBar.vue"
 import { getInstrumentProfile } from "@/api/instruments"
 import { useWatchlistsStore } from "@/stores/watchlists"
 import { useRecentSearchesStore } from "@/stores/recentSearches"
-import { baseSymbol, researchSymbol } from "@/utils/research"
+import { researchSymbol } from "@/utils/research"
 import type { InstrumentsProfile } from "@/api/types"
 
 const route = useRoute()
 const router = useRouter()
 const routeSymbol = computed(() => String(route.params.symbol).toUpperCase())
-const symbol = computed(() => baseSymbol(routeSymbol.value))
+const symbol = computed(() => routeSymbol.value)
 const watchlists = useWatchlistsStore()
 const recentSearches = useRecentSearchesStore()
 const showSearch = ref(false)
@@ -50,7 +50,7 @@ onMounted(async () => {
 // Same-route navigation (quick switcher / search) only changes the param —
 // refetch the header profile when it does.
 watch(routeSymbol, async (sym) => {
-  void recentSearches.record(baseSymbol(sym))
+  void recentSearches.record(sym)
   profile.value = null
   try {
     profile.value = await getInstrumentProfile(sym)

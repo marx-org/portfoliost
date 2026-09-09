@@ -1,14 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue"
 import { useRoute } from "vue-router"
-import { baseSymbol } from "@/utils/research"
 import { getInstrumentPeers } from "@/api/instruments"
 import type { components } from "@/api/types"
 import { COMPARE_METRICS } from "./compareMetrics"
 
 const route = useRoute()
 const routeSymbol = String(route.params.symbol).toUpperCase()
-const symbol = baseSymbol(routeSymbol)
+const symbol = routeSymbol
 
 const items = ref<components["schemas"]["ResearchCompare"][]>([])
 const loading = ref(true)

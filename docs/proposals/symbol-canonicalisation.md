@@ -164,7 +164,7 @@ Tests: `npm run build` in all consumer repos after installing the new contracts 
 
 ---
 
-### Step 2 — Simplify `researchSymbol`, delete `baseSymbol` and `symbolExchange` [ ]
+### Step 2 — Simplify `researchSymbol`, delete `baseSymbol` and `symbolExchange` [x]
 
 File: `portfoliost/src/utils/research.ts`
 
