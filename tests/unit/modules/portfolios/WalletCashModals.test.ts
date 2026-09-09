@@ -18,6 +18,8 @@ vi.mock("@/api/wallets", async (importOriginal) => {
   const actual = await importOriginal<typeof walletsApi>()
   return {
     ...actual,
+    getWallets: vi.fn(),
+    getWalletTotalBalance: vi.fn(),
     depositToWallet: vi.fn(),
     withdrawFromWallet: vi.fn(),
     transferBetweenWallets: vi.fn(),
@@ -68,6 +70,8 @@ describe("WalletCashModals — fee currency & cross-currency transfer (§10.4)",
     mocked.depositToWallet.mockResolvedValue({} as never)
     mocked.withdrawFromWallet.mockResolvedValue({} as never)
     mocked.transferBetweenWallets.mockResolvedValue({} as never)
+    mocked.getWallets.mockResolvedValue([] as never)
+    mocked.getWalletTotalBalance.mockResolvedValue({} as never)
   })
 
   it("withdraw fee select preselects the wallet currency and submits it", async () => {
@@ -86,6 +90,7 @@ describe("WalletCashModals — fee currency & cross-currency transfer (§10.4)",
     const payload = mocked.withdrawFromWallet.mock.calls[0][1]
     expect(payload.feeCurrency).toBe("USD")
     expect(payload.rateSource).toBe("automatic")
+    wrapper.unmount()
   })
 
   it("deposit includes fee fields when provided", async () => {
@@ -101,6 +106,7 @@ describe("WalletCashModals — fee currency & cross-currency transfer (§10.4)",
     const payload = mocked.depositToWallet.mock.calls[0][1]
     expect(payload.fees_type).toBe("pct")
     expect(payload.feeCurrency).toBeUndefined()
+    wrapper.unmount()
   })
 
   it("same-currency transfer hides target inputs; payload has no targetAmount", async () => {
@@ -109,6 +115,7 @@ describe("WalletCashModals — fee currency & cross-currency transfer (§10.4)",
     await flushPromises()
     // add a second EUR wallet via store? simpler: same-currency by using only one wallet -> no dest options
     expect(wrapper.find('[data-testid="wc-target-amount"]').exists()).toBe(false)
+    wrapper.unmount()
   })
 
   it("cross-currency transfer shows target input and submits manual target amount", async () => {
@@ -140,6 +147,7 @@ describe("WalletCashModals — fee currency & cross-currency transfer (§10.4)",
     const payload = mocked.transferBetweenWallets.mock.calls[0][1]
     expect(payload.targetAmount).toBe(91.5)
     expect(payload.to_wallet_id).toBe("w-eur")
+    wrapper.unmount()
   })
 })
 
@@ -172,6 +180,7 @@ describe("WalletCashModals — dual-currency confirmation (§10a D39/D40)", () =
     expect(text).toContain("Total debited")
     expect(text).toContain("$400.00")        // remaining (no fee)
     expect(text).toContain("≈ €1,680.00")    // remaining dual
+    wrapper.unmount()
   })
 
   it("same-currency summary stays single-currency", async () => {
@@ -181,6 +190,7 @@ describe("WalletCashModals — dual-currency confirmation (§10a D39/D40)", () =
     await wrapper.find("#wc-amount").setValue(50)
     await flushPromises()
     expect(wrapper.text()).not.toContain("≈")
+    wrapper.unmount()
   })
 })
 
@@ -208,5 +218,6 @@ describe("WalletCashModals — deposit net summary (§13 follow-up)", () => {
     const text = wrapper.text().replace(/\u00A0/g, " ")
     expect(text).toContain("Total credited (net)")
     expect(text).toContain("$197.50") // 200 − 10×0.25
+    wrapper.unmount()
   })
 })

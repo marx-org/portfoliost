@@ -50,6 +50,7 @@ vi.mock("@/api/wallets", async (importOriginal) => {
   return {
     ...actual,
     getWallets: vi.fn(),
+    getWalletTotalBalance: vi.fn(),
   }
 })
 
@@ -73,6 +74,12 @@ function makeEnv() {
     { id: "w1", userId: "u", name: "Cash USD", currency: "USD", balance: 1000, availableBalance: 1000, isDefault: false, createdAt: "", updatedAt: "" },
     { id: "w2", userId: "u", name: "Cash PLN", currency: "PLN", balance: 4300, availableBalance: 4300, isDefault: false, createdAt: "", updatedAt: "" },
   ] as never)
+  mockedWallets.getWalletTotalBalance.mockResolvedValue({
+    totalBalance: 5300,
+    totalAvailableBalance: 5300,
+    baseCurrency: "PLN",
+    walletBreakdown: [],
+  } as never)
   return { pinia }
 }
 
