@@ -371,7 +371,7 @@ Each step is one commit after its test passes.
   - _Test:_ Unit: `GET /metrics` returns `text/plain` with `http_server_request_duration`; health check passes
 - [x] **Step 3** — Same for `portfoliost-wallets`
   - _Test:_ Same as step 2
-- [ ] **Step 4** — Same for `portfoliost-instruments`
+- [x] **Step 4** — Same for `portfoliost-instruments`
   - _Test:_ Same as step 2
 - [ ] **Step 5** — Same for `portfoliost-users-auth`
   - _Test:_ Same as step 2
