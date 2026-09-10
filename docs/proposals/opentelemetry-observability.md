@@ -365,9 +365,9 @@ Once D56 is implemented:
 
 Each step is one commit after its test passes.
 
-- [ ] **Step 1** — Restructure `portfoliost-contracts` repo: move existing files under `contracts/` subfolder; add `otel/` subfolder with `src/index.ts`, `package.json`, `tsconfig.json`; add separate GHA workflow `release-otel.yml`; update `release-contracts.yml` with path filter; bump both packages via CI
+- [x] **Step 1** — Restructure `portfoliost-contracts` repo: move existing files under `contracts/` subfolder; add `otel/` subfolder with `src/index.ts`, `package.json`, `tsconfig.json`; add separate GHA workflow `release-otel.yml`; update `release-contracts.yml` with path filter; bump both packages via CI
   - _Test:_ TypeScript compiles in both subfolders (`npm run build` in `contracts/` and `otel/`); `@marx2/otel` importable; `@marx2/contracts` consumer imports unchanged
-- [ ] **Step 2** — Add OTel deps + `src/instrumentation.ts` + `/metrics` route + pino logging to `portfoliost-admin`
+- [x] **Step 2** — Add OTel deps + `src/instrumentation.ts` + `/metrics` route + pino logging to `portfoliost-admin`
   - _Test:_ Unit: `GET /metrics` returns `text/plain` with `http_server_request_duration`; health check passes
 - [ ] **Step 3** — Same for `portfoliost-wallets`
   - _Test:_ Same as step 2
