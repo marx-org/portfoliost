@@ -369,7 +369,7 @@ Each step is one commit after its test passes.
   - _Test:_ TypeScript compiles in both subfolders (`npm run build` in `contracts/` and `otel/`); `@marx2/otel` importable; `@marx2/contracts` consumer imports unchanged
 - [x] **Step 2** — Add OTel deps + `src/instrumentation.ts` + `/metrics` route + pino logging to `portfoliost-admin`
   - _Test:_ Unit: `GET /metrics` returns `text/plain` with `http_server_request_duration`; health check passes
-- [ ] **Step 3** — Same for `portfoliost-wallets`
+- [x] **Step 3** — Same for `portfoliost-wallets`
   - _Test:_ Same as step 2
 - [ ] **Step 4** — Same for `portfoliost-instruments`
   - _Test:_ Same as step 2
