@@ -1,17 +1,21 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from "vue"
+import { ref, computed, onMounted, onUnmounted } from "vue"
 import { fetchSystemVersions, type ServiceVersion } from "@/api/admin"
 
-const services = ref<ServiceVersion[]>([])
+const rawServices = ref<ServiceVersion[]>([])
 const fetchedAt = ref("")
 const loading = ref(true)
 const error = ref<string | null>(null)
+
+const spaEntry: ServiceVersion = { service: "portfoliost", version: __APP_VERSION__, impl: "real" }
+
+const services = computed(() => [spaEntry, ...rawServices.value])
 
 async function load() {
   try {
     loading.value = true
     const res = await fetchSystemVersions()
-    services.value = res.services
+    rawServices.value = res.services
     fetchedAt.value = res.fetchedAt
   } catch (e) {
     error.value = e instanceof Error ? e.message : "Failed to load"
