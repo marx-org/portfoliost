@@ -5,6 +5,7 @@ export interface ServiceVersion {
   service: string
   version: string
   impl: "real" | "mock" | "unknown" | "job"
+  image?: string
 }
 
 // Contract-typed admin user (from @marx2/contracts /api/admin/users).

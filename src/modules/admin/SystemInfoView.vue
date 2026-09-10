@@ -7,7 +7,12 @@ const fetchedAt = ref("")
 const loading = ref(true)
 const error = ref<string | null>(null)
 
-const spaEntry: ServiceVersion = { service: "portfoliost", version: __APP_VERSION__, impl: "real" }
+const spaEntry: ServiceVersion = {
+  service: "portfoliost",
+  version: __APP_VERSION__,
+  impl: "real",
+  image: `ghcr.io/marx2/portfoliost:${__APP_VERSION__}`,
+}
 
 const services = computed(() => [spaEntry, ...rawServices.value])
 
@@ -32,10 +37,14 @@ onMounted(() => {
 onUnmounted(() => clearInterval(timer))
 
 function implBadge(impl: string) {
-  if (impl === "real") return { label: "Real", class: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" }
+  if (impl === "real") return { label: "Deployment", class: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400" }
   if (impl === "mock") return { label: "Mock", class: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" }
   if (impl === "job") return { label: "Job", class: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400" }
   return { label: "Unreachable", class: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" }
+}
+
+function displayRef(svc: ServiceVersion) {
+  return svc.image ?? svc.version
 }
 </script>
 
@@ -52,7 +61,7 @@ function implBadge(impl: string) {
       >
         <div>
           <div class="font-medium text-slate-900 dark:text-slate-100">{{ svc.service }}</div>
-          <div class="text-sm text-slate-500 dark:text-slate-400">{{ svc.version }}</div>
+          <div class="text-sm text-slate-500 dark:text-slate-400">{{ displayRef(svc) }}</div>
         </div>
         <span
           class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
