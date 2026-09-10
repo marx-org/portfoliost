@@ -327,7 +327,7 @@ The Vue Flow canvas background is set to `bg-slate-50 dark:bg-slate-950`
 
 ### D55-11 — Backend contract additions
 
-Two new schemas added to `portfoliost-contracts/openapi.yaml`:
+Two new schemas added to `portfoliost-contracts/contracts/openapi.yaml`:
 
 - `TopologyStatusResponse` (described in D55-4 above)
 - `TopologyTrafficResponse` (described in D55-4 above)

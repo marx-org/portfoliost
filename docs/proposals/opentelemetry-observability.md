@@ -35,16 +35,48 @@ The `/__meta` endpoint is **not replaced**. It serves a different purpose
 
 ---
 
-## D56-1 — Shared OTel helpers via `@marx2/contracts/otel`
+## D56-1 — Shared OTel helpers as `@marx2/otel` (new package in `portfoliost-contracts` monorepo)
 
-The four Hono services currently share a copy-pasted `meta.ts`. This proposal
-introduces a new sub-path export `@marx2/contracts/otel` that provides shared
-OTel bootstrap helpers, following the exact same pattern already used by
-`@marx2/contracts/fx` and `@marx2/contracts/currencies`.
+The `portfoliost-contracts` repo is restructured into two independently-published
+packages that live as subfolders in the same repository:
 
-**Changes to `portfoliost-contracts`:**
+```
+portfoliost-contracts/
+  contracts/          ← existing package (@marx2/contracts) — OpenAPI spec, fx, currencies
+    openapi.yaml
+    src/
+      fx.ts
+      currencies.ts
+    package.json      ← name: "@marx2/contracts"
+    tsconfig.json
+  otel/               ← new package (@marx2/otel) — OTel bootstrap helpers
+    src/
+      index.ts
+    package.json      ← name: "@marx2/otel"
+    tsconfig.json
+  .github/
+    workflows/
+      release-contracts.yml   ← paths: ['contracts/**']
+      release-otel.yml        ← paths: ['otel/**']
+  .npmrc
+  .gitignore
+```
 
-1. Add `src/otel.ts` — shared, Hono-agnostic setup helpers:
+The two sub-packages each have their own `package.json`, `tsconfig.json`, independent
+semver version, and a dedicated GHA release workflow triggered only when files in
+their respective subfolder change. They share the repo-level `.npmrc` and `.gitignore`.
+
+**`contracts/` subfolder** — no functional changes; this is purely a directory move:
+- `openapi.yaml`, `src/fx.ts`, `src/currencies.ts`, `src/fx.test.ts` move under `contracts/`
+- `contracts/package.json` retains `name: "@marx2/contracts"` and all existing exports
+- `.github/workflows/release-contracts.yml` — identical logic to the current
+  `release.yml` but scoped with `paths: ['contracts/**']` in the `on: push` trigger and
+  `working-directory: contracts` on build/test steps
+- Consumer import paths (`@marx2/contracts`, `@marx2/contracts/fx`, `@marx2/contracts/currencies`) are **unchanged**
+
+**`otel/` subfolder** — new package `@marx2/otel`:
+
+1. `otel/src/index.ts` — shared, Hono-agnostic setup helpers:
    - `createResource(serviceName: string)` — builds an OTel `Resource` with
      `service.name`, `service.version` (from `APP_VERSION` env), and
      `deployment.environment`
@@ -54,24 +86,42 @@ OTel bootstrap helpers, following the exact same pattern already used by
    - `buildMetricsRoute()` — returns a Hono-compatible route handler that
      serves the Prometheus text format from the shared `PrometheusExporter`
 
-2. `peerDependencies` added to `package.json`:
-   ```
-   @opentelemetry/sdk-node
-   @opentelemetry/exporter-prometheus
-   @opentelemetry/auto-instrumentations-node
-   @opentelemetry/instrumentation-runtime-node
-   @opentelemetry/api
-   ```
-
-3. New sub-path export in `package.json`:
+2. `otel/package.json`:
    ```json
-   "./otel": {
-     "types": "./dist/otel.d.ts",
-     "default": "./dist/otel.js"
+   {
+     "name": "@marx2/otel",
+     "version": "1.0.0",
+     "type": "module",
+     "exports": {
+       ".": {
+         "types": "./dist/index.d.ts",
+         "default": "./dist/index.js"
+       }
+     },
+     "peerDependencies": {
+       "@opentelemetry/sdk-node": ">=0.50",
+       "@opentelemetry/exporter-prometheus": ">=0.50",
+       "@opentelemetry/auto-instrumentations-node": ">=0.50",
+       "@opentelemetry/instrumentation-runtime-node": ">=0.4",
+       "@opentelemetry/api": ">=1.7",
+       "hono": ">=4"
+     },
+     "devDependencies": {
+       "@types/node": "^22.0.0",
+       "typescript": "^5.5.0"
+     },
+     "publishConfig": { "registry": "https://npm.pkg.github.com" }
    }
    ```
 
-4. Bump contracts patch version via CI as usual.
+3. `.github/workflows/release-otel.yml` — same bump/build/publish pattern as the
+   contracts workflow, but:
+   - `paths: ['otel/**']` in the `on: push` trigger
+   - `working-directory: otel` on all build/test/publish steps
+   - `git add otel/package.json otel/package-lock.json` in the commit step
+   - Tags prefixed `otel-v*` (e.g. `otel-v1.0.1`) so they don't collide with contracts tags
+
+4. Bump `otel` version via CI as usual on first merge.
 
 No traces exporter is wired into the shared helper yet — `NodeSDK` initialises
 with `traceExporter: new NoopSpanExporter()` by default until D57 (Tempo).
@@ -85,6 +135,7 @@ Applies to: `portfoliost-admin`, `portfoliost-wallets`, `portfoliost-instruments
 
 **New dependencies added to each service's `package.json`:**
 ```
+@marx2/otel
 @opentelemetry/sdk-node
 @opentelemetry/api
 @opentelemetry/exporter-prometheus
@@ -95,7 +146,7 @@ Applies to: `portfoliost-admin`, `portfoliost-wallets`, `portfoliost-instruments
 **New file per service: `src/instrumentation.ts`**
 
 ```typescript
-import { createSdk, buildMetricsRoute } from '@marx2/contracts/otel'
+import { createSdk, buildMetricsRoute } from '@marx2/otel'
 import { PrometheusExporter } from '@opentelemetry/exporter-prometheus'
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node'
 import { RuntimeNodeInstrumentation } from '@opentelemetry/instrumentation-runtime-node'
@@ -314,8 +365,8 @@ Once D56 is implemented:
 
 Each step is one commit after its test passes.
 
-- [ ] **Step 1** — Add `src/otel.ts` to `portfoliost-contracts`, add peer deps, add `./otel` export, bump version via CI
-  - _Test:_ TypeScript compiles; `@marx2/contracts/otel` importable
+- [ ] **Step 1** — Restructure `portfoliost-contracts` repo: move existing files under `contracts/` subfolder; add `otel/` subfolder with `src/index.ts`, `package.json`, `tsconfig.json`; add separate GHA workflow `release-otel.yml`; update `release-contracts.yml` with path filter; bump both packages via CI
+  - _Test:_ TypeScript compiles in both subfolders (`npm run build` in `contracts/` and `otel/`); `@marx2/otel` importable; `@marx2/contracts` consumer imports unchanged
 - [ ] **Step 2** — Add OTel deps + `src/instrumentation.ts` + `/metrics` route + pino logging to `portfoliost-admin`
   - _Test:_ Unit: `GET /metrics` returns `text/plain` with `http_server_request_duration`; health check passes
 - [ ] **Step 3** — Same for `portfoliost-wallets`
@@ -344,8 +395,13 @@ consumed by the admin aggregation endpoint; `/metrics` is a Prometheus scrape
 target. Both are kept.
 
 **Q: Shared OTel code — separate repo or contracts?**
-`@marx2/contracts/otel` sub-path export. The contracts package already exports
-`./fx` and `./currencies` with the identical pattern. No new repo needed.
+New `otel/` subfolder in the `portfoliost-contracts` monorepo, published as the
+independent package `@marx2/otel`. This keeps OTel helpers physically co-located
+with the rest of the shared code (same repo, same `.npmrc`, same CI runner) while
+keeping the two packages cleanly separated: `@marx2/contracts` stays a lean
+OpenAPI + pure-function library with no runtime deps; `@marx2/otel` carries the
+heavy OTel peer deps without polluting contracts consumers. Each subfolder has its
+own `package.json`, `tsconfig.json`, versioning, and release workflow.
 
 **Q: Traces — what to do without Tempo?**
 Wire OTel SDK with no-op exporter. Application code is ready; only the exporter
