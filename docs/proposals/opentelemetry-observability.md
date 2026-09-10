@@ -373,7 +373,7 @@ Each step is one commit after its test passes.
   - _Test:_ Same as step 2
 - [x] **Step 4** — Same for `portfoliost-instruments`
   - _Test:_ Same as step 2
-- [ ] **Step 5** — Same for `portfoliost-users-auth`
+- [x] **Step 5** — Same for `portfoliost-users-auth`
   - _Test:_ Same as step 2
 - [ ] **Step 6** — Add OTel deps + `otel.py` + `/metrics` + `/health` + structured JSON logging to `openst`
   - _Test:_ `GET /metrics` returns Prometheus text; `GET /health` returns `{"status":"ok"}`
