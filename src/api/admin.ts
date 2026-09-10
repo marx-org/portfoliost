@@ -4,7 +4,7 @@ import type { components } from "../../generated/api-types"
 export interface ServiceVersion {
   service: string
   version: string
-  impl: "real" | "mock" | "unknown"
+  impl: "real" | "mock" | "unknown" | "job"
 }
 
 // Contract-typed admin user (from @marx2/contracts /api/admin/users).
