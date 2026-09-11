@@ -400,7 +400,7 @@ is marked complete.
   - _Test:_ Unit: mock Prometheus OTel metrics path + ingress fallback path; verify `cachestProviders` populated from cachest per-`server_address` histogram
 - [x] **Step 4** — Install `@vue-flow/core` + `@dagrejs/dagre` in `portfoliost`
   - _Test:_ Build passes, no TS errors
-- [ ] **Step 5** — Write `graph-definition.ts` (all nodes, edges, provider metadata)
+- [x] **Step 5** — Write `graph-definition.ts` (all nodes, edges, provider metadata)
   - _Test:_ Snapshot: all expected node IDs and edge source/target pairs present
 - [ ] **Step 6** — Implement custom node components (one per area) with status dot logic
   - _Test:_ Visual review
