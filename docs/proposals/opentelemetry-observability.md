@@ -469,7 +469,7 @@ Each step is one commit after its test passes.
   - _Test:_ `http_server_request_duration_seconds_count` appears in Prometheus for all 4 JS services after traffic
 - [x] **Step 10** — Align metric names: bump `@marx2/otel` to 1.0.2 with `ViewOptions` renaming JS histograms to `*.seconds`; update all 4 consumer repos; redeploy
   - _Test:_ `sum by (service)(rate(http_server_request_duration_seconds_count[5m]))` returns all 6 services
-- [ ] **Step 11** — Update D55 proposal to reference D56 as prerequisite for richer traffic data
+- [x] **Step 11** — Update D55 proposal to reference D56 as prerequisite for richer traffic data
 
 ---
 

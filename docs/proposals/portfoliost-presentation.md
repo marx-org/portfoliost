@@ -215,24 +215,57 @@ gracefully (no status dot, grey node).
 **`GET /api/admin/topology/traffic`** — new endpoint in `portfoliost-admin`
 
 Queries Prometheus for 5-minute traffic windows per service. When D56 is live,
-prefers application-level `http_server_request_duration` metrics; falls back to
-nginx-ingress `nginx_ingress_controller_requests` metrics:
+prefers application-level `http_server_request_duration_seconds` metrics (all 6
+services emit this after D56); falls back to nginx-ingress
+`nginx_ingress_controller_requests` metrics when D56 metrics are absent:
 
 ```typescript
 // Response shape (new contract schema: TopologyTrafficResponse)
 {
   services: Array<{
-    name: string            // ingress service name
+    name: string            // service name (matches graph node id)
     requestsPerMin: number
     errorRate: number       // fraction 0–1
     p99LatencyMs: number
     source: "otel" | "ingress" | "none"  // which metric source was used
   }>
+  // Per-provider outbound latency from cachest (populated when D56 is live)
+  cachestProviders: Array<{
+    provider: string        // server_address label, e.g. "openst", "alphavantage.co"
+    p99LatencyMs: number
+  }>
   fetchedAt: string
 }
 ```
 
-Falls back to an empty `services` array if Prometheus is unavailable.
+**PromQL used when D56 (`source: "otel"`) is available:**
+```promql
+# request rate per service (all 6 after D56)
+sum by (service_name) (rate(http_server_request_duration_seconds_count[5m]))
+
+# P99 latency per service
+histogram_quantile(0.99,
+  sum by (le, service_name) (
+    rate(http_server_request_duration_seconds_bucket[5m])
+  )
+)
+
+# cachest per-provider outbound P99 (D56-3)
+histogram_quantile(0.99,
+  sum by (le, server_address) (
+    rate(http_client_request_duration_seconds_bucket{service_name="cachest"}[5m])
+  )
+)
+```
+
+**PromQL used when falling back (`source: "ingress"`):**
+```promql
+nginx_ingress_controller_requests{exported_namespace="pfire"}
+nginx_ingress_controller_request_duration_seconds_bucket{exported_namespace="pfire"}
+```
+
+Falls back to an empty `services` array (and empty `cachestProviders`) if
+Prometheus is unavailable.
 
 Both new endpoints are guarded by the existing `requireGroup("portfoliost_admin")`
 middleware.
@@ -285,6 +318,10 @@ Clicking a node opens a right-side slide-in details panel (320 px wide):
 - For `data-provider` nodes: data types supplied, quota limits
 - For `internal` services: replica count, restart count, request rate, P99
   latency, error rate (from `/topology/traffic`)
+- For the **cachest** node specifically: per-upstream-provider P99 latency table
+  (`cachestProviders` from `/topology/traffic`), showing response times for
+  `openst`, `alphavantage.co`, `financialmodelingprep.com`, `dividendhistory.org`
+  — populated when D56 is live; section hidden otherwise
 - Quick-link to the relevant Admin tab where one exists:
   e.g. "Currency Rates" for fxsync, "Jobs" for stooq-importer, "System" for
   all backend services
@@ -359,8 +396,8 @@ is marked complete.
   - _Test:_ Contract compile passes in both repos
 - [ ] **Step 2** — Implement `GET /api/admin/topology/status` in `portfoliost-admin` (fan-out `/__meta` + Prometheus k8s queries with graceful fallback)
   - _Test:_ Unit: mock Prometheus, verify fallback path
-- [ ] **Step 3** — Implement `GET /api/admin/topology/traffic` in `portfoliost-admin` (Prometheus ingress queries, empty fallback; OTel metrics preferred when D56 is live)
-  - _Test:_ Unit: mock Prometheus ingress metrics
+- [ ] **Step 3** — Implement `GET /api/admin/topology/traffic` in `portfoliost-admin` (prefer D56 OTel `http_server_request_duration_seconds` when available; fall back to nginx-ingress metrics; include `cachestProviders` from cachest's `http_client_request_duration_seconds`)
+  - _Test:_ Unit: mock Prometheus OTel metrics path + ingress fallback path; verify `cachestProviders` populated from cachest per-`server_address` histogram
 - [ ] **Step 4** — Install `@vue-flow/core` + `@dagrejs/dagre` in `portfoliost`
   - _Test:_ Build passes, no TS errors
 - [ ] **Step 5** — Write `graph-definition.ts` (all nodes, edges, provider metadata)

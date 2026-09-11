@@ -109,6 +109,44 @@ worker/job pod ─ pulls row, runs engine, writes progress+results back
 3. **Cluster rollout** — drop the KrakenD deployment; ingress + per-module deployments + `service-urls` ConfigMap; add D9 edge auth once `users-auth` is real.
 4. **Backtest module** — queue + worker in compose first; k8s Jobs in cluster.
 
+## D56 — OpenTelemetry as data source for topology traffic metrics
+
+**D56 (OpenTelemetry Observability) is a prerequisite for richer live traffic data
+in the topology view.**
+
+Once D56 is deployed all six backend services expose Prometheus-compatible
+`/metrics` endpoints with:
+
+- `http_server_request_duration_seconds` — per-route request latency histograms
+  (P50/P99) for admin, wallets, instruments, users-auth, openst, and cachest.
+- `http_client_request_duration_seconds` on **cachest** — outbound call latency
+  labelled by `server_address` (hostname), making it possible to see response
+  times for `openst`, `alphavantage.co`, `financialmodelingprep.com`, and
+  `dividendhistory.org` separately in the topology details panel.
+
+The `GET /api/admin/topology/traffic` endpoint (D55) should be enriched to query
+these application-level metrics via the Prometheus API alongside the existing
+nginx-ingress metrics, giving more precise per-route throughput and latency data.
+
+The topology view is designed to **degrade gracefully** when D56 metrics are
+absent — it falls back to nginx-ingress metrics alone without any user-visible
+error. D56 enrichment is additive.
+
+**PromQL references (unified across all 6 services after D56-3 addendum):**
+```promql
+# request rate per service
+sum by (service_name) (rate(http_server_request_duration_seconds_count[5m]))
+
+# cachest per-provider latency (p99)
+histogram_quantile(0.99,
+  sum by (le, server_address) (
+    rate(http_client_request_duration_seconds_bucket{service_name="cachest"}[5m])
+  )
+)
+```
+
+---
+
 ## Open questions
 
 - Trust model for user-uploaded strategy code (deferred; see D11).
