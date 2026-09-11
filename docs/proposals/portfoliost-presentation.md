@@ -394,7 +394,7 @@ is marked complete.
 
 - [x] **Step 1** — Add `TopologyStatusResponse` + `TopologyTrafficResponse` to `openapi.yaml`; bump contracts; regenerate `api-types.d.ts` in admin + portfoliost
   - _Test:_ Contract compile passes in both repos
-- [ ] **Step 2** — Implement `GET /api/admin/topology/status` in `portfoliost-admin` (fan-out `/__meta` + Prometheus k8s queries with graceful fallback)
+- [x] **Step 2** — Implement `GET /api/admin/topology/status` in `portfoliost-admin` (fan-out `/__meta` + Prometheus k8s queries with graceful fallback)
   - _Test:_ Unit: mock Prometheus, verify fallback path
 - [ ] **Step 3** — Implement `GET /api/admin/topology/traffic` in `portfoliost-admin` (prefer D56 OTel `http_server_request_duration_seconds` when available; fall back to nginx-ingress metrics; include `cachestProviders` from cachest's `http_client_request_duration_seconds`)
   - _Test:_ Unit: mock Prometheus OTel metrics path + ingress fallback path; verify `cachestProviders` populated from cachest per-`server_address` histogram
