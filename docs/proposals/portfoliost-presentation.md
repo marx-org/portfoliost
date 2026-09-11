@@ -398,7 +398,7 @@ is marked complete.
   - _Test:_ Unit: mock Prometheus, verify fallback path
 - [x] **Step 3** — Implement `GET /api/admin/topology/traffic` in `portfoliost-admin` (prefer D56 OTel `http_server_request_duration_seconds` when available; fall back to nginx-ingress metrics; include `cachestProviders` from cachest's `http_client_request_duration_seconds`)
   - _Test:_ Unit: mock Prometheus OTel metrics path + ingress fallback path; verify `cachestProviders` populated from cachest per-`server_address` histogram
-- [ ] **Step 4** — Install `@vue-flow/core` + `@dagrejs/dagre` in `portfoliost`
+- [x] **Step 4** — Install `@vue-flow/core` + `@dagrejs/dagre` in `portfoliost`
   - _Test:_ Build passes, no TS errors
 - [ ] **Step 5** — Write `graph-definition.ts` (all nodes, edges, provider metadata)
   - _Test:_ Snapshot: all expected node IDs and edge source/target pairs present
