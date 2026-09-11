@@ -1,6 +1,6 @@
 # D56 — OpenTelemetry Observability: Metrics, Structured Logs, Traces
 
-## Status: Proposed
+## Status: Implemented (metrics + structured logs live; traces no-op pending D57)
 
 ## Goal
 
@@ -81,8 +81,11 @@ their respective subfolder change. They share the repo-level `.npmrc` and `.giti
      `service.name`, `service.version` (from `APP_VERSION` env), and
      `deployment.environment`
    - `createSdk(opts: { serviceName, metricReader, instrumentations })` —
-     creates and returns a configured `NodeSDK`; called from each service's
-     `instrumentation.ts`
+     creates and returns a configured `NodeSDK`; includes built-in `views` that
+     rename `http.server.request.duration` → `http.server.request.duration.seconds`
+     and `http.client.request.duration` → `http.client.request.duration.seconds`
+     so the Prometheus exporter produces `_seconds`-suffixed names consistent with
+     the Python services (see D56-3 addendum below)
    - `buildMetricsRoute()` — returns a Hono-compatible route handler that
      serves the Prometheus text format from the shared `PrometheusExporter`
 
@@ -90,7 +93,7 @@ their respective subfolder change. They share the repo-level `.npmrc` and `.giti
    ```json
    {
      "name": "@marx2/otel",
-     "version": "1.0.0",
+     "version": "1.0.2",
      "type": "module",
      "exports": {
        ".": {
@@ -119,7 +122,7 @@ their respective subfolder change. They share the repo-level `.npmrc` and `.giti
    - `paths: ['otel/**']` in the `on: push` trigger
    - `working-directory: otel` on all build/test/publish steps
    - `git add otel/package.json otel/package-lock.json` in the commit step
-   - Tags prefixed `otel-v*` (e.g. `otel-v1.0.1`) so they don't collide with contracts tags
+   - Tags prefixed `otel-v*` (e.g. `otel-v1.0.2`) so they don't collide with contracts tags
 
 4. Bump `otel` version via CI as usual on first merge.
 
@@ -141,6 +144,7 @@ Applies to: `portfoliost-admin`, `portfoliost-wallets`, `portfoliost-instruments
 @opentelemetry/exporter-prometheus
 @opentelemetry/auto-instrumentations-node
 @opentelemetry/instrumentation-runtime-node
+import-in-the-middle          ← required for ESM http instrumentation (see below)
 ```
 
 **New file per service: `src/instrumentation.ts`**
@@ -170,6 +174,17 @@ process.once('beforeExit', async () => { await sdk.shutdown() })
 export const metricsRouteHandler = buildMetricsRoute(prometheusExporter)
 ```
 
+**New file per service: `src/iitm.ts`** (ESM loader registration — must be the
+first `--import` flag; see ESM fix note below)
+
+```typescript
+import { register } from 'import-in-the-middle/register-hooks.mjs'
+register()
+```
+
+**New file per service: `src/import-in-the-middle.d.ts`** — ambient TS declaration
+for the `.mjs` subpath (no exports map in the package).
+
 **Changes to `src/index.ts`** (each service):
 ```typescript
 import { metricsRouteHandler } from './instrumentation.js'
@@ -177,16 +192,57 @@ import { metricsRouteHandler } from './instrumentation.js'
 app.get('/metrics', metricsRouteHandler)
 ```
 
-The `--import ./dist/instrumentation.js` flag is added to the Node start
-command in the Dockerfile / package.json start script so OTel is registered
-before any other module loads.
+**Dockerfile `CMD`** (each service):
+```
+CMD ["node", "--import", "./dist/iitm.js", "--import", "./dist/instrumentation.js", "dist/server.js"]
+```
+
+The `iitm.js` preload **must come first** — it registers the ESM module hook
+before OTel evaluates; reversing the order causes the http server histogram to
+remain silent (traces still flow, but server metrics do not record).
+
+### ESM http instrumentation — root cause and fix
+
+All four Hono services run as ESM (`"type": "module"`). `@hono/node-server` imports
+`node:http` as an ESM static import (`import { createServer } from "node:http"` at
+the top of `@hono/node-server/dist/index.mjs`). OTel's http instrumentation patches
+`http.Server.prototype.emit` via module hooks, but:
+
+- **RITM** (`require-in-the-middle`) only intercepts CJS `require()` — it cannot
+  intercept ESM static imports.
+- **IITM** (`import-in-the-middle`) _can_ intercept ESM imports, but only when its
+  loader is registered via `module.registerHooks()` (Node ≥ 22.8) before any ESM
+  module graph is evaluated.
+- OTel SDK 0.222.0 does **not** call `module.register()` / `module.registerHooks()`
+  automatically — nothing wires the IITM loader.
+
+Result without the fix: `node:http` loads unpatched → `http.Server.prototype.emit`
+is never wrapped → `_onServerResponseFinish` never fires → `http_server_request_duration`
+records zero observations (client/runtime metrics still work because undici patches
+globals and runtime-node uses process hooks).
+
+Fix: `src/iitm.ts` calls `register()` from `import-in-the-middle/register-hooks.mjs`,
+which uses the sync `module.registerHooks()` API (Node ≥ 22.22.3; containers run
+`node:22-alpine` = 22.23.2). It must be the **first** `--import` so the loader is
+active before the OTel SDK or `@hono/node-server` module graphs are evaluated.
+
+**Note for `portfoliost-users-auth`:** the HelmRelease overrides the container
+command (runs `db:migrate` before the server). The override must explicitly include
+both `--import` flags:
+```yaml
+command:
+  - /bin/sh
+  - -c
+  - npm run db:migrate && node --import ./dist/iitm.js --import ./dist/instrumentation.js dist/server.js
+```
 
 **Metrics exposed automatically:**
 
 | Metric | Description |
 |---|---|
-| `http.server.request.duration` | HTTP request latency histogram (P50/P99 per route) |
-| `http.server.active_requests` | Concurrent in-flight requests |
+| `http_server_request_duration_seconds` | HTTP request latency histogram (P50/P99 per route) |
+| `http_server_active_requests` | Concurrent in-flight requests |
+| `http_client_request_duration_seconds` | Outbound fetch/undici call latency |
 | `nodejs.eventloop.delay.*` | Event loop health (p50/p90/p99/mean/max) |
 | `v8js.gc.duration` | GC pause histogram |
 | `v8js.memory.heap.used` | Heap usage |
@@ -251,14 +307,42 @@ async def health():
 
 | Metric | Description |
 |---|---|
-| `http.server.request.duration` | FastAPI request latency histogram |
-| `http.server.active_requests` | In-flight requests |
-| `http.client.request.duration` | **Outbound httpx call latency** (per upstream URL — very useful for cachest to see latency per provider) |
+| `http_server_request_duration_seconds` | FastAPI request latency histogram |
+| `http_server_active_requests` | In-flight requests |
+| `http_client_request_duration_seconds` | **Outbound httpx call latency** (per upstream URL — very useful for cachest to see latency per provider) |
 
-The outbound `http.client.request.duration` metric on cachest will label calls by
-`http.url` (hostname), making it possible to see response times for
+The outbound `http_client_request_duration_seconds` metric on cachest will label calls by
+`server_address` (hostname), making it possible to see response times for
 `openst`, `alphavantage.co`, `financialmodelingprep.com`, and `dividendhistory.org`
 separately — directly useful for the topology visualization in D55.
+
+### D56-3 addendum — metric name alignment across JS and Python
+
+The JS Prometheus exporter (≥ 0.200) emits the bare sanitised OTel name
+(`http_server_request_duration`) plus a `# UNIT s` metadata comment, following the
+newer OpenMetrics convention. The Python exporter appends the unit into the name
+(`http_server_request_duration_seconds`), following the older Prometheus convention.
+
+To make all six services consistent, `@marx2/otel@1.0.2` adds two `ViewOptions` to
+`createSdk` that rename the JS histograms before they reach the exporter:
+
+```typescript
+// inside @marx2/otel src/index.ts
+const HTTP_DURATION_VIEWS: ViewOptions[] = [
+  { name: 'http.server.request.duration.seconds', instrumentName: 'http.server.request.duration' },
+  { name: 'http.client.request.duration.seconds', instrumentName: 'http.client.request.duration' },
+]
+// passed as `views: HTTP_DURATION_VIEWS` to NodeSDK
+```
+
+`http.server.request.duration.seconds` sanitises to `http_server_request_duration_seconds`
+— identical to what Python emits. No per-service changes needed; upgrading
+`@marx2/otel` is sufficient.
+
+**Unified PromQL query (all 6 services):**
+```promql
+sum by (service) (rate(http_server_request_duration_seconds_count[5m]))
+```
 
 ---
 
@@ -379,11 +463,13 @@ Each step is one commit after its test passes.
   - _Test:_ `GET /metrics` returns Prometheus text; `GET /health` returns `{"status":"ok"}`
 - [x] **Step 7** — Add OTel deps + `otel.py` + `/metrics` + `/health` + structured JSON logging to `cachest`; verify `http_client_request_duration` appears per upstream host
   - _Test:_ `GET /metrics` includes `http_client_request_duration_seconds{server_address="openst"}` — the stable import emits `server_address`/`server_port`, not `http_host`
-- [ ] **Step 8** — Add `serviceMonitor` values to all 6 HelmReleases in homelab repo; commit + push
+- [x] **Step 8** — Add `serviceMonitor` values to all 6 HelmReleases in homelab repo; commit + push
   - _Test:_ Prometheus scrape targets show all 6 services as `UP` in `pfire` namespace
-- [ ] **Step 9** — Verify metrics appear in Prometheus UI; run sample PromQL queries
-  - _Test:_ Manual smoke test
-- [ ] **Step 10** — Update D55 proposal to reference D56 as prerequisite for richer traffic data
+- [x] **Step 9** — Fix ESM http instrumentation: add `src/iitm.ts` + `import-in-the-middle` dep to all 4 JS services; update Dockerfile CMD to `--import ./dist/iitm.js --import ./dist/instrumentation.js`; fix users-auth HelmRelease command override to include both preloads
+  - _Test:_ `http_server_request_duration_seconds_count` appears in Prometheus for all 4 JS services after traffic
+- [x] **Step 10** — Align metric names: bump `@marx2/otel` to 1.0.2 with `ViewOptions` renaming JS histograms to `*.seconds`; update all 4 consumer repos; redeploy
+  - _Test:_ `sum by (service)(rate(http_server_request_duration_seconds_count[5m]))` returns all 6 services
+- [ ] **Step 11** — Update D55 proposal to reference D56 as prerequisite for richer traffic data
 
 ---
 
