@@ -375,7 +375,7 @@ Each step is one commit after its test passes.
   - _Test:_ Same as step 2
 - [x] **Step 5** — Same for `portfoliost-users-auth`
   - _Test:_ Same as step 2
-- [ ] **Step 6** — Add OTel deps + `otel.py` + `/metrics` + `/health` + structured JSON logging to `openst`
+- [x] **Step 6** — Add OTel deps + `otel.py` + `/metrics` + `/health` + structured JSON logging to `openst`
   - _Test:_ `GET /metrics` returns Prometheus text; `GET /health` returns `{"status":"ok"}`
 - [ ] **Step 7** — Same for `cachest`; verify `http_client_request_duration` appears per upstream host
   - _Test:_ `GET /metrics` includes `http_client_request_duration{http_host="openst"}`
