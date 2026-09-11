@@ -377,8 +377,8 @@ Each step is one commit after its test passes.
   - _Test:_ Same as step 2
 - [x] **Step 6** — Add OTel deps + `otel.py` + `/metrics` + `/health` + structured JSON logging to `openst`
   - _Test:_ `GET /metrics` returns Prometheus text; `GET /health` returns `{"status":"ok"}`
-- [ ] **Step 7** — Same for `cachest`; verify `http_client_request_duration` appears per upstream host
-  - _Test:_ `GET /metrics` includes `http_client_request_duration{http_host="openst"}`
+- [x] **Step 7** — Add OTel deps + `otel.py` + `/metrics` + `/health` + structured JSON logging to `cachest`; verify `http_client_request_duration` appears per upstream host
+  - _Test:_ `GET /metrics` includes `http_client_request_duration_seconds{server_address="openst"}` — the stable import emits `server_address`/`server_port`, not `http_host`
 - [ ] **Step 8** — Add `serviceMonitor` values to all 6 HelmReleases in homelab repo; commit + push
   - _Test:_ Prometheus scrape targets show all 6 services as `UP` in `pfire` namespace
 - [ ] **Step 9** — Verify metrics appear in Prometheus UI; run sample PromQL queries
