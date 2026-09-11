@@ -402,7 +402,7 @@ is marked complete.
   - _Test:_ Build passes, no TS errors
 - [x] **Step 5** — Write `graph-definition.ts` (all nodes, edges, provider metadata)
   - _Test:_ Snapshot: all expected node IDs and edge source/target pairs present
-- [ ] **Step 6** — Implement custom node components (one per area) with status dot logic
+- [x] **Step 6** — Implement custom node components (one per area) with status dot logic
   - _Test:_ Visual review
 - [ ] **Step 7** — Implement `useTopologyStore` (Pinia, polls both endpoints, maps to node status)
   - _Test:_ Unit: correct status mapping for all `impl` values and Prometheus states
