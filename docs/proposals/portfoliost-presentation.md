@@ -392,7 +392,7 @@ consumers, commit updated lockfiles and `api-types.d.ts`.
 Each step ships as one commit, passing its specified test(s) before the step
 is marked complete.
 
-- [ ] **Step 1** — Add `TopologyStatusResponse` + `TopologyTrafficResponse` to `openapi.yaml`; bump contracts; regenerate `api-types.d.ts` in admin + portfoliost
+- [x] **Step 1** — Add `TopologyStatusResponse` + `TopologyTrafficResponse` to `openapi.yaml`; bump contracts; regenerate `api-types.d.ts` in admin + portfoliost
   - _Test:_ Contract compile passes in both repos
 - [ ] **Step 2** — Implement `GET /api/admin/topology/status` in `portfoliost-admin` (fan-out `/__meta` + Prometheus k8s queries with graceful fallback)
   - _Test:_ Unit: mock Prometheus, verify fallback path
