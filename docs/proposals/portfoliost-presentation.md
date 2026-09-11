@@ -404,7 +404,7 @@ is marked complete.
   - _Test:_ Snapshot: all expected node IDs and edge source/target pairs present
 - [x] **Step 6** — Implement custom node components (one per area) with status dot logic
   - _Test:_ Visual review
-- [ ] **Step 7** — Implement `useTopologyStore` (Pinia, polls both endpoints, maps to node status)
+- [x] **Step 7** — Implement `useTopologyStore` (Pinia, polls both endpoints, maps to node status)
   - _Test:_ Unit: correct status mapping for all `impl` values and Prometheus states
 - [ ] **Step 8** — Implement `TopologyView.vue`: Vue Flow canvas + dagre layout + swim-lane backgrounds
 - [ ] **Step 9** — Implement edge animation (active vs. idle, CSS animated dash with moving dot)

@@ -23,8 +23,20 @@ export interface SystemVersionsResponse {
 export type FxRateItem = components["schemas"]["AdminFxRate"]
 export type FxRatesResponse = components["schemas"]["AdminFxRatesResponse"]
 
+// D55-4 — topology live overlay (from @marx2/contracts /admin/topology/*).
+export type TopologyStatusResponse = components["schemas"]["TopologyStatusResponse"]
+export type TopologyTrafficResponse = components["schemas"]["TopologyTrafficResponse"]
+
 export function fetchSystemVersions(): Promise<SystemVersionsResponse> {
   return http.get<SystemVersionsResponse>("/api/admin/system/versions")
+}
+
+export function fetchTopologyStatus(): Promise<TopologyStatusResponse> {
+  return http.get<TopologyStatusResponse>("/api/admin/topology/status")
+}
+
+export function fetchTopologyTraffic(): Promise<TopologyTrafficResponse> {
+  return http.get<TopologyTrafficResponse>("/api/admin/topology/traffic")
 }
 
 export function fetchFxRates(params?: Record<string, string>): Promise<FxRatesResponse> {

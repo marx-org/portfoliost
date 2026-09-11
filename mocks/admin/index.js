@@ -2,6 +2,34 @@ import { requireAuth } from "../lib/auth.js"
 import { nowIso, uuid } from "../lib/http.js"
 import { DEMO_RATES, DEMO_FX_DATE } from "../lib/demo-fx.js"
 
+// D55-4 — representative topology data for local development and mock-API
+// tests. Services cover every health state (healthy/degraded/down/unknown) and
+// every impl value so the visual review shows all node types.
+const TOPOLOGY_SERVICES = [
+  { name: "portfoliost-admin",       reachable: true,  impl: "real", version: "1.6.20", replicas: { desired: 2, ready: 2 }, restarts: 0 },
+  { name: "portfoliost-users-auth",  reachable: true,  impl: "real", version: "1.6.20", replicas: { desired: 2, ready: 2 }, restarts: 0 },
+  { name: "portfoliost-wallets",     reachable: true,  impl: "real", version: "1.6.20", replicas: { desired: 2, ready: 1 }, restarts: 0 },
+  { name: "portfoliost-instruments", reachable: true,  impl: "real", version: "1.6.20", replicas: { desired: 1, ready: 1 }, restarts: 7 },
+  { name: "openst",                  reachable: false, impl: "unknown", version: "unreachable" },
+  { name: "cachest",                 reachable: true,  impl: "mock", version: "1.6.20", replicas: null, restarts: null },
+]
+
+const TOPOLOGY_TRAFFIC = [
+  { name: "portfoliost-admin",       requestsPerMin: 4.2,  errorRate: 0,    p99LatencyMs: 110, source: "otel" },
+  { name: "portfoliost-users-auth",  requestsPerMin: 28.0, errorRate: 0,    p99LatencyMs: 45,  source: "otel" },
+  { name: "portfoliost-wallets",     requestsPerMin: 11.5, errorRate: 0.02, p99LatencyMs: 180, source: "otel" },
+  { name: "portfoliost-instruments", requestsPerMin: 62.0, errorRate: 0,    p99LatencyMs: 90,  source: "otel" },
+  { name: "openst",                  requestsPerMin: 0,    errorRate: 0,    p99LatencyMs: 0,   source: "none" },
+  { name: "cachest",                 requestsPerMin: 30.0, errorRate: 0,    p99LatencyMs: 55,  source: "otel" },
+]
+
+const CACHEST_PROVIDERS = [
+  { provider: "openst",                   p99LatencyMs: 320 },
+  { provider: "alphavantage.co",          p99LatencyMs: 640 },
+  { provider: "financialmodelingprep.com", p99LatencyMs: 380 },
+  { provider: "dividendhistory.org",       p99LatencyMs: 520 },
+]
+
 const DATASETS = [
   "daily_world",
   "daily_us",
@@ -139,5 +167,17 @@ export function register(app) {
       }
     })
     ctx.res.json(log)
+  })
+
+  // GET /api/admin/topology/status — live service health overlay (D55-4 / step 2).
+  app.get("/api/admin/topology/status", (ctx) => {
+    if (!requireAuth(ctx)) return
+    ctx.res.json({ services: TOPOLOGY_SERVICES, fetchedAt: nowIso() })
+  })
+
+  // GET /api/admin/topology/traffic — per-service request metrics overlay (D55-4 / step 3).
+  app.get("/api/admin/topology/traffic", (ctx) => {
+    if (!requireAuth(ctx)) return
+    ctx.res.json({ services: TOPOLOGY_TRAFFIC, cachestProviders: CACHEST_PROVIDERS, fetchedAt: nowIso() })
   })
 }
