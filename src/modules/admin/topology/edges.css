@@ -31,20 +31,45 @@
   stroke: rgb(245 158 11 / 0.5); /* amber-500 */
 }
 
-/* Active: vue-flow's built-in animated dash (moving dot along a dashed path);
-   the inline --topo-edge-speed variable scales one dash cycle to the request
-   rate (higher rpm → shorter cycle → faster dot). The triple-class selector
-   outranks vue-flow's `.vue-flow__edge.animated path` shorthand so the
-   duration override wins the cascade. */
-.vue-flow__edge.animated.topo-edge--active .vue-flow__edge-path {
-  animation-duration: var(--topo-edge-speed, 0.5s);
-}
+/* Active: flowing edge with traffic. The base path glows with a sky-blue
+   wash (FlowEdge draws the moving dots on top). Idle measurable edges keep
+   the muted slate line and glow faintly so the flow is still noticeable; the
+   FlowEdge overlay handles the actual motion via --topo-flow-speed. */
 .topo-edge--active .vue-flow__edge-path {
-  stroke: rgb(100 116 139); /* slate-500 */
-  stroke-width: 1.5;
+  stroke: rgb(56 189 248 / 0.85); /* sky-500 */
+  stroke-width: 1.7;
+  filter: drop-shadow(0 0 4px rgb(56 189 248 / 0.55));
 }
 .dark .topo-edge--active .vue-flow__edge-path {
-  stroke: rgb(148 163 184); /* slate-400 */
+  stroke: rgb(125 211 252 / 0.9); /* sky-300 */
+}
+
+.topo-edge--idle .vue-flow__edge-path {
+  filter: drop-shadow(0 0 2px rgb(100 116 139 / 0.25));
+}
+
+/* The moving-dot overlay rendered by FlowEdge.vue. A single short dash
+   (0.06 of pathLength 1) travels source → target as stroke-dashoffset runs
+   0 → 1; the glow keeps the particle luminous. --topo-flow-speed is set
+   inline per edge (fast under traffic, slow idle flow). */
+.topo-flow {
+  stroke: rgb(125 211 252); /* sky-300 */
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 0.06 0.18;
+  stroke-dashoffset: 0;
+  animation: topo-edge-flow var(--topo-flow-speed, 4.5s) linear infinite;
+  filter: drop-shadow(0 0 3px rgb(125 211 252 / 0.85));
+  pointer-events: none;
+}
+
+@keyframes topo-edge-flow {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: 1;
+  }
 }
 
 /* D55-7 / step 10 — selection highlight + dimming. Edges incident to the

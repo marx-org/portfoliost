@@ -23,6 +23,21 @@ const title = computed(() => `${props.data.label} — ${DOT_LABELS[state.value]}
 </template>
 
 <style scoped>
+/* A soft static halo in the state colour so even quiet nodes carry a glow. */
+.status-dot {
+  box-shadow: 0 0 4px rgb(148 163 184 / 0.4);
+}
+.status-dot.bg-green-500 {
+  box-shadow: 0 0 4px rgb(34 197 94 / 0.55);
+}
+.status-dot.bg-amber-500 {
+  box-shadow: 0 0 4px rgb(245 158 11 / 0.55);
+}
+.status-dot.bg-red-500 {
+  box-shadow: 0 0 4px rgb(239 68 68 / 0.55);
+}
+
+/* Active traffic: the dot pulses with a radiating ring so it reads as alive. */
 .status-dot--pulse {
   animation: status-dot-pulse 1.4s ease-in-out infinite;
 }
@@ -31,11 +46,11 @@ const title = computed(() => `${props.data.label} — ${DOT_LABELS[state.value]}
   0%,
   100% {
     transform: scale(1);
-    box-shadow: 0 0 0 0 currentColor;
+    box-shadow: 0 0 6px 1px currentColor;
   }
   50% {
-    transform: scale(1.35);
-    box-shadow: 0 0 0 3px rgb(0 0 0 / 0);
+    transform: scale(1.45);
+    box-shadow: 0 0 12px 4px currentColor;
   }
 }
 </style>

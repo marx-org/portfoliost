@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
+  IDLE_FLOW_SEC,
   animationDuration,
   resolveTopologyEdge,
 } from "@/modules/admin/topology/edge-state"
@@ -21,7 +22,8 @@ describe("resolveTopologyEdge", () => {
       edge({ kind: "job", source: "stooq-importer", target: "portfoliost-instruments" }),
       { "portfoliost-instruments": traffic("portfoliost-instruments", 62) },
     )
-    expect(resolved).toEqual({ state: "job", requestsPerMin: 0, animationDurationSec: 0 })
+    expect(resolved).toEqual({ state: "job", requestsPerMin: 0, animationDurationSec: 0, flowing: false, intensity: 0 })
+    expect(resolved.flowing).toBe(false)
   })
 
   it("provider edges are static regardless of traffic", () => {
@@ -29,20 +31,24 @@ describe("resolveTopologyEdge", () => {
       edge({ kind: "provider", source: "cachest", target: "alphavantage" }),
       { cachest: traffic("cachest", 30) },
     )
-    expect(resolved).toEqual({ state: "provider", requestsPerMin: 0, animationDurationSec: 0 })
+    expect(resolved).toEqual({ state: "provider", requestsPerMin: 0, animationDurationSec: 0, flowing: false, intensity: 0 })
   })
 
-  it("unmeasurable edges are idle regardless of traffic", () => {
+  it("unmeasurable edges are static idles regardless of traffic", () => {
     const resolved = resolveTopologyEdge(
       edge({ measurable: "none", kind: "storage" }),
       { a: traffic("a", 10) },
     )
-    expect(resolved).toEqual({ state: "idle", requestsPerMin: 0, animationDurationSec: 0 })
+    expect(resolved).toEqual({ state: "idle", requestsPerMin: 0, animationDurationSec: 0, flowing: false, intensity: 0 })
   })
 
-  it("measurable edges with no traffic data are idle", () => {
+  it("measurable edges flow slowly even without traffic data (never flat)", () => {
     const resolved = resolveTopologyEdge(edge({}), {})
-    expect(resolved).toEqual({ state: "idle", requestsPerMin: 0, animationDurationSec: 0 })
+    expect(resolved.state).toBe("idle")
+    expect(resolved.requestsPerMin).toBe(0)
+    expect(resolved.flowing).toBe(true)
+    expect(resolved.intensity).toBe(0)
+    expect(resolved.animationDurationSec).toBe(IDLE_FLOW_SEC)
   })
 
   it("source traffic activates the edge with speed proportional to rpm", () => {
@@ -51,6 +57,7 @@ describe("resolveTopologyEdge", () => {
     })
     expect(resolved.state).toBe("active")
     expect(resolved.requestsPerMin).toBe(8)
+    expect(resolved.flowing).toBe(true)
     expect(resolved.animationDurationSec).toBeCloseTo(0.5, 5)
   })
 
@@ -61,6 +68,7 @@ describe("resolveTopologyEdge", () => {
     )
     expect(resolved.state).toBe("active")
     expect(resolved.requestsPerMin).toBe(11.5)
+    expect(resolved.flowing).toBe(true)
   })
 
   it("uses the highest endpoint rpm when both endpoints are measured", () => {
@@ -75,14 +83,17 @@ describe("resolveTopologyEdge", () => {
     expect(resolved.requestsPerMin).toBe(62)
     expect(resolved.animationDurationSec).toBeCloseTo(animationDuration(62), 5)
     expect(resolved.animationDurationSec).toBeCloseTo(0.15, 5) // clamped floor
+    expect(resolved.intensity).toBe(1) // saturates at INTENSITY_REF_RPM
   })
 
-  it("zero-rpm entries keep the edge idle", () => {
+  it("zero-rpm entries keep the edge flowing at idle speed", () => {
     const resolved = resolveTopologyEdge(edge({ source: "openst" }), {
       openst: traffic("openst", 0),
     })
     expect(resolved.state).toBe("idle")
     expect(resolved.requestsPerMin).toBe(0)
+    expect(resolved.flowing).toBe(true)
+    expect(resolved.animationDurationSec).toBe(IDLE_FLOW_SEC)
   })
 })
 

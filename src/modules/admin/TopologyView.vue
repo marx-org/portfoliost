@@ -16,11 +16,13 @@ import "./topology/edges.css"
 import { AREA_LABELS, NODE_AREAS, topologyEdges, topologyNodes } from "./topology/graph-definition"
 import type { NodeArea } from "./topology/graph-definition"
 import { resolveTopologyEdge } from "./topology/edge-state"
+import FlowEdge from "./topology/FlowEdge.vue"
 import { edgeSelectionState, nodeSelectionState } from "./topology/topology-selection"
 import { filterEdgesByVisible, filterNodeDefs } from "./topology/topology-filters"
 import { layoutTopology } from "./topology/topology-layout"
 import { TOPOLOGY_NODE_TYPES } from "./topology/nodes"
 import type { TopologyNodeData } from "./topology/nodes"
+import { dotState } from "./topology/nodes/status"
 import { useTopologyStore } from "./topology/topology-store"
 import TopologyDetailsPanel from "./topology/TopologyDetailsPanel.vue"
 
@@ -28,6 +30,11 @@ type TopologyFlowNode = Node<TopologyNodeData>
 
 const store = useTopologyStore()
 const layout = layoutTopology()
+
+// Custom edge renderer: FlowEdge draws the moving-dot flow overlay on top of
+// the standard path (definition in edges.css). Job/provider/static edges get
+// the same component but render no overlay because their `flowing` is false.
+const TOPOLOGY_EDGE_TYPES = { flow: FlowEdge }
 
 // D55-7 / step 11 — the toolbar shares the Vue Flow instance (useVueFlow in
 // the VueFlow parent component is the documented pattern), so zoom/fit act on
@@ -45,12 +52,16 @@ const visibleAreas = ref<Set<NodeArea>>(new Set(NODE_AREAS))
 const flowNodes = computed<TopologyFlowNode[]>(() =>
   topologyNodes.map((def) => {
     const state = nodeSelectionState(selectedNodeId.value, def.id, topologyEdges)
+    const nodeData = store.nodeData(def)
+    const healthy = nodeData.status ? dotState(nodeData.status) === "healthy" : false
     return {
       id: def.id,
       type: def.area,
       position: layout.positions[def.id],
-      data: { ...store.nodeData(def), selected: state.selected, dimmed: state.dimmed },
+      data: { ...nodeData, selected: state.selected, dimmed: state.dimmed },
       class: [
+        `topo-node--${def.area}`,
+        healthy ? "topo-node--healthy" : "",
         state.selected ? "topo-node--selected" : "",
         state.dimmed ? "topo-node--dimmed" : "",
       ].filter(Boolean).join(" "),
@@ -58,9 +69,10 @@ const flowNodes = computed<TopologyFlowNode[]>(() =>
   }),
 )
 
-// Step 9 — edge visual state (D55-6): active edges get vue-flow's built-in
-// animated dash (moving dot along a dashed path) with a speed variable scaled
-// to the request rate; idle/job/provider edges stay static (edges.css).
+// Step 9 (D55-6) — edges render through FlowEdge, which draws a moving-dot
+// flow overlay whose speed scales with the request rate on active edges and
+// runs at a slow steady idle flow on measurable edges with no traffic yet
+// (resolveTopologyEdge sets `flowing`). Job/provider/static edges stay still.
 // Step 10 (D55-7) — incident edges thicken at full opacity, unrelated edges dim.
 const flowEdges = computed<Edge[]>(() =>
   topologyEdges.map((e) => {
@@ -71,21 +83,22 @@ const flowEdges = computed<Edge[]>(() =>
       source: e.source,
       target: e.target,
       label: e.label,
-      type: "default",
+      type: "flow",
       // Vue Flow's marker prop is `markerEnd` (not `arrowEnd`); a plain string
       // resolves to vue-flow's default marker colour in both themes.
       markerEnd: MarkerType.ArrowClosed,
-      animated: resolved.state === "active",
+      data: {
+        flowing: resolved.flowing,
+        state: resolved.state,
+        animationDurationSec: resolved.animationDurationSec,
+        intensity: resolved.intensity,
+      },
       class: [
         "topo-edge",
         `topo-edge--${resolved.state}`,
         selection.connected ? "topo-edge--connected" : "",
         selection.dimmed ? "topo-edge--dimmed" : "",
       ].filter(Boolean).join(" "),
-      style:
-        resolved.state === "active"
-          ? { "--topo-edge-speed": `${resolved.animationDurationSec}s` }
-          : undefined,
     }
   }),
 )
@@ -216,6 +229,7 @@ onBeforeUnmount(() => store.stopPolling())
         :nodes="filteredFlowNodes"
         :edges="filteredFlowEdges"
         :node-types="TOPOLOGY_NODE_TYPES"
+        :edge-types="TOPOLOGY_EDGE_TYPES"
         :fit-view-on-init="true"
         :min-zoom="0.2"
         :max-zoom="1.5"

@@ -20,6 +20,19 @@
   opacity: 1;
 }
 
+/* Every node is an inspection target (click-to-inspect panel), so the whole
+   node reads as clickable. Hover lifts the node slightly with a brighter glow.
+   The doubled class outranks vue-flow's own `.vue-flow__node { cursor: grab }`
+   once their theme css is injected after ours. */
+.vue-flow__node.vue-flow__node {
+  cursor: pointer;
+  transition: opacity 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+.vue-flow__node:hover {
+  z-index: 20;
+}
+
 /* D55-7 / step 10 — selection highlight + dimming, applied to the
    .vue-flow__node wrapper via the node `class` set in TopologyView.vue. A
    coloured ring marks the clicked node; unrelated nodes fade to 0.25. */
@@ -35,6 +48,58 @@
   opacity: 0.25;
 }
 
-.vue-flow__node {
-  transition: opacity 0.15s ease, box-shadow 0.15s ease;
+/* Visual polish — soft tinted glow per node area so the graph has depth
+   instead of flat cards. The glow lives on the inner card (each node
+   component renders one), keyed off the `topo-node--<area>` wrapper class
+   added in TopologyView.vue. */
+.vue-flow__node.topo-node--internal .card {
+  box-shadow: 0 0 8px rgb(100 116 139 / 0.12);
+}
+.dark .vue-flow__node.topo-node--internal .card {
+  box-shadow: 0 0 10px rgb(148 163 184 / 0.1);
+}
+
+.vue-flow__node.topo-node--storage > * {
+  box-shadow: 0 0 8px rgb(59 130 246 / 0.12);
+}
+.dark .vue-flow__node.topo-node--storage > * {
+  box-shadow: 0 0 10px rgb(96 165 250 / 0.12);
+}
+
+.vue-flow__node.topo-node--jobs > * {
+  box-shadow: 0 0 8px rgb(34 197 94 / 0.1);
+}
+.dark .vue-flow__node.topo-node--jobs > * {
+  box-shadow: 0 0 10px rgb(74 222 128 / 0.12);
+}
+
+.vue-flow__node.topo-node--external-services > * {
+  box-shadow: 0 0 8px rgb(129 140 248 / 0.12);
+}
+.dark .vue-flow__node.topo-node--external-services > * {
+  box-shadow: 0 0 10px rgb(165 180 252 / 0.12);
+}
+
+.vue-flow__node.topo-node--data-providers > * {
+  box-shadow: 0 0 8px rgb(245 158 11 / 0.12);
+}
+.dark .vue-flow__node.topo-node--data-providers > * {
+  box-shadow: 0 0 10px rgb(251 191 36 / 0.12);
+}
+
+/* Healthy live services pop with a green-tinted aura on top of their area
+   glow. */
+.vue-flow__node.topo-node--healthy .card,
+.vue-flow__node.topo-node--healthy > * {
+  box-shadow: 0 0 12px rgb(34 197 94 / 0.18);
+}
+.dark .vue-flow__node.topo-node--healthy .card,
+.dark .vue-flow__node.topo-node--healthy > * {
+  box-shadow: 0 0 12px rgb(74 222 128 / 0.2);
+}
+
+/* Hover boosts the node content so the node reads as interactive. */
+.vue-flow__node:hover .card,
+.vue-flow__node:hover > * {
+  filter: brightness(1.04);
 }
