@@ -7,7 +7,7 @@
 // wiring lands in step 12.
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
-import { VueFlow, useVueFlow } from "@vue-flow/core"
+import { VueFlow, useVueFlow, MarkerType } from "@vue-flow/core"
 import type { Edge, Node, NodeMouseEvent } from "@vue-flow/core"
 import "@vue-flow/core/dist/style.css"
 import "@vue-flow/core/dist/theme-default.css"
@@ -72,7 +72,9 @@ const flowEdges = computed<Edge[]>(() =>
       target: e.target,
       label: e.label,
       type: "default",
-      arrowEnd: "closed",
+      // Vue Flow's marker prop is `markerEnd` (not `arrowEnd`); a plain string
+      // resolves to vue-flow's default marker colour in both themes.
+      markerEnd: MarkerType.ArrowClosed,
       animated: resolved.state === "active",
       class: [
         "topo-edge",

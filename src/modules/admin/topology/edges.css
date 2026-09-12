@@ -67,3 +67,17 @@
 .dark .topo-edge--connected .vue-flow__edge-path {
   stroke: rgb(96 165 250 / 0.9); /* blue-400 */
 }
+
+/* D55-13 — vue-flow's default theme hard-codes the edge-label pill to white
+   with black text (`.vue-flow__edge-textbg { fill:#fff }`), which leaves bright
+   pills on the dark canvas. Recolour both the pill and the label for dark mode
+   so labels stay readable and on-theme. */
+.vue-flow__edge-text {
+  fill: rgb(71 85 105); /* slate-600 */
+}
+.dark .vue-flow__edge-text {
+  fill: rgb(203 213 225); /* slate-300 */
+}
+.dark .vue-flow__edge-textbg {
+  fill: rgb(15 23 42 / 0.85); /* slate-900 */
+}
