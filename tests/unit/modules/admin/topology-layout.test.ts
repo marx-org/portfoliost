@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { layoutTopology, NODE_SIZES } from "@/modules/admin/topology/topology-layout"
+import { layoutTopology, nearOverlap, packAreas, NODE_SIZES, laneId } from "@/modules/admin/topology/topology-layout"
 import { NODE_AREAS, nodeById, topologyNodes } from "@/modules/admin/topology/graph-definition"
 
 const layout = layoutTopology()
@@ -73,16 +73,75 @@ describe("topology layout (D55-9)", () => {
     }
   })
 
-  it("separates the swim lanes so no lane fully contains another", () => {
+  it("separates the swim lanes so no two lanes overlap (D55 follow-up)", () => {
     for (let i = 0; i < layout.lanes.length; i++) {
       for (let j = i + 1; j < layout.lanes.length; j++) {
         const a = layout.lanes[i]
         const b = layout.lanes[j]
-        const aInB = b.x <= a.x && b.y <= a.y && a.x + a.width <= b.x + b.width && a.y + a.height <= b.y + b.height
-        const bInA = a.x <= b.x && a.y <= b.y && b.x + b.width <= a.x + a.width && b.y + b.height <= a.y + a.height
-        expect(aInB || bInA, `${a.area} / ${b.area}`).toBe(false)
+        const overlapX = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x)
+        const overlapY = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y)
+        expect(overlapX > 0 && overlapY > 0, `${a.area} / ${b.area}`).toBe(false)
       }
     }
+  })
+
+  it("provides stable lane ids usable as vue-flow parent nodes", () => {
+    const ids = layout.lanes.map((l) => laneId(l.area))
+    expect(new Set(ids).size).toBe(ids.length)
+    for (const lane of layout.lanes) {
+      expect(laneId(lane.area)).toMatch(/^lane-/)
+    }
+  })
+
+  it("every member node sits strictly inside its lane (bounded boxes)", () => {
+    for (const def of topologyNodes) {
+      const lane = layout.lanes.find((l) => l.area === def.area)!
+      const p = layout.positions[def.id]
+      const s = NODE_SIZES[def.area]
+      expect(p.x - lane.x, def.id).toBeGreaterThanOrEqual(0)
+      expect(p.y - lane.y, def.id).toBeGreaterThanOrEqual(0)
+      expect(lane.x + lane.width - (p.x + s.width), def.id).toBeGreaterThanOrEqual(0)
+      expect(lane.y + lane.height - (p.y + s.height), def.id).toBeGreaterThanOrEqual(0)
+    }
+  })
+
+  it("packAreas stacks overlapping boxes deterministically with no overlap", () => {
+    const raw = {
+      "data-providers": { x: 0, y: 0, width: 300, height: 200 },
+      storage: { x: 0, y: 40, width: 300, height: 200 },
+      internal: { x: 0, y: 80, width: 300, height: 200 },
+      jobs: { x: 0, y: 120, width: 300, height: 200 },
+      "external-services": { x: 0, y: 160, width: 300, height: 200 },
+    }
+    const shifts = packAreas(raw)
+    const placed = (Object.keys(shifts) as (typeof NODE_AREAS)[number][]).map((a) => {
+      const r = raw[a]
+      return { area: a, x: r.x + shifts[a].x, y: r.y + shifts[a].y, width: r.width, height: r.height }
+    })
+    for (let i = 0; i < placed.length; i++) {
+      for (let j = i + 1; j < placed.length; j++) {
+        const a = placed[i]
+        const b = placed[j]
+        const ox = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x)
+        const oy = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y)
+        expect(ox > 0 && oy > 0, `${a.area} / ${b.area}`).toBe(false)
+      }
+    }
+    // Deterministic: same input, same shifts.
+    expect(JSON.stringify(packAreas(raw))).toBe(JSON.stringify(shifts))
+    // Horizontal positions are untouched.
+    for (const a of Object.keys(shifts) as (typeof NODE_AREAS)[number][]) {
+      expect(shifts[a].x, a).toBe(0)
+    }
+  })
+
+  it("nearOverlap reports proximity inside the gap threshold (overlap counts as near)", () => {
+    expect(nearOverlap({ x: 0, y: 0, width: 100, height: 100 }, { x: 90, y: 0, width: 100, height: 100 }, 16)).toBe(true)
+    expect(nearOverlap({ x: 0, y: 0, width: 100, height: 100 }, { x: 100, y: 0, width: 100, height: 100 }, 16)).toBe(true)
+    expect(nearOverlap({ x: 0, y: 0, width: 100, height: 100 }, { x: 110, y: 0, width: 100, height: 100 }, 16)).toBe(true)
+    expect(nearOverlap({ x: 0, y: 0, width: 100, height: 100 }, { x: 130, y: 0, width: 100, height: 100 }, 16)).toBe(false)
+    expect(nearOverlap({ x: 0, y: 0, width: 100, height: 100 }, { x: 0, y: 50, width: 100, height: 100 }, 16)).toBe(true)
+    expect(nearOverlap({ x: 0, y: 0, width: 100, height: 100 }, { x: 0, y: 116, width: 100, height: 100 }, 16)).toBe(false)
   })
 
   it("keeps the External lane compact (isolated nodes pinned, no canvas-spanning lane)", () => {

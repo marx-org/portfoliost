@@ -4,13 +4,13 @@
 // right — Providers → openst/cachest → services → gateway → SPA — because
 // every request edge points upstream (SPA → gateway → services → providers).
 //
-// Swim lanes are per-area rectangles rendered behind the nodes by
-// TopologyView.vue (fill only, no heavy borders — D55-9). Because the five
-// thematic areas interleave across the same dagre columns, their raw bounding
-// boxes overlap heavily. `separateLanes` applies a small vertical shift per
-// area (a deterministic coordinate-descent) so no lane fully contains another
-// and large overlaps shrink, while the flow areas (data-providers, internal)
-// stay pinned — keeping the left-to-right reading intact.
+// Each thematic area becomes a movable lane box (LaneBox) that never overlaps
+// another one: `packAreas` runs a deterministic greedy stack (ascending raw
+// top, push each lane down until it clears every already-placed lane). The
+// lane geometry is returned to TopologyView.vue, which renders each area as a
+// vue-flow parent node; its member nodes live with `extent: "parent"` so they
+// physically cannot leave the box, and dragging a lane header moves the whole
+// group at once (clamped against sibling lanes).
 
 import { Graph, layout } from "@dagrejs/dagre"
 
@@ -27,9 +27,14 @@ export interface LaneBox {
 }
 
 export interface TopologyLayout {
-  /** Top-left position of every node, keyed by node id (graph coordinates). */
+  /** Top-left position of every member node (graph coordinates, absolute). */
   positions: Record<string, { x: number; y: number }>
   lanes: LaneBox[]
+}
+
+/** Vue-flow parent-node id for an area lane. */
+export function laneId(area: NodeArea): string {
+  return `lane-${area}`
 }
 
 /** Approximate rendered node size per area — drives dagre spacing. */
@@ -42,16 +47,18 @@ export const NODE_SIZES: Record<NodeArea, { width: number; height: number }> = {
 }
 
 const LANE_PADDING = 24
+/** Minimum separation kept between two lanes after packing. */
+const LANE_GAP = 16
 
 /**
  * Nodes without edges would default to the first rank (right-most in RL).
  * Pin each to the column of the node it logically belongs next to, so the
  * External/Jobs swim lanes stay compact instead of spanning the canvas.
+ * Isolated nodes have no edges, so moving them cannot affect edge routing.
  */
 const ISOLATED_ANCHORS: Array<{ id: string; anchor: string }> = [
   { id: "mastra-ticker", anchor: "portfoliost-instruments" },
   { id: "scanst", anchor: "portfoliost-instruments" },
-  { id: "jobshot", anchor: "portfoliost-admin" },
 ]
 
 function buildDagreGraph() {
@@ -67,7 +74,15 @@ function buildDagreGraph() {
   return g
 }
 
-function areaBox(positions: TopologyLayout["positions"], area: NodeArea) {
+interface Rect {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+/** Upper-left bounding rect of an area's nodes (plus lane padding). */
+function areaBox(positions: TopologyLayout["positions"], area: NodeArea): Rect {
   let minX = Infinity
   let minY = Infinity
   let maxX = -Infinity
@@ -83,88 +98,32 @@ function areaBox(positions: TopologyLayout["positions"], area: NodeArea) {
   return { x: minX - LANE_PADDING, y: minY - LANE_PADDING, width: maxX - minX + LANE_PADDING * 2, height: maxY - minY + LANE_PADDING * 2 }
 }
 
-function overlapArea(a: LaneBox, b: LaneBox): number {
+/** True when `a` and `b` come within `gap` px of each other (overlap counts). */
+export function nearOverlap(a: Rect, b: Rect, gap: number): boolean {
   const ox = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x)
   const oy = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y)
-  return ox > 0 && oy > 0 ? ox * oy : 0
-}
-
-function contains(outer: LaneBox, inner: LaneBox): boolean {
-  return inner.x >= outer.x && inner.y >= outer.y && inner.x + inner.width <= outer.x + outer.width && inner.y + inner.height <= outer.y + outer.height
+  return ox > -gap && oy > -gap
 }
 
 /**
- * Choose a vertical shift (dy) per area that minimizes lane overlap while
- * keeping the flow areas aligned. Deterministic: fixed start (all zero),
- * fixed grid, fixed iteration budget.
+ * Deterministic greedy pack: process areas top-down (by raw y, then definition
+ * order) and push each lane straight down until it clears every already-placed
+ * lane by at least LANE_GAP. Result lanes are pairwise disjoint. Horizontal
+ * positions are untouched, preserving the left-to-right column reading.
  */
-function separateLanes(positions: TopologyLayout["positions"]): Record<NodeArea, number> {
-  const N = NODE_AREAS.length
-  const FLOW_AREAS: NodeArea[] = ["internal", "data-providers"]
-  const flowSet = new Set<NodeArea>(FLOW_AREAS)
-  const flowIdx = NODE_AREAS.map((a, i) => (flowSet.has(a) ? i : -1)).filter((i) => i >= 0)
-
-  const boxesAt = (dy: number[]): LaneBox[] =>
-    NODE_AREAS.map((a, i) => {
-      const b = areaBox(positions, a)
-      return { area: a, label: AREA_LABELS[a], x: b.x, y: b.y + dy[i], width: b.width, height: b.height }
-    })
-
-  const W_CONTAIN = 8
-  const W_LARGE = 5
-  const W_FLOW = 6
-  const W_ALIGN = 8
-
-  const cost = (dy: number[]): number => {
-    const bs = boxesAt(dy)
-    let c = 0
-    for (let i = 0; i < N; i++) {
-      for (let j = i + 1; j < N; j++) {
-        if (contains(bs[i], bs[j]) || contains(bs[j], bs[i])) c += W_CONTAIN
-        const frac = overlapArea(bs[i], bs[j]) / Math.min(bs[i].width * bs[i].height, bs[j].width * bs[j].height)
-        if (frac > 0.5) c += W_LARGE * (frac - 0.5)
-      }
+export function packAreas(raw: Record<NodeArea, Rect>): Record<NodeArea, { x: number; y: number }> {
+  const order = NODE_AREAS.slice().sort((a, b) => raw[a].y - raw[b].y || NODE_AREAS.indexOf(a) - NODE_AREAS.indexOf(b))
+  const placed: Rect[] = []
+  const out = {} as Record<NodeArea, { x: number; y: number }>
+  for (const area of order) {
+    let px = raw[area].x
+    let py = raw[area].y
+    while (placed.some((p) => nearOverlap({ ...raw[area], x: px, y: py }, p, LANE_GAP))) {
+      py += 24
     }
-    c += W_FLOW * (dy.reduce((s, v) => s + Math.abs(v), 0) / 1000)
-    // keep the flow areas vertically aligned with each other
-    for (let k = 0; k < flowIdx.length; k++) {
-      for (let m = k + 1; m < flowIdx.length; m++) c += W_ALIGN * (Math.abs(dy[flowIdx[k]] - dy[flowIdx[m]]) / 1000)
-    }
-    return c
+    placed.push({ ...raw[area], x: px, y: py })
+    out[area] = { x: px - raw[area].x, y: py - raw[area].y }
   }
-
-  let dy = new Array(N).fill(0)
-  let best = cost(dy)
-  const STEP = 20
-  const RANGE = 600
-  for (let iter = 0; iter < 400; iter++) {
-    let improved = false
-    for (let i = 0; i < N; i++) {
-      let lb = dy[i]
-      let lc = best
-      for (let s = -RANGE; s <= RANGE; s += STEP) {
-        const trial = [...dy]
-        trial[i] = s
-        const cc = cost(trial)
-        if (cc < lc - 1e-4) {
-          lc = cc
-          lb = s
-        }
-      }
-      if (lb !== dy[i]) {
-        dy[i] = lb
-        improved = true
-      }
-    }
-    const nb = cost(dy)
-    if (nb < best - 1e-4) best = nb
-    else if (!improved) break
-  }
-
-  const out = {} as Record<NodeArea, number>
-  NODE_AREAS.forEach((a, i) => {
-    out[a] = dy[i]
-  })
   return out
 }
 
@@ -173,10 +132,9 @@ export function layoutTopology(): TopologyLayout {
   layout(g)
 
   // Reposition isolated nodes next to their anchor (stacked below the column).
-  // dagre v3 ignores minRank/maxRank, and an isolated node would otherwise
+  // dagre v3 ignores minRank/maxRank, so an isolated node would otherwise
   // default to the first rank (right-most in RL), stretching the External /
-  // Jobs swim lanes across the whole canvas. Isolated nodes have no edges,
-  // so moving them cannot affect edge routing. Guarded, so a future edge in
+  // Jobs swim lanes across the whole canvas. Guarded, so a future edge in
   // the definition automatically lifts the pin.
   const columnBottom = new Map<number, number>()
   for (const n of topologyNodes) {
@@ -208,37 +166,20 @@ export function layoutTopology(): TopologyLayout {
     }
   }
 
-  // Spread the per-area swim lanes apart (vertical shift per area) so they
-  // don't fully contain one another, while keeping the flow pinned.
-  const shifts = separateLanes(positions)
+  // Spread the per-area swim lanes apart so no lane overlaps another.
+  const raw = {} as Record<NodeArea, Rect>
+  for (const area of NODE_AREAS) raw[area] = areaBox(positions, area)
+  const shifts = packAreas(raw)
   for (const n of topologyNodes) {
-    positions[n.id].y += shifts[n.area]
+    positions[n.id].x += shifts[n.area].x
+    positions[n.id].y += shifts[n.area].y
   }
 
   const lanes: LaneBox[] = []
   for (const area of NODE_AREAS) {
-    const nodes = areaNodes(area)
-    if (!nodes.length) continue
-    let minX = Infinity
-    let minY = Infinity
-    let maxX = -Infinity
-    let maxY = -Infinity
-    for (const n of nodes) {
-      const p = positions[n.id]
-      const s = NODE_SIZES[area]
-      minX = Math.min(minX, p.x)
-      minY = Math.min(minY, p.y)
-      maxX = Math.max(maxX, p.x + s.width)
-      maxY = Math.max(maxY, p.y + s.height)
-    }
-    lanes.push({
-      area,
-      label: AREA_LABELS[area],
-      x: minX - LANE_PADDING,
-      y: minY - LANE_PADDING,
-      width: maxX - minX + LANE_PADDING * 2,
-      height: maxY - minY + LANE_PADDING * 2,
-    })
+    if (!areaNodes(area).length) continue
+    const box = areaBox(positions, area)
+    lanes.push({ area, label: AREA_LABELS[area], ...box })
   }
 
   return { positions, lanes }

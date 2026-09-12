@@ -89,6 +89,10 @@ exports[`topology graph definition (D55-3) > snapshots node IDs and edge pairs 1
     ],
     [
       "portfoliost-admin",
+      "jobshot",
+    ],
+    [
+      "portfoliost-admin",
       "openst",
     ],
     [

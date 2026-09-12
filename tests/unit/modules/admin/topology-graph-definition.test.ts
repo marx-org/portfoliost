@@ -73,6 +73,7 @@ const EXPECTED_EDGE_PAIRS = [
   ["openst", "yfinance"],
   ["portfoliost", "nginx-gateway"],
   ["portfoliost-admin", "cachest"],
+  ["portfoliost-admin", "jobshot"],
   ["portfoliost-admin", "openst"],
   ["portfoliost-admin", "portfoliost-instruments"],
   ["portfoliost-admin", "portfoliost-users-auth"],
@@ -144,6 +145,7 @@ describe("topology graph definition (D55-3)", () => {
   it("computes upstream/downstream neighbours correctly", () => {
     expect(downstreamOf("nginx-gateway").sort()).toEqual(["portfoliost-admin", "portfoliost-instruments", "portfoliost-users-auth", "portfoliost-wallets"])
     expect(upstreamOf("portfoliost-users-auth").sort()).toEqual(["nginx-gateway", "pocketid", "portfoliost-admin", "portfoliost-instruments", "portfoliost-wallets"])
+    expect(upstreamOf("jobshot").sort()).toEqual(["portfoliost-admin"])
     expect(edgesForNode("cachest")).toHaveLength(7)
     expect(edgesForNode("scanst")).toHaveLength(0)
   })

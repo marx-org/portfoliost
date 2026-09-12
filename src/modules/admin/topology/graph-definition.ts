@@ -140,6 +140,7 @@ export const topologyEdges: TopologyEdgeDef[] = [
   // FX
   { source: "portfoliost-wallets", target: "ecb", label: "FX rates (via fxsync CronJob)", kind: "provider", measurable: "none" },
   // jobs
+  { source: "portfoliost-admin", target: "jobshot", label: "On-demand job trigger", kind: "job", measurable: "none" },
   { source: "portfoliost-wallets-fxsync", target: "portfoliost-wallets", label: "Updates FX rates", kind: "job", measurable: "none" },
   { source: "portfoliost-instruments-tickersync", target: "portfoliost-instruments", label: "Syncs tickers", kind: "job", measurable: "none" },
   { source: "stooq-downloader", target: "stooq-pl", label: "CSV download", kind: "provider", measurable: "none" },

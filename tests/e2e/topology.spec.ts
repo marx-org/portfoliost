@@ -139,3 +139,128 @@ test("filter pill toggles area visibility", async ({ page }) => {
   await expect(cachest).toBeVisible()
   await expect(providersPill).toHaveAttribute("aria-pressed", "true")
 })
+
+// D55 / follow-up — each area renders as a movable parent lane node. The lanes
+// never overlap, dragging a lane header moves the whole group together, the
+// Re-layout button restores the canonical dagre arrangement, and manual
+// positions survive a reload (localStorage).
+
+function laneNode(page: import("@playwright/test").Page, area: string) {
+  return page.locator(`.topo-lane-node:has([data-lane="${area}"])`)
+}
+
+async function laneBox(locator: import("@playwright/test").Locator): Promise<{ x: number; y: number }> {
+  const box = await locator.boundingBox()
+  expect(box).not.toBeNull()
+  return { x: box!.x, y: box!.y }
+}
+
+function intersects(a: { x: number; y: number; width: number; height: number }, b: { x: number; y: number; width: number; height: number }): boolean {
+  const ox = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x)
+  const oy = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y)
+  return ox > 0 && oy > 0
+}
+
+test("lane parent boxes render per area and never overlap", async ({ page }) => {
+  await openTopology(page)
+
+  const lanes = page.locator(".topo-lane-node")
+  await expect(lanes).toHaveCount(5)
+  for (const area of ["internal", "storage", "jobs", "external-services", "data-providers"]) {
+    await expect(laneNode(page, area)).toBeVisible()
+    await expect(laneNode(page, area).locator(".topo-lane__label")).toContainText(
+      area === "external-services" ? "External" : area === "data-providers" ? "Providers" : area.slice(0, 1).toUpperCase() + area.slice(1),
+    )
+  }
+
+  const boxes = await Promise.all(
+    ["internal", "storage", "jobs", "external-services", "data-providers"].map(async (area) => ({
+      area,
+      box: (await laneNode(page, area).boundingBox())!,
+    })),
+  )
+  for (let i = 0; i < boxes.length; i++) {
+    for (let j = i + 1; j < boxes.length; j++) {
+      expect(intersects(boxes[i].box, boxes[j].box), `${boxes[i].area} ⊕ ${boxes[j].area}`).toBe(false)
+    }
+  }
+
+  // Every member node sits inside its lane box on screen.
+  for (const id of ["cachest", "portfoliost-admin", "jobshot", "postgres", "pocketid"]) {
+    const member = await nodeWrapper(page, id).boundingBox()
+    const lane = boxes.find((l) =>
+      l.box.x <= member!.x + 1 &&
+      l.box.y <= member!.y + 1 &&
+      l.box.x + l.box.width >= member!.x + member!.width - 1 &&
+      l.box.y + l.box.height >= member!.y + member!.height - 1,
+    )
+    expect(lane, `${id} inside a lane`).toBeDefined()
+  }
+})
+
+test("dragging a lane header moves its member nodes together", async ({ page }) => {
+  await openTopology(page)
+
+  const external = laneNode(page, "external-services")
+  const pocketid = nodeWrapper(page, "pocketid")
+  const beforeLane = await laneBox(external)
+  const beforeChild = await laneBox(pocketid)
+
+  const header = external.locator(".topo-lane__header")
+  const hb = (await header.boundingBox())!
+  await page.mouse.move(hb.x + 40, hb.y + hb.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(hb.x + 40 + 80, hb.y + hb.height / 2 + 30, { steps: 8 })
+  await page.mouse.up()
+
+  const afterLane = await laneBox(external)
+  const afterChild = await laneBox(pocketid)
+  // Members are parented to the lane: both translate by the same vector.
+  expect(afterLane.x - beforeLane.x).toBeGreaterThan(20)
+  expect(Math.abs(afterChild.x - beforeChild.x - (afterLane.x - beforeLane.x))).toBeLessThan(2)
+  expect(Math.abs(afterChild.y - beforeChild.y - (afterLane.y - beforeLane.y))).toBeLessThan(2)
+})
+
+test("re-layout restores the canonical arrangement after a manual move", async ({ page }) => {
+  await openTopology(page)
+
+  const external = laneNode(page, "external-services")
+  const before = await laneBox(external)
+
+  const header = external.locator(".topo-lane__header")
+  const hb = (await header.boundingBox())!
+  await page.mouse.move(hb.x + 40, hb.y + hb.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(hb.x + 40 + 120, hb.y + hb.height / 2 + 60, { steps: 8 })
+  await page.mouse.up()
+  const afterDrag = await laneBox(external)
+  expect(Math.abs(afterDrag.x - before.x)).toBeGreaterThan(40)
+
+  await page.getByTestId("topo-relayout").click()
+  const afterRelayout = await laneBox(external)
+  expect(Math.abs(afterRelayout.x - before.x)).toBeLessThan(2)
+  expect(Math.abs(afterRelayout.y - before.y)).toBeLessThan(2)
+})
+
+test("moved lanes persist across a reload", async ({ page }) => {
+  await openTopology(page)
+
+  const external = laneNode(page, "external-services")
+  const header = external.locator(".topo-lane__header")
+  const hb = (await header.boundingBox())!
+  await page.mouse.move(hb.x + 40, hb.y + hb.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(hb.x + 40 + 100, hb.y + hb.height / 2, { steps: 8 })
+  await page.mouse.up()
+  const afterDrag = await laneBox(external)
+  expect(afterDrag.x).toBeGreaterThan(40)
+
+  await page.reload()
+  await page.getByRole("link", { name: "Admin" }).click()
+  await page.getByRole("link", { name: "Topology" }).click()
+  await expect(page).toHaveURL(/\/en\/admin\/topology/)
+
+  const restored = await laneBox(laneNode(page, "external-services"))
+  expect(Math.abs(restored.x - afterDrag.x)).toBeLessThan(2)
+  expect(Math.abs(restored.y - afterDrag.y)).toBeLessThan(2)
+})
