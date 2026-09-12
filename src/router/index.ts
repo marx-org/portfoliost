@@ -242,6 +242,12 @@ const router = createRouter({
               component: () => import("@/modules/admin/MarketDataView.vue"),
               meta: { admin: true },
             },
+            {
+              path: "topology",
+              name: "admin-topology",
+              component: () => import("@/modules/admin/TopologyView.vue"),
+              meta: { admin: true },
+            },
           ],
         },
       ],

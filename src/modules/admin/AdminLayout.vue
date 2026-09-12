@@ -5,6 +5,7 @@ const route = useRoute()
 
 const tabs = [
   { name: "admin-system",      label: "System" },
+  { name: "admin-topology",    label: "Topology" },
   { name: "admin-currencies",  label: "Currency Rates" },
   { name: "admin-users",       label: "Users" },
   { name: "admin-jobs",        label: "Jobs" },

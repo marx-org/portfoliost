@@ -413,7 +413,7 @@ is marked complete.
   - _Test:_ Playwright: click node → panel visible; click background → panel closed
 - [ ] **Step 11** — Implement toolbar (zoom/fit/reset/search/filter pills)
   - _Test:_ Playwright: search filters nodes; filter pill toggles area visibility
-- [ ] **Step 12** — Add route + tab entry in `AdminLayout.vue` + `router/index.ts`
+- [x] **Step 12** — Add route + tab entry in `AdminLayout.vue` + `router/index.ts`
   - _Test:_ Playwright: admin user can navigate to `/en/admin/topology`
 - [ ] **Step 13** — Dark/light mode QA pass
   - _Test:_ Visual review in both modes
