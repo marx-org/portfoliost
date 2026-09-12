@@ -407,7 +407,7 @@ is marked complete.
 - [x] **Step 7** — Implement `useTopologyStore` (Pinia, polls both endpoints, maps to node status)
   - _Test:_ Unit: correct status mapping for all `impl` values and Prometheus states
 - [x] **Step 8** — Implement `TopologyView.vue`: Vue Flow canvas + dagre layout + swim-lane backgrounds
-- [ ] **Step 9** — Implement edge animation (active vs. idle, CSS animated dash with moving dot)
+- [x] **Step 9** — Implement edge animation (active vs. idle, CSS animated dash with moving dot)
   - _Test:_ Visual review
 - [ ] **Step 10** — Implement click-to-inspect details panel + selection highlighting/dimming
   - _Test:_ Playwright: click node → panel visible; click background → panel closed

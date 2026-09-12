@@ -1,15 +1,18 @@
 // D55 / step 8 — Admin → Topology tab: Vue Flow canvas with the dagre layout
 // (topology-layout.ts) and per-area swim-lane backgrounds. Live status and
 // traffic are overlaid from useTopologyStore (step 7); custom node rendering
-// from step 6. Route/tab wiring lands in step 12.
+// from step 6; edge animation (active/idle) from step 9. Route/tab wiring
+// lands in step 12.
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted } from "vue"
 import { VueFlow } from "@vue-flow/core"
 import type { Edge, Node } from "@vue-flow/core"
 import "@vue-flow/core/dist/style.css"
 import "@vue-flow/core/dist/theme-default.css"
+import "./topology/edges.css"
 
 import { topologyEdges, topologyNodes } from "./topology/graph-definition"
+import { resolveTopologyEdge } from "./topology/edge-state"
 import { layoutTopology } from "./topology/topology-layout"
 import { TOPOLOGY_NODE_TYPES } from "./topology/nodes"
 import type { TopologyNodeData } from "./topology/nodes"
@@ -29,16 +32,27 @@ const flowNodes = computed<TopologyFlowNode[]>(() =>
   })),
 )
 
+// Step 9 — edge visual state (D55-6): active edges get vue-flow's built-in
+// animated dash (moving dot along a dashed path) with a speed variable scaled
+// to the request rate; idle/job/provider edges stay static (edges.css).
 const flowEdges = computed<Edge[]>(() =>
-  topologyEdges.map((e) => ({
-    id: `${e.source}->${e.target}`,
-    source: e.source,
-    target: e.target,
-    label: e.label,
-    type: "default",
-    arrowEnd: "closed",
-    animated: false,
-  })),
+  topologyEdges.map((e) => {
+    const resolved = resolveTopologyEdge(e, store.trafficById)
+    return {
+      id: `${e.source}->${e.target}`,
+      source: e.source,
+      target: e.target,
+      label: e.label,
+      type: "default",
+      arrowEnd: "closed",
+      animated: resolved.state === "active",
+      class: `topo-edge topo-edge--${resolved.state}`,
+      style:
+        resolved.state === "active"
+          ? { "--topo-edge-speed": `${resolved.animationDurationSec}s` }
+          : undefined,
+    }
+  }),
 )
 
 onMounted(() => store.startPolling())

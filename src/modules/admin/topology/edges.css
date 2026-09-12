@@ -1,0 +1,48 @@
+/* D55-6 / step 9 — topology edge styles. Edge paths render inside vue-flow's
+   edge layer, unreachable from the view's scoped styles; this global sheet
+   targets the `topo-edge--*` classes set in TopologyView.vue. It is imported
+   after @vue-flow/core's stylesheet so its rules win specificity ties. */
+
+/* Idle: static thin line with arrow (D55-6). */
+.topo-edge--idle .vue-flow__edge-path {
+  stroke: rgb(148 163 184 / 0.9); /* slate-400 */
+  stroke-width: 1.25;
+}
+.dark .topo-edge--idle .vue-flow__edge-path {
+  stroke: rgb(71 85 105); /* slate-600 */
+}
+
+/* Job trigger: static dashed line, green tint (D55-6). */
+.topo-edge--job .vue-flow__edge-path {
+  stroke: rgb(22 163 74 / 0.8); /* green-600 */
+  stroke-width: 1.25;
+  stroke-dasharray: 6 5;
+}
+.dark .topo-edge--job .vue-flow__edge-path {
+  stroke: rgb(22 163 74 / 0.9);
+}
+
+/* External provider: static thin line, amber tint, no animation (D55-6). */
+.topo-edge--provider .vue-flow__edge-path {
+  stroke: rgb(217 119 6 / 0.55); /* amber-600 */
+  stroke-width: 1;
+}
+.dark .topo-edge--provider .vue-flow__edge-path {
+  stroke: rgb(245 158 11 / 0.5); /* amber-500 */
+}
+
+/* Active: vue-flow's built-in animated dash (moving dot along a dashed path);
+   the inline --topo-edge-speed variable scales one dash cycle to the request
+   rate (higher rpm → shorter cycle → faster dot). The triple-class selector
+   outranks vue-flow's `.vue-flow__edge.animated path` shorthand so the
+   duration override wins the cascade. */
+.vue-flow__edge.animated.topo-edge--active .vue-flow__edge-path {
+  animation-duration: var(--topo-edge-speed, 0.5s);
+}
+.topo-edge--active .vue-flow__edge-path {
+  stroke: rgb(100 116 139); /* slate-500 */
+  stroke-width: 1.5;
+}
+.dark .topo-edge--active .vue-flow__edge-path {
+  stroke: rgb(148 163 184); /* slate-400 */
+}
