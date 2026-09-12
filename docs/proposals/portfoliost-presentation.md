@@ -417,7 +417,7 @@ is marked complete.
   - _Test:_ Playwright: admin user can navigate to `/en/admin/topology`
 - [x] **Step 13** — Dark/light mode QA pass
   - _Test:_ Visual review in both modes
-- [ ] **Step 14** — Add `PROMETHEUS_URL` env var to homelab HelmRelease for `portfoliost-admin`; verify live status dots appear in cluster
+- [x] **Step 14** — Add `PROMETHEUS_URL` env var to homelab HelmRelease for `portfoliost-admin`; verify live status dots appear in cluster
   - _Test:_ Manual smoke test in cluster
 
 ---
