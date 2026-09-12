@@ -409,7 +409,7 @@ is marked complete.
 - [x] **Step 8** — Implement `TopologyView.vue`: Vue Flow canvas + dagre layout + swim-lane backgrounds
 - [x] **Step 9** — Implement edge animation (active vs. idle, CSS animated dash with moving dot)
   - _Test:_ Visual review
-- [ ] **Step 10** — Implement click-to-inspect details panel + selection highlighting/dimming
+- [x] **Step 10** — Implement click-to-inspect details panel + selection highlighting/dimming
   - _Test:_ Playwright: click node → panel visible; click background → panel closed
 - [ ] **Step 11** — Implement toolbar (zoom/fit/reset/search/filter pills)
   - _Test:_ Playwright: search filters nodes; filter pill toggles area visibility

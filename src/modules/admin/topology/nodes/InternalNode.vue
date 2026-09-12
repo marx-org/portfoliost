@@ -9,7 +9,10 @@ const props = defineProps<{ data: TopologyNodeData }>()
 </script>
 
 <template>
-  <div class="card relative flex items-center gap-2 px-3 py-2">
+  <div
+    class="card relative flex items-center gap-2 px-3 py-2"
+    :data-node-id="props.data.id"
+  >
     <svg
       class="h-4 w-4 shrink-0 text-blue-500 dark:text-blue-400"
       viewBox="0 0 24 24"

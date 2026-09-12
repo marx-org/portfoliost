@@ -11,6 +11,7 @@ const props = defineProps<{ data: TopologyNodeData }>()
 <template>
   <div
     class="relative flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 dark:border-blue-900/40 dark:bg-blue-950/30"
+    :data-node-id="props.data.id"
   >
     <svg
       class="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400"

@@ -84,6 +84,7 @@ export const useTopologyStore = defineStore("topology", () => {
   /** Merge a static node definition with its live status/traffic overlay. */
   function nodeData(def: TopologyNodeDef): TopologyNodeData {
     return {
+      id: def.id,
       label: def.label,
       area: def.area,
       live: def.live,

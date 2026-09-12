@@ -46,3 +46,24 @@
 .dark .topo-edge--active .vue-flow__edge-path {
   stroke: rgb(148 163 184); /* slate-400 */
 }
+
+/* D55-7 / step 10 — selection highlight + dimming. Edges incident to the
+   clicked node get a thicker stroke at full opacity; unrelated edges fade.
+   Opacity on the .vue-flow__edge wrapper dims the path, label and animated
+   dot together. */
+.vue-flow__edge {
+  transition: opacity 0.15s ease;
+}
+
+.vue-flow__edge.topo-edge--dimmed {
+  opacity: 0.2;
+  pointer-events: none;
+}
+
+.topo-edge--connected .vue-flow__edge-path {
+  stroke-width: 2.25;
+  stroke: rgb(59 130 246 / 0.85); /* blue-500 */
+}
+.dark .topo-edge--connected .vue-flow__edge-path {
+  stroke: rgb(96 165 250 / 0.9); /* blue-400 */
+}

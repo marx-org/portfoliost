@@ -1,43 +1,59 @@
 // D55 / step 8 — Admin → Topology tab: Vue Flow canvas with the dagre layout
 // (topology-layout.ts) and per-area swim-lane backgrounds. Live status and
 // traffic are overlaid from useTopologyStore (step 7); custom node rendering
-// from step 6; edge animation (active/idle) from step 9. Route/tab wiring
-// lands in step 12.
+// from step 6; edge animation (active/idle) from step 9; click-to-inspect
+// details panel + selection highlight/dimming from step 10 (D55-7). Route/tab
+// wiring lands in step 12.
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted } from "vue"
+import { computed, onBeforeUnmount, onMounted, ref } from "vue"
 import { VueFlow } from "@vue-flow/core"
-import type { Edge, Node } from "@vue-flow/core"
+import type { Edge, Node, NodeMouseEvent } from "@vue-flow/core"
 import "@vue-flow/core/dist/style.css"
 import "@vue-flow/core/dist/theme-default.css"
 import "./topology/edges.css"
 
 import { topologyEdges, topologyNodes } from "./topology/graph-definition"
 import { resolveTopologyEdge } from "./topology/edge-state"
+import { edgeSelectionState, nodeSelectionState } from "./topology/topology-selection"
 import { layoutTopology } from "./topology/topology-layout"
 import { TOPOLOGY_NODE_TYPES } from "./topology/nodes"
 import type { TopologyNodeData } from "./topology/nodes"
 import { useTopologyStore } from "./topology/topology-store"
+import TopologyDetailsPanel from "./topology/TopologyDetailsPanel.vue"
 
 type TopologyFlowNode = Node<TopologyNodeData>
 
 const store = useTopologyStore()
 const layout = layoutTopology()
 
+// D55-7 / step 10 — the clicked node (null = nothing inspected, canvas click
+// resets). Drives the details panel plus the ring/dim overlay on nodes+edges.
+const selectedNodeId = ref<string | null>(null)
+
 const flowNodes = computed<TopologyFlowNode[]>(() =>
-  topologyNodes.map((def) => ({
-    id: def.id,
-    type: def.area,
-    position: layout.positions[def.id],
-    data: store.nodeData(def),
-  })),
+  topologyNodes.map((def) => {
+    const state = nodeSelectionState(selectedNodeId.value, def.id, topologyEdges)
+    return {
+      id: def.id,
+      type: def.area,
+      position: layout.positions[def.id],
+      data: { ...store.nodeData(def), selected: state.selected, dimmed: state.dimmed },
+      class: [
+        state.selected ? "topo-node--selected" : "",
+        state.dimmed ? "topo-node--dimmed" : "",
+      ].filter(Boolean).join(" "),
+    }
+  }),
 )
 
 // Step 9 — edge visual state (D55-6): active edges get vue-flow's built-in
 // animated dash (moving dot along a dashed path) with a speed variable scaled
 // to the request rate; idle/job/provider edges stay static (edges.css).
+// Step 10 (D55-7) — incident edges thicken at full opacity, unrelated edges dim.
 const flowEdges = computed<Edge[]>(() =>
   topologyEdges.map((e) => {
     const resolved = resolveTopologyEdge(e, store.trafficById)
+    const selection = edgeSelectionState(selectedNodeId.value, e)
     return {
       id: `${e.source}->${e.target}`,
       source: e.source,
@@ -46,7 +62,12 @@ const flowEdges = computed<Edge[]>(() =>
       type: "default",
       arrowEnd: "closed",
       animated: resolved.state === "active",
-      class: `topo-edge topo-edge--${resolved.state}`,
+      class: [
+        "topo-edge",
+        `topo-edge--${resolved.state}`,
+        selection.connected ? "topo-edge--connected" : "",
+        selection.dimmed ? "topo-edge--dimmed" : "",
+      ].filter(Boolean).join(" "),
       style:
         resolved.state === "active"
           ? { "--topo-edge-speed": `${resolved.animationDurationSec}s` }
@@ -54,6 +75,18 @@ const flowEdges = computed<Edge[]>(() =>
     }
   }),
 )
+
+function onNodeClick(event: NodeMouseEvent): void {
+  selectedNodeId.value = event.node.id
+}
+
+function onPaneClick(): void {
+  selectedNodeId.value = null
+}
+
+function closePanel(): void {
+  selectedNodeId.value = null
+}
 
 onMounted(() => store.startPolling())
 onBeforeUnmount(() => store.stopPolling())
@@ -72,6 +105,8 @@ onBeforeUnmount(() => store.stopPolling())
         :min-zoom="0.2"
         :max-zoom="1.5"
         :delete-key-code="null"
+        @node-click="onNodeClick"
+        @pane-click="onPaneClick"
       >
         <template #zoom-pane>
           <div
@@ -86,6 +121,16 @@ onBeforeUnmount(() => store.stopPolling())
           </div>
         </template>
       </VueFlow>
+
+      <Transition name="topo-panel" appear>
+        <TopologyDetailsPanel
+          v-if="selectedNodeId"
+          :node-id="selectedNodeId"
+          data-testid="topology-details-panel"
+          @close="closePanel"
+          @select="selectedNodeId = $event"
+        />
+      </Transition>
     </div>
 
     <p v-if="store.error" class="mt-3 text-sm text-red-600 dark:text-red-400">{{ store.error }}</p>
@@ -96,6 +141,16 @@ onBeforeUnmount(() => store.stopPolling())
 </template>
 
 <style scoped>
+/* D55-7 / step 10 — right-side slide-in for the click-to-inspect panel. */
+.topo-panel-enter-active,
+.topo-panel-leave-active {
+  transition: transform 0.22s ease;
+}
+.topo-panel-enter-from,
+.topo-panel-leave-to {
+  transform: translateX(100%);
+}
+
 /* Swim lanes sit inside vue-flow's transformed pane (zoom-pane slot), so
    graph coordinates map 1:1. z-index -1 keeps them behind nodes/edges. */
 .topo-lane {
