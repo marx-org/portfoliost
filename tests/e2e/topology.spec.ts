@@ -1,10 +1,15 @@
 import { expect, test } from "@playwright/test"
 
-// D55 / step 10 — click-to-inspect details panel + selection highlight/dimming.
-// Login as the mock admin (mocks/oidc seeds demo@example.com with the
-// portfoliost_admin group), open the Topology tab, then exercise the canvas:
-// clicking a node opens the right-side panel, the selected node rings and
-// unrelated nodes dim, and clicking the canvas background closes the panel.
+// D55 / steps 10-11 — click-to-inspect details panel + selection
+// highlight/dimming (step 10) and the toolbar with search + area filter pills
+// (step 11). Login as the mock admin (mocks/oidc seeds demo@example.com with
+// the portfoliost_admin group), open the Topology tab, then exercise the
+// canvas: clicking a node opens the right-side panel, the selected node rings
+// and unrelated nodes dim, clicking the canvas background closes the panel,
+// searching filters nodes down to matches, and filter pills toggle area
+// visibility. Live status/traffic never resolves in this compose stack (the
+// admin module needs X-User-* headers or a JWT), so assertions stay on static
+// content and filtering behavior.
 
 async function login(page: import("@playwright/test").Page) {
   await page.goto("/login")
@@ -86,4 +91,51 @@ test("panel close button closes the panel", async ({ page }) => {
 
   await page.getByTestId("topology-panel-close").click()
   await expect(page.getByTestId("topology-details-panel")).toHaveCount(0)
+})
+
+test("search filters nodes down to matches", async ({ page }) => {
+  await openTopology(page)
+
+  const cachest = nodeWrapper(page, "cachest")
+  const openst = nodeWrapper(page, "openst")
+  const spa = nodeWrapper(page, "portfoliost")
+  await expect(cachest).toBeVisible()
+
+  await page.getByTestId("topo-search").fill("cachest")
+
+  // The matching node stays; non-matching nodes are removed from the DOM.
+  await expect(cachest).toBeVisible()
+  await expect(openst).toHaveCount(0)
+  await expect(spa).toHaveCount(0)
+
+  // The inspector still opens for the visible match.
+  await cachest.click()
+  await expect(page.getByTestId("topology-details-panel")).toBeVisible()
+  await expect(page.getByTestId("topology-details-panel")).toContainText("cachest")
+
+  // Clearing the search restores every node.
+  await page.getByTestId("topo-search").fill("")
+  await expect(openst).toBeVisible()
+  await expect(spa).toBeVisible()
+})
+
+test("filter pill toggles area visibility", async ({ page }) => {
+  await openTopology(page)
+
+  const providersPill = page.getByTestId("topo-filter-data-providers")
+  const cachest = nodeWrapper(page, "cachest")
+  const spa = nodeWrapper(page, "portfoliost")
+  await expect(cachest).toBeVisible()
+  await expect(providersPill).toHaveAttribute("aria-pressed", "true")
+
+  // Providers off → openst/cachest disappear while Internal (SPA) remains.
+  await providersPill.click()
+  await expect(cachest).toHaveCount(0)
+  await expect(spa).toBeVisible()
+  await expect(providersPill).toHaveAttribute("aria-pressed", "false")
+
+  // Back on → providers return.
+  await providersPill.click()
+  await expect(cachest).toBeVisible()
+  await expect(providersPill).toHaveAttribute("aria-pressed", "true")
 })
