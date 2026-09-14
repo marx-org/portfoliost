@@ -290,16 +290,31 @@ Note: as only a single fetcher can be registered per (provider, model) key — a
 
 ### 16.6 — openst standalone compose smoke (local, real HTTP)
 
-- [ ] Start openst standalone compose: `docker compose up -d` (redis + app).
-- [ ] Smoke-curl — **one request per symbol** (not a loop):
+- [x] Start openst standalone compose: `docker compose up -d` (redis + app).
+- [x] Smoke-curl — **one request per symbol** (not a loop):
   ```bash
   curl "http://localhost:8080/price/ohlcv/NNEP25.TFI?start=2026-01-01&end=2026-06-30"
   # expect: JSON array with {date, open, high, low, close, volume} rows; close==open==high==low
   curl "http://localhost:8080/price/ohlcv/BST0327?start=2026-01-01&end=2026-06-30"
   # expect: JSON array with real OHLCV; or 404 if no data in range
   ```
-- [ ] Second call to each URL: confirm Redis cache HIT (no outbound HTTP to biznesradar).
-- [ ] Mark step done; note results inline. `docker compose down`.
+- [x] Second call to each URL: confirm Redis cache HIT (no outbound HTTP to biznesradar).
+- [x] Mark step done; note results inline. `docker compose down`.
+
+#### Implementation notes
+
+- Live results via compose stack (local build, `impl: real`):
+  - `NNEP25.TFI` → 200, **123 rows** `2026-01-02 → 2026-06-30`, every row
+    `close==open==high==low`, `volume=0` (e.g. `2026-01-02: 14.32`)
+    — correct fund/NAV shape.
+  - `BST0327` → 200, **33 rows** `2026-01-13 → 2026-06-30`, real distinct OHLCV +
+    volume (e.g. `2026-01-13: o 103.50 h 103.50 l 102.00 c 102.00 vol 64`;
+    `2026-06-30: vol 176`) — correct bond/Catalyst shape.
+  - Repeat calls: **0.04s** each (first call ~8s of biznesradar paging) and both
+    `price_ohlcv:*` keys present in Redis → cache HIT, no outbound HTTP.
+- Fix required to run the standalone stack: `app` service in `docker-compose.yml` was
+  missing `REDIS_HOST: redis` (default `localhost` wouldn't reach the container);
+  now set explicitly like the `test` service.
 
 ---
 
