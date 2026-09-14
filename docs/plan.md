@@ -162,7 +162,7 @@ contract…`): keep `_safe_float` NaN-safety, restore `ndigits=2` for yield and
 
 ### 16.3 — shared scraper + unit tests
 
-- [ ] Implement `openbb_biznesradar/scraper.py`:
+- [x] Implement `openbb_biznesradar/scraper.py`:
   - `strip_wa_suffix(symbol: str) -> str`: strips the literal `.WA` suffix if present,
     preserves everything else. `NNEP25.TFI.WA` → `NNEP25.TFI`; `BST0327.WA` → `BST0327`;
     `NNEP25.TFI` → `NNEP25.TFI` (unchanged); `AAPL` → `AAPL` (unchanged).
@@ -176,7 +176,7 @@ contract…`): keep `_safe_float` NaN-safety, restore `ndigits=2` for yield and
       verify from fixtures — page 1 is newest-first; stop when date exits range).
     - Applies `time.sleep(fetch_delay_s)` between page fetches (not on the first page).
     - On HTTP error (non-200) or missing table: raises `BiznesRadarNotFound(symbol)`.
-- [ ] Unit tests in `tests/test_scraper.py` using fixture HTML (mock `httpx.get`):
+- [x] Unit tests in `tests/test_scraper.py` using fixture HTML (mock `httpx.get`):
   - correct date + value extraction for both table shapes.
   - early stop: given `start_date=2026-01-01`, stops before fetching a page whose
     first row is `2025-12-31`.
@@ -184,13 +184,29 @@ contract…`): keep `_safe_float` NaN-safety, restore `ndigits=2` for yield and
     `BST0327`; `NNEP25.TFI` → `NNEP25.TFI`; `AAPL` → `AAPL`.
   - sleep called between pages, not before first page.
   - raises on 404.
-- [ ] All scraper tests pass: `pytest openst/plugins/openbb_biznesradar/tests/test_scraper.py`.
-- [ ] Commit.
+- [x] All scraper tests pass: `pytest openst/plugins/openbb_biznesradar/tests/test_scraper.py`.
+- [x] Commit.
+
+#### Implementation notes
+
+- `strip_wa_suffix` strips a configured suffix set (`{"WA"}`), not any last dotted
+  segment — the `.TFI` / `.FIZ` venue codes and bare Catalyst codes must pass through.
+- The sleep sits **before** the page-N (N≥2) fetch, i.e. strictly between fetches;
+  page 1 is fetched immediately. Pagination stops when the per-page
+  `a.pages_right[title="następna"]` link is absent, or early on `date < start_date`.
+- Value cells parse as float except the `volume` column (int; whitespace thousands
+  separators stripped — `Obrót` is not extracted at all).
+- Plugin tests resolve fixtures via `Path(__file__).parents[3] / "tests/fixtures/biznesradar"`
+  — works both in-container (`/app/plugins/...` → `/app/tests/...`) and on host.
+- Verified: `pytest plugins/` → 8 passed (scraper), 3 skipped (16.4 stubs);
+  full compose suite stays green (138 passed).
 
 ---
 
 ### 16.4 — `FundHistoricalFetcher` + `BondHistoricalFetcher` + unit tests
 
+Note: as only single plugin can be implemented per provider, biznesradar provider should implement
+all three fetchers: bonds, funds and equities.
 - [ ] `models/fund_historical.py` — `FundHistoricalFetcher`:
   - Input: `symbol`, `start_date`, `end_date`.
   - Calls `_scrape_pages` with `col_indices={date: 0, close: 1}`.
