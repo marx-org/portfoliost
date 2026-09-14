@@ -97,7 +97,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ### 16.2 — `openbb_biznesradar` plugin package scaffold
 
-- [ ] Create `openst/plugins/openbb_biznesradar/` with the standard OpenBB provider
+- [x] Create `openst/plugins/openbb_biznesradar/` with the standard OpenBB provider
   extension layout:
   ```
   openst/plugins/openbb_biznesradar/
@@ -107,45 +107,54 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
   │   ├── scraper.py            # shared _scrape_pages() + symbol stripping
   │   └── models/
   │       ├── __init__.py
-  │       ├── fund_historical.py      # FundHistoricalFetcher
-  │       └── bond_historical.py      # BondHistoricalFetcher
+  │       ├── equity_historical.py    # EquityHistoricalFetcher (single dispatch fetcher)
+  │       ├── fund_historical.py      # 2-col Data|Kurs parser
+  │       └── bond_historical.py      # 7-col OHLCV parser
   └── tests/
       ├── __init__.py
       ├── test_scraper.py
+      ├── test_equity_historical.py
       ├── test_fund_historical.py
       └── test_bond_historical.py
   ```
-- [ ] `pyproject.toml` uses **setuptools** (not Poetry — avoids lock-file clash with the
-  parent `requirements.txt` approach):
-  ```toml
-  [build-system]
-  requires = ["setuptools>=68"]
-  build-backend = "setuptools.backends.legacy:build"
-
-  [project]
-  name = "openbb-biznesradar"
-  version = "0.1.0"
-  dependencies = ["openbb-core", "beautifulsoup4", "lxml", "httpx"]
-
-  [project.entry-points."openbb_provider_extension"]
-  biznesradar = "openbb_biznesradar:biznesradar_provider"
-  ```
-- [ ] `__init__.py` instantiates:
-  ```python
-  biznesradar_provider = Provider(
-      name="biznesradar",
-      description="BiznesRadar.pl scraper — Polish TFI funds and Catalyst bonds",
-      fetcher_dict={
-          "FundHistorical": FundHistoricalFetcher,
-          "BondHistorical": BondHistoricalFetcher,
-      },
-  )
-  ```
-- [ ] Add `beautifulsoup4` and `lxml` to `openst/requirements.txt` (they are new
-  transitive deps not pulled in by current packages).
-- [ ] Add `-e ./plugins/openbb_biznesradar` to `openst/requirements.txt` so the editable
+- [x] `pyproject.toml` uses **setuptools** (not Poetry — avoids lock-file clash with the
+  parent `requirements.txt` approach). Note: the plan's
+  `setuptools.backends.legacy:build` spelling does not exist; the correct legacy
+  backend is `setuptools.build_meta:__legacy__` (verified: `pip install -e` works,
+  entry point registers).
+- [x] `__init__.py` instantiates `biznesradar_provider` — see *architecture change*
+  below; `fetcher_dict` is keyed on the OpenBB **model name** `EquityHistorical`.
+- [x] Add `beautifulsoup4==4.15.0` and `lxml==6.1.3` to `openst/requirements.txt`.
+- [x] Add `-e ./plugins/openbb_biznesradar` to `openst/requirements.txt` so the editable
   install registers the entrypoint at container build time.
-- [ ] Commit scaffold (stubs only, tests expected to fail/skip).
+- [x] Dockerfile: `COPY plugins/ ./plugins/` in the builder (before pip install — the
+  `-e` relative path resolves there) and `COPY plugins/ /build/plugins/` in the test +
+  runtime stages (the PEP 660 editable finder bakes that absolute source path at
+  install time). Test stage also gets `COPY plugins/ /app/plugins/` so
+  `pytest plugins/` can be run in-container; the default CMD stays `pytest tests/`
+  only.
+- [x] Commit scaffold (stubs only, tests expected to fail/skip).
+
+##### Architecture change vs original plan (fetcher wiring)
+
+OpenBB routes `obb.equity.price.historical(...)` (model `EquityHistorical`, confirmed
+in `openbb_equity/price/price_router.py`) to a provider by the model-name key in
+`Provider.fetcher_dict`. The plan's keys `FundHistorical`/`BondHistorical` match no
+registered model, so 16.5's provider fallback loop would never reach biznesradar;
+additionally only one fetcher may be registered per `(provider, model)` key.
+Approved change (per user): **one** `EquityHistoricalFetcher` under the
+`EquityHistorical` key that dispatches by symbol shape to the fund (2-col) vs bond
+(7-col) scraper — the two scraping code paths stay separate in `fund_historical.py`
+/ `bond_historical.py`.
+
+##### Docker suite note (pre-existing failures)
+
+`docker compose --profile test run --rm test` is **already red on `main`**, unrelated
+to this step: 3 dividend tests fail since commit `bb00f87` (2026-08-28) changed
+`get_dividend_yield` to `_safe_float(raw, ndigits=4)` → `2.4568` while
+`tests/test_openbb_client.py:118` (from 2026-05-24) still asserts `2.46`; the two
+`get_dividend_history` amount-formatting assertions (`0.2500` vs `0.25`) are the same
+class of drift. Not fixed here (out of 16.x scope); flagged for a separate fix commit.
 
 ---
 
