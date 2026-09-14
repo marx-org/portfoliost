@@ -250,7 +250,7 @@ Note: as only a single fetcher can be registered per (provider, model) key — a
 
 ### 16.5 — wire into `openbb_client.py` + openst suite
 
-- [ ] In `openst/src/openbb_client.py`:
+- [x] In `openst/src/openbb_client.py`:
   - Add `"biznesradar"` to `PRICE_PROVIDERS` list **at the end** (yfinance/fmp/…
     tried first; biznesradar is the last-resort fallback for PL-venue symbols).
   - Read `BIZNESRADAR_FETCH_DELAY_S = float(os.getenv("BIZNESRADAR_FETCH_DELAY_S", "2.0"))`.
@@ -258,13 +258,33 @@ Note: as only a single fetcher can be registered per (provider, model) key — a
     from env inside the fetcher — confirm the cleanest approach when wiring.
   - No route changes: the existing `get_ohlcv_history()` provider-fallback loop calls
     `obb.equity.price.historical(ticker, ..., provider="biznesradar")` automatically.
-- [ ] Extend `openst/tests/test_openbb_client.py` with mocked `obb.equity.price.historical`
+- [x] Extend `openst/tests/test_openbb_client.py` with mocked `obb.equity.price.historical`
   for the biznesradar fallback path: returns fixture-shaped rows for `NNEP25.TFI`.
-- [ ] Run full openst test suite via docker compose (all tests must pass):
+- [x] Run full openst test suite via docker compose (all tests must pass):
   ```bash
   docker compose --profile test run --rm test
   ```
-- [ ] Commit. Push openst to `main`. Wait for GHA image build.
+- [x] Commit. Push openst to `main`. Wait for GHA image build.
+
+#### Implementation notes
+
+- Confirm: the **direct-env-read** approach is cleanest — `equity_historical.py` already
+  reads `BIZNESRADAR_FETCH_DELAY_S` itself via `_fetch_delay_s()`, so `openbb_client.py`
+  requires zero env plumbing (a compose env var is all that's needed to tune the delay).
+- Real-router smoke in-container (live HTTP): `obb.equity.price.historical(
+  "NNEP25.TFI", start=, end=, provider="biznesradar")` returns fund rows with
+  `open==high==low==close`, `volume=0`; `"BST0327.WA"` returns real OHLCV/volume and
+  `to_df()` yields a `date`-indexed frame (index values are `datetime.date` — the
+  existing `hasattr(idx, "date")` check falls through to the raw value; output is the
+  same "YYYY-MM-DD" string).
+- Router plumbing discovery: `fetch_data()` forwards router-level kwargs
+  (`preferences`, …) into `extract_data`, so the fetcher's `extract_data` signature
+  needed `**kwargs` added (post-16.4 fix) or the live call raised
+  `extract_data() got an unexpected keyword argument 'preferences'`.
+- The `symbol` mock assertion uses `call.args[0]`, not `kwargs["symbol"]` — the router
+  hands the ticker over positionally.
+- Verified: full compose suite 141 passed (138 + 3 new biznesradar fallback/order
+  tests), 5 deselected; plugin suite still 23 passed.
 
 ---
 
