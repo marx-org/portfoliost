@@ -205,26 +205,46 @@ contract…`): keep `_safe_float` NaN-safety, restore `ndigits=2` for yield and
 
 ### 16.4 — `FundHistoricalFetcher` + `BondHistoricalFetcher` + unit tests
 
-Note: as only single plugin can be implemented per provider, biznesradar provider should implement
-all three fetchers: bonds, funds and equities.
-- [ ] `models/fund_historical.py` — `FundHistoricalFetcher`:
+Note: as only a single fetcher can be registered per (provider, model) key — and the
+`EquityHistorical` model is the one wired in 16.5 — the plan's `FundHistoricalFetcher`
+/ `BondHistoricalFetcher` names became *parsers + column maps* in
+`fund_historical.py`/`bond_historical.py`, dispatched by a single
+`EquityHistoricalFetcher` in `equity_historical.py` (user-approved 16.2 change).
+- [x] `models/fund_historical.py` — `FundHistoricalFetcher`:
   - Input: `symbol`, `start_date`, `end_date`.
   - Calls `_scrape_pages` with `col_indices={date: 0, close: 1}`.
   - Maps each row to OpenBB `EquityHistoricalData` shape:
     `{date, open=close, high=close, low=close, close, volume=0}`.
   - Returns `OBBject` with `results` list.
-- [ ] `models/bond_historical.py` — `BondHistoricalFetcher`:
+- [x] `models/bond_historical.py` — `BondHistoricalFetcher`:
   - Same signature. Calls `_scrape_pages` with
     `col_indices={date:0, open:1, high:2, low:3, close:4, volume:5}`.
   - Maps each row to the same `EquityHistoricalData` shape (OpenBB unifies on this).
-- [ ] Unit tests (`test_fund_historical.py`, `test_bond_historical.py`) using fixture HTML
+- [x] Unit tests (`test_fund_historical.py`, `test_bond_historical.py`) using fixture HTML
   (mock `_scrape_pages` or mock `httpx.get`):
   - happy-path: correct `close`, `open=high=low=close`, `volume=0` for fund.
   - happy-path: distinct `open/high/low/close`, real volume for bond.
   - date range filtering: rows outside `[start_date, end_date]` excluded.
   - empty result (symbol exists but no data in range) → empty `results`, not 404.
-- [ ] All fetcher tests pass: `pytest openst/plugins/openbb_biznesradar/tests/`.
-- [ ] Commit.
+- [x] All fetcher tests pass: `pytest openst/plugins/openbb_biznesradar/tests/`.
+- [x] Commit.
+
+#### Implementation notes
+
+- `EquityHistoricalFetcher` dispatches by symbol shape: `.TFI` / `.FIZ` →
+  `FUND_COLUMNS` + `parse_fund_row`; anything else → `BOND_COLUMNS` +
+  `parse_bond_row` (`.WA` stripped by `strip_wa_suffix` first).
+- The fetcher implements the **sync** `extract_data` (scraper is sync);
+  `transform_data` returns `BiznesRadarEquityHistoricalData` — the `OBBject` wrapper is
+  applied by the OpenBB router, not the fetcher.
+- `BIZNESRADAR_FETCH_DELAY_S` (default `2.0`) is read from env at extract time (no
+  extra plumbing through OpenBB credentials).
+- Missing `start_date`/`end_date` default to `date.min`/`date.max` bounds → full
+  available history; an in-range-empty page set yields `[]`, not 404.
+- Shared test helpers moved to a plugin-local `tests/conftest.py` — a bare `conftest`
+  import fails because pytest imports the plugin test dir as a `tests` package.
+- Verified: `pytest plugins/` → 23 passed; full compose suite stays green
+  (138 passed); fetcher imports in-container with `require_credentials=False`.
 
 ---
 
