@@ -333,12 +333,19 @@ Note: as only a single fetcher can be registered per (provider, model) key — a
   ```
   Rationale: separate route with longer TTL vs equity `OPENST_OHLCV` (6 h) because fund
   NAV and Catalyst bond prices change at most once per business day.
-- [ ] Add `test_real_config_has_ohlcv_funds_route` to `cachest/tests/test_config.py`.
-- [ ] Run cachest test suite (all tests must pass):
+- [x] Add `test_real_config_has_ohlcv_funds_route` to `cachest/tests/test_config.py`.
+- [x] Run cachest test suite (all tests must pass):
   ```bash
   docker compose --profile test run --rm test
   ```
-- [ ] Commit cachest config + test. Push to `main`. Wait for GHA image build.
+- [x] Commit cachest config + test. Push to `main`. Wait for GHA image build.
+
+#### Implementation notes
+
+- Routing conflict check passed: `/ohlcv/fund/{ticker}` (3 segments, registered via
+  `add_api_route`) can never be shadowed by `/ohlcv/{ticker}` (2 segments) — Starlette
+  matches `/ohlcv/fund/NNEP25.TFI` against the 3-segment route only.
+- Test suite green: **69 passed** (incl. the new config test), 1 warning.
 
 ---
 
