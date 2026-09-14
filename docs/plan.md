@@ -351,17 +351,31 @@ Note: as only a single fetcher can be registered per (provider, model) key — a
 
 ### 16.8 — portfoliost compose stack smoke (full chain)
 
-- [ ] Update openst and cachest image references in portfoliost `docker-compose.yml` to
+- [x] Update openst and cachest image references in portfoliost `docker-compose.yml` to
   pick up the new versions (rebuild or bump `ghcr.io` tags).
-- [ ] Start: `docker compose up -d redis openst cachest instruments`.
-- [ ] Smoke-curl through cachest (**single requests**):
+- [x] Start: `docker compose up -d redis openst cachest instruments`.
+- [x] Smoke-curl through cachest (**single requests**):
   ```bash
   curl "http://localhost:<cachest_port>/ohlcv/fund/NNEP25.TFI?start=2026-01-01&end=2026-06-30"
   # X-Cache: MISS first call; HIT on repeat
   ```
-- [ ] Run `npm run test:stack` — existing 29 contract checks must stay green (no equity
+- [x] Run `npm run test:stack` — existing 29 contract checks must stay green (no equity
   regression).
-- [ ] Commit note: `chore: verify D77 smoke through full compose stack`.
+- [x] Commit note: `chore: verify D77 smoke through full compose stack`.
+
+#### Implementation notes
+
+- openst/cachest are wired as `build:` services in portfoliost compose → a `--build`
+  rebuild picks up openst `v1.1.9` + cachest `v1.0.28` (no ghcr tags in this file).
+- cachest had no host port for smoke curl → added `8090:8080` to the `cachest` service.
+- Smoke through cachest: `GET /ohlcv/fund/NNEP25.TFI?start=…&end=…` → **200, 123 rows**,
+  `X-Cache: MISS` on first; repeat → **`X-Cache: HIT`**, identical 11875-byte payload.
+  Proves the full chain cachest → openst → biznesradar on the 24h fund route.
+- `npm run test:stack` green: **32/32 checks**, `detected upstream: real` (incl. `logo
+  KTY.WA` long-tail) — no equity regression. (Plan said "29"; current suite is 32.)
+- Note: the stack test targets the nginx gateway (`:8080`), whose nginx resolves all
+  upstream hostnames at startup — the instruments-only start is not enough; run the full
+  `docker compose up -d` (or at least all module containers) beforehand.
 
 ---
 

@@ -118,6 +118,8 @@ services:
     container_name: portfoliost-cachest
     volumes:
       - ../cachest/config.yaml:/app/config.yaml:ro
+    ports:
+      - "8090:8080"
     depends_on:
       redis:
         condition: service_healthy
