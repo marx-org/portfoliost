@@ -1,4 +1,4 @@
-# openst provider coverage (verified 2026-09-07)
+# openst provider coverage (verified 2026-09-14)
 
 Ground truth from probing **OpenBB 4.7.2** (with `openbb-sec==1.6.7` pinned) inside
 the openst image with the current keys (`FMP_API_KEY` starter tier, yfinance, sec;
@@ -11,6 +11,7 @@ intrinio key present but broken). sec is keyless (SEC EDGAR).
 | profile | `/equity/profile/{t}` | `equity.profile` | fmp, yfinance | fmp richer (cik/cusip/ceo/employees); intrinio errors |
 | quote | `/equity/quote/{t}` | `price.quote` | fmp, yfinance | change/change_percent/market_cap/year_high… |
 | history (OHLCV) | `/price/ohlcv/{t}?start&end` | `price.historical` | yfinance, fmp, intrinio | daily bars; legacy close-only `/price/history` kept |
+| history (OHLCV) — PL funds/bonds (D77) | `/price/ohlcv/{t}?start&end` | `equity.price.historical` provider `biznesradar` | biznesradar (keyless) | last-resort fallback in `PRICE_PROVIDERS`; `*.TFI`/`*.FIZ` open-end funds (2-col NAV → `open==high==low==close`, `volume=0`) and Catalyst bonds (`BST*`/`INS*`/`KRI*`, `.WA` suffix stripped; real OHLCV+volume); cached 24h at cachest `/ohlcv/fund/{ticker}` (NAV moves once/business day). `BIZNESRADAR_FETCH_DELAY_S` (default 2s) = inter-page politeness |
 | fundamentals | `/equity/fundamentals/{t}?statement=income\|balance\|cash&period=annual\|quarter` | `fundamental.income/balance/cash` | fmp, yfinance | full statements, fiscal metadata incl. |
 | metrics (+overview subset) | `/equity/metrics/{t}` | `fundamental.metrics` | yfinance, fmp | market_cap, pe_ratio, margins, ratios… |
 | projections | `/equity/projections/{t}` | `estimates.consensus` | fmp, yfinance | target_consensus/high/low/median; yfinance adds recommendation + analyst count |

@@ -1,6 +1,7 @@
 # Proposal: instruments module backed by the provider tier
 
 **Status**: accepted (2026-08-23)
+**D77 (PL fund/bond OHLCV)**: **done** (2026-09-14) — biznesradar provider wiring
 **Builds on**: [backend-topology.md](backend-topology.md) (D1–D11), [MODULARISATION.md](../MODULARISATION.md)
 **Scope**: second extracted module `portfoliost-instruments`; local verification only (cluster rollout deferred to a later phase).
 
