@@ -147,14 +147,16 @@ Approved change (per user): **one** `EquityHistoricalFetcher` under the
 (7-col) scraper — the two scraping code paths stay separate in `fund_historical.py`
 / `bond_historical.py`.
 
-##### Docker suite note (pre-existing failures)
+##### Docker suite note (pre-existing failures — since fixed)
 
-`docker compose --profile test run --rm test` is **already red on `main`**, unrelated
-to this step: 3 dividend tests fail since commit `bb00f87` (2026-08-28) changed
-`get_dividend_yield` to `_safe_float(raw, ndigits=4)` → `2.4568` while
-`tests/test_openbb_client.py:118` (from 2026-05-24) still asserts `2.46`; the two
-`get_dividend_history` amount-formatting assertions (`0.2500` vs `0.25`) are the same
-class of drift. Not fixed here (out of 16.x scope); flagged for a separate fix commit.
+At 16.2 time the docker suite was **already red on `main`**, unrelated to this step:
+3 dividend tests failed since commit `bb00f87` (2026-08-28), which — while sanitizing
+NaN/Inf floats — accidentally changed the API contract: `get_dividend_yield` moved from
+2-decimal to 4-decimal rounding (`2.4568` vs the `2.46` asserted since 2026-05-24) and
+`get_dividend_history` moved from fixed 4-decimal amount strings to `str(round(...))`
+(`"0.25"` vs `"0.2500"`). Fixed in a dedicated commit (`fix(openst): restore dividend
+contract…`): keep `_safe_float` NaN-safety, restore `ndigits=2` for yield and
+`f"{amount:.4f}"` for amounts. Suite is green again (138 passed).
 
 ---
 
