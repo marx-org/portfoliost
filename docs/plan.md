@@ -60,18 +60,38 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ### 16.1 — HTML fixture capture
 
-- [ ] Fetch and save HTML fixtures for both table shapes (single `requests.get` call each —
+- [x] Fetch and save HTML fixtures for both table shapes (single `requests.get` call each —
   no loops, no automation):
   - `openst/tests/fixtures/biznesradar/NNEP25.TFI.html` — fund page (2-col table)
   - `openst/tests/fixtures/biznesradar/BST0327.html` — bond page (7-col table)
   - Also save page 2 of one symbol to verify pagination HTML structure:
     `openst/tests/fixtures/biznesradar/BST0327_p2.html`
     (`https://www.biznesradar.pl/notowania-historyczne/BST0327,2`)
-- [ ] Confirm from fixtures: CSS class of the main data table, exact column header text,
+- [x] Confirm from fixtures: CSS class of the main data table, exact column header text,
   date column index, value column index(es), pagination link pattern.
-- [ ] Document exact selectors in a comment block at the top of
-  `openst/plugins/openbb_biznesradar/openbb_biznesradar/scraper.py`.
-- [ ] Commit fixtures only (no code changes yet).
+- [x] Document exact selectors in a comment block at the top of
+  `openst/plugins/openbb_biznesradar/openbb_biznesradar/scraper.py` (docstring-only file,
+  committed with this step's fixtures; no logic yet).
+- [x] Commit fixtures only (no code changes yet).
+
+#### Selectors confirmed from fixtures (openst commit `16.1`)
+
+- **Main data table CSS class**: `qTableFull` — exactly one per page.
+- **Header row**: first `<tr>` inside the table; cells are `<th>`. Data rows are the
+  subsequent `<tr>`s with `<td>` cells. 50 data rows per page, newest-first.
+- **Fund/TFI/FIZ table (2 cols)**: header text `Data | Kurs` → indices 0=date, 1=Kurs.
+- **Bond/Catalyst table (7 cols)**: header text
+  `Data | Otwarcie | Max | Min | Zamknięcie | Wolumen | Obrót` → indices 0=date,
+  1=open, 2=high, 3=low, 4=close, 5=volume, 6=Obrót (turnover — not used in output).
+- **Date**: `DD.MM.YYYY` (verified `11.09.2026`), parsed with `%d.%m.%Y`; decimal
+  separator is a dot. `Wolumen` plain integer; `Obrót` uses a space thousands
+  separator (`6 078`) — irrelevant since it is not exposed.
+- **Pagination**: `<div class="buttons pages">` after the table. Current page is a
+  non-link `<span class="pages_pos_current">N</span>`; other pages are
+  `<a class="pages_pos" href="/notowania-historyczne/{symbol},{N}">N</a>` (`{N}` = page
+  number, comma-separated); next page is `<a class="pages_right" title="następna">`.
+  Ellipsis `<span class="pages_pos dots">…</span>` present on long histories — ignore.
+  Advance one page at a time: `{symbol}`, `{symbol},2`, `{symbol},3`, …
 
 ---
 
