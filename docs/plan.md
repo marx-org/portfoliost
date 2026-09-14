@@ -56,19 +56,19 @@ Build the **search + quote fallback** path (full flow), not search-only.
 - [x] **17.2** — append `"biznesradar"` to `SEARCH_PROVIDERS` (last).
   Unit tests: mock `httpx.get` on `/notowania/{q}` 200 vs 404; openbb_client
   search-fallback test (sec/nasdaq/cboe empty → biznesradar hit).
-- [ ] **17.3** — biznesradar quote fetcher (`models/equity_quote.py`, OpenBB
+- [x] **17.3** — biznesradar quote fetcher (`models/equity_quote.py`, OpenBB
   `EquityQuote`): scrape today/last close + change/volume from `/notowania/{symbol}`
   → `{symbol, name, price, change, change_percent, previous_close, day_high,
   day_low, volume}` (fields used by `price.quote`); stub gracefully when the row
   is missing. Register under `EquityQuote`.
-- [ ] **17.4** — openst wiring: append `"biznesradar"` to `QUOTE_PROVIDERS`
+- [x] **17.4** — openst wiring: append `"biznesradar"` to `QUOTE_PROVIDERS`
   (last) and, for full PL coverage, `PROFILE_PROVIDERS` (biznesradar
   `EquityProfile` minimal: `{name, symbol, currency:"PLN"}` or empty list → fall
   through to existing providers). openbb_client fallback tests for both.
-- [ ] **17.5** — verify: openst compose suite (all pass) + plugin suite; cachest
+- [x] **17.5** — verify: openst compose suite (all pass) + plugin suite; cachest
   unchanged (same routes, no new route needed); full compose stack smoke:
   `curl /equity/search/bst0327.wa` → 200 with a search hit, then instruments
   `/api/instruments/BST0327.WA` detail resolves via quote/profile fallback.
   Keep `npm run test:stack` green.
-- [ ] **17.6** — commit openst (+ plan), push `main`, wait for GHA image build,
+- [x] **17.6** — commit openst (+ plan), push `main`, wait for GHA image build,
   bump homelab helmrelease, verify in cluster (search + detail for `BST0327.WA`).
