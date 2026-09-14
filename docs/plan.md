@@ -53,7 +53,7 @@ Build the **search + quote fallback** path (full flow), not search-only.
     200 + expected table ⇒ `[{name, symbol, cik: null}]` (name from page title /
     table header); 404/missing table ⇒ `[]`.
   - Register under OpenBB `EquitySearch` in `fetcher_dict`.
-- [ ] **17.2** — append `"biznesradar"` to `SEARCH_PROVIDERS` (last).
+- [x] **17.2** — append `"biznesradar"` to `SEARCH_PROVIDERS` (last).
   Unit tests: mock `httpx.get` on `/notowania/{q}` 200 vs 404; openbb_client
   search-fallback test (sec/nasdaq/cboe empty → biznesradar hit).
 - [ ] **17.3** — biznesradar quote fetcher (`models/equity_quote.py`, OpenBB
