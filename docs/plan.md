@@ -298,40 +298,46 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ### 20.1 — openst: `get_crypto_search` client function
 
-- [ ] In `openst/src/openbb_client.py` add `get_crypto_search(query: str) -> list[dict]`,
+- [x] In `openst/src/openbb_client.py` add `get_crypto_search(query: str) -> list[dict]`,
   fmp-only loop mirroring `search_equities` (rate-limit block, empty → continue → `[]`).
-- [ ] Unit tests in `openst/tests/test_openbb_client.py`: monkeypatched `obb.crypto.search`
+- [x] Unit tests in `openst/tests/test_openbb_client.py`: monkeypatched `obb.crypto.search`
   returns rows → pass-through; empty df → `[]`; rate-limited provider → blocked + next.
-- [ ] Tests: openst full suite via `docker compose --profile test run --rm test`.
-- [ ] Commit: `feat(openbb_client): crypto search client fn (fmp-only)`.
+- [x] Tests: openst full suite via `docker compose --profile test run --rm test`.
+- [x] Commit: `feat(openbb_client): crypto search client fn (fmp-only)`.
 
 ### 20.2 — openst: `/crypto/search/{query}` + `/crypto/profile/{pair}` routes
 
-- [ ] In `openst/src/main.py` add `GET /crypto/search/{query}` (mirror of `/equity/search`:
+- [x] In `openst/src/main.py` add `GET /crypto/search/{query}` (mirror of `/equity/search`:
   `_cached_or_404`, lowercase-normalized query) and `GET /crypto/profile/{pair}` (quote →
   `{ symbol, name, currency }` from the two search/quote fields that exist; pair kept as-is).
-- [ ] Route tests in `openst/tests/test_main.py`: search returns rows / 404 on empty; profile
+- [x] Route tests in `openst/tests/test_main.py`: search returns rows / 404 on empty; profile
   maps quote fields / 404 on missing quote.
-- [ ] Tests: full openst suite; compose-level smoke `curl /crypto/search/btc` → rows, second
+- [x] Tests: full openst suite; compose-level smoke `curl /crypto/search/btc` → rows, second
   call → `X-Cache: HIT`; `curl /crypto/profile/btc-usd` → 200.
-- [ ] Commit: `feat(main): crypto search + profile routes (D78 gap-fix)`.
+- [x] Commit: `feat(main): crypto search + profile routes (D78 gap-fix)`.
 
 ### 20.3 — cachest: `OPENST_CRYPTO_SEARCH` + `OPENST_CRYPTO_PROFILE`
 
-- [ ] `cachest/config.yaml`: `OPENST_CRYPTO_SEARCH` `/crypto/search/{query}` (TTL 7d — universe
+- [x] `cachest/config.yaml`: `OPENST_CRYPTO_SEARCH` `/crypto/search/{query}` (TTL 7d — universe
   changes rarely, matches `OPENST_SEARCH`) and `OPENST_CRYPTO_PROFILE` `/crypto/profile/{pair}`
   (TTL 6h, matches `OPENST_CRYPTO_QUOTE`).
-- [ ] Tests: `cachest/tests/test_config.py` gains an assertion per new route.
-- [ ] Tests: full cachest suite via compose.
-- [ ] Commit: `feat(config): OPENST_CRYPTO_SEARCH + OPENST_CRYPTO_PROFILE routes`.
+- [x] Tests: `cachest/tests/test_config.py` gains an assertion per new route.
+- [x] Tests: full cachest suite via compose.
+- [x] Commit: `feat(config): OPENST_CRYPTO_SEARCH + OPENST_CRYPTO_PROFILE routes`.
 
 ### 20.4 — openst standalone smoke
 
-- [ ] `docker compose up -d redis openst`; single curls:
+- [x] `docker compose up -d redis openst`; single curls:
   `/crypto/search/btc`, `/crypto/search/eth`, `/crypto/profile/BTC-USD` — rows + payload shape
   recorded in the step result.
-- [ ] Verify Redis cache: second `curl` each → `X-Cache: HIT`.
-- [ ] Commit note: `chore: verify crypto search + profile smoke`.
+- [x] Verify Redis cache: second `curl` each → `X-Cache: HIT`.
+- [x] Commit note: `chore: verify crypto search + profile smoke`.
+
+Observed 2026-09-15 (openst local build, host `:8081` — `8080` held by portfoliost-gateway):
+- `/crypto/search/btc` → 200, 30 rows, shape `{symbol, name, exchange, ico_date, circulating_supply, total_supply}`; eth/ethereum/bitcoin/sol/ada/etc. also 200.
+- `/crypto/search/eth` → **404**. Upstream anomaly: FMP returns a row with `ico_date=NaN` for this query, and OpenBB `FMPCryptoSearchData` model validation rejects it → whole search errors (→ honest 404). Typing `ETH` won't suggest via raw search; step 20.5's curated base→pair map must cover `eth→ETH-USD`.
+- `/crypto/profile/BTC-USD` → 200 `{"symbol":"BTC-USD","name":null,"currency":"USD"}`.
+- Redis cache confirmed: `crypto_search:btc` + `crypto_profile:BTC-USD` keys present, second curls served instantly (openst itself emits no `X-Cache` header — that's cachest 20.6).
 
 ### 20.5 — instruments: crypto search leg + symbol normalization
 
