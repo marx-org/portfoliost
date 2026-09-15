@@ -75,22 +75,31 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ### 19.3 — CPI importer script + one-shot k8s Job
 
-- [ ] Create `openst/src/importers/cpi.py`:
-  - Scrapes `obligacje.pl/pl/narzedzia/inflacja,data_od-{from},data_do-{to}` —
-    `Data | Wartość` HTML table (BeautifulSoup/lxml, same pattern as biznesradar).
-  - Parses Polish month-name dates (e.g. `31 sty 2000`) → `YYYY-MM-DD`.
+Requirement vs reality: the live `obligacje.pl/pl/narzedzia/inflacja` page has **no
+`Data | Wartość` HTML table** — the CPI series (320 rows, Jan 2000 → now, incl.
+negative deflation values for 2014-15) is embedded in a
+`google.visualization.arrayToDataTable([...])` JS block as `[new Date(YYYY,M,D), value]`
+with a 0-based month and dot-decimal values. Range filtering is server-side via
+`…inflacja,data_od-YYYY_MM_DD,data_do-YYYY_MM_DD` (parse, don't paint). The
+importer therefore parses the JS array, not a table. The k8s Job/CronJob reuses
+the openst image (`ghcr.io/marx2/openst:<tag>`) with a command override —
+`python -m src.importers.cpi --mode …` (same pattern as `scanst-job.yaml`).
+
+- [x] Create `openst/src/importers/cpi.py`:
+  - Parses the `arrayToDataTable` JS block (regex over `new Date(y,m,d), value]`),
+    dates to `YYYY-MM-DD`, values as `Decimal` (dot-decimal, integer, or negative).
   - Upserts rows into `openst.cpi_12m` (INSERT … ON CONFLICT DO NOTHING).
-  - `--mode full` fetches `MAX` history (used for initial import).
-  - `--mode incremental` fetches last 60 days (used for daily CronJob).
-- [ ] Unit tests (`openst/tests/test_cpi_importer.py`) with captured
+  - `--mode full` fetches `MAX` history (no range params — initial import).
+  - `--mode incremental` fetches last 60 days (daily CronJob).
+- [x] Unit tests (`openst/tests/test_cpi_importer.py`) with captured
   `obligacje.pl` HTML fixture:
-  - Correct date parsing for all 12 Polish month names.
-  - Correct value parsing (comma as decimal separator).
+  - Correct date parsing for all 12 (0-based JS) months.
+  - Correct value parsing (dot-decimal, plain int, negative).
   - Upsert: duplicate rows are silently ignored.
-- [ ] Capture HTML fixture: `openst/tests/fixtures/obligacje/inflacja.html`
-  (one `requests.get` call, save to file — same approach as biznesradar fixtures).
-- [ ] Run full openst test suite (docker compose — must stay green).
-- [ ] Commit.
+- [x] Capture HTML fixture: `openst/tests/fixtures/obligacje/inflacja.html`
+  (one fetch to the MAX page, saved to file — same approach as biznesradar fixtures).
+- [x] Run full openst test suite (docker compose — must stay green).
+- [x] Commit.
 
 ---
 
@@ -197,8 +206,8 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
   ```bash
   # Run importers locally against a test DB first
   docker compose up -d redis app
-  docker compose run --rm app python -m openst.importers.cpi --mode full
-  docker compose run --rm app python -m openst.importers.bond_series --mode full
+  docker compose run --rm app python -m src.importers.cpi --mode full
+  docker compose run --rm app python -m src.importers.bond_series --mode full
   ```
 - [ ] Smoke-curl — **one request per endpoint**:
   ```bash
