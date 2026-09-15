@@ -86,7 +86,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 > rows instead of calling a nonexistent command (signature unchanged, so 18.4/18.6
 > routes stay as planned).
 
-- [ ] In `openst/src/openbb_client.py` add two functions mirroring the equity OHLCV
+- [x] In `openst/src/openbb_client.py` add two functions mirroring the equity OHLCV
   pattern:
   - `CRYPTO_PROVIDERS = ["yfinance", "fmp", "tiingo"]`  — provider fallback list
     (yfinance first; fmp and tiingo only if keys are present; same
@@ -110,7 +110,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
       - same fallback loop as `get_ohlcv_history` (blocked provider skipped, rate-limit
         blocks provider, invalid-pair logs & continues, continue on empty); returns
         `None` if all providers fail or empty.
-- [ ] Unit tests in `openst/tests/test_openbb_client.py`:
+- [x] Unit tests in `openst/tests/test_openbb_client.py`:
   - `get_crypto_ohlcv` happy path: mocked `obb.crypto.price.historical` returns fixture
     frame for `BTC-USD`; assert returned list shape and date normalization.
   - `get_crypto_ohlcv` all-empty: all providers return empty DataFrame → `None`.
@@ -120,11 +120,21 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
     `low`, `volume`, `date`) and that `price` equals the latest close.
   - `get_crypto_quote` single-row frame: quote returned without `change`/`change_percent`.
   - `get_crypto_quote` failure: exception from all providers → `None`.
-- [ ] Run full openst test suite (docker compose):
+- [x] Run full openst test suite (docker compose):
   ```bash
   docker compose --profile test run --rm test
   ```
-- [ ] Commit.
+- [x] Commit.
+
+  **Result (2026-09-15):** `CRYPTO_PROVIDERS = ["yfinance", "fmp", "tiingo"]` with a
+  `_provider_has_key` guard (fmp → `FMP_API_KEY`, tiingo → `TIINGO_TOKEN`) so key-gated
+  providers are only tried when the key is set. `get_crypto_ohlcv` mirrors the equity
+  `get_ohlcv_history` normalization; `get_crypto_quote` derives the snapshot from the
+  latest `historical` rows (change/change_percent computed when ≥2 rows, `change` at 4 dp,
+  `change_percent` at 2 dp). 7 new unit tests cover row shape + date normalization,
+  all-empty → `None`, rate-limit block → next provider, keyless-provider skip,
+  quote dict keys/bounds, single-row quote (no change fields), and all-providers-fail →
+  `None`. Full suite: 143 passed, 5 deselected.
 
 ---
 
