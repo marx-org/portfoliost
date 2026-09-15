@@ -25,16 +25,31 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ### 18.1 — verify `openbb-crypto` version + pin
 
-- [ ] In the openst repo, resolve the correct `openbb-crypto` pin that is compatible with
+- [x] In the openst repo, resolve the correct `openbb-crypto` pin that is compatible with
   `openbb==4.7.2`.  The `openbb` meta-package pins `openbb-core`; `openbb-crypto` must
   require the same core version.  Strategy: run
   `pip install "openbb==4.7.2" "openbb-crypto" --dry-run` inside a clean venv (or the
   existing openst Docker build) and record the resolved version.
-- [ ] Verify `obb.crypto.price.historical("BTC-USD", provider="yfinance")` and
+- [x] Verify `obb.crypto.price.historical("BTC-USD", provider="yfinance")` and
   `obb.crypto.price.quote("BTC-USD", provider="yfinance")` are callable with the
   resolved version (smoke in a Python REPL, not a full test yet).
-- [ ] Record the pinned version (e.g. `openbb-crypto==1.6.2`) as a comment in this step.
-- [ ] Commit note only (no requirements change yet — that lands in 17.2).
+- [x] Record the pinned version (e.g. `openbb-crypto==1.6.2`) as a comment in this step.
+- [x] Commit note only (no requirements change yet — that lands in 18.2).
+
+  **Result (2026-09-15, clean venv py3.12, pip `--dry-run` + live install of `openbb==4.7.2`):**
+  - Pinned version: **`openbb-crypto==1.6.2`** ↔ resolves against `openbb-core==1.6.13`
+    (same core the `openbb==4.7.2` meta-package pins).  Note: `openbb==4.7.2` already
+    depends transitively on `openbb-crypto` — the explicit pin in 18.2 just locks it.
+  - `obb.crypto.price.historical("BTC-USD", start_date=…, end_date=…, provider="yfinance")`
+    works: returns a RangeIndex DataFrame, columns `[open, high, low, close, volume]`
+    (5 rows for a 2026-06-01→05 window).
+  - **Deviation — `obb.crypto.price.quote` does NOT exist in openbb-crypto 1.6.2.**
+    `CryptoHistorical` is the only crypto-price command; the extension exposes exactly
+    `crypto.price.historical` + `crypto.search` (search is fmp-only).  Providers for
+    `CryptoHistorical` are `[yfinance, fmp, tiingo]` — matches the planned
+    `CRYPTO_PROVIDERS`.  The 18.3 `get_crypto_quote` design must change: derive the
+    quote from the latest `historical` row (or revisit whether a quote endpoint is even
+    needed).
 
 ---
 
