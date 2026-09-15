@@ -341,23 +341,23 @@ Observed 2026-09-15 (openst local build, host `:8081` — `8080` held by portfol
 
 ### 20.5 — instruments: crypto search leg + symbol normalization
 
-- [ ] `portfoliost-instruments/src/adapters/cachest.ts`: add `fetchCryptoSearch(query)` →
+- [x] `portfoliost-instruments/src/adapters/cachest.ts`: add `fetchCryptoSearch(query)` →
   `${BASE_URL}/crypto/search/${q}`.
-- [ ] `portfoliost-instruments/src/adapters/symbol.ts` (or a new `crypto.ts`): normalize an FMP
+- [x] `portfoliost-instruments/src/adapters/symbol.ts` (or a new `crypto.ts`): normalize an FMP
   row to a yfinance pair + display name. Curated primary map (base coin → pair, ≥ ~30 majors,
   e.g. `btc→BTC-USD`, `eth→ETH-USD`, `sol→SOL-USD`) so typing `BTC`/`ETH` suggests the exact
   pair; fallback heuristic drops FMP-wrap prefixes/`USD` and only emits `<BASE>-USD` when the
   base parses as a bare coin mnemonic (no `tBTC`, `BTC.BUSD`, leveraged/wrapped variants).
-- [ ] `src/routes/instruments.ts` `/search`: run crypto search alongside the existing tiers
+- [x] `src/routes/instruments.ts` `/search`: run crypto search alongside the existing tiers
   (not as last-only fallback — equity search "btc" already returns BTCS Inc. etc., so crypto
   must be additive), merge + de-dupe by symbol, type `"CRYPTO"` (source `"CRYPTO"`).
-- [ ] `src/adapters/translate.ts`: `toSearchResponse`/new `toCryptoSearchResponse` emit
+- [x] `src/adapters/translate.ts`: `toSearchResponse`/new `toCryptoSearchResponse` emit
   `type: "CRYPTO"`; widen `toReferenceSearchResponse` `assetType` mapping to emit `BOND`/`CRYPTO`
   when present (D79-ready; ticker_reference still has none).
-- [ ] Tests: unit tests for normalization (BTC → BTC-USD, wrapped `TBTCUSD` excluded, `BTCBUSD`
+- [x] Tests: unit tests for normalization (BTC → BTC-USD, wrapped `TBTCUSD` excluded, `BTCBUSD`
   excluded) + route test: q=btc returns a merged list containing `BTC-USD` type CRYPTO.
-- [ ] Tests: `npm run build` + `npm run test` in portfoliost-instruments.
-- [ ] Commit: `feat(search): crypto leg + type CRYPTO with yfinance-pair normalization`.
+- [x] Tests: `npm run build` + `npm run test` in portfoliost-instruments.
+- [x] Commit: `feat(search): crypto leg + type CRYPTO with yfinance-pair normalization`.
 
 ### 20.6 — full compose stack smoke
 
