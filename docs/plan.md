@@ -134,43 +134,74 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
   `change_percent` at 2 dp). 7 new unit tests cover row shape + date normalization,
   all-empty → `None`, rate-limit block → next provider, keyless-provider skip,
   quote dict keys/bounds, single-row quote (no change fields), and all-providers-fail →
-  `None`. Full suite: 143 passed, 5 deselected.
+  `None`. **Correction (18.4):** the first test run reused the stale `test` image (no
+  rebuild) and reported 143 passed — after `docker compose --profile test build` the real
+  result is **156 passed, 5 deselected**. The keyless-provider test must explicitly
+  `delenv("FMP_API_KEY"/"TIINGO_TOKEN")` because the local `.env` ships live keys.
 
 ---
 
 ### 18.4 — new openst routes `/crypto/ohlcv/{pair}` and `/crypto/quote/{pair}`
 
-- [ ] In `openst/src/main.py` add two routes following the `/price/ohlcv` pattern:
+- [x] In `openst/src/main.py` add two routes following the `/price/ohlcv` pattern:
   - `GET /crypto/ohlcv/{pair}?start&end` — calls `get_crypto_ohlcv`; returns JSON
     array of OHLCV dicts or `404` if `None`; same `start`/`end` default-window logic
-    (90-day default if omitted) as the equity route.
+    (365-day default if omitted, via `_default_dates()`) as the equity route.
   - `GET /crypto/quote/{pair}` — calls `get_crypto_quote`; returns single JSON object
     or `404`.
-- [ ] Update `openst/tests/` with route-level tests (mock `get_crypto_ohlcv` /
+- [x] Update `openst/tests/` with route-level tests (mock `get_crypto_ohlcv` /
   `get_crypto_quote`):
   - `200` with correct JSON body for a valid pair.
   - `404` when client returns `None`.
   - `start`/`end` query params forwarded to the client function.
-- [ ] Run full openst test suite (docker compose — all tests must pass).
-- [ ] Commit.
+- [x] Run full openst test suite (docker compose — all tests must pass).
+- [x] Commit.
+
+  **Result (2026-09-15):** routes follow the existing `/price/ohlcv` pattern verbatim —
+  `_default_dates()` fallback (note: the equity route's actual default is the 365-day
+  window, not 90-day) and `_cached_or_404` (JSON array / single object, `404` when the
+  client returns `None`). 6 route tests added in `tests/test_main.py` (200 body, 404,
+  explicit-window forwarding, bad-date 422 for OHLCV; 200 + 404 for quote). After a test
+  image rebuild the full suite is **156 passed, 5 deselected** (18.3 + 18.4 together;
+  the stale-image first run had reported a misleading 143).
 
 ---
 
 ### 18.5 — openst standalone compose smoke (local, real HTTP)
 
-- [ ] Start openst standalone compose: `docker compose up -d` (redis + app).
-- [ ] Smoke-curl — **one request per endpoint** (not a loop):
+- [x] Start openst standalone compose: `docker compose up -d` (redis + app).
+- [x] Smoke-curl — **one request per endpoint** (not a loop):
   ```bash
   curl "http://localhost:8080/crypto/ohlcv/BTC-USD?start=2026-01-01&end=2026-06-30"
   # expect: JSON array with {date, open, high, low, close, volume} rows
   curl "http://localhost:8080/crypto/quote/BTC-USD"
   # expect: single JSON object with price/volume fields
   ```
-- [ ] Second call to each URL: confirm Redis cache HIT (no outbound HTTP).
-- [ ] Note results (row count, field sample) inline below.
-- [ ] `docker compose down`.
-- [ ] Commit note (no code change — observations only).  Push openst to `main`.
+- [x] Second call to each URL: confirm Redis cache HIT (no outbound HTTP).
+- [x] Note results (row count, field sample) inline below.
+- [x] `docker compose down`.
+- [x] Commit note (no code change — observations only).  Push openst to `main`.
   Wait for GHA image build.
+
+  **Note:** host port 8080 was already published by the `portfoliost-gateway` stack
+  (its 8080-only port mapping, while openst standalone also wants 8080), so the smoke ran
+  on `localhost:18080` via a one-off container from the freshly built `openst-app` image
+  on the standalone `openst_default` network (`--env-file .env -e REDIS_HOST=redis`).
+
+  **Results (2026-09-15, live data via yfinance):**
+  - `GET /crypto/ohlcv/BTC-USD?start=2026-01-01&end=2026-06-30` → **181 rows**.
+    First/last:
+    ```json
+    {"date": "2026-01-01", "open": 87508.0469, "high": 88803.2266, "low": 87399.4062, "close": 88731.9844, "volume": 18849043990}
+    {"date": "2026-06-30", "open": 60136.4531, "high": 60173.2188, "low": 58111.6719, "close": 58558.8594, "volume": 32747419391}
+    ```
+  - `GET /crypto/quote/BTC-USD` → single object (latest close 2026-09-15):
+    ```json
+    {"symbol": "BTC-USD", "price": 77134.2031, "open": 78181.3281, "high": 78232.375, "low": 76735.1797, "volume": 29305964544, "date": "2026-09-15", "change": -1029.1797, "change_percent": -0.01}
+    ```
+  - **Cache HITs:** second call to each URL returned identical bodies at
+    0.0134 s / 0.0071 s (no outbound fetch); Redis keys present with default TTL
+    (`crypto_ohlcv:BTC-USD:2026-01-01:2026-06-30`, `crypto_quote:BTC-USD`).
 
 ---
 
