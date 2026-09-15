@@ -75,6 +75,12 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ### 18.3 — `get_crypto_ohlcv` / `get_crypto_quote` in `openbb_client.py`
 
+> Reworked for the 18.1 finding: `obb.crypto.price.quote` does not exist in
+> `openbb-crypto==1.6.2` — the only crypto-price command is `crypto.price.historical`.
+> `get_crypto_quote` therefore derives a quote snapshot from the latest `historical`
+> rows instead of calling a nonexistent command (signature unchanged, so 18.4/18.6
+> routes stay as planned).
+
 - [ ] In `openst/src/openbb_client.py` add two functions mirroring the equity OHLCV
   pattern:
   - `CRYPTO_PROVIDERS = ["yfinance", "fmp", "tiingo"]`  — provider fallback list
@@ -86,14 +92,28 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
     normalization as `get_ohlcv_history`, returns `None` if all providers fail or
     return empty.
   - `get_crypto_quote(pair: str) -> dict | None`
-    — calls `obb.crypto.price.quote(pair, provider=provider).to_df().iloc[0].to_dict()`,
-    same fallback loop; returns `None` on failure.
+    — snaps the latest quote from `obb.crypto.price.historical(pair, provider=provider)`
+    (no explicit window — provider default, ~last 90d for yfinance):
+      - take the last row `{date, open, high, low, close, volume}` (via the same
+        RangeIndex-date normalization);
+      - if ≥2 rows exist, compute `change = close − prev_close` and
+        `change_percent = change / prev_close` (rounded to 2/4 dp, consistent with
+        `_safe_float`);
+      - return `{"symbol": pair, "price": close, "open": …, "high": …, "low": …,
+        "volume": …, "change":…, "change_percent":…, "date": latest-row date}`
+        (skipping `change`/`change_percent` when less than 2 rows);
+      - same fallback loop as `get_ohlcv_history` (blocked provider skipped, rate-limit
+        blocks provider, invalid-pair logs & continues, continue on empty); returns
+        `None` if all providers fail or empty.
 - [ ] Unit tests in `openst/tests/test_openbb_client.py`:
   - `get_crypto_ohlcv` happy path: mocked `obb.crypto.price.historical` returns fixture
     frame for `BTC-USD`; assert returned list shape and date normalization.
   - `get_crypto_ohlcv` all-empty: all providers return empty DataFrame → `None`.
   - `get_crypto_ohlcv` provider block: blocked provider skipped; next provider used.
-  - `get_crypto_quote` happy path: mocked quote row for `ETH-USD`; assert dict shape.
+  - `get_crypto_quote` happy path: mocked `historical` returns ≥2 rows for `ETH-USD`;
+    assert dict keys (`symbol`, `price`, `change`, `change_percent`, `open`, `high`,
+    `low`, `volume`, `date`) and that `price` equals the latest close.
+  - `get_crypto_quote` single-row frame: quote returned without `change`/`change_percent`.
   - `get_crypto_quote` failure: exception from all providers → `None`.
 - [ ] Run full openst test suite (docker compose):
   ```bash
