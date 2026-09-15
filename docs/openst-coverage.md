@@ -1,4 +1,4 @@
-# openst provider coverage (verified 2026-09-14)
+# openst provider coverage (verified 2026-09-15)
 
 Ground truth from probing **OpenBB 4.7.2** (with `openbb-sec==1.6.7` pinned) inside
 the openst image with the current keys (`FMP_API_KEY` starter tier, yfinance, sec;
@@ -23,6 +23,8 @@ intrinio key present but broken). sec is keyless (SEC EDGAR).
 | institutional ownership | `/equity/ownership/institutional/{t}` | `ownership.form_13f` | sec | Form 13F quarterly holdings; SEC-only, keyless |
 | filings | `/equity/filings/{t}` | `fundamental.filings` | sec | EDGAR filing index (10-K, 10-Q, 8-K) + report URLs |
 | management discussion | `/equity/fundamentals/{t}/mda` | `fundamental.management_discussion_analysis` | sec | MD&A text from latest 10-K/10-Q; SEC-only |
+| crypto OHLCV | `/crypto/ohlcv/{p}?start&end` | `crypto.price.historical` | yfinance, fmp, tiingo | daily bars via `openbb-crypto==1.6.2`; `CRYPTO_PROVIDERS` fallback; fmp/tiingo skipped when `FMP_API_KEY`/`TIINGO_TOKEN` unset; cached 6h at cachest `OPENST_CRYPTO_OHLCV` |
+| crypto quote | `/crypto/quote/{p}` | `crypto.price.historical` (derived latest row) | yfinance, fmp, tiingo | snapshot from latest `historical` row (no `crypto.price.quote` in openbb-crypto 1.6.2); change/change_percent from ≥2 rows; cached 6h at cachest `OPENST_CRYPTO_QUOTE` |
 
 All four SEC surfaces are keyless (SEC EDGAR). cachest proxies them at
 `/ownership/{t}`, `/ownership/institutional/{t}`, `/filings/{t}`,

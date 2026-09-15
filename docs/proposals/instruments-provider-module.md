@@ -121,7 +121,7 @@ surface (cachest `config.yaml`). Bond math follows obligacjeskarbowe.pl
 | --- | --- | --- | --- | --- |
 | TFI sub-funds (`NNEP25.TFI`, `GSEM25.TFI`…) | `biznesradar` provider (D77) ✅ | `biznesradar` EquitySearch (D77) ✅ | `biznesradar` EquityProfile (D77) ✅ | done |
 | GPW-listed FIZ (`Beta ETF * FIZ`) | yfinance `.WA` (equity path) ✅ | `biznesradar` symbol probe ✅ | `biznesradar` EquityProfile ✅ | done |
-| Crypto | `openbb-crypto` extension (D78) | `openbb-crypto` `crypto.search` (D78) | via quote fields (D78) | D78 |
+| Crypto | `openbb-crypto` extension (D78) ✅ | `openbb-crypto` `crypto.search` (D78) ✅ | via quote fields (D78) ✅ | done |
 | Retail savings bonds (ROD/EDO/OTS/ROR/DOR/TOS/COI/ROS) | `openbb_obligacje` pricing engine (D79) | `bond_series` catalogue in Postgres `openst` schema (D79) | `bond_series` from `obligacjeskarbowe.pl` (D79) | D79 |
 | Catalyst corp bonds (BST, INS, KRI, ARH, VOX, NVA + `YMM`) | `biznesradar` OHLCV (D77) ✅ | `biznesradar` EquitySearch ✅ | `obligacje.pl /pl/obligacja/{symbol}` (D80) | D80 |
 

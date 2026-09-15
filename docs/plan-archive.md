@@ -1302,3 +1302,282 @@ Note: as only a single fetcher can be registered per (provider, model) key — a
 - [x] Update `docs/openst-coverage.md` to note biznesradar provider coverage for
   `*.TFI`, `*.FIZ`, and Catalyst bond symbols.
 - [x] Archive this section to `plan-archive.md` once all steps are `[x]`.
+
+## 18. D78 — crypto via `openbb-crypto` extension in openst
+
+Proposal: [instruments-provider-module.md](proposals/instruments-provider-module.md) — D78 (2026-09-14).
+
+Installs `openbb-crypto` (compatible with OpenBB 4.7.2) into openst, adds
+`get_crypto_ohlcv` / `get_crypto_quote` client functions and two new routes
+(`/crypto/ohlcv/{pair}`, `/crypto/quote/{pair}`), then exposes both through cachest
+(`OPENST_CRYPTO_OHLCV`, `OPENST_CRYPTO_QUOTE`).  Pair symbols follow yfinance convention
+(`BTC-USD`).  No instruments-module changes in this step — routing for the new asset
+class is deferred to D81.
+
+Rules: one step = one commit; a step is marked `[x]` only after its tests pass
+(unit + docker-compose level per openst and cachest CLAUDE.md).
+
+---
+
+### 18.1 — verify `openbb-crypto` version + pin
+
+- [x] In the openst repo, resolve the correct `openbb-crypto` pin that is compatible with
+  `openbb==4.7.2`.  The `openbb` meta-package pins `openbb-core`; `openbb-crypto` must
+  require the same core version.  Strategy: run
+  `pip install "openbb==4.7.2" "openbb-crypto" --dry-run` inside a clean venv (or the
+  existing openst Docker build) and record the resolved version.
+- [x] Verify `obb.crypto.price.historical("BTC-USD", provider="yfinance")` and
+  `obb.crypto.price.quote("BTC-USD", provider="yfinance")` are callable with the
+  resolved version (smoke in a Python REPL, not a full test yet).
+- [x] Record the pinned version (e.g. `openbb-crypto==1.6.2`) as a comment in this step.
+- [x] Commit note only (no requirements change yet — that lands in 18.2).
+
+  **Result (2026-09-15, clean venv py3.12, pip `--dry-run` + live install of `openbb==4.7.2`):**
+  - Pinned version: **`openbb-crypto==1.6.2`** ↔ resolves against `openbb-core==1.6.13`
+    (same core the `openbb==4.7.2` meta-package pins).  Note: `openbb==4.7.2` already
+    depends transitively on `openbb-crypto` — the explicit pin in 18.2 just locks it.
+  - `obb.crypto.price.historical("BTC-USD", start_date=…, end_date=…, provider="yfinance")`
+    works: returns a RangeIndex DataFrame, columns `[open, high, low, close, volume]`
+    (5 rows for a 2026-06-01→05 window).
+  - **Deviation — `obb.crypto.price.quote` does NOT exist in openbb-crypto 1.6.2.**
+    `CryptoHistorical` is the only crypto-price command; the extension exposes exactly
+    `crypto.price.historical` + `crypto.search` (search is fmp-only).  Providers for
+    `CryptoHistorical` are `[yfinance, fmp, tiingo]` — matches the planned
+    `CRYPTO_PROVIDERS`.  The 18.3 `get_crypto_quote` design must change: derive the
+    quote from the latest `historical` row (or revisit whether a quote endpoint is even
+    needed).
+
+---
+
+### 18.2 — add `openbb-crypto` to openst requirements + Dockerfile
+
+- [x] Add `openbb-crypto==<pinned>` to `openst/requirements.txt` after the existing
+  `openbb==4.7.2` line.
+- [x] Rebuild the openst Docker image locally:
+  ```bash
+  docker compose --profile test build
+  ```
+  Confirm the build succeeds and `obb.crypto` is importable inside the container:
+  ```bash
+  docker compose run --rm test python -c "from openbb import obb; print(obb.crypto)"
+  ```
+- [x] Run existing openst test suite (must stay green):
+  ```bash
+  docker compose --profile test run --rm test
+  ```
+- [x] Commit `openst/requirements.txt` change.
+
+  **Result (2026-09-15):** `openbb-crypto==1.6.2` added after `openbb==4.7.2`.  Build
+  succeeded; `obb.crypto` imports in the `test` container with `crypto@1.6.2`
+  (`/crypto/price/historical` + `/crypto/search` routers present).  Full suite:
+  143 passed, 5 deselected.
+
+---
+
+### 18.3 — `get_crypto_ohlcv` / `get_crypto_quote` in `openbb_client.py`
+
+> Reworked for the 18.1 finding: `obb.crypto.price.quote` does not exist in
+> `openbb-crypto==1.6.2` — the only crypto-price command is `crypto.price.historical`.
+> `get_crypto_quote` therefore derives a quote snapshot from the latest `historical`
+> rows instead of calling a nonexistent command (signature unchanged, so 18.4/18.6
+> routes stay as planned).
+
+- [x] In `openst/src/openbb_client.py` add two functions mirroring the equity OHLCV
+  pattern:
+  - `CRYPTO_PROVIDERS = ["yfinance", "fmp", "tiingo"]`  — provider fallback list
+    (yfinance first; fmp and tiingo only if keys are present; same
+    `_provider_is_blocked` guard as `get_ohlcv_history`).
+  - `get_crypto_ohlcv(pair: str, start_date: str, end_date: str) -> list[dict] | None`
+    — calls `obb.crypto.price.historical(pair, start_date=start_date,
+    end_date=end_date, provider=provider).to_df()`, applies the same RangeIndex-date
+    normalization as `get_ohlcv_history`, returns `None` if all providers fail or
+    return empty.
+  - `get_crypto_quote(pair: str) -> dict | None`
+    — snaps the latest quote from `obb.crypto.price.historical(pair, provider=provider)`
+    (no explicit window — provider default, ~last 90d for yfinance):
+      - take the last row `{date, open, high, low, close, volume}` (via the same
+        RangeIndex-date normalization);
+      - if ≥2 rows exist, compute `change = close − prev_close` and
+        `change_percent = change / prev_close` (rounded to 2/4 dp, consistent with
+        `_safe_float`);
+      - return `{"symbol": pair, "price": close, "open": …, "high": …, "low": …,
+        "volume": …, "change":…, "change_percent":…, "date": latest-row date}`
+        (skipping `change`/`change_percent` when less than 2 rows);
+      - same fallback loop as `get_ohlcv_history` (blocked provider skipped, rate-limit
+        blocks provider, invalid-pair logs & continues, continue on empty); returns
+        `None` if all providers fail or empty.
+- [x] Unit tests in `openst/tests/test_openbb_client.py`:
+  - `get_crypto_ohlcv` happy path: mocked `obb.crypto.price.historical` returns fixture
+    frame for `BTC-USD`; assert returned list shape and date normalization.
+  - `get_crypto_ohlcv` all-empty: all providers return empty DataFrame → `None`.
+  - `get_crypto_ohlcv` provider block: blocked provider skipped; next provider used.
+  - `get_crypto_quote` happy path: mocked `historical` returns ≥2 rows for `ETH-USD`;
+    assert dict keys (`symbol`, `price`, `change`, `change_percent`, `open`, `high`,
+    `low`, `volume`, `date`) and that `price` equals the latest close.
+  - `get_crypto_quote` single-row frame: quote returned without `change`/`change_percent`.
+  - `get_crypto_quote` failure: exception from all providers → `None`.
+- [x] Run full openst test suite (docker compose):
+  ```bash
+  docker compose --profile test run --rm test
+  ```
+- [x] Commit.
+
+  **Result (2026-09-15):** `CRYPTO_PROVIDERS = ["yfinance", "fmp", "tiingo"]` with a
+  `_provider_has_key` guard (fmp → `FMP_API_KEY`, tiingo → `TIINGO_TOKEN`) so key-gated
+  providers are only tried when the key is set. `get_crypto_ohlcv` mirrors the equity
+  `get_ohlcv_history` normalization; `get_crypto_quote` derives the snapshot from the
+  latest `historical` rows (change/change_percent computed when ≥2 rows, `change` at 4 dp,
+  `change_percent` at 2 dp). 7 new unit tests cover row shape + date normalization,
+  all-empty → `None`, rate-limit block → next provider, keyless-provider skip,
+  quote dict keys/bounds, single-row quote (no change fields), and all-providers-fail →
+  `None`. **Correction (18.4):** the first test run reused the stale `test` image (no
+  rebuild) and reported 143 passed — after `docker compose --profile test build` the real
+  result is **156 passed, 5 deselected**. The keyless-provider test must explicitly
+  `delenv("FMP_API_KEY"/"TIINGO_TOKEN")` because the local `.env` ships live keys.
+
+---
+
+### 18.4 — new openst routes `/crypto/ohlcv/{pair}` and `/crypto/quote/{pair}`
+
+- [x] In `openst/src/main.py` add two routes following the `/price/ohlcv` pattern:
+  - `GET /crypto/ohlcv/{pair}?start&end` — calls `get_crypto_ohlcv`; returns JSON
+    array of OHLCV dicts or `404` if `None`; same `start`/`end` default-window logic
+    (365-day default if omitted, via `_default_dates()`) as the equity route.
+  - `GET /crypto/quote/{pair}` — calls `get_crypto_quote`; returns single JSON object
+    or `404`.
+- [x] Update `openst/tests/` with route-level tests (mock `get_crypto_ohlcv` /
+  `get_crypto_quote`):
+  - `200` with correct JSON body for a valid pair.
+  - `404` when client returns `None`.
+  - `start`/`end` query params forwarded to the client function.
+- [x] Run full openst test suite (docker compose — all tests must pass).
+- [x] Commit.
+
+  **Result (2026-09-15):** routes follow the existing `/price/ohlcv` pattern verbatim —
+  `_default_dates()` fallback (note: the equity route's actual default is the 365-day
+  window, not 90-day) and `_cached_or_404` (JSON array / single object, `404` when the
+  client returns `None`). 6 route tests added in `tests/test_main.py` (200 body, 404,
+  explicit-window forwarding, bad-date 422 for OHLCV; 200 + 404 for quote). After a test
+  image rebuild the full suite is **156 passed, 5 deselected** (18.3 + 18.4 together;
+  the stale-image first run had reported a misleading 143).
+
+---
+
+### 18.5 — openst standalone compose smoke (local, real HTTP)
+
+- [x] Start openst standalone compose: `docker compose up -d` (redis + app).
+- [x] Smoke-curl — **one request per endpoint** (not a loop):
+  ```bash
+  curl "http://localhost:8080/crypto/ohlcv/BTC-USD?start=2026-01-01&end=2026-06-30"
+  # expect: JSON array with {date, open, high, low, close, volume} rows
+  curl "http://localhost:8080/crypto/quote/BTC-USD"
+  # expect: single JSON object with price/volume fields
+  ```
+- [x] Second call to each URL: confirm Redis cache HIT (no outbound HTTP).
+- [x] Note results (row count, field sample) inline below.
+- [x] `docker compose down`.
+- [x] Commit note (no code change — observations only).  Push openst to `main`.
+  Wait for GHA image build.
+
+  **Note:** host port 8080 was already published by the `portfoliost-gateway` stack
+  (its 8080-only port mapping, while openst standalone also wants 8080), so the smoke ran
+  on `localhost:18080` via a one-off container from the freshly built `openst-app` image
+  on the standalone `openst_default` network (`--env-file .env -e REDIS_HOST=redis`).
+
+  **Results (2026-09-15, live data via yfinance):**
+  - `GET /crypto/ohlcv/BTC-USD?start=2026-01-01&end=2026-06-30` → **181 rows**.
+    First/last:
+    ```json
+    {"date": "2026-01-01", "open": 87508.0469, "high": 88803.2266, "low": 87399.4062, "close": 88731.9844, "volume": 18849043990}
+    {"date": "2026-06-30", "open": 60136.4531, "high": 60173.2188, "low": 58111.6719, "close": 58558.8594, "volume": 32747419391}
+    ```
+  - `GET /crypto/quote/BTC-USD` → single object (latest close 2026-09-15):
+    ```json
+    {"symbol": "BTC-USD", "price": 77134.2031, "open": 78181.3281, "high": 78232.375, "low": 76735.1797, "volume": 29305964544, "date": "2026-09-15", "change": -1029.1797, "change_percent": -0.01}
+    ```
+  - **Cache HITs:** second call to each URL returned identical bodies at
+    0.0134 s / 0.0071 s (no outbound fetch); Redis keys present with default TTL
+    (`crypto_ohlcv:BTC-USD:2026-01-01:2026-06-30`, `crypto_quote:BTC-USD`).
+
+---
+
+### 18.6 — cachest: `OPENST_CRYPTO_OHLCV` + `OPENST_CRYPTO_QUOTE` routes
+
+- [x] In `cachest/config.yaml`, add after `OPENST_OHLCV_FUNDS`:
+  ```yaml
+  - name: OPENST_CRYPTO_OHLCV
+    path: /crypto/ohlcv/{pair}
+    url: "http://openst:8080/crypto/ohlcv/{pair}?start={start}&end={end}"
+    query_params: [start, end]
+    cache_ttl: 21600           # 6h — mirrors OPENST_OHLCV
+    stale_ttl: 2592000
+    fetch_interval: 2
+    fetch_max_wait: 4
+
+  - name: OPENST_CRYPTO_QUOTE
+    path: /crypto/quote/{pair}
+    url: "http://openst:8080/crypto/quote/{pair}"
+    cache_ttl: 21600           # 6h — daily prices only
+    stale_ttl: 2592000
+    fetch_interval: 2
+    fetch_max_wait: 4
+  ```
+- [x] Add `test_real_config_has_crypto_ohlcv_route` and
+  `test_real_config_has_crypto_quote_route` to `cachest/tests/test_config.py`
+  (assert `name`, `url`, `query_params` for OHLCV; `name`, `url` for quote).
+- [x] Run cachest test suite (all tests must pass):
+  ```bash
+  docker compose --profile test run --rm test
+  ```
+- [x] Commit cachest config + tests.  Push cachest to `main`.  Wait for GHA image build.
+
+  **Result (2026-09-15):** both routes added in `config.yaml` exactly as specced (after
+  `OPENST_OHLCV_FUNDS`, `fetch_timeout` left at default — crypto providers are plain HTTP,
+  no biznesradar-style scrape). 2 new `test_config.py` assertions; full suite
+  **73 passed** (fresh image build first — config/tests are baked into the `test` image).
+
+---
+
+### 18.7 — portfoliost compose stack smoke (full chain)
+
+- [x] Rebuild openst + cachest images in portfoliost compose to pick up the new versions:
+  ```bash
+  docker compose up -d --build redis openst cachest
+  ```
+- [x] Smoke-curl through cachest (**single requests**):
+  ```bash
+  curl "http://localhost:8090/crypto/ohlcv/BTC-USD?start=2026-01-01&end=2026-06-30"
+  # X-Cache: MISS on first call; HIT on repeat
+  curl "http://localhost:8090/crypto/quote/BTC-USD"
+  # X-Cache: MISS on first call; HIT on repeat
+  ```
+- [x] Run `npm run test:stack` — existing contract checks must stay green (no regression).
+- [x] Commit note: `chore: verify D78 smoke through full compose stack`.
+
+  **Result (2026-09-15):** rebuilt `portfoliost-openst` + `portfoliost-cachest` from the
+  local `../openst` / `../cachest` sources (config.yaml rides the existing volume mount).
+  Full-chain smoke through cachest on `:8090`:
+  - `GET /crypto/ohlcv/BTC-USD?start=2026-01-01&end=2026-06-30` → 200, **181 rows**
+    (last bar 2026-06-30 close 58558.8594); `X-Cache: MISS` then `X-Cache: HIT`,
+    bodies identical.
+  - `GET /crypto/quote/BTC-USD` → 200, latest close 76907.7266 (2026-09-15);
+    `X-Cache: MISS` then `X-Cache: HIT`, bodies identical.
+  - `npm run test:stack` → **32/32 checks passed** (no regression; instrument contract
+    checks hit the same live openst through cachest, upstream detected `real`).
+
+---
+
+### 18.8 — closeout
+
+- [x] Update `docs/proposals/instruments-provider-module.md` D78 status to `done`.
+- [x] Update `docs/openst-coverage.md` to note crypto provider coverage via
+  `openbb-crypto` for `BTC-USD`-style pairs.
+- [x] Archive this section to `plan-archive.md` once all steps are `[x]`.
+
+  **Result (2026-09-15):** D78 verdict cell in `instruments-provider-module.md`
+  coverage table set to `done`; `openst-coverage.md` gained two crypto rows
+  (OHLCV `/crypto/ohlcv/{p}` and quote `/crypto/quote/{p}`, both via
+  `crypto.price.historical`, providers yfinance/fmp/tiingo, 6h cachest TTLs, and the
+  quote-is-derived note) with the coverage date bumped to 2026-09-15. Section archived.
+
+---
