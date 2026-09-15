@@ -7,7 +7,7 @@ Legend: `[ ]` pending · `[x]` done
 
 ---
 
-## 17. D78 — crypto via `openbb-crypto` extension in openst
+## 18. D78 — crypto via `openbb-crypto` extension in openst
 
 Proposal: [instruments-provider-module.md](proposals/instruments-provider-module.md) — D78 (2026-09-14).
 
@@ -23,7 +23,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ---
 
-### 17.1 — verify `openbb-crypto` version + pin
+### 18.1 — verify `openbb-crypto` version + pin
 
 - [ ] In the openst repo, resolve the correct `openbb-crypto` pin that is compatible with
   `openbb==4.7.2`.  The `openbb` meta-package pins `openbb-core`; `openbb-crypto` must
@@ -38,7 +38,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ---
 
-### 17.2 — add `openbb-crypto` to openst requirements + Dockerfile
+### 18.2 — add `openbb-crypto` to openst requirements + Dockerfile
 
 - [ ] Add `openbb-crypto==<pinned>` to `openst/requirements.txt` after the existing
   `openbb==4.7.2` line.
@@ -58,7 +58,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ---
 
-### 17.3 — `get_crypto_ohlcv` / `get_crypto_quote` in `openbb_client.py`
+### 18.3 — `get_crypto_ohlcv` / `get_crypto_quote` in `openbb_client.py`
 
 - [ ] In `openst/src/openbb_client.py` add two functions mirroring the equity OHLCV
   pattern:
@@ -88,7 +88,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ---
 
-### 17.4 — new openst routes `/crypto/ohlcv/{pair}` and `/crypto/quote/{pair}`
+### 18.4 — new openst routes `/crypto/ohlcv/{pair}` and `/crypto/quote/{pair}`
 
 - [ ] In `openst/src/main.py` add two routes following the `/price/ohlcv` pattern:
   - `GET /crypto/ohlcv/{pair}?start&end` — calls `get_crypto_ohlcv`; returns JSON
@@ -106,7 +106,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ---
 
-### 17.5 — openst standalone compose smoke (local, real HTTP)
+### 18.5 — openst standalone compose smoke (local, real HTTP)
 
 - [ ] Start openst standalone compose: `docker compose up -d` (redis + app).
 - [ ] Smoke-curl — **one request per endpoint** (not a loop):
@@ -124,7 +124,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ---
 
-### 17.6 — cachest: `OPENST_CRYPTO_OHLCV` + `OPENST_CRYPTO_QUOTE` routes
+### 18.6 — cachest: `OPENST_CRYPTO_OHLCV` + `OPENST_CRYPTO_QUOTE` routes
 
 - [ ] In `cachest/config.yaml`, add after `OPENST_OHLCV_FUNDS`:
   ```yaml
@@ -156,7 +156,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ---
 
-### 17.7 — portfoliost compose stack smoke (full chain)
+### 18.7 — portfoliost compose stack smoke (full chain)
 
 - [ ] Rebuild openst + cachest images in portfoliost compose to pick up the new versions:
   ```bash
@@ -174,7 +174,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ---
 
-### 17.8 — closeout
+### 18.8 — closeout
 
 - [ ] Update `docs/proposals/instruments-provider-module.md` D78 status to `done`.
 - [ ] Update `docs/openst-coverage.md` to note crypto provider coverage via
@@ -183,7 +183,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ---
 
-## 18. D79 — retail savings bonds: `openbb_obligacje` provider in openst
+## 19. D79 — retail savings bonds: `openbb_obligacje` provider in openst
 
 Proposal: [instruments-provider-module.md](proposals/instruments-provider-module.md) — D79.
 
@@ -198,7 +198,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ---
 
-### 18.1 — homelab: Postgres `openst` schema + secret
+### 19.1 — homelab: Postgres `openst` schema + secret
 
 - [ ] In the homelab repo, add PGO least-privilege user `openst` and schema `openst`
   alongside existing module schemas (follow the pattern from `portfoliost-instruments`
@@ -214,7 +214,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ---
 
-### 18.2 — openst: Postgres connection + schema migrations
+### 19.2 — openst: Postgres connection + schema migrationss
 
 - [ ] Add `psycopg2-binary` (or `psycopg[binary]`) to `openst/requirements.txt`.
 - [ ] Create `openst/src/db.py`: thin module that reads `DATABASE_URL` from env and
@@ -249,7 +249,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ---
 
-### 18.3 — CPI importer script + one-shot k8s Job
+### 19.3 — CPI importer script + one-shot k8s Job
 
 - [ ] Create `openst/src/importers/cpi.py`:
   - Scrapes `obligacje.pl/pl/narzedzia/inflacja,data_od-{from},data_do-{to}` —
@@ -270,7 +270,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ---
 
-### 18.4 — bond_series importer script + one-shot k8s Job
+### 19.4 — bond_series importer script + one-shot k8s Job
 
 - [ ] Create `openst/src/importers/bond_series.py`:
   - Scrapes each series offer page on `obligacjeskarbowe.pl`:
@@ -290,7 +290,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ---
 
-### 18.5 — pricing engine (`openbb_obligacje` plugin scaffold + engine)
+### 19.5 — pricing engine (`openbb_obligacje` plugin scaffold + engine)
 
 - [ ] Create `openst/plugins/openbb_obligacje/` with the same scaffold as
   `openbb_biznesradar`:
@@ -327,7 +327,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ---
 
-### 18.6 — fetchers: `FixedIncomeHistoricalFetcher`, `SearchFetcher`, `ProfileFetcher`
+### 19.6 — fetchers: `FixedIncomeHistoricalFetcher`, `SearchFetcher`, `ProfileFetcher`
 
 - [ ] `fixedincome_historical.py` — `FixedIncomeHistoricalFetcher`:
   - Registered under OpenBB `FixedIncomeHistorical` model
@@ -348,7 +348,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ---
 
-### 18.7 — wire into `openbb_client.py` + new openst routes
+### 19.7 — wire into `openbb_client.py` + new openst routes
 
 - [ ] In `openst/src/openbb_client.py` add:
   - `get_bond_ohlcv(symbol: str, start_date: str, end_date: str) -> list[dict] | None`
@@ -367,7 +367,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ---
 
-### 18.8 — openst standalone compose smoke (local, real DB)
+### 19.8 — openst standalone compose smoke (local, real DB)
 
 - [ ] Start openst standalone compose with DB populated:
   ```bash
@@ -391,7 +391,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ---
 
-### 18.9 — cachest: `OPENST_BOND_OHLCV` + `OPENST_BOND_PROFILE` routes
+### 19.9 — cachest: `OPENST_BOND_OHLCV` + `OPENST_BOND_PROFILE` routes
 
 - [ ] In `cachest/config.yaml`, add after `OPENST_CRYPTO_QUOTE`:
   ```yaml
@@ -419,7 +419,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ---
 
-### 18.10 — portfoliost compose stack smoke (full chain)
+### 19.10 — portfoliost compose stack smoke (full chain)
 
 - [ ] Rebuild openst + cachest in portfoliost compose:
   ```bash
@@ -437,7 +437,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ---
 
-### 18.11 — closeout
+### 19.11 — closeout
 
 - [ ] Update `docs/proposals/instruments-provider-module.md` D79 status to `done`.
 - [ ] Update `docs/openst-coverage.md` to note savings bond coverage via
