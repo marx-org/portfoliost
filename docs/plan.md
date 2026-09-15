@@ -207,7 +207,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ### 18.6 — cachest: `OPENST_CRYPTO_OHLCV` + `OPENST_CRYPTO_QUOTE` routes
 
-- [ ] In `cachest/config.yaml`, add after `OPENST_OHLCV_FUNDS`:
+- [x] In `cachest/config.yaml`, add after `OPENST_OHLCV_FUNDS`:
   ```yaml
   - name: OPENST_CRYPTO_OHLCV
     path: /crypto/ohlcv/{pair}
@@ -226,14 +226,19 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
     fetch_interval: 2
     fetch_max_wait: 4
   ```
-- [ ] Add `test_real_config_has_crypto_ohlcv_route` and
+- [x] Add `test_real_config_has_crypto_ohlcv_route` and
   `test_real_config_has_crypto_quote_route` to `cachest/tests/test_config.py`
   (assert `name`, `url`, `query_params` for OHLCV; `name`, `url` for quote).
-- [ ] Run cachest test suite (all tests must pass):
+- [x] Run cachest test suite (all tests must pass):
   ```bash
   docker compose --profile test run --rm test
   ```
-- [ ] Commit cachest config + tests.  Push cachest to `main`.  Wait for GHA image build.
+- [x] Commit cachest config + tests.  Push cachest to `main`.  Wait for GHA image build.
+
+  **Result (2026-09-15):** both routes added in `config.yaml` exactly as specced (after
+  `OPENST_OHLCV_FUNDS`, `fetch_timeout` left at default — crypto providers are plain HTTP,
+  no biznesradar-style scrape). 2 new `test_config.py` assertions; full suite
+  **73 passed** (fresh image build first — config/tests are baked into the `test` image).
 
 ---
 
