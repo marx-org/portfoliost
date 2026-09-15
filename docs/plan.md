@@ -361,11 +361,20 @@ Observed 2026-09-15 (openst local build, host `:8081` — `8080` held by portfol
 
 ### 20.6 — full compose stack smoke
 
-- [ ] In portfoliost compose, rebuild + run `redis openst cachest instruments`.
-- [ ] Smoke through cachest: `curl "http://localhost:8090/crypto/search/btc"` MISS→HIT;
+- [x] In portfoliost compose, rebuild + run `redis openst cachest instruments`.
+- [x] Smoke through cachest: `curl "http://localhost:8090/crypto/search/btc"` MISS→HIT;
   instruments `/api/instruments/search?q=btc` (via worked-upstream) contains `BTC-USD`/CRYPTO.
-- [ ] Run `npm run test:stack` — existing contract checks stay green.
-- [ ] Commit note: `chore: verify crypto search through full compose stack`.
+- [x] Run `npm run test:stack` — existing contract checks stay green.
+- [x] Commit note: `chore: verify crypto search through full compose stack`.
+
+Verification notes (live, 2026-09-15): rebuilt `openst cachest instruments` images in portfoliost
+compose (`NODE_AUTH_TOKEN` set); cachest `/crypto/search/btc` → `x-cache: MISS` then `HIT`;
+instruments `/api/instruments/search?q=btc` via gateway → 50 rows with 6 `CRYPTO`, `BTC-USD`
+first (`type=CRYPTO`, `source=CRYPTO`); `q=eth` → `ETH-USD` first despite the upstream FMP NaN
+`ico_date` rejection (curated suggestion). `npm run test:stack` → 32/32, upstream `real`. The
+smoke exposed that the 50-row cap occluded the crypto leg behind the reference DB's "btc" name
+flood — fixed by leading the merge with the curated crypto exact-pair
+(`portfoliost-instruments` `f3b5f5b`).
 
 ### 20.7 — closeout
 
