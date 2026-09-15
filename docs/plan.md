@@ -267,3 +267,108 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 - [ ] Update `docs/openst-coverage.md` to note savings bond coverage via
   `openbb_obligacje` for `EDO*`, `ROD*`, `OTS*`, `ROR*`, `DOR*`, `TOS*`, `COI*`, `ROS*`.
 - [ ] Archive this section to `plan-archive.md` once all steps are `[x]`.
+
+---
+
+## 20. Crypto search + asset-type labels (D78 gap-fix)
+
+Proposal: [instruments-provider-module.md](proposals/instruments-provider-module.md) —
+D78 gap-fix. Step 18 shipped only `/crypto/ohlcv/{pair}` + `/crypto/quote/{pair}`; the
+search/profile half of D78 (`openst /crypto/search/{query}` + `/crypto/profile/{pair}`)
+was skipped, so the SPA search can never surface a crypto pair.
+
+Scope (4 repos): openst (two routes + client fn), cachest (two routes), portfoliost-instruments
+(crypto search leg + `type: "CRYPTO"`), SPA — **no change needed**: the search modal already
+renders the `result.type` badge (`InstrumentSearchModal.vue:102`). Bonds: `BOND` type surfaces
+once D79 seeds `ticker_reference` (mapping added in step 20.5, no crypto-blocking).
+
+Verified live in cluster (2026-09-15, openst v1.1.16):
+- `obb.crypto.search("btc", provider="fmp")` works; **fmp-only** (yfinance/tiingo reject it);
+  `FMP_API_KEY` already in `openst-secrets`.
+- Rows are FMP-style pairs (`TBTCUSD`, `BTCBUSD`, …) — **not** the yfinance pairs
+  (`BTC-USD`) the OHLCV/quote routes accept. `fmp` OHLCV rejects `BTC-USD` (402); yfinance is
+  the pair authority. Search results therefore need symbol normalization in instruments.
+- `ticker_reference` has only `Stock` (45,210) + `ETF` (16,601) — no crypto rows. The SPA
+  placeholder already promises "crypto" (`InstrumentSearchModal.vue:74`).
+
+Rules: one step = one commit; a step is marked `[x]` only after its tests pass
+(unit + docker-compose level per openst and cachest CLAUDE.md; portfoliost build + vitest).
+
+---
+
+### 20.1 — openst: `get_crypto_search` client function
+
+- [ ] In `openst/src/openbb_client.py` add `get_crypto_search(query: str) -> list[dict]`,
+  fmp-only loop mirroring `search_equities` (rate-limit block, empty → continue → `[]`).
+- [ ] Unit tests in `openst/tests/test_openbb_client.py`: monkeypatched `obb.crypto.search`
+  returns rows → pass-through; empty df → `[]`; rate-limited provider → blocked + next.
+- [ ] Tests: openst full suite via `docker compose --profile test run --rm test`.
+- [ ] Commit: `feat(openbb_client): crypto search client fn (fmp-only)`.
+
+### 20.2 — openst: `/crypto/search/{query}` + `/crypto/profile/{pair}` routes
+
+- [ ] In `openst/src/main.py` add `GET /crypto/search/{query}` (mirror of `/equity/search`:
+  `_cached_or_404`, lowercase-normalized query) and `GET /crypto/profile/{pair}` (quote →
+  `{ symbol, name, currency }` from the two search/quote fields that exist; pair kept as-is).
+- [ ] Route tests in `openst/tests/test_main.py`: search returns rows / 404 on empty; profile
+  maps quote fields / 404 on missing quote.
+- [ ] Tests: full openst suite; compose-level smoke `curl /crypto/search/btc` → rows, second
+  call → `X-Cache: HIT`; `curl /crypto/profile/btc-usd` → 200.
+- [ ] Commit: `feat(main): crypto search + profile routes (D78 gap-fix)`.
+
+### 20.3 — cachest: `OPENST_CRYPTO_SEARCH` + `OPENST_CRYPTO_PROFILE`
+
+- [ ] `cachest/config.yaml`: `OPENST_CRYPTO_SEARCH` `/crypto/search/{query}` (TTL 7d — universe
+  changes rarely, matches `OPENST_SEARCH`) and `OPENST_CRYPTO_PROFILE` `/crypto/profile/{pair}`
+  (TTL 6h, matches `OPENST_CRYPTO_QUOTE`).
+- [ ] Tests: `cachest/tests/test_config.py` gains an assertion per new route.
+- [ ] Tests: full cachest suite via compose.
+- [ ] Commit: `feat(config): OPENST_CRYPTO_SEARCH + OPENST_CRYPTO_PROFILE routes`.
+
+### 20.4 — openst standalone smoke
+
+- [ ] `docker compose up -d redis openst`; single curls:
+  `/crypto/search/btc`, `/crypto/search/eth`, `/crypto/profile/BTC-USD` — rows + payload shape
+  recorded in the step result.
+- [ ] Verify Redis cache: second `curl` each → `X-Cache: HIT`.
+- [ ] Commit note: `chore: verify crypto search + profile smoke`.
+
+### 20.5 — instruments: crypto search leg + symbol normalization
+
+- [ ] `portfoliost-instruments/src/adapters/cachest.ts`: add `fetchCryptoSearch(query)` →
+  `${BASE_URL}/crypto/search/${q}`.
+- [ ] `portfoliost-instruments/src/adapters/symbol.ts` (or a new `crypto.ts`): normalize an FMP
+  row to a yfinance pair + display name. Curated primary map (base coin → pair, ≥ ~30 majors,
+  e.g. `btc→BTC-USD`, `eth→ETH-USD`, `sol→SOL-USD`) so typing `BTC`/`ETH` suggests the exact
+  pair; fallback heuristic drops FMP-wrap prefixes/`USD` and only emits `<BASE>-USD` when the
+  base parses as a bare coin mnemonic (no `tBTC`, `BTC.BUSD`, leveraged/wrapped variants).
+- [ ] `src/routes/instruments.ts` `/search`: run crypto search alongside the existing tiers
+  (not as last-only fallback — equity search "btc" already returns BTCS Inc. etc., so crypto
+  must be additive), merge + de-dupe by symbol, type `"CRYPTO"` (source `"CRYPTO"`).
+- [ ] `src/adapters/translate.ts`: `toSearchResponse`/new `toCryptoSearchResponse` emit
+  `type: "CRYPTO"`; widen `toReferenceSearchResponse` `assetType` mapping to emit `BOND`/`CRYPTO`
+  when present (D79-ready; ticker_reference still has none).
+- [ ] Tests: unit tests for normalization (BTC → BTC-USD, wrapped `TBTCUSD` excluded, `BTCBUSD`
+  excluded) + route test: q=btc returns a merged list containing `BTC-USD` type CRYPTO.
+- [ ] Tests: `npm run build` + `npm run test` in portfoliost-instruments.
+- [ ] Commit: `feat(search): crypto leg + type CRYPTO with yfinance-pair normalization`.
+
+### 20.6 — full compose stack smoke
+
+- [ ] In portfoliost compose, rebuild + run `redis openst cachest instruments`.
+- [ ] Smoke through cachest: `curl "http://localhost:8090/crypto/search/btc"` MISS→HIT;
+  instruments `/api/instruments/search?q=btc` (via worked-upstream) contains `BTC-USD`/CRYPTO.
+- [ ] Run `npm run test:stack` — existing contract checks stay green.
+- [ ] Commit note: `chore: verify crypto search through full compose stack`.
+
+### 20.7 — closeout
+
+- [ ] Update `docs/openst-coverage.md`: crypto **search** row (fmp-only, `/crypto/search/{query}`)
+  + note crypto search symbols normalize to yfinance pairs in instruments; keep date current.
+- [ ] Archive this section to `plan-archive.md` once all steps are `[x]`.
+
+**Open question (resolved pending user):** crypto search should surface **native pairs**
+— typing `BTC`/`ETH` suggests `BTC-USD`/`ETH-USD` flagged crypto, via a curated base→pair map
+in instruments (step 20.5). Not part of this section: research/profile *navigation* for the
+selected pair (fetchProfile/price-bars routing for `BTC-USD`) is inherited from D81; this
+section only makes the pair appear in search with the `CRYPTO` label.
