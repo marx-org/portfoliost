@@ -117,13 +117,13 @@ surface (cachest `config.yaml`). Bond math follows obligacjeskarbowe.pl
 
 ## Coverage verdict for the new families
 
-| Family | Installed OpenBB (4.7.2) | openst today | Verdict |
-| --- | --- | --- | --- |
-| TFI sub-funds (`NNEP25.TFI`, `GSEM25.TFI`…) | none — `equity.search is_fund`/`etf.search` cover US ETFs only | none | custom OpenBB provider `biznesradar` in openst (D77) |
-| GPW-listed FIZ (`Beta ETF * FIZ`) | yfinance WSE coverage | equity path alive | seed symbol map (`.WA`) + verify per fund (D77) |
-| Crypto | `openbb-crypto` not installed; providers fmp/tiingo/yfinance | none | install `openbb-crypto` + `/crypto/*` routes (D78) |
-| Retail savings bonds (ROD, EDO) | no market price, no provider data | none | on-the-fly valuation engine in instruments (D79) |
-| Catalyst bonds (BST, INS, KRI, ARH, VOX, NVA + `YMM`) | no PL fixed-income coverage | none | market price via biznesradar "obligacje" provider path (D80) |
+| Family | Price/OHLCV | Search | Profile | Verdict |
+| --- | --- | --- | --- | --- |
+| TFI sub-funds (`NNEP25.TFI`, `GSEM25.TFI`…) | `biznesradar` provider (D77) ✅ | `biznesradar` EquitySearch (D77) ✅ | `biznesradar` EquityProfile (D77) ✅ | done |
+| GPW-listed FIZ (`Beta ETF * FIZ`) | yfinance `.WA` (equity path) ✅ | `biznesradar` symbol probe ✅ | `biznesradar` EquityProfile ✅ | done |
+| Crypto | `openbb-crypto` extension (D78) | `openbb-crypto` `crypto.search` (D78) | via quote fields (D78) | D78 |
+| Retail savings bonds (ROD/EDO/OTS/ROR/DOR/TOS/COI/ROS) | `openbb_obligacje` pricing engine (D79) | `bond_series` catalogue in Postgres `openst` schema (D79) | `bond_series` from `obligacjeskarbowe.pl` (D79) | D79 |
+| Catalyst corp bonds (BST, INS, KRI, ARH, VOX, NVA + `YMM`) | `biznesradar` OHLCV (D77) ✅ | `biznesradar` EquitySearch ✅ | `obligacje.pl /pl/obligacja/{symbol}` (D80) | D80 |
 
 ### D77 — `biznesradar` as an OpenBB provider extension inside openst
 
@@ -150,80 +150,203 @@ surface (cachest `config.yaml`). Bond math follows obligacjeskarbowe.pl
 - openbb_client additions `get_crypto_ohlcv` / `get_crypto_quote` → new openst routes
   `/crypto/ohlcv/{pair}?start&end` and `/crypto/quote/{pair}` (same default-window and
   RangeIndex-date normalization as the equity routes).
-- cachest: `OPENST_CRYPTO_OHLCV` `/crypto/ohlcv/{pair}` (TTL 6h, mirroring
-  `OPENST_OHLCV`) + quote route. instruments adapter adds `fetchCryptoOhlcv`.
+- **Search + profile**: `openbb-crypto` exposes `obb.crypto.search` and quote fields
+  (`name`, `currency`) which serve as a minimal profile. `openst /crypto/search/{query}`
+  and `/crypto/profile/{pair}` routes added alongside OHLCV/quote (same pattern as
+  equity routes).
+- cachest: `OPENST_CRYPTO_OHLCV` `/crypto/ohlcv/{pair}` (TTL 6h) + `OPENST_CRYPTO_QUOTE`
+  (TTL 6h). instruments adapter adds `fetchCryptoOhlcv`; search falls back to
+  `ticker_reference` as for equities (crypto pairs seeded with `asset_type='crypto'`).
 
-### D79 — retail savings bonds: on-the-fly valuation engine in instruments
+### D79 — retail savings bonds: `openbb_obligacje` provider in openst
 
-Savings bonds (ROD, EDO) have **no market price** — value is a deterministic function
-of the issue parameters, elapsed periods and announced rates. openst has nothing useful:
-OpenBB `fixedincome` is US treasury-only. So the module computes prices itself.
+Retail savings bonds (ROD, EDO, OTS, ROR, DOR, TOS, COI, ROS) have **no market
+price** — their value is a deterministic function of issue parameters, elapsed periods,
+and announced rates.  The original plan placed the pricing engine in
+`portfoliost-instruments` (TypeScript).  **Revised**: the engine moves into openst as
+a custom OpenBB provider `openbb_obligacje`, following the same plugin pattern as
+`openbb_biznesradar`.  instruments calls it through cachest like every other provider;
+no bond math lives in instruments.
 
-- New reference: `bond_series` (series code, issue date, term, capitalization flag,
-  nominal 100 PLN, early-redemption fee `b`, rate-rule `fixed | nbp_ref+margin |
-  cpi_12m+margin`, margin) and `bond_rate_history` (per series/period: effective-from,
-  rate `r_k`). Floating-rate history is *derived*, not scraped: `nbp_reference_rate`
-  (per-period reference, WIRON-based on current listings) and `cpi_12m` (GUS) joined per
-  period set the rate for the whole period. Fixed series take `r` from the issue list.
-- `src/services/bondpricing.ts` — pure, unit-tested per obligacjeskarbowe.pl:
-  - maturity/capitalization value `W = N·∏(1+r_k)` (capitalized series);
-  - current redemption value `WP = N + O − b` with `O = N·r·(a/D)/F` (ACT/ACT accrual);
-  - **100 PLN floor** in the first period; `b ≤ O` cap for capitalized series so the
-    bond never prices below redemption;
-  - fees per series: OTS 0, ROR 0.50, DOR 0.70, TOS 1.00, COI 2.00, EDO/ROD 3.00.
-- Wired like a price bar: the valuation service produces the as-of series, stored into
-  `price_bars` with `source='bond'` — the caller (admin/scheduler) refreshes daily;
-  reads keep using the `price_bars_all` view unchanged. No cachest/openst call.
-- Input freshness is a data job (not a provider): import issue lists + monthly rate
-  table from obligacjeskarbowe.pl "Tabele odsetkowe", NBP reference rate, GUS CPI 12m;
-  acceptance test compares engine output against the official per-bond table for a
-  random series/date.
+#### Postgres schema `openst`
 
-### D80 — Catalyst bonds: market price via biznesradar, engine as fallback
+All persistent data for openst lives in a dedicated **`openst` schema** in the
+shared PGO Postgres cluster (same instance used by `instruments`, `wallets`, etc.).
+openst gains a `DATABASE_URL` env var (PGO least-privilege user, schema `openst`);
+the k8s CronJobs use the same connection string — no PVC, no SQLite, no concurrency
+concerns.
 
-Catalyst-listed corporate bonds (BST confirmed = BEST S.A.; INS/KRI/ARH/VOX/NVA + `YMM`
-maturity suffix) trade at a market price that diverges from calculated value. Same
-`biznesradar` provider gains an "obligacje" fetcher (bond section of biznesradar) served
-through the existing equity price path. Where no quote exists or quotes are stale,
-degrade to the D79 engine's calculated clean price via the series registry
-(`valuation: 'market' | 'calculated'`).
+Tables in schema `openst`:
+
+| Table | Contents |
+| --- | --- |
+| `cpi_12m` | `(date DATE PK, value NUMERIC)` — monthly CPI 12m from `obligacje.pl` |
+| `bond_series` | one row per savings-bond emission: symbol, name, issue_date, maturity_date, term_months, rate_rule, margin, fee_b, nominal |
+
+CPI is the **only rate required for D79** — savings bonds (ROD, EDO, COI, ROS) are
+CPI-linked or fixed; their rates are derived directly from issue parameters + CPI,
+no WIBOR/WIRON needed.  WIBOR 3M, WIBOR 6M, WIRON are deferred to D83 (separate
+extension for Catalyst bond coupon data).
+
+**Homelab wiring**: PGO `PostgresCluster` already manages user/schema creation per
+module via least-privilege users.  Add `openst` user + schema alongside existing
+module schemas; add `DATABASE_URL` to `openst-secrets` in the homelab repo.
+
+#### CPI import
+
+Source: `obligacje.pl/pl/narzedzia/inflacja,data_od-{from},data_do-{to}` —
+`Data | Wartość` HTML table, monthly rows, back to 2000.  Same scraper pattern as
+biznesradar (BeautifulSoup, `lxml`).
+
+- **Initial import**: one-shot k8s Job using the openst image, scrapes full `MAX`
+  history into `openst.cpi_12m`.
+- **Daily CronJob** (`concurrencyPolicy: Forbid`): fetches last 60 days, upserts
+  by date.  CPI is published monthly — most runs are no-ops.
+
+#### Savings-bond emissions catalogue
+
+`obligacjeskarbowe.pl` lists every emission per series (symbol `{TYPE}{MMYY}`, e.g.
+`EDO0936`, `ROD0938`).  Fields: series code, issue date, maturity date, term (months),
+nominal 100 PLN, rate rule (`fixed | cpi_12m+margin`), margin, early-redemption fee `b`.
+Savings bond profiles come from this site.
+
+- **Initial import**: one-shot k8s Job scrapes all offer pages
+  (`/oferta-obligacji/obligacje-{type}/`) into `openst.bond_series`.
+- **Daily CronJob**: checks current-offer page (~8 active series at any time);
+  inserts new emissions only.  Same job as the CPI importer (single script, two
+  targets).
+
+#### `openbb_obligacje` plugin
+
+New package `openst/plugins/openbb_obligacje/`, same scaffold as `openbb_biznesradar`.
+Reads from Postgres `openst` schema via `psycopg2` (already available in the openst
+image via the PGO stack) using `DATABASE_URL` from env.
+
+- **`FixedIncomeHistoricalFetcher`** — registered under OpenBB `FixedIncomeHistorical`
+  model (`obb.fixedincome.price.historical`).
+  - Reads `bond_series` + `cpi_12m` from Postgres.
+  - Pricing engine (pure Python, unit-tested per `obligacjeskarbowe.pl` worked examples):
+    - Capitalized series: `W = N·∏(1+r_k)` across elapsed periods.
+    - Redemption value: `WP = N + O − b` with `O = N·r·(a/D)/F` (ACT/ACT accrual).
+    - 100 PLN floor in first period; `b ≤ O` cap for capitalized series.
+    - Early-redemption fees per series: OTS 0, ROR 0.50, DOR 0.70, TOS 1.00, COI 2.00,
+      EDO/ROD/ROS 3.00 PLN.
+  - Produces a daily price series for the requested `[start_date, end_date]` range.
+  - Rate lookup: CPI from `openst.cpi_12m`; fixed series take `r` directly from
+    `bond_series.margin`.
+- **`FixedIncomeSearchFetcher`** — queries `bond_series` by symbol prefix or name
+  substring; returns `{symbol, name, series_type, maturity_date}`.
+- **`FixedIncomeProfileFetcher`** — returns static fields from `bond_series` for a
+  known symbol: name, series code, nominal, rate rule, margin, maturity, fee `b`,
+  `asset_type: "bond"`, `country: "PL"`, `currency: "PLN"`.
+  Profile source: `obligacjeskarbowe.pl` (data imported into `bond_series` — no
+  live scrape at request time).
+
+New openst routes (mirroring the crypto pattern):
+- `GET /fixedincome/ohlcv/{symbol}?start&end` → calls `FixedIncomeHistoricalFetcher`
+- `GET /fixedincome/search/{query}` → calls `FixedIncomeSearchFetcher`
+- `GET /fixedincome/profile/{symbol}` → calls `FixedIncomeProfileFetcher`
+
+cachest adds `OPENST_BOND_OHLCV` `/fixedincome/ohlcv/{symbol}` (TTL 6h), mirroring
+`OPENST_CRYPTO_OHLCV`.  Profile and search are also cacheable (TTL 24h — data changes
+only when a new emission is imported).
+
+`portfoliost-instruments`: D81 routing for `bond` asset class calls
+`/fixedincome/ohlcv/{symbol}` through cachest; search falls back to the `bond_series`
+catalogue (seeded into `ticker_reference` with `asset_type='bond'`).
+
+### D80 — Catalyst corporate bonds: profile metadata + catalogue
+
+Catalyst-listed corporate bonds (BST, INS, KRI, ARH, VOX, NVA + `YMM` maturity
+suffix) already have working OHLCV via `openbb_biznesradar` (D77) — `BST0327.WA`
+returns real market prices today.  D80 closes the remaining gap: **profile metadata**
+and **search catalogue**.  No coupon calculation engine is needed for corp bonds.
+
+#### Profile metadata source
+
+`obligacje.pl/pl/obligacja/{symbol}` provides full bond metadata scraped as profile:
+emitent name, ISIN, market (`GPW RR` / `ASO`), nominal (100 PLN), coupon type
+(`zmienne WIBOR 3M + {margin}%` or `stałe`), current coupon %, maturity date,
+`asset_type: "corp_bond"`, `country: "PL"`, `currency: "PLN"`.
+
+A new **`CorporateBondProfileFetcher`** is added to `openbb_biznesradar` (extending
+the existing plugin — same scraper infrastructure, new target site):
+- Registered under `EquityInfo` model (same as `EquityProfileFetcher`) but dispatches
+  on Catalyst bond symbol patterns (`BST*`, `INS*`, `KRI*`, `ARH*`, `VOX*`, `NVA*` +
+  any `{3-letters}{4-digits}` Catalyst shape) to scrape `obligacje.pl` instead of
+  biznesradar's `/notowania` page.
+- Falls back to the existing `EquityProfileFetcher` for non-bond symbols.
+
+#### Catalyst bond catalogue
+
+The `obligacje.pl` bond search page (`/pl/narzedzia/wyszukiwarka-obligacji-notowanych`)
+lists **936 bonds** with symbol, emitent, maturity, coupon type, margin, current
+coupon.  A one-shot k8s Job imports the full catalogue into `ticker_reference` in
+`portfoliost-instruments` with `asset_type='corp_bond'` (enabling search without an
+openst roundtrip).  The daily CronJob re-imports to pick up newly listed bonds.
 
 ### D81 — asset-class routing in price-bars
 
 - `ticker_reference.asset_type` widens beyond today's stock/etf: `fund`, `crypto`,
   `bond`, `corp_bond`. Routing in `fetchPriceBars` branches per class before touching
-  cachest or stooq: fund → `/ohlcv` (reused equity path); crypto → `/crypto/ohlcv`;
-  bond/corp_bond → D79 engine; equity keeps the existing stooq-overflow path.
+  cachest or stooq:
+  - `fund` → existing `/ohlcv` equity path (biznesradar or yfinance `.WA`)
+  - `crypto` → `/crypto/ohlcv/{pair}` (D78)
+  - `bond` → `/fixedincome/ohlcv/{symbol}` (D79 engine via cachest)
+  - `corp_bond` → `/ohlcv/{symbol}` equity path (biznesradar OHLCV, D77) — no engine fallback needed; biznesradar serves market prices reliably
+  - `equity` keeps the existing stooq-overflow path unchanged
   `providerSymbol()` is already a passthrough for any non-`.US` suffix, so `.TFI`,
-  `.FIZ`, `.WA`, `BTC-USD` pass through untouched; funds/crypto/bonds never enter stooq
-  (overflow-only) and skip `checkSplitBoundary`.
+  `.FIZ`, `.WA`, `BTC-USD`, `EDO0936` pass through untouched; bonds/crypto never
+  enter stooq (overflow-only) and skip `checkSplitBoundary`.
 
 ### D82 — contract & admin surface
 
 - Reused contract shapes: bar/quote series need no changes. `InstrumentType`/detail
   `type` gains `fund | bond | corp_bond | crypto` so the SPA can label and route rows —
   one `@marx2/contracts` patch bump (edit `openapi.yaml`, CI bump, reinstall, `gen:types`).
-- Admin: `bond_series` CRUD + rate-import endpoint in portfoliost-admin (module
-  `instruments` schema owns the tables).
+- Admin: bond catalogue and CPI import status visible in portfoliost-admin; `bond_series`
+  and `cpi_12m` live in `openst` Postgres schema, not in instruments.
+- Homelab: PGO least-privilege user `openst` + schema `openst` created alongside
+  existing module schemas; `DATABASE_URL` added to `openst-secrets`.
+
+### D83 — WIBOR/WIRON rate import (optional extension)
+
+Deferred from D79. Required if Catalyst bond coupon calculation is ever added.
+
+- Tables `openst.wibor_3m`, `openst.wibor_6m`, `openst.wiron_on` — same schema as
+  `cpi_12m`: `(date DATE PK, value NUMERIC)`.
+- Source: `obligacje.pl` `/pl/narzedzia/wibor-3m`, `/wibor-6m`, `/wiron` — same
+  `Data | Wartość` scraper. WIRON URL must be verified before implementing
+  (`wiron.pl` domain is for sale; fallback is `gpwbenchmark.pl/dane_historyczne` CSV).
+- Same CronJob pattern as CPI: one-shot historical import + daily append.
+- No openst routes exposed — rate tables are engine inputs only.
 
 ## Testing strategy (additions)
 
-- openst: plugin unit tests with captured biznesradar HTML fixtures; compose smoke
-  curls `/price/ohlcv/NNEP25.TFI` and `/crypto/ohlcv/BTC-USD`.
-- instruments: `bondpricing` tests against obligacjeskarbowe.pl worked examples (W,
-  WP, accrual, fees, floor); price-bars routing tests per asset class with mocked
-  cachest; adapter URL-mapping tests for the new crypto path.
-- stack (I9 pattern): fund symbol + bond series + crypto pair through
+- openst `openbb_obligacje`: unit tests with Postgres fixtures (in-memory PGlite or
+  test DB); engine tests against `obligacjeskarbowe.pl` worked examples (W, WP,
+  accrual, fees, floor) for at least one fixed and one CPI-linked series; compose
+  smoke curl `/fixedincome/ohlcv/EDO0936?start=2026-01-01&end=2026-06-30`.
+- openst `openbb_biznesradar`: new `CorporateBondProfileFetcher` unit tests with
+  captured `obligacje.pl` HTML fixture for `BST0327`; compose smoke curls
+  `/equity/profile/BST0327` and `/price/ohlcv/BST0327.WA` (regression check).
+- openst `openbb-crypto`: compose smoke curls `/crypto/ohlcv/BTC-USD` and
+  `/crypto/search/bitcoin`.
+- instruments: price-bars routing tests per asset class with mocked cachest; adapter
+  URL-mapping tests for crypto and fixedincome paths.
+- stack (I9 pattern): savings bond + Catalyst bond + crypto pair through
   instruments → cachest → openst in compose, contract-shape checks.
 
 ## Risks (additions)
 
-4. **Scraper fragility (biznesradar)** — no public API; parser pinned to captured
-   fixtures, isolated in one provider, cachest swallows volatility; revisit provider
-   if structure drifts.
-5. **Savings-bond inputs are a data job** — monthly import can drift from official
-   tables; acceptance test against official values per random series/date gates the job.
-6. **Series semantics (BST/INS/KRI/ARH/VOX/NVA)** — BST is definitively a Catalyst
-   corporate series; treating short codes as savings-bond series would misprice them.
-   D80 covers both by registration, but the registry must encode the correct
-   `valuation` per series before first use.
+4. **Scraper fragility (biznesradar / obligacje.pl / obligacjeskarbowe.pl)** — no
+   public APIs; parsers pinned to captured HTML fixtures; cachest swallows upstream
+   volatility. `obligacje.pl` is used for Catalyst bond profiles and (optionally D83)
+   rate data — single-site dependency worth monitoring.
+5. **CPI data freshness** — published monthly; daily CronJob is mostly a no-op but
+   if it fails across a month boundary the engine silently prices against stale CPI.
+   Add a staleness check: if the latest `cpi_12m` row is older than 40 days, the
+   fetcher returns an error rather than a silently wrong price.
+6. **openst Postgres dependency** — openst currently has no DB. Adding `DATABASE_URL`
+   is a new operational dependency. The engine gracefully returns 503 if the DB is
+   unreachable (savings bond pricing fails closed, not silently wrong).
