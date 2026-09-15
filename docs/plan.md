@@ -244,19 +244,30 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ### 18.7 — portfoliost compose stack smoke (full chain)
 
-- [ ] Rebuild openst + cachest images in portfoliost compose to pick up the new versions:
+- [x] Rebuild openst + cachest images in portfoliost compose to pick up the new versions:
   ```bash
   docker compose up -d --build redis openst cachest
   ```
-- [ ] Smoke-curl through cachest (**single requests**):
+- [x] Smoke-curl through cachest (**single requests**):
   ```bash
   curl "http://localhost:8090/crypto/ohlcv/BTC-USD?start=2026-01-01&end=2026-06-30"
   # X-Cache: MISS on first call; HIT on repeat
   curl "http://localhost:8090/crypto/quote/BTC-USD"
   # X-Cache: MISS on first call; HIT on repeat
   ```
-- [ ] Run `npm run test:stack` — existing contract checks must stay green (no regression).
-- [ ] Commit note: `chore: verify D78 smoke through full compose stack`.
+- [x] Run `npm run test:stack` — existing contract checks must stay green (no regression).
+- [x] Commit note: `chore: verify D78 smoke through full compose stack`.
+
+  **Result (2026-09-15):** rebuilt `portfoliost-openst` + `portfoliost-cachest` from the
+  local `../openst` / `../cachest` sources (config.yaml rides the existing volume mount).
+  Full-chain smoke through cachest on `:8090`:
+  - `GET /crypto/ohlcv/BTC-USD?start=2026-01-01&end=2026-06-30` → 200, **181 rows**
+    (last bar 2026-06-30 close 58558.8594); `X-Cache: MISS` then `X-Cache: HIT`,
+    bodies identical.
+  - `GET /crypto/quote/BTC-USD` → 200, latest close 76907.7266 (2026-09-15);
+    `X-Cache: MISS` then `X-Cache: HIT`, bodies identical.
+  - `npm run test:stack` → **32/32 checks passed** (no regression; instrument contract
+    checks hit the same live openst through cachest, upstream detected `real`).
 
 ---
 
