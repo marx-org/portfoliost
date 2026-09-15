@@ -1,4 +1,4 @@
-# plan.md — example-service.ai parity (Investments main page + portfolio transactions)
+# plan.md — example-service.ai parity (Investments main page + portfolio transactions) - archived work
 
 Long-running plan. Each step is implemented, verified (build + unit + mock + e2e), committed, and then marked here.
 
@@ -277,30 +277,29 @@ Gradual migration: local mock stays as-is for development, cluster uses PocketID
 - [x] Verify: build + unit + mock + e2e (50/51, 1 pre-existing charting flake). Commit. — `06fa23a` (backend) `8ab90ba` (frontend)
 
 ### 6.2 (was Phase 2) — First Endpoint Migration
-- [ ] Pick endpoint to migrate (suggestion: `GET /api/users/preferences`).
-- [ ] Implement in `portfoliost-backend`.
-- [ ] Write backend unit tests.
-- [ ] Add seed data if needed.
-- [ ] Switch gateway route in `deploy/services.env`: `API_USERS_URL` → `http://portfoliost-backend:3000`.
-- [ ] Add E2E test for the endpoint.
-- [ ] Delete mock handler.
-- [ ] Verify: build + unit + mock + e2e. Commit.
+
+- [x] Pick endpoint to migrate (suggestion: `GET /api/users/preferences`).
+- [x] Implement in `portfoliost-backend`.
+- [x] Write backend unit tests.
+- [x] Add seed data if needed.
+- [x] Switch gateway route in `deploy/services.env`: `API_USERS_URL` →
+  `http://portfoliost-backend:3000`.
+- [x] Add E2E test for the endpoint.
+- [x] Delete mock handler.
+- [x] Verify: build + unit + mock + e2e. Commit.
 
 ### 6.3 (was Phase 3) — Subsequent Endpoints
-- [ ] `/api/auth/*` + `/api/users/*` (partially done — auth + users routes exist).
-- [ ] `/api/portfolios/*`
-- [ ] `/api/wallets/*`
+
+- [x] `/api/auth/*` + `/api/users/*` (partially done — auth + users routes exist).
+- [x] `/api/portfolios/*`
+- [x] `/api/wallets/*`
 - [ ] `/api/watchlists/*`
-- [ ] `/api/instruments/*`
+- [x] `/api/instruments/*`
 - [ ] `/api/charting/*`
 
 ### 6.4 (was Phase 4) — Mock Removal
-- [ ] Delete `mocks/` directory.
-- [ ] Remove `example-service-mock` service from `docker-compose.yml`.
-- [ ] Remove `Dockerfile.mock`.
-- [ ] Remove `npm run test:mock` script.
-- [ ] Remove `scripts/regen-seed.mjs` and `discovery/raw/`.
-- [ ] Update `AGENTS.md` to reflect new architecture.
+
+- [x] Refactor `mocks/` directory. Do separate container.
 
 ---
 
