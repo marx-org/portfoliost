@@ -40,10 +40,10 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ### 19.2 — openst: Postgres connection + schema migrationss
 
-- [ ] Add `psycopg2-binary` (or `psycopg[binary]`) to `openst/requirements.txt`.
-- [ ] Create `openst/src/db.py`: thin module that reads `DATABASE_URL` from env and
+- [x] Add `psycopg2-binary` (or `psycopg[binary]`) to `openst/requirements.txt`.
+- [x] Create `openst/src/db.py`: thin module that reads `DATABASE_URL` from env and
   exposes a `get_conn()` helper (plain psycopg2 connection, no ORM needed).
-- [ ] Create `openst/migrations/001_openst_schema.sql`:
+- [x] Create `openst/migrations/001_openst_schema.sql`:
   ```sql
   CREATE SCHEMA IF NOT EXISTS openst;
 
@@ -65,11 +65,11 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
       nominal         NUMERIC(8,2) NOT NULL DEFAULT 100.00
   );
   ```
-- [ ] Migration runs at openst startup (add to `src/main.py` lifespan, guarded by
+- [x] Migration runs at openst startup (add to `src/main.py` lifespan, guarded by
   `DATABASE_URL` presence — openst still starts without DB for non-bond routes).
-- [ ] Unit test: migration is idempotent (run twice, no error).
-- [ ] Run full openst test suite (docker compose — must stay green).
-- [ ] Commit.
+- [x] Unit test: migration is idempotent (run twice, no error).
+- [x] Run full openst test suite (docker compose — must stay green).
+- [x] Commit.
 
 ---
 
