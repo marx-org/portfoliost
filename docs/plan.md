@@ -24,13 +24,13 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ### 19.1 — homelab: Postgres `openst` schema + secret
 
-- [ ] In the homelab repo, add PGO least-privilege user `openst` and schema `openst`
+- [x] In the homelab repo, add PGO least-privilege user `openst` and schema `openst`
   alongside existing module schemas (follow the pattern from `portfoliost-instruments`
   or `portfoliost-wallets`).
-- [ ] Add `DATABASE_URL` to `openst-secrets` (k8s Secret in `pfire` namespace).
-- [ ] Add `DATABASE_URL` env var to the openst HelmRelease
+- [x] Add `DATABASE_URL` to `openst-secrets` (k8s Secret in `pfire` namespace).
+- [x] Add `DATABASE_URL` env var to the openst HelmRelease
   (`cluster/apps/pfire/openst/app/helmrelease.yaml`) referencing the secret.
-- [ ] Commit homelab. Verify secret is present in cluster:
+- [x] Commit homelab. Verify secret is present in cluster:
   ```bash
   export KUBECONFIG=$HOME/.kube/homylab
   kubectl get secret openst-secrets -n pfire -o jsonpath='{.data.DATABASE_URL}' | base64 -d
