@@ -55,9 +55,9 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ### 18.2 — add `openbb-crypto` to openst requirements + Dockerfile
 
-- [ ] Add `openbb-crypto==<pinned>` to `openst/requirements.txt` after the existing
+- [x] Add `openbb-crypto==<pinned>` to `openst/requirements.txt` after the existing
   `openbb==4.7.2` line.
-- [ ] Rebuild the openst Docker image locally:
+- [x] Rebuild the openst Docker image locally:
   ```bash
   docker compose --profile test build
   ```
@@ -65,11 +65,16 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
   ```bash
   docker compose run --rm test python -c "from openbb import obb; print(obb.crypto)"
   ```
-- [ ] Run existing openst test suite (must stay green):
+- [x] Run existing openst test suite (must stay green):
   ```bash
   docker compose --profile test run --rm test
   ```
-- [ ] Commit `openst/requirements.txt` change.
+- [x] Commit `openst/requirements.txt` change.
+
+  **Result (2026-09-15):** `openbb-crypto==1.6.2` added after `openbb==4.7.2`.  Build
+  succeeded; `obb.crypto` imports in the `test` container with `crypto@1.6.2`
+  (`/crypto/price/historical` + `/crypto/search` routers present).  Full suite:
+  143 passed, 5 deselected.
 
 ---
 
