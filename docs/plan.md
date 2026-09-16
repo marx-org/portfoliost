@@ -201,7 +201,7 @@ under the `EquityHistorical`, `EquitySearch` and `EquityInfo` model keys**, maki
 as `obb.equity.price.historical(..., provider="obligacje")`, `obb.equity.search(..., provider="obligacje")`,
 `obb.equity.profile(..., provider="obligacje")`.
 
-- [ ] Re-point the 19.5 stubs at the equity standard models (and change the model keys in
+- [x] Re-point the 19.5 stubs at the equity standard models (and change the model keys in
   `openbb_obligacje/__init__.py` from `FixedIncomeHistorical/Search/Profile` to
   `EquityHistorical/EquitySearch/EquityInfo`):
   - `fixedincome_historical.py` — subclass `EquityHistoricalQueryParams`/`EquityHistoricalData`
@@ -210,22 +210,22 @@ as `obb.equity.price.historical(..., provider="obligacje")`, `obb.equity.search(
     (`{symbol, name, maturity_date}` mapped onto the optional fields).
   - `fixedincome_profile.py` — subclass `EquityInfoQueryParams`/`EquityInfoData`
     (only `symbol` required; carry `name` and the emission fields where the schema allows).
-- [ ] `fixedincome_historical.py` — `FixedIncomeHistoricalFetcher`:
+- [x] `fixedincome_historical.py` — `FixedIncomeHistoricalFetcher`:
   - Reached via `obb.equity.price.historical(symbol, start_date, end_date, provider="obligacje")`.
   - Reads `bond_series` + `cpi_12m` from Postgres via `db.get_conn()`.
   - Calls `engine.price_series(...)` and returns results as an `EquityHistoricalData` list.
   - Returns empty list (not error) if symbol not found in `bond_series`.
   - Raises informative error if `cpi_12m` is stale (latest row older than 40 days).
-- [ ] `fixedincome_search.py` — queries `bond_series` by symbol prefix or name
+- [x] `fixedincome_search.py` — queries `bond_series` by symbol prefix or name
   substring; returns `{symbol, name, maturity_date}`.
-- [ ] `fixedincome_profile.py` — returns static fields from `bond_series` for a
+- [x] `fixedincome_profile.py` — returns static fields from `bond_series` for a
   known symbol; 404-equivalent (empty list) if symbol unknown.
-- [ ] Unit tests for all three fetchers (mock DB connection).
-- [ ] `pytest openst/plugins/openbb_obligacje/tests/` — all pass.
-- [ ] Wire-check in the test image that `provider="obligacje"` now appears in the
+- [x] Unit tests for all three fetchers (mock DB connection).
+- [x] `pytest openst/plugins/openbb_obligacje/tests/` — all pass.
+- [x] Wire-check in the test image that `provider="obligacje"` now appears in the
   `obb.equity.price.historical` / `obb.equity.search` / `obb.equity.profile` provider Literals.
-- [ ] Run full openst test suite (docker compose — all pass).
-- [ ] Commit.
+- [x] Run full openst test suite (docker compose — all pass).
+- [x] Commit.
 
 ---
 
