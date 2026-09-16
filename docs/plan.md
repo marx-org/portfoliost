@@ -118,15 +118,22 @@ portfoliost-instruments).
 
 ### 21.5 — instruments: venue-suffix normalization in the bond search leg
 
-- [ ] `portfoliost-instruments/src/routes/instruments.ts` `bondSearchLeg(q)`: strip a trailing
+- [x] `portfoliost-instruments/src/routes/instruments.ts` `bondSearchLeg(q)`: strip a trailing
       venue suffix (`.WA`, `.US`, … — reuse/extend the existing `providerSymbol`-style logic)
       from `q` before calling `fetchBondSearch`, so `ROD1033.WA` resolves the same row as
       `ROD1033`. Do **not** strip elsewhere in the bond chain.
-- [ ] Tests (`portfoliost-instruments/src/routes/instruments.test.ts`): `q=rod1033.wa` →
+- [x] Tests (`portfoliost-instruments/src/routes/instruments.test.ts`): `q=rod1033.wa` →
       `fetchBondSearch` called with `rod1033`; `q=rod1033` unchanged; existing bond/equity search
       tests still green.
-- [ ] Tests: `npm run build` + `npm run test` in portfoliost-instruments.
-- [ ] Commit: `feat(search): normalize venue suffix in bond search leg (ROD1033.WA)`.
+- [x] Tests: `npm run build` + `npm run test` in portfoliost-instruments.
+- [x] Commit: `feat(search): normalize venue suffix in bond search leg (ROD1033.WA)`.
+
+  **Result (2026-09-16):** added `venueFreeSymbol()` to `src/adapters/symbol.ts` (cuts any trailing
+  `.suffix`; mirrored after crypto.ts's existing `venueFree` concept, unlike `providerSymbol` it
+  drops every venue) and applied it in `bondSearchLeg` only — the rest of the bond chain is
+  untouched. Route tests assert `q=rod1033.wa` → `fetchBondSearch("rod1033")` + row surfaces and
+  `q=rod1033` passed through unchanged; helper tests cover `.WA`/`.US`/bare/name queries. Commit
+  `d7fec26`, build clean, suite 217 passed / 16 files.
 
 ### 21.6 — full compose stack smoke
 
