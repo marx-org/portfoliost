@@ -75,18 +75,18 @@ portfoliost-instruments).
 
 ### 21.3 — openst: DB-first `search_bonds` + `get_bond_profile`
 
-- [ ] `openbb_client.py`: when `db.database_url()` is set (guard; openst runs DB-less fine),
+- [x] `openbb_client.py`: when `db.database_url()` is set (guard; openst runs DB-less fine),
       query `openst.bond_series` first —
       `search_bonds(query)`: symbol-prefix OR name ILIKE `%{query}%` (query is already
       lowercased by the route), return `[{symbol, name, maturity_date}]` to match the OpenBB
       search rows; `get_bond_profile(symbol)`: exact symbol (upper-cased) → the 10-column row as
       a dict matching the OpenBB profile shape. Fall back to the existing OpenBB call when the
       DB yields nothing (import not yet run / DB-less).
-- [ ] Tests (`openst/tests/test_openbb_client.py`): when the DB returns rows, OpenBB is **not**
+- [x] Tests (`openst/tests/test_openbb_client.py`): when the DB returns rows, OpenBB is **not**
       called; DB empty → OpenBB fallback called; `search_bonds` maps columns to the search shape;
       no-DB env (monkeypatch `database_url` → `None`) → pure OpenBB path unchanged.
-- [ ] Tests: full openst suite via compose.
-- [ ] Commit: `feat(openbb_client): DB-first bond search + profile with OpenBB fallback`.
+- [x] Tests: full openst suite via compose.
+- [x] Commit: `feat(openbb_client): DB-first bond search + profile with OpenBB fallback`.
 
 ### 21.4 — openst standalone smoke (backfill + DB-first live)
 
