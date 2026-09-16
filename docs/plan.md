@@ -150,7 +150,7 @@ scrape:
 
 ### 19.5 — pricing engine (`openbb_obligacje` plugin scaffold + engine)
 
-- [ ] Create `openst/plugins/openbb_obligacje/` with the same scaffold as
+- [x] Create `openst/plugins/openbb_obligacje/` with the same scaffold as
   `openbb_biznesradar`:
   ```
   openst/plugins/openbb_obligacje/
@@ -170,18 +170,18 @@ scrape:
       ├── test_fixedincome_search.py
       └── test_fixedincome_profile.py
   ```
-- [ ] Add `-e ./plugins/openbb_obligacje` to `openst/requirements.txt`.
-- [ ] Update `openst/Dockerfile` to `COPY plugins/ ./plugins/` (already done for
+- [x] Add `-e ./plugins/openbb_obligacje` to `openst/requirements.txt`.
+- [x] Update `openst/Dockerfile` to `COPY plugins/ ./plugins/` (already done for
   biznesradar — verify it covers the new plugin).
-- [ ] `engine.py` — pure functions, no DB access, fully unit-tested:
+- [x] `engine.py` — pure functions, no DB access, fully unit-tested:
   - `price_series(bond: BondSeries, cpi_rows: list[CpiRow], start: date, end: date) -> list[dict]`
   - Capitalized series: `W = N·∏(1+r_k)` across elapsed periods.
   - Redemption value: `WP = N + O − b` with `O = N·r·(a/D)/F` (ACT/ACT accrual).
   - 100 PLN floor in first period; `b ≤ O` cap for capitalized series.
   - Fees per series: OTS 0, ROR 0.50, DOR 0.70, TOS 1.00, COI 2.00, EDO/ROD/ROS 3.00 PLN.
-- [ ] `test_engine.py` — tests against `obligacjeskarbowe.pl` published worked examples
+- [x] `test_engine.py` — tests against `obligacjeskarbowe.pl` published worked examples
   for at least: one fixed series (OTS), one CPI-linked series (EDO or COI).
-- [ ] Commit scaffold + engine (fetcher stubs may skip/fail — engine tests must pass).
+- [x] Commit scaffold + engine (fetcher stubs may skip/fail — engine tests must pass).
 
 ---
 
