@@ -252,14 +252,14 @@ as `obb.equity.price.historical(..., provider="obligacje")`, `obb.equity.search(
 
 ### 19.8 — openst standalone compose smoke (local, real DB)
 
-- [ ] Start openst standalone compose with DB populated:
+- [x] Start openst standalone compose with DB populated:
   ```bash
   # Run importers locally against a test DB first
   docker compose up -d redis app
   docker compose run --rm app python -m src.importers.cpi --mode full
   docker compose run --rm app python -m src.importers.bond_series --mode full
   ```
-- [ ] Smoke-curl — **one request per endpoint**:
+- [x] Smoke-curl — **one request per endpoint**:
   ```bash
   curl "http://localhost:8080/fixedincome/ohlcv/EDO0936?start=2026-01-01&end=2026-06-30"
   # expect: JSON array with daily {date, open, high, low, close, volume} rows
@@ -268,9 +268,22 @@ as `obb.equity.price.historical(..., provider="obligacje")`, `obb.equity.search(
   curl "http://localhost:8080/fixedincome/search/EDO"
   # expect: JSON array of matching emissions
   ```
-- [ ] Second OHLCV call: confirm Redis cache HIT.
-- [ ] `docker compose down`.
-- [ ] Commit note (observations only).
+- [x] Second OHLCV call: confirm Redis cache HIT.
+- [x] `docker compose down`.
+- [x] Commit note (observations only).
+
+**Smoke observations (2026-09-16):** to run, `DATABASE_URL` must be added to
+`openst/.env` (gitignored — the compose `app` service has no DB wiring otherwise);
+point it at the compose postgres (`postgresql://openst:openst@postgres:5432/openst`,
+same as the `test` profile). Importers: CPI 320 rows / 317 inserted, bond_series 8
+emissions (`OTS1226 ROR0927 DOR0928 TOS0929 COI0930 ROS0932 EDO0936 ROD0938`).
+`/fixedincome/profile/EDO0936` and `/fixedincome/search/EDO` return 200 with issue
+params / match arrays. The plan's documented OHLCV window (`2026-01-01..2026-06-30`)
+returns **404** because the currently-active `EDO0936` only issues **2026-09-01** —
+the window predates issuance, so the engine prices zero rows. With a window
+overlapping issuance (`2026-09-01..2026-09-30`) the endpoint returns the expected
+daily `{date, open, high, low, close, volume}` rows (100.00 floor). Second call:
+identical 2910-byte payload + `fixedincome_ohlcv:*` key with ~24h TTL → cache HIT.
 
 ---
 
