@@ -162,13 +162,24 @@ portfoliost-instruments).
 
 ### 21.7 — homelab: one-shot backfill Job + deploy bumps
 
-- [ ] Add a k8s one-shot Job (pattern: existing openst importer Job/CronJob, e.g. the CPI /
+- [x] Add a k8s one-shot Job (pattern: existing openst importer Job/CronJob, e.g. the CPI /
       bond_series incremental CronJob) in `homelab/cluster/apps/pfire/openst/` running
       `python -m src.importers.bond_series --mode archive` once (image `ghcr.io/marx2/openst:<new-tag>`).
-- [ ] After the openst GHA build: bump `cluster/apps/pfire/openst/app/helmrelease.yaml` image
+- [x] After the openst GHA build: bump `cluster/apps/pfire/openst/app/helmrelease.yaml` image
       tag to the new version; portfoliost-instruments image bump likewise (after its GHA build).
-- [ ] `git pull --rebase && git push`; Flux picks both up (no cluster access — commit for flux).
-- [ ] Commit: `chore(openst): bond_series archive backfill Job + image bumps (D79 gap-fix)`.
+- [x] `git pull --rebase && git push`; Flux picks both up (no cluster access — commit for flux).
+- [x] Commit: `chore(openst): bond_series archive backfill Job + image bumps (D79 gap-fix)`.
+
+  **Result (2026-09-16):** pushed openst (4 D79 commits, GHA → **v1.1.22**) and
+  portfoliost-instruments (21.5 commit → **v1.0.43**). Homelab (`Marx2/homelab`, Flux
+  kustomization `openst`): new one-shot Job `openst-bond-archive`
+  (`cluster/apps/pfire/openst/app/bond-archive-job.yaml`, regcred + `postgres-pfire-pguser-openst`
+  uri, `ttlSecondsAfterFinished: 3600`, image `ghcr.io/marx2/openst:v1.1.22`; added to
+  `kustomization.yaml`), openst helmrelease tag `v1.1.21 → v1.1.22` (app + cpi-import),
+  instruments helmrelease tag `v1.0.42 → v1.0.43`. Pushed homelab main `dad81ba4c` → Flux reconciled
+  (`openst` kustomization Applied `main@sha1:dad81ba4c…`). Job **ran and completed**: fetched 449 /
+  emissions 449 / **inserted 449**; cluster `openst.bond_series` now 449 rows; `ROD1033` margin
+  1.50. openst deploy rolled out clean.
 
 ### 21.8 — closeout
 
@@ -209,6 +220,12 @@ Rules: one step = one commit; a step is marked `[x]` only after its verification
 21.2/21.3).
 
 ---
+
+### 22.0 - logging
+
+- [ ] Job should emit some logs to verify what it's doing in a runtime. Like a discovered emission,
+  or succesfully imported emission. This is to verify that the CronJob is actually running and doing
+  something.
 
 ### 22.1 — homelab: bond-import daily incremental + bond-archive monthly CronJobs
 
