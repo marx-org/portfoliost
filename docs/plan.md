@@ -231,7 +231,7 @@ as `obb.equity.price.historical(..., provider="obligacje")`, `obb.equity.search(
 
 ### 19.7 — wire into `openbb_client.py` + new openst routes
 
-- [ ] In `openst/src/openbb_client.py` add:
+- [x] In `openst/src/openbb_client.py` add:
   - `get_bond_ohlcv(symbol: str, start_date: str, end_date: str) -> list[dict] | None`
     — calls `obb.equity.price.historical(symbol, start_date=start_date, end_date=end_date,
     provider="obligacje")`; returns `None` if empty or DB unavailable.
@@ -239,13 +239,13 @@ as `obb.equity.price.historical(..., provider="obligacje")`, `obb.equity.search(
     — calls `obb.equity.profile(symbol, provider="obligacje")`.
   - `search_bonds(query: str) -> list[dict]`
     — calls `obb.equity.search(query, provider="obligacje")`.
-- [ ] In `openst/src/main.py` add routes:
+- [x] In `openst/src/main.py` add routes:
   - `GET /fixedincome/ohlcv/{symbol}?start&end` → `get_bond_ohlcv`; 404 on None.
   - `GET /fixedincome/profile/{symbol}` → `get_bond_profile`; 404 on None.
   - `GET /fixedincome/search/{query}` → `search_bonds`; empty array on no results.
-- [ ] Route-level tests (mock client functions): 200/404 for ohlcv and profile;
+- [x] Route-level tests (mock client functions): 200/404 for ohlcv and profile;
   200 with array for search.
-- [ ] Run full openst test suite (docker compose — all pass).
+- [x] Run full openst test suite (docker compose — all pass).
 - [ ] Commit. Push openst to `main`. Wait for GHA image build.
 
 ---
