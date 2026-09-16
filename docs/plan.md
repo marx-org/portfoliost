@@ -289,7 +289,7 @@ identical 2910-byte payload + `fixedincome_ohlcv:*` key with ~24h TTL → cache 
 
 ### 19.9 — cachest: `OPENST_BOND_OHLCV` + `OPENST_BOND_PROFILE` routes
 
-- [ ] In `cachest/config.yaml`, add after `OPENST_CRYPTO_QUOTE`:
+- [x] In `cachest/config.yaml`, add after `OPENST_CRYPTO_QUOTE`:
   ```yaml
   - name: OPENST_BOND_OHLCV
     path: /fixedincome/ohlcv/{symbol}
@@ -308,10 +308,18 @@ identical 2910-byte payload + `fixedincome_ohlcv:*` key with ~24h TTL → cache 
     fetch_interval: 60
     fetch_max_wait: 4
   ```
-- [ ] Add `test_real_config_has_bond_ohlcv_route` and
+- [x] Add `test_real_config_has_bond_ohlcv_route` and
   `test_real_config_has_bond_profile_route` to `cachest/tests/test_config.py`.
-- [ ] Run cachest test suite (all pass).
-- [ ] Commit. Push cachest to `main`. Wait for GHA image build.
+- [x] Run cachest test suite (all pass).
+- [x] Commit. Push cachest to `main`. Wait for GHA image build.
+
+**Deploy (homelab) — done 2026-09-16:** added both routes to the cluster ConfigMap
+`cluster/apps/pfire/cachest/app/config/config.yaml` (k8s URLs
+`http://openst.pfire.svc.cluster.local:8080/fixedincome/...`); no nginx ingress
+route change was needed — the cachest `path: /` ingress (and openst's) already
+route `/fixedincome/*`. Bumped images: openst `v1.1.21` (19.7 build — both `app`
+and `cpi-import` refs) and cachest `v1.0.32`. ConfigMap reloader restarts cachest
+on config change; Flux synced both commits.
 
 ---
 
