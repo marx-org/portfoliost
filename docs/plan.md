@@ -105,21 +105,46 @@ the openst image (`ghcr.io/marx2/openst:<tag>`) with a command override —
 
 ### 19.4 — bond_series importer script + one-shot k8s Job
 
-- [ ] Create `openst/src/importers/bond_series.py`:
-  - Scrapes each series offer page on `obligacjeskarbowe.pl`:
-    `/oferta-obligacji/obligacje-{type}/` (one page per series type: ots, ror, dor,
-    tos, coi, edo, ros, rod).
-  - Extracts per-emission fields: symbol (`{TYPE}{MMYY}`), name, issue_date,
-    maturity_date, term_months, rate_rule, margin, fee_b.
+Requirement vs reality: the live `obligacjeskarbowe.pl` offer pages carry **no HTML
+`Data | Wartość`-style table** — each emission's parameters are a
+`<ul class="product-details__list">` of `label`/`value` rows, and the redemption
+fee is prose in the "Opłaty dodatkowe" section. Two further realities reshape the
+scrape:
+1. **The site always renders the *currently-active* emission per series** (the
+   per-emission detail URL `…/obligacje-{slug}/{symbol}/` is cosmetic — it serves
+   the same live parameters). Per-emission scraping therefore accumulates the
+   catalog over time (each monthly emission is captured once, then its row is
+   immutable via `ON CONFLICT DO NOTHING`); it does **not** recover historical
+   parameters (those live in the official `listy-emisyjne` PDFs, out of scope).
+2. **Three rate rules, not two**: `fixed` (OTS, TOS), `cpi_12m+margin` (COI, ROS,
+   EDO, ROD) and `nbp_ref+margin` (ROR, DOR — indexed to the NBP reference rate +
+   margin, not CPI). `rate_rule` is a free `TEXT` column, so the third value is
+   valid; D79's pricing engine (19.5) prices `fixed` + `cpi_12m+margin`, and
+   `nbp_ref+margin` series are priced once D83 lands NBP reference rates.
+
+- [x] Create `openst/src/importers/bond_series.py`:
+  - `--mode full` fetches the eight per-series offer pages
+    (`/oferta-obligacji/obligacje-{slug}/`; the slug carries the term, e.g.
+    `obligacje-10-letnie-edo`) and parses the active emission from each.
+  - `--mode incremental` fetches the current-offer page (`/oferta-obligacji/`),
+    follows its per-emission detail links and parses each (~8 active emissions).
+  - Parses the `product-details__list` rows (Seria → symbol `{TYPE}{MMYY}`,
+    Sprzedaż → issue_date, Oprocentowanie → rate_rule + margin) and the
+    "Opłata wynosi X,XX zł" prose (last occurrence) → fee_b; `term_months` from a
+    per-series map; `maturity_date` = issue_date + term_months (day-clamped).
   - Upserts into `openst.bond_series` (INSERT … ON CONFLICT DO NOTHING — emissions
     are immutable once published).
-  - `--mode full` scrapes all series (initial import).
-  - `--mode incremental` scrapes current-offer page only (~8 active emissions).
-- [ ] Capture HTML fixtures for at least two series types (one fixed, one CPI-linked):
-  `openst/tests/fixtures/obligacjeskarbowe/edo.html`, `ots.html`.
-- [ ] Unit tests with fixtures: correct field extraction for both rate rules.
-- [ ] Run full openst test suite (docker compose — must stay green).
-- [ ] Commit.
+- [x] Capture HTML fixtures for all eight series types plus the current-offer page:
+  `openst/tests/fixtures/obligacjeskarbowe/{ots,ror,dor,tos,coi,ros,edo,rod,oferta}.html`
+  (one fetch each — covers all three rate rules and both modes).
+- [x] Unit tests (`openst/tests/test_bond_series_importer.py`) with fixtures:
+  - Field extraction (symbol, issue/maturity dates, term, rate_rule, margin, fee_b,
+    nominal) for all eight series / all three rate rules.
+  - `add_months` day-clamping; margin/fee extraction; fee last-occurrence +
+    per-series default fallback; offer-page link parsing; `run` mode plumbing;
+    upsert idempotency (duplicate symbols ignored).
+- [x] Run full openst test suite (docker compose — must stay green): 212 passed.
+- [x] Commit.
 
 ---
 
