@@ -137,14 +137,28 @@ portfoliost-instruments).
 
 ### 21.6 — full compose stack smoke
 
-- [ ] In portfoliost compose: rebuild + run `redis openst cachest instruments`; re-run the
+- [x] In portfoliost compose: rebuild + run `redis openst cachest instruments`; re-run the
       `archive` backfill inside the compose DB (openst shares the portfoliost Postgres).
-- [ ] Through cachest: `curl "http://localhost:8090/fixedincome/search/rod1033"` MISS→HIT.
-- [ ] Through the gateway: `/api/instruments/search?q=rod1033` → 200 with a `BOND`/`OBLIGACJE`
+- [x] Through cachest: `curl "http://localhost:8090/fixedincome/search/rod1033"` MISS→HIT.
+- [x] Through the gateway: `/api/instruments/search?q=rod1033` → 200 with a `BOND`/`OBLIGACJE`
       result (`ROD1033`); `/api/instruments/search?q=rod1033.wa` → same row; `/api/instruments/ROD1033`
       → 200. Record payloads in the step result.
-- [ ] Run `npm run test:stack` (instruments-stack-test.mjs) — 32/32 stays green.
-- [ ] Commit note: `chore: verify bond history search through full compose stack`.
+- [x] Run `npm run test:stack` (instruments-stack-test.mjs) — 32/32 stays green.
+- [x] Commit note: `chore: verify bond history search through full compose stack`.
+
+  **Result (2026-09-16):** rebuilt `openst` + `instruments` in the compose stack (cachest image
+  unchanged — D79 passthrough already present), then `docker compose exec openst python -m
+  src.importers.bond_series --mode archive` against the shared Postgres: fetched 449 / parsed 449 /
+  inserted 441 → **449 rows**. cachest `http://localhost:8090/fixedincome/search/rod1033` →
+  `200 x-cache: MISS` then `200 x-cache: HIT`, payload
+  `[{"symbol":"ROD1033","name":"Obligacje 12-letnie ROD","maturity_date":"2033-10-01"}]`. Gateway
+  `http://localhost:8080/api/instruments/search?q=rod1033` (X-User-Id/Email headers required) →
+  `{count:1, results:[{symbol:"ROD1033",name:"Obligacje 12-letnie ROD",type:"BOND",exchange:"PL",
+  countryCode:"PL",source:"OBLIGACJE"}]}` — **identical** for `q=rod1033.wa` (21.5 normalization
+  live); `/api/instruments/ROD1033` → `{id, symbol:"ROD1033", type:"BOND", exchange:"PL",
+  currency:"PLN"}`. `npm run test:stack` 32/32. Note: compose builds of consumers need
+  `NODE_AUTH_TOKEN` from `../portfoliost/.env`/shell (npm ci against @marx2 registry) — absent it
+  failed "instruments target ... npm ci ... exit code 1".
 
 ### 21.7 — homelab: one-shot backfill Job + deploy bumps
 
