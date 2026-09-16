@@ -187,20 +187,43 @@ scrape:
 
 ### 19.6 — fetchers: `FixedIncomeHistoricalFetcher`, `SearchFetcher`, `ProfileFetcher`
 
+**Verified wiring (openbb 4.7.2 / openbb-fixedincome 1.6.2 / openbb-core 1.6.13):** there is
+**no** `FixedIncomeHistorical` standard model and **no** `fixedincome.price` router. The
+fixed-income suite only exposes `rate`, `spreads`, `government` (yield_curve, treasury_rates,
+treasury_auctions, treasury_prices, tips_yields) and `corporate` (bond_prices, spot_rates, …).
+Neither fits the redemption OHLCV series: `TreasuryPrices` is a date-only snapshot with no symbol
+selector (single `date` param, bid/offer/eod_price), `BondPrices` is a screener (no history).
+A provider registered under `FixedIncomeHistorical` is **not callable through any `obb.*` command**
+— verified live: `obb.fixedincome.government.treasury_prices(provider="obligacje")` fails
+validation (`Input should be 'government_us' or 'tmx'`). Follow the repo precedent — the biznesradar
+plugin already overloads the equity models for Catalyst bonds. **Register the obligacje fetchers
+under the `EquityHistorical`, `EquitySearch` and `EquityInfo` model keys**, making them reachable
+as `obb.equity.price.historical(..., provider="obligacje")`, `obb.equity.search(..., provider="obligacje")`,
+`obb.equity.profile(..., provider="obligacje")`.
+
+- [ ] Re-point the 19.5 stubs at the equity standard models (and change the model keys in
+  `openbb_obligacje/__init__.py` from `FixedIncomeHistorical/Search/Profile` to
+  `EquityHistorical/EquitySearch/EquityInfo`):
+  - `fixedincome_historical.py` — subclass `EquityHistoricalQueryParams`/`EquityHistoricalData`
+    (date/open/high/low/close/volume — exact fit for `engine.price_series` rows).
+  - `fixedincome_search.py` — subclass `EquitySearchQueryParams`/`EquitySearchData`
+    (`{symbol, name, maturity_date}` mapped onto the optional fields).
+  - `fixedincome_profile.py` — subclass `EquityInfoQueryParams`/`EquityInfoData`
+    (only `symbol` required; carry `name` and the emission fields where the schema allows).
 - [ ] `fixedincome_historical.py` — `FixedIncomeHistoricalFetcher`:
-  - Registered under OpenBB `FixedIncomeHistorical` model
-    (`obb.fixedincome.price.historical`).
+  - Reached via `obb.equity.price.historical(symbol, start_date, end_date, provider="obligacje")`.
   - Reads `bond_series` + `cpi_12m` from Postgres via `db.get_conn()`.
-  - Calls `engine.price_series(...)` and returns results as
-    `FixedIncomeHistoricalData` list.
+  - Calls `engine.price_series(...)` and returns results as an `EquityHistoricalData` list.
   - Returns empty list (not error) if symbol not found in `bond_series`.
   - Raises informative error if `cpi_12m` is stale (latest row older than 40 days).
 - [ ] `fixedincome_search.py` — queries `bond_series` by symbol prefix or name
-  substring; returns `{symbol, name, series_code, maturity_date}`.
+  substring; returns `{symbol, name, maturity_date}`.
 - [ ] `fixedincome_profile.py` — returns static fields from `bond_series` for a
   known symbol; 404-equivalent (empty list) if symbol unknown.
 - [ ] Unit tests for all three fetchers (mock DB connection).
 - [ ] `pytest openst/plugins/openbb_obligacje/tests/` — all pass.
+- [ ] Wire-check in the test image that `provider="obligacje"` now appears in the
+  `obb.equity.price.historical` / `obb.equity.search` / `obb.equity.profile` provider Literals.
 - [ ] Run full openst test suite (docker compose — all pass).
 - [ ] Commit.
 
@@ -210,10 +233,12 @@ scrape:
 
 - [ ] In `openst/src/openbb_client.py` add:
   - `get_bond_ohlcv(symbol: str, start_date: str, end_date: str) -> list[dict] | None`
-    — calls `obb.fixedincome.price.historical(symbol, provider="obligacje")`;
-    returns `None` if empty or DB unavailable.
+    — calls `obb.equity.price.historical(symbol, start_date=start_date, end_date=end_date,
+    provider="obligacje")`; returns `None` if empty or DB unavailable.
   - `get_bond_profile(symbol: str) -> dict | None`
+    — calls `obb.equity.profile(symbol, provider="obligacje")`.
   - `search_bonds(query: str) -> list[dict]`
+    — calls `obb.equity.search(query, provider="obligacje")`.
 - [ ] In `openst/src/main.py` add routes:
   - `GET /fixedincome/ohlcv/{symbol}?start&end` → `get_bond_ohlcv`; 404 on None.
   - `GET /fixedincome/profile/{symbol}` → `get_bond_profile`; 404 on None.
