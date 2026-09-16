@@ -2,6 +2,7 @@
 
 **Status**: accepted (2026-08-23)
 **D77 (PL fund/bond OHLCV)**: **done** (2026-09-14) — biznesradar provider wiring
+**D79 (retail savings bonds)**: **done** (2026-09-16) — openbb_obligacje provider wiring
 **Builds on**: [backend-topology.md](backend-topology.md) (D1–D11), [MODULARISATION.md](../MODULARISATION.md)
 **Scope**: second extracted module `portfoliost-instruments`; local verification only (cluster rollout deferred to a later phase).
 
@@ -122,7 +123,7 @@ surface (cachest `config.yaml`). Bond math follows obligacjeskarbowe.pl
 | TFI sub-funds (`NNEP25.TFI`, `GSEM25.TFI`…) | `biznesradar` provider (D77) ✅ | `biznesradar` EquitySearch (D77) ✅ | `biznesradar` EquityProfile (D77) ✅ | done |
 | GPW-listed FIZ (`Beta ETF * FIZ`) | yfinance `.WA` (equity path) ✅ | `biznesradar` symbol probe ✅ | `biznesradar` EquityProfile ✅ | done |
 | Crypto | `openbb-crypto` extension (D78) ✅ | `openbb-crypto` `crypto.search` (D78) ✅ | via quote fields (D78) ✅ | done |
-| Retail savings bonds (ROD/EDO/OTS/ROR/DOR/TOS/COI/ROS) | `openbb_obligacje` pricing engine (D79) | `bond_series` catalogue in Postgres `openst` schema (D79) | `bond_series` from `obligacjeskarbowe.pl` (D79) | D79 |
+| Retail savings bonds (ROD/EDO/OTS/ROR/DOR/TOS/COI/ROS) | `openbb_obligacje` pricing engine (D79) ✅ | `bond_series` catalogue in Postgres `openst` schema (D79) ✅ | `bond_series` from `obligacjeskarbowe.pl` (D79) ✅ | D79 ✅ |
 | Catalyst corp bonds (BST, INS, KRI, ARH, VOX, NVA + `YMM`) | `biznesradar` OHLCV (D77) ✅ | `biznesradar` EquitySearch ✅ | `obligacje.pl /pl/obligacja/{symbol}` (D80) | D80 |
 
 ### D77 — `biznesradar` as an OpenBB provider extension inside openst
