@@ -49,11 +49,11 @@ portfoliost-instruments).
 
 ### 21.1 — fixture capture: archive page + a historical emission page (manual, no code)
 
-- [ ] Capture `obligacjeskarbowe.pl/listy-emisyjne/` (one GET) → `openst/tests/fixtures/obligacjeskarbowe/emission_archive.html`.
-- [ ] Capture the `rod1033` emission page (one GET) → `openst/tests/fixtures/obligacjeskarbowe/rod1033.html`; append the already-captured current-ROD page (`rod0938` style, exists in fixture set) as the contrast case.
-- [ ] Inspect the archive fixture: confirm all 449 emission `<option/>` codes + `data-id` series values parse; note the old series absent from `SERIES_SLUGS` (POS, DOS, TOZ, KOS prefixes appear in the archive but are **skipped** — history import covers the 8 modern `SERIES_SLUGS` series only).
-- [ ] No TESTS for the fixture itself; it exists to make 21.2–21.4 deterministic.
-- [ ] Commit: `fixtures: obligacjeskarbowe emission archive + rod1033 (historical vs current ROD)`.
+- [x] Capture `obligacjeskarbowe.pl/listy-emisyjne/` (one GET) → `openst/tests/fixtures/obligacjeskarbowe/emission_archive.html`.
+- [x] Capture the `rod1033` emission page (one GET) → `openst/tests/fixtures/obligacjeskarbowe/rod1033.html`; append the already-captured current-ROD page (`rod0938` style, exists in fixture set) as the contrast case.
+- [x] Inspect the archive fixture: confirm all 449 emission `<option/>` codes + `data-id` series values parse; note the old series absent from `SERIES_SLUGS` (POS, DOS, TOZ, KOS prefixes appear in the archive but are **skipped** — history import covers the 8 modern `SERIES_SLUGS` series only).
+- [x] No TESTS for the fixture itself; it exists to make 21.2–21.4 deterministic.
+- [x] Commit: `fixtures: obligacjeskarbowe emission archive + rod1033 (historical vs current ROD)`.
 
 ### 21.2 — openst: `--mode archive` in `bond_series.py` (backfill all modern-series emissions)
 
