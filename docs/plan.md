@@ -90,16 +90,31 @@ portfoliost-instruments).
 
 ### 21.4 — openst standalone smoke (backfill + DB-first live)
 
-- [ ] In the **openst** standalone compose (`openst/docker-compose.yml`): `docker compose up -d redis openst`,
+- [x] In the **openst** standalone compose (`openst/docker-compose.yml`): `docker compose up -d redis openst`,
       run `python -m src.importers.bond_series --mode archive` against the local Postgres
       (dev db from step 19.2; ~8 modern series × ~12 past monthly emissions ≈ 100 rows), and
       verify `openst.bond_series` count jumped from 8 → expected backfill total.
-- [ ] `curl /fixedincome/search/rod1033` → 200, row `ROD1033`/`Obligacje 12-letnie ROD`, and
+- [x] `curl /fixedincome/search/rod1033` → 200, row `ROD1033`/`Obligacje 12-letnie ROD`, and
       `/fixedincome/search/rod0938` still 200; `curl /fixedincome/profile/ROD1033` → 200 with the
       10-column shape (marża 1.50). Record payloads in the step result.
-- [ ] Verify Redis: second `curl` each → `X-Cache: HIT` (openst emits its own cache header in
+- [x] Verify Redis: second `curl` each → `X-Cache: HIT` (openst emits its own cache header in
       standalone, per step 20.4 precedent).
-- [ ] Commit note: `chore: verify bond archive backfill + DB-first search smoke`.
+- [x] Commit note: `chore: verify bond archive backfill + DB-first search smoke`.
+
+  **Result (2026-09-16):** `docker compose up -d --build` (app service gained `DATABASE_URL` +
+  postgres dep) → `--mode full` 8 rows → `--mode archive` 449 fetched / 449 parsed / 441 inserted
+  (8 current skipped by `ON CONFLICT`) → **total 449 rows**. The smoke **caught a real bug** in the
+  21.2 archive URL construction: the site ships URL typos for 4 archived EDO codes
+  (`id=edo07829` renders `EDO0829`, likewise `edo01028/edo01128/edo01228`), so
+  `{display symbol lowercased}` paths 404'd. Fixed by having `parse_archive_codes` return
+  `(series_code, symbol, url_id)` triples (symbol stays display text, stored correctly) and
+  fetching each emission at its raw `url_id`. Curls: `/fixedincome/search/rod1033` → 200
+  `[{"symbol":"ROD1033","name":"Obligacje 12-letnie ROD","maturity_date":"2033-10-01"}]`;
+  `/fixedincome/search/rod0938` → 200 (current ROD0938, `2038-09-01`); `/fixedincome/profile/ROD1033`
+  → 200 10-column shape (`issue_date 2021-10-01`, `margin 1.5000`, `rate_rule cpi_12m+margin`);
+  `/fixedincome/profile/EDO0829` → 200 (2019-08-01/2029-08-01, the typo'd emission now resolvable).
+  Redis caching verified via the `_cache` (response `X-Cache` header is emitted by cachest, not
+  openst — no such header in openst today). suite: 231 passed (incl. the updated url_id tests).
 
 ### 21.5 — instruments: venue-suffix normalization in the bond search leg
 
