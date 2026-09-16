@@ -256,6 +256,15 @@ only when a new emission is imported).
 `/fixedincome/ohlcv/{symbol}` through cachest; search falls back to the `bond_series`
 catalogue (seeded into `ticker_reference` with `asset_type='bond'`).
 
+**Gap-fix 2026-09-16 (D79 history + DB-first):** `bond_series` now backfills 449 historical
+emissions via `--mode archive` (scrapes `/listy-emisyjne/`; resolves 4 archived EDO URL id
+typos by fetching at the raw selector `url_id`). `search_bonds` and `get_bond_profile` in
+`openbb_client.py` read the DB first (OpenBB fallback for DB-less / empty DB).
+Instruments normalizes a trailing `.WA`/`.US` venue suffix off bond search queries so
+`ROD1033.WA` ≡ `ROD1033` (`venueFreeSymbol()` in `src/adapters/symbol.ts`, applied only in
+`bondSearchLeg`). Cluster one-shot Job `openst-bond-archive` (`openst@v1.1.22`, Flux)
+populated `openst.bond_series` — 449 rows, `ROD1033` margin 1.50.
+
 ### D80 — Catalyst corporate bonds: profile metadata + catalogue
 
 Catalyst-listed corporate bonds (BST, INS, KRI, ARH, VOX, NVA + `YMM` maturity
