@@ -325,19 +325,41 @@ on config change; Flux synced both commits.
 
 ### 19.10 — portfoliost compose stack smoke (full chain)
 
-- [ ] Rebuild openst + cachest in portfoliost compose:
+- [x] Rebuild openst + cachest in portfoliost compose:
   ```bash
   docker compose up -d --build redis openst cachest
   ```
-- [ ] Smoke-curl through cachest (**single requests**):
+- [x] Smoke-curl through cachest (**single requests**):
   ```bash
   curl "http://localhost:8090/fixedincome/ohlcv/EDO0936?start=2026-01-01&end=2026-06-30"
   # X-Cache: MISS then HIT
   curl "http://localhost:8090/fixedincome/profile/EDO0936"
   # X-Cache: MISS then HIT
   ```
-- [ ] Run `npm run test:stack` — existing contract checks must stay green.
-- [ ] Commit note: `chore: verify D79 smoke through full compose stack`.
+- [x] Run `npm run test:stack` — existing contract checks must stay green.
+- [x] Commit note: `chore: verify D79 smoke through full compose stack`.
+
+**Done 2026-09-16.** Two compose-prep notes:
+- `portfoliost/docker-compose.yml` `openst` service gained an explicit
+  `DATABASE_URL: postgres://portfoliost:portfoliost@postgres:5432/portfoliost`
+  (plus `depends_on postgres: service_healthy`). The env_file `../openst/.env`
+  carries the *standalone* compose DB URL (`openst/openst` db) added in 19.8,
+  which does not exist in the portfoliost compose postgres — without the pin,
+  openst crash-loops at boot (migration connect fails). openst reuses the shared
+  compose DB with its own `openst` schema (same pattern as the cluster).
+- After rebuild: openst boot applied `001_openst_schema` into the shared DB;
+  seeded via `docker compose run --rm openst python -m src.importers.cpi
+  --mode full` (320 rows) and `... bond_series --mode full` (8 emissions).
+
+Smoke results through cachest :8090:
+- Plan's documented OHLCV window (`EDO0936` `2026-01-01..2026-06-30`) → **404**
+  (same pre-issuance behaviour as 19.8: EDO0936 issues 2026-09-01). Valid window
+  `2026-09-01..2026-09-30` → 200, 30 daily rows, `X-Cache: MISS` then `HIT`.
+- `profile/EDO0936` → 200 (10y EDO, issue 2026-09-01, margin 2.0, cpi_12m+margin),
+  `X-Cache: MISS` then `HIT`.
+
+`npm run test:stack` against the full compose stack (gateway :8080 → instruments
+→ cachest → openst): **32/32 checks passed**, upstream detected `real`.
 
 ---
 

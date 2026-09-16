@@ -104,8 +104,14 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
     environment:
       REDIS_HOST: redis
+      # D79 — openst reuses the shared compose postgres (schema `openst` is
+      # created by its boot migration); ../openst/.env carries the standalone
+      # compose DATABASE_URL (openst/openst DB) which does not exist here.
+      DATABASE_URL: postgres://portfoliost:portfoliost@postgres:5432/portfoliost
     env_file:
       - path: ../openst/.env
         required: false
