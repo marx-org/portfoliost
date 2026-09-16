@@ -57,21 +57,21 @@ portfoliost-instruments).
 
 ### 21.2 — openst: `--mode archive` in `bond_series.py` (backfill all modern-series emissions)
 
-- [ ] Add `parse_archive_codes(html) -> list[(series_code, symbol)]`: regex the
+- [x] Add `parse_archive_codes(html) -> list[(series_code, symbol)]`: regex the
       `<option … data-id="{series}">{SYMBOL}</option>` rows from the capture in 21.1.
-- [ ] Add `--mode archive`: fetch `/listy-emisyjne/`, map `({series_code}, symbol)` →
+- [x] Add `--mode archive`: fetch `/listy-emisyjne/`, map `({series_code}, symbol)` →
       `/oferta-obligacji/{SERIES_SLUGS[series.upper()]}/{symbol}/`, fetch + `parse_emission` each
       (reuse existing code path; `upsert_bonds` already idempotent via `ON CONFLICT DO NOTHING`).
       Filter to series present in `SERIES_SLUGS` (skip POS/DOS/TOZ/KOS — no term map, out of scope).
-- [ ] Fix the module docstring: per-emission detail URLs are **not** cosmetic — archived
+- [x] Fix the module docstring: per-emission detail URLs are **not** cosmetic — archived
       emissions render their own historical parameters; current-only accumulation describes only
       the `incremental`/`full` modes, and `archive` backfills the rest.
-- [ ] Tests (`openst/tests/test_bond_series_importer.py`): `parse_archive_codes` from the 21.1
+- [x] Tests (`openst/tests/test_bond_series_importer.py`): `parse_archive_codes` from the 21.1
       fixture → ≥400 codes incl. `ROD1033`; archive-mode page list built from a stub `fetch_page`
       returns the correct per-series URL for a sampled emission; `ROD1033` parse → symbol, issue
       `2021-10-01`, maturity `2033-10-01`, margin 1.50.
-- [ ] Tests: full openst suite via `docker compose --profile test run --rm test`.
-- [ ] Commit: `feat(bond_series): archive mode backfills all modern-series emissions`.
+- [x] Tests: full openst suite via `docker compose --profile test run --rm test`.
+- [x] Commit: `feat(bond_series): archive mode backfills all modern-series emissions`.
 
 ### 21.3 — openst: DB-first `search_bonds` + `get_bond_profile`
 
