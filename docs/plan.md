@@ -142,10 +142,10 @@ any route work (23.3+).
 
 ### 23.5 — `GET /api/import/sync-runs`, `DELETE /api/import/sync-runs/:id`, `DELETE /api/import/source/:externalSource`
 
-- [ ] `GET /api/import/sync-runs`: list runs for authenticated user; filter by
+- [x] `GET /api/import/sync-runs`: list runs for authenticated user; filter by
       `externalSource`; paginate with `limit`/`offset`.
-- [ ] `DELETE /api/import/sync-runs/:id`: delete run record only; 404 if not owned.
-- [ ] `DELETE /api/import/source/:externalSource`: wipe all data tagged with this
+- [x] `DELETE /api/import/sync-runs/:id`: delete run record only; 404 if not owned.
+- [x] `DELETE /api/import/source/:externalSource`: wipe all data tagged with this
       source for the authenticated user, in a single DB transaction:
       1. DELETE `wallet_transactions` WHERE `external_source = $s AND user_id = $u`.
       2. DELETE `portfolios.portfolios` WHERE `external_source = $s AND user_id = $u`
@@ -154,10 +154,10 @@ any route work (23.3+).
       4. DELETE `sync_runs` WHERE `external_source = $s AND user_id = $u`.
       Returns `{ deleted: { walletTransactions, portfolios, wallets, syncRuns } }`.
       Manually-created rows (`external_source IS NULL`) are never touched.
-- [ ] Unit tests: wipe removes only tagged rows; manual wallet/portfolio survive;
+- [x] Unit tests: wipe removes only tagged rows; manual wallet/portfolio survive;
       wipe on empty source returns zero counts (not 404).
-- [ ] `npm run test` passes.
-- [ ] Commit: `feat(wallets): sync-run list/delete + source wipe endpoint`.
+- [x] `npm run test` passes.
+- [x] Commit: `feat(wallets): sync-run list/delete + source wipe endpoint`.
 
 ### 23.6 — `POST /internal/apply-split` (wallets)
 
