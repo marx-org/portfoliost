@@ -61,6 +61,13 @@ describe("topology layout (D55-9)", () => {
     }
   })
 
+  it("keeps every lane origin inside the drag bounds so lanes stay movable", () => {
+    for (const lane of layout.lanes) {
+      expect(lane.x, lane.area).toBeGreaterThanOrEqual(0)
+      expect(lane.y, lane.area).toBeGreaterThanOrEqual(0)
+    }
+  })
+
   it("covers every node of its area with the matching lane", () => {
     for (const def of topologyNodes) {
       const lane = layout.lanes.find((l) => l.area === def.area)!

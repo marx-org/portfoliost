@@ -38,21 +38,92 @@ test("cinematic effects animate, pause, and respect reduced motion without block
   await openTopology(page)
   const atmosphere = page.locator('.mission-aurora').first()
   const flow = page.locator('.topo-flow').first()
+  // Icon glow (mission-icon-breathe) pulses on every node regardless of live
+  // status; the status dot only pulses when health resolves (unit-tested).
+  const iconGlow = page.locator('.vue-flow__node [data-node-id]').first()
+  // The breathe glow renders on the node card's ::before pseudo-element.
+  const glowAnimation = () => iconGlow.evaluate((e) => getComputedStyle(e, '::before').animationName)
+  const glowPlayState = () => iconGlow.evaluate((e) => getComputedStyle(e, '::before').animationPlayState)
   await expect(atmosphere).toHaveCSS('animation-name', 'mission-drift')
   await expect(atmosphere).toHaveCSS('animation-play-state', 'running')
   await expect(flow).toHaveCSS('animation-name', 'topo-edge-flow')
+  await expect.poll(glowAnimation).toBe('mission-icon-breathe')
   await page.getByTestId('topo-effects').click()
   await expect(page.getByTestId('topo-effects')).toHaveAttribute('aria-pressed', 'true')
   await expect(atmosphere).toHaveCSS('animation-play-state', 'paused')
   await expect(flow).toHaveCSS('animation-play-state', 'paused')
+  await expect.poll(glowPlayState).toBe('paused')
   await page.getByTestId('topo-effects').click()
   await expect(atmosphere).toHaveCSS('animation-play-state', 'running')
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await expect(atmosphere).toHaveCSS('animation-name', 'none')
   await expect(flow).toHaveCSS('animation-name', 'none')
+  await expect.poll(glowAnimation).toBe('none')
   await expect(page.locator('.mission-legend')).toContainText('Reduced motion')
   await page.locator('[data-node-id="cachest"]').first().click()
   await expect(page.getByTestId('topology-details-panel')).toBeVisible()
+})
+
+test("theme switcher switches light, dark, and system, and persists across reload", async ({ page }) => {
+  await openTopology(page)
+  const dark = page.getByTestId('topo-theme-dark')
+  const light = page.getByTestId('topo-theme-light')
+  const auto = page.getByTestId('topo-theme-system')
+
+  const stage = page.locator('.mission-stage')
+  const node = page.locator('[data-node-id="cachest"]').first()
+  const nodeBackground = () => node.evaluate(el => getComputedStyle(el).backgroundImage)
+  await dark.click()
+  await expect(dark).toHaveAttribute('aria-pressed', 'true')
+  await expect(stage).toHaveCSS('background-color', 'rgb(7, 17, 31)')
+  await expect.poll(nodeBackground).toContain('rgb(27, 42, 66)')
+
+  // Light: the dark shell on <html> is removed and the stage follows.
+  await light.click()
+  await expect(page.locator('html')).not.toHaveClass(/dark/)
+  await expect(stage).toHaveCSS('background-color', 'rgb(237, 244, 252)')
+  await expect(page.locator('.mission-atmosphere')).toHaveCSS('background-color', 'rgb(237, 244, 252)')
+  await expect.poll(nodeBackground).toContain('rgb(255, 255, 255)')
+  await node.click()
+  await expect(page.getByTestId('topology-details-panel')).toHaveCSS('background-color', 'rgba(255, 255, 255, 0.96)')
+  await page.getByTestId('topology-panel-close').click()
+
+  // Auto: follows the OS setting (emulated dark here); the fixed listener
+  // re-applies the class when the OS setting changes.
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await auto.click()
+  await expect(page.locator('html')).toHaveClass(/dark/)
+  await page.emulateMedia({ colorScheme: 'light' })
+  await expect(page.locator('html')).not.toHaveClass(/dark/)
+
+  // Preference persists across a reload.
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await dark.click()
+  await page.reload()
+  await page.getByRole('link', { name: 'Admin' }).click()
+  await page.getByRole('link', { name: 'Topology' }).click()
+  await expect(page.getByTestId('topo-theme-dark')).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.locator('html')).toHaveClass(/dark/)
+
+  // Restore light so other tests (which assume the default) are unaffected.
+  await light.click()
+})
+
+test("OpenST plugins and scheduled jobs are mapped and inspectable", async ({ page }) => {
+  await openTopology(page)
+  for (const id of ['biznesradar', 'obligacje', 'openst-bond-import', 'openst-bond-archive', 'openst-cpi-import', 'openst-cpi-seed']) {
+    const node = page.locator(`[data-node-id="${id}"]`).first()
+    await node.click()
+    await expect(page.getByTestId('topology-details-panel')).toBeVisible()
+    if (id === 'openst-cpi-seed') {
+      await expect(page.getByTestId('topology-details-panel')).toContainText('Suspended')
+      await expect(page.getByTestId('topology-details-panel')).toContainText('Not live execution status')
+    }
+    if (id === 'obligacje') {
+      await expect(page.getByTestId('topology-details-panel')).toContainText('issue parameters + CPI')
+    }
+    await page.getByTestId('topology-panel-close').click()
+  }
 })
 
 test("focus mode exits with Escape and empty search offers recovery", async ({ page }) => {
@@ -267,7 +338,9 @@ test("dragging a lane header moves its member nodes together", async ({ page }) 
   const hb = (await header.boundingBox())!
   await page.mouse.move(hb.x + 40, hb.y + hb.height / 2)
   await page.mouse.down()
-  await page.mouse.move(hb.x + 40 + 80, hb.y + hb.height / 2 + 30, { steps: 8 })
+  // Drag horizontally through free space; a diagonal path may correctly hit
+  // the jobs lane as the graph grows (collision clamping is unit-tested).
+  await page.mouse.move(hb.x + 40 + 80, hb.y + hb.height / 2, { steps: 8 })
   await page.mouse.up()
 
   const afterLane = await laneBox(external)
@@ -288,7 +361,7 @@ test("re-layout restores the canonical arrangement after a manual move", async (
   const hb = (await header.boundingBox())!
   await page.mouse.move(hb.x + 40, hb.y + hb.height / 2)
   await page.mouse.down()
-  await page.mouse.move(hb.x + 40 + 120, hb.y + hb.height / 2 + 60, { steps: 8 })
+  await page.mouse.move(hb.x + 40 + 120, hb.y + hb.height / 2, { steps: 8 })
   await page.mouse.up()
   const afterDrag = await laneBox(external)
   expect(Math.abs(afterDrag.x - before.x)).toBeGreaterThan(40)

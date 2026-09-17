@@ -31,6 +31,7 @@ import { TOPOLOGY_NODE_TYPES } from "./topology/nodes"
 import type { TopologyNodeData } from "./topology/nodes"
 import { dotState } from "./topology/nodes/status"
 import { useTopologyStore } from "./topology/topology-store"
+import { useThemeStore } from "@/stores/theme"
 import TopologyDetailsPanel from "./topology/TopologyDetailsPanel.vue"
 
 type TopologyFlowNode = Node<TopologyNodeData>
@@ -38,6 +39,7 @@ type LaneFlowNode = Node<LaneNodeData>
 
 const store = useTopologyStore()
 const layout = layoutTopology()
+const theme = useThemeStore()
 const effectsPaused = ref(false)
 const focusMode = ref(false)
 const reducedMotion = ref(false)
@@ -71,6 +73,9 @@ const TOPOLOGY_NODE_TYPES_ALL: Record<string, Component> = { ...TOPOLOGY_NODE_TY
 
 // Toolbar shares the Vue Flow instance so zoom/fit act on the live viewport.
 const { zoomIn, zoomOut, fitView } = useVueFlow()
+const canvasElement = ref<HTMLElement | null>(null)
+let canvasObserver: ResizeObserver | undefined
+let resizeFrame = 0
 
 // Step 10 — the clicked node (null = nothing inspected, canvas click resets).
 const selectedNodeId = ref<string | null>(null)
@@ -281,8 +286,19 @@ onMounted(() => {
   motionQuery.addEventListener("change", syncMotion)
   window.addEventListener("keydown", onEscape)
   store.startPolling()
+  // Vue Flow retains its transform on resize. Refit after mobile/focus layout
+  // changes, without resetting any manually positioned nodes or lanes.
+  canvasObserver = new ResizeObserver(() => {
+    cancelAnimationFrame(resizeFrame)
+    resizeFrame = requestAnimationFrame(() => {
+      void fitView({ padding: 0.15, duration: 0 })
+    })
+  })
+  if (canvasElement.value) canvasObserver.observe(canvasElement.value)
 })
 onBeforeUnmount(() => {
+  canvasObserver?.disconnect()
+  cancelAnimationFrame(resizeFrame)
   store.stopPolling()
   motionQuery?.removeEventListener("change", syncMotion)
   window.removeEventListener("keydown", onEscape)
@@ -298,6 +314,27 @@ onBeforeUnmount(() => {
         <p class="mission-description">Every service. Every connection. One extraordinary view.</p>
       </div>
       <div class="mission-actions">
+        <div class="mission-theme" role="group" aria-label="Color theme">
+          <button
+            v-for="option in [
+              { value: 'light', label: 'Light', icon: 'M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0-5v2m0 16v2M2 12h2m16 0h2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4' },
+              { value: 'system', label: 'Auto', icon: 'M3 4h18v12H3ZM8 21h8m-4-5v5' },
+              { value: 'dark', label: 'Dark', icon: 'M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z' },
+            ] as const"
+            :key="option.value"
+            type="button"
+            class="mission-theme__option"
+            :class="{ 'mission-theme__option--active': theme.preference === option.value }"
+            :aria-pressed="theme.preference === option.value"
+            :data-theme-option="option.value"
+            :data-testid="`topo-theme-${option.value}`"
+            :title="`${option.label} theme`"
+            :aria-label="`${option.label} theme`"
+            @click="theme.setPreference(option.value)"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="option.icon" /></svg>
+          </button>
+        </div>
         <button type="button" class="mission-button" data-testid="topo-effects" :aria-pressed="effectsPaused" @click="effectsPaused = !effectsPaused">
           <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path v-if="effectsPaused" d="m6 3 11 7-11 7Z" /><path v-else d="M5 3h3v14H5zm7 0h3v14h-3z" /></svg>
           {{ effectsPaused ? 'Resume effects' : 'Pause effects' }}
@@ -330,7 +367,7 @@ onBeforeUnmount(() => {
       </article>
     </div>
 
-    <div class="mission-stage dark">
+    <div class="mission-stage">
       <div class="mission-atmosphere" aria-hidden="true">
         <div class="mission-aurora" /><div class="mission-aurora mission-aurora--violet" />
         <div class="mission-grid" /><div class="mission-scan" /><div class="mission-grain" />
@@ -411,14 +448,14 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <div class="mission-canvas">
+      <div ref="canvasElement" class="mission-canvas">
       <VueFlow
         :nodes="filteredFlowNodes"
         :edges="filteredFlowEdges"
         :node-types="TOPOLOGY_NODE_TYPES_ALL"
         :edge-types="TOPOLOGY_EDGE_TYPES"
         :fit-view-on-init="true"
-        :min-zoom="0.2"
+        :min-zoom="0.05"
         :max-zoom="1.5"
         :delete-key-code="null"
         @node-click="onNodeClick"

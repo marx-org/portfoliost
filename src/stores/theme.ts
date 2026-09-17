@@ -36,6 +36,9 @@ export const useThemeStore = defineStore("theme", () => {
     systemDark.value = mediaQuery.matches
     mediaHandler = () => {
       systemDark.value = mediaQuery?.matches ?? false
+      // Bug fix (found by the topology theme e2e): the class must follow the
+      // OS setting while preference is "system", not only on explicit sets.
+      apply()
     }
     mediaQuery.addEventListener("change", mediaHandler)
   }

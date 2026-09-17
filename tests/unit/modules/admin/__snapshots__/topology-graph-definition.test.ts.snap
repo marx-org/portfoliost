@@ -41,6 +41,10 @@ exports[`topology graph definition (D55-3) > snapshots node IDs and edge pairs 1
     ],
     [
       "openst",
+      "biznesradar",
+    ],
+    [
+      "openst",
       "cboe",
     ],
     [
@@ -54,6 +58,10 @@ exports[`topology graph definition (D55-3) > snapshots node IDs and edge pairs 1
     [
       "openst",
       "nasdaq",
+    ],
+    [
+      "openst",
+      "obligacje",
     ],
     [
       "openst",
@@ -74,6 +82,22 @@ exports[`topology graph definition (D55-3) > snapshots node IDs and edge pairs 1
     [
       "openst",
       "yfinance",
+    ],
+    [
+      "openst-bond-archive",
+      "openst",
+    ],
+    [
+      "openst-bond-import",
+      "openst",
+    ],
+    [
+      "openst-cpi-import",
+      "openst",
+    ],
+    [
+      "openst-cpi-seed",
+      "openst",
     ],
     [
       "pocketid",
@@ -162,6 +186,7 @@ exports[`topology graph definition (D55-3) > snapshots node IDs and edge pairs 1
   ],
   "nodeIds": [
     "alphavantage",
+    "biznesradar",
     "cachest",
     "cboe",
     "dividendhistory",
@@ -172,7 +197,12 @@ exports[`topology graph definition (D55-3) > snapshots node IDs and edge pairs 1
     "mastra-ticker",
     "nasdaq",
     "nginx-gateway",
+    "obligacje",
     "openst",
+    "openst-bond-archive",
+    "openst-bond-import",
+    "openst-cpi-import",
+    "openst-cpi-seed",
     "pocketid",
     "polygon",
     "portfoliost",

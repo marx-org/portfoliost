@@ -22,6 +22,8 @@ export interface TopologyNodeDef {
   /** True when the node maps to a live probed deployment (status overlay). */
   live: boolean
   provider?: ProviderMeta
+  /** Deployment snapshot, not live job execution telemetry. */
+  job?: { schedule: string; suspended: boolean; purpose: string }
 }
 
 export type EdgeKind = "api" | "gateway" | "auth" | "job" | "provider" | "storage"
@@ -66,6 +68,12 @@ export const topologyNodes: TopologyNodeDef[] = [
   { id: "stooq-downloader", label: "Stooq Downloader", area: "jobs", rank: R.back, live: false },
   { id: "stooq-importer", label: "Stooq Importer", area: "jobs", rank: R.back, live: false },
   { id: "jobshot", label: "Jobshot", area: "jobs", rank: R.back, live: false },
+  // Verified against pfire CronJobs, 2026-09-17. These populate the provider
+  // tier consumed by instruments; they are not instruments API deployments.
+  { id: "openst-bond-import", label: "Bond Import", area: "jobs", rank: R.back, live: false, job: { schedule: "30 4 * * *", suspended: false, purpose: "Incrementally imports Treasury bond series into OpenST." } },
+  { id: "openst-bond-archive", label: "Bond Archive", area: "jobs", rank: R.back, live: false, job: { schedule: "0 6 3 * *", suspended: false, purpose: "Archives Treasury bond series in OpenST." } },
+  { id: "openst-cpi-import", label: "CPI Import", area: "jobs", rank: R.back, live: false, job: { schedule: "30 4 * * *", suspended: false, purpose: "Incrementally imports CPI data into OpenST." } },
+  { id: "openst-cpi-seed", label: "CPI Seed", area: "jobs", rank: R.back, live: false, job: { schedule: "0 5 1 1 *", suspended: true, purpose: "Full CPI seed; scheduled execution is suspended." } },
   // external-services
   { id: "pocketid", label: "PocketID (OIDC)", area: "external-services", rank: R.providers, live: false },
   { id: "stooq-pl", label: "stooq.pl", area: "external-services", rank: R.providers, live: false },
@@ -89,6 +97,8 @@ export const topologyNodes: TopologyNodeDef[] = [
     provider: { dataTypes: ["Market data cache (TTL proxy)"] },
   },
   // data-providers — leaf providers
+  { id: "biznesradar", label: "BiznesRadar", area: "data-providers", rank: R.providers, live: false, provider: { dataTypes: ["Polish TFI funds / Catalyst bonds", "History, quotes, profiles, search"] } },
+  { id: "obligacje", label: "Obligacje", area: "data-providers", rank: R.providers, live: false, provider: { dataTypes: ["Polish retail savings bonds", "Redemption values computed from issue parameters + CPI", "History, profiles, search"] } },
   { id: "yfinance", label: "yfinance", area: "data-providers", rank: R.providers, live: false, provider: { dataTypes: ["OHLCV", "Dividends", "Company profile"] } },
   { id: "fmp", label: "FMP", area: "data-providers", rank: R.providers, live: false, provider: { dataTypes: ["Dividends", "Company profile"], quota: "250 req/day (direct)" } },
   { id: "intrinio", label: "Intrinio", area: "data-providers", rank: R.providers, live: false, provider: { dataTypes: ["OHLCV", "Fundamentals"] } },
@@ -137,9 +147,15 @@ export const topologyEdges: TopologyEdgeDef[] = [
   { source: "openst", target: "cboe", label: "OpenBB SDK", kind: "provider", measurable: "otel" },
   { source: "openst", target: "tiingo", label: "OpenBB SDK", kind: "provider", measurable: "otel" },
   { source: "openst", target: "tmx", label: "OpenBB SDK", kind: "provider", measurable: "otel" },
+  { source: "openst", target: "biznesradar", label: "OpenBB plugin (scraper)", kind: "provider", measurable: "none" },
+  { source: "openst", target: "obligacje", label: "OpenBB plugin (local pricing)", kind: "provider", measurable: "none" },
   // FX
   { source: "portfoliost-wallets", target: "ecb", label: "FX rates (via fxsync CronJob)", kind: "provider", measurable: "none" },
   // jobs
+  { source: "openst-bond-import", target: "openst", label: "Imports bond series", kind: "job", measurable: "none" },
+  { source: "openst-bond-archive", target: "openst", label: "Archives bond series", kind: "job", measurable: "none" },
+  { source: "openst-cpi-import", target: "openst", label: "Imports CPI", kind: "job", measurable: "none" },
+  { source: "openst-cpi-seed", target: "openst", label: "Full CPI seed (suspended)", kind: "job", measurable: "none" },
   { source: "portfoliost-admin", target: "jobshot", label: "On-demand job trigger", kind: "job", measurable: "none" },
   { source: "portfoliost-wallets-fxsync", target: "portfoliost-wallets", label: "Updates FX rates", kind: "job", measurable: "none" },
   { source: "portfoliost-instruments-tickersync", target: "portfoliost-instruments", label: "Syncs tickers", kind: "job", measurable: "none" },

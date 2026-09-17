@@ -175,6 +175,21 @@ export function layoutTopology(): TopologyLayout {
     positions[n.id].y += shifts[n.area].y
   }
 
+  // Normalize into LANE_BOUNDS so every lane is draggable. dagre freely emits
+  // negative coordinates; the drag clamp treats any negative lane origin as
+  // out of bounds, which would silently pin such lanes in place. Lanes extend
+  // LANE_PADDING beyond their members, so shift by the padding too.
+  const minX = Math.min(...topologyNodes.map((n) => positions[n.id].x))
+  const minY = Math.min(...topologyNodes.map((n) => positions[n.id].y))
+  const shiftX = Math.max(0, LANE_PADDING - minX)
+  const shiftY = Math.max(0, LANE_PADDING - minY)
+  if (shiftX > 0 || shiftY > 0) {
+    for (const n of topologyNodes) {
+      positions[n.id].x += shiftX
+      positions[n.id].y += shiftY
+    }
+  }
+
   const lanes: LaneBox[] = []
   for (const area of NODE_AREAS) {
     if (!areaNodes(area).length) continue

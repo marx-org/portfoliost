@@ -123,6 +123,13 @@ function onSelect(id: string): void {
 
       <!-- Body -->
       <div class="space-y-5 px-4 py-4 text-sm">
+        <section v-if="def.job" aria-label="Job schedule">
+          <h3 class="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Job schedule</h3>
+          <p class="text-slate-700 dark:text-slate-200">{{ def.job.purpose }}</p>
+          <p class="mt-2 font-mono text-xs text-slate-600 dark:text-slate-300">{{ def.job.schedule }}</p>
+          <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">{{ def.job.suspended ? 'Suspended' : 'Scheduled' }} · Controller timezone</p>
+          <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">Deployment snapshot · verified 2026-09-17. Not live execution status.</p>
+        </section>
         <!-- Version / deployment details -->
         <section v-if="status?.version" aria-label="Version">
           <h3 class="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Deployment</h3>

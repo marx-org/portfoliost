@@ -26,6 +26,10 @@ const EXPECTED_NODE_IDS = [
   "redis",
   // jobs
   "jobshot",
+  "openst-bond-import",
+  "openst-bond-archive",
+  "openst-cpi-import",
+  "openst-cpi-seed",
   "portfoliost-instruments-tickersync",
   "portfoliost-wallets-fxsync",
   "stooq-downloader",
@@ -36,6 +40,8 @@ const EXPECTED_NODE_IDS = [
   "scanst",
   "stooq-pl",
   // data-providers
+  "biznesradar",
+  "obligacje",
   "alphavantage",
   "cachest",
   "cboe",
@@ -62,6 +68,12 @@ const EXPECTED_EDGE_PAIRS = [
   ["nginx-gateway", "portfoliost-instruments"],
   ["nginx-gateway", "portfoliost-users-auth"],
   ["nginx-gateway", "portfoliost-wallets"],
+  ["openst-bond-import", "openst"],
+  ["openst-bond-archive", "openst"],
+  ["openst-cpi-import", "openst"],
+  ["openst-cpi-seed", "openst"],
+  ["openst", "biznesradar"],
+  ["openst", "obligacje"],
   ["openst", "cboe"],
   ["openst", "fmp"],
   ["openst", "intrinio"],
@@ -123,9 +135,9 @@ describe("topology graph definition (D55-3)", () => {
     expect(NODE_AREAS).toHaveLength(5)
     expect(areaNodes("internal")).toHaveLength(6)
     expect(areaNodes("storage")).toHaveLength(2)
-    expect(areaNodes("jobs")).toHaveLength(5)
+    expect(areaNodes("jobs")).toHaveLength(9)
     expect(areaNodes("external-services")).toHaveLength(4)
-    expect(areaNodes("data-providers")).toHaveLength(14)
+    expect(areaNodes("data-providers")).toHaveLength(16)
   })
 
   it("marks the six probed deployments as live and nothing else", () => {
@@ -140,6 +152,15 @@ describe("topology graph definition (D55-3)", () => {
     expect(nodeById.get("alphavantage")?.provider?.quota).toBe("25 req/day")
     expect(nodeById.get("fmp")?.provider?.quota).toBe("250 req/day (direct)")
     expect(nodeById.get("yfinance")?.provider?.quota).toBeUndefined()
+  })
+
+  it("maps verified OpenST CronJobs without claiming live execution health", () => {
+    for (const id of ["openst-bond-import", "openst-bond-archive", "openst-cpi-import", "openst-cpi-seed"]) {
+      expect(nodeById.get(id)?.live).toBe(false)
+      expect(nodeById.get(id)?.job?.schedule).toBeTruthy()
+      expect(downstreamOf(id)).toEqual(["openst"])
+    }
+    expect(nodeById.get("openst-cpi-seed")?.job?.suspended).toBe(true)
   })
 
   it("computes upstream/downstream neighbours correctly", () => {
