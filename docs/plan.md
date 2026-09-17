@@ -68,15 +68,27 @@ Rules: one step = one commit; a step is marked `[x]` only after its verification
 
 ### 22.2 — cluster verification of the recurrence
 
-- [ ] After the next monthly emission change: confirm a `bond-import` run upserted the new emission
+- [x] After the next monthly emission change: confirm a `bond-import` run upserted the new emission
       (`kubectl logs -n pfire -l job-name=bond-import-* --tail=50`, summary JSON shows the new
       symbol) and a `bond-archive` run converges the catalogue (row count stable across consecutive
       runs, equal to the full modern-series set of 449 codes from the 21.1 fixture).
-- [ ] Record the observed `symbols` payloads in the step result; confirm `X-Cache: HIT` flow through
-      cachest is untouched (no cachest change).
-- [ ] Tests: verification only — no code changes; existing openst/cachest/instruments suites stay
-      green as-is.
-- [ ] Commit note: `chore: verify bond recurring import CronJobs (D79 gap-fix)`.
+      No month-turn emission was due, so the discovery path was proven by deleting the current
+      ROD emission (`ROD0938`, on sale 01–30.09 → 448 rows) and running
+      `kubectl create job --from=cronjob/openst-bond-import`: `inserted ROD0938 …`,
+      `done mode=incremental fetched=8 parsed=8 inserted=1 in 14.4s`, restored row
+      field-for-field identical to the pre-delete snapshot. `--from=cronjob/openst-bond-archive`:
+      `done mode=archive fetched=449 parsed=449 inserted=0 in 689.2s`, table 449 rows before and
+      after (2016-08-01 … 2026-09-01) = the 21.1 fixture size.
+- [x] Record the observed `symbols` payloads in the step result; confirm `X-Cache: HIT` flow through
+      cachest is untouched (no cachest change). Incremental:
+      `["COI0930","DOR0928","EDO0936","OTS1226","ROD0938","ROR0927","ROS0932","TOS0929"]`;
+      archive: the same eight first, 449 total ending `EDO1026`, `ROD1028`, `EDO0926`, `EDO0826`.
+      cachest `/fixedincome/search/rod0938` → `200 x-cache: MISS` then `200 x-cache: HIT`,
+      `[{"symbol":"ROD0938","name":"Obligacje 12-letnie ROD","maturity_date":"2038-09-01"}]`.
+- [x] Tests: verification only — no code changes; existing openst/cachest/instruments suites stay
+      green as-is — openst compose 236 passed, cachest compose 78 passed, instruments
+      `vitest run` 221 passed.
+- [x] Commit note: `chore: verify bond recurring import CronJobs (D79 gap-fix)`.
 
 ### 22.3 — closeout
 
