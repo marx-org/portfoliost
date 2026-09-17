@@ -91,19 +91,24 @@ any route work (23.3+).
 
 ### 23.3 — `POST /api/import/wallets/bootstrap` + `POST /api/import/portfolios/bootstrap`
 
-- [ ] New route file `src/routes/import.ts`; mount at `/api/import` in `server.ts`.
-- [ ] `POST /api/import/wallets/bootstrap`: accept `{ externalSource, wallets:
+- [x] New route file `src/routes/import.ts`; mount at `/api/import` in `server.ts`.
+- [x] `POST /api/import/wallets/bootstrap`: accept `{ externalSource, wallets:
       [{name, currency, baseCurrency}] }`; upsert each on `(userId, name)` (`ON
       CONFLICT DO NOTHING`, re-select); set `external_source` on INSERT only; return
       array with `id` + `created` flag. Annotate responses with
       `satisfies ImportWalletBootstrapResponse`.
-- [ ] `POST /api/import/portfolios/bootstrap`: accept `{ externalSource, name,
+- [x] `POST /api/import/portfolios/bootstrap`: accept `{ externalSource, name,
       currency, baseCurrency }`; upsert on `(userId, name)`; set `external_source`
       on INSERT only; return `{ id, name, created }`.
-- [ ] Unit tests (PGlite): first call creates + tags (`created=true`); second call
+- [x] Unit tests (PGlite): first call creates + tags (`created=true`); second call
       returns same id, does not re-tag (`created=false`); unknown fields → 422.
-- [ ] `npm run test` passes.
-- [ ] Commit: `feat(wallets): POST /api/import/wallets/bootstrap + portfolios/bootstrap`.
+- [x] Prerequisite (no unique `(user_id, name)` existed): drizzle `0002` adds
+      `uq_wallets_user_name` + `uq_portfolios_user_name`; prod verified free of
+      duplicate names; manual create routes now return 409 on duplicate name.
+      Migration chain audited against `database-schema-migrations.md` (pure DDL,
+      own module only, breakpoint-separated — compliant).
+- [x] `npm run test` passes (271/271).
+- [x] Commit: `feat(wallets): POST /api/import/wallets/bootstrap + portfolios/bootstrap`.
 
 ### 23.4 — `POST /api/import/transactions`
 
