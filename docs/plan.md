@@ -46,7 +46,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
 
 ### 24.1 — `ticker_reference` seed additions (instruments repo)
 
-- [ ] In `portfoliost-instruments`, add to the tickerref seed CSV:
+- [x] In `portfoliost-instruments`, add to the tickerref seed CSV:
       - **Crypto**: `BTC` → `BTC-USD` (`asset_type=crypto`), `ETH` → `ETH-USD`
         (`asset_type=crypto`).
       - **NN/Goldman funds** (no `Symbol` in sheet): `NN Emerytura 2030` →
@@ -58,9 +58,9 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
         exist in reference or add with `asset_type=fund`, exchange `WSE`.
       - **Noisy-name aliases**: `Text S.A.` / `Text` → `TXT` WSE; confirm abbreviated
         names audited in the proposal have aliases.
-- [ ] Re-run `tickerref-sync.ts`; verify row counts.
-- [ ] `npm run test` passes.
-- [ ] Commit: `feat(instruments): ticker_reference seed — crypto + fund aliases`.
+- [x] Re-run `tickerref-sync.ts`; verify row counts.
+- [x] `npm run test` passes.
+- [x] Commit: `feat(instruments): ticker_reference seed — crypto + fund aliases`.
 
 ### 24.2 — Scaffold `portfoliost-sheets-sync` repo
 
