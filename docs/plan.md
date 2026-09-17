@@ -30,7 +30,7 @@ Contract-first (MODULARISATION.md): every module builds against
 `/api/import/*` + `/internal/apply-split` surfaces must be defined here before
 any route work (23.3+).
 
-- [ ] In `portfoliost-contracts/contracts/openapi.yaml` add schemas per the
+- [x] In `portfoliost-contracts/contracts/openapi.yaml` add schemas per the
       proposal shapes:
       - `ImportWalletBootstrapRequest` (`externalSource` + `wallets:
         [{name, currency, baseCurrency}]`), `ImportWalletBootstrapResponse`
@@ -54,18 +54,21 @@ any route work (23.3+).
         extend `CashTransaction` with optional `externalSource`, `externalId`.
         (`CashTransaction.type`/`Transaction.type` are free strings — no enum
         change needed for `ADJUSTMENT`.)
-- [ ] Add paths (tag `Wallets`): `POST /import/wallets/bootstrap`,
+- [x] Add paths (tag `Wallets`): `POST /import/wallets/bootstrap`,
       `POST /import/portfolios/bootstrap`, `POST /import/transactions`,
       `GET /import/sync-runs`, `DELETE /import/sync-runs/{id}`,
       `DELETE /import/source/{externalSource}`; plus `POST /internal/apply-split`
       (no auth). Wire request/response `$ref`s incl. `404`/`422` error shapes
-      per proposal.
-- [ ] Patch-bump `contracts/package.json`, `npm run lint` (yaml parses), push →
-      CI publishes `@marx2/contracts` `v1.6.x` (tag on GitHub Packages).
-- [ ] `portfoliost-wallets`: `npm run gen:types`; new paths/schemas appear in
-      `src/generated/api-types.d.ts`.
-- [ ] `npm run build` (tsc clean) + `npm run test` pass unchanged.
-- [ ] Commit: `feat(contracts): import API + internal apply-split contract`.
+      per proposal. (Added new `Internal` tag.)
+- [x] `npm run lint` (yaml parses), commit, push → CI auto-bumped and published
+      `@marx2/contracts` `v1.6.21` (tag + GitHub Packages). No manual
+      `package.json` bump needed — `release-contracts.yml` computes it from tags.
+- [x] `portfoliost-wallets`: `npm install` (v1.6.21) + `npm run gen:types`; new
+      paths/schemas verified in `src/generated/api-types.d.ts`.
+- [x] `npm run build` (tsc clean) + `npm run test` pass unchanged (265/265).
+- [x] Commit (contracts, `8b38246`): `feat(contracts): import API + internal
+      apply-split contract`; commit (wallets, `c164517`): `chore: regenerate
+      API types from @marx2/contracts v1.6.21`.
 
 ### 23.2 — DB migration: provenance + sync_runs + source tags + split columns
 
