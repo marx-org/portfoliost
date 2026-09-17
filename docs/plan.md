@@ -24,7 +24,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
 
 ### 23.1 — DB migration: provenance + sync_runs + source tags + split columns
 
-- [ ] In `portfoliost-wallets` add Drizzle migration:
+- [x] In `portfoliost-wallets` add Drizzle migration:
       - `wallets.wallets`: add `external_source text` (NULL = manual).
       - `portfolios.portfolios`: add `external_source text` (NULL = manual).
       - `wallets.wallet_transactions`: add `external_source text`, `external_id text`;
@@ -35,10 +35,10 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
         and `original_price numeric(20,8)` (both nullable; frozen at creation).
       - New table `wallets.sync_runs` per proposal schema.
       - Relax `ck_wtx_amount_nonzero` to `amount <> 0 OR type = 'ADJUSTMENT'`.
-- [ ] PGlite migration test: all objects exist; partial unique index rejects duplicate
+- [x] PGlite migration test: all objects exist; partial unique index rejects duplicate
       `external_id`; allows NULL duplicates (manual rows); `original_quantity` /
       `original_price` are independent of `quantity` / `price` (no constraint).
-- [ ] `npm run test` passes.
+- [x] `npm run test` passes.
 - [ ] Commit: `feat(wallets): import API migration — provenance + split columns`.
 
 ### 23.2 — `POST /api/import/wallets/bootstrap` + `POST /api/import/portfolios/bootstrap`
