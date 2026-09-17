@@ -220,13 +220,24 @@ any route work (23.3+).
 
 ### 23.8 — Mock handlers + full suite
 
-- [ ] In `portfoliost/mocks/`: add handlers for all seven import/internal routes:
+- [x] In `portfoliost/mocks/`: add handlers for all seven import/internal routes:
       `POST /api/import/wallets/bootstrap`, `POST /api/import/portfolios/bootstrap`,
       `POST /api/import/transactions`, `GET /api/import/sync-runs`,
       `DELETE /api/import/sync-runs/:id`, `DELETE /api/import/source/:externalSource`,
       `POST /internal/apply-split` → `{ updatedTransactions: 0, affectedPortfolios: 0 }`.
-- [ ] `npm run build` + `npm run test` + `npm run test:mock` + `npm run test:e2e` pass.
-- [ ] Commit: `feat(mocks): import API + apply-split mock handlers`.
+- [x] `npm run build` + `npm run test` + `npm run test:mock` + `npm run test:e2e` pass
+      (re-verified 2026-09-17 vs the full compose stack: build clean, vitest 272,
+      mock 186, e2e 68 passed / 1 skipped; the two failures are pre-existing and
+      unrelated to §23 — (1) `auth.spec.ts` "login page hides the user/password
+      form" conflicts with the `login()` helper in ~15 other specs that require the
+      form and with the compose default `PASSWORD_LOGIN_ENABLED=true` (spec dates to
+      2026-08-31); (2) `price-bars.spec.ts` expects the pricebars-sim AAPL close
+      57.625 (230.5 × 0.25) but the live openst provider backfilled real AAPL closes
+      into `instruments.price_bars`, shadowing the sim in `price_bars_all` — passes
+      3/3 with openst stopped + openst rows deleted (spec dates to 2026-09-03; its
+      "provider unavailable for mock symbols" premise breaks when openst has network
+      access)).
+- [x] Commit: `feat(mocks): import API + apply-split mock handlers`.
 
 ### 23.9 — Closeout
 
