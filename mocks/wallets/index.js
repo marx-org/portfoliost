@@ -424,6 +424,156 @@ export function register(app) {
     }
     ctx.res.json(paginatePage(ctx.query.page, ctx.query.limit, items, items.length))
   })
+
+  // ── §23 — import API (mock state is in-memory per process) ────────────────
+  const importWallets = new Map()
+  const importPortfolios = new Map()
+  const importRuns = []
+  let importRunSeq = 0
+  const importTxs = []
+
+  app.post("/api/import/wallets/bootstrap", (ctx) => {
+    if (!requireAuth(ctx)) return
+    const { externalSource, wallets } = ctx.body || {}
+    if (!externalSource || !Array.isArray(wallets) || wallets.length === 0) {
+      return ctx.res.status(422).json({ error: "ValidationError", message: "externalSource and wallets[] are required" })
+    }
+    const out = []
+    for (const w of wallets) {
+      const key = `${externalSource}\u0000${w.name}`
+      const existing = importWallets.get(key)
+      if (existing) {
+        out.push({ ...existing, created: false })
+      } else {
+        const row = { id: uuid(), name: w.name, currency: String(w.currency || "USD").toUpperCase(), baseCurrency: String(w.baseCurrency || "USD").toUpperCase() }
+        importWallets.set(key, row)
+        out.push({ ...row, created: true })
+      }
+    }
+    ctx.res.json({ wallets: out })
+  })
+
+  app.post("/api/import/portfolios/bootstrap", (ctx) => {
+    if (!requireAuth(ctx)) return
+    const { externalSource, name, currency, baseCurrency } = ctx.body || {}
+    if (!externalSource || !name || !currency) {
+      return ctx.res.status(422).json({ error: "ValidationError", message: "externalSource, name and currency are required" })
+    }
+    const key = `${externalSource}\u0000${name}`
+    const existing = importPortfolios.get(key)
+    if (existing) return ctx.res.json({ ...existing, created: false })
+    const row = { id: uuid(), name, currency: String(currency).toUpperCase(), baseCurrency: String(baseCurrency || "USD").toUpperCase() }
+    importPortfolios.set(key, row)
+    ctx.res.json({ ...row, created: true })
+  })
+
+  app.post("/api/import/transactions", (ctx) => {
+    if (!requireAuth(ctx)) return
+    const { source, transactions } = ctx.body || {}
+    if (!source?.externalSource || !Array.isArray(transactions)) {
+      return ctx.res.status(422).json({ error: "ValidationError", message: "source and transactions[] are required" })
+    }
+    const errors = []
+    let inserted = 0
+    let insertedPtx = 0
+    let skipped = 0
+    for (const t of transactions) {
+      if (!t?.externalId) {
+        errors.push({ externalId: null, error: "missing_external_id", message: "externalId is required" })
+        continue
+      }
+      if (importTxs.some((x) => x.externalId === t.externalId && x.externalSource === source.externalSource)) {
+        skipped++
+        continue
+      }
+      importTxs.push({ externalId: t.externalId, externalSource: source.externalSource, hasPortfolioTx: Boolean(t.portfolioTx) })
+      inserted++
+      if (t.portfolioTx) insertedPtx++
+    }
+
+    let run = importRuns.find(
+      (r) =>
+        r.externalSource === source.externalSource &&
+        r.spreadsheetId === source.spreadsheetId &&
+        r.sheet === source.sheet,
+    )
+    if (!run) {
+      run = {
+        id: ++importRunSeq,
+        externalSource: source.externalSource,
+        spreadsheetId: source.spreadsheetId ?? null,
+        sheet: source.sheet ?? null,
+        lastRow: null,
+        status: "pending",
+        startedAt: nowIso(),
+        completedAt: null,
+        error: null,
+        insertedWtx: 0,
+        insertedPtx: 0,
+        skipped: 0,
+      }
+      importRuns.push(run)
+    }
+    run.insertedWtx = inserted
+    run.insertedPtx = insertedPtx
+    run.skipped = skipped
+    run.status = inserted === 0 && errors.length > 0 ? "failed" : "done"
+    run.completedAt = nowIso()
+    run.error = errors.length > 0 ? `${errors.length} row(s) failed` : null
+
+    ctx.res.json({ inserted, skipped, errors, syncRun: run })
+  })
+
+  app.get("/api/import/sync-runs", (ctx) => {
+    if (!requireAuth(ctx)) return
+    const externalSource = ctx.query.externalSource
+    const limit = Math.min(Math.max(Number(ctx.query.limit) || 25, 1), 100)
+    const offset = Math.max(Number(ctx.query.offset) || 0, 0)
+    let items = [...importRuns].reverse()
+    if (externalSource) items = items.filter((r) => r.externalSource === externalSource)
+    const total = items.length
+    ctx.res.json({ items: items.slice(offset, offset + limit), total })
+  })
+
+  app.delete("/api/import/sync-runs/:id", (ctx) => {
+    if (!requireAuth(ctx)) return
+    const idx = importRuns.findIndex((r) => r.id === Number(ctx.params.id))
+    if (idx === -1) return ctx.res.status(404).json({ error: "NotFound", message: "Run not found" })
+    importRuns.splice(idx, 1)
+    ctx.res.status(204).end()
+  })
+
+  app.delete("/api/import/source/:externalSource", (ctx) => {
+    if (!requireAuth(ctx)) return
+    const source = ctx.params.externalSource
+    const deleted = { walletTransactions: 0, portfolios: 0, wallets: 0, syncRuns: 0 }
+    for (const [k] of [...importWallets]) {
+      if (k.startsWith(source + "\u0000")) {
+        importWallets.delete(k)
+        deleted.wallets++
+      }
+    }
+    for (const [k] of [...importPortfolios]) {
+      if (k.startsWith(source + "\u0000")) {
+        importPortfolios.delete(k)
+        deleted.portfolios++
+      }
+    }
+    deleted.walletTransactions = importTxs.filter((t) => t.externalSource === source).length
+    for (let i = importTxs.length - 1; i >= 0; i--) {
+      if (importTxs[i].externalSource === source) importTxs.splice(i, 1)
+    }
+    deleted.syncRuns = importRuns.filter((r) => r.externalSource === source).length
+    for (let i = importRuns.length - 1; i >= 0; i--) {
+      if (importRuns[i].externalSource === source) importRuns.splice(i, 1)
+    }
+    ctx.res.json({ deleted })
+  })
+
+  // §23.6 — internal split application (no auth; no-op in the mock)
+  app.post("/internal/apply-split", (ctx) => {
+    ctx.res.json({ updatedTransactions: 0, affectedPortfolios: 0 })
+  })
 }
 
 function round2(x) {

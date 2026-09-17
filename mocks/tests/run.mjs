@@ -645,6 +645,105 @@ async function main() {
     await request(`/portfolios/${pid2}/transactions/${ptx.json.id}`, { method: "DELETE", token })
   }
 
+  // ── Import (§23) ────────────────────────────────────────────
+  const importSource = "mock:tests"
+  const wb = await request("/import/wallets/bootstrap", {
+    method: "POST",
+    token,
+    body: { externalSource: importSource, wallets: [{ name: "MockImport", currency: "usd" }] },
+  })
+  check(
+    "import.wallets.bootstrap creates tagged wallet",
+    wb.status === 200 && wb.json.wallets?.[0]?.created === true && wb.json.wallets[0].currency === "USD",
+    JSON.stringify(wb.json || {}).slice(0, 160),
+  )
+  const wb2 = await request("/import/wallets/bootstrap", {
+    method: "POST",
+    token,
+    body: { externalSource: importSource, wallets: [{ name: "MockImport", currency: "usd" }] },
+  })
+  check(
+    "import.wallets.bootstrap is idempotent",
+    wb2.status === 200 &&
+      wb2.json.wallets?.[0]?.created === false &&
+      wb2.json.wallets[0].id === wb.json.wallets[0].id,
+    JSON.stringify(wb2.json || {}).slice(0, 160),
+  )
+
+  const pb = await request("/import/portfolios/bootstrap", {
+    method: "POST",
+    token,
+    body: { externalSource: importSource, name: "MockImportP", currency: "USD" },
+  })
+  check("import.portfolios.bootstrap creates", pb.status === 200 && pb.json.created === true && pb.json.id, JSON.stringify(pb.json || {}).slice(0, 160))
+
+  const importTxBody = {
+    source: { externalSource: importSource, spreadsheetId: "spr-mock", sheet: "tx" },
+    transactions: [
+      {
+        externalId: "mock-1",
+        walletName: "MockImport",
+        executedAt: new Date().toISOString(),
+        walletTx: { type: "DEPOSIT", amount: 100, currency: "USD" },
+      },
+    ],
+  }
+  const itx = await request("/import/transactions", { method: "POST", token, body: importTxBody })
+  check(
+    "import.transactions inserts + syncRun",
+    itx.status === 200 && itx.json.inserted === 1 && itx.json.skipped === 0 && itx.json.syncRun?.status === "done",
+    JSON.stringify(itx.json || {}).slice(0, 160),
+  )
+  const itx2 = await request("/import/transactions", { method: "POST", token, body: importTxBody })
+  check(
+    "import.transactions is idempotent by externalId",
+    itx2.status === 200 && itx2.json.inserted === 0 && itx2.json.skipped === 1,
+    JSON.stringify(itx2.json || {}).slice(0, 160),
+  )
+
+  const runs = await request(`/import/sync-runs?externalSource=${encodeURIComponent(importSource)}`, { token })
+  check(
+    "import.sync-runs lists filtered runs",
+    runs.status === 200 && runs.json.total === 1 && runs.json.items?.[0]?.externalSource === importSource,
+    JSON.stringify(runs.json || {}).slice(0, 160),
+  )
+
+  const delRun = await request(`/import/sync-runs/${runs.json.items[0].id}`, { method: "DELETE", token })
+  check("import.sync-runs delete → 204", delRun.status === 204, `got ${delRun.status}`)
+  const delMissing = await request("/import/sync-runs/99999", { method: "DELETE", token })
+  check("import.sync-runs delete missing → 404", delMissing.status === 404, `got ${delMissing.status}`)
+
+  const wipe = await request(`/import/source/${importSource}`, { method: "DELETE", token })
+  check(
+    "import.source wipe removes tagged data",
+    wipe.status === 200 &&
+      wipe.json.deleted?.wallets === 1 &&
+      wipe.json.deleted.portfolios === 1 &&
+      wipe.json.deleted.walletTransactions === 1 &&
+      wipe.json.deleted.syncRuns === 0,
+    JSON.stringify(wipe.json || {}).slice(0, 160),
+  )
+  const runsAfter = await request("/import/sync-runs", { token })
+  check("import.sync-runs empty after run delete", runsAfter.json.total === 0, JSON.stringify(runsAfter.json || {}).slice(0, 120))
+  const wb3 = await request("/import/wallets/bootstrap", {
+    method: "POST",
+    token,
+    body: { externalSource: importSource, wallets: [{ name: "MockImport", currency: "usd" }] },
+  })
+  check("import.wallets.bootstrap re-creates after wipe", wb3.json.wallets?.[0]?.created === true, JSON.stringify(wb3.json || {}).slice(0, 120))
+
+  const split = await fetch(`http://localhost:${PORT}/internal/apply-split`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ symbol: "AAPL", factor: 2, effectiveDate: "2024-01-01" }),
+  })
+  const splitJson = await split.json()
+  check(
+    "internal.apply-split no-op shape",
+    split.status === 200 && splitJson.updatedTransactions === 0 && splitJson.affectedPortfolios === 0,
+    JSON.stringify(splitJson),
+  )
+
   // ── 404 + errors ────────────────────────────────────────────
   const nope = await request("/does/not/exist", { token })
   check("unknown route → 404", nope.status === 404, `got ${nope.status}`)
