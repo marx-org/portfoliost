@@ -35,9 +35,11 @@ Rules: one step = one commit; a step is marked `[x]` only after its verification
 
 ### 22.0 - logging
 
-- [ ] Job should emit some logs to verify what it's doing in a runtime. Like a discovered emission,
+- [x] Job should emit some logs to verify what it's doing in a runtime. Like a discovered emission,
   or succesfully imported emission. This is to verify that the CronJob is actually running and doing
-  something.
+  something. — openst `51f7fc3` (GHA v1.1.23): one INFO line per enumerated page, per emission
+  parsed and per symbol inserted (duplicates at DEBUG), plus a `done` line with
+  fetched/parsed/inserted + elapsed. 4 new tests; openst compose suite 236 passed.
 
 ### 22.1 — homelab: bond-import daily incremental + bond-archive monthly CronJobs
 
