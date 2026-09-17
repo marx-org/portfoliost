@@ -112,7 +112,7 @@ any route work (23.3+).
 
 ### 23.4 — `POST /api/import/transactions`
 
-- [ ] `POST /api/import/transactions`: accept `source` + `transactions[]` (≤ 500);
+- [x] `POST /api/import/transactions`: accept `source` + `transactions[]` (≤ 500);
       per-row: resolve `walletName` → `walletId`; INSERT `wallet_transactions` with
       `ON CONFLICT (external_source, external_id) DO NOTHING`; when `portfolioTx`
       present INSERT `portfolios.transactions` with `original_quantity` and
@@ -123,11 +123,11 @@ any route work (23.3+).
       After all rows: recalculate wallet balances as `SUM(amount)` for each affected
       wallet; call `recomputePortfolioTotals` once per distinct `portfolioId`;
       upsert `sync_runs` row.
-- [ ] Existing interactive routes (`POST /api/portfolios/:id/transactions`,
+- [x] Existing interactive routes (`POST /api/portfolios/:id/transactions`,
       `POST /api/portfolios/:id/positions`): set `original_quantity = quantity` and
       `original_price = price` at INSERT time (server-side copy; caller never supplies
       these fields).
-- [ ] Unit tests (PGlite):
+- [x] Unit tests (PGlite):
       - BUY + SELL sequence: correct qty, avg cost, realizedGainLoss.
       - Import BUY with `originalQuantity ≠ quantity`: both stored independently;
         `quantity`/`price` are the restated values used in calculations.
@@ -137,8 +137,8 @@ any route work (23.3+).
       - DEPOSIT (no `portfolioTx`): wallet row only, no position.
       - Wallet balance after batch equals `SUM(amount)`.
       - `sync_runs` upserted with correct counts.
-- [ ] `npm run test` passes.
-- [ ] Commit: `feat(wallets): POST /api/import/transactions — batch import + original values`.
+- [x] `npm run test` passes.
+- [x] Commit: `feat(wallets): POST /api/import/transactions — batch import + original values`.
 
 ### 23.5 — `GET /api/import/sync-runs`, `DELETE /api/import/sync-runs/:id`, `DELETE /api/import/source/:externalSource`
 
