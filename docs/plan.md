@@ -106,11 +106,14 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
 
 ### 24.5 — Instrument resolver + Konto map
 
-- [ ] `src/instrument-resolver.ts`: `resolveInstrument(row, instrumentsDb)`:
-      symbol-primary (`ticker_reference` by `ticker` + `exchange`); aktywo-fallback
-      (name-fold against `name`/`aliases`); unmatched → `{ ticker: aktywo,
-      assetType: "stock", matched: false }`.
-- [ ] `src/konto-map.ts`: static map `Konto` → `{ walletName, currency, baseCurrency }`
+- [x] `src/instrument-resolver.ts`: `resolveInstrument(row, instrumentsDb)`:
+      symbol-primary (`ticker_reference` by `ticker` + `exchange`; with exchange
+      → venue-strict, without → ticker must be unique across venues); aktywo-fallback
+      (name-fold against `name`/`aliases`; Polish ąćęłńśźż transliterated — no NFD
+      decomposition); ambiguous fold → unmatched; unmatched → `{ ticker: aktywo,
+      assetType: "stock", matched: false }`. Index loaded once per connection
+      (WeakMap cache) — ~60k rows in memory.
+- [x] `src/konto-map.ts`: static map `Konto` → `{ walletName, currency, baseCurrency }`
       for all 10 known values; throws on unknown.
 
       | Konto                     | walletName                  | currency | baseCurrency |
@@ -126,10 +129,10 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
       | `Crypto`                  | Crypto                      | PLN      | PLN          |
       | `Obligacje PKO SA Beata`  | Obligacje PKO SA Beata      | PLN      | PLN          |
 
-- [ ] Unit tests: symbol-primary; aktywo-fallback; unmatched; all 10 Konto values;
+- [x] Unit tests: symbol-primary; aktywo-fallback; unmatched; all 10 Konto values;
       unknown throws.
-- [ ] `npm run test` passes.
-- [ ] Commit: `feat(sheets-sync): instrument resolver + Konto→wallet map`.
+- [x] `npm run test` passes.
+- [x] Commit: `feat(sheets-sync): instrument resolver + Konto→wallet map`.
 
 ### 24.6 — Wallets API client
 
