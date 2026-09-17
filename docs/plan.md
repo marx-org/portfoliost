@@ -16,13 +16,58 @@ wipe for clean re-imports, and split preservation with retroactive adjustment.
 First consumer: `portfoliost-sheets-sync` (§24). Future consumers: CSV broker exports,
 bank feeds, etc.
 
-Repos touched: `portfoliost-wallets`, `portfoliost-admin`, `portfoliost` (mock handlers).
+Repos touched: `portfoliost-contracts`, `portfoliost-wallets`, `portfoliost-admin`,
+`portfoliost` (mock handlers).
 
 Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
 
 ---
 
-### 23.1 — DB migration: provenance + sync_runs + source tags + split columns
+### 23.1 — `@marx2/contracts` bump: import API + internal apply-split contract
+
+Contract-first (MODULARISATION.md): every module builds against
+`@marx2/contracts` and annotates responses with `satisfies`, so the new
+`/api/import/*` + `/internal/apply-split` surfaces must be defined here before
+any route work (23.3+).
+
+- [ ] In `portfoliost-contracts/contracts/openapi.yaml` add schemas per the
+      proposal shapes:
+      - `ImportWalletBootstrapRequest` (`externalSource` + `wallets:
+        [{name, currency, baseCurrency}]`), `ImportWalletBootstrapResponse`
+        (`wallets: [{id, name, currency, baseCurrency, created}]`),
+        `ImportPortfolioBootstrapRequest` / `Response`
+        (`{id, name, currency, baseCurrency, created}`).
+      - `ImportTransactionsRequest` (`source: {externalSource, spreadsheetId,
+        sheet}` + `transactions[]`: `externalId`, `walletName`, `executedAt`,
+        `walletTx: ImportWalletTx`, `portfolioTx: ImportPortfolioTx` optional),
+        `ImportWalletTx` (fields of `wallet_transactions`, incl. `ADJUSTMENT`),
+        `ImportPortfolioTx` (`Transaction` fields + optional
+        `originalQuantity`, `originalPrice`), `ImportTransactionsResponse`
+        (`{inserted, skipped, errors, syncRun}`).
+      - `SyncRun`, `SyncRunsResponse` (`{items, total}`),
+        `SourceWipeResponse` (`deleted: {walletTransactions, portfolios,
+        wallets, syncRuns}`), `ApplySplitRequest` (`{symbol, factor,
+        effectiveDate}`), `ApplySplitResponse` (`{updatedTransactions,
+        affectedPortfolios}`).
+      - Extend the existing portfolio `Transaction` schema with optional
+        `externalSource`, `externalId`, `originalQuantity`, `originalPrice`;
+        extend `CashTransaction` with optional `externalSource`, `externalId`.
+        (`CashTransaction.type`/`Transaction.type` are free strings — no enum
+        change needed for `ADJUSTMENT`.)
+- [ ] Add paths (tag `Wallets`): `POST /import/wallets/bootstrap`,
+      `POST /import/portfolios/bootstrap`, `POST /import/transactions`,
+      `GET /import/sync-runs`, `DELETE /import/sync-runs/{id}`,
+      `DELETE /import/source/{externalSource}`; plus `POST /internal/apply-split`
+      (no auth). Wire request/response `$ref`s incl. `404`/`422` error shapes
+      per proposal.
+- [ ] Patch-bump `contracts/package.json`, `npm run lint` (yaml parses), push →
+      CI publishes `@marx2/contracts` `v1.6.x` (tag on GitHub Packages).
+- [ ] `portfoliost-wallets`: `npm run gen:types`; new paths/schemas appear in
+      `src/generated/api-types.d.ts`.
+- [ ] `npm run build` (tsc clean) + `npm run test` pass unchanged.
+- [ ] Commit: `feat(contracts): import API + internal apply-split contract`.
+
+### 23.2 — DB migration: provenance + sync_runs + source tags + split columns
 
 - [x] In `portfoliost-wallets` add Drizzle migration:
       - `wallets.wallets`: add `external_source text` (NULL = manual).
@@ -39,15 +84,16 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
       `external_id`; allows NULL duplicates (manual rows); `original_quantity` /
       `original_price` are independent of `quantity` / `price` (no constraint).
 - [x] `npm run test` passes.
-- [ ] Commit: `feat(wallets): import API migration — provenance + split columns`.
+- [x] Commit: `feat(wallets): import API migration — provenance + split columns`.
 
-### 23.2 — `POST /api/import/wallets/bootstrap` + `POST /api/import/portfolios/bootstrap`
+### 23.3 — `POST /api/import/wallets/bootstrap` + `POST /api/import/portfolios/bootstrap`
 
 - [ ] New route file `src/routes/import.ts`; mount at `/api/import` in `server.ts`.
 - [ ] `POST /api/import/wallets/bootstrap`: accept `{ externalSource, wallets:
       [{name, currency, baseCurrency}] }`; upsert each on `(userId, name)` (`ON
       CONFLICT DO NOTHING`, re-select); set `external_source` on INSERT only; return
-      array with `id` + `created` flag.
+      array with `id` + `created` flag. Annotate responses with
+      `satisfies ImportWalletBootstrapResponse`.
 - [ ] `POST /api/import/portfolios/bootstrap`: accept `{ externalSource, name,
       currency, baseCurrency }`; upsert on `(userId, name)`; set `external_source`
       on INSERT only; return `{ id, name, created }`.
@@ -56,7 +102,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
 - [ ] `npm run test` passes.
 - [ ] Commit: `feat(wallets): POST /api/import/wallets/bootstrap + portfolios/bootstrap`.
 
-### 23.3 — `POST /api/import/transactions`
+### 23.4 — `POST /api/import/transactions`
 
 - [ ] `POST /api/import/transactions`: accept `source` + `transactions[]` (≤ 500);
       per-row: resolve `walletName` → `walletId`; INSERT `wallet_transactions` with
@@ -86,7 +132,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
 - [ ] `npm run test` passes.
 - [ ] Commit: `feat(wallets): POST /api/import/transactions — batch import + original values`.
 
-### 23.4 — `GET /api/import/sync-runs`, `DELETE /api/import/sync-runs/:id`, `DELETE /api/import/source/:externalSource`
+### 23.5 — `GET /api/import/sync-runs`, `DELETE /api/import/sync-runs/:id`, `DELETE /api/import/source/:externalSource`
 
 - [ ] `GET /api/import/sync-runs`: list runs for authenticated user; filter by
       `externalSource`; paginate with `limit`/`offset`.
@@ -105,7 +151,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
 - [ ] `npm run test` passes.
 - [ ] Commit: `feat(wallets): sync-run list/delete + source wipe endpoint`.
 
-### 23.5 — `POST /internal/apply-split` (wallets)
+### 23.6 — `POST /internal/apply-split` (wallets)
 
 - [ ] New internal endpoint `src/routes/internal.ts`, mounted at `/internal` (no JWT —
       internal network only, not exposed through nginx gateway):
@@ -134,7 +180,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
 - [ ] `npm run test` passes.
 - [ ] Commit: `feat(wallets): POST /internal/apply-split`.
 
-### 23.6 — Admin split apply hook
+### 23.7 — Admin split apply hook
 
 - [ ] In `portfoliost-admin/src/market-data.ts`, after the existing
       `split_adjustments` INSERT in the `/apply` handler:
@@ -148,7 +194,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
 - [ ] `npm run test` passes (admin suite).
 - [ ] Commit: `feat(admin): fire apply-split hook on split candidate apply`.
 
-### 23.7 — Mock handlers + full suite
+### 23.8 — Mock handlers + full suite
 
 - [ ] In `portfoliost/mocks/`: add handlers for all seven import/internal routes:
       `POST /api/import/wallets/bootstrap`, `POST /api/import/portfolios/bootstrap`,
@@ -158,7 +204,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
 - [ ] `npm run build` + `npm run test` + `npm run test:mock` + `npm run test:e2e` pass.
 - [ ] Commit: `feat(mocks): import API + apply-split mock handlers`.
 
-### 23.8 — Closeout
+### 23.9 — Closeout
 
 - [ ] Update `wallets-import-api.md` status to **implemented** with date; resolve the
       three open questions; note `original_quantity`/`original_price` invariant and
