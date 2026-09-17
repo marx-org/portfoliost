@@ -141,8 +141,8 @@ function onSelect(id: string): void {
           </div>
         </section>
 
-        <!-- Live traffic metrics (internal services) -->
-        <section v-if="traffic && data.area === 'internal'" aria-label="Traffic">
+        <!-- Live traffic metrics (any probed service with traffic data) -->
+        <section v-if="traffic" aria-label="Traffic">
           <h3 class="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Traffic</h3>
           <div class="grid grid-cols-3 gap-2">
             <div class="card px-2 py-1.5">
