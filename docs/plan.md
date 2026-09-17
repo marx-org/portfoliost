@@ -136,11 +136,14 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
 
 ### 24.6 — Wallets API client
 
-- [ ] `src/wallets-api-client.ts`: typed `fetch` wrappers for `POST
+- [x] `src/wallets-api-client.ts`: typed `fetch` wrappers for `POST
       /api/import/wallets/bootstrap`, `POST /api/import/transactions`, `GET
-      /api/import/sync-runs`. Auth: `Authorization: Bearer $WALLETS_API_TOKEN`.
-- [ ] Unit tests: mocked fetch; URL, headers, payload shapes.
-- [ ] Commit: `feat(sheets-sync): wallets import API client`.
+      /api/import/sync-runs` (plus `POST /api/import/portfolios/bootstrap` and
+      `DELETE /api/import/source/:externalSource` for §24.8). Auth:
+      `Authorization: Bearer $WALLETS_API_TOKEN`. `createWalletsClient(baseUrl, token)`
+      + `walletsClientFromEnv()`; enforces the 500-row batch cap client-side.
+- [x] Unit tests: mocked fetch; URL, headers, payload shapes.
+- [x] Commit: `feat(sheets-sync): wallets import API client`.
 
 ### 24.7 — Row mapper: `RawTransakcjeRow` → `ImportTransaction`
 
