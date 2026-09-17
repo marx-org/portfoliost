@@ -36478,7 +36478,7 @@ NYSE::BSAC,BSAC,NYSE,Banco Santander Chile,Stock,Financials,,Chile,CL,US05965X10
 NYSE::BSX,BSX,NYSE,Boston Scientific Corp,Stock,Health Care,,United States,US,US1011371077,boston scientific,US1011371077,primary_listing
 NYSE::BTFD,BTFD,NYSE,Valkyrie Bitcoin Strategy ETF,ETF,,Alternative,United States,US,,valkyrie bitcoin strategy,NYSE::BTFD,primary_listing_missing_isin
 NYSE::BTGO,BTGO,NYSE,"BitGo Holdings, Inc.",Stock,Financials,,United States,US,US0919471013,bitgo holdings|bitgo,US0919471013,primary_listing
-NYSE::BTI,BTI,NYSE,British American Tobacco p.l.c.,Stock,Consumer Staples,,United Kingdom,GB,US1104481072,,US1104481072,primary_listing
+NYSE::BTI,BTI,NYSE,British American Tobacco p.l.c.,Stock,Consumer Staples,,United Kingdom,GB,US1104481072,british american tobacco plc ads common stock,US1104481072,primary_listing
 NYSE::BTU,BTU,NYSE,Peabody Energy Corp,Stock,Energy,,United States,US,US7045511000,peabody energy|peabody,US7045511000,primary_listing
 NYSE::BTX,BTX,NYSE,BlackRock Technology and Private Equity Term Trust,Stock,Financials,,United States,US,US09260Q1085,blackrock technology and private equity term trust,US09260Q1085,primary_listing
 NYSE::BUD,BUD,NYSE,Anheuser-Busch InBev SA/NV Sponsored ADR,Stock,Consumer Staples,,Belgium,BE,US03524A1088,anheuser-busch inbev/sponsored,US03524A1088,primary_listing
@@ -58887,7 +58887,7 @@ WSE::GNS,GNS,WSE,Niewiadow Polska Grupa Militarna Sa,Stock,Industrials,,Poland,P
 WSE::GOB,GOB,WSE,Gobarto Sa,Stock,Consumer Staples,,Poland,PL,PLDUDA000016,gobarto,PLDUDA000016,primary_listing
 WSE::GOP,GOP,WSE,Games Operators Sa,Stock,Communication Services,,Poland,PL,PLGMSOP00019,games operators,PLGMSOP00019,primary_listing
 WSE::GPP,GPP,WSE,Grupa Pracuj S.A.,Stock,Energy,,Poland,PL,PLGRPRC00015,grupa pracuj,PLGRPRC00015,primary_listing
-WSE::GPW,GPW,WSE,Gielda Papierow Wartosciowych w Warszawie SA,Stock,Financials,,Poland,PL,PLGPW0000017,gielda papierow wartosciowych w warszawie,PLGPW0000017,primary_listing
+WSE::GPW,GPW,WSE,Gielda Papierow Wartosciowych w Warszawie SA,Stock,Financials,,Poland,PL,PLGPW0000017,gielda papierow wartosciowych w warszawie|gielda papierow wartosciowych w wrszw sa,PLGPW0000017,primary_listing
 WSE::GRC,GRC,WSE,Grupa Recykl Sa,Stock,Industrials,,Poland,PL,PLRCKL000010,grupa recykl,PLRCKL000010,primary_listing
 WSE::GRM,GRM,WSE,Grempco,Stock,Financials,,Poland,PL,PLGRMPC00016,grempco,PLGRMPC00016,primary_listing
 WSE::GRN,GRN,WSE,Grodno Sa,Stock,Industrials,,Poland,PL,PLGRODN00015,grodno,PLGRODN00015,primary_listing
@@ -59179,7 +59179,7 @@ WSE::TRK,TRK,WSE,Trakcja PRKiI S.A.,Stock,Industrials,,Poland,PL,PLTRKPL00014,tr
 WSE::TRN,TRN,WSE,Trans Polonia Sa,Stock,Industrials,,Poland,PL,PLTRNSP00013,trans polonia,PLTRNSP00013,primary_listing
 WSE::TRR,TRR,WSE,Termorex,Stock,Materials,,Poland,PL,PLTRMRX00011,termorex,PLTRMRX00011,primary_listing
 WSE::TSG,TSG,WSE,TESGAS S.A.,Stock,Materials,,Poland,PL,PLTSGS000019,tesgas,PLTSGS000019,primary_listing
-WSE::TXT,TXT,WSE,Text S.A.,Stock,Information Technology,,Poland,PL,PLLVTSF00010,,PLLVTSF00010,primary_listing
+WSE::TXT,TXT,WSE,Text S.A.,Stock,Information Technology,,Poland,PL,PLLVTSF00010,text|text s.a.,PLLVTSF00010,primary_listing
 WSE::ULG,ULG,WSE,Ultimate Games SA,Stock,Communication Services,,Poland,PL,PLULTGM00013,ultimate games,PLULTGM00013,primary_listing
 WSE::ULM,ULM,WSE,ULMA Construccion Polska SA,Stock,Industrials,,Poland,PL,PLBAUMA00017,ulma construccion polska,PLBAUMA00017,primary_listing
 WSE::UNI,UNI,WSE,Unibep Sa,Stock,Industrials,,Poland,PL,PLUNBEP00015,unibep,PLUNBEP00015,primary_listing
@@ -60784,7 +60784,7 @@ XETRA::MUB,MUB,XETRA,Mühlbauer Holding AG,Stock,Industrials,,Germany,DE,DE00066
 XETRA::MUM,MUM,XETRA,MENSCH UND MASCHINE SOFTWARE O.N.,Stock,Information Technology,,Germany,DE,DE0006580806,mensch und maschine software|mensch und maschine,DE0006580806,primary_listing
 XETRA::MUT,MUT,XETRA,Mineralbrunnen Überkingen-Teinach GmbH & Co. KGaA,Stock,Consumer Staples,,Germany,DE,DE0006614001,mineralbrunnen uberkingen-teinach gmbh,DE0006614001,primary_listing
 XETRA::MUT3,MUT3,XETRA,MINERALBR.UEBERK.-VZ-,Stock,Consumer Staples,,Germany,DE,DE0006614035,mineralbr.ueberk.-vz,DE0006614035,primary_listing
-XETRA::MUV2,MUV2,XETRA,MUENCH.RUECKVERSICHERUNGS GESELLSCHAFT.VNA O.N.,Stock,Financials,,Germany,DE,DE0008430026,muench.rueckversicherungs gesellschaft|munchener ruck|munich re,DE0008430026,primary_listing
+XETRA::MUV2,MUV2,XETRA,MUENCH.RUECKVERSICHERUNGS GESELLSCHAFT.VNA O.N.,Stock,Financials,,Germany,DE,DE0008430026,muench.rueckversicherungs gesellschaft|munchener ruck|munich re|mnchnr rckvrschrngs-gsllschft n mnchn ag,DE0008430026,primary_listing
 XETRA::MUX,MUX,XETRA,Mutares SE & Co. KGaA,Stock,Financials,,Germany,DE,DE000A2NB650,mutares,DE000A2NB650,primary_listing
 XETRA::MVEE,MVEE,XETRA,iShares Edge MSCI Europe Minimum Volatility ESG UCITS ETF EUR (Acc),ETF,,Equity,Ireland,IE,IE00BKVL7D31,edge msci europe minimum volatility esg,IE00BKVL7D31,primary_listing
 XETRA::MVV1,MVV1,XETRA,MVV ENERGIE AG NA O.N.,Stock,Utilities,,Germany,DE,DE000A0H52F5,mvv energie,DE000A0H52F5,primary_listing
@@ -61691,3 +61691,11 @@ ZSE_ZW::ZECO,ZECO,ZSE_ZW,ZECO HOLDINGS LIMITED,Stock,Industrials,,Zimbabwe,ZW,ZW
 ZSE_ZW::ZIMP,ZIMP,ZSE_ZW,ZIMBABWE NEWSPAPERS (1980) LIMITED,Stock,Communication Services,,Zimbabwe,ZW,ZW0009011595,zimbabwe newspapers 1980|zimbabwe newspapers,ZW0009011595,primary_listing
 ZSE_ZW::ZIMR,ZIMR,ZSE_ZW,ZIMRE HOLDINGS LIMITED,Stock,Financials,,Zimbabwe,ZW,ZW0009011611,zimre holdings|zimre,ZW0009011611,primary_listing
 ZSE_ZW::ZSEH,ZSEH,ZSE_ZW,ZIMBABWE STOCK EXCHANGE HOLDINGS LIMITED,Stock,Financials,,Zimbabwe,ZW,ZW0009012494,zimbabwe stock exchange holdings|zimbabwe stock exchange,ZW0009012494,primary_listing
+CRYPTO::BTC-USD,BTC-USD,CRYPTO,Bitcoin,crypto,,,,,,btc|bitcoin,,primary_listing
+CRYPTO::ETH-USD,ETH-USD,CRYPTO,Ethereum,crypto,,,,,,eth|ethereum,,primary_listing
+TFI::NNEP30.TFI,NNEP30.TFI,TFI,NN Emerytura 2030,fund,,,Poland,PL,,nn emerytura 2030,,primary_listing
+TFI::NNEP25.TFI,NNEP25.TFI,TFI,NN Emerytura 2025,fund,,,Poland,PL,,nn emerytura 2025,,primary_listing
+TFI::GSEM65.TFI,GSEM65.TFI,TFI,Goldman Sachs Emerytura 2065,fund,,,Poland,PL,,goldman sachs emerytura 2065,,primary_listing
+TFI::GSEM60.TFI,GSEM60.TFI,TFI,Goldman Sachs Emerytura 2060,fund,,,Poland,PL,,goldman sachs emerytura 2060,,primary_listing
+TFI::GSAK.TFI,GSAK.TFI,TFI,Goldman Sachs Akcji,fund,,,Poland,PL,,goldman sachs akcji,,primary_listing
+TFI::NNOB.TFI,NNOB.TFI,TFI,NN Obligacji,fund,,,Poland,PL,,nn obligacji,,primary_listing
