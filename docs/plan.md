@@ -90,7 +90,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
 
 ### 24.4 — Row parser: column mapping, PL decimal, split restatement
 
-- [ ] `src/transakcje-parser.ts`:
+- [x] `src/transakcje-parser.ts`:
       - `parsePlDecimal(raw: string): number | null` — strips NBSP/space/` zł`,
         `,`→`.`, null for `-`/empty.
       - `parseRow(cols: string[]): RawTransakcjeRow` — maps cols 1–8, 12, 17, 19–21,
@@ -100,9 +100,9 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
         date; validate against col 11; throw `SplitMismatchError` on mismatch.
         Known splits: Amazon ×20 (2022-06-06), Alphabet ×20 (2022-07-15), Dino ×10
         (2025-07-30).
-- [ ] Unit tests: decimal edge cases; BUY/DIV/SELL/DEPOSIT rows; Amazon split fixture.
-- [ ] `npm run test` passes.
-- [ ] Commit: `feat(sheets-sync): Transakcje row parser + split restatement`.
+- [x] Unit tests: decimal edge cases; BUY/DIV/SELL/DEPOSIT rows; Amazon split fixture.
+- [x] `npm run test` passes.
+- [x] Commit: `feat(sheets-sync): Transakcje row parser + split restatement`.
 
 ### 24.5 — Instrument resolver + Konto map
 
