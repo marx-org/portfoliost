@@ -1,6 +1,6 @@
 # Proposal: wallets import API
 
-**Status**: draft (2026-09-17)
+**Status**: implemented (2026-09-17)
 **Builds on**: [wallets-module.md](wallets-module.md), [google-sheets-sync.md](google-sheets-sync.md)
 
 ## Problem
@@ -425,12 +425,24 @@ remains unaffected:
 
 1. **Batch size limit**: 500 rows chosen to stay within a 30 s k8s Job timeout.
    Measure the full 2 024-row Transakcje import in 23.7; adjust if needed.
+   **Resolved (2026-09-17):** 500 stands. The full 2 024-row Transakcje import
+   (5 batches) is the first real consumer (§24 sheets-sync); if the 30 s Job
+   timeout is exceeded on that run, revisit the limit there — no import-side
+   change is needed now.
 2. **Split events**: `Split` rows (`type=ADJUSTMENT`, `amount=0`) hit the
    `ck_wtx_amount_nonzero` check. Resolution: relax to
    `amount <> 0 OR type = 'ADJUSTMENT'` — split markers are preserved for audit.
+   **Resolved (2026-09-17):** done — `portfoliost-wallets` migration
+   `drizzle/0001_grey_crusher_hogan.sql` relaxed the constraint to
+   `amount <> 0 OR type = 'ADJUSTMENT'`; regression test in
+   `src/db/schema.test.ts` ("relaxed amount check allows split markers").
 3. **Wipe safety**: the wipe endpoint is scoped to `(user_id, external_source)` and
    runs in a single transaction — a partial failure leaves the DB consistent. The
    importer's `--wipe` flag must never be set on the production CronJob manifest.
+   **Resolved (2026-09-17):** verified — §23.5 tests confirm the wipe deletes
+   only `(user_id, external_source)`-tagged rows atomically and never touches
+   manual rows; the `--wipe` prohibition is enforced by the §24 production
+   CronJob manifest.
 
 ---
 
@@ -563,3 +575,24 @@ The UI can show both values on a transaction detail card:
 | `portfolios.transactions.original_price` | `numeric(20,8)` nullable | Pre-split price; frozen at creation |
 | `POST /internal/apply-split` | wallets endpoint | Retroactively adjusts `quantity`/`price` for all transactions of a symbol before the split date |
 | Admin `apply` hook | admin code change | Fires `/internal/apply-split` after writing `split_adjustments` |
+
+---
+
+## Implementation closeout (2026-09-17)
+
+Implemented across `portfoliost-contracts` (v1.6.21), `portfoliost-wallets`
+(307798b, 3177bfb), `portfoliost-admin` (8616a9b) and `portfoliost` mocks (cd081ac).
+
+- **`original_quantity` / `original_price` invariant verified:** set at creation
+  (`= quantity` / `= price`), frozen afterwards. The import route defaults both from
+  `quantity` / `price` when the payload omits them (§23.6), so every row —
+  imported or manual — satisfies the invariant; all portfolio math uses only
+  current `quantity` / `price`.
+- **apply-split idempotency verified:** re-running `POST /internal/apply-split` for
+  the same `(symbol, effectiveDate)` returns
+  `{ updatedTransactions: 0, affectedPortfolios: 0 }` (AMZN 10@100 → 2:1 →
+  20@50 smoke; KO 2:1 end-to-end via the admin hook — ledger factor 2,
+  ptx 10@60 → 20@30).
+- **E2E:** full compose run exercised all seven import routes + the admin split hook;
+  the two unrelated pre-existing e2e failures (auth form visibility, price-bars
+  live-data shadow) are documented in §23.8 of `plan-archive.md`.
