@@ -73,6 +73,16 @@ const labelProps = computed(() => {
     />
     <path
       v-if="props.data?.flowing"
+      class="topo-flow topo-flow-trail"
+      :d="path.d"
+      :style="{ '--topo-flow-speed': `${props.data.animationDurationSec}s` }"
+      pathLength="1"
+      vector-effect="non-scaling-stroke"
+      fill="none"
+      pointer-events="none"
+    />
+    <path
+      v-if="props.data?.flowing"
       class="topo-flow"
       :d="path.d"
       :style="overlayStyle"

@@ -34,6 +34,63 @@ function nodeWrapper(page: import("@playwright/test").Page, nodeId: string) {
   return page.locator(`.vue-flow__node:has([data-node-id="${nodeId}"])`)
 }
 
+test("cinematic effects animate, pause, and respect reduced motion without blocking inspection", async ({ page }) => {
+  await openTopology(page)
+  const atmosphere = page.locator('.mission-aurora').first()
+  const flow = page.locator('.topo-flow').first()
+  await expect(atmosphere).toHaveCSS('animation-name', 'mission-drift')
+  await expect(atmosphere).toHaveCSS('animation-play-state', 'running')
+  await expect(flow).toHaveCSS('animation-name', 'topo-edge-flow')
+  await page.getByTestId('topo-effects').click()
+  await expect(page.getByTestId('topo-effects')).toHaveAttribute('aria-pressed', 'true')
+  await expect(atmosphere).toHaveCSS('animation-play-state', 'paused')
+  await expect(flow).toHaveCSS('animation-play-state', 'paused')
+  await page.getByTestId('topo-effects').click()
+  await expect(atmosphere).toHaveCSS('animation-play-state', 'running')
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await expect(atmosphere).toHaveCSS('animation-name', 'none')
+  await expect(flow).toHaveCSS('animation-name', 'none')
+  await expect(page.locator('.mission-legend')).toContainText('Reduced motion')
+  await page.locator('[data-node-id="cachest"]').first().click()
+  await expect(page.getByTestId('topology-details-panel')).toBeVisible()
+})
+
+test("focus mode exits with Escape and empty search offers recovery", async ({ page }) => {
+  await openTopology(page)
+  await page.getByTestId('topo-focus').click()
+  await expect(page.locator('.mission-control')).toHaveClass(/mission-control--focus/)
+  await page.keyboard.press('Escape')
+  await expect(page.getByTestId('topo-focus')).toHaveAttribute('aria-pressed', 'false')
+  await page.getByTestId('topo-search').fill('no-service-matches-this')
+  await expect(page.getByText('No nodes in view')).toBeVisible()
+  await page.getByRole('button', { name: 'Reset filters', exact: true }).click()
+  await expect(page.getByTestId('topo-search')).toHaveValue('')
+  await expect(page.locator('[data-node-id="cachest"]').first()).toBeVisible()
+})
+
+test("cinematic workspace fits mobile and keeps the inspector reachable", async ({ page }) => {
+  // Login/navigation in the desktop shell, then switch to mobile for this admin surface.
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await openTopology(page)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect(page.getByTestId('topo-effects')).toBeVisible()
+  const bounds = await page.locator('.mission-stage').boundingBox()
+  expect(bounds!.x).toBeGreaterThanOrEqual(0)
+  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(391)
+  await page.getByTestId('topo-focus').click()
+  await page.locator('[data-node-id="cachest"]').first().click()
+  const panel = page.getByTestId('topology-details-panel')
+  await expect(panel).toBeVisible()
+  await expect.poll(async () => {
+    const box = await panel.boundingBox()
+    return box!.x + box!.width
+  }).toBeLessThanOrEqual(391)
+  expect((await panel.boundingBox())!.x).toBeGreaterThanOrEqual(0)
+  await page.getByTestId('topology-panel-close').click()
+  await page.getByTestId('topo-focus').click()
+  await expect(page.getByTestId('topo-focus')).toHaveAttribute('aria-pressed', 'false')
+})
+
 test("clicking a node opens the details panel", async ({ page }) => {
   await openTopology(page)
 

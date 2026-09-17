@@ -48,9 +48,9 @@
   filter: drop-shadow(0 0 2px rgb(100 116 139 / 0.25));
 }
 
-/* The moving-dot overlay rendered by FlowEdge.vue. A single short dash
-   (0.06 of pathLength 1) travels source → target as stroke-dashoffset runs
-   0 → 1; the glow keeps the particle luminous. --topo-flow-speed is set
+/* The moving-dot overlay rendered by FlowEdge.vue travels source → target
+   using a negative dash offset. Four complete 0.24-length patterns per cycle
+   keep the loop seamless; the glow keeps it luminous. --topo-flow-speed is set
    inline per edge (fast under traffic, slow idle flow). */
 .topo-flow {
   stroke: rgb(125 211 252); /* sky-300 */
@@ -68,7 +68,7 @@
     stroke-dashoffset: 0;
   }
   to {
-    stroke-dashoffset: 1;
+    stroke-dashoffset: -0.96;
   }
 }
 

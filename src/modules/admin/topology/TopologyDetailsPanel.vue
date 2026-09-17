@@ -85,7 +85,7 @@ function onSelect(id: string): void {
 
 <template>
   <aside
-    class="absolute inset-y-0 right-0 z-20 w-80 overflow-y-auto border-l border-slate-200 bg-white/95 shadow-xl backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/95"
+    class="topology-inspector absolute inset-y-0 right-0 z-20 w-80 overflow-y-auto border-l border-slate-200 bg-white/95 shadow-xl backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/95"
     :aria-hidden="!def"
   >
     <template v-if="def && data">

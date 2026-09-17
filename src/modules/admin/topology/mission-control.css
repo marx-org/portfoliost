@@ -1,0 +1,122 @@
+/* An original, cinematic Portfoliost surface. All decoration is CSS/SVG: no
+   video download, timers or per-frame JS. Motion is not a request replay. */
+.mission-control { --mission-ink: #152339; --mission-muted: #61718a; --mission-border: #dce5f0; --mission-surface: #ffffff; }
+.dark .mission-control { --mission-ink: #edf5ff; --mission-muted: #92a4be; --mission-border: #25334b; --mission-surface: #111c2e; }
+.mission-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; margin: 8px 0 24px; }
+.mission-eyebrow { display: flex; align-items: center; gap: 9px; font: 600 10px/1.5 ui-monospace, monospace; letter-spacing: .2em; color: var(--mission-muted); }
+.mission-signal { width: 6px; height: 6px; border-radius: 50%; background: #38bdf8; box-shadow: 0 0 12px #38bdf880; }
+.mission-header h2 { margin: 7px 0 6px; font-size: clamp(30px, 3vw, 44px); line-height: 1.15; letter-spacing: -.05em; font-weight: 650; color: var(--mission-ink); }
+.mission-header h2 span { color: #0284c7; }
+.dark .mission-header h2 span { color: #7dd3fc; }
+.mission-description { font-size: 13px; color: var(--mission-muted); }
+.mission-actions { display: flex; gap: 8px; }
+.mission-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 13px; border: 1px solid var(--mission-border); border-radius: 9px; background: var(--mission-surface); color: var(--mission-ink); font-size: 12px; font-weight: 500; transition: border-color .2s, background .2s, box-shadow .2s; }
+.mission-button svg { height: 14px; width: 14px; }
+.mission-button:hover { border-color: #38bdf8; box-shadow: 0 0 16px #38bdf81a; }
+.mission-control button:focus-visible, .mission-control input:focus-visible { outline: 2px solid #38bdf8; outline-offset: 3px; }
+.mission-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 20px; }
+.mission-stat { position: relative; overflow: hidden; padding: 17px 20px 19px; background: var(--mission-surface); border: 1px solid var(--mission-border); border-radius: 13px; animation: mission-arrive .6s both; animation-delay: calc(var(--stat-index) * 90ms); }
+.mission-stat::before { content: ''; position: absolute; width: 140px; height: 140px; border-radius: 50%; right: -60px; top: -90px; background: var(--stat-color); opacity: .1; filter: blur(24px); }
+.mission-stat__label { display: flex; justify-content: space-between; align-items: center; font: 500 10px/1.5 ui-monospace, monospace; letter-spacing: .1em; color: var(--mission-muted); }
+.mission-stat__label > span { font-size: 17px; color: var(--stat-color); }
+.mission-stat p { display: flex; align-items: baseline; gap: 9px; margin: 6px 0 3px; color: var(--mission-muted); font-size: 12px; }
+.mission-stat strong { color: var(--mission-ink); font-size: 32px; line-height: 1.25; font-weight: 550; letter-spacing: -.05em; font-variant-numeric: tabular-nums; }
+.mission-stat small { color: var(--mission-muted); font-size: 11px; }
+.mission-stat__track { height: 2px; background: var(--mission-border); position: absolute; bottom: 0; left: 0; right: 0; }
+.mission-stat__track i { display: block; height: 100%; background: var(--stat-color); box-shadow: 0 0 8px var(--stat-color); transition: width .9s ease; }
+.mission-stage { --mission-ink: #edf5ff; --mission-muted: #92a4be; --mission-border: #263850; --mission-surface: #111e31; position: relative; isolation: isolate; overflow: hidden; border: 1px solid #2b3b53; border-radius: 16px; background: #07111f; color: #dbeafe; box-shadow: 0 24px 60px -30px #02061770, 0 0 0 4px #64748b08; }
+.mission-atmosphere { position: absolute; inset: 0; overflow: hidden; pointer-events: none; background: #07111f; }
+.mission-aurora { position: absolute; inset: -30%; background: radial-gradient(ellipse at 25% 35%, #0ea5e92b, transparent 45%), radial-gradient(ellipse at 75% 65%, #8b5cf622, transparent 45%); animation: mission-drift 18s ease-in-out infinite alternate; }
+.mission-aurora--violet { background: radial-gradient(ellipse at 60% 55%, #6366f11f, transparent 40%); animation-duration: 24s; animation-delay: -12s; }
+.mission-grid { position: absolute; inset: 0; background-image: radial-gradient(#8298b338 1px, transparent 1px); background-size: 24px 24px; mask-image: radial-gradient(ellipse, black, transparent 85%); }
+.mission-scan { position: absolute; inset: -100% 0 0; background: linear-gradient(transparent 48%, #38bdf80d 50%, transparent 52%); animation: mission-scan 14s linear infinite; }
+.mission-grain { position: absolute; inset: 0; opacity: .12; background: repeating-linear-gradient(0deg, transparent 0 3px, #02061740 3px 4px); }
+.mission-particle { position: absolute; height: 2px; width: 2px; border-radius: 50%; background: #a5e6ff; box-shadow: 0 0 7px #38bdf8; animation: mission-particle var(--particle-duration) ease-in-out infinite; animation-delay: var(--particle-delay); }
+.mission-stage-heading { position: relative; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 18px 20px 12px; font: 500 10px/1.5 ui-monospace, monospace; letter-spacing: .12em; }
+.mission-stage-title { display: flex; align-items: center; gap: 9px; color: #c4d4e9; }
+.mission-stage-title svg { width: 18px; height: 18px; color: #7dd3fc; }
+.mission-feed { display: inline-flex; align-items: center; gap: 7px; font-size: 10px; letter-spacing: .02em; color: #94a9c6; }
+.mission-feed i { height: 5px; width: 5px; border-radius: 50%; background: #38bdf8; box-shadow: 0 0 8px #38bdf850; }
+.mission-feed--warning { color: #fbbf24; }
+.mission-feed--warning i { background: #fbbf24; box-shadow: none; }
+.mission-toolbar-wrap { position: relative; z-index: 10; padding: 0 16px; }
+.mission-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 10px; border: 1px solid #283952; border-radius: 11px; background: #101d30e6; box-shadow: 0 5px 20px #0000001a; }
+.mission-toolbar input.input { background: #080f1f; border-color: #2a3c55; color: #e2e8f0; border-radius: 7px; }
+.mission-toolbar .btn-ghost { color: #adc2dc; }
+.mission-toolbar .btn-ghost:hover { background: #263751; color: #e0f2fe; }
+.mission-area { --area-color: #7dd3fc; border: 1px solid transparent; }
+.mission-area[data-area="storage"] { --area-color: #60a5fa; }
+.mission-area[data-area="jobs"] { --area-color: #6ee7b7; }
+.mission-area[data-area="external-services"] { --area-color: #c4b5fd; }
+.mission-area[data-area="data-providers"] { --area-color: #fcd34d; }
+.mission-area::before { content: ''; display: inline-block; width: 5px; height: 5px; margin-right: 6px; border-radius: 50%; background: var(--area-color); }
+.mission-toolbar .mission-area[aria-pressed="true"] { color: var(--area-color); background: #1c2b41; border-color: #35445c; }
+.mission-toolbar .mission-area[aria-pressed="false"] { color: #8194af; background: transparent; }
+.mission-area[aria-pressed="false"]::before { background: #54657c; }
+.mission-canvas { position: relative; height: clamp(540px, calc(100vh - 430px), 1000px); }
+.mission-empty { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(330px, 90%); text-align: center; padding: 25px; border: 1px solid #2c405c; border-radius: 14px; background: #0b172bee; box-shadow: 0 20px 50px #0004; }
+.mission-empty > span { display: block; color: #7dd3fc; font-size: 32px; }
+.mission-empty strong { display: block; font-size: 17px; }
+.mission-empty p { margin: 8px 0 18px; font-size: 12px; color: #94a3b8; }
+.mission-legend { position: relative; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; padding: 13px 20px; border-top: 1px solid #23334a; color: #91a5c0; font-size: 10px; background: #091322b3; }
+.mission-legend > div { display: flex; gap: 20px; }
+.mission-legend > div span { display: inline-flex; align-items: center; gap: 7px; }
+.mission-legend i { width: 18px; height: 2px; background: #7dd3fc; }
+.mission-legend .legend-job { background: repeating-linear-gradient(90deg, #4ade80 0 4px, transparent 4px 7px); }
+.mission-legend .legend-provider { background: #fbbf24; }
+.mission-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 14px 2px; color: var(--mission-muted); font-size: 10px; }
+.mission-footer p > span[aria-hidden] { margin: 0 8px; opacity: .5; }
+.mission-footer .mission-error { color: #d97706; overflow-wrap: anywhere; }
+.dark .mission-footer .mission-error { color: #fbbf24; }
+.mission-control--focus { position: fixed; inset: 0; z-index: 60; padding: 20px 28px; overflow: auto; background: var(--mission-surface); }
+.mission-control--focus .mission-stats { display: none; }
+.mission-control--focus .mission-header { margin-bottom: 16px; }
+.mission-control--focus .mission-canvas { height: calc(100dvh - 285px); min-height: 400px; }
+/* Keep node dimensions intact: graph layout and drag bounds depend on them. */
+.mission-control .vue-flow__node { --node-accent: #7dd3fc; }
+.mission-control .topo-node--storage { --node-accent: #60a5fa; }
+.mission-control .topo-node--jobs { --node-accent: #6ee7b7; }
+.mission-control .topo-node--external-services { --node-accent: #c4b5fd; }
+.mission-control .topo-node--data-providers { --node-accent: #fcd34d; }
+.mission-control .vue-flow__node [data-node-id] { background: linear-gradient(135deg, #1b2a42, #101c30); border-color: #3b4e69; border-radius: 10px; box-shadow: 0 4px 12px #0005, inset 0 1px 0 #ffffff0d; transition: border-color .25s, box-shadow .25s; }
+.mission-control .vue-flow__node [data-node-id] > svg { color: var(--node-accent); filter: drop-shadow(0 0 5px #7dd3fc30); }
+.mission-control .vue-flow__node:hover [data-node-id], .mission-control .topo-node--selected [data-node-id] { border-color: var(--node-accent); box-shadow: 0 0 22px #38bdf82b, 0 10px 20px #0005; }
+.mission-control .topo-node--healthy [data-node-id] { border-color: #2e806e; }
+.mission-control .topo-lane { border: 1px solid #6e8fb529; background-image: linear-gradient(140deg, #ffffff03, transparent 55%); box-shadow: inset 0 1px 0 #ffffff04; }
+.mission-control .topo-lane__header { border-bottom: 1px solid #6e8fb51a; padding: 6px 12px; }
+.mission-control .topo-lane__label { letter-spacing: .13em; }
+.mission-control .topo-lane__grip { margin-left: auto; }
+.mission-control .tf-node-handle { background: #13243b; border-color: #7dd3fc; }
+.mission-control .topo-flow { stroke: #b8efff; stroke-width: 2.5; stroke-dasharray: .018 .222; filter: drop-shadow(0 0 4px #38bdf8); }
+.mission-control .topo-flow-trail { stroke: #38bdf8; stroke-width: 5; stroke-dasharray: .07 .17; opacity: .2; filter: blur(2px); }
+.mission-control .vue-flow__edge-text { font-size: 9px; fill: #adbed6; }
+.mission-control .vue-flow__edge-textbg { fill: #0c182ce6; }
+.mission-control .topology-inspector { top: 10px; right: 10px; bottom: 10px; width: min(360px, calc(100% - 20px)); border: 1px solid #3c536f; border-radius: 14px; background: #0d192dee; box-shadow: -20px 0 70px #0006; }
+.mission-control .topology-inspector > div:first-child { padding: 20px; background: linear-gradient(135deg, #1a304b, #131f34); }
+.mission-control .topology-inspector section { padding: 12px; background: #13213999; border: 1px solid #2b3e565c; border-radius: 10px; }
+@keyframes mission-arrive { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes mission-drift { to { transform: translate(6%, -5%) rotate(12deg) scale(1.1); } }
+@keyframes mission-scan { to { transform: translateY(50%); } }
+@keyframes mission-particle { 0%, 100% { opacity: 0; transform: translateY(20px); } 30%, 70% { opacity: .55; } 95% { transform: translateY(-100px); } }
+@media (max-width: 720px) {
+  .mission-header { margin-top: 0; gap: 14px; }
+  .mission-stats { grid-template-columns: 1fr; gap: 8px; }
+  .mission-stat { padding: 12px 14px; }
+  .mission-stat p { margin: 0; }
+  .mission-stat strong { font-size: 25px; }
+  .mission-stat__label { float: right; max-width: 45%; text-align: right; gap: 7px; }
+  .mission-toolbar-wrap { padding: 0 8px; }
+  .mission-toolbar { gap: 8px; }
+  .mission-toolbar input { flex: 1; min-width: 120px; }
+  .mission-toolbar button { min-height: 34px; }
+  .mission-stage-heading { padding: 14px 12px; }
+  .mission-legend { padding: 12px; }
+  .mission-control--focus { padding: 14px; }
+  .mission-control--focus .mission-description { display: none; }
+  .mission-control--focus .mission-canvas { height: calc(100dvh - 340px); }
+}
+/* Catch nested node pulse and edge motion too, not just the atmosphere. */
+.mission-control.effects-paused *, .mission-control.effects-paused *::before, .mission-control.effects-paused *::after { animation-play-state: paused !important; transition: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .mission-control *, .mission-control *::before, .mission-control *::after { animation: none !important; transition: none !important; }
+}
