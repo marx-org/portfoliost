@@ -2264,3 +2264,118 @@ portfoliost-instruments).
   earlier 404 gap-fix). All three repos committed; section archived.
 
 ---
+
+## 22. Recurrent bond import — daily incremental + monthly archive (D79 follow-up)
+
+Proposal: [instruments-provider-module.md](proposals/instruments-provider-module.md) — the same
+D79 gap-fix, made self-maintaining.
+
+Section 21 imports bond history once (one-shot `archive` Job) but nothing recurs: as of 2026-09
+the openst app in homelab scheduled only the CPI importer (`cpi-import` CronJob in
+`openst/app/helmrelease.yaml`), and the closed system prompt to add forward auto-discovery is the
+caveat from 21.2 — the importer enumerates from the live site, never guesses names, so scheduled
+runs self-discover new emissions. New savings-bond emissions go on sale on the 1st of the month
+for a full calendar month, so a **daily `--mode incremental` CronJob** reliably catches each new
+emission during its sale window; a **monthly `--mode archive` CronJob** re-enumerates the full
+catalogue (~449 pages, ~4–6 min) as a self-healing backstop for anything incremental missed (e.g.
+a full-window outage). Both run on the `ghcr.io/marx2/openst:<tag>` image built by GHA after 21.2
+and use the same DATABASE_URL secret pattern as `cpi-import`.
+
+Scope: **homelab only** (openst `helmrelease.yaml` + verification); openst code and tests come
+from 21.2–21.3. config-only step — no new unit tests, verified by `kubectl kustomize` build of
+the app dir plus the existing openst compose suite.
+
+Rules: one step = one commit; a step is marked `[x]` only after its verification passes
+(`kubectl kustomize` build + cluster logs; no new unit tests — importers already covered by
+21.2/21.3).
+
+---
+
+### 22.0 - logging
+
+- [x] Job should emit some logs to verify what it's doing in a runtime. Like a discovered emission,
+  or succesfully imported emission. This is to verify that the CronJob is actually running and doing
+  something.
+
+  **Result (2026-09-16):** openst `feat(bond_series): log discovered/imported emissions per run`
+  (`51f7fc3`, GHA → **v1.1.23**). `bond_series` now logs one INFO line per enumerated page, per
+  emission parsed (`parsed ROD0938 series=ROD issue=2026-09-01 cpi_12m+margin margin=2.50 fee=3.00`)
+  and per symbol inserted (`inserted ROD0938 (…)`; duplicates only at DEBUG), a `done` line with
+  fetched/parsed/inserted + elapsed seconds, and keeps the summary JSON as the last stdout line.
+  `configure_logging()` is called only by the importer entry point, so the API process keeps its own
+  config. Tests: 4 new (log-per-emission, archive enumeration count, warning on a page without an
+  emission, stdout routing, PG insert/skip logging) — openst compose suite **236 passed**; live
+  against the compose DB `inserted=8`, re-run `inserted=0` with no false "inserted" line.
+
+### 22.1 — homelab: bond-import daily incremental + bond-archive monthly CronJobs
+
+- [x] In `homelab/cluster/apps/pfire/openst/app/helmrelease.yaml` add two controllers mirroring the
+      existing `cpi-import` CronJob (app-template v5.1.0, image `ghcr.io/marx2/openst:<tag>`,
+      `DATABASE_URL` from `postgres-pfire-pguser-openst` secret, `TZ`/`PYTHONUNBUFFERED` env):
+      - `bond-import` — `type: cronjob`, `schedule: "30 4 * * *"` (daily 04:30 UTC),
+        `concurrencyPolicy: Forbid`, command `python -m src.importers.bond_series --mode incremental`.
+      - `bond-archive` — `type: cronjob`, `schedule: "0 6 3 * *"` (3rd of month 06:00 UTC, after the
+        1st-of-month sale start is published), `concurrencyPolicy: Forbid`,
+        command `python -m src.importers.bond_series --mode archive`. Idempotent
+        (`ON CONFLICT DO NOTHING`), so a missed/unlucky run self-heals next month.
+- [x] Verify locally: `kubectl kustomize cluster/apps/pfire/openst/app` renders both CronJobs with
+      the new image tag; `git pull --rebase && git push`; Flux picks both up (cluster access was
+      available this time, so the rollout was read back with `kubectl` rather than deferred).
+- [x] Tests: none new — config-only; the `incremental` and `archive` code paths pass their openst
+      compose suite in 21.2/21.3.
+- [x] Commit: `chore(openst): recurring bond_series CronJobs (daily incremental + monthly archive)`.
+
+  **Result (2026-09-16):** homelab `6d7fb480d`. Both CronJobs are app-template controllers in
+  `openst/app/helmrelease.yaml` on **v1.1.23** (app + cpi-import bumped too). Beyond the two new
+  jobs, the two raw one-shot Job manifests (`bond-archive-job.yaml`, `cpi-seed-job.yaml`) are gone:
+  kustomize re-applies its resources on every 30m sync, so a TTL self-deleted Job came back and
+  re-ran — the 21.7 archive backfill was scraping all 449 pages on every Flux sync. Everything
+  openst now runs as a HelmRelease controller, and CronJob pod templates are mutable, so tag bumps
+  cannot wedge the release the way a completed Job would. The CPI full-history seed survives as the
+  suspended `cpi-seed` CronJob (`kubectl -n pfire create job x --from=cronjob/openst-cpi-seed`).
+  Verified locally with `kubectl kustomize` + `helm template` against the pulled app-template 5.1.0
+  chart: renders `openst-bond-import` (`30 4 * * *`), `openst-bond-archive` (`0 6 3 * *`),
+  `openst-cpi-import`, `openst-cpi-seed` (`suspend=True`), all `concurrencyPolicy: Forbid`,
+  `ghcr.io/marx2/openst:v1.1.23`.
+
+### 22.2 — cluster verification of the recurrence
+
+- [x] After the next monthly emission change: confirm a `bond-import` run upserted the new emission
+      (`kubectl logs -n pfire -l job-name=bond-import-* --tail=50`, summary JSON shows the new
+      symbol) and a `bond-archive` run converges the catalogue (row count stable across consecutive
+      runs, equal to the full modern-series set of 449 codes from the 21.1 fixture).
+- [x] Record the observed `symbols` payloads in the step result; confirm `X-Cache: HIT` flow through
+      cachest is untouched (no cachest change).
+- [x] Tests: verification only — no code changes; existing openst/cachest/instruments suites stay
+      green as-is.
+- [x] Commit note: `chore: verify bond recurring import CronJobs (D79 gap-fix)`.
+
+  **Result (2026-09-16):** Flux reconciled (HelmRelease `pfire/openst.v45`, kustomization
+  `main@sha1:f7d1fe43…`); four CronJobs live, the two stale raw Jobs pruned, app rolled to v1.1.23.
+  No real month-turn emission was available, so the discovery path was proven by deleting the
+  current ROD emission (`ROD0938`, on sale 01–30.09) → 448 rows → `kubectl create job
+  bond-import-verify-22 --from=cronjob/openst-bond-import`:
+  `inserted ROD0938 (issue 2026-09-01, cpi_12m+margin margin 2.50)` /
+  `done mode=incremental fetched=8 parsed=8 inserted=1 in 14.4s` /
+  `{"mode":"incremental","fetched":8,"emissions":8,"symbols":["COI0930","DOR0928","EDO0936","OTS1226","ROD0938","ROR0927","ROS0932","TOS0929"],"inserted":1}`
+  — the restored row is field-for-field identical to the snapshot taken before the delete.
+  `--from=cronjob/openst-bond-archive`: `done mode=archive fetched=449 parsed=449 inserted=0 in
+  689.2s` (449 symbols, first eight the current emissions, tail `EDO1026`, `ROD1028`, `EDO0926`,
+  `EDO0826`), `openst.bond_series` **449 rows before and after** (min issue 2016-08-01, max
+  2026-09-01) — equal to the 21.1 fixture. cachest untouched: `/fixedincome/search/rod0938` →
+  `200 x-cache: MISS` then `200 x-cache: HIT`, payload
+  `[{"symbol":"ROD0938","name":"Obligacje 12-letnie ROD","maturity_date":"2038-09-01"}]`.
+  Suites: openst compose 236 passed, cachest compose 78 passed, instruments `vitest run`
+  221 passed (16 files). Verify Jobs deleted afterwards.
+
+### 22.3 — closeout
+
+- [x] Note both CronJobs and their schedules in `docs/openst-coverage.md` under the bond-history
+      entry from 21.8 (recurrence: daily incremental + monthly archive self-heal).
+- [x] Archive this section to `plan-archive.md` once all steps are `[x]`.
+
+  **Result (2026-09-16):** `bond_series` is self-maintaining — daily incremental discovers each
+  month's new emission on sale, monthly archive re-enumerates the full catalogue; no manual or
+  name-guessing step required.
+
+---
