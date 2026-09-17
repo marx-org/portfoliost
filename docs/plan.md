@@ -64,18 +64,18 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
 
 ### 24.2 — Scaffold `portfoliost-sheets-sync` repo
 
-- [ ] Create `Marx2/portfoliost-sheets-sync` (private) on GitHub.
-- [ ] Scaffold: `package.json`, `tsconfig.json`, `vitest.config.ts` — copy from
+- [x] Create `Marx2/portfoliost-sheets-sync` (private) on GitHub.
+- [x] Scaffold: `package.json`, `tsconfig.json`, `vitest.config.ts` — copy from
       `portfoliost-wallets`; strip Hono/Drizzle/server deps. Keep: `vitest`, `tsx`,
       `typescript`. No direct DB access — all writes go through the wallets API.
-- [ ] `Dockerfile`: `node:22-alpine`, `npm ci`, `tsc`, entrypoint `node dist/sync.js`.
+- [x] `Dockerfile`: `node:22-alpine`, `npm ci`, `tsc`, entrypoint `node dist/sync.js`.
       No healthcheck port, no server.
-- [ ] Env vars: `WALLETS_API_URL`, `WALLETS_API_TOKEN` (service JWT),
+- [x] Env vars: `WALLETS_API_URL`, `WALLETS_API_TOKEN` (service JWT),
       `GOOGLE_REFRESH_TOKEN`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
       `INSTRUMENTS_DATABASE_URL` (read-only, `ticker_reference` lookup only).
-- [ ] GHA: build + test on push; publish `ghcr.io/marx2/portfoliost-sheets-sync` on tags.
-- [ ] `npm run build` + `npm run test` (empty suite) pass.
-- [ ] Commit: `chore: scaffold portfoliost-sheets-sync repo`.
+- [x] GHA: build + test on push; publish `ghcr.io/marx2/portfoliost-sheets-sync` on tags.
+- [x] `npm run build` + `npm run test` (empty suite) pass.
+- [x] Commit: `chore: scaffold portfoliost-sheets-sync repo`.
 
 ### 24.3 — Google Sheets REST client + token refresh
 
