@@ -43,7 +43,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its verification
 
 ### 22.1 — homelab: bond-import daily incremental + bond-archive monthly CronJobs
 
-- [ ] In `homelab/cluster/apps/pfire/openst/app/helmrelease.yaml` add two controllers mirroring the
+- [x] In `homelab/cluster/apps/pfire/openst/app/helmrelease.yaml` add two controllers mirroring the
       existing `cpi-import` CronJob (app-template v5.1.0, image `ghcr.io/marx2/openst:<tag>`,
       `DATABASE_URL` from `postgres-pfire-pguser-openst` secret, `TZ`/`PYTHONUNBUFFERED` env):
       - `bond-import` — `type: cronjob`, `schedule: "30 4 * * *"` (daily 04:30 UTC),
@@ -52,12 +52,19 @@ Rules: one step = one commit; a step is marked `[x]` only after its verification
         1st-of-month sale start is published), `concurrencyPolicy: Forbid`,
         command `python -m src.importers.bond_series --mode archive`. Idempotent
         (`ON CONFLICT DO NOTHING`), so a missed/unlucky run self-heals next month.
-- [ ] Verify locally: `kubectl kustomize cluster/apps/pfire/openst/app` renders both CronJobs with
-      the new image tag; `git pull --rebase && git push`; Flux picks both up (no cluster access —
-      commit for flux, mirroring 21.7).
-- [ ] Tests: none new — config-only; the `incremental` and `archive` code paths pass their openst
+- [x] Verify locally: `kubectl kustomize cluster/apps/pfire/openst/app` renders both CronJobs with
+      the new image tag; `git pull --rebase && git push`; Flux picks both up.
+      Homelab `6d7fb480d`: both CronJobs render on `ghcr.io/marx2/openst:v1.1.23`
+      (`helm template` against the pulled app-template 5.1.0 chart) and Flux reconciled
+      (`pfire/openst.v45`). The two raw one-shot Job manifests went away with them —
+      kustomize re-applied them every 30m sync, so a TTL self-deleted Job came back and
+      re-ran (the archive backfill was scraping 449 pages per sync); everything openst runs
+      is now a HelmRelease controller, and the CPI full-history seed survives as a suspended
+      `cpi-seed` CronJob for manual runs.
+- [x] Tests: none new — config-only; the `incremental` and `archive` code paths pass their openst
       compose suite in 21.2/21.3.
-- [ ] Commit: `chore(openst): recurring bond_series CronJobs (daily incremental + monthly archive)`.
+- [x] Commit: `chore(openst): recurring bond_series CronJobs (daily incremental + monthly archive)`
+      (homelab `6d7fb480d`).
 
 ### 22.2 — cluster verification of the recurrence
 
