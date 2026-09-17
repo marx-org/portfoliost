@@ -79,12 +79,14 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
 
 ### 24.3 — Google Sheets REST client + token refresh
 
-- [ ] `src/sheets-client.ts`: `fetchSheet(spreadsheetId, range, accessToken):
+- [x] `src/sheets-client.ts`: `fetchSheet(spreadsheetId, range, accessToken):
       Promise<string[][]>` — plain `fetch` against Sheets REST API v4; no SDK.
-- [ ] `refreshToken(clientId, clientSecret, refreshToken): Promise<string>` — POST to
+      Always `valueRenderOption=FORMATTED_VALUE` (parser is built for the PL
+      display format); empty range → `[]`.
+- [x] `refreshToken(clientId, clientSecret, refreshToken): Promise<string>` — POST to
       `https://oauth2.googleapis.com/token`; called once at Job startup.
-- [ ] Unit tests: mocked `fetch`; URL, auth header, empty-range, token refresh.
-- [ ] Commit: `feat(sheets-sync): Sheets REST client + OAuth2 token refresh`.
+- [x] Unit tests: mocked `fetch`; URL, auth header, empty-range, token refresh.
+- [x] Commit: `feat(sheets-sync): Sheets REST client + OAuth2 token refresh`.
 
 ### 24.4 — Row parser: column mapping, PL decimal, split restatement
 
