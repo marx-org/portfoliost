@@ -2303,8 +2303,8 @@ Rules: one step = one commit; a step is marked `[x]` only after its verification
   and per symbol inserted (`inserted ROD0938 (…)`; duplicates only at DEBUG), a `done` line with
   fetched/parsed/inserted + elapsed seconds, and keeps the summary JSON as the last stdout line.
   `configure_logging()` is called only by the importer entry point, so the API process keeps its own
-  config. Tests: 4 new (log-per-emission, archive enumeration count, warning on a page without an
-  emission, stdout routing, PG insert/skip logging) — openst compose suite **236 passed**; live
+  config. Tests: 5 new (log-per-emission, archive enumeration
+  count, warning on a page without an emission, stdout routing, PG insert/skip logging) — openst compose suite **236 passed**; live
   against the compose DB `inserted=8`, re-run `inserted=0` with no false "inserted" line.
 
 ### 22.1 — homelab: bond-import daily incremental + bond-archive monthly CronJobs
