@@ -161,39 +161,55 @@ any route work (23.3+).
 
 ### 23.6 — `POST /internal/apply-split` (wallets)
 
-- [ ] New internal endpoint `src/routes/internal.ts`, mounted at `/internal` (no JWT —
+- [x] New internal endpoint `src/routes/internal.ts`, mounted at `/internal` (no JWT —
       internal network only, not exposed through nginx gateway):
       `POST /internal/apply-split` — body `{ symbol, factor, effectiveDate }`.
-- [ ] Handler (single DB transaction per affected user batch):
+      `factor` is the **quantity multiplier** (2 for a 2:1 split).
+- [x] Handler (single DB transaction):
       1. Fetch all `portfolios.transactions` rows where `instrument_symbol = $symbol`
          AND `executed_at < $effectiveDate` AND `original_quantity IS NOT NULL`
          (rows with originals — both imported and manual, since manual rows get
-         `original_quantity = quantity` at creation).
-      2. For each row compute cumulative factor = product of all
-         `instruments.split_adjustments.factor` for this symbol with
-         `detected_at ≤ $effectiveDate` (query instruments schema via
-         `INSTRUMENTS_DATABASE_URL` read-only connection, same pattern as
-         `ticker_reference` lookups).
+         `original_quantity = quantity` at creation; the import route now defaults
+         originals to the restated values when omitted, same invariant).
+      2. Durable split ledger `portfolios.split_events` (new table, migration
+         0003; `factor` = quantity multiplier, unique per `(symbol, effective_date)`).
+         **Deviation from the original wording:** `instruments.split_adjustments`
+         was rejected as the source — it holds *price* multipliers (inverted
+         semantics for quantity restatement) and is transient (the stooq import
+         hook deletes rows for covered symbols), so re-running apply-split after
+         a price-data import would silently regress restated quantities. The
+         ledger is idempotent by construction; the admin hook (§23.7) inverts
+         the price factor (`quantityFactor = 1 / priceFactor`) before calling.
       3. UPDATE `quantity = original_quantity × cumulative_factor`,
-               `price    = original_price    / cumulative_factor`.
-         `original_quantity` and `original_price` are never written.
-      4. Recompute position avg cost + market value for all affected positions.
+               `price    = original_price    / cumulative_factor`, where
+               cumulative_factor = product of ledger factors with
+               `effective_date` after the row's `executed_at`.
+               `original_quantity` and `original_price` are never written.
+      4. Recompute affected positions from the transaction ledger (moving
+         average), including null-`position_id` SELL rows resolved by symbol
+         fallback; adjust `current_price`/`market_value`/`unrealized_gain_loss`
+         by the cumulative factor.
       5. Call `recomputePortfolioTotals` for all affected portfolios.
       Returns `{ updatedTransactions: N, affectedPortfolios: M }`.
-- [ ] Idempotency: re-running with the same `(symbol, effectiveDate)` produces the
+- [x] Idempotency: re-running with the same `(symbol, effectiveDate)` produces the
       same result because `original_quantity` is frozen (test: call twice, assert
-      `quantity` identical after second call).
-- [ ] Cumulative splits: two splits on same symbol applied in order; final `quantity =
-      original_quantity × factor1 × factor2` (test with Amazon ×20 then ×4 fixture).
-- [ ] `npm run test` passes.
-- [ ] Commit: `feat(wallets): POST /internal/apply-split`.
+      `quantity` identical after second call; also older-event retry after a newer
+      event, and conflicting-factor first-write-wins).
+- [x] Cumulative splits: two splits on same symbol applied in order; final `quantity =
+      original_quantity × factor1 × factor2` (test: 2× then 3× fixture → 6×, plus
+      trade-between-splits restated only by later splits, on/after-date rows untouched,
+      cross-user scope, position price/market-value adjustment, 422 validation).
+- [x] `npm run test` passes (295 tests).
+- [x] Commit: `feat(wallets): POST /internal/apply-split`.
 
 ### 23.7 — Admin split apply hook
 
 - [ ] In `portfoliost-admin/src/market-data.ts`, after the existing
       `split_adjustments` INSERT in the `/apply` handler:
       fire `fetch(`${API_WALLETS_URL}/internal/apply-split`, { method: "POST", body:
-      JSON.stringify({ symbol, factor, effectiveDate: today }) })`.
+      JSON.stringify({ symbol, factor: 1 / priceFactor, effectiveDate: today }) })`
+      (wallets expects the **quantity** multiplier; the admin split_adjustments
+      row stores the price multiplier — invert it).
       On fetch failure: log error + return `{ ok: true, splitApplied: true,
       portfolioAdjustmentFailed: true, error: "..." }` (price bars are corrected;
       portfolio adjustment can be retried by re-calling apply from the admin panel).
