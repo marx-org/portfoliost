@@ -204,7 +204,7 @@ any route work (23.3+).
 
 ### 23.7 — Admin split apply hook
 
-- [ ] In `portfoliost-admin/src/market-data.ts`, after the existing
+- [x] In `portfoliost-admin/src/market-data.ts`, after the existing
       `split_adjustments` INSERT in the `/apply` handler:
       fire `fetch(`${API_WALLETS_URL}/internal/apply-split`, { method: "POST", body:
       JSON.stringify({ symbol, factor: 1 / priceFactor, effectiveDate: today }) })`
@@ -213,10 +213,10 @@ any route work (23.3+).
       On fetch failure: log error + return `{ ok: true, splitApplied: true,
       portfolioAdjustmentFailed: true, error: "..." }` (price bars are corrected;
       portfolio adjustment can be retried by re-calling apply from the admin panel).
-- [ ] `portfoliost-admin` vitest: mock wallets fetch; assert it is called with correct
+- [x] `portfoliost-admin` vitest: mock wallets fetch; assert it is called with correct
       body after successful `split_adjustments` insert.
-- [ ] `npm run test` passes (admin suite).
-- [ ] Commit: `feat(admin): fire apply-split hook on split candidate apply`.
+- [x] `npm run test` passes (admin suite).
+- [x] Commit: `feat(admin): fire apply-split hook on split candidate apply`.
 
 ### 23.8 — Mock handlers + full suite
 
