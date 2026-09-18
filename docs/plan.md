@@ -147,9 +147,9 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
 
 ### 24.7 — Row mapper: `RawTransakcjeRow` → `ImportTransaction`
 
-- [ ] `src/transakcje-mapper.ts`: `mapRow(row, walletUuidMap, portfolioId):
+- [x] `src/transakcje-mapper.ts`: `mapRow(row, walletUuidMap, portfolioId):
       ImportTransaction` — converts parser output to the `POST /api/import/transactions`
-      payload shape:
+      payload shape (row is enriched with `instrument` by the orchestrator):
       - `walletName` from `konto-map`; `walletTx.type` from `Typ` mapping
         (`Kupno→INVEST`, `Sprzedaż→SELL`, `Div→DIVIDEND`, `Wpłata→DEPOSIT`,
         `Wypłata→WITHDRAWAL`, `Split→ADJUSTMENT`, `Sell Call Option→SELL`).
@@ -157,23 +157,30 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
         `exchangeRate` = col 21; `rateSource=manual`.
       - `walletTx.fees` = col 33 when `feeCurrency ≠ PLN` else col 7;
         `feeCurrency` = col 31; `feeExchangeRate` = col 32; `feeRateSource=manual`.
+        Fees applied to both legs (proposal col 7).
       - `portfolioTx` (omit for DEPOSIT/WITHDRAWAL/ADJUSTMENT): `price` = col 30
-        (post-restatement); `quantity` positive (post-restatement); `type` =
-        BUY/SELL/DIVIDEND; `realizedGainLoss` from col 17 on SELL; `assetType` from
-        resolved instrument.
-      - **`portfolioTx.originalQuantity`** = `row.rawQuantity` (pre-restatement value
-        captured by the parser before `restateSplits` runs; see 24.4). Set to `null`
-        when the row was already in post-split terms (rawQuantity = restated quantity).
-      - **`portfolioTx.originalPrice`** = `row.rawPriceNative` (same logic).
+        (post-restatement; fallback `|cashFlow| ÷ rate ÷ qty` only when col 30 is
+        empty — never overrides a sheet value); `quantity` positive (post-
+        restatement); `type` = BUY/SELL/DIVIDEND; `realizedGainLoss` from col 17 on
+        Sprzedaż; `assetType` from resolved instrument (uppercased).
+      - **`portfolioTx.originalQuantity`** = `row.rawQuantity` (pre-restatement),
+        null when raw == restated; **`originalPrice`** = `row.rawPriceNative` (same).
       - Options: `assetType=OPTION`, `optionType=CALL`, `direction=SHORT`,
         `contractSize=100`; strike/expiry null.
-- [ ] `src/transakcje-parser.ts` (24.4): `RawTransakcjeRow` carries `rawQuantity` and
-      `rawPriceNative` set from the sheet values **before** `restateSplits` overwrites
-      them; `restateSplits` mutates `quantity`/`priceNative` only.
-- [ ] Unit tests: pre-split BUY row → `originalQuantity ≠ quantity`,
+      - Unknown Typ / wallet missing from bootstrap map / no usable qty or price
+        → throw (loud abort, never drop a row).
+- [x] `portfoliost-wallets` (feecddd): `ImportPortfolioTxSchema` gains
+      `direction`/`optionType`/`contractSize`; `direction=SHORT` = short-option
+      OPEN (position-creating regardless of type) with its own lot distinct from
+      the same-symbol underlying equity lot (direction-filtered position lookup);
+      new test: SAP equity + written calls.
+- [x] `@marx2/contracts` (ea74c37): `ImportPortfolioTx` option fields; fixed
+      pre-existing broken YAML indentation (13-space keys) that invalidated the
+      whole spec.
+- [x] Unit tests: pre-split BUY row → `originalQuantity ≠ quantity`,
       `originalPrice ≠ price`; post-split BUY row → both null; DEPOSIT → null.
-- [ ] `npm run test` passes.
-- [ ] Commit: `feat(sheets-sync): row mapper → ImportTransaction + original values`.
+- [x] `npm run test` passes (sheets-sync 64, wallets 296).
+- [x] Commit: `feat(sheets-sync): row mapper → ImportTransaction + original values`.
 
 ### 24.8 — Orchestrator
 
