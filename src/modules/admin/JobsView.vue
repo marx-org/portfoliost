@@ -9,6 +9,10 @@ import {
   runStooqImport,
   getStooqImportStatus,
   getStooqImportLog,
+  runSheetsSync,
+  getSheetsSyncStatus,
+  getSheetsSyncLog,
+  type SheetsSyncLogEntry,
 } from "@/api/adminJobs"
 
 // ── Dataset metadata ──────────────────────────────────────────────────────────
@@ -77,6 +81,23 @@ async function loadLog() {
   } finally {
     pageLoading.value = false
   }
+
+  // Sheets sync last run — independent of the stooq log (one job → one row).
+  try {
+    const sheetsLog = await getSheetsSyncLog()
+    sheets.value.log = sheetsLog
+    if (sheetsLog.status === "Running") {
+      sheets.value.phase = "running"
+      startSheetsPolling()
+    } else if (sheetsLog.status === "Succeeded") {
+      sheets.value.phase = "succeeded"
+    } else if (sheetsLog.status === "Failed") {
+      sheets.value.phase = "failed"
+      sheets.value.errorMsg = "Last sync failed. Check cluster logs."
+    }
+  } catch {
+    // transient — the run buttons still work
+  }
 }
 
 // ── Status polling ────────────────────────────────────────────────────────────
@@ -130,6 +151,95 @@ function applyStatus(dataset: StooqDataset, status: StooqImportStatusResponse) {
       s.phase = "succeeded"
       stopPolling(dataset)
     }
+  }
+}
+
+// ── Google Sheets sync state (plan §24.9) ────────────────────────────────────
+
+type SheetsPhase = "idle" | "running" | "succeeded" | "failed"
+
+interface SheetsState {
+  phase: SheetsPhase
+  errorMsg: string | null
+  jobName: string | null
+  log: SheetsSyncLogEntry | null
+}
+
+const sheets = ref<SheetsState>({ phase: "idle", errorMsg: null, jobName: null, log: null })
+
+let sheetsPoller: ReturnType<typeof setInterval> | null = null
+
+function startSheetsPolling() {
+  stopSheetsPolling()
+  sheetsPoller = setInterval(() => pollSheetsStatus(), 60_000)
+}
+
+function stopSheetsPolling() {
+  if (sheetsPoller !== null) {
+    clearInterval(sheetsPoller)
+    sheetsPoller = null
+  }
+}
+
+async function pollSheetsStatus() {
+  try {
+    const status = await getSheetsSyncStatus()
+    applySheetsStatus(status)
+  } catch {
+    // transient — keep polling
+  }
+}
+
+function applySheetsStatus(status: { status: string; details: unknown }) {
+  const s = sheets.value
+  if (status.status === "Running") {
+    s.phase = "running"
+  } else if (status.status === "Succeeded") {
+    s.phase = "succeeded"
+    stopSheetsPolling()
+    refreshSheetsLog()
+  } else if (status.status === "Failed") {
+    s.phase = "failed"
+    s.errorMsg = "Sync job failed. Check cluster logs."
+    stopSheetsPolling()
+  } else if (s.phase === "running") {
+    // NotFound — job completed and was cleaned up (jobshot deletes on completion)
+    s.phase = "succeeded"
+    stopSheetsPolling()
+    refreshSheetsLog()
+  }
+}
+
+function refreshSheetsLog() {
+  getSheetsSyncLog()
+    .then((log) => {
+      sheets.value.log = log
+      if (log.status === "Running") {
+        sheets.value.phase = "running"
+        startSheetsPolling()
+      }
+    })
+    .catch(() => { /* ignore */ })
+}
+
+async function runSheets(wipe: boolean) {
+  const s = sheets.value
+  if (wipe) {
+    const ok = window.confirm(
+      "Wipe all previously imported Transakcje data and re-import the full sheet?",
+    )
+    if (!ok) return
+  }
+  s.errorMsg = null
+  s.jobName = null
+  try {
+    const run = await runSheetsSync(wipe)
+    s.jobName = run.jobName
+    s.phase = "running"
+    startSheetsPolling()
+  } catch (e) {
+    s.phase = "failed"
+    s.errorMsg = e instanceof Error ? e.message : "Failed to start sync job"
   }
 }
 
@@ -208,11 +318,21 @@ function formatDate(iso: string | null | undefined): string {
   return new Date(iso).toLocaleString()
 }
 
+function sheetsBadge(): { label: string; cls: string } | null {
+  const s = sheets.value
+  if (s.phase === "running")   return { label: "Running",   cls: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" }
+  if (s.phase === "succeeded") return { label: "Succeeded", cls: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" }
+  if (s.phase === "failed")    return { label: "Failed",    cls: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" }
+  if (s.log?.startedAt)        return { label: "Succeeded", cls: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" }
+  return null
+}
+
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 
 onMounted(loadLog)
 onUnmounted(() => {
   for (const dataset of STOOQ_DATASETS) stopPolling(dataset)
+  stopSheetsPolling()
 })
 </script>
 
@@ -222,6 +342,72 @@ onUnmounted(() => {
     <div v-else-if="pageError" class="text-sm text-red-600 dark:text-red-400">{{ pageError }}</div>
 
     <div v-else class="space-y-8">
+      <!-- Google Sheets sync (§24.9) -->
+      <section>
+        <h2 class="mb-3 text-base font-semibold text-slate-700 dark:text-slate-300">Google Sheets</h2>
+
+        <div class="space-y-3">
+          <div
+            class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
+            data-testid="job-card-sheets-sync"
+          >
+            <!-- Header row -->
+            <div class="mb-3 flex items-start justify-between gap-4">
+              <div>
+                <div class="font-medium text-slate-900 dark:text-slate-100">Transakcje sheet sync</div>
+                <div class="mt-0.5 font-mono text-xs text-slate-400 dark:text-slate-500">
+                  Google Sheets → wallets &amp; portfolios
+                </div>
+              </div>
+              <span
+                v-if="sheetsBadge()"
+                class="inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
+                :class="sheetsBadge()!.cls"
+              >
+                {{ sheetsBadge()!.label }}
+              </span>
+            </div>
+
+            <!-- Last run info -->
+            <div class="mb-3 text-xs text-slate-500 dark:text-slate-400">
+              <span v-if="sheets.log?.startedAt">
+                Last sync: {{ formatDate(sheets.log.startedAt) }}
+                <template v-if="sheets.log.mode">· {{ sheets.log.mode }}</template>
+              </span>
+              <span v-else>Never synced</span>
+            </div>
+
+            <!-- Error message -->
+            <div
+              v-if="sheets.errorMsg"
+              class="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-700/50 dark:bg-red-900/20 dark:text-red-400"
+            >
+              {{ sheets.errorMsg }}
+            </div>
+
+            <!-- Buttons -->
+            <div class="flex items-center gap-3">
+              <button
+                class="btn-primary shrink-0"
+                :disabled="sheets.phase === 'running'"
+                data-testid="sheets-run-btn"
+                @click="runSheets(false)"
+              >
+                {{ sheets.phase === "running" ? "Running…" : "Run Sync" }}
+              </button>
+              <button
+                class="btn-danger shrink-0"
+                :disabled="sheets.phase === 'running'"
+                data-testid="sheets-wipe-btn"
+                @click="runSheets(true)"
+              >
+                Wipe &amp; re-import
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section v-for="group in GROUPS" :key="group">
         <h2 class="mb-3 text-base font-semibold text-slate-700 dark:text-slate-300">{{ group }}</h2>
 

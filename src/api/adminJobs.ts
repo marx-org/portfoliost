@@ -93,3 +93,39 @@ export function getStooqImportStatus(
 export function getStooqImportLog(): Promise<StooqImportLogEntry[]> {
   return http.get<StooqImportLogEntry[]>("/api/admin/jobs/stooq-import/log")
 }
+
+// ── Google Sheets sync (plan §24.9) ──────────────────────────────────────────
+
+// The sheets-sync endpoints are not in the @marx2/contracts generated types yet;
+// local mirrors of the admin backend responses (src/sheets-sync.ts).
+export interface SheetsSyncRunResponse {
+  jobName: string
+  namespace: string
+  status: string
+}
+
+export interface SheetsSyncStatusResponse {
+  jobName: string
+  status: "Running" | "Succeeded" | "Failed" | "NotFound" | string
+  details: { active: number; succeeded: number; failed: number } | null
+  startedAt?: string | null
+}
+
+export interface SheetsSyncLogEntry {
+  startedAt: string | null
+  status: string | null
+  mode: "wipe" | "incremental" | null
+}
+
+/** Trigger the sheets-sync Job (optionally wiping previously imported data first). */
+export function runSheetsSync(wipe: boolean): Promise<SheetsSyncRunResponse> {
+  return http.post<SheetsSyncRunResponse>("/api/admin/jobs/sheets-sync/run", { wipe })
+}
+
+export function getSheetsSyncStatus(): Promise<SheetsSyncStatusResponse> {
+  return http.get<SheetsSyncStatusResponse>("/api/admin/jobs/sheets-sync/status")
+}
+
+export function getSheetsSyncLog(): Promise<SheetsSyncLogEntry> {
+  return http.get<SheetsSyncLogEntry>("/api/admin/jobs/sheets-sync/log")
+}
