@@ -12,7 +12,8 @@ Legend: `[ ]` pending · `[x]` done
 Proposal: [google-sheets-sync.md](proposals/google-sheets-sync.md) — sync the `Transakcje`
 sheet of spreadsheet `1iDzR0OTHvqPbjjRSnAI4SdoD7sZOGy8uT9991sPFFps` into
 `wallets.wallet_transactions` and `portfolios.transactions` / `positions` via a Kubernetes
-CronJob. 2 024 data rows; 7 transaction types; columns A–AM (39 total).
+Job triggered from the portfoliost-admin panel (jobshot). 2 024 data rows; 7 transaction
+types; columns A–AM (39 total).
 
 **Proposal corrections from live sheet inspection (2026-09-17):**
 
@@ -34,7 +35,10 @@ CronJob. 2 024 data rows; 7 transaction types; columns A–AM (39 total).
 
 **Architecture**: `portfoliost-sheets-sync` is a standalone Job repo
 (`Marx2/portfoliost-sheets-sync`). It calls the `portfoliost-wallets` import API (§23)
-over HTTP — **no direct DB access**. Auth: service JWT stored in `sheets-sync-secrets`.
+over HTTP — **no direct DB access**. Auth (decided 2026-09-18): the sync is triggered
+manually from the admin panel; the caller's Pocket-ID JWT (admin API is JWT-gated) is
+passed through by the admin backend to the K8s Job as `WALLETS_API_TOKEN` — no static
+service token, no CronJob.
 The importer is responsible only for fetching + parsing + mapping; all DB writes and
 position/balance logic go through `/api/import/transactions`.
 
@@ -70,7 +74,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
       `typescript`. No direct DB access — all writes go through the wallets API.
 - [x] `Dockerfile`: `node:22-alpine`, `npm ci`, `tsc`, entrypoint `node dist/sync.js`.
       No healthcheck port, no server.
-- [x] Env vars: `WALLETS_API_URL`, `WALLETS_API_TOKEN` (service JWT),
+- [x] Env vars: `WALLETS_API_URL`, `WALLETS_API_TOKEN` (caller JWT, injected per run),
       `GOOGLE_REFRESH_TOKEN`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
       `INSTRUMENTS_DATABASE_URL` (read-only, `ticker_reference` lookup only).
 - [x] GHA: build + test on push; publish `ghcr.io/marx2/portfoliost-sheets-sync` on tags.
@@ -230,18 +234,47 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
     `Monolithic Power Systems Inc` rows tagged `TSM`, `Yum China` tagged `PAYC`,
     `Vercom SA` tagged `VER`, `Big Cheese Studio SA` tagged `BCS`/`MBR`.
 
-### 24.9 — Homelab CronJob
+### 24.9 — Sheets sync job from the admin panel
 
-- [ ] `homelab/cluster/apps/pfire/portfoliost-sheets-sync/app/helmrelease.yaml`:
-      app-template v5.1.0, `type: cronjob`, `schedule: "0 5 * * *"`,
-      `concurrencyPolicy: Forbid`, image `ghcr.io/marx2/portfoliost-sheets-sync:<tag>`,
-      command `node dist/sync.js`. Secrets: `sheets-sync-secrets`
-      (`GOOGLE_REFRESH_TOKEN`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
-      `WALLETS_API_TOKEN`); `WALLETS_API_URL` from ConfigMap;
-      `INSTRUMENTS_DATABASE_URL` from instruments secret.
-- [ ] `ks.yaml` + add to `homelab/cluster/apps/pfire/kustomization.yaml`.
-- [ ] `kubectl kustomize` renders cleanly.
-- [ ] Commit: `chore(homelab): portfoliost-sheets-sync CronJob`.
+Approach change (2026-09-18, supersedes the CronJob design): no schedule, no static
+service token. The admin panel (JWT-gated, Pocket-ID) triggers the sync on demand via
+jobshot; the backend passes the **caller's own JWT** to the K8s Job as
+`WALLETS_API_TOKEN`, so the job authenticates to the wallets import API exactly like a
+browser session. All pfire services share one database, so the admin's `DATABASE_URL`
+serves as the Job's `INSTRUMENTS_DATABASE_URL` (read-only `ticker_reference` lookup).
+
+Job spec (jobshot `POST /api/run-job`):
+- image `ghcr.io/marx2/portfoliost-sheets-sync:<tag>`, command `node dist/sync.js`,
+  optional `--wipe` (full re-import) from the UI.
+- `secretName: sheets-sync-secrets` (envFrom) — `GOOGLE_CLIENT_ID`,
+  `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`.
+- per-run `env` from the admin backend: `WALLETS_API_TOKEN` (caller JWT from the
+  request), `WALLETS_API_URL` (= admin `API_WALLETS_URL`),
+  `INSTRUMENTS_DATABASE_URL` (= admin `DATABASE_URL`).
+- jobshot unchanged — its `env` map already supports arbitrary values.
+
+Note: 24.3–24.8 commits were never pushed; `v1.0.1` (2026-09-18) is the first release
+containing the full sync (v1.0.0 was the bare scaffold).
+
+- [ ] Push `portfoliost-sheets-sync` main → GHA release `v1.0.1` (done 2026-09-18,
+      image built; record here when the rest of this step lands).
+- [ ] `portfoliost-admin`: `POST /api/admin/jobs/sheets-sync/run` (`{ wipe?: boolean }`)
+      + `GET /api/admin/jobs/sheets-sync/status` + `GET .../log` — build the jobshot
+      payload above; duplicate-run guard (409); `job_run` row kind `sheets_sync`
+      (backend poller tracks it). Unit tests: payload carries the request JWT,
+      wipe → `["--wipe"]`, 409 while running. Commit + release.
+- [ ] `portfoliost` (SPA): `src/api/adminJobs.ts` — `runSheetsSync`,
+      `getSheetsSyncStatus`, `getSheetsSyncLog`; `JobsView.vue` — "Google Sheets"
+      card: Run Sync + Wipe & re-import (confirm), status badge, last-run info,
+      60 s polling (stooq pattern). Commit + release.
+- [ ] `homelab/cluster/apps/pfire/portfoliost-sheets-sync/`: `sheets-sync-secrets`
+      (Google creds, postBuild substitution) + `ks.yaml` + app kustomization (no
+      HelmRelease — image is pinned in the admin job spec); add
+      `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN` to `tmpl/cluster-secrets.yaml`;
+      tag bumps for the admin + portfoliost releases. `kubectl kustomize` renders
+      cleanly. Commit: `chore(homelab): portfoliost-sheets-sync admin job secret`.
+- [ ] E2E: trigger the sync from the admin panel against the cluster; assert
+      `GET /api/import/sync-runs` shows a completed run with `insertedWtx > 0`.
 
 ### 24.10 — Closeout
 
