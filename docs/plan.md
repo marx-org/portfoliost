@@ -184,7 +184,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
 
 ### 24.8 — Orchestrator
 
-- [ ] `src/sync.ts` (entrypoint):
+- [x] `src/sync.ts` (entrypoint):
       1. If `--wipe` / `WIPE=true`: `DELETE /api/import/source/google-sheets:transakcje`
          and log deleted counts. Skip on production CronJob.
       2. Refresh OAuth2 token.
@@ -193,15 +193,42 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
       5. `fetchSheet` → `parseRow` → `restateSplits` → `resolveInstrument` → `mapRow`.
       6. Batch into groups of ≤ 500; `POST /api/import/transactions` per batch.
       7. Log total inserted/skipped/errors and `syncRun.id`.
-- [ ] Smoke (clean run): `docker compose run --rm sheets-sync node dist/sync.js --wipe`
+- [x] Smoke (clean run): `docker compose run --rm sheets-sync node dist/sync.js --wipe`
       against local stack; assert `GET /api/import/sync-runs` shows completed run with
       `insertedWtx > 0`.
-- [ ] Smoke (idempotent re-run): run again without `--wipe`; assert `inserted=0,
+- [x] Smoke (idempotent re-run): run again without `--wipe`; assert `inserted=0,
       skipped=<all rows>`.
-- [ ] Add `sheets-sync` service to `portfoliost/docker-compose.yml` (build
+- [x] Add `sheets-sync` service to `portfoliost/docker-compose.yml` (build
       `../portfoliost-sheets-sync`, env `sheets-sync.env`, `restart: no`).
-- [ ] `npm run test` passes.
-- [ ] Commit: `feat(sheets-sync): sync orchestrator + wipe support`.
+- [x] `npm run test` passes.
+- [x] Commit: `feat(sheets-sync): sync orchestrator + wipe support`.
+- **Real-data decisions (2024 rows forced these; all loud, none silent):**
+  - `mapRow` returns `null` for **no-op rows** (zero quantity AND zero cash —
+    e.g. sheet row 29 Div SAP): nothing to import (the wallets DB also forbids
+    zero-amount non-ADJUSTMENT wallet txs, `ck_wtx_amount_nonzero`); the Job logs
+    each (`noOp=1`).
+  - **Zero-quantity rows with cash** (sheet row 206 Kupno Intuit, −0.43 zł):
+    wallet cash leg only, no portfolio leg (the sheet's col 11 is unchanged);
+    Job logs each (`walletOnly=1`).
+  - **Zero-price buys** (Syn2bio 21, Creotech 13 — free allotments, cash 0):
+    `ImportPortfolioTx.price` relaxed to `nonnegative` (portfoliost-wallets),
+    wallet leg books `ADJUSTMENT` (zero cash); zero-cost lot, `averageCostBasis=0`.
+  - **Display-precision sell drift**: sheet quantities are 6-decimal rounded,
+    so a full-position exit can exceed the rounded buy sum by ~1e-6 relative
+    (GSEM60: 995.290675 vs 995.290673). `processImportSell` clamps within
+    `max(1e-9, qty·1e-6)` and errors beyond.
+  - `ticker_reference` aliases added (bundled CSV + local DB): `RGEN` +
+    `repligen corp`; `DTLA` + `ishares treasury bond 20 yr ucits etf usd a`;
+    `IUFS` + `ishares s p 500 financials sector ucits etf usd a` — rows with an
+    empty Symbol col now resolve instead of splitting positions under a
+    name-as-symbol.
+  - Smoke result: clean `--wipe` run `inserted=2016 skipped=7 errors=0
+    walletOnly=1 noOp=1` (2024 rows; 7 = duplicate-`externalId` pairs by
+    idempotency design); re-run `inserted=0 skipped=2023 errors=0`, run row
+    `status=done`.
+  - **Known sheet typos left as-is** (symbol col authoritative; report to owner):
+    `Monolithic Power Systems Inc` rows tagged `TSM`, `Yum China` tagged `PAYC`,
+    `Vercom SA` tagged `VER`, `Big Cheese Studio SA` tagged `BCS`/`MBR`.
 
 ### 24.9 — Homelab CronJob
 
