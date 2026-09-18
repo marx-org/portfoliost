@@ -245,3 +245,24 @@ services:
       wallets:    { condition: service_healthy }
       instruments: { condition: service_healthy }
     restart: "no"
+
+  # §24.8 — one-shot Google Sheets sync Job (k8s CronJob stand-in, plan §24.9).
+  # Never auto-starts: lives in the `jobs` profile, so run it explicitly:
+  #   docker compose run --rm sheets-sync node dist/sync.js --wipe
+  # GOOGLE_* creds come from ./sheets-sync.env (gitignored; see .env.example).
+  sheets-sync:
+    build:
+      context: ../portfoliost-sheets-sync
+    container_name: portfoliost-sheets-sync
+    profiles: ["jobs"]
+    env_file:
+      - path: ./sheets-sync.env
+        required: false
+    environment:
+      WALLETS_API_URL: http://wallets:3000
+      WALLETS_API_TOKEN: ${EXAMPLE_SERVICE_MOCK_TOKEN:-mock-dev-token}
+      INSTRUMENTS_DATABASE_URL: postgres://portfoliost:portfoliost@postgres:5432/portfoliost
+    depends_on:
+      postgres: { condition: service_healthy }
+      wallets:  { condition: service_healthy }
+    restart: "no"
