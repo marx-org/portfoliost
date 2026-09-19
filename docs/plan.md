@@ -213,13 +213,15 @@ both build against it.
 
 ### 28.4 — Sync client ships catalog fields
 
-- [ ] `wallets-api-client.ts`: `ImportPortfolioTx` request body adds `sector`,
+- [x] `wallets-api-client.ts`: `ImportPortfolioTx` request body adds `sector`,
       `industry`, `country`, `countryCode` from the resolved instrument (nulls
       omitted); `instrumentSymbol` already reflects 28.3.
-- [ ] Tests (`wallets-api-client.test.ts`): request body carries venue-qualified
+- [x] `sync.ts`: fetch `Podsumowanie!A1:AL233`, `readPodsumowanie`, pass the
+      catalog into `resolveInstrument`.
+- [x] Tests (`wallets-api-client.test.ts`, `transakcje-mapper.test.ts`): request body carries venue-qualified
       symbol + new fields; regression on the happy-path import.
-- [ ] Gate: `npm run test` in `portfoliost-sheets-sync` passes.
-- [ ] Commit: `feat(sheets-sync): send sector/country in import payload`.
+- [x] Gate: `npm run test` + `npm run build` (tsc) in `portfoliost-sheets-sync` pass.
+- [x] Commit: `feat(sheets-sync): send sector/country in import payload`.
 
 ### 28.5 — Wallets: persist fields + self-heal the "Other" sentinel
 
