@@ -96,14 +96,35 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
 
 ### 25.4 — D81: asset-class routing in `price-bars`
 
-- [ ] `portfoliost-instruments/src/services/price-bars.ts`: `getPriceBarSeries` accepts
+- [x] `portfoliost-instruments/src/services/price-bars.ts`: `getPriceBarSeries` accepts
       `assetType`; branches: `crypto` → `fetchCryptoOhlcv`; `bond` →
-      `fetchBondOhlcv` (new, hits `OPENST_BOND_OHLCV`); `corp_bond`/`fund` → existing
+      `fetchBondOhlcv` (hits `OPENST_BOND_OHLCV`); `corp_bond`/`fund` → existing
       equity `fetchOhlcv`; `stock`/`etf` → unchanged stooq-overflow path.
-- [ ] Add `fetchBondOhlcv` to `src/adapters/cachest.ts`.
-- [ ] Route handler looks up `ticker_reference.asset_type`; falls back to `stock`.
-- [ ] Unit tests: correct adapter per `assetType`; stooq skipped for crypto/bond/corp_bond.
-- [ ] Compose stack smoke: ROD1033, BST0327.WA, BTC-USD price-bars end-to-end.
+      (implemented as an `upstreamFor(assetType, symbol, …)` router +
+      `normalizeAssetType`/`lookupAssetType` helpers; the stooq split-boundary check
+      now runs **only** for stock/etf — crypto/bond/corp_bond/fund write straight
+      to overflow and never touch stooq)
+- [x] Add `fetchBondOhlcv` to `src/adapters/cachest.ts`.
+      (`fetchBondOhlcv` already existed from D79; the **new** adapter is
+      `fetchCryptoOhlcv` → `cachest /crypto/ohlcv/{pair}`)
+- [x] Route handler looks up `ticker_reference.asset_type`; falls back to `stock`.
+      (lookup is inside `getPriceBarSeries` via `ticker_reference` on the bare
+      venue-free ticker; an unlisted symbol resolves to `stock`, so the equity path
+      is byte-for-byte unchanged — cluster only has Stock/ETF today, so this is a
+      no-op until the bond/corp_bond/crypto rows are synced by the 25.3 Job)
+- [x] Unit tests: correct adapter per `assetType`; stooq skipped for crypto/bond/corp_bond.
+      (12 new tests in `price-bars.test.ts`: `upstreamFor` per class,
+      `normalizeAssetType`, `lookupAssetType`, and `getPriceBarSeries` routing incl.
+      the stock fallback + no-split-candidate guard for corp_bond)
+- [x] Compose stack smoke: ROD1033, BST0327.WA, BTC-USD price-bars end-to-end.
+- [x] `npm run test` + `npm run test:stack` pass.
+  (instruments has no standalone `test:stack`/compose file — the compose stack is
+  the full `portfoliost` stack. Smoke ran a focused openst+cachest+instruments
+  compose: **BTC-USD** → `/crypto/ohlcv/BTC-USD` 200 (4315 bars to overflow),
+  **BST0327** → `/ohlcv/BST0327` biznesradar 200 (408 bars), **AAPL** →
+  stooq-overflow path (regression intact), **ROD1033** → `/fixedincome/ohlcv`
+  bond leg (404 only because the smoke openst has no `openst.bond_series` data).
+  `npm run build` + `npm run test` (236) all green.)
 - [ ] `npm run test` + `npm run test:stack` pass.
 - [ ] Commit: `feat(instruments): asset-class routing in price-bars — D81`.
 
