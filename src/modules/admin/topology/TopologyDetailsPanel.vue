@@ -145,15 +145,15 @@ function onSelect(id: string): void {
         <section v-if="traffic" aria-label="Traffic">
           <h3 class="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Traffic</h3>
           <div class="grid grid-cols-3 gap-2">
-            <div class="card px-2 py-1.5">
+            <div v-if="traffic.requestsPerMin != null" class="card px-2 py-1.5">
               <p class="text-[11px] text-slate-400 dark:text-slate-500">Req/min</p>
               <p class="font-mono text-base font-semibold text-slate-900 dark:text-slate-100">{{ traffic.requestsPerMin.toFixed(1) }}</p>
             </div>
-            <div class="card px-2 py-1.5">
+            <div v-if="traffic.p99LatencyMs != null" class="card px-2 py-1.5">
               <p class="text-[11px] text-slate-400 dark:text-slate-500">P99</p>
               <p class="font-mono text-base font-semibold text-slate-900 dark:text-slate-100">{{ traffic.p99LatencyMs }}ms</p>
             </div>
-            <div class="card px-2 py-1.5">
+            <div v-if="traffic.errorRate != null" class="card px-2 py-1.5">
               <p class="text-[11px] text-slate-400 dark:text-slate-500">Errors</p>
               <p class="font-mono text-base font-semibold text-slate-900 dark:text-slate-100">{{ errorRatePct }}</p>
             </div>

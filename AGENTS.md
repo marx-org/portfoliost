@@ -15,6 +15,7 @@ Portfoliost-specific guidelines (parent `../AGENTS.md` has shared rules).
 
 - Vue 3 `<script setup lang="ts">` SFCs; Pinia stores; `vue-router`; Tailwind utility classes (`card`, `btn-primary`, `btn-secondary`, `btn-ghost`, `btn-danger`, `input`, `label`).
 - API client functions live in `src/api/<domain>.ts` with explicit return types.
+- **Contracts repo layout**: `../portfoliost-contracts/` — the OpenAPI spec is `../portfoliost-contracts/contracts/openapi.yaml`, but the npm `@marx2/contracts` package (package.json, vitest, build) lives one level down in `../portfoliost-contracts/contracts/`. Run `npm test` / `npm run lint` from there, not the repo root. Regenerated types land in `generated/api-types.d.ts` (`npm run gen:types`).
 
 ## Working guidelines
 

@@ -516,7 +516,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
 
 ### 26.1 — Contracts: nullable HTTP fields + resource metrics on `TopologyServiceTraffic`
 
-- [ ] `portfoliost-contracts/contracts/openapi.yaml`:
+- [x] `portfoliost-contracts/contracts/openapi.yaml`:
   - `TopologyServiceTraffic`: make `requestsPerMin`, `errorRate`,
     `p99LatencyMs` nullable (DB workloads have no HTTP latency); add nullable
     `cpuCores`, `memoryBytes`, `connections` (numbers); extend `source` enum
@@ -524,14 +524,14 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
     `requestsPerMin` as "requests/min (HTTP) or transactions/min (databases)".
   - `TopologyServiceStatus.reachable`: update description to cover
     k8s-only workloads (ready replicas) alongside `/__meta` reachability.
-- [ ] Push main → GHA `release.yml` auto-bump; `gh release list` to read the real
+- [x] Push main → GHA `release.yml` auto-bump; `gh release list` to read the real
   tag (never assume +1).
-- [ ] In `portfoliost-admin` + `portfoliost`: `NODE_AUTH_TOKEN=$(gh auth token)
+- [x] In `portfoliost-admin` + `portfoliost`: `NODE_AUTH_TOKEN=$(gh auth token)
   npm install @marx2/contracts@<new>` → `npm run gen:types` (both repos have it)
   → commit `package-lock.json` + `generated/api-types.d.ts` in each.
-- [ ] Tests: contracts repo suite green; consumer builds (`tsc` / `vue-tsc`)
+- [x] Tests: contracts repo suite green; consumer builds (`tsc` / `vue-tsc`)
   accept the generated types.
-- [ ] Commit: `feat(contracts): topology traffic — nullable HTTP fields + resource metrics`.
+- [x] Commit: `feat(contracts): topology traffic — nullable HTTP fields + resource metrics`.
 
 ### 26.2 — admin: workload health in `/topology/status`
 
