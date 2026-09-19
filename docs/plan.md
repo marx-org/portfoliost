@@ -166,26 +166,26 @@ both build against it.
 
 ### 28.2 — Podsumowanie catalog reader + fixture (sheets-sync)
 
-- [ ] Capture fixture `src/tests/fixtures/podsumowanie.json` from the live
+- [x] Capture fixture `src/tests/fixtures/podsumowanie.json` from the live
       `Podsumowanie!A1:AL233` (226 data rows via existing `fetchSheet` +
       `FORMATTED_VALUE`).
-- [ ] `src/podsumowanie-parser.ts`: `readPodsumowanie(sheet)` →
+- [x] `src/podsumowanie-parser.ts`: `readPodsumowanie(sheet)` →
       `PodsumowanieCatalogEntry[]` with `aktywo, symbol, giełda, yahooSymbol,
       stooqSymbol, sektor, krajRaw, currency, kategoria` from cols 1/29/30/4/35/20/36/37/0
       (empty strings → null). Indexes: `byFoldedName` and `bySymbolGielda`.
-- [ ] `src/instrument-resolver.ts` `nameFold`: add "S.A."-style collapse
+- [x] `src/instrument-resolver.ts` `nameFold`: add "S.A."-style collapse
       (`/\bs a\b/` → `sa`) so `"Newag S.A."` ≡ `"Newag Sa"`; export it for reuse by
       the parser (single fold implementation). Keep NFD/diacritics transliteration.
-- [ ] `src/countries.ts`: Kraj → ISO-2 map `Niemcy→DE, USA→US, UK→GB, Tajwan→TW,
+- [x] `src/countries.ts`: Kraj → ISO-2 map `Niemcy→DE, USA→US, UK→GB, Tajwan→TW,
       Holandia→NL, Irlandia→IE, Szwecja→SE, Singapur→SG, Kanada→CA, Japonia→JP,
       Chiny→CN, Dania→DK, Luksemburg→LU`, empty → null (→ later resolved by venue).
-- [ ] Tests (`src/podsumowanie-parser.test.ts`, extend `instrument-resolver.test.ts`):
+- [x] Tests (`src/podsumowanie-parser.test.ts`, extend `instrument-resolver.test.ts`):
       fixture parses 226 rows; folded-name key uniqueness (no silent collisions);
       Synektik SA / Newag Sa / MO-BRUK SA rows map to `SNT.WA`/`NWG.WA`/`MBR.WA` with
       `sektor`; Kraj mapping incl. empty→null; `nameFold("Newag S.A.")`
       === `nameFold("Newag Sa")`.
-- [ ] Gate: `npm run test` in `portfoliost-sheets-sync` passes.
-- [ ] Commit: `feat(sheets-sync): Podsumowanie catalog reader + name fold (D24 f/up)`.
+- [x] Gate: `npm run test` in `portfoliost-sheets-sync` passes.
+- [x] Commit: `feat(sheets-sync): Podsumowanie catalog reader + name fold (D24 f/up)`.
 
 ### 28.3 — Resolver: name-first catalog join, venue-qualified symbol
 
