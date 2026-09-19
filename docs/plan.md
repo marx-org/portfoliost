@@ -147,5 +147,155 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
 - [ ] Commit: `chore: D80/D81/D82 closeout`.
 
 ---
+
+## 34. Holdings with no current price — asset-class-aware quote routing (D81 sibling)
+
+Proposal: no separate file — this is a defect-fix plan extending
+[price-data-architecture.md](proposals/price-data-architecture.md) and the D81
+routing table in [instruments-provider-module.md](proposals/instruments-provider-module.md).
+
+Some near-production positions show no current price; the affected assets are
+almost all in the "(Other) Stock/Bond" row group, i.e. `country='Other'`
+(the §28.6 sentinel bucket): retail savings bonds (`ROD*`/`EDO*`), Catalyst
+corp-bond codes, PL TFI sub-funds, crypto (`BTC`/`ETH`), and two venue-unresolved
+foreign stocks (Allianz SE, Nintendo Co). Verified read-only in the code: wallets
+`refreshQuotes` (`portfoliost-wallets/src/services/quotes.ts:71`) asks
+`GET /api/instruments/:symbol/quote`, and that route
+(`portfoliost-instruments/src/routes/instruments.ts:428`) unconditionally proxies
+`cachest fetchQuote` → `/equity/quote/{symbol}`. There is **no fixedincome quote**
+(cachest has `/fixedincome/ohlcv` + profile only, openst has no
+`/fixedincome/quote`) and **no crypto/fund quote branch** in the instruments quote
+route, so those classes 404 and wallets marks `priceSource='fallback'` with no
+price. `country='Other'` is *correlated*, not causal — the causal gap is the
+equity-only quote path. `openbb_crypto` already exposes `get_crypto_quote`
+(`openst/src/openbb_client.py:457`, route `/crypto/quote/{pair}`) and
+`scrape_quote` already handles Catalyst `.WA` + `.TFI` fund symbols
+(`openst/plugins/openbb_biznesradar/openbb_biznesradar/scraper.py:150`) — the
+wiring in instruments/cachest is what is missing.
+
+Repos touched: `openst`, `cachest`, `portfoliost-instruments`,
+`portfoliost-sheets-sync` (step 34.7 only), `portfoliost` (mocks/tests). No
+`@marx2/contracts` change expected — the `Quote` contract shape is reused.
+
+Rules: one step = one commit; a step is marked `[x]` only after its tests pass
+(unit per repo + mock per `AGENTS.md`; e2e against docker compose). The catalog
+re-import in 34.7 touches homelab and requires explicit approval before running.
+Step order mirrors the provider tier: openst → openst smoke → cachest →
+instruments adapter → full stack → catalog/closeout. The `ticker_reference.asset_type`
+lookup that dispatch needs is the same one D81 adds in 25.4 — implement it once
+as a shared helper and reuse in both the price-bars route and the quote route.
+
+---
+
+### 34.1 — Read-only inventory of no-price positions + per-class quote probe
+
+- [ ] `psql` (read-only, prod DB): `select symbol, asset_type, country,
+      price_source, current_price from positions where is_open and
+      (current_price is null or current_price = 0)` → group by `asset_type`;
+      confirm the overlap with `country='Other'`.
+- [ ] For each distinct unresolved symbol (one per class): probe live through the
+      stack and record the exact outcome — e.g. `ROD1033` → `/equity/quote/ROD1033`
+      (expect 404) vs `/fixedincome/ohlcv/ROD1033` (200, last close);
+      `BST0327`/`ARH` bare vs `BST0327.WA` → `/equity/quote/...` (biznesradar
+      scrape); `BTC` vs `BTC-USD` → `/crypto/quote/...`; `NNEP25.TFI` ·
+      `ALV.DE` → `/equity/quote/...`. Save rows/status to
+      `openst/tests/fixtures/no-prices/` as JSON fixtures.
+- [ ] Record the required symbol normalization per class (`.WA` for Catalyst
+      bonds, `-USD` pair form for crypto, bare for savings bonds) and the exact
+      quote provider (obligacje computed close vs biznesradar vs crypto.route).
+- [ ] Commit: `chore(openst): no-price asset inventory + quote probes`.
+
+### 34.2 — openst: `/fixedincome/quote/{symbol}` (savings-bond current price)
+
+- [ ] `openst/src/openbb_client.py`: add `get_bond_quote(symbol)` → last bar of
+      `get_bond_ohlcv(symbol, today, today)` shaped
+      `{ last_price, currency: "PLN" }` (or None when no bar / before issue date).
+- [ ] `openst/src/main.py`: `GET /fixedincome/quote/{symbol}` →
+      `_cached_or_404("fixedincome_quote:{symbol}", get_bond_quote, "No bond quote...")`.
+- [ ] Unit tests (`test_main.py`, patch `get_bond_ohlcv`): known emission returns
+      last price; unknown symbol → 404.
+- [ ] Full openst compose suite (openst + biznesradar + obligacje) passes.
+- [ ] Commit: `feat(openst): fixedincome quote endpoint (D79 sibling)`.
+
+### 34.3 — openst standalone smoke (before any cachest change)
+
+- [ ] `docker compose up -d` openst; `curl /fixedincome/quote/ROD1033` check twice
+      → second call Redis HIT (key `fixedincome_quote:ROD1033`).
+- [ ] Confirm the 34.1 outcome for Catalyst bonds and crypto: if equity quote with
+      normalized symbol works (`.WA` / `-USD`), no new openst route is needed for
+      them — note the verified symbol forms; else add the missing route here.
+- [ ] Commit: `chore(openst): smoke-verify fixedincome quote + class symbol forms`.
+
+### 34.4 — cachest: quote routes for bonds (and crypto if not yet covered)
+
+- [ ] `cachest/config.yaml`: `OPENST_BOND_QUOTE` `/fixedincome/quote/{symbol}` →
+      openst, `cache_ttl: 21600` (6h), `stale_ttl` matching
+      `OPENST_BOND_OHLCV`.
+- [ ] Add `test_real_config_has_bond_quote_route`; full cachest suite passes.
+- [ ] If 34.1 shows crypto quotes never reach `OPENST_CRYPTO_QUOTE` because of the
+      stored pair form, document the normalization here (route itself exists).
+- [ ] Commit: `feat(cachest): OPENST_BOND_QUOTE route`.
+
+### 34.5 — instruments: asset-class-aware quote dispatch
+
+- [ ] Extract the `ticker_reference.asset_type` lookup as a shared helper (reused
+      by the D81 price-bars route in 25.4): `src/db/tickerref-queries.ts`
+      `assetTypeForSymbol(db, symbol)`.
+- [ ] `src/adapters/cachest.ts`: add `fetchFixedincomeQuote(symbol)` →
+      `/fixedincome/quote/{symbol}` and `fetchCryptoQuote(symbol)` →
+      `/crypto/quote/{symbol}`.
+- [ ] Route `/:symbol/quote` (`routes/instruments.ts:428`) and `/:symbol/price`
+      (`instruments.ts:536`): branch on `asset_type`: `crypto` →
+      `fetchCryptoQuote(venueFree(symbol))`; `bond` →
+      `fetchFixedincomeQuote(venueFree(symbol))`; `corp_bond`/`fund` → existing
+      equity `/equity/quote` with the 34.1-verified symbol form; default unchanged.
+- [ ] `src/adapters/translate.ts`: reuse the existing quote row→`QuoteSchema`
+      translator (`toQuote` at `translate.ts:119`) for bond/crypto quote rows;
+      `currency` defaults to `PLN`/quote-provider value.
+- [ ] Unit tests (`routes/instruments.test.ts` + `translate.test.ts`): correct
+      adapter per `assetType`; AAPL regression unchanged; savings bond resolves.
+- [ ] `npm run build` + `npm run test` + `npm run test:stack` pass.
+- [ ] Commit: `feat(instruments): asset-class-aware quote dispatch (34)`.
+
+### 34.6 — Full compose stack smoke + mock parity
+
+- [ ] `docker compose up -d --build`; curl via cachest for one savings bond, one
+      Catalyst bond, one crypto pair, one PL fund, and AAPL regression; second
+      call → Redis HIT per route; wallets `refreshQuotes` no longer falls back for
+      those symbols.
+- [ ] `portfoliost/mocks/`: add bond/crypto positions to seed fixtures with
+      `country='Other'` so `test:mock` and E2E assert current-price parity for
+      those classes; `npm run test` + `npm run test:mock` + `npm run test:e2e`
+      pass.
+- [ ] Commit: `test(portfoliost): no-price bond/crypto position parity`.
+
+### 34.7 — Venue-unresolved stocks + catalog (sheets-sync, requires approval)
+
+- [ ] Podsumowanie catalog (`portfoliost-sheets-sync`): add venue-qualified
+      `Symbol Yahoo` rows for Allianz SE (`ALV.DE`) and Nintendo Co (venue
+      decided against a live stooq/yahoo probe in 34.1); `Kraj` → DE/JP.
+- [ ] Re-run the prod sync Job (wipe + re-import — **explicit user approval**);
+      verify read-only: Allianz/Nintendo positions now have country and a
+      `price_source='quote'` current price.
+- [ ] Commit: `feat(sheets-sync): resolve Allianz/Nintendo venues (34)`.
+
+### 34.8 — Closeout
+
+- [ ] Update `openst-coverage.md`: fixedincome quote route row; crypto/bond quote
+      dispatch table for instruments.
+- [ ] Update `google-sheets-sync.md` / `instruments-provider-module.md` statuses if
+      affected.
+- [ ] Archive §34 to `plan-archive.md`; add §28.6 cross-reference.
+- [ ] Commit: `chore: §34 closeout (asset-class quotes)`.
+
+Open questions (verify in 34.1, do not guess before):
+- Catalyst corp-bond current price: biznesradar market quote (`/notowania/BST0327.WA`)
+  vs obligacje computed close — pick per probe result.
+- Stored crypto symbol form at import time (`BTC` vs `BTC-USD`) determines whether
+  a normalization step is needed in `venueFreeSymbol` or the wallets store.
+- Retail savings bonds have no market price by definition — "quote" = today's
+  computed close from the obligacje engine and is the intended behaviour, not a bug.
+
+---
 ---
 
