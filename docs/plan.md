@@ -66,16 +66,33 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
 
 ### 25.3 — openst smoke + cachest route + corp-bond catalogue
 
-- [ ] `docker compose up -d` openst; verify `/equity/profile/BST0327` →
+- [x] `docker compose up -d` openst; verify `/equity/profile/BST0327` →
       `asset_type=corp_bond`; regression `/equity/profile/NNEP25.TFI` unchanged.
-- [ ] Add `OPENST_CORP_BOND_PROFILE` to `cachest/config.yaml` (TTL 24h);
+- [x] Add `OPENST_CORP_BOND_PROFILE` to `cachest/config.yaml` (TTL 24h);
       `test_real_config_has_corp_bond_profile_route`; full cachest suite passes.
-- [ ] `openst/src/importers/corp_bond_catalogue.py`: scrapes all pages of
+- [x] `openst/src/importers/corp_bond_catalogue.py`: scrapes all pages of
       `obligacje.pl/pl/narzedzia/wyszukiwarka-obligacji-notowanych`; emits
       `tickerref-sync.ts` CSV format with `asset_type=corp_bond`. One-shot k8s Job;
       unit tests with `obligacje_bond_catalogue_page1.html` fixture.
-- [ ] `npm run test` passes.
-- [ ] Commit: `feat(openst+cachest+instruments): D80 corp-bond profile + catalogue`.
+- [x] `npm run test` passes.
+- [x] Commit: `feat(openst+cachest+instruments): D80 corp-bond profile + catalogue`.
+  - Profile smoke (live, 2026-09-19): **`/corp-bond/profile/BST0327`** →
+    `asset_type=corp_bond, issuer=Best S.A., isin=PLBEST000333, market=GPW RR,
+    nominal 100 PLN, maturity 2027-03-07, currency=PLN`. A dedicated
+    `/corp-bond/profile/{symbol}` endpoint was added (rather than reusing
+    `/equity/profile`) so the bond path never touches fmp/yfinance and so cachest
+    can give it its own 24h route. `/equity/profile/BST0327` **also** now returns
+    the corp-bond profile (biznesradar dispatch) and `/equity/profile/NNEP25.TFI`
+    is unchanged (`ING Emerytura 2025`, `hq_country=PL`); savings bonds stay on
+    `/fixedincome/profile` (verified `ROD1033` → 404 on the equity path).
+  - Catalogue: the search page is a **single server-rendered page** (no
+    server-side pagination) — 937 unique bonds (5 hyphenated: `BOS0735-K` etc.).
+    Importer emits `WSE::{SYMBOL}` rows; ISIN is not on the catalogue page so that
+    column is empty (detail page only).
+  - Compose suites: openst 261 + biznesradar 69 + obligacje 53; cachest 78
+    (incl. `test_real_config_has_corp_bond_profile_route`); instruments 225 — all
+    green. One-shot k8s Job wiring for the catalogue importer is homelab work,
+    tracked in 25.6 closeout (not yet deployed).
 
 ### 25.4 — D81: asset-class routing in `price-bars`
 
