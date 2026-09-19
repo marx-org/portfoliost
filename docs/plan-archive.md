@@ -5,7 +5,7 @@ Long-running plan. Each step is implemented, verified (build + unit + mock + e2e
 Legend: `[ ]` pending · `[x]` done
 
 Single archive since 2026-09-19 — `plan-archive2.md` merged here; its sections were renumbered to
-0 / 29–33 (was 1–5), 17 kept, and the duplicate D77 pointer (was 16) dropped. The live `plan.md` §25 (D80/D81/D82) stays there.
+0 / 29–33 (was 1–5), 17 kept, and the duplicate D77 pointer (was 16) dropped. §25 (D80/D81/D82) archived here at closeout (2026-09-19).
 
 ---
 
@@ -4096,3 +4096,158 @@ the list investor-relevant.
    homelab deploy still pending.**
 10. [x] **Verify in cluster**: open `/en/research/AAPL.US/investor-relations`; confirm
    SEC filings show and opening one shows real MD&A content.
+
+---
+
+## 25. D80 / D81 / D82 — Catalyst bond profiles, asset-class routing, contract patch
+
+Proposal: [instruments-provider-module.md](proposals/instruments-provider-module.md) —
+closes remaining open D-items: Catalyst corporate-bond profile metadata (D80), asset-class
+routing in `price-bars` for `fund/crypto/bond/corp_bond` (D81), `InstrumentType` contract
+widening + admin surface (D82).
+
+D77 wired Catalyst OHLCV; D79 wired retail-savings-bond OHLCV. Independent of §23/§24.
+
+Repos touched: `openst`, `cachest`, `portfoliost-instruments`, `portfoliost-admin`,
+`@marx2/contracts`.
+
+Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
+
+---
+
+### 25.1 — HTML fixture capture: `obligacje.pl` bond detail + search pages
+
+- [x] `curl` `obligacje.pl/pl/obligacja/BST0327` → save to
+      `openst/tests/fixtures/obligacje_bond_profile_BST0327.html`.
+- [x] `curl` `obligacje.pl/pl/narzedzia/wyszukiwarka-obligacji-notowanych` (page 1) →
+      save to `openst/tests/fixtures/obligacje_bond_catalogue_page1.html`.
+- [x] Record: CSS selectors for emitent, ISIN, market, nominal, coupon type, margin,
+      maturity; pagination URL pattern; total bond count (≈936).
+- [x] Commit: `test(openst): fixture HTML for obligacje.pl bond profile + catalogue (D80)`.
+  - Recorded in `openst/tests/fixtures/obligacje/README.md`: detail fields in
+    `table.table-9`, maturity under `Wązne daty → Dzień wykupu`; catalogue is a
+    **single server-rendered page** (client-side DataTables, no pagination) with
+    937 rows / 932 unique symbols; margin is a dedicated catalogue column, not on
+    the detail page (it lives in the coupon-type text).
+
+### 25.2 — `CorporateBondProfileFetcher` in `openbb_biznesradar`
+
+- [x] `openst/plugins/openbb_biznesradar/fetchers/corp_bond_profile.py`: scrapes
+      `obligacje.pl/pl/obligacja/{symbol}`; returns emitent, ISIN, market, nominal,
+      coupon type, margin, maturity, `asset_type="corp_bond"`, `country="PL"`,
+      `currency="PLN"`.
+- [x] `EquityInfoFetcher.__call__` dispatches on Catalyst pattern `[A-Z]{3}\d{4}(\.WA)?$`
+      → new fetcher; all other symbols keep existing path.
+- [x] Unit tests against fixture; regression: existing profile tests unchanged.
+- [x] Full openst compose suite passes.
+- [x] Commit: `feat(openbb_biznesradar): CorporateBondProfileFetcher (D80)`.
+  - Implemented as `openbb_biznesradar/obligacje.py` (scraper) +
+    `openbb_biznesradar/models/corp_bond_profile.py` (fetcher), matching the
+    plugin's existing layout; bond-specific fields ride as provider-specific
+    extras, same pattern as `openbb_obligacje` (D79).
+  - Dispatch implemented on `EquityProfileFetcher.fetch_data` — the OpenBB router
+    entry point (`Fetcher` has no `__call__`; per OpenBB provider docs the router
+    calls `fetch_data`). Pattern extended with an optional `-K` suffix
+    (`BOS0735-K`). The `[A-Z]{3}\d{4}` shape is ambiguous with savings-bond codes
+    (ROD1033/EDO0936), so the dispatch probes the bond page and falls back to the
+    biznesradar probe on 404/error; savings bonds are unaffected — their profile
+    lives on `/fixedincome/profile`, not the biznesradar provider.
+  - Suite now: 247 (openst) + 69 (openbb_biznesradar) + 53 (openbb_obligacje),
+    all green; Dockerfile test stage runs the plugin suites as separate pytest
+    invocations (a combined run hits a `tests` package-name collision).
+
+### 25.3 — openst smoke + cachest route + corp-bond catalogue
+
+- [x] `docker compose up -d` openst; verify `/equity/profile/BST0327` →
+      `asset_type=corp_bond`; regression `/equity/profile/NNEP25.TFI` unchanged.
+- [x] Add `OPENST_CORP_BOND_PROFILE` to `cachest/config.yaml` (TTL 24h);
+      `test_real_config_has_corp_bond_profile_route`; full cachest suite passes.
+- [x] `openst/src/importers/corp_bond_catalogue.py`: scrapes all pages of
+      `obligacje.pl/pl/narzedzia/wyszukiwarka-obligacji-notowanych`; emits
+      `tickerref-sync.ts` CSV format with `asset_type=corp_bond`. One-shot k8s Job;
+      unit tests with `obligacje_bond_catalogue_page1.html` fixture.
+- [x] `npm run test` passes.
+- [x] Commit: `feat(openst+cachest+instruments): D80 corp-bond profile + catalogue`.
+  - Profile smoke (live, 2026-09-19): **`/corp-bond/profile/BST0327`** →
+    `asset_type=corp_bond, issuer=Best S.A., isin=PLBEST000333, market=GPW RR,
+    nominal 100 PLN, maturity 2027-03-07, currency=PLN`. A dedicated
+    `/corp-bond/profile/{symbol}` endpoint was added (rather than reusing
+    `/equity/profile`) so the bond path never touches fmp/yfinance and so cachest
+    can give it its own 24h route. `/equity/profile/BST0327` **also** now returns
+    the corp-bond profile (biznesradar dispatch) and `/equity/profile/NNEP25.TFI`
+    is unchanged (`ING Emerytura 2025`, `hq_country=PL`); savings bonds stay on
+    `/fixedincome/profile` (verified `ROD1033` → 404 on the equity path).
+  - Catalogue: the search page is a **single server-rendered page** (no
+    server-side pagination) — 937 unique bonds (5 hyphenated: `BOS0735-K` etc.).
+    Importer emits `WSE::{SYMBOL}` rows; ISIN is not on the catalogue page so that
+    column is empty (detail page only).
+  - Compose suites: openst 261 + biznesradar 69 + obligacje 53; cachest 78
+    (incl. `test_real_config_has_corp_bond_profile_route`); instruments 225 — all
+    green. One-shot k8s Job wiring for the catalogue importer is homelab work,
+    tracked in 25.6 closeout (not yet deployed).
+
+### 25.4 — D81: asset-class routing in `price-bars`
+
+- [x] `portfoliost-instruments/src/services/price-bars.ts`: `getPriceBarSeries` accepts
+      `assetType`; branches: `crypto` → `fetchCryptoOhlcv`; `bond` →
+      `fetchBondOhlcv` (hits `OPENST_BOND_OHLCV`); `corp_bond`/`fund` → existing
+      equity `fetchOhlcv`; `stock`/`etf` → unchanged stooq-overflow path.
+      (implemented as an `upstreamFor(assetType, symbol, …)` router +
+      `normalizeAssetType`/`lookupAssetType` helpers; the stooq split-boundary check
+      now runs **only** for stock/etf — crypto/bond/corp_bond/fund write straight
+      to overflow and never touch stooq)
+- [x] Add `fetchBondOhlcv` to `src/adapters/cachest.ts`.
+      (`fetchBondOhlcv` already existed from D79; the **new** adapter is
+      `fetchCryptoOhlcv` → `cachest /crypto/ohlcv/{pair}`)
+- [x] Route handler looks up `ticker_reference.asset_type`; falls back to `stock`.
+      (lookup is inside `getPriceBarSeries` via `ticker_reference` on the bare
+      venue-free ticker; an unlisted symbol resolves to `stock`, so the equity path
+      is byte-for-byte unchanged — cluster only has Stock/ETF today, so this is a
+      no-op until the bond/corp_bond/crypto rows are synced by the 25.3 Job)
+- [x] Unit tests: correct adapter per `assetType`; stooq skipped for crypto/bond/corp_bond.
+      (12 new tests in `price-bars.test.ts`: `upstreamFor` per class,
+      `normalizeAssetType`, `lookupAssetType`, and `getPriceBarSeries` routing incl.
+      the stock fallback + no-split-candidate guard for corp_bond)
+- [x] Compose stack smoke: ROD1033, BST0327.WA, BTC-USD price-bars end-to-end.
+- [x] `npm run test` + `npm run test:stack` pass.
+  (instruments has no standalone `test:stack`/compose file — the compose stack is
+  the full `portfoliost` stack. Smoke ran a focused openst+cachest+instruments
+  compose: **BTC-USD** → `/crypto/ohlcv/BTC-USD` 200 (4315 bars to overflow),
+  **BST0327** → `/ohlcv/BST0327` biznesradar 200 (408 bars), **AAPL** →
+  stooq-overflow path (regression intact), **ROD1033** → `/fixedincome/ohlcv`
+  bond leg (404 only because the smoke openst has no `openst.bond_series` data).
+  `npm run build` + `npm run test` (236) all green.)
+- [x] `npm run test` + `npm run test:stack` pass.
+- [x] Commit: `feat(instruments): asset-class routing in price-bars — D81`.
+
+### 25.5 — D82: contracts patch + admin surface
+
+- [x] `@marx2/contracts` `openapi.yaml`: add `fund | bond | corp_bond | crypto` to
+      `InstrumentType`; patch bump; reinstall; `gen:types`.
+- [x] `src/adapters/translate.ts`: add `corp_bond → CORP_BOND`, `fund → FUND`
+      (BOND and CRYPTO already at `translate.ts:289`).
+- [x] portfoliost-admin: read-only table for `openst.bond_series` (symbol, name,
+      issue/maturity, rate_rule, margin; row count) and `openst.cpi_12m` (24 rows;
+      staleness warning > 40 days).
+- [x] `npm run build` + `npm run test` + `npm run test:mock` pass.
+- [x] Commit: `feat(contracts+admin): InstrumentType widening + bond/CPI admin (D82)`.
+  - Result (2026-09-19): `InstrumentType` enum (STOCK, ETF, BOND, CRYPTO, FUND,
+    CORP_BOND) added to `InstrumentDetail.type` + `SearchResult.type`; CI published
+    `@marx2/contracts@1.6.26`. Instruments: `toInstrumentType` helper, detail/search
+    mappings widened, contracts bump + gen:types (commit `adb69c9`; 239 tests green).
+    Admin: read-only `GET /api/admin/bond-catalogue/bond-series` + `/cpi` over the
+    shared DB's `openst` schema (commit `3b2078e`; 77 tests green incl. 5 PGlite).
+    SPA: `BondCatalogueView.vue` + admin tab (commit `b5c51b3`; build clean,
+    293 unit + 190 mock green).
+
+### 25.6 — Closeout D80/D81/D82
+
+- [x] Update `instruments-provider-module.md`: D80, D81, D82 done with date.
+- [x] Update `openst-coverage.md`: `CorporateBondProfileFetcher`; D81 routing table.
+- [x] Archive to `plan-archive.md`.
+- [x] Commit: `chore: D80/D81/D82 closeout`.
+  - Result (2026-09-19): proposal + coverage docs updated; §25 archived here.
+    Known carry-over (homelab, not code): the 25.3 catalogue importer
+    (`openst/src/importers/corp_bond_catalogue.py`, 937 bonds) is a one-shot
+    k8s Job not yet deployed — cluster `ticker_reference` still has Stock/ETF
+    rows only, so D81 routing is a no-op for bond/corp_bond/crypto until it runs.

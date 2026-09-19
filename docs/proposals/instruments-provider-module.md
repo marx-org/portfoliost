@@ -265,7 +265,7 @@ Instruments normalizes a trailing `.WA`/`.US` venue suffix off bond search queri
 `bondSearchLeg`). Cluster one-shot Job `openst-bond-archive` (`openst@v1.1.22`, Flux)
 populated `openst.bond_series` — 449 rows, `ROD1033` margin 1.50.
 
-### D80 — Catalyst corporate bonds: profile metadata + catalogue
+### D80 — Catalyst corporate bonds: profile metadata + catalogue — **DONE 2026-09-19** (plan §25.2/§25.3)
 
 Catalyst-listed corporate bonds (BST, INS, KRI, ARH, VOX, NVA + `YMM` maturity
 suffix) already have working OHLCV via `openbb_biznesradar` (D77) — `BST0327.WA`
@@ -295,7 +295,7 @@ coupon.  A one-shot k8s Job imports the full catalogue into `ticker_reference` i
 `portfoliost-instruments` with `asset_type='corp_bond'` (enabling search without an
 openst roundtrip).  The daily CronJob re-imports to pick up newly listed bonds.
 
-### D81 — asset-class routing in price-bars
+### D81 — asset-class routing in price-bars — **DONE 2026-09-19** (plan §25.4; routing table implemented as-is: `getPriceBarSeries` dispatches on `ticker_reference.asset_type`, crypto→`/crypto/ohlcv`, bond→`/fixedincome/ohlcv`, corp_bond/fund→equity `/ohlcv`, stock/etf unchanged stooq-overflow path)
 
 - `ticker_reference.asset_type` widens beyond today's stock/etf: `fund`, `crypto`,
   `bond`, `corp_bond`. Routing in `fetchPriceBars` branches per class before touching
@@ -309,7 +309,7 @@ openst roundtrip).  The daily CronJob re-imports to pick up newly listed bonds.
   `.FIZ`, `.WA`, `BTC-USD`, `EDO0936` pass through untouched; bonds/crypto never
   enter stooq (overflow-only) and skip `checkSplitBoundary`.
 
-### D82 — contract & admin surface
+### D82 — contract & admin surface — **DONE 2026-09-19** (plan §25.5; `@marx2/contracts@1.6.26` with `InstrumentType` enum STOCK/ETF/BOND/CRYPTO/FUND/CORP_BOND wired to `InstrumentDetail.type` + `SearchResult.type`; admin `GET /api/admin/bond-catalogue/bond-series` + `/cpi` + SPA Bond Catalogue tab)
 
 - Reused contract shapes: bar/quote series need no changes. `InstrumentType`/detail
   `type` gains `fund | bond | corp_bond | crypto` so the SPA can label and route rows —
