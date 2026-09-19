@@ -1,6 +1,6 @@
 # google-sheets-sync — discovery & column mapping
 
-> Status: **implemented (2026-09-19)** — `portfoliost-sheets-sync` Job (§24 of
+> Status: **final/done (2026-09-19)** — `portfoliost-sheets-sync` Job (§24 of
 > plan.md) imports `Transakcje` into `wallets.wallet_transactions` and
 > `portfolios.transactions`/`positions` via the wallets import API (§23); triggered
 > on demand from the portfoliost-admin panel. The live-sheet inspection of
@@ -8,6 +8,26 @@
 > col 29 `Konto` there is an account column (per-row wallet target); bonds import
 > directly via the col 34 `Symbol` + `ticker_reference` (no exclusion); fees are
 > settled per col 31–33 rather than always PLN.
+>
+> D24 follow-up (final, §28 of plan.md) — the import now resolves real instruments,
+> not name-as-symbol:
+>
+> - **Podsumowanie catalog, name-first join** — the `Podsumowanie` tab (`A1:AL233`)
+>   is read as a catalog of instrument names; each `Transakcje` row joins to it on
+>   `Aktywo` name before any exchange lookup. This fixes brand-name-only cells
+>   (`Text` → `TXT.WA`, `Gielda Papierow Wartosciowych w Wrszw SA`, ...).
+> - **Venue-qualified `Symbol Yahoo` import** — the catalog's symbol column is a
+>   Yahoo-style, venue-qualified ticker (`SNT.WA`, `AMS.S`, `TSLA`); the resolved
+>   symbol is what lands in `positions.symbol`/`portfolio_transactions`.
+> - **Country/sector sources** — `sector`/`industry`/`country` are sourced per
+>   instrument from the catalog first, then `instruments.exchange_reference`
+>   (exchange country etc.) as fallback; carried end-to-end in the import payload
+>   (`ImportPortfolioTx.sector/industry/country`, wallets `coalesce`-persisted)
+>   after the wallets `v1.1.41` release.
+> - **Random-sector stock self-heal** — the "(Other) Stock" trap (matching a
+>   `GOLDMAN SACHS AKCJI`-style row to a random `* Stock` when the catalog misses)
+>   now self-heals on the next quotes pass because the stored `sector`/`country`
+>   win over the provider guess, no wipe needed.
 >
 > Data read-only from the `Transakcje` sheet of spreadsheet
 > `1iDzR0OTHvqPbjjRSnAI4SdoD7sZOGy8uT9991sPFFps`. Access via the **Sheets REST API**

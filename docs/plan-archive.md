@@ -3362,3 +3362,172 @@ build against `@marx2/contracts`.
       behaviour is irrelevant for e2e chart tests — use the seeded Top10 portfolio.
 - [x] Archive to `plan-archive.md`.
 - [x] Commit: `chore: charts recompute closeout`.
+
+## 28. Google Sheets import: venue-correct symbols + real country/sector (D24 follow-up)
+
+Proposal: [google-sheets-sync.md](proposals/google-sheets-sync.md) — fix two defects
+surfaced after production import (§24): (a) every position shows "(Other) Stock" in
+holdings because import stamps `country="Other"` and nothing corrects it; (b) SNT
+and NWG are enriched to the wrong listings — **Senstar Technologies (NASDAQ)** instead
+of Synektik SA and **NatWest Group (LSE)** instead of Newag SA — because wallets later
+re-resolve the stored **bare** ticker, which is ambiguous across venues.
+
+Fix approach (verified read-only 2026-09-19 against the live spreadsheet + real DB):
+
+- The **"Podsumowanie" sheet is the authoritative per-asset catalog**: 225 named
+  assets with `Kategoria`, `Aktywo`, `Symbol Google`, **`Symbol Yahoo` (venue-qualified:
+  `SNT.WA`, `NWG.WA`, `MBR.WA`, `SAP.DE`, `RIO.L`, bare `CRM`)**, `Sektor` (PL + English),
+  `Kraj` (empty for PL, Polish names otherwise), `Oryginalna waluta`, plus the
+  `Symbol giełdowy`/`Giełda` pair (col 29/30) and `Symbol Stooq` (col 35).
+- **Join key = folded `Aktywo` name** (Transakcje col D ↔ Podsumowanie col B); with a
+  new "S.A."→"sa" fold rule, **all 707 position rows (86 assets) name-match the
+  catalog (verified 0 misses)**. `(Symbol giełdowy, Giełda)` (Transakcje col AH/AI)
+  is the secondary fallback key for future typos/misses; in doubts the Transakcje
+  `Aktywo` name wins — never guess.
+- Imported transactions get `instrumentSymbol = Symbol Yahoo` (venue-qualified) plus
+  `country`/`countryCode`/`sector`/`industry` carried through the contracts, so
+  wallets enrichment, quotes, and research resolve the exact listing (Synektik/WSE)
+  and the holdings label becomes "(PL) Stock".
+
+Repos touched: `portfoliost-contracts`, `portfoliost-sheets-sync`, `portfoliost-wallets`,
+`portfoliost` (mocks/tests only). No openst/cachest changes.
+
+Rules: one step = one commit; a step is marked `[x]` only after its tests pass
+(unit per repo + mock per `AGENTS.md`; e2e against docker compose). The production
+re-import in 28.6 touches homelab and requires explicit approval before running.
+
+---
+
+### 28.1 — Contract: `ImportPortfolioTx` carries sector/industry/country
+
+Contract-first (`MODULARISATION.md`); the sync client in 28.4 and wallets in 28.5
+both build against it.
+
+- [x] `portfoliost-contracts/contracts/openapi.yaml` `ImportPortfolioTx` (~1734):
+      add optional `sector`, `industry` (strings, nullable), `country` (string,
+      ISO-2 e.g. `PL`, nullable), `countryCode` (string, nullable, legacy 2/3-letter
+      when different from the ISO-2 `country`).
+- [x] `portfoliost-contracts/contracts`: `npm run lint` + `npm test`.
+- [x] Bump `@marx2/contracts`, publish, bump in `portfoliost-wallets/package.json`
+      + `portfoliost/package.json`, `npm install`.
+- [x] `npm run gen:types` in `portfoliost-wallets`; confirm fields on
+      `ImportPortfolioTx`.
+- [x] Commit: `feat(contracts): ImportPortfolioTx sector/industry/country`.
+
+### 28.2 — Podsumowanie catalog reader + fixture (sheets-sync)
+
+- [x] Capture fixture `src/tests/fixtures/podsumowanie.json` from the live
+      `Podsumowanie!A1:AL233` (226 data rows via existing `fetchSheet` +
+      `FORMATTED_VALUE`).
+- [x] `src/podsumowanie-parser.ts`: `readPodsumowanie(sheet)` →
+      `PodsumowanieCatalogEntry[]` with `aktywo, symbol, giełda, yahooSymbol,
+      stooqSymbol, sektor, krajRaw, currency, kategoria` from cols 1/29/30/4/35/20/36/37/0
+      (empty strings → null). Indexes: `byFoldedName` and `bySymbolGielda`.
+- [x] `src/instrument-resolver.ts` `nameFold`: add "S.A."-style collapse
+      (`/\bs a\b/` → `sa`) so `"Newag S.A."` ≡ `"Newag Sa"`; export it for reuse by
+      the parser (single fold implementation). Keep NFD/diacritics transliteration.
+- [x] `src/countries.ts`: Kraj → ISO-2 map `Niemcy→DE, USA→US, UK→GB, Tajwan→TW,
+      Holandia→NL, Irlandia→IE, Szwecja→SE, Singapur→SG, Kanada→CA, Japonia→JP,
+      Chiny→CN, Dania→DK, Luksemburg→LU`, empty → null (→ later resolved by venue).
+- [x] Tests (`src/podsumowanie-parser.test.ts`, extend `instrument-resolver.test.ts`):
+      fixture parses 226 rows; folded-name key uniqueness (no silent collisions);
+      Synektik SA / Newag Sa / MO-BRUK SA rows map to `SNT.WA`/`NWG.WA`/`MBR.WA` with
+      `sektor`; Kraj mapping incl. empty→null; `nameFold("Newag S.A.")`
+      === `nameFold("Newag Sa")`.
+- [x] Gate: `npm run test` in `portfoliost-sheets-sync` passes.
+- [x] Commit: `feat(sheets-sync): Podsumowanie catalog reader + name fold (D24 f/up)`.
+
+### 28.3 — Resolver: name-first catalog join, venue-qualified symbol
+
+- [x] `ResolvedInstrument` gains `yahooSymbol: string | null`, `sector`,
+      `industry`, `country: string | null` (ISO-2), `countryCode: string | null`.
+- [x] Resolution order in `resolveInstrument`: (1) **catalog by folded `Aktywo`
+      name** → single entry wins; multiple entries with the same folded name are
+      disambiguated by `(symbol, giełda)` when present, else treated as unmatched
+      (no guessing); (2) **catalog by `(symbol giełdowy, giełda)`** when name misses
+      (typo case, e.g. "w Wrszw SA"); (3) existing `ticker_reference` match (which
+      remains for assets absent from the catalog, e.g. funds) — build `yahooSymbol`
+      as `ticker + yahoo_suffix` from a `LEFT JOIN exchange_reference ON exchange`
+      added to the index load, `country` from `exchange_reference.country_code`,
+      sector from `stock_sector`; (4) unmatched keeps sheet values + `matched:false`.
+- [x] Mapper (`transakcje-mapper.ts:164`): set `instrumentSymbol = yahooSymbol ??
+      ticker` — the **venue-qualified** symbol is what wallets/quotes/research see
+      downstream, so bare ambiguous tickers never re-resolve to a namesake.
+- [x] Tests (`instrument-resolver.test.ts`, `transakcje-mapper.test.ts`): SNT/WSE →
+      `SNT.WA` + `PL` + sektor; NWG/WSE → `NWG.WA`; SAP/ETR → `SAP.DE`; RIO/LON →
+      `RIO.L`; CRM/NYSE stays bare; fund (`NN Emerytura 2030`) keeps ticker_reference
+      path; ambiguous-name catalog case stays unmatched. Update existing
+      `ResolvedInstrument` assertions.
+- [x] Gate: `npm run test` + `npm run build` (tsc) in `portfoliost-sheets-sync` pass.
+- [x] Commit: `feat(sheets-sync): name-first catalog join + venue symbols (D24 f/up)`.
+
+### 28.4 — Sync client ships catalog fields
+
+- [x] `wallets-api-client.ts`: `ImportPortfolioTx` request body adds `sector`,
+      `industry`, `country`, `countryCode` from the resolved instrument (nulls
+      omitted); `instrumentSymbol` already reflects 28.3.
+- [x] `sync.ts`: fetch `Podsumowanie!A1:AL233`, `readPodsumowanie`, pass the
+      catalog into `resolveInstrument`.
+- [x] Tests (`wallets-api-client.test.ts`, `transakcje-mapper.test.ts`): request body carries venue-qualified
+      symbol + new fields; regression on the happy-path import.
+- [x] Gate: `npm run test` + `npm run build` (tsc) in `portfoliost-sheets-sync` pass.
+- [x] Commit: `feat(sheets-sync): send sector/country in import payload`.
+
+### 28.5 — Wallets: persist fields + self-heal the "Other" sentinel
+
+- [x] `portfoliost-wallets/src/routes/import.ts` (~240): when `tx.country` is
+      provided use it and its `countryCode`, else keep the current `"Other"`
+      fallback; map `tx.sector`/`tx.industry` onto positions (fallback stays
+      `"Other"`); same in `portfolio-transactions.ts:206` (industry added).
+- [x] `src/services/quotes.ts` (~215): enrichment fills `country`/`sector` when
+      the stored value is `null`, empty, **or the `"Other"` sentinel** — so already
+      imported positions self-heal on the next quotes pass without a wipe.
+- [x] Tests (`routes/import.test.ts` / `quotes.test.ts`): positions persist the
+      incoming sector/country; `"Other"`+`null` positions get overwritten by the
+      profile country; a real-profile position keeps its stored values.
+- [x] Gate: `npm run test` + `npm run build` (tsc) in `portfoliost-wallets` pass.
+- [x] Commit: `feat(wallets): persist sector/country + heal 'Other' (D24 f/up)`.
+
+### 28.6 — Mock parity + full re-import + validation
+
+- [x] `portfoliost/mocks/`: import/position fixtures gain `sector`/`country`/`countryCode`
+      samples; `npm run mock:seed` unchanged unless seeds add positions.
+      Verdict: fixtures **already** carry `sector`/`country` — `portfolio_positions.json`,
+      `portfolio_transactions.json`, `mocks/db-seed/constants.mjs` `SEED_POSITIONS`, and the
+      mock POST fallback. `countryCode` is a wallets-import-only payload field (dropped before
+      storage; no positions column, no SPA screen expects it), so nothing to add.
+- [x] Full gates: `npm run build` + `npm run test` + `npm run test:mock` in
+      `portfoliost`; npm build/test in contracts/wallets/sheets-sync/instruments; dockerized
+      `npm run test:e2e` (78 passed, 1 skipped). E2E hardening covered along the way:
+      deterministic stooq-first ordering for overlapping price-bar dates (instruments),
+      self-contained fees-fx wallet handling, wallet refill + merge-tolerant buy specs,
+      structural holdings/transactions group asserts, scoped portfolio-tab nav.
+- [x] Commit: `test(portfoliost): mock parity for sector/country positions`.
+- [x] **Production re-import (requires explicit user approval):** rebuild the
+      `portfoliost-sheets-sync` image, run the Job against the live spreadsheet
+      (wipe + re-import), then verify read-only via `psql`:
+      `positions` for SNT → company `Synektik`, country `PL`, sector not "Other";
+      NWG → `Newag`, country `PL`; count remaining `country='Other'` rows — expect
+      only genuinely-unknown assets (name-less funds/bonds) and report the list.
+      Result: imported 2016 rows, syncRun 31, errors 0. Note `positions.symbol` is the
+      venue-qualified ticker — `SNT.WA` → Synektik SA, sector Healthcare, country PL;
+      `NWG.WA` → Newag Sa, sector Industrials, country PL. 215/265 positions carry a
+      country; the 50 `country='Other'` rows are only genuinely-unknown assets:
+      Polish retail savings bonds (`ROD*`/`EDO*`), name-less Catalyst bond codes
+      (`ARH`/`BST`/`INS`/`KIN`/`KRI`/`NVA`/`VOX`), PL TFI sub-funds (Goldman Sachs /
+      NN / Beta ETF lines), crypto (`BTC`/`ETH`), and two venue-unresolved foreign
+      stocks (Allianz SE, Nintendo Co Ltd). First attempt failed with
+      `422 unrecognized keys: sector, country` — prod wallets `v1.1.40` predated the
+      acceptance commit (`bccf51e`); released wallets `v1.1.41` + homelab tag bump +
+      re-run succeeded.
+- [x] Commit the re-import result/summary to the plan section.
+
+### 28.7 — Closeout: google-sheets-sync.md to final status
+
+- [x] `docs/proposals/google-sheets-sync.md`: set status to **final/done**; document
+      the Podsumowanie catalog (name-first join), venue-qualified `Symbol Yahoo`
+      import, country/sector sources (catalog → exchange_reference), and the
+      "(Other) Stock" root cause + self-heal.
+- [x] Update `AGENTS.md`/KB if the sync-surface notes need refreshing.
+- [x] Archive §28 into `plan-archive.md`.
+- [x] Commit: `chore: D24 follow-up closeout (venue symbols + country/sector)`.
