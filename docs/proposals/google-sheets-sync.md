@@ -1,9 +1,18 @@
 # google-sheets-sync — discovery & column mapping
 
-> Status: **discovery → design input** (pre-proposal). Data read-only from the
-> `Transakcje` sheet of spreadsheet `1iDzR0OTHvqPbjjRSnAI4SdoD7sZOGy8uT9991sPFFps`.
-> Access via the **Sheets REST API** only (the hosted Sheets MCP is a Developer
-> Preview gated on Workspace enrollment — decided: not used).
+> Status: **implemented (2026-09-19)** — `portfoliost-sheets-sync` Job (§24 of
+> plan.md) imports `Transakcje` into `wallets.wallet_transactions` and
+> `portfolios.transactions`/`positions` via the wallets import API (§23); triggered
+> on demand from the portfoliost-admin panel. The live-sheet inspection of
+> 2026-09-17 corrected three proposal assumptions (all folded in below):
+> col 29 `Konto` there is an account column (per-row wallet target); bonds import
+> directly via the col 34 `Symbol` + `ticker_reference` (no exclusion); fees are
+> settled per col 31–33 rather than always PLN.
+>
+> Data read-only from the `Transakcje` sheet of spreadsheet
+> `1iDzR0OTHvqPbjjRSnAI4SdoD7sZOGy8uT9991sPFFps`. Access via the **Sheets REST API**
+> only (the hosted Sheets MCP is a Developer Preview gated on Workspace enrollment —
+> decided: not used).
 
 ## Goal
 
@@ -64,12 +73,19 @@ row:
 | 24 | Skumulowane Dywidendy/Odsetki (PLN) | PL decimal | — | recomputable — not imported |
 | 25 | Skumulowana wpłata (PLN) | PL decimal | — | recomputable — not imported |
 | 26 | Skumulowany zrealizowany zysk (PLN) | PL decimal | — | recomputable — not imported |
+| 29 | Konto | text | wallet target | **account name per row — the sheet has an account column** (the "no account col" gap was wrong); maps 1:1 to a wallet via `src/konto-map.ts`: `IB`→IBKR, `Equate+`, `IKE Marek`, `IKE Beata`, `NN TFI PPK`, `NN TFI PPO`, `Rach. rejestrowy PKO BP`, `XTB`, `Crypto`, `Obligacje PKO SA Beata` (10 distinct, zero empty rows). Fee currency decided independently of this column. |
+| 30 | Cena transakcyjna jednostki (w walucie) | PL decimal | `price` | native-currency unit price; used as `price` (post-restatement; fallback `|cashFlow| ÷ rate ÷ qty` only when empty — never overrides a sheet value) |
+| 31 | (fee) Waluta opłaty | ISO 4217 | `feeCurrency` | fee currency (≠ PLN on some rows → fee leg not always PLN) |
+| 32 | (fee) Kurs | PL decimal | `feeExchangeRate` | fee FX (`feeRateSource=manual`) |
+| 33 | (fee) Opłaty (w walucie) | PL decimal | `fees` | primary fee amount when `feeCurrency ≠ PLN`; else fees come from col 7 |
+| 34 | Symbol | text | `positions.symbol` / resolved instrument | canonical ticker (WSE/venue suffix), primary instrument key for stocks, ETFs, bonds, Beta ETF FIZ; bonds resolve directly via `ticker_reference` — **no bond exclusion** (decision 6 superseded) |
+| 35 | Giełda | text | resolve venue | canonical exchange (e.g. `NAS`, `WSE`, `LON`); venue-strict match with col 34 or name-fold fallback via aliases |
 
 ### Imported vs recomputed
 
-Only columns 1–8 + 12 + 17 + 19–21 carry irreducible source data; everything else is
-derivable by the existing lot/cost-basis math (D54) and must **not** be copied — import
-stays a faithful append of source events.
+The importer maps columns 1–8, 12, 17, 19–21, 29–35; all other columns (9–11, 13–16,
+18, 22–28, 36–39) are derivable by the existing lot/cost-basis math (D54) and must
+**not** be copied — import stays a faithful append of source events.
 
 ### FX convention
 
@@ -147,10 +163,13 @@ started/completed timestamps — i.e. the incremental cursor, outside the event 
   1193/1303/1744 confirm: `Aktywo=Gotówka IB`, cash out of IB).
 - `Transfery` inter-account moves: not part of this Transakcje-scoped proposal (see
   follow-ups).
-- **Account attribution gap**: `Transakcje` has **no account column**; account must be
-  inferred per row from `Aktywo`/venue (`Gotówka IB` → IB; WSE/PLN assets → Polish
-  broker; SAP SE etc. → IBKR; Equate+ list → Equate+). Confirm the asset→account map in
-  design phase.
+- **Account attribution (resolved 2026-09-17):** `Transakcje` **has an account
+  column** — col 29 `Konto`, populated on every row (10 distinct values, zero empty;
+  965 `IB`, 396 `IKE Beata`, 261 `IKE Marek`, 173 `Equate+`, 93 `NN TFI PPK`, 81
+  `NN TFI PPO`, 26 `Rach. rejestrowy PKO BP`, 22 `XTB`, 5 `Crypto`, 2
+  `Obligacje PKO SA Beata`). Each value maps directly to a wallet via `konto-map`
+  (see the col 29 row above); the 10 values are exactly the 10 wallets the sync
+  bootstraps, so no `Aktywo`/venue inference is needed.
 
 ## Instruments resolution & options (decision)
 
@@ -169,8 +188,13 @@ started/completed timestamps — i.e. the incremental cursor, outside the event 
 - V1 limits: no exercise/assignment/expiry events in the sheet → a written SHORT call
   stays open; premium P/L is what the ledger sees. Log as-is; full options lifecycle is
   future work.
-- **Bonds: not supported yet → future work** (coupon income, amortization, nominal
-  tracking; `positions.assetType` has no BOND).
+- **Bonds (decision superseded 2026-09-17):** originally "not supported → future
+  work", but live inspection showed the sheet's col 34 `Symbol` is populated for all
+  bond rows (`ROD`/`EDO`/`BST`/… series) → they resolve directly via
+  `ticker_reference.ticker` and import as `assetType=bond`/`fund` positions. No
+  series-regex exclusion; the Bonds row in the coverage-audit table below no longer
+  applies. (Full bond coupon/amortization accounting remains out of scope — the
+  import stores the positions and the ledger, not the coupon schedule.)
 
 ## Position coverage audit (decision)
 
@@ -184,7 +208,7 @@ Audited all 223 distinct `Aktywo` / 2 024 rows (2026-09-13):
 | Options (SAP SE covered calls) | 1 | 5 | SHORT CALL position (already in SAP SE rows) |
 | Crypto (BTC, ETH) | 2 | 5 | `assetType=CRYPTO`, PLN-quoted, no venue |
 | Cash markers (Gotówka IB / IKE Marek / IKE Beata) | 3 | 58 | wallet cash (DEPOSIT/WITHDRAWAL); never a position |
-| Bonds (series ROD/EDO/BST/INS/KRI/ARH/VOX/NVA + `YMM` maturity) | 33 | 90 | **excluded** — unsupported; detector = series regex `^(ROD|EDO|BST|INS|KRI|ARH|VOX|NVA|OK|PS|WZ|DO|DZ|COI|OTS|ROR|ROS|GRB)\d{4}$` + allowlist override |
+| Bonds (series ROD/EDO/BST/INS/KRI/ARH/VOX/NVA + `YMM` maturity) | 33 | 90 | **superseded 2026-09-17** — col 34 `Symbol` resolves via `ticker_reference` → `assetType=bond`/`fund`; no exclusion. Detector `^(ROD\|EDO\|…)\d{4}$` was from the original pre-inspection assumption |
 | `Text` = **TEXT S.A. (WSE, `TXT.WA`)** | 1 | 18 | `Aktywo` cell holds the brand name only. Resolved via alias `Text`/`Text S.A.` → `TXT.WA` (WSE); BUY/SELL/DIVIDEND, PLN |
 
 **Result: every non-bond, non-cash asset passes the import structurally** (schema holds
@@ -218,7 +242,9 @@ Decided (2026-09-13):
 3. **Options**: stored (schema already fits); SHORT CALL on SAP SE, strike/expiry NULL.
 4. **value_snapshots**: recalculated separately already — out of scope here.
 5. **MCP**: not used — REST only.
-6. **Bonds**: unsupported → future work.
+6. **Bonds**: unsupported → future work. **Superseded 2026-09-17** — bonds import
+   via the col 34 `Symbol` → `ticker_reference` (see the decision bullet in
+   §Instruments resolution & options).
 7. **Splits**: restatement pass during import — pre-split rows `qty ×= F`, `price /= F`;
    validation against sheet `Skumulowana ilość` (§Splits).
 8. **Position coverage**: all non-bond/non-cash assets pass; bonds excluded by series
@@ -226,7 +252,9 @@ Decided (2026-09-13):
 
 Follow-ups to design phase:
 
-- Account attribution map `Aktywo`/venue → wallet (sheet has no account column).
+- ~~Account attribution map `Aktywo`/venue → wallet (sheet has no account column).~~
+  **Closed 2026-09-17** — col 29 `Konto` is the account column; static `konto-map`
+  covers all 10 values (§Wallet/account model).
 - Inter-account `Transfery` handling (out of this Transakcje-scoped proposal).
 - Full options lifecycle (exercise/assignment/expiry) + strike/expiry columns in the
   sheet; BOND support.

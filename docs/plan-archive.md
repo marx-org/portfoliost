@@ -2621,3 +2621,380 @@ any route work (23.3+).
 - [x] Commit: `chore: wallets import API closeout`.
 
 ---
+
+## 24. Google Sheets sync — Transakcje import (wallets + portfolio)
+
+Proposal: [google-sheets-sync.md](proposals/google-sheets-sync.md) — sync the `Transakcje`
+sheet of spreadsheet `1iDzR0OTHvqPbjjRSnAI4SdoD7sZOGy8uT9991sPFFps` into
+`wallets.wallet_transactions` and `portfolios.transactions` / `positions` via a Kubernetes
+Job triggered from the portfoliost-admin panel (jobshot). 2 024 data rows; 7 transaction
+types; columns A–AM (39 total).
+
+**Proposal corrections from live sheet inspection (2026-09-17):**
+
+- Col 27 `Zysk/strata z opcji`, col 28 `Skumulowany zysk z opcji (PLN)` — skip.
+- **Col 29 `Konto`** — account name per row; maps directly to wallet. Distinct values:
+  `IB` (965), `IKE Beata` (396), `IKE Marek` (261), `Equate+` (173), `NN TFI PPK`
+  (93), `NN TFI PPO` (81), `Rach. rejestrowy PKO BP` (26), `XTB` (22), `Crypto` (5),
+  `Obligacje PKO SA Beata` (2). Zero empty rows — "no account column" was wrong.
+- **Col 30** `Cena transakcyjna jednostki (w walucie)` — native-currency unit price;
+  used as `price`. Cols 31–33: fee currency details.
+- **Col 34 `Symbol`**, col 35 `Giełda`** — canonical ticker + exchange; primary
+  instrument key for stocks, ETFs, bonds, Beta ETF FIZ.
+- Bonds (`ROD`, `EDO`, `BST`, …): `Symbol` col populated → resolve directly via
+  `ticker_reference`; no exclusion needed.
+- Crypto (`BTC`, `ETH`): `Konto=Crypto`, no `Symbol` → resolve by `Aktywo` via seed.
+- Funds (NN TFI, Goldman): no `Symbol` → resolve by `Aktywo` name-fold via seed.
+
+**Imported columns:** 1–8, 12, 17, 19–21, 29–35. Skipped: 9–11, 13–16, 18, 22–28, 36–39.
+
+**Architecture**: `portfoliost-sheets-sync` is a standalone Job repo
+(`Marx2/portfoliost-sheets-sync`). It calls the `portfoliost-wallets` import API (§23)
+over HTTP — **no direct DB access**. Auth (decided 2026-09-18): the sync is triggered
+manually from the admin panel; the caller's Pocket-ID JWT (admin API is JWT-gated) is
+passed through by the admin backend to the K8s Job as `WALLETS_API_TOKEN` — no static
+service token, no CronJob.
+The importer is responsible only for fetching + parsing + mapping; all DB writes and
+position/balance logic go through `/api/import/transactions`.
+
+**Dependency**: §23 (import API) must be complete before 24.3.
+
+Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
+
+---
+
+### 24.1 — `ticker_reference` seed additions (instruments repo)
+
+- [x] In `portfoliost-instruments`, add to the tickerref seed CSV:
+      - **Crypto**: `BTC` → `BTC-USD` (`asset_type=crypto`), `ETH` → `ETH-USD`
+        (`asset_type=crypto`).
+      - **NN/Goldman funds** (no `Symbol` in sheet): `NN Emerytura 2030` →
+        `NNEP30.TFI`, `NN Emerytura 2025` → `NNEP25.TFI`, `Goldman Sachs Emerytura
+        2065` → `GSEM65.TFI`, `Goldman Sachs Emerytura 2060` → `GSEM60.TFI`,
+        `Goldman Sachs Akcji` → `GSAK.TFI`, `NN Obligacji` → `NNOB.TFI`;
+        all `asset_type=fund`.
+      - **Beta ETF FIZ**: confirm `ETFBM40TR`, `ETFBTBSP`, `ETFBTCPL.WA`, `ETFBW20TR`
+        exist in reference or add with `asset_type=fund`, exchange `WSE`.
+      - **Noisy-name aliases**: `Text S.A.` / `Text` → `TXT` WSE; confirm abbreviated
+        names audited in the proposal have aliases.
+- [x] Re-run `tickerref-sync.ts`; verify row counts.
+- [x] `npm run test` passes.
+- [x] Commit: `feat(instruments): ticker_reference seed — crypto + fund aliases`.
+
+### 24.2 — Scaffold `portfoliost-sheets-sync` repo
+
+- [x] Create `Marx2/portfoliost-sheets-sync` (private) on GitHub.
+- [x] Scaffold: `package.json`, `tsconfig.json`, `vitest.config.ts` — copy from
+      `portfoliost-wallets`; strip Hono/Drizzle/server deps. Keep: `vitest`, `tsx`,
+      `typescript`. No direct DB access — all writes go through the wallets API.
+- [x] `Dockerfile`: `node:22-alpine`, `npm ci`, `tsc`, entrypoint `node dist/sync.js`.
+      No healthcheck port, no server.
+- [x] Env vars: `WALLETS_API_URL`, `WALLETS_API_TOKEN` (caller JWT, injected per run),
+      `GOOGLE_REFRESH_TOKEN`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
+      `INSTRUMENTS_DATABASE_URL` (read-only, `ticker_reference` lookup only).
+- [x] GHA: build + test on push; publish `ghcr.io/marx2/portfoliost-sheets-sync` on tags.
+- [x] `npm run build` + `npm run test` (empty suite) pass.
+- [x] Commit: `chore: scaffold portfoliost-sheets-sync repo`.
+
+### 24.3 — Google Sheets REST client + token refresh
+
+- [x] `src/sheets-client.ts`: `fetchSheet(spreadsheetId, range, accessToken):
+      Promise<string[][]>` — plain `fetch` against Sheets REST API v4; no SDK.
+      Always `valueRenderOption=FORMATTED_VALUE` (parser is built for the PL
+      display format); empty range → `[]`.
+- [x] `refreshToken(clientId, clientSecret, refreshToken): Promise<string>` — POST to
+      `https://oauth2.googleapis.com/token`; called once at Job startup.
+- [x] Unit tests: mocked `fetch`; URL, auth header, empty-range, token refresh.
+- [x] Commit: `feat(sheets-sync): Sheets REST client + OAuth2 token refresh`.
+
+### 24.4 — Row parser: column mapping, PL decimal, split restatement
+
+- [x] `src/transakcje-parser.ts`:
+      - `parsePlDecimal(raw: string): number | null` — strips NBSP/space/` zł`,
+        `,`→`.`, null for `-`/empty.
+      - `parseRow(cols: string[]): RawTransakcjeRow` — maps cols 1–8, 12, 17, 19–21,
+        29–35; `externalId` = SHA256 of `date|typ|aktywo|quantity|currency|kursPln`.
+      - `restateSplits(rows: RawTransakcjeRow[]): RawTransakcjeRow[]` — per asset:
+        `quantity *= F`, `priceNative /= F`, `pricePln /= F` for rows before split
+        date; validate against col 11; throw `SplitMismatchError` on mismatch.
+        Known splits: Amazon ×20 (2022-06-06), Alphabet ×20 (2022-07-15), Dino ×10
+        (2025-07-30).
+- [x] Unit tests: decimal edge cases; BUY/DIV/SELL/DEPOSIT rows; Amazon split fixture.
+- [x] `npm run test` passes.
+- [x] Commit: `feat(sheets-sync): Transakcje row parser + split restatement`.
+
+### 24.5 — Instrument resolver + Konto map
+
+- [x] `src/instrument-resolver.ts`: `resolveInstrument(row, instrumentsDb)`:
+      symbol-primary (`ticker_reference` by `ticker` + `exchange`; with exchange
+      → venue-strict, without → ticker must be unique across venues); aktywo-fallback
+      (name-fold against `name`/`aliases`; Polish ąćęłńśźż transliterated — no NFD
+      decomposition); ambiguous fold → unmatched; unmatched → `{ ticker: aktywo,
+      assetType: "stock", matched: false }`. Index loaded once per connection
+      (WeakMap cache) — ~60k rows in memory.
+- [x] `src/konto-map.ts`: static map `Konto` → `{ walletName, currency, baseCurrency }`
+      for all 10 known values; throws on unknown.
+
+      | Konto                     | walletName                  | currency | baseCurrency |
+      |---------------------------|-----------------------------|----------|--------------|
+      | `IB`                      | IBKR                        | USD      | PLN          |
+      | `Equate+`                 | Equate+                     | EUR      | PLN          |
+      | `IKE Marek`               | IKE Marek                   | PLN      | PLN          |
+      | `IKE Beata`               | IKE Beata                   | PLN      | PLN          |
+      | `NN TFI PPK`              | NN TFI PPK                  | PLN      | PLN          |
+      | `NN TFI PPO`              | NN TFI PPO                  | PLN      | PLN          |
+      | `Rach. rejestrowy PKO BP` | Rach. rejestrowy PKO BP     | PLN      | PLN          |
+      | `XTB`                     | XTB                         | PLN      | PLN          |
+      | `Crypto`                  | Crypto                      | PLN      | PLN          |
+      | `Obligacje PKO SA Beata`  | Obligacje PKO SA Beata      | PLN      | PLN          |
+
+- [x] Unit tests: symbol-primary; aktywo-fallback; unmatched; all 10 Konto values;
+      unknown throws.
+- [x] `npm run test` passes.
+- [x] Commit: `feat(sheets-sync): instrument resolver + Konto→wallet map`.
+
+### 24.6 — Wallets API client
+
+- [x] `src/wallets-api-client.ts`: typed `fetch` wrappers for `POST
+      /api/import/wallets/bootstrap`, `POST /api/import/transactions`, `GET
+      /api/import/sync-runs` (plus `POST /api/import/portfolios/bootstrap` and
+      `DELETE /api/import/source/:externalSource` for §24.8). Auth:
+      `Authorization: Bearer $WALLETS_API_TOKEN`. `createWalletsClient(baseUrl, token)`
+      + `walletsClientFromEnv()`; enforces the 500-row batch cap client-side.
+- [x] Unit tests: mocked fetch; URL, headers, payload shapes.
+- [x] Commit: `feat(sheets-sync): wallets import API client`.
+
+### 24.7 — Row mapper: `RawTransakcjeRow` → `ImportTransaction`
+
+- [x] `src/transakcje-mapper.ts`: `mapRow(row, walletUuidMap, portfolioId):
+      ImportTransaction` — converts parser output to the `POST /api/import/transactions`
+      payload shape (row is enriched with `instrument` by the orchestrator):
+      - `walletName` from `konto-map`; `walletTx.type` from `Typ` mapping
+        (`Kupno→INVEST`, `Sprzedaż→SELL`, `Div→DIVIDEND`, `Wpłata→DEPOSIT`,
+        `Wypłata→WITHDRAWAL`, `Split→ADJUSTMENT`, `Sell Call Option→SELL`).
+      - `walletTx.amount` = col 19 `cashFlow` (PLN signed); `currency` = col 20;
+        `exchangeRate` = col 21; `rateSource=manual`.
+      - `walletTx.fees` = col 33 when `feeCurrency ≠ PLN` else col 7;
+        `feeCurrency` = col 31; `feeExchangeRate` = col 32; `feeRateSource=manual`.
+        Fees applied to both legs (proposal col 7).
+      - `portfolioTx` (omit for DEPOSIT/WITHDRAWAL/ADJUSTMENT): `price` = col 30
+        (post-restatement; fallback `|cashFlow| ÷ rate ÷ qty` only when col 30 is
+        empty — never overrides a sheet value); `quantity` positive (post-
+        restatement); `type` = BUY/SELL/DIVIDEND; `realizedGainLoss` from col 17 on
+        Sprzedaż; `assetType` from resolved instrument (uppercased).
+      - **`portfolioTx.originalQuantity`** = `row.rawQuantity` (pre-restatement),
+        null when raw == restated; **`originalPrice`** = `row.rawPriceNative` (same).
+      - Options: `assetType=OPTION`, `optionType=CALL`, `direction=SHORT`,
+        `contractSize=100`; strike/expiry null.
+      - Unknown Typ / wallet missing from bootstrap map / no usable qty or price
+        → throw (loud abort, never drop a row).
+- [x] `portfoliost-wallets` (feecddd): `ImportPortfolioTxSchema` gains
+      `direction`/`optionType`/`contractSize`; `direction=SHORT` = short-option
+      OPEN (position-creating regardless of type) with its own lot distinct from
+      the same-symbol underlying equity lot (direction-filtered position lookup);
+      new test: SAP equity + written calls.
+- [x] `@marx2/contracts` (ea74c37): `ImportPortfolioTx` option fields; fixed
+      pre-existing broken YAML indentation (13-space keys) that invalidated the
+      whole spec.
+- [x] Unit tests: pre-split BUY row → `originalQuantity ≠ quantity`,
+      `originalPrice ≠ price`; post-split BUY row → both null; DEPOSIT → null.
+- [x] `npm run test` passes (sheets-sync 64, wallets 296).
+- [x] Commit: `feat(sheets-sync): row mapper → ImportTransaction + original values`.
+
+### 24.8 — Orchestrator
+
+- [x] `src/sync.ts` (entrypoint):
+      1. If `--wipe` / `WIPE=true`: `DELETE /api/import/source/google-sheets:transakcje`
+         and log deleted counts. Skip on production CronJob.
+      2. Refresh OAuth2 token.
+      3. `POST /api/import/wallets/bootstrap` with all 10 wallets → UUID map.
+      4. `POST /api/import/portfolios/bootstrap` → `portfolioId`.
+      5. `fetchSheet` → `parseRow` → `restateSplits` → `resolveInstrument` → `mapRow`.
+      6. Batch into groups of ≤ 500; `POST /api/import/transactions` per batch.
+      7. Log total inserted/skipped/errors and `syncRun.id`.
+- [x] Smoke (clean run): `docker compose run --rm sheets-sync node dist/sync.js --wipe`
+      against local stack; assert `GET /api/import/sync-runs` shows completed run with
+      `insertedWtx > 0`.
+- [x] Smoke (idempotent re-run): run again without `--wipe`; assert `inserted=0,
+      skipped=<all rows>`.
+- [x] Add `sheets-sync` service to `portfoliost/docker-compose.yml` (build
+      `../portfoliost-sheets-sync`, env `sheets-sync.env`, `restart: no`).
+- [x] `npm run test` passes.
+- [x] Commit: `feat(sheets-sync): sync orchestrator + wipe support`.
+- **Real-data decisions (2024 rows forced these; all loud, none silent):**
+  - `mapRow` returns `null` for **no-op rows** (zero quantity AND zero cash —
+    e.g. sheet row 29 Div SAP): nothing to import (the wallets DB also forbids
+    zero-amount non-ADJUSTMENT wallet txs, `ck_wtx_amount_nonzero`); the Job logs
+    each (`noOp=1`).
+  - **Zero-quantity rows with cash** (sheet row 206 Kupno Intuit, −0.43 zł):
+    wallet cash leg only, no portfolio leg (the sheet's col 11 is unchanged);
+    Job logs each (`walletOnly=1`).
+  - **Zero-price buys** (Syn2bio 21, Creotech 13 — free allotments, cash 0):
+    `ImportPortfolioTx.price` relaxed to `nonnegative` (portfoliost-wallets),
+    wallet leg books `ADJUSTMENT` (zero cash); zero-cost lot, `averageCostBasis=0`.
+  - **Display-precision sell drift**: sheet quantities are 6-decimal rounded,
+    so a full-position exit can exceed the rounded buy sum by ~1e-6 relative
+    (GSEM60: 995.290675 vs 995.290673). `processImportSell` clamps within
+    `max(1e-9, qty·1e-6)` and errors beyond.
+  - `ticker_reference` aliases added (bundled CSV + local DB): `RGEN` +
+    `repligen corp`; `DTLA` + `ishares treasury bond 20 yr ucits etf usd a`;
+    `IUFS` + `ishares s p 500 financials sector ucits etf usd a` — rows with an
+    empty Symbol col now resolve instead of splitting positions under a
+    name-as-symbol.
+  - Smoke result: clean `--wipe` run `inserted=2016 skipped=7 errors=0
+    walletOnly=1 noOp=1` (2024 rows; 7 = duplicate-`externalId` pairs by
+    idempotency design); re-run `inserted=0 skipped=2023 errors=0`, run row
+    `status=done`.
+  - **Known sheet typos left as-is** (symbol col authoritative; report to owner):
+    `Monolithic Power Systems Inc` rows tagged `TSM`, `Yum China` tagged `PAYC`,
+    `Vercom SA` tagged `VER`, `Big Cheese Studio SA` tagged `BCS`/`MBR`.
+
+### 24.9 — Sheets sync job from the admin panel
+
+Approach change (2026-09-18, supersedes the CronJob design): no schedule, no static
+service token. The admin panel (JWT-gated, Pocket-ID) triggers the sync on demand via
+jobshot; the backend passes the **caller's own JWT** to the K8s Job as
+`WALLETS_API_TOKEN`, so the job authenticates to the wallets import API exactly like a
+browser session. All pfire services share one database, so the admin's `DATABASE_URL`
+serves as the Job's `INSTRUMENTS_DATABASE_URL` (read-only `ticker_reference` lookup).
+
+Job spec (jobshot `POST /api/run-job`):
+- image `ghcr.io/marx2/portfoliost-sheets-sync:<tag>`, command `node dist/sync.js`,
+  optional `--wipe` (full re-import) from the UI.
+- `secretName: sheets-sync-secrets` (envFrom) — `GOOGLE_CLIENT_ID`,
+  `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`.
+- per-run `env` from the admin backend: `WALLETS_API_TOKEN` (caller JWT from the
+  request), `WALLETS_API_URL` (= admin `API_WALLETS_URL`),
+  `INSTRUMENTS_DATABASE_URL` (= admin `DATABASE_URL`).
+- jobshot unchanged — its `env` map already supports arbitrary values.
+
+Note: 24.3–24.8 commits were never pushed; `v1.0.1` (2026-09-18) is the first release
+containing the full sync (v1.0.0 was the bare scaffold).
+
+- [x] Push `portfoliost-sheets-sync` main → GHA release. Note: `v1.0.2` tag exists but has no
+  release (GHA auto-bumped to `v1.0.3`); the admin job spec pins
+  `v1.0.3` (stable date-sort + 1:1 wallet↔portfolio).
+- [x] `portfoliost-admin`: `POST /api/admin/jobs/sheets-sync/run` (`{ wipe?: boolean }`)
+      + `GET /api/admin/jobs/sheets-sync/status` + `GET .../log` — build the jobshot
+      payload above; duplicate-run guard (409); `job_run` row kind `sheets_sync`
+      (backend poller tracks it). Unit tests: payload carries the request JWT, wipe → `["--wipe"]`,
+  409 while running. Commit + release (`v1.0.47`, 2026-09-19; the sheets-sync job image pin had the
+  same GHA off-by-one — `v1.0.2` → `v1.0.3`).
+- [x] `portfoliost` (SPA): `src/api/adminJobs.ts` — `runSheetsSync`,
+      `getSheetsSyncStatus`, `getSheetsSyncLog`; `JobsView.vue` — "Google Sheets"
+      card: Run Sync + Wipe & re-import (confirm), status badge, last-run info, 60 s polling (stooq
+  pattern). Commit + release (`v1.0.166`, 2026-09-19).
+- [x] `homelab/cluster/apps/pfire/portfoliost-sheets-sync/`: `sheets-sync-secrets`
+      (Google creds, postBuild substitution) + `ks.yaml` + app kustomization (no
+      HelmRelease — image is pinned in the admin job spec); add
+      `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN` to `tmpl/cluster-secrets.yaml`; tag bumps for
+  the admin + portfoliost releases. Applied 2026-09-18.
+- [x] E2E: trigger the sync from the admin panel against the cluster — run 21
+      (2026-09-19 10:54 local, image `v1.0.3`, wipe): job **Complete**,
+      `status=done`, `inserted=2016 skipped=7 errors=0 walletOnly=1 noOp=1`
+      (matches the §24.8 smoke counts exactly).
+
+**Deployment incident (2026-09-19, resolved) — homelab tag bump off-by-one.**
+The §24.9 tag bumps pinned `admin v1.0.45` / `wallets v1.1.37` — tags that GHA never released
+(auto-bump produced `v1.0.46` / `v1.1.38` instead). Helm upgrades timed out on `ImagePullBackOff`
+(rollout never ready), and the stuck
+`pending-upgrade` helm revisions left both HelmReleases `Stalled/RetriesExceeded`
+/ blocked, wedging the kustomizations for a day. Fixed by homelab `ca03848ff`
+(admin `v1.0.47`, wallets `v1.1.38`, SPA `v1.0.166`); the spec change cleared the Stalled state and
+all three rolled out clean. Lesson: after pushing a service, wait for the GHA release and pin the
+tag it actually created.
+
+**Sync row errors (2026-09-19, all resolved via reference data — nothing left in
+the sheet).** Run 11 (first admin-triggered wipe) failed with 5 row errors. All
+five were `ticker_reference` gaps, not sheet typos — the cluster table had lost
+the §24.8 manual aliases (the live tickersync upserts from adanos and resets the
+column) and the sheet's naming/venue variants don't name-fold onto the upstream
+names:
+- RGEN buy 0.2297 (sheet row 159, "Repligen Corp", empty symbol col) → ref name
+  folds to "repligen corporation", no "repligen corp" alias → name-as-symbol.
+  Fixed by `NASDAQ::RGEN` alias `repligen corp`.
+- DTLA buy 64 (row 703, venue `LON`), IUFS sell 24 (row 1673, `LON`), IUFS buy
+  45 (row 1878, `LON`) → venue-strict match misses (`LON` ≠ ref venue `LSE`)
+  and the name-fold fallback needed the full-name aliases, missing in-cluster.
+  Fixed by `LSE::DTLA` / `LSE::IUFS` full-name aliases.
+- ASML sell 0.4909 (row 852) → ASML buy 0.1028 (row 167, "ASML Holding NV")
+  didn't resolve: ref name "ASML Holding N.V." folds to "asml holding n v" vs
+  sheet "asml holding nv". Fixed by `NASDAQ::ASML` alias `asml holding nv`.
+Persistence: `ALIAS_OVERRIDES` in `tickerref-sync` re-applies all four after
+every upstream sync (instruments `010921b` + `2c9912e`, release `v1.0.48`,
+homelab `5c23d5b81`). Optional sheet-side cleanup (owner): normalize the Giełda
+col `LON` → `LSE` on rows 703/1673/1878 — with the aliases this is now moot.
+
+**Known bug (2026-09-19, fix later) — `wallets.sync_runs` stores only the last
+batch's counts.** The import API upserts the run row per batch (≤500 rows)
+without accumulating, so after a 5-batch run `inserted_wtx` reads 24 (batch 5)
+instead of 2011. The §24.10 verification "insertedWtx ≈ 2024" will read wrong
+until the API accumulates (or the job POSTs a final summary update).
+
+**Known bug (2026-09-19, fix later) — SPA admin route bounces on hard reload.**
+`router.beforeEach` checks `auth.isAdmin` synchronously, but on a fresh page
+load `user` is null until `fetchMe` resolves, so `to.meta.admin` routes redirect
+to `/investments` (only soft navigation after login works). Fix: await
+`fetchMe()` (once per session) in the guard before the admin check, or hydrate
+the store before the initial navigation.
+
+**Fixed (2026-09-19) — pfire postgres CPU saturation from price-bar backfill.**
+After the full sheets re-import (~2000 txs → 100+ positions), the value-snapshot
+backfill hammered `instruments.price_bars_all` with per-symbol price lookups,
+10+ portfolios in parallel. The pfire postgres pod (node `kura`) pegged the node
+at ~100 % CPU; probe timeouts cascaded cluster-wide and `pfire` k8s rollouts
+timed out → Helm/Flux rollbacks (wallets v1.1.38 / admin v1.0.46).
+`pg_terminate_backend` on the active queries dropped node load to ~16 %.
+
+**Root causes (two independent):**
+1. **Missing index (the big one).** The `price_bars_all` US branch computes
+   `replace(ticker, '.US', '') AS symbol` over the `stooq_daily_us` foreign
+   table (28M rows); no index could serve that expression, so every per-symbol
+   US lookup was a full 28M-row FDW fetch (~2.2 s for 20 rows). Fixed with a
+   functional index in the remote `stooq` DB:
+   `daily_us_stripped_ticker_date on public.daily_us (replace(ticker, '.US', ''), date)`
+   → US branch 2219 ms → 7.7 ms; full-view US query ~15 ms. Persisted in
+   `pfire-init-sql.yaml` (bootstrap) + local PGlite/docker parity
+   (`stooq_daily_us_stripped_ticker_date`, portfoliost-instruments v1.0.49).
+2. **Unbounded parallelism.** `computeSnapshotBatch` fanned out
+   `Promise.all` over every symbol, and multiple portfolios' backfills/recalcs
+   ran concurrently. Fixed in portfoliost-wallets v1.1.39:
+   - `backfill-runner.ts`: global FIFO runner — **one recompute pass at a time
+     cluster-wide** (analytics `runBackfill` and post-mutation recalcs share it).
+     Per-portfolio dedupe (latest state wins); abort + re-run after the grace
+     period; `MAX_AUTO_RESTARTS` valve against abort livelock.
+   - Per-pass price fan-out bounded: `RECALC_PRICE_CONCURRENCY` (default 4).
+   - Import route still triggers **no** snapshot recompute (only wallet-balance
+     recalc), so price-bar work starts only after the import, one portfolio at
+     a time — as required ("suspend until the whole import is done, then
+     one-by-one").
+
+**Verified in cluster (2026-09-19):** wallets v1.1.39 + instruments v1.0.49
+running; US-symbol view query 15 ms; `kubectl top nodes` 15–27 % CPU (kura was
+100 %).
+
+### 24.10 — Closeout
+
+- [x] Update `google-sheets-sync.md`: status **implemented**; record col 29 `Konto`;
+      close "no account column" follow-up; mark bond decision 6 superseded.
+- [x] Verify (2026-09-19, live cluster) — `sync_runs` run id 26:
+      `external_source=google-sheets:transakcje`, `status=done`, completed
+      2026-09-19 12:39 UTC. `inserted_wtx` reads **24** — the known batch bug
+      (the API upserts the run row per ≤500-row batch without accumulating, so
+      only the last batch's counts survive); authority counts come from the event
+      tables: `wallets.wallet_transactions` tagged **2016** (distinct
+      `external_id` 2016 = 2024 sheet rows − 7 duplicate-`externalId` pairs − 1
+      noOp Div SAP row), matching the §24.8 wipe-run count exactly;
+      `portfolios.transactions` tagged **1955** = 2016 − 57
+      (DEPOSIT/WITHDRAWAL, no portfolio leg by design) − 3 (ADJUSTMENT split
+      rows) − 1 (walletOnly Intuit row 206) — no unexplained loss.
+- [x] Spot-checks pass: **SELL `realizedGainLoss`** — 236 SELL rows, 231 present;
+      5 absent are exactly the SAP covered-call option sells
+      (`asset_type=OPTION`, qty 100, no col 17); 5 sampled with values. **Split
+      restatement** — 6 BUY rows restated, ratio-exact: AMZN ×20 (0.0209→0.418,
+      0.0051→0.102), GOOGL ×20 (0.031→0.62, 0.178→3.56), DNP ×10 (5→50, 2→20),
+      `price` ÷ by the same factor.
+- [x] Archive to `plan-archive.md`.
+- [x] Commit: `chore: google-sheets-sync closeout`.
+
+---
