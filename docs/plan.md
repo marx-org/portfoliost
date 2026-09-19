@@ -124,27 +124,37 @@ as a shared helper and reuse in both the price-bars route and the quote route.
 
 ### 34.2 — openst: `/fixedincome/quote/{symbol}` (savings-bond current price)
 
-- [ ] `openst/src/openbb_client.py`: add `get_bond_quote(symbol)` → last 1–2 bars of
+- [x] `openst/src/openbb_client.py`: add `get_bond_quote(symbol)` → last 1–2 bars of
       `get_bond_ohlcv(symbol, …)` over a recent window (e.g. last 30 days — savings
       bonds move infrequently, so today alone may not yield a prev_close) shaped
       `{ last_price, prev_close, change, change_percent, currency: "PLN" }` —
       equity-quote-shaped so instruments' existing `toQuote` reuses it unchanged
       (or None when no bar / before issue date).
-- [ ] `openst/src/main.py`: `GET /fixedincome/quote/{symbol}` →
+- [x] `openst/src/main.py`: `GET /fixedincome/quote/{symbol}` →
       `_cached_or_404("fixedincome_quote:{symbol}", get_bond_quote, "No bond quote...")`.
-- [ ] Unit tests (`test_main.py`, patch `get_bond_ohlcv`): known emission returns
+- [x] Unit tests (`test_main.py`, patch `get_bond_ohlcv`): known emission returns
       last price; unknown symbol → 404.
-- [ ] Full openst compose suite (openst + biznesradar + obligacje) passes.
-- [ ] Commit: `feat(openst): fixedincome quote endpoint (D79 sibling)`.
+      (4 new tests: two-bar shape incl. 30-day window end-anchored to today,
+      single-bar omits prev_close, None → 404, second call served from Redis.)
+- [x] Full openst compose suite (openst + biznesradar + obligacje) passes.
+      (268 + 69 + 53, `docker compose --profile test run --rm test`.)
+- [x] Commit: `feat(openst): fixedincome quote endpoint (D79 sibling)`.
 
 ### 34.3 — openst standalone smoke (before any cachest change)
 
-- [ ] `docker compose up -d` openst; `curl /fixedincome/quote/ROD1033` check twice
+- [x] `docker compose up -d` openst; `curl /fixedincome/quote/ROD1033` check twice
       → second call Redis HIT (key `fixedincome_quote:ROD1033`).
-- [ ] Confirm the 34.1 outcome for Catalyst bonds and crypto: if equity quote with
+      (Local compose: seeded `openst.bond_series` (449) + `openst.cpi_12m` (320)
+      from the prod `openst` DB read-only. ROD1033 → 200 `last_price 151.99 PLN,
+      prev_close 151.97, date 2026-09-19`; key `fixedincome_quote:ROD1033` exists
+      after call 1, call 2 = 200 in ~12 ms (HIT). EDO0232 (12y EDO) → 200 147.03.
+      UNKNOWN999 → 404 "No bond quote for …".)
+- [x] Confirm the 34.1 outcome for Catalyst bonds and crypto: if equity quote with
       normalized symbol works (`.WA` / `-USD`), no new openst route is needed for
       them — note the verified symbol forms; else add the missing route here.
-- [ ] Commit: `chore(openst): smoke-verify fixedincome quote + class symbol forms`.
+      (Confirmed in prod 34.1: corp bond `BST0327` bare AND `.WA` → 200 on the
+      equity quote; crypto `BTC-USD` 200 / bare `BTC` 404. No new openst route
+      needed → no openst code change in this step; the commit is the plan closeout.)
 
 ### 34.4 — cachest: quote routes for bonds (and crypto if not yet covered)
 
