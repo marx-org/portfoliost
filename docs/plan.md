@@ -253,13 +253,24 @@ both build against it.
       self-contained fees-fx wallet handling, wallet refill + merge-tolerant buy specs,
       structural holdings/transactions group asserts, scoped portfolio-tab nav.
 - [x] Commit: `test(portfoliost): mock parity for sector/country positions`.
-- [ ] **Production re-import (requires explicit user approval):** rebuild the
+- [x] **Production re-import (requires explicit user approval):** rebuild the
       `portfoliost-sheets-sync` image, run the Job against the live spreadsheet
       (wipe + re-import), then verify read-only via `psql`:
       `positions` for SNT → company `Synektik`, country `PL`, sector not "Other";
       NWG → `Newag`, country `PL`; count remaining `country='Other'` rows — expect
       only genuinely-unknown assets (name-less funds/bonds) and report the list.
-- [ ] Commit the re-import result/summary to the plan section.
+      Result: imported 2016 rows, syncRun 31, errors 0. Note `positions.symbol` is the
+      venue-qualified ticker — `SNT.WA` → Synektik SA, sector Healthcare, country PL;
+      `NWG.WA` → Newag Sa, sector Industrials, country PL. 215/265 positions carry a
+      country; the 50 `country='Other'` rows are only genuinely-unknown assets:
+      Polish retail savings bonds (`ROD*`/`EDO*`), name-less Catalyst bond codes
+      (`ARH`/`BST`/`INS`/`KIN`/`KRI`/`NVA`/`VOX`), PL TFI sub-funds (Goldman Sachs /
+      NN / Beta ETF lines), crypto (`BTC`/`ETH`), and two venue-unresolved foreign
+      stocks (Allianz SE, Nintendo Co Ltd). First attempt failed with
+      `422 unrecognized keys: sector, country` — prod wallets `v1.1.40` predated the
+      acceptance commit (`bccf51e`); released wallets `v1.1.41` + homelab tag bump +
+      re-run succeeded.
+- [x] Commit the re-import result/summary to the plan section.
 
 ### 28.7 — Closeout: google-sheets-sync.md to final status
 
