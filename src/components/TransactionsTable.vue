@@ -220,6 +220,11 @@ function typeLabel(type: string): string {
   return type.charAt(0) + type.slice(1).toLowerCase()
 }
 
+function assetLabel(tx: Tx): string {
+  const kind = tx.assetType ? tx.assetType.charAt(0) + tx.assetType.slice(1).toLowerCase() : "Stock"
+  return `(${tx.country || "US"}) ${kind}`
+}
+
 // ── Edit / Delete ─────────────────────────────────────────────────────
 
 const editing      = ref<Tx | null>(null)
@@ -365,9 +370,7 @@ const colCount = computed(() =>
                   <span>
                     <span class="flex items-center gap-1 font-medium text-slate-900 dark:text-slate-100">
                       {{ tx.instrumentSymbol }}
-                      <span v-if="mode === 'global'" class="text-xs font-normal text-slate-400 dark:text-slate-500">
-                        {{ typeLabel(tx.assetType ?? "STOCK") }}
-                      </span>
+                      <span class="text-xs font-normal text-slate-400 dark:text-slate-500">{{ assetLabel(tx) }}</span>
                     </span>
                     <span class="block text-xs text-slate-500 dark:text-slate-400">{{ tx.instrumentName }}</span>
                     <LabelChips v-if="tx.labels?.length" :labels="tx.labels" :max="3" class="mt-0.5" />
