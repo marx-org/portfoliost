@@ -65,6 +65,7 @@ export const topologyNodes: TopologyNodeDef[] = [
   // jobs
   { id: "portfoliost-wallets-fxsync", label: "FX Sync", area: "jobs", rank: R.back, live: false },
   { id: "portfoliost-instruments-tickersync", label: "Ticker Sync", area: "jobs", rank: R.back, live: false },
+  { id: "portfoliost-sheets-sync", label: "Sheets Sync", area: "jobs", rank: R.back, live: false },
   { id: "stooq-downloader", label: "Stooq Downloader", area: "jobs", rank: R.back, live: false },
   { id: "stooq-importer", label: "Stooq Importer", area: "jobs", rank: R.back, live: false },
   { id: "jobshot", label: "Jobshot", area: "jobs", rank: R.back, live: false },
@@ -76,6 +77,7 @@ export const topologyNodes: TopologyNodeDef[] = [
   { id: "openst-cpi-seed", label: "CPI Seed", area: "jobs", rank: R.back, live: false, job: { schedule: "0 5 1 1 *", suspended: true, purpose: "Full CPI seed; scheduled execution is suspended." } },
   // external-services
   { id: "pocketid", label: "PocketID (OIDC)", area: "external-services", rank: R.providers, live: false },
+  { id: "google-sheets", label: "Google Sheets", area: "external-services", rank: R.providers, live: false },
   { id: "stooq-pl", label: "stooq.pl", area: "external-services", rank: R.providers, live: false },
   { id: "scanst", label: "scanst", area: "external-services", rank: R.providers, live: false },
   { id: "mastra-ticker", label: "mastra-ticker", area: "external-services", rank: R.providers, live: false },
@@ -157,6 +159,8 @@ export const topologyEdges: TopologyEdgeDef[] = [
   { source: "openst-cpi-import", target: "openst", label: "Imports CPI", kind: "job", measurable: "none" },
   { source: "openst-cpi-seed", target: "openst", label: "Full CPI seed (suspended)", kind: "job", measurable: "none" },
   { source: "portfoliost-admin", target: "jobshot", label: "On-demand job trigger", kind: "job", measurable: "none" },
+  { source: "portfoliost-sheets-sync", target: "google-sheets", label: "Fetches Transakcje sheet", kind: "provider", measurable: "none" },
+  { source: "portfoliost-sheets-sync", target: "portfoliost-wallets", label: "Imports transactions", kind: "job", measurable: "none" },
   { source: "portfoliost-wallets-fxsync", target: "portfoliost-wallets", label: "Updates FX rates", kind: "job", measurable: "none" },
   { source: "portfoliost-instruments-tickersync", target: "portfoliost-instruments", label: "Syncs tickers", kind: "job", measurable: "none" },
   { source: "stooq-downloader", target: "stooq-pl", label: "CSV download", kind: "provider", measurable: "none" },

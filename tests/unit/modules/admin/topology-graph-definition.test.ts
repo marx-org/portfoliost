@@ -31,10 +31,12 @@ const EXPECTED_NODE_IDS = [
   "openst-cpi-import",
   "openst-cpi-seed",
   "portfoliost-instruments-tickersync",
+  "portfoliost-sheets-sync",
   "portfoliost-wallets-fxsync",
   "stooq-downloader",
   "stooq-importer",
   // external-services
+  "google-sheets",
   "mastra-ticker",
   "pocketid",
   "scanst",
@@ -95,6 +97,8 @@ const EXPECTED_EDGE_PAIRS = [
   ["portfoliost-instruments", "portfoliost-users-auth"],
   ["portfoliost-instruments", "postgres"],
   ["portfoliost-instruments-tickersync", "portfoliost-instruments"],
+  ["portfoliost-sheets-sync", "google-sheets"],
+  ["portfoliost-sheets-sync", "portfoliost-wallets"],
   ["portfoliost-users-auth", "postgres"],
   ["portfoliost-wallets", "ecb"],
   ["portfoliost-wallets", "portfoliost-users-auth"],
@@ -135,8 +139,8 @@ describe("topology graph definition (D55-3)", () => {
     expect(NODE_AREAS).toHaveLength(5)
     expect(areaNodes("internal")).toHaveLength(6)
     expect(areaNodes("storage")).toHaveLength(2)
-    expect(areaNodes("jobs")).toHaveLength(9)
-    expect(areaNodes("external-services")).toHaveLength(4)
+    expect(areaNodes("jobs")).toHaveLength(10)
+    expect(areaNodes("external-services")).toHaveLength(5)
     expect(areaNodes("data-providers")).toHaveLength(16)
   })
 

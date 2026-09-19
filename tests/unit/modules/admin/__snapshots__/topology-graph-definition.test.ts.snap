@@ -152,6 +152,14 @@ exports[`topology graph definition (D55-3) > snapshots node IDs and edge pairs 1
       "portfoliost-instruments",
     ],
     [
+      "portfoliost-sheets-sync",
+      "google-sheets",
+    ],
+    [
+      "portfoliost-sheets-sync",
+      "portfoliost-wallets",
+    ],
+    [
       "portfoliost-users-auth",
       "postgres",
     ],
@@ -192,6 +200,7 @@ exports[`topology graph definition (D55-3) > snapshots node IDs and edge pairs 1
     "dividendhistory",
     "ecb",
     "fmp",
+    "google-sheets",
     "intrinio",
     "jobshot",
     "mastra-ticker",
@@ -209,6 +218,7 @@ exports[`topology graph definition (D55-3) > snapshots node IDs and edge pairs 1
     "portfoliost-admin",
     "portfoliost-instruments",
     "portfoliost-instruments-tickersync",
+    "portfoliost-sheets-sync",
     "portfoliost-users-auth",
     "portfoliost-wallets",
     "portfoliost-wallets-fxsync",
