@@ -7,6 +7,9 @@ import { benchmarkSeries, benchmarkSymbols } from "./benchmarks.js"
 const created = new Map()
 const positionsByPortfolio = new Map()
 const newPortfolioIds = new Set()
+/** Portfolio ids whose history was force-rebuilt (POST /:id/recompute) — their
+ *  analytics now serve the populated fixture even when they started empty. */
+const recomputedIds = new Set()
 const allTxs = new Map()
 let txInited = false
 let shares = null
@@ -371,7 +374,9 @@ export function register(app) {
     if (!requireAuth(ctx)) return
     const timeframe = timelineFor(ctx.query.timeframe)
     const emptyFile = EMPTY_BY_TIMEFRAME[timeframe]
-    const base = withDataFile(ctx.params.id, ANALYTICS_BY_TIMEFRAME[timeframe], emptyFile)
+    const base = recomputedIds.has(ctx.params.id)
+      ? loadRaw(ANALYTICS_BY_TIMEFRAME[timeframe])
+      : withDataFile(ctx.params.id, ANALYTICS_BY_TIMEFRAME[timeframe], emptyFile)
 
     const benchParam = ctx.query.benchmarks ?? ctx.query.benchmark
     const wanted = benchParam
@@ -382,6 +387,18 @@ export function register(app) {
     const benchmarks = symbols.map((s) => benchmarkSeries(s, timeframe))
 
     ctx.res.json({ ...base, benchmarks })
+  })
+
+  app.post("/api/portfolios/:id/recompute", (ctx) => {
+    if (!requireAuth(ctx)) return
+    const id = ctx.params.id
+    if (!findPortfolio(id) && !created.has(id)) {
+      return ctx.res.status(404).json({ error: "NotFound", message: "Portfolio not found", statusCode: 404 })
+    }
+    // The real backend enqueues a serialized delete+rebuild pass; the mock
+    // just flips the flag so the next analytics call serves populated data.
+    recomputedIds.add(id)
+    ctx.res.json({ backfillStatus: "pending" })
   })
 
   app.get("/api/portfolios/:id/positions", (ctx) => {

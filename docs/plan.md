@@ -239,38 +239,54 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
 
 ### 26.5 — homelab: scrape the Crunchy exporter + pin admin/SPA
 
-- [ ] New `cluster/apps/pfire/postgres-exporter-podmonitor.yaml` (standalone
+- [x] New `cluster/apps/pfire/postgres-exporter-podmonitor.yaml` (standalone
   PodMonitor — deterministic, no operator-RBAC dependency; the
   operator-managed `spec.metrics` alternative noted but not used):
   `selector.matchLabels.postgres-operator.crunchydata.com/cluster:
-  postgres-pfire`, `podMetricsEndpoints: [{portName: exporter, interval: 30s}]`,
+  postgres-pfire`, `podMetricsEndpoints: [{port: exporter, interval: 30s}]`,
   namespace `pfire`; add to the pfire app kustomization.
-- [ ] Verify scrape: port-forward `kube-prometheus-stack-prometheus`,
+- [x] Verify scrape: port-forward `kube-prometheus-stack-prometheus`,
   `pg_up{namespace="pfire"}` = 1, `pg_stat_database_xact_commit` +
   `pg_stat_activity_count` series present.
-- [ ] Bump `helmrelease.yaml` tags: admin → 26.3 tag, portfoliost → 26.4 tag
+- [x] Bump `helmrelease.yaml` tags: admin → 26.3 tag, portfoliost → 26.4 tag
   (pin the real GHA tags; several files pin twice — check none of these two do).
-- [ ] Commit + push homelab main; Flux reconcile
+- [x] Commit + push homelab main; Flux reconcile
   (`kubectl get kustomization -n flux-system portfoliost` ready) →
   `kubectl get deploy -n pfire portfoliost,portfoliost-admin -o
   jsonpath=…image` + pods running.
-- [ ] Live verification: hit the cluster admin API
+- [x] Live verification: hit the cluster admin API
   (`kubectl -n pfire exec` into the admin pod → `curl localhost:3000/api/admin/topology/status`
   + `/traffic`): postgres row `replicas 1/1`, version = pg image tag; traffic
   row `cpuCores > 0`, `memoryBytes > 0`, and after the PodMonitor: `connections`
   + `requestsPerMin` present.
-- [ ] Browser: Playwright on https://portfoliost.k.homylab.com → Admin →
+- [x] Browser: Playwright on https://portfoliost.k.homylab.com → Admin →
   Topology → click postgres: health pill + replicas, CPU/Memory/Tx-min cards
   with non-zero values; same for redis (CPU/Memory).
 
+**Verified (2026-09-19, live cluster + browser).** PodMonitor
+`postgres-pfire-exporter` deployed & scraped: `pg_up{namespace="pfire"}=1`
+(instance 10.42.4.134:9187), `sum(pg_stat_activity_count)=24`, commit+rollback
+≈ 3.06 tx/s. Tags pinned + running: admin `ghcr.io/marx2/portfoliost-admin:v1.0.51`
+(the 26.3 release tag was `v1.0.50` — homelab `934e5692f` pinned it/SPA `v1.0.170`;
+`adba5d163` then bumped admin to v1.0.51 for the PromQL anchor fix), SPA
+`ghcr.io/marx2/portfoliost:v1.0.170`; both reconciled by Flux.
+Admin API is JWT-gated (401 w/o `Authorization`), so the endpoint check was done
+from the signed-in browser: postgres row **Healthy**, version `vubi8-16.2-0-v0.2.0`
+(image tag), replicas 1/1, CPU 0.01 c, Memory 2331 MiB, Tx/min 440.7, Conns 24,
+`Source: prometheus`; redis row **Healthy**, version `v8.10.1`, replicas 1/1,
+restarts 0, CPU ~0 (idle — rounds to 0.00), Memory 52 MiB, `Source: prometheus`.
+Zero console errors on the topology page.
+
 ### 26.6 — Closeout
 
-- [ ] KB: save the Prometheus query cookbook (cAdvisor + kube-state-metrics
+- [x] KB: save the Prometheus query cookbook (cAdvisor + kube-state-metrics
   workload health + Crunchy exporter labels, PodMonitor location,
   `podMonitorSelector` = any-namespace fact) under `pfire/ops`.
-- [ ] Update this section's investigation notes with the live numbers observed.
-- [ ] Archive to `plan-archive.md`.
-- [ ] Commit: `chore: topology storage metrics closeout`.
+  **→ `pfire/ops/prometheus-query-cookbook` (id 9).**
+- [x] Update this section's investigation notes with the live numbers observed
+  (see the §26.5 verification block).
+- [x] Archive to `plan-archive.md`.
+- [x] Commit: `chore: topology storage metrics closeout`.
 
 **Open questions / out of scope**
 

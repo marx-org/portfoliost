@@ -144,6 +144,11 @@ export async function getPortfolioAnalytics(
   return http.get<PortfolioAnalytics1Y>(`/api/portfolios/${id}/analytics?timeframe=${timeframe}${bench}&benchmarkCalcType=${calcType}`)
 }
 
+/** Force-rebuild the portfolio's value-snapshot history (full delete+rebuild). */
+export async function recomputePortfolio(id: string): Promise<components["schemas"]["BackfillRecomputeResponse"]> {
+  return http.post<components["schemas"]["BackfillRecomputeResponse"]>(`/api/portfolios/${id}/recompute`)
+}
+
 export async function getPortfolioTransactions(
   id: string,
   page = 1,
