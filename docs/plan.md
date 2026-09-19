@@ -535,29 +535,29 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
 
 ### 26.2 — admin: workload health in `/topology/status`
 
-- [ ] `portfoliost-admin/src/workload-probe.ts` (new module per
+- [x] `portfoliost-admin/src/workload-probe.ts` (new module per
   `docs/MODULARISATION.md`): `workloadTargets()` —
   `{ id: "postgres", kind: "statefulset", sts: env TOPOLOGY_POSTGRES_STATEFULSET
   ?? "postgres-pfire-postgres-pfire-k8db", podRe: "^postgres-pfire-postgres-pfire-",
   container: "database" }` and `{ id: "redis", kind: "deployment", name: "redis",
   container: "redis" }`.
-- [ ] `topology.ts` `loadDeploymentHealth`: keep deployment chain; add
+- [x] `topology.ts` `loadDeploymentHealth`: keep deployment chain; add
   StatefulSet branch (`kube_statefulset_status_replicas{statefulset=…}`,
   `kube_statefulset_status_replicas_ready`) and a restarts attribution for STS
   pods (`sum by (created_by_name)(kube_pod_container_status_restarts_total *
   on(pod) group_left(label_replace(kube_pod_info, "created_by_name", "$1",
   "created_by_name", "(.+)")))` — for STS pods `created_by_name` is the
   StatefulSet name).
-- [ ] `/topology/status` handler: after the `/__meta` fan-out, append one row per
+- [x] `/topology/status` handler: after the `/__meta` fan-out, append one row per
   workload target — `reachable: ready >= desired`, `impl: "real"`,
   `replicas {desired, ready}`, `restarts`, `version` = image tag parsed from
   `kube_pod_container_info{pod=~podRe, container=…}` (null on failure). Degrade
   per target (a failed query nulls that row's fields, never 500s), same
   pattern as the existing Prometheus fallback.
-- [ ] Unit tests (mocked `queryInstant`): STS + deployment rows merged, version
+- [x] Unit tests (mocked `queryInstant`): STS + deployment rows merged, version
   parsing, degradation on query failure, deployment rows unchanged.
-- [ ] `npm run test` + `npm run build` pass.
-- [ ] Commit: `feat(admin): topology status — postgres/redis workload health`.
+- [x] `npm run test` + `npm run build` pass.
+- [x] Commit: `feat(admin): topology status — postgres/redis workload health`.
 
 ### 26.3 — admin: resource metrics in `/topology/traffic` + release
 
