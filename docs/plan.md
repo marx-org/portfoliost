@@ -153,16 +153,16 @@ re-import in 28.6 touches homelab and requires explicit approval before running.
 Contract-first (`MODULARISATION.md`); the sync client in 28.4 and wallets in 28.5
 both build against it.
 
-- [ ] `portfoliost-contracts/contracts/openapi.yaml` `ImportPortfolioTx` (~1734):
+- [x] `portfoliost-contracts/contracts/openapi.yaml` `ImportPortfolioTx` (~1734):
       add optional `sector`, `industry` (strings, nullable), `country` (string,
       ISO-2 e.g. `PL`, nullable), `countryCode` (string, nullable, legacy 2/3-letter
       when different from the ISO-2 `country`).
-- [ ] `portfoliost-contracts/contracts`: `npm run lint` + `npm test`.
-- [ ] Bump `@marx2/contracts`, publish, bump in `portfoliost-wallets/package.json`
+- [x] `portfoliost-contracts/contracts`: `npm run lint` + `npm test`.
+- [x] Bump `@marx2/contracts`, publish, bump in `portfoliost-wallets/package.json`
       + `portfoliost/package.json`, `npm install`.
-- [ ] `npm run gen:types` in `portfoliost-wallets`; confirm fields on
+- [x] `npm run gen:types` in `portfoliost-wallets`; confirm fields on
       `ImportPortfolioTx`.
-- [ ] Commit: `feat(contracts): ImportPortfolioTx sector/industry/country`.
+- [x] Commit: `feat(contracts): ImportPortfolioTx sector/industry/country`.
 
 ### 28.2 — Podsumowanie catalog reader + fixture (sheets-sync)
 
