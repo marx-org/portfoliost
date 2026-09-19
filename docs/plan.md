@@ -22,7 +22,7 @@ Legend: `[ ]` pending · `[x]` done
 - [x] Restore a complete light palette and global light/dark/system controls; add icon glow and state-colored dot pulses. Validation: build, 279 unit (incl. new StatusDot pulse tests), 186 mock, motion gate, 15/15 topology E2E incl. real canvas/node/inspector colors, system-theme reactivity, glow pause/reduced-motion, mobile inspection. Fixed `theme.ts` system-listener bug. Fixed `auth.spec.ts` OIDC-only test to override `passwordLoginEnabled` before boot (compose keeps password login for other flows) — that blocker is resolved.
 - [x] Add verified missing OpenST jobs and providers to the graph: Bond Import `30 4 * * *`, Bond Archive `0 6 3 * *`, CPI Import `30 4 * * *`, CPI Seed `0 5 1 1 *` (suspended) as job nodes with edges into openst and schedule metadata in the inspector; OpenBB plugins `biznesradar` (Polish TFI funds / Catalyst bonds, quotes/history/profile/search) and `obligacje` (retail savings-bond pricing from issue parameters + CPI) as provider leaves. Enabling the expansion surfaced two real defects, both fixed with tests: dagre could emit negative lane origins which the drag clamp treated as out of bounds (layout now normalizes into LANE_BOUNDS; unit test added), and resizing the canvas kept a stale viewport transform on small screens (ResizeObserver refit; min-zoom lowered). Draggable-lane, re-layout, persistence, mobile-inspection tests all pass.
 - [x] Traffic metrics hidden for cachest/openst: the inspector rendered the Traffic section only for `area === "internal"`, but both are probed live services in `data-providers`. Verified live via `kubectl` port-forward to Prometheus (series exist for all six services under `job`/`service_name`) and the admin `/topology/traffic` mapping (every `serviceTargets()` entry is serialized). Gate removed; new `TopologyDetailsPanel` unit test locks Traffic + cachest per-upstream P99 visibility for data-provider nodes.
-- [ ] Remaining (separate module work, portfoliost-instruments): `price-bars.spec.ts` "returns a valid series" fails because `price_bars_all` yields BOTH an `openst` overflow row (338.19) and the split-adjusted `stooq` row (57.625) for 2026-07-29; `dates.indexOf` picks the unadjusted one. Verified read-only via SQL. The view's source-priority/cleanup rules (price-data-architecture, "overflow kept free of rows covered by stooq") are not enforced for this overlap; needs a product/data decision in that repo. Not masked here.
+- [x] Remaining (separate module work, portfoliost-instruments): `price-bars.spec.ts` "returns a valid series" failed because `price_bars_all` yields BOTH an `openst` overflow row (338.19) and the split-adjusted `stooq` row (57.625) for 2026-07-29; `dates.indexOf` picked the unadjusted one. Fixed read-only in `portfoliost-instruments@0c03214`: the price-bars query orders `stooq` rows ahead of `openst` overflow rows on equal dates (deterministic stooq-first; unit test added), so the split-adjusted value wins. The duplicate rows themselves remain in the view (the importer needs them) — data-level dedup stays an optional product/data decision in that repo. Verified 2026-09-20: `tests/e2e/price-bars.spec.ts` 3/3 against the compose stack.
   - Sources: homelab-deploy skill, `~/prv/homelab/homelab`, live read-only Kubernetes queries using `~/.kube/homylab` (2026-09-17). Wallets FX Sync and Instruments Ticker Sync confirmed; OpenST bond-import, bond-archive, cpi-import, and suspended cpi-seed were missing from the map.
   - Read-only cluster result: wallets fxsync `10 17 * * *`; instruments tickersync `30 4 * * 1`; OpenST bond-import and cpi-import `30 4 * * *`, bond-archive `0 6 3 * *`, cpi-seed `0 5 1 1 *` (suspended). All use controller timezone. No deployments were modified.
   - Baseline blockers: auth expected hidden password form although compose enables it; its OIDC-only test now explicitly overrides runtime configuration before application boot (no production change). Combined auth/topology E2E passes 16/16. AAPL price-bars remains failing: read-only SQL confirms both `openst` and split-adjusted `stooq` rows for July 29/30 in `price_bars_all`; expectations and seeds unchanged. Tracked as the remaining item above.
@@ -58,6 +58,21 @@ Repos touched: `openst`, `cachest`, `portfoliost-instruments`,
 `portfoliost-sheets-sync` (step 34.7 only), `portfoliost` (mocks/tests). No
 `@marx2/contracts` change expected — the `Quote` contract shape is reused.
 
+Review 2026-09-20 (post D80/D81/D82, §35 deployed):
+- D81 (§25.4) already ships the `ticker_reference.asset_type` lookup —
+  `normalizeAssetType` + `lookupAssetType` live in `src/services/price-bars.ts`
+  (not `db/tickerref-queries.ts`); 34.5 relocates them to a shared home instead
+  of re-implementing.
+- The D80 catalogue sync (§35, deployed) already seeded 937 `corp_bond` rows into
+  `ticker_reference` (BST0327 → corp_bond verified in §35.5), so 34.5 dispatch
+  resolves Catalyst codes in prod without extra seeding.
+- cachest already routes `OPENST_CRYPTO_QUOTE` (D78, 6h TTL) → 34.4 is
+  bond-quote only.
+- `portfoliost-instruments/src/adapters/cachest.ts` still has no
+  `fetchCryptoQuote` / `fetchFixedincomeQuote` (verified 2026-09-20); the OHLCV
+  routes' `fetchOhlcvWithBondFallback` (D79) is the pattern to mirror for the
+  quote route.
+
 Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 (unit per repo + mock per `AGENTS.md`; e2e against docker compose). The catalog
 re-import in 34.7 touches homelab and requires explicit approval before running.
@@ -73,7 +88,9 @@ as a shared helper and reuse in both the price-bars route and the quote route.
 - [ ] `psql` (read-only, prod DB): `select symbol, asset_type, country,
       price_source, current_price from positions where is_open and
       (current_price is null or current_price = 0)` → group by `asset_type`;
-      confirm the overlap with `country='Other'`.
+      confirm the overlap with `country='Other'`. Expect Catalyst codes to already
+      carry `asset_type=corp_bond` from the D80 catalogue sync (§35); if any are
+      missing, add them to the openst catalogue CSV (importer), not by hand-seeding.
 - [ ] For each distinct unresolved symbol (one per class): probe live through the
       stack and record the exact outcome — e.g. `ROD1033` → `/equity/quote/ROD1033`
       (expect 404) vs `/fixedincome/ohlcv/ROD1033` (200, last close);
@@ -88,9 +105,12 @@ as a shared helper and reuse in both the price-bars route and the quote route.
 
 ### 34.2 — openst: `/fixedincome/quote/{symbol}` (savings-bond current price)
 
-- [ ] `openst/src/openbb_client.py`: add `get_bond_quote(symbol)` → last bar of
-      `get_bond_ohlcv(symbol, today, today)` shaped
-      `{ last_price, currency: "PLN" }` (or None when no bar / before issue date).
+- [ ] `openst/src/openbb_client.py`: add `get_bond_quote(symbol)` → last 1–2 bars of
+      `get_bond_ohlcv(symbol, …)` over a recent window (e.g. last 30 days — savings
+      bonds move infrequently, so today alone may not yield a prev_close) shaped
+      `{ last_price, prev_close, change, change_percent, currency: "PLN" }` —
+      equity-quote-shaped so instruments' existing `toQuote` reuses it unchanged
+      (or None when no bar / before issue date).
 - [ ] `openst/src/main.py`: `GET /fixedincome/quote/{symbol}` →
       `_cached_or_404("fixedincome_quote:{symbol}", get_bond_quote, "No bond quote...")`.
 - [ ] Unit tests (`test_main.py`, patch `get_bond_ohlcv`): known emission returns
@@ -111,7 +131,8 @@ as a shared helper and reuse in both the price-bars route and the quote route.
 
 - [ ] `cachest/config.yaml`: `OPENST_BOND_QUOTE` `/fixedincome/quote/{symbol}` →
       openst, `cache_ttl: 21600` (6h), `stale_ttl` matching
-      `OPENST_BOND_OHLCV`.
+      `OPENST_BOND_OHLCV`. Crypto is already covered by `OPENST_CRYPTO_QUOTE`
+      (D78) — nothing to add there.
 - [ ] Add `test_real_config_has_bond_quote_route`; full cachest suite passes.
 - [ ] If 34.1 shows crypto quotes never reach `OPENST_CRYPTO_QUOTE` because of the
       stored pair form, document the normalization here (route itself exists).
@@ -119,19 +140,21 @@ as a shared helper and reuse in both the price-bars route and the quote route.
 
 ### 34.5 — instruments: asset-class-aware quote dispatch
 
-- [ ] Extract the `ticker_reference.asset_type` lookup as a shared helper (reused
-      by the D81 price-bars route in 25.4): `src/db/tickerref-queries.ts`
-      `assetTypeForSymbol(db, symbol)`.
+- [ ] Relocate the D81 helpers (`normalizeAssetType` + `lookupAssetType` from
+      `src/services/price-bars.ts`) into `src/db/tickerref-queries.ts`
+      (`assetTypeForSymbol(db, symbol)` + the normalizer), with `services/price-bars.ts`
+      re-exporting them — one shared implementation used by both the D81 price-bars
+      dispatch and the new quote dispatch (no re-implementation).
 - [ ] `src/adapters/cachest.ts`: add `fetchFixedincomeQuote(symbol)` →
       `/fixedincome/quote/{symbol}` and `fetchCryptoQuote(symbol)` →
-      `/crypto/quote/{symbol}`.
-- [ ] Route `/:symbol/quote` (`routes/instruments.ts:428`) and `/:symbol/price`
-      (`instruments.ts:536`): branch on `asset_type`: `crypto` →
+      `/crypto/quote/{symbol}` (mirror the D79 `fetchOhlcvWithBondFallback` pattern).
+- [ ] Route `/:symbol/quote` (`routes/instruments.ts:413`) and `/:symbol/price`
+      (`instruments.ts:518`): branch on `asset_type`: `crypto` →
       `fetchCryptoQuote(venueFree(symbol))`; `bond` →
       `fetchFixedincomeQuote(venueFree(symbol))`; `corp_bond`/`fund` → existing
       equity `/equity/quote` with the 34.1-verified symbol form; default unchanged.
 - [ ] `src/adapters/translate.ts`: reuse the existing quote row→`QuoteSchema`
-      translator (`toQuote` at `translate.ts:119`) for bond/crypto quote rows;
+      translator (`toQuote` at `translate.ts:155`) for bond/crypto quote rows;
       `currency` defaults to `PLN`/quote-provider value.
 - [ ] Unit tests (`routes/instruments.test.ts` + `translate.test.ts`): correct
       adapter per `assetType`; AAPL regression unchanged; savings bond resolves.
@@ -147,7 +170,8 @@ as a shared helper and reuse in both the price-bars route and the quote route.
 - [ ] `portfoliost/mocks/`: add bond/crypto positions to seed fixtures with
       `country='Other'` so `test:mock` and E2E assert current-price parity for
       those classes; `npm run test` + `npm run test:mock` + `npm run test:e2e`
-      pass.
+      pass (incl. `price-bars.spec.ts` regression — stooq-first ordering from
+      `0c03214` must keep holding).
 - [ ] Commit: `test(portfoliost): no-price bond/crypto position parity`.
 
 ### 34.7 — Venue-unresolved stocks + catalog (sheets-sync, requires approval)
@@ -155,6 +179,9 @@ as a shared helper and reuse in both the price-bars route and the quote route.
 - [ ] Podsumowanie catalog (`portfoliost-sheets-sync`): add venue-qualified
       `Symbol Yahoo` rows for Allianz SE (`ALV.DE`) and Nintendo Co (venue
       decided against a live stooq/yahoo probe in 34.1); `Kraj` → DE/JP.
+- [ ] Version coupling (D24): the new sheets-sync image must not send keys a
+      deployed `portfoliost-wallets` rejects — check the live wallets tag in
+      homelab before pinning the sheets-sync release.
 - [ ] Re-run the prod sync Job (wipe + re-import — **explicit user approval**);
       verify read-only: Allianz/Nintendo positions now have country and a
       `price_source='quote'` current price.
