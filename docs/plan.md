@@ -256,25 +256,72 @@ Job spec (jobshot `POST /api/run-job`):
 Note: 24.3–24.8 commits were never pushed; `v1.0.1` (2026-09-18) is the first release
 containing the full sync (v1.0.0 was the bare scaffold).
 
-- [ ] Push `portfoliost-sheets-sync` main → GHA release `v1.0.1` (done 2026-09-18,
-      image built; record here when the rest of this step lands).
-- [ ] `portfoliost-admin`: `POST /api/admin/jobs/sheets-sync/run` (`{ wipe?: boolean }`)
+- [x] Push `portfoliost-sheets-sync` main → GHA release. Note: `v1.0.2` tag exists but has no
+  release (GHA auto-bumped to `v1.0.3`); the admin job spec pins
+  `v1.0.3` (stable date-sort + 1:1 wallet↔portfolio).
+- [x] `portfoliost-admin`: `POST /api/admin/jobs/sheets-sync/run` (`{ wipe?: boolean }`)
       + `GET /api/admin/jobs/sheets-sync/status` + `GET .../log` — build the jobshot
       payload above; duplicate-run guard (409); `job_run` row kind `sheets_sync`
-      (backend poller tracks it). Unit tests: payload carries the request JWT,
-      wipe → `["--wipe"]`, 409 while running. Commit + release.
-- [ ] `portfoliost` (SPA): `src/api/adminJobs.ts` — `runSheetsSync`,
+      (backend poller tracks it). Unit tests: payload carries the request JWT, wipe → `["--wipe"]`,
+  409 while running. Commit + release (`v1.0.47`, 2026-09-19; the sheets-sync job image pin had the
+  same GHA off-by-one — `v1.0.2` → `v1.0.3`).
+- [x] `portfoliost` (SPA): `src/api/adminJobs.ts` — `runSheetsSync`,
       `getSheetsSyncStatus`, `getSheetsSyncLog`; `JobsView.vue` — "Google Sheets"
-      card: Run Sync + Wipe & re-import (confirm), status badge, last-run info,
-      60 s polling (stooq pattern). Commit + release.
-- [ ] `homelab/cluster/apps/pfire/portfoliost-sheets-sync/`: `sheets-sync-secrets`
+      card: Run Sync + Wipe & re-import (confirm), status badge, last-run info, 60 s polling (stooq
+  pattern). Commit + release (`v1.0.166`, 2026-09-19).
+- [x] `homelab/cluster/apps/pfire/portfoliost-sheets-sync/`: `sheets-sync-secrets`
       (Google creds, postBuild substitution) + `ks.yaml` + app kustomization (no
       HelmRelease — image is pinned in the admin job spec); add
-      `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN` to `tmpl/cluster-secrets.yaml`;
-      tag bumps for the admin + portfoliost releases. `kubectl kustomize` renders
-      cleanly. Commit: `chore(homelab): portfoliost-sheets-sync admin job secret`.
-- [ ] E2E: trigger the sync from the admin panel against the cluster; assert
-       `GET /api/import/sync-runs` shows a completed run with `insertedWtx > 0`.
+      `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN` to `tmpl/cluster-secrets.yaml`; tag bumps for
+  the admin + portfoliost releases. Applied 2026-09-18.
+- [x] E2E: trigger the sync from the admin panel against the cluster — run 21
+      (2026-09-19 10:54 local, image `v1.0.3`, wipe): job **Complete**,
+      `status=done`, `inserted=2016 skipped=7 errors=0 walletOnly=1 noOp=1`
+      (matches the §24.8 smoke counts exactly).
+
+**Deployment incident (2026-09-19, resolved) — homelab tag bump off-by-one.**
+The §24.9 tag bumps pinned `admin v1.0.45` / `wallets v1.1.37` — tags that GHA never released
+(auto-bump produced `v1.0.46` / `v1.1.38` instead). Helm upgrades timed out on `ImagePullBackOff`
+(rollout never ready), and the stuck
+`pending-upgrade` helm revisions left both HelmReleases `Stalled/RetriesExceeded`
+/ blocked, wedging the kustomizations for a day. Fixed by homelab `ca03848ff`
+(admin `v1.0.47`, wallets `v1.1.38`, SPA `v1.0.166`); the spec change cleared the Stalled state and
+all three rolled out clean. Lesson: after pushing a service, wait for the GHA release and pin the
+tag it actually created.
+
+**Sync row errors (2026-09-19, all resolved via reference data — nothing left in
+the sheet).** Run 11 (first admin-triggered wipe) failed with 5 row errors. All
+five were `ticker_reference` gaps, not sheet typos — the cluster table had lost
+the §24.8 manual aliases (the live tickersync upserts from adanos and resets the
+column) and the sheet's naming/venue variants don't name-fold onto the upstream
+names:
+- RGEN buy 0.2297 (sheet row 159, "Repligen Corp", empty symbol col) → ref name
+  folds to "repligen corporation", no "repligen corp" alias → name-as-symbol.
+  Fixed by `NASDAQ::RGEN` alias `repligen corp`.
+- DTLA buy 64 (row 703, venue `LON`), IUFS sell 24 (row 1673, `LON`), IUFS buy
+  45 (row 1878, `LON`) → venue-strict match misses (`LON` ≠ ref venue `LSE`)
+  and the name-fold fallback needed the full-name aliases, missing in-cluster.
+  Fixed by `LSE::DTLA` / `LSE::IUFS` full-name aliases.
+- ASML sell 0.4909 (row 852) → ASML buy 0.1028 (row 167, "ASML Holding NV")
+  didn't resolve: ref name "ASML Holding N.V." folds to "asml holding n v" vs
+  sheet "asml holding nv". Fixed by `NASDAQ::ASML` alias `asml holding nv`.
+Persistence: `ALIAS_OVERRIDES` in `tickerref-sync` re-applies all four after
+every upstream sync (instruments `010921b` + `2c9912e`, release `v1.0.48`,
+homelab `5c23d5b81`). Optional sheet-side cleanup (owner): normalize the Giełda
+col `LON` → `LSE` on rows 703/1673/1878 — with the aliases this is now moot.
+
+**Known bug (2026-09-19, fix later) — `wallets.sync_runs` stores only the last
+batch's counts.** The import API upserts the run row per batch (≤500 rows)
+without accumulating, so after a 5-batch run `inserted_wtx` reads 24 (batch 5)
+instead of 2011. The §24.10 verification "insertedWtx ≈ 2024" will read wrong
+until the API accumulates (or the job POSTs a final summary update).
+
+**Known bug (2026-09-19, fix later) — SPA admin route bounces on hard reload.**
+`router.beforeEach` checks `auth.isAdmin` synchronously, but on a fresh page
+load `user` is null until `fetchMe` resolves, so `to.meta.admin` routes redirect
+to `/investments` (only soft navigation after login works). Fix: await
+`fetchMe()` (once per session) in the guard before the admin check, or hydrate
+the store before the initial navigation.
 
 **Known issue (2026-09-19, fix later) — pfire postgres CPU saturation from price-bar
 backfill.** After the full sheets re-import (~2000 txs → 100+ positions), the
@@ -287,7 +334,8 @@ Helm/Flux then rolls back. Symptom chain observed 2026-09-19: wallets v1.1.38 +
 admin v1.0.46 rollbacks; `pg_terminate_backend` on the active queries immediately
 drops node load to ~16 %. Fix candidates: bound backfill concurrency, index
 `price_bars_all(symbol, date)` (check existing index), batch the max-date lookups,
-or rate-limit the backfill worker.
+or rate-limit the backfill worker. Possible solution is to block the backfill until the sheets sync
+completes.
 
 ### 24.10 — Closeout
 
