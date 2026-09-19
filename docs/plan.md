@@ -157,35 +157,35 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 Contract-first (MODULARISATION.md): the route in 27.2 and the SPA call in 27.3 both
 build against `@marx2/contracts`.
 
-- [ ] In `portfoliost-contracts/contracts/openapi.yaml`, under `/portfolios/{id}`:
+- [x] In `portfoliost-contracts/contracts/openapi.yaml`, under `/portfolios/{id}`:
       add `post` operation `portfolioRecompute` (tags `Portfolios`,
       `security: bearerAuth`) with `204`/`200`-free shape:
       `200` → `BackfillRecomputeResponse { backfillStatus: enum[pending,complete,failed] }`,
       `404` → existing NotFound error shape. Reuse the `portfolioId` path parameter.
       Add the `BackfillRecomputeResponse` schema next to `PortfolioAnalytics`.
-- [ ] `portfoliost-contracts/contracts`: `npm run lint` (yaml parses) + `npm test`.
-- [ ] Bump `@marx2/contracts` version in `portfoliost-contracts`, publish, then
+- [x] `portfoliost-contracts/contracts`: `npm run lint` (yaml parses) + `npm test`.
+- [x] Bump `@marx2/contracts` version in `portfoliost-contracts`, publish, then
       bump the dependency in `portfoliost/package.json` + `portfoliost-wallets/package.json`
       and `npm install`.
-- [ ] Regenerate: `npm run gen:types` in `portfoliost` (→ `generated/api-types.d.ts`)
+- [x] Regenerate: `npm run gen:types` in `portfoliost` (→ `generated/api-types.d.ts`)
       and `portfoliost-wallets` (→ `src/generated/api-types.d.ts`); confirm
       `operations["portfolioRecompute"]` and `BackfillRecomputeResponse` exist.
-- [ ] Commit: `feat(contracts): portfolio recompute operation`.
+- [x] Commit: `feat(contracts): portfolio recompute operation`.
 
 ### 27.2 — Backend: `POST /api/portfolios/:id/recompute`
 
-- [ ] In `portfoliost-wallets/src/services/backfill.ts` export
+- [x] In `portfoliost-wallets/src/services/backfill.ts` export
       `forcePortfolioRecalc(db, portfolioId, authToken)`: delegates to
       `enqueueBackfill(portfolioId, (signal) => recalcPortfolioHistory(db, portfolioId, authToken, new Date(), signal))`
       (backfill-runner.ts, backfill.ts:611) — full delete+rebuild, returns the
       enqueue promise (resolved when the slot is consumed).
-- [ ] In `portfoliost-wallets/src/routes/portfolios.ts`, inside the existing
+- [x] In `portfoliost-wallets/src/routes/portfolios.ts`, inside the existing
       `/portfolios` Hono app (before `/:id/analytics`): `routes.post("/:id/recompute", …)`
       — ownership check (404 like analytics), then
       `void forcePortfolioRecalc(database, id, c.req.header("Authorization") ?? "").catch(() => undefined)`
       and return `{ backfillStatus: "pending" } satisfies BackfillRecomputeResponse`.
       Import the schema type from `../generated/api-types.js`.
-- [ ] Tests (`portfoliost-wallets/src/routes/portfolios.test.ts` or a new
+- [x] Tests (`portfoliost-wallets/src/routes/portfolios.test.ts` or a new
       `recompute.test.ts` next to `analytics.test.ts`):
       - 404 for a portfolio not owned by the user;
       - returns `{ backfillStatus: "pending" }` and, with mocked
@@ -195,28 +195,28 @@ build against `@marx2/contracts`.
       - replace-semantics: seed a stale snapshot row (a day with value after the
         position was fully sold), force recompute, assert the stale row is gone;
       - BUY/SELL-less portfolio: recompute marks complete with 0 rows (no crash).
-- [ ] Gate: `npm test` + `npm run lint` in `portfoliost-wallets` pass.
-- [ ] Commit: `feat(wallets): force portfolio recompute endpoint`.
+- [x] Gate: `npm test` + `npm run lint` in `portfoliost-wallets` pass.
+- [x] Commit: `feat(wallets): force portfolio recompute endpoint`.
 
 ### 27.3 — Mock + SPA API client
 
-- [ ] `portfoliost/mocks/portfolios/index.js`: handle `POST /api/portfolios/:id/recompute` —
+- [x] `portfoliost/mocks/portfolios/index.js`: handle `POST /api/portfolios/:id/recompute` —
       verify the id exists (else 404), set an in-memory `recomputed` flag and return
       `{ backfillStatus: "pending" }`; make the subsequent
       `GET /api/portfolios/:id/analytics` serve data (default `portfolio_analytics_1Y.json`)
       regardless of empty-state list so the e2e in 27.5 can assert the chart fills.
       Add a dedicated empty-analytics fixture portfolio whose analytics starts empty
       and fills after recompute.
-- [ ] `portfoliost/src/api/portfolios.ts`: add
+- [x] `portfoliost/src/api/portfolios.ts`: add
       `recomputePortfolio(id: string): Promise<{ backfillStatus: string }>` via
       `http.post` typed from `components["schemas"]["BackfillRecomputeResponse"]`.
-- [ ] Gate: `npm run test:mock` in `portfoliost` passes (mock tests asserting the
+- [x] Gate: `npm run test:mock` in `portfoliost` passes (mock tests asserting the
       recompute flag toggles the analytics body).
-- [ ] Commit: `feat(portfoliost): recompute API client + mock`.
+- [x] Commit: `feat(portfoliost): recompute API client + mock`.
 
 ### 27.4 — Reusable chart components with Recompute button
 
-- [ ] Create `portfoliost/src/components/WalletBalanceChart.vue`: props
+- [x] Create `portfoliost/src/components/WalletBalanceChart.vue`: props
       `points: Array<{ date: string; balance: number }>`, `busy?: boolean`, emits
       `recompute`. Renders the existing green area apexchart (stroke 2, gradient
       fill, height via prop default 200, x-labels via `formatDate`), a
@@ -225,18 +225,18 @@ build against `@marx2/contracts`.
       `No balance history available.` empty state. Keeps per-view point shaping
       (e.g. `balance > 0` filter) in the parent — the component renders what it
       gets.
-- [ ] Create `portfoliost/src/components/PortfolioPerformanceChart.vue`: props
+- [x] Create `portfoliost/src/components/PortfolioPerformanceChart.vue`: props
       `timeSeries`, `benchmarks`, `returnType`, `backfillPending?: boolean`, emits
       `recompute`. Moves the current `equityOptions` computed (index-normalized,
       TWR/MWR/simple selection, benchmark overlay) from `PortfolioPerformanceTab.vue`
       into the component; renders the chart, the `Historical data is loading…`
       pending line, and `data-testid="portfolio-chart-recompute"` button.
-- [ ] Unit tests (`portfoliost/tests/unit/components/`):
+- [x] Unit tests (`portfoliost/tests/unit/components/`):
       `WalletBalanceChart.test.ts` (renders points, emits recompute) and
       `PortfolioPerformanceChart.test.ts` (indexed series start = 100 for
       TWR/MWR/simple fallback, emits recompute, pending line only when pending).
-- [ ] Gate: `npm run build` + `npm run test` in `portfoliost` pass.
-- [ ] Commit: `feat(portfoliost): reusable chart components with recompute`.
+- [x] Gate: `npm run build` + `npm run test` in `portfoliost` pass.
+- [x] Commit: `feat(portfoliost): reusable chart components with recompute`.
 
 ### 27.5 — Wire the four views to the new components
 
@@ -268,6 +268,157 @@ build against `@marx2/contracts`.
       under `pfire/investigations`.
 - [ ] Archive to `plan-archive.md`.
 - [ ] Commit: `chore: charts recompute closeout`.
+
+---
+
+## 28. Google Sheets import: venue-correct symbols + real country/sector (D24 follow-up)
+
+Proposal: [google-sheets-sync.md](proposals/google-sheets-sync.md) — fix two defects
+surfaced after production import (§24): (a) every position shows "(Other) Stock" in
+holdings because import stamps `country="Other"` and nothing corrects it; (b) SNT
+and NWG are enriched to the wrong listings — **Senstar Technologies (NASDAQ)** instead
+of Synektik SA and **NatWest Group (LSE)** instead of Newag SA — because wallets later
+re-resolve the stored **bare** ticker, which is ambiguous across venues.
+
+Fix approach (verified read-only 2026-09-19 against the live spreadsheet + real DB):
+
+- The **"Podsumowanie" sheet is the authoritative per-asset catalog**: 225 named
+  assets with `Kategoria`, `Aktywo`, `Symbol Google`, **`Symbol Yahoo` (venue-qualified:
+  `SNT.WA`, `NWG.WA`, `MBR.WA`, `SAP.DE`, `RIO.L`, bare `CRM`)**, `Sektor` (PL + English),
+  `Kraj` (empty for PL, Polish names otherwise), `Oryginalna waluta`, plus the
+  `Symbol giełdowy`/`Giełda` pair (col 29/30) and `Symbol Stooq` (col 35).
+- **Join key = folded `Aktywo` name** (Transakcje col D ↔ Podsumowanie col B); with a
+  new "S.A."→"sa" fold rule, **all 707 position rows (86 assets) name-match the
+  catalog (verified 0 misses)**. `(Symbol giełdowy, Giełda)` (Transakcje col AH/AI)
+  is the secondary fallback key for future typos/misses; in doubts the Transakcje
+  `Aktywo` name wins — never guess.
+- Imported transactions get `instrumentSymbol = Symbol Yahoo` (venue-qualified) plus
+  `country`/`countryCode`/`sector`/`industry` carried through the contracts, so
+  wallets enrichment, quotes, and research resolve the exact listing (Synektik/WSE)
+  and the holdings label becomes "(PL) Stock".
+
+Repos touched: `portfoliost-contracts`, `portfoliost-sheets-sync`, `portfoliost-wallets`,
+`portfoliost` (mocks/tests only). No openst/cachest changes.
+
+Rules: one step = one commit; a step is marked `[x]` only after its tests pass
+(unit per repo + mock per `AGENTS.md`; e2e against docker compose). The production
+re-import in 28.6 touches homelab and requires explicit approval before running.
+
+---
+
+### 28.1 — Contract: `ImportPortfolioTx` carries sector/industry/country
+
+Contract-first (`MODULARISATION.md`); the sync client in 28.4 and wallets in 28.5
+both build against it.
+
+- [ ] `portfoliost-contracts/contracts/openapi.yaml` `ImportPortfolioTx` (~1734):
+      add optional `sector`, `industry` (strings, nullable), `country` (string,
+      ISO-2 e.g. `PL`, nullable), `countryCode` (string, nullable, legacy 2/3-letter
+      when different from the ISO-2 `country`).
+- [ ] `portfoliost-contracts/contracts`: `npm run lint` + `npm test`.
+- [ ] Bump `@marx2/contracts`, publish, bump in `portfoliost-wallets/package.json`
+      + `portfoliost/package.json`, `npm install`.
+- [ ] `npm run gen:types` in `portfoliost-wallets`; confirm fields on
+      `ImportPortfolioTx`.
+- [ ] Commit: `feat(contracts): ImportPortfolioTx sector/industry/country`.
+
+### 28.2 — Podsumowanie catalog reader + fixture (sheets-sync)
+
+- [ ] Capture fixture `src/tests/fixtures/podsumowanie.json` from the live
+      `Podsumowanie!A1:AL233` (226 data rows via existing `fetchSheet` +
+      `FORMATTED_VALUE`).
+- [ ] `src/podsumowanie-parser.ts`: `readPodsumowanie(sheet)` →
+      `PodsumowanieCatalogEntry[]` with `aktywo, symbol, giełda, yahooSymbol,
+      stooqSymbol, sektor, krajRaw, currency, kategoria` from cols 1/29/30/4/35/20/36/37/0
+      (empty strings → null). Indexes: `byFoldedName` and `bySymbolGielda`.
+- [ ] `src/instrument-resolver.ts` `nameFold`: add "S.A."-style collapse
+      (`/\bs a\b/` → `sa`) so `"Newag S.A."` ≡ `"Newag Sa"`; export it for reuse by
+      the parser (single fold implementation). Keep NFD/diacritics transliteration.
+- [ ] `src/countries.ts`: Kraj → ISO-2 map `Niemcy→DE, USA→US, UK→GB, Tajwan→TW,
+      Holandia→NL, Irlandia→IE, Szwecja→SE, Singapur→SG, Kanada→CA, Japonia→JP,
+      Chiny→CN, Dania→DK, Luksemburg→LU`, empty → null (→ later resolved by venue).
+- [ ] Tests (`src/podsumowanie-parser.test.ts`, extend `instrument-resolver.test.ts`):
+      fixture parses 226 rows; folded-name key uniqueness (no silent collisions);
+      Synektik SA / Newag Sa / MO-BRUK SA rows map to `SNT.WA`/`NWG.WA`/`MBR.WA` with
+      `sektor`; Kraj mapping incl. empty→null; `nameFold("Newag S.A.")`
+      === `nameFold("Newag Sa")`.
+- [ ] Gate: `npm run test` in `portfoliost-sheets-sync` passes.
+- [ ] Commit: `feat(sheets-sync): Podsumowanie catalog reader + name fold (D24 f/up)`.
+
+### 28.3 — Resolver: name-first catalog join, venue-qualified symbol
+
+- [ ] `ResolvedInstrument` gains `yahooSymbol: string | null`, `sector`,
+      `industry`, `country: string | null` (ISO-2), `countryCode: string | null`.
+- [ ] Resolution order in `resolveInstrument`: (1) **catalog by folded `Aktywo`
+      name** → single entry wins; multiple entries with the same folded name are
+      disambiguated by `(symbol, giełda)` when present, else treated as unmatched
+      (no guessing); (2) **catalog by `(symbol giełdowy, giełda)`** when name misses
+      (typo case, e.g. "w Wrszw SA"); (3) existing `ticker_reference` match (which
+      remains for assets absent from the catalog, e.g. funds) — build `yahooSymbol`
+      as `ticker + yahoo_suffix` from a `LEFT JOIN exchange_reference ON exchange`
+      added to the index load, `country` from `exchange_reference.country_code`,
+      sector from `stock_sector`; (4) unmatched keeps sheet values + `matched:false`.
+- [ ] Mapper (`transakcje-mapper.ts:164`): set `instrumentSymbol = yahooSymbol ??
+      ticker` — the **venue-qualified** symbol is what wallets/quotes/research see
+      downstream, so bare ambiguous tickers never re-resolve to a namesake.
+- [ ] Tests (`instrument-resolver.test.ts`, `transakcje-mapper.test.ts`): SNT/WSE →
+      `SNT.WA` + `PL` + sektor; NWG/WSE → `NWG.WA`; SAP/ETR → `SAP.DE`; RIO/LON →
+      `RIO.L`; CRM/NYSE stays bare; fund (`NN Emerytura 2030`) keeps ticker_reference
+      path; ambiguous-name catalog case stays unmatched. Update existing
+      `ResolvedInstrument` assertions.
+- [ ] Gate: `npm run test` + `npm run lint` in `portfoliost-sheets-sync` pass.
+- [ ] Commit: `feat(sheets-sync): name-first catalog join + venue symbols (D24 f/up)`.
+
+### 28.4 — Sync client ships catalog fields
+
+- [ ] `wallets-api-client.ts`: `ImportPortfolioTx` request body adds `sector`,
+      `industry`, `country`, `countryCode` from the resolved instrument (nulls
+      omitted); `instrumentSymbol` already reflects 28.3.
+- [ ] Tests (`wallets-api-client.test.ts`): request body carries venue-qualified
+      symbol + new fields; regression on the happy-path import.
+- [ ] Gate: `npm run test` in `portfoliost-sheets-sync` passes.
+- [ ] Commit: `feat(sheets-sync): send sector/country in import payload`.
+
+### 28.5 — Wallets: persist fields + self-heal the "Other" sentinel
+
+- [ ] `portfoliost-wallets/src/routes/import.ts` (~240): when `tx.country` is
+      provided use it and its `countryCode`, else keep the current `"Other"`
+      fallback; map `tx.sector`/`tx.industry` onto positions (fallback stays
+      `"Other"`); same in `portfolio-transactions.ts:206`.
+- [ ] `src/services/quotes.ts` (~215): enrichment fills `country`/`sector` when
+      the stored value is `null`, empty, **or the `"Other"` sentinel** — so already
+      imported positions self-heal on the next quotes pass without a wipe.
+- [ ] Tests (`routes/import.test.ts` / `quotes.test.ts`): positions persist the
+      incoming sector/country; `"Other"`+`null` positions get overwritten by the
+      profile country; a real-profile position keeps its stored values.
+- [ ] Gate: `npm run test` + `npm run lint` in `portfoliost-wallets` pass.
+- [ ] Commit: `feat(wallets): persist sector/country + heal 'Other' (D24 f/up)`.
+
+### 28.6 — Mock parity + full re-import + validation
+
+- [ ] `portfoliost/mocks/`: import/position fixtures gain `sector`/`country`/`countryCode`
+      samples; `npm run mock:seed` unchanged unless seeds add positions.
+- [ ] Full gates: `npm run build` + `npm run test` + `npm run test:mock` in
+      `portfoliost`; `npm run test` + `npm run lint` in contracts/wallets/sheets-sync;
+      dockerized `npm run test:e2e`.
+- [ ] Commit: `test(portfoliost): mock parity for sector/country positions`.
+- [ ] **Production re-import (requires explicit user approval):** rebuild the
+      `portfoliost-sheets-sync` image, run the Job against the live spreadsheet
+      (wipe + re-import), then verify read-only via `psql`:
+      `positions` for SNT → company `Synektik`, country `PL`, sector not "Other";
+      NWG → `Newag`, country `PL`; count remaining `country='Other'` rows — expect
+      only genuinely-unknown assets (name-less funds/bonds) and report the list.
+- [ ] Commit the re-import result/summary to the plan section.
+
+### 28.7 — Closeout: google-sheets-sync.md to final status
+
+- [ ] `docs/proposals/google-sheets-sync.md`: set status to **final/done**; document
+      the Podsumowanie catalog (name-first join), venue-qualified `Symbol Yahoo`
+      import, country/sector sources (catalog → exchange_reference), and the
+      "(Other) Stock" root cause + self-heal.
+- [ ] Update `AGENTS.md`/KB if the sync-surface notes need refreshing.
+- [ ] Archive §28 into `plan-archive.md`.
+- [ ] Commit: `chore: D24 follow-up closeout (venue symbols + country/sector)`.
 
 ---
 
