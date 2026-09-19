@@ -158,14 +158,17 @@ as a shared helper and reuse in both the price-bars route and the quote route.
 
 ### 34.4 — cachest: quote routes for bonds (and crypto if not yet covered)
 
-- [ ] `cachest/config.yaml`: `OPENST_BOND_QUOTE` `/fixedincome/quote/{symbol}` →
+- [x] `cachest/config.yaml`: `OPENST_BOND_QUOTE` `/fixedincome/quote/{symbol}` →
       openst, `cache_ttl: 21600` (6h), `stale_ttl` matching
       `OPENST_BOND_OHLCV`. Crypto is already covered by `OPENST_CRYPTO_QUOTE`
       (D78) — nothing to add there.
-- [ ] Add `test_real_config_has_bond_quote_route`; full cachest suite passes.
-- [ ] If 34.1 shows crypto quotes never reach `OPENST_CRYPTO_QUOTE` because of the
+- [x] Add `test_real_config_has_bond_quote_route`; full cachest suite passes.
+      (81 passed incl. the new route test; knowledge graph refreshed.)
+- [x] If 34.1 shows crypto quotes never reach `OPENST_CRYPTO_QUOTE` because of the
       stored pair form, document the normalization here (route itself exists).
-- [ ] Commit: `feat(cachest): OPENST_BOND_QUOTE route`.
+      (34.1: `BTC-USD` 200 / bare `BTC` 404 — the route is fine; the stored-symbol
+      normalization happens in the instruments dispatch, see 34.5.)
+- [x] Commit: `feat(cachest): OPENST_BOND_QUOTE route`.
 
 ### 34.5 — instruments: asset-class-aware quote dispatch
 
