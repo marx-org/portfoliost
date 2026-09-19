@@ -561,7 +561,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
 
 ### 26.3 — admin: resource metrics in `/topology/traffic` + release
 
-- [ ] `topology-traffic.ts` `loadTrafficData`: alongside the existing service
+- [x] `topology-traffic.ts` `loadTrafficData`: alongside the existing service
   rows, build one row per workload target —
   - `cpuCores`: `sum(rate(container_cpu_usage_seconds_total{namespace=~ns,
     pod=~podRe, container=…}[5m]))`
@@ -573,12 +573,12 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
     while the exporter is not yet scraped (queries fail → nulls, not zeros)
   - `errorRate`/`p99LatencyMs`: null; `source: "prometheus"` (or `"none"` when
     `PROMETHEUS_URL` unset — then no workload rows at all, as today).
-- [ ] Existing `buildService` rows unchanged in shape (HTTP fields stay set).
-- [ ] Unit tests: workload rows with/without exporter series; degradation;
+- [x] Existing `buildService` rows unchanged in shape (HTTP fields stay set).
+- [x] Unit tests: workload rows with/without exporter series; degradation;
   existing otel/ingress rows unchanged.
-- [ ] `npm run test` + `npm run build` pass; push main → GHA release; record the
+- [x] `npm run test` + `npm run build` pass; push main → GHA release; record the
   real tag for the 26.5 homelab pin.
-- [ ] Commit: `feat(admin): topology traffic — postgres/redis CPU/mem/throughput`.
+- [x] Commit: `feat(admin): topology traffic — postgres/redis CPU/mem/throughput`.
 
 ### 26.4 — SPA: mark storage live + resource cards in the details panel
 
