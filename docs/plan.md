@@ -172,26 +172,55 @@ as a shared helper and reuse in both the price-bars route and the quote route.
 
 ### 34.5 — instruments: asset-class-aware quote dispatch
 
-- [ ] Relocate the D81 helpers (`normalizeAssetType` + `lookupAssetType` from
+- [x] Relocate the D81 helpers (`normalizeAssetType` + `lookupAssetType` from
       `src/services/price-bars.ts`) into `src/db/tickerref-queries.ts`
       (`assetTypeForSymbol(db, symbol)` + the normalizer), with `services/price-bars.ts`
       re-exporting them — one shared implementation used by both the D81 price-bars
       dispatch and the new quote dispatch (no re-implementation).
-- [ ] `src/adapters/cachest.ts`: add `fetchFixedincomeQuote(symbol)` →
+      **Prod data findings (2026-09-20, read-only):** `ticker_reference` has
+      **zero** bond/fund/crypto rows (Stock 45,210 / ETF 16,601 / corp_bond 937
+      only) — the §24.1 seed additions (crypto majors, TFI funds) were composed
+      locally but the commit never landed, so they never reached prod; the weekly
+      `--url` tickersync is upsert-only, so nothing re-adds them. `BTC` also
+      collides with ASX/Euronext/NYSE-ARCA stock+ETF tickers. Handled by:
+      (a) the lookup is now pair-aware (`BTC-USD` → `BTC`; hyphen class codes like
+      `BOS0735-K` never stripped) with specific-class collision priority, and
+      (b) `tickerref-sync.ts` re-applies curated listings (38 crypto pairs keyed
+      by base coin + the six §24.1 TFI funds) idempotently after every sync run,
+      with a `--curated-only` one-shot mode for the prod bootstrap.
+- [x] `src/adapters/cachest.ts`: add `fetchFixedincomeQuote(symbol)` →
       `/fixedincome/quote/{symbol}` and `fetchCryptoQuote(symbol)` →
       `/crypto/quote/{symbol}` (mirror the D79 `fetchOhlcvWithBondFallback` pattern).
-- [ ] Route `/:symbol/quote` (`routes/instruments.ts:413`) and `/:symbol/price`
+- [x] Route `/:symbol/quote` (`routes/instruments.ts:413`) and `/:symbol/price`
       (`instruments.ts:518`): branch on `asset_type`: `crypto` →
-      `fetchCryptoQuote(venueFree(symbol))`; `bond` →
-      `fetchFixedincomeQuote(venueFree(symbol))`; `corp_bond`/`fund` → existing
-      equity `/equity/quote` with the 34.1-verified symbol form; default unchanged.
-- [ ] `src/adapters/translate.ts`: reuse the existing quote row→`QuoteSchema`
+      `fetchCryptoQuote(pair)` (bare ticker normalizes to the `-USD` pair; the
+      crypto row's `price` field is mapped to `last_price` so `toQuote` reuses);
+      `bond` → `fetchFixedincomeQuote(venueFree(symbol))`; `corp_bond`/`fund` →
+      existing equity `/equity/quote` with the 34.1-verified symbol form; default
+      unchanged — plus a D79-style fallback: an unlisted savings-bond code
+      (`^(ROD|EDO)\d{4}$`) that 404s the equity tier re-tries the fixedincome
+      quote (prod has no bond rows until a bond-catalogue tickerref sync, a
+      §35-pattern follow-up).
+- [x] `src/adapters/translate.ts`: reuse the existing quote row→`QuoteSchema`
       translator (`toQuote` at `translate.ts:155`) for bond/crypto quote rows;
-      `currency` defaults to `PLN`/quote-provider value.
-- [ ] Unit tests (`routes/instruments.test.ts` + `translate.test.ts`): correct
+      `currency` defaults to `PLN`/quote-provider value. (No translate change
+      needed — the adapter-level `price`→`last_price` normalization covers it.)
+- [x] Unit tests (`routes/instruments.test.ts` + `translate.test.ts`): correct
       adapter per `assetType`; AAPL regression unchanged; savings bond resolves.
-- [ ] `npm run build` + `npm run test` + `npm run test:stack` pass.
-- [ ] Commit: `feat(instruments): asset-class-aware quote dispatch (34)`.
+      (10 new route tests: bond direct, crypto bare→pair + pair as-is, corp_bond,
+      fund, unlisted regression, /price route, unlisted-bond 404 fallback, no
+      fallback for other 404s, BTC stock-collision priority, BOS0735-K
+      hyphen regression; + `referenceTickerKeys`/`assetTypeForSymbol` and
+      `curatedListingRows`/`syncCuratedListings` unit tests.)
+- [x] `npm run build` + `npm run test` pass (264 tests; `test:stack` does not
+      exist in this repo — the compose stack is the full `portfoliost` stack,
+      covered in 34.6).
+- [x] Commit: `feat(instruments): asset-class-aware quote dispatch (34)`.
+- **Related finding (separate defect, not fixed in 34):** the D82 admin
+      bond-catalogue surface queries `openst.bond_series` through the
+      `portfoliost` DB connection, but prod's `openst` tables live in the
+      separate `openst` database (no `openst` schema in `portfoliost`) — the
+      admin Bond Catalogue tab cannot work in prod as wired.
 
 ### 34.6 — Full compose stack smoke + mock parity
 
