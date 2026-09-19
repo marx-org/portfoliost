@@ -189,9 +189,9 @@ both build against it.
 
 ### 28.3 — Resolver: name-first catalog join, venue-qualified symbol
 
-- [ ] `ResolvedInstrument` gains `yahooSymbol: string | null`, `sector`,
+- [x] `ResolvedInstrument` gains `yahooSymbol: string | null`, `sector`,
       `industry`, `country: string | null` (ISO-2), `countryCode: string | null`.
-- [ ] Resolution order in `resolveInstrument`: (1) **catalog by folded `Aktywo`
+- [x] Resolution order in `resolveInstrument`: (1) **catalog by folded `Aktywo`
       name** → single entry wins; multiple entries with the same folded name are
       disambiguated by `(symbol, giełda)` when present, else treated as unmatched
       (no guessing); (2) **catalog by `(symbol giełdowy, giełda)`** when name misses
@@ -200,16 +200,16 @@ both build against it.
       as `ticker + yahoo_suffix` from a `LEFT JOIN exchange_reference ON exchange`
       added to the index load, `country` from `exchange_reference.country_code`,
       sector from `stock_sector`; (4) unmatched keeps sheet values + `matched:false`.
-- [ ] Mapper (`transakcje-mapper.ts:164`): set `instrumentSymbol = yahooSymbol ??
+- [x] Mapper (`transakcje-mapper.ts:164`): set `instrumentSymbol = yahooSymbol ??
       ticker` — the **venue-qualified** symbol is what wallets/quotes/research see
       downstream, so bare ambiguous tickers never re-resolve to a namesake.
-- [ ] Tests (`instrument-resolver.test.ts`, `transakcje-mapper.test.ts`): SNT/WSE →
+- [x] Tests (`instrument-resolver.test.ts`, `transakcje-mapper.test.ts`): SNT/WSE →
       `SNT.WA` + `PL` + sektor; NWG/WSE → `NWG.WA`; SAP/ETR → `SAP.DE`; RIO/LON →
       `RIO.L`; CRM/NYSE stays bare; fund (`NN Emerytura 2030`) keeps ticker_reference
       path; ambiguous-name catalog case stays unmatched. Update existing
       `ResolvedInstrument` assertions.
-- [ ] Gate: `npm run test` + `npm run lint` in `portfoliost-sheets-sync` pass.
-- [ ] Commit: `feat(sheets-sync): name-first catalog join + venue symbols (D24 f/up)`.
+- [x] Gate: `npm run test` + `npm run build` (tsc) in `portfoliost-sheets-sync` pass.
+- [x] Commit: `feat(sheets-sync): name-first catalog join + venue symbols (D24 f/up)`.
 
 ### 28.4 — Sync client ships catalog fields
 
