@@ -323,19 +323,40 @@ to `/investments` (only soft navigation after login works). Fix: await
 `fetchMe()` (once per session) in the guard before the admin check, or hydrate
 the store before the initial navigation.
 
-**Known issue (2026-09-19, fix later) — pfire postgres CPU saturation from price-bar
-backfill.** After the full sheets re-import (~2000 txs → 100+ positions), the
-value-snapshot backfill hammers `instruments.price_bars_all` with per-symbol
-`select max(date) … where symbol = ?` + cursor `FETCH 100` loops, 10+ concurrent,
-each 15–21 s. The pfire postgres pod (node `kura`) pegs the node at ~100 % CPU;
-probe timeouts cascade cluster-wide (metallb/longhorn/loki …) and **k8s deployment
-rollouts in `pfire` time out** ("timeout waiting for Deployment InProgress") —
-Helm/Flux then rolls back. Symptom chain observed 2026-09-19: wallets v1.1.38 +
-admin v1.0.46 rollbacks; `pg_terminate_backend` on the active queries immediately
-drops node load to ~16 %. Fix candidates: bound backfill concurrency, index
-`price_bars_all(symbol, date)` (check existing index), batch the max-date lookups,
-or rate-limit the backfill worker. Possible solution is to block the backfill until the sheets sync
-completes.
+**Fixed (2026-09-19) — pfire postgres CPU saturation from price-bar backfill.**
+After the full sheets re-import (~2000 txs → 100+ positions), the value-snapshot
+backfill hammered `instruments.price_bars_all` with per-symbol price lookups,
+10+ portfolios in parallel. The pfire postgres pod (node `kura`) pegged the node
+at ~100 % CPU; probe timeouts cascaded cluster-wide and `pfire` k8s rollouts
+timed out → Helm/Flux rollbacks (wallets v1.1.38 / admin v1.0.46).
+`pg_terminate_backend` on the active queries dropped node load to ~16 %.
+
+**Root causes (two independent):**
+1. **Missing index (the big one).** The `price_bars_all` US branch computes
+   `replace(ticker, '.US', '') AS symbol` over the `stooq_daily_us` foreign
+   table (28M rows); no index could serve that expression, so every per-symbol
+   US lookup was a full 28M-row FDW fetch (~2.2 s for 20 rows). Fixed with a
+   functional index in the remote `stooq` DB:
+   `daily_us_stripped_ticker_date on public.daily_us (replace(ticker, '.US', ''), date)`
+   → US branch 2219 ms → 7.7 ms; full-view US query ~15 ms. Persisted in
+   `pfire-init-sql.yaml` (bootstrap) + local PGlite/docker parity
+   (`stooq_daily_us_stripped_ticker_date`, portfoliost-instruments v1.0.49).
+2. **Unbounded parallelism.** `computeSnapshotBatch` fanned out
+   `Promise.all` over every symbol, and multiple portfolios' backfills/recalcs
+   ran concurrently. Fixed in portfoliost-wallets v1.1.39:
+   - `backfill-runner.ts`: global FIFO runner — **one recompute pass at a time
+     cluster-wide** (analytics `runBackfill` and post-mutation recalcs share it).
+     Per-portfolio dedupe (latest state wins); abort + re-run after the grace
+     period; `MAX_AUTO_RESTARTS` valve against abort livelock.
+   - Per-pass price fan-out bounded: `RECALC_PRICE_CONCURRENCY` (default 4).
+   - Import route still triggers **no** snapshot recompute (only wallet-balance
+     recalc), so price-bar work starts only after the import, one portfolio at
+     a time — as required ("suspend until the whole import is done, then
+     one-by-one").
+
+**Verified in cluster (2026-09-19):** wallets v1.1.39 + instruments v1.0.49
+running; US-symbol view query 15 ms; `kubectl top nodes` 15–27 % CPU (kura was
+100 %).
 
 ### 24.10 — Closeout
 
