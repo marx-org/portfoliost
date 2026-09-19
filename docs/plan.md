@@ -472,3 +472,176 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
 
 ---
 
+## 26. Topology storage metrics — postgres + redis workload health & resource usage
+
+Scope: the Admin → Topology map shows live status/traffic for the six HTTP
+services but nothing for the storage lane. This section makes the **postgres**
+(Crunchy PostgresCluster `postgres-pfire`, StatefulSet
+`postgres-pfire-postgres-pfire-k8db`) and **redis** (deployment `redis`,
+`REDIS_HOST: redis` per cachest helmrelease) nodes show: health pill +
+replicas/restarts (status) and CPU / memory / throughput cards (traffic).
+
+Investigation (2026-09-19, read-only, Prometheus `kube-prometheus-stack-prometheus`
+v3.14 in `monitoring`, `podMonitorSelector`/`podMonitorNamespaceSelector` empty =
+accepts any PodMonitor in any namespace):
+
+- **Already in Prometheus today** (cAdvisor via kubelet + kube-state-metrics):
+  `container_cpu_usage_seconds_total` / `container_memory_working_set_bytes`
+  for both workloads; `kube_statefulset_status_replicas[_ready]` for the
+  StatefulSet (admin's `loadDeploymentHealth` only queries `kube_deployment_*` —
+  the reason postgres shows nothing); `kube_pod_container_info` (image tag →
+  version).
+- **Not in Prometheus:** the Crunchy exporter (container `exporter`, port name
+  `exporter`/9187, present in the pod via `spec.monitoring.pgmonitor.exporter`)
+  is never scraped — `pg_up` empty, no `spec.metrics` dispatcher on the
+  PostgresCluster, no PodMonitor. Query-level metrics (connections,
+  transactions/min) need a scrape target first.
+- Redis has no exporter; redis query-level metrics would need a
+  redis-exporter — **out of scope** (CPU/mem/restarts are enough for the map).
+
+Repos touched: `@marx2/contracts`, `portfoliost-admin`, `portfoliost` (SPA),
+homelab (one new PodMonitor YAML + two tag pins).
+
+Design: no new endpoints. `/topology/status` gains k8s-only workload rows for
+nodes without `/__meta` (impl `real`, reachable = ready replicas, version from
+the `kube_pod_container_info` image tag); `/topology/traffic` gains rows whose
+`source` is `prometheus` carrying `cpuCores`/`memoryBytes`/`connections` and
+`requestsPerMin` reused as transactions/min for postgres (null until the
+exporter is scraped). Compose stack has no Prometheus → endpoints degrade
+exactly as today; compose E2E stays static-only.
+
+Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
+
+---
+
+### 26.1 — Contracts: nullable HTTP fields + resource metrics on `TopologyServiceTraffic`
+
+- [ ] `portfoliost-contracts/contracts/openapi.yaml`:
+  - `TopologyServiceTraffic`: make `requestsPerMin`, `errorRate`,
+    `p99LatencyMs` nullable (DB workloads have no HTTP latency); add nullable
+    `cpuCores`, `memoryBytes`, `connections` (numbers); extend `source` enum
+    with `prometheus`; `required` shrinks to `[name, source]`; document
+    `requestsPerMin` as "requests/min (HTTP) or transactions/min (databases)".
+  - `TopologyServiceStatus.reachable`: update description to cover
+    k8s-only workloads (ready replicas) alongside `/__meta` reachability.
+- [ ] Push main → GHA `release.yml` auto-bump; `gh release list` to read the real
+  tag (never assume +1).
+- [ ] In `portfoliost-admin` + `portfoliost`: `NODE_AUTH_TOKEN=$(gh auth token)
+  npm install @marx2/contracts@<new>` → `npm run gen:types` (both repos have it)
+  → commit `package-lock.json` + `generated/api-types.d.ts` in each.
+- [ ] Tests: contracts repo suite green; consumer builds (`tsc` / `vue-tsc`)
+  accept the generated types.
+- [ ] Commit: `feat(contracts): topology traffic — nullable HTTP fields + resource metrics`.
+
+### 26.2 — admin: workload health in `/topology/status`
+
+- [ ] `portfoliost-admin/src/workload-probe.ts` (new module per
+  `docs/MODULARISATION.md`): `workloadTargets()` —
+  `{ id: "postgres", kind: "statefulset", sts: env TOPOLOGY_POSTGRES_STATEFULSET
+  ?? "postgres-pfire-postgres-pfire-k8db", podRe: "^postgres-pfire-postgres-pfire-",
+  container: "database" }` and `{ id: "redis", kind: "deployment", name: "redis",
+  container: "redis" }`.
+- [ ] `topology.ts` `loadDeploymentHealth`: keep deployment chain; add
+  StatefulSet branch (`kube_statefulset_status_replicas{statefulset=…}`,
+  `kube_statefulset_status_replicas_ready`) and a restarts attribution for STS
+  pods (`sum by (created_by_name)(kube_pod_container_status_restarts_total *
+  on(pod) group_left(label_replace(kube_pod_info, "created_by_name", "$1",
+  "created_by_name", "(.+)")))` — for STS pods `created_by_name` is the
+  StatefulSet name).
+- [ ] `/topology/status` handler: after the `/__meta` fan-out, append one row per
+  workload target — `reachable: ready >= desired`, `impl: "real"`,
+  `replicas {desired, ready}`, `restarts`, `version` = image tag parsed from
+  `kube_pod_container_info{pod=~podRe, container=…}` (null on failure). Degrade
+  per target (a failed query nulls that row's fields, never 500s), same
+  pattern as the existing Prometheus fallback.
+- [ ] Unit tests (mocked `queryInstant`): STS + deployment rows merged, version
+  parsing, degradation on query failure, deployment rows unchanged.
+- [ ] `npm run test` + `npm run build` pass.
+- [ ] Commit: `feat(admin): topology status — postgres/redis workload health`.
+
+### 26.3 — admin: resource metrics in `/topology/traffic` + release
+
+- [ ] `topology-traffic.ts` `loadTrafficData`: alongside the existing service
+  rows, build one row per workload target —
+  - `cpuCores`: `sum(rate(container_cpu_usage_seconds_total{namespace=~ns,
+    pod=~podRe, container=…}[5m]))`
+  - `memoryBytes`: `sum(container_memory_working_set_bytes{…same…})`
+  - postgres only: `connections`: `sum(pg_stat_activity_count{namespace=~ns})`,
+    `requestsPerMin`:
+    `sum(rate(pg_stat_database_xact_commit{namespace=~ns}[5m]) +
+    rate(pg_stat_database_xact_rollback{namespace=~ns}[5m])) * 60` — both null
+    while the exporter is not yet scraped (queries fail → nulls, not zeros)
+  - `errorRate`/`p99LatencyMs`: null; `source: "prometheus"` (or `"none"` when
+    `PROMETHEUS_URL` unset — then no workload rows at all, as today).
+- [ ] Existing `buildService` rows unchanged in shape (HTTP fields stay set).
+- [ ] Unit tests: workload rows with/without exporter series; degradation;
+  existing otel/ingress rows unchanged.
+- [ ] `npm run test` + `npm run build` pass; push main → GHA release; record the
+  real tag for the 26.5 homelab pin.
+- [ ] Commit: `feat(admin): topology traffic — postgres/redis CPU/mem/throughput`.
+
+### 26.4 — SPA: mark storage live + resource cards in the details panel
+
+- [ ] `graph-definition.ts`: `postgres` and `redis` → `live: true` (they now map
+  to probed workloads). Update `topology-graph-definition.test.ts` live list
+  (6 → 8) + snapshot.
+- [ ] `TopologyDetailsPanel.vue`: when `traffic.cpuCores != null` render a
+  resource card row — CPU (cores, 2 dp), Memory (MiB, rounded),
+  Tx/min (`requestsPerMin`) for postgres — instead of the Req/min/P99/Errors
+  cards; make the existing cards null-safe (`v-if` per field) so a partial
+  payload renders only what exists. Version row already `v-if="status.version"`.
+- [ ] Unit tests: panel renders resource cards from a mocked store payload;
+  HTTP cards still render for `cachest`; null fields render nothing.
+- [ ] `npm run build` + `npm run test` + `npm run test:mock` +
+  `docker compose up -d --build portfoliost` + `npm run test:e2e` (topology
+  specs; compose has no Prometheus so postgres/redis show no live overlay —
+  assert the nodes still render and inspect). Push main → GHA release; record
+  the real SPA tag.
+- [ ] Commit: `feat(admin-ui): topology — storage resource cards + live postgres/redis`.
+
+### 26.5 — homelab: scrape the Crunchy exporter + pin admin/SPA
+
+- [ ] New `cluster/apps/pfire/postgres-exporter-podmonitor.yaml` (standalone
+  PodMonitor — deterministic, no operator-RBAC dependency; the
+  operator-managed `spec.metrics` alternative noted but not used):
+  `selector.matchLabels.postgres-operator.crunchydata.com/cluster:
+  postgres-pfire`, `podMetricsEndpoints: [{portName: exporter, interval: 30s}]`,
+  namespace `pfire`; add to the pfire app kustomization.
+- [ ] Verify scrape: port-forward `kube-prometheus-stack-prometheus`,
+  `pg_up{namespace="pfire"}` = 1, `pg_stat_database_xact_commit` +
+  `pg_stat_activity_count` series present.
+- [ ] Bump `helmrelease.yaml` tags: admin → 26.3 tag, portfoliost → 26.4 tag
+  (pin the real GHA tags; several files pin twice — check none of these two do).
+- [ ] Commit + push homelab main; Flux reconcile
+  (`kubectl get kustomization -n flux-system portfoliost` ready) →
+  `kubectl get deploy -n pfire portfoliost,portfoliost-admin -o
+  jsonpath=…image` + pods running.
+- [ ] Live verification: hit the cluster admin API
+  (`kubectl -n pfire exec` into the admin pod → `curl localhost:3000/api/admin/topology/status`
+  + `/traffic`): postgres row `replicas 1/1`, version = pg image tag; traffic
+  row `cpuCores > 0`, `memoryBytes > 0`, and after the PodMonitor: `connections`
+  + `requestsPerMin` present.
+- [ ] Browser: Playwright on https://portfoliost.k.homylab.com → Admin →
+  Topology → click postgres: health pill + replicas, CPU/Memory/Tx-min cards
+  with non-zero values; same for redis (CPU/Memory).
+
+### 26.6 — Closeout
+
+- [ ] KB: save the Prometheus query cookbook (cAdvisor + kube-state-metrics
+  workload health + Crunchy exporter labels, PodMonitor location,
+  `podMonitorSelector` = any-namespace fact) under `pfire/ops`.
+- [ ] Update this section's investigation notes with the live numbers observed.
+- [ ] Archive to `plan-archive.md`.
+- [ ] Commit: `chore: topology storage metrics closeout`.
+
+**Open questions / out of scope**
+
+- redis query-level metrics (queries/sec, hit ratio) need a redis-exporter —
+  follow-up, not part of this section.
+- Job nodes (fxsync, tickersync, sheets-sync, …) could later show last-run
+  completion from `kube_job_status_succeeded` — separate follow-up.
+- pgBouncer metrics: not deployed (pgdb spec section commented out) — nothing
+  to surface.
+
+---
+
