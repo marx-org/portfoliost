@@ -2,10 +2,11 @@
 import { computed, onMounted, onUnmounted, ref } from "vue"
 import { useRoute } from "vue-router"
 import { usePortfolioStore } from "@/stores/portfolios"
-import { getPortfolioAnalytics, getPortfolioRiskMetrics } from "@/api/portfolios"
+import { getPortfolioAnalytics, getPortfolioRiskMetrics, recomputePortfolio } from "@/api/portfolios"
 import type { PortfolioBenchmarkCalcType, PortfolioAnalyticsTimeframe } from "@/api/portfolios"
 import { formatPercent, formatSignedCurrency } from "@/utils/format"
 import InstrumentSearchModal from "@/modules/instruments/InstrumentSearchModal.vue"
+import PortfolioPerformanceChart from "@/components/PortfolioPerformanceChart.vue"
 
 const route = useRoute()
 const store = usePortfolioStore()
@@ -138,49 +139,22 @@ async function changeTimeframe(timeframe: PortfolioAnalyticsTimeframe) {
   }
 }
 
-const equityOptions = computed(() => {
-  const series = store.analytics?.performance?.timeSeries ?? []
-  const rt = store.analyticsReturnType
+const recomputeBusy = ref(false)
 
-  // Pick the pre-computed indexed series matching the selected return type.
-  // Falls back to normalising raw value if columns are null (e.g. before first recompute).
-  const toPoint = (p: typeof series[number]): [number, number] => {
-    const ts = new Date(p.date ?? "").getTime()
-    if (rt === "timeWeighted" && p.cumulativeTwr != null) return [ts, p.cumulativeTwr]
-    if (rt === "moneyWeighted" && p.cumulativeMwr != null) return [ts, p.cumulativeMwr]
-    if (rt === "simple" && p.cumulativeSimple != null) return [ts, p.cumulativeSimple]
-    // fallback: normalise raw value to index of 100
-    const firstVal = series[0]?.value ?? 0
-    return [ts, firstVal > 0 ? Math.round(((p.value ?? 0) / firstVal) * 10000) / 100 : (p.value ?? 0)]
+async function handleRecompute() {
+  if (recomputeBusy.value) return
+  recomputeBusy.value = true
+  try {
+    await recomputePortfolio(id)
+    if (store.analytics) store.analytics.backfillStatus = "pending"
+    backfillPending.value = true
+    startPolling()
+  } catch {
+    // network error — stay idle; the user can retry
+  } finally {
+    recomputeBusy.value = false
   }
-
-  const normalized = series.map(toPoint)
-  const benchmarks = store.analytics?.benchmarks ?? []
-  const palette = ["#94a3b8", "#f59e0b", "#ec4899", "#8b5cf6", "#10b981"]
-  const benchSeriesCols = benchmarks.map((_, i) => palette[i % palette.length])
-  return {
-    chart: { type: "line" as const, toolbar: { show: false }, zoom: { enabled: false } },
-    colors: ["#2563eb", ...benchSeriesCols],
-    series: [
-      { name: "Portfolio", data: normalized },
-      ...benchmarks.map((b) => ({
-        name: b.name || b.symbol || "Benchmark",
-        data: (b.timeSeries ?? []).map((p) => [new Date(p.date ?? "").getTime(), p.value ?? 0]),
-      })),
-    ],
-    xaxis: { type: "datetime" as const, labels: { datetimeUTC: false } },
-    yaxis: {
-      labels: { formatter: (v: number) => String(Math.round(v * 100) / 100) },
-      title: { text: "Index (start = 100)" },
-    },
-    tooltip: {
-      shared: true,
-      y: { formatter: (v: number) => `${v.toFixed(2)} (indexed, start = 100)` },
-    },
-    stroke: { width: [2, ...benchmarks.map(() => 1)], dashArray: [0, ...benchmarks.map(() => 4)] },
-    dataLabels: { enabled: false },
-  }
-})
+}
 
 const monthlyOptions = computed(() => {
   const returns = store.analytics?.performance?.monthlyReturns ?? []
@@ -254,16 +228,15 @@ const performers = computed(() => {
           </button>
         </div>
       </div>
-      <div class="relative">
-        <component :is="'apexchart'" v-if="equityOptions.series[0].data.length" :options="equityOptions" :series="equityOptions.series" height="300" />
-        <p v-else class="text-sm text-slate-500 dark:text-slate-400">No analytics available.</p>
-        <div v-if="store.analyticsLoading" class="absolute inset-0 flex items-center justify-center rounded-lg bg-white/70 dark:bg-slate-900/70">
-          <span class="text-sm font-medium text-slate-500 dark:text-slate-400">Refreshing...</span>
-        </div>
-      </div>
-      <p v-if="backfillPending" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
-        Historical data is loading, chart will update in a moment.
-      </p>
+      <PortfolioPerformanceChart
+        :time-series="store.analytics?.performance?.timeSeries ?? []"
+        :benchmarks="store.analytics?.benchmarks ?? []"
+        :return-type="store.analyticsReturnType"
+        :backfill-pending="backfillPending || recomputeBusy"
+        :loading="store.analyticsLoading"
+        :height="300"
+        @recompute="handleRecompute"
+      />
     </div>
 
     <div class="card p-6">

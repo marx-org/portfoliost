@@ -240,26 +240,26 @@ build against `@marx2/contracts`.
 
 ### 27.5 — Wire the four views to the new components
 
-- [ ] `PortfolioPerformanceTab.vue`: replace the inline `equityOptions`/apexchart
+- [x] `PortfolioPerformanceTab.vue`: replace the inline `equityOptions`/apexchart
       block in the Performance Chart card with `<PortfolioPerformanceChart>` passing
       `store.analytics` series + `store.analyticsBenchmarks` + `store.analyticsReturnType`
       + `backfillPending`; on `@recompute` call `recomputePortfolio(id)`, set
       `store.analytics.backfillStatus = "pending"`, `backfillPending = true` and
       restart the existing 5-minute poll loop (`startPolling`). Keep the Customize
       modal + timeframe buttons untouched.
-- [ ] `WalletsView.vue`, `WalletDetailView.vue`, `CashWalletCard.vue`: replace the
+- [x] `WalletsView.vue`, `WalletDetailView.vue`, `CashWalletCard.vue`: replace the
       inline `historyChart` apexchart with `<WalletBalanceChart>` passing the existing
       `points` mapping (`balance > 0` filter preserved in the wallet list/card,
       unfiltered in the detail view); `@recompute` re-runs the view's own
       `loadHistory`/`toggleHistory` with a busy state while in flight. Delete the
       now-unused inline `historyChart` computeds.
-- [ ] Mock E2E (`portfoliost/tests/e2e/`): new spec — open a portfolio whose
+- [x] Mock E2E (`portfoliost/tests/e2e/`): new spec — open a portfolio whose
       analytics mock starts empty, click `portfolio-chart-recompute`, assert the
       pending line then the populated chart; open a wallet, click
       `wallet-chart-recompute`, assert no error and refreshed history.
-- [ ] Gate: `npm run build` + `npm run test` + `npm run test:mock` + (docker compose
+- [x] Gate: `npm run build` + `npm run test` + `npm run test:mock` + (docker compose
       rebuild) `npm run test:e2e` in `portfoliost` pass.
-- [ ] Commit: `feat(portfoliost): wire views to chart components + recompute`.
+- [x] Commit: `feat(portfoliost): wire views to chart components + recompute`.
 
 ### 27.6 — Closeout
 

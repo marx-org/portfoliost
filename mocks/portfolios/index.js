@@ -374,7 +374,8 @@ export function register(app) {
     if (!requireAuth(ctx)) return
     const timeframe = timelineFor(ctx.query.timeframe)
     const emptyFile = EMPTY_BY_TIMEFRAME[timeframe]
-    const base = recomputedIds.has(ctx.params.id)
+    const recomputed = recomputedIds.has(ctx.params.id)
+    const base = recomputed
       ? loadRaw(ANALYTICS_BY_TIMEFRAME[timeframe])
       : withDataFile(ctx.params.id, ANALYTICS_BY_TIMEFRAME[timeframe], emptyFile)
 
@@ -386,7 +387,11 @@ export function register(app) {
     const symbols = wanted.filter((s) => available.includes(s))
     const benchmarks = symbols.map((s) => benchmarkSeries(s, timeframe))
 
-    ctx.res.json({ ...base, benchmarks })
+    // A created portfolio starts with an empty backfill: the analytics call
+    // reports `pending` (mirroring the real backend's n<2 auto-trigger) until
+    // a recompute fills the series.
+    const backfillStatus = !recomputed && newPortfolioIds.has(ctx.params.id) ? "pending" : undefined
+    ctx.res.json({ ...base, ...(backfillStatus ? { backfillStatus } : {}), benchmarks })
   })
 
   app.post("/api/portfolios/:id/recompute", (ctx) => {

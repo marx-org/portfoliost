@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue"
+import { onMounted, ref } from "vue"
 import { useRouter } from "vue-router"
 import { useWalletsStore } from "@/stores/wallets"
 import { ApiError } from "@/api/client"
 import { getWalletBalanceHistory } from "@/api/wallets"
-import { formatCurrency, formatDate, formatNumber } from "@/utils/format"
+import { formatCurrency, formatNumber } from "@/utils/format"
+import WalletBalanceChart from "@/components/WalletBalanceChart.vue"
 import WalletCashModals from "@/modules/portfolios/WalletCashModals.vue"
 import type { Wallets } from "@/api/types"
 
@@ -20,6 +21,8 @@ const showCashModal = ref(false)
 const cashAction = ref<"deposit" | "withdraw" | "transfer">("deposit")
 
 const history = ref<Array<{ date: string; balance: number }>>([])
+const historyBusy = ref(false)
+const historyLoaded = ref(false)
 const historyError = ref<string | null>(null)
 
 const showRename = ref(false)
@@ -55,6 +58,7 @@ function cashDone(amount: number) {
 }
 
 async function loadHistory() {
+  historyBusy.value = true
   historyError.value = null
   try {
     const res = await getWalletBalanceHistory(props.wallet.id)
@@ -63,6 +67,9 @@ async function loadHistory() {
       .map((p) => ({ date: p.date, balance: p.balance }))
   } catch (err) {
     historyError.value = err instanceof Error ? err.message : "Failed to load balance history"
+  } finally {
+    historyBusy.value = false
+    historyLoaded.value = true
   }
 }
 
@@ -115,15 +122,6 @@ async function submitDelete() {
   }
 }
 
-const historyChart = computed(() => ({
-  chart: { type: "area" as const, height: 160, toolbar: { show: false } },
-  colors: ["#16a34a"],
-  series: [{ name: "Balance", data: history.value.map((p) => p.balance) }],
-  xaxis: { categories: history.value.map((p) => formatDate(p.date)), labels: { show: false } },
-  stroke: { curve: "smooth" as const, width: 2 },
-  dataLabels: { enabled: false },
-  fill: { type: "gradient" as const, gradient: { opacityFrom: 0.3, opacityTo: 0 } },
-}))
 </script>
 
 <template>
@@ -169,7 +167,7 @@ const historyChart = computed(() => ({
         <button type="button" class="text-xs font-medium text-blue-600 hover:underline" @click.stop="goToDetail">History</button>
       </div>
       <p v-if="historyError" class="text-sm text-red-600 dark:text-red-400">{{ historyError }}</p>
-      <component :is="'apexchart'" v-else-if="history.length" :options="historyChart" :series="historyChart.series" />
+      <WalletBalanceChart v-else-if="historyLoaded" :points="history" :busy="historyBusy" :height="160" @recompute="loadHistory" />
       <div v-else class="flex h-[160px] items-center justify-center">
         <p class="text-xs text-slate-400 dark:text-slate-500">Loading balance...</p>
       </div>

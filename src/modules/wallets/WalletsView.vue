@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue"
+import { onMounted, onUnmounted, ref } from "vue"
 import { useWalletsStore } from "@/stores/wallets"
 import CurrencySelect from "@/components/CurrencySelect.vue"
 import { useCurrenciesStore } from "@/stores/currencies"
 import { formatCurrency, formatDate, formatNumber } from "@/utils/format"
 import WalletCashModals from "@/modules/portfolios/WalletCashModals.vue"
+import WalletBalanceChart from "@/components/WalletBalanceChart.vue"
 import type { Wallets } from "@/api/types"
 
 const store = useWalletsStore()
@@ -29,6 +30,7 @@ const selectedWallet = ref<Wallets[number] | null>(null)
 const showTransactions = ref(false)
 const showHistory = ref(false)
 const history = ref<Array<{ date: string; balance: number }>>([])
+const historyBusy = ref(false)
 const historyError = ref<string | null>(null)
 
 onMounted(load)
@@ -72,14 +74,8 @@ function closeCash() {
   showCashModal.value = false
 }
 
-async function toggleHistory(wallet: Wallets[number]) {
-  if (showHistory.value && selectedWallet.value?.id === wallet.id) {
-    showHistory.value = false
-    return
-  }
-  selectedWallet.value = wallet
-  showHistory.value = true
-  showTransactions.value = false
+async function loadHistory(wallet: Wallets[number]) {
+  historyBusy.value = true
   historyError.value = null
   try {
     const res = await import("@/api/wallets").then((m) => m.getWalletBalanceHistory(wallet.id))
@@ -88,7 +84,25 @@ async function toggleHistory(wallet: Wallets[number]) {
       .map((p) => ({ date: p.date, balance: p.balance }))
   } catch (err) {
     historyError.value = err instanceof Error ? err.message : "Failed to load balance history"
+  } finally {
+    historyBusy.value = false
   }
+}
+
+async function toggleHistory(wallet: Wallets[number]) {
+  if (showHistory.value && selectedWallet.value?.id === wallet.id) {
+    showHistory.value = false
+    return
+  }
+  selectedWallet.value = wallet
+  showHistory.value = true
+  showTransactions.value = false
+  await loadHistory(wallet)
+}
+
+async function handleHistoryRecompute() {
+  if (!selectedWallet.value || historyBusy.value) return
+  await loadHistory(selectedWallet.value)
 }
 
 async function toggleTransactions(wallet: Wallets[number]) {
@@ -102,15 +116,6 @@ async function toggleTransactions(wallet: Wallets[number]) {
   await store.fetchTransactions(wallet.id)
 }
 
-const historyChart = computed(() => ({
-  chart: { type: "area" as const, height: 200, toolbar: { show: false } },
-  colors: ["#16a34a"],
-  series: [{ name: "Balance", data: history.value.map((p) => p.balance) }],
-  xaxis: { categories: history.value.map((p) => formatDate(p.date)), labels: { show: false } },
-  stroke: { curve: "smooth" as const, width: 2 },
-  dataLabels: { enabled: false },
-  fill: { type: "gradient" as const, gradient: { opacityFrom: 0.3, opacityTo: 0 } },
-}))
 </script>
 
 <template>
@@ -165,8 +170,7 @@ const historyChart = computed(() => ({
         <div v-if="showHistory && selectedWallet?.id === wallet.id" class="mt-4 border-t border-slate-100 dark:border-slate-800 pt-4">
           <h3 class="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">Balance History</h3>
           <p v-if="historyError" class="text-sm text-red-600 dark:text-red-400">{{ historyError }}</p>
-          <component :is="'apexchart'" v-else-if="history.length" :options="historyChart" :series="historyChart.series" />
-          <p v-else class="text-sm text-slate-500 dark:text-slate-400">No balance history available.</p>
+          <WalletBalanceChart v-else :points="history" :busy="historyBusy" :height="200" @recompute="handleHistoryRecompute" />
         </div>
 
         <div v-if="showTransactions && selectedWallet?.id === wallet.id" class="mt-4 border-t border-slate-100 dark:border-slate-800 pt-4">

@@ -9,6 +9,7 @@ import FeeFields from "@/components/FeeFields.vue"
 import FxRateFields from "@/components/FxRateFields.vue"
 import type { LatestRate } from "@/api/fx"
 import { formatCurrency, formatDate, formatSignedCurrency } from "@/utils/format"
+import WalletBalanceChart from "@/components/WalletBalanceChart.vue"
 import WalletCashModals from "@/modules/portfolios/WalletCashModals.vue"
 import ConfirmDeleteModal from "@/modules/portfolios/ConfirmDeleteModal.vue"
 import type { CashTransaction } from "@/api/wallets"
@@ -59,6 +60,7 @@ const deleteTxBusy = ref(false)
 const deleteTxError = ref<string | null>(null)
 
 const history = ref<Array<{ date: string; balance: number }>>([])
+const historyBusy = ref(false)
 const historyError = ref<string | null>(null)
 
 const RANGES = ["1W", "1M", "3M", "1Y", "2Y", "3Y", "5Y", "10Y", "ALL"] as const
@@ -86,12 +88,15 @@ async function load() {
 }
 
 async function loadHistory() {
+  historyBusy.value = true
   historyError.value = null
   try {
     const res = await getWalletBalanceHistory(route.params.id as string)
     history.value = res.data.map((p) => ({ date: p.date, balance: p.balance }))
   } catch (err) {
     historyError.value = err instanceof Error ? err.message : "Failed to load balance history"
+  } finally {
+    historyBusy.value = false
   }
 }
 
@@ -248,15 +253,6 @@ const historyStats = computed(() => {
   }
 })
 
-const historyChart = computed(() => ({
-  chart: { type: "area" as const, height: 220, toolbar: { show: false } },
-  colors: ["#16a34a"],
-  series: [{ name: "Balance", data: filteredHistory.value.map((p) => p.balance) }],
-  xaxis: { categories: filteredHistory.value.map((p) => formatDate(p.date)), labels: { show: false } },
-  stroke: { curve: "smooth" as const, width: 2 },
-  dataLabels: { enabled: false },
-  fill: { type: "gradient" as const, gradient: { opacityFrom: 0.3, opacityTo: 0 } },
-}))
 
 const TYPE_LABELS: Record<string, string> = { DEPOSIT: "Deposit", WITHDRAWAL: "Withdrawal", TRANSFER: "Transfer", INVEST: "Investment" }
 
@@ -390,8 +386,7 @@ function exportHistory() {
           </div>
         </div>
         <p v-if="historyError" class="mt-3 text-sm text-red-600 dark:text-red-400">{{ historyError }}</p>
-        <component :is="'apexchart'" v-else-if="filteredHistory.length" :options="historyChart" :series="historyChart.series" />
-        <p v-else class="py-8 text-center text-sm text-slate-500 dark:text-slate-400">No balance history available.</p>
+        <WalletBalanceChart v-else :points="filteredHistory" :busy="historyBusy" :height="220" @recompute="loadHistory" />
       </div>
 
       <div class="card mt-6 p-5">
