@@ -225,18 +225,18 @@ both build against it.
 
 ### 28.5 — Wallets: persist fields + self-heal the "Other" sentinel
 
-- [ ] `portfoliost-wallets/src/routes/import.ts` (~240): when `tx.country` is
+- [x] `portfoliost-wallets/src/routes/import.ts` (~240): when `tx.country` is
       provided use it and its `countryCode`, else keep the current `"Other"`
       fallback; map `tx.sector`/`tx.industry` onto positions (fallback stays
-      `"Other"`); same in `portfolio-transactions.ts:206`.
-- [ ] `src/services/quotes.ts` (~215): enrichment fills `country`/`sector` when
+      `"Other"`); same in `portfolio-transactions.ts:206` (industry added).
+- [x] `src/services/quotes.ts` (~215): enrichment fills `country`/`sector` when
       the stored value is `null`, empty, **or the `"Other"` sentinel** — so already
       imported positions self-heal on the next quotes pass without a wipe.
-- [ ] Tests (`routes/import.test.ts` / `quotes.test.ts`): positions persist the
+- [x] Tests (`routes/import.test.ts` / `quotes.test.ts`): positions persist the
       incoming sector/country; `"Other"`+`null` positions get overwritten by the
       profile country; a real-profile position keeps its stored values.
-- [ ] Gate: `npm run test` + `npm run lint` in `portfoliost-wallets` pass.
-- [ ] Commit: `feat(wallets): persist sector/country + heal 'Other' (D24 f/up)`.
+- [x] Gate: `npm run test` + `npm run build` (tsc) in `portfoliost-wallets` pass.
+- [x] Commit: `feat(wallets): persist sector/country + heal 'Other' (D24 f/up)`.
 
 ### 28.6 — Mock parity + full re-import + validation
 
