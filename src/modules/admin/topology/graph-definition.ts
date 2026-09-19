@@ -60,8 +60,8 @@ export const topologyNodes: TopologyNodeDef[] = [
   { id: "portfoliost-wallets", label: "portfoliost-wallets", area: "internal", rank: R.services, live: true },
   { id: "portfoliost-instruments", label: "portfoliost-instruments", area: "internal", rank: R.services, live: true },
   // storage
-  { id: "postgres", label: "PostgreSQL", area: "storage", rank: R.back, live: false },
-  { id: "redis", label: "Redis", area: "storage", rank: R.back, live: false },
+  { id: "postgres", label: "PostgreSQL", area: "storage", rank: R.back, live: true },
+  { id: "redis", label: "Redis", area: "storage", rank: R.back, live: true },
   // jobs
   { id: "portfoliost-wallets-fxsync", label: "FX Sync", area: "jobs", rank: R.back, live: false },
   { id: "portfoliost-instruments-tickersync", label: "Ticker Sync", area: "jobs", rank: R.back, live: false },

@@ -582,22 +582,22 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
 
 ### 26.4 — SPA: mark storage live + resource cards in the details panel
 
-- [ ] `graph-definition.ts`: `postgres` and `redis` → `live: true` (they now map
+- [x] `graph-definition.ts`: `postgres` and `redis` → `live: true` (they now map
   to probed workloads). Update `topology-graph-definition.test.ts` live list
   (6 → 8) + snapshot.
-- [ ] `TopologyDetailsPanel.vue`: when `traffic.cpuCores != null` render a
+- [x] `TopologyDetailsPanel.vue`: when `traffic.cpuCores != null` render a
   resource card row — CPU (cores, 2 dp), Memory (MiB, rounded),
   Tx/min (`requestsPerMin`) for postgres — instead of the Req/min/P99/Errors
   cards; make the existing cards null-safe (`v-if` per field) so a partial
   payload renders only what exists. Version row already `v-if="status.version"`.
-- [ ] Unit tests: panel renders resource cards from a mocked store payload;
+- [x] Unit tests: panel renders resource cards from a mocked store payload;
   HTTP cards still render for `cachest`; null fields render nothing.
-- [ ] `npm run build` + `npm run test` + `npm run test:mock` +
+- [x] `npm run build` + `npm run test` + `npm run test:mock` +
   `docker compose up -d --build portfoliost` + `npm run test:e2e` (topology
   specs; compose has no Prometheus so postgres/redis show no live overlay —
   assert the nodes still render and inspect). Push main → GHA release; record
   the real SPA tag.
-- [ ] Commit: `feat(admin-ui): topology — storage resource cards + live postgres/redis`.
+- [x] Commit: `feat(admin-ui): topology — storage resource cards + live postgres/redis`.
 
 ### 26.5 — homelab: scrape the Crunchy exporter + pin admin/SPA
 

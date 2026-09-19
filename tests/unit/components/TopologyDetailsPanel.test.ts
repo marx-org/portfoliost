@@ -58,4 +58,96 @@ describe("TopologyDetailsPanel traffic visibility", () => {
     })
     expect(wrapper.find('[aria-label="Traffic"]').exists()).toBe(false)
   })
+
+  it("renders resource cards (CPU/Memory/Tx-min) for a prometheus-source workload (postgres)", () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const store = useTopologyStore()
+    store.statusById = {
+      postgres: { name: "postgres", reachable: true, impl: "real", version: "16.4-debian-12", replicas: { desired: 1, ready: 1 }, restarts: 0 },
+    }
+    store.trafficById = {
+      postgres: {
+        name: "postgres",
+        requestsPerMin: 36,
+        errorRate: null,
+        p99LatencyMs: null,
+        cpuCores: 0.1234,
+        memoryBytes: 104857600,
+        connections: 42,
+        source: "prometheus",
+      },
+    }
+    const wrapper = mount(TopologyDetailsPanel, {
+      props: { nodeId: "postgres" },
+      global: { stubs: { RouterLink: true, Transition: false } },
+    })
+    const section = wrapper.get('[aria-label="Traffic"]')
+    expect(section.text()).toContain("Resources")
+    expect(section.text()).toContain("CPU")
+    expect(section.text()).toContain("0.12")
+    expect(section.text()).toContain("Memory")
+    expect(section.text()).toContain("100 MiB")
+    expect(section.text()).toContain("Tx/min")
+    expect(section.text()).toContain("36.0")
+    expect(section.text()).toContain("Conns")
+    expect(section.text()).toContain("42")
+    expect(section.text()).toContain("prometheus")
+    // HTTP-only cards must not render for a resource workload
+    expect(section.text()).not.toContain("Req/min")
+    expect(section.text()).not.toContain("P99")
+  })
+
+  it("renders CPU/Memory cards for redis without Tx/min or Conns cards", () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const store = useTopologyStore()
+    store.statusById = {
+      redis: { name: "redis", reachable: true, impl: "real", version: "7.4", replicas: { desired: 1, ready: 1 }, restarts: 0 },
+    }
+    store.trafficById = {
+      redis: {
+        name: "redis",
+        requestsPerMin: null,
+        errorRate: null,
+        p99LatencyMs: null,
+        cpuCores: 0.01,
+        memoryBytes: 20971520,
+        connections: null,
+        source: "prometheus",
+      },
+    }
+    const wrapper = mount(TopologyDetailsPanel, {
+      props: { nodeId: "redis" },
+      global: { stubs: { RouterLink: true, Transition: false } },
+    })
+    const section = wrapper.get('[aria-label="Traffic"]')
+    expect(section.text()).toContain("CPU")
+    expect(section.text()).toContain("0.01")
+    expect(section.text()).toContain("Memory")
+    expect(section.text()).toContain("20 MiB")
+    expect(section.text()).not.toContain("Tx/min")
+    expect(section.text()).not.toContain("Conns")
+  })
+
+  it("renders only the present HTTP cards when traffic fields are null", () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const store = useTopologyStore()
+    store.statusById = {
+      openst: { name: "openst", reachable: true, impl: "real", version: "1.0.0" },
+    }
+    store.trafficById = {
+      openst: { name: "openst", requestsPerMin: 60, errorRate: null, p99LatencyMs: null, source: "ingress" },
+    }
+    const wrapper = mount(TopologyDetailsPanel, {
+      props: { nodeId: "openst" },
+      global: { stubs: { RouterLink: true, Transition: false } },
+    })
+    const section = wrapper.get('[aria-label="Traffic"]')
+    expect(section.text()).toContain("Req/min")
+    expect(section.text()).toContain("60.0")
+    expect(section.text()).not.toContain("P99")
+    expect(section.text()).not.toContain("Errors")
+  })
 })

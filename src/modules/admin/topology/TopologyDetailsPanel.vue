@@ -60,6 +60,11 @@ const errorRatePct = computed(() => {
   return typeof rate === "number" ? `${Math.round(rate * 100)}%` : null
 })
 
+const memoryMib = computed(() => {
+  const bytes = traffic.value?.memoryBytes
+  return typeof bytes === "number" ? Math.round(bytes / 1024 / 1024).toString() : null
+})
+
 const cachestProviders = computed<CachestProviderLatency[]>(() => store.cachestProviders)
 
 /** Admin tab quick-link for a node, where one exists (D55-7). */
@@ -143,8 +148,28 @@ function onSelect(id: string): void {
 
         <!-- Live traffic metrics (any probed service with traffic data) -->
         <section v-if="traffic" aria-label="Traffic">
-          <h3 class="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Traffic</h3>
-          <div class="grid grid-cols-3 gap-2">
+          <h3 class="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{{ traffic.cpuCores != null ? 'Resources' : 'Traffic' }}</h3>
+          <!-- Resource metrics (k8s workloads: postgres/redis) — CPU / Memory / Tx-per-min -->
+          <div v-if="traffic.cpuCores != null" class="grid grid-cols-3 gap-2">
+            <div class="card px-2 py-1.5">
+              <p class="text-[11px] text-slate-400 dark:text-slate-500">CPU</p>
+              <p class="font-mono text-base font-semibold text-slate-900 dark:text-slate-100">{{ traffic.cpuCores.toFixed(2) }}<span class="text-xs font-normal text-slate-400"> c</span></p>
+            </div>
+            <div v-if="traffic.memoryBytes != null" class="card px-2 py-1.5">
+              <p class="text-[11px] text-slate-400 dark:text-slate-500">Memory</p>
+              <p class="font-mono text-base font-semibold text-slate-900 dark:text-slate-100">{{ memoryMib }}<span class="text-xs font-normal text-slate-400"> MiB</span></p>
+            </div>
+            <div v-if="def?.id === 'postgres' && traffic.requestsPerMin != null" class="card px-2 py-1.5">
+              <p class="text-[11px] text-slate-400 dark:text-slate-500">Tx/min</p>
+              <p class="font-mono text-base font-semibold text-slate-900 dark:text-slate-100">{{ traffic.requestsPerMin.toFixed(1) }}</p>
+            </div>
+            <div v-if="def?.id === 'postgres' && traffic.connections != null" class="card px-2 py-1.5">
+              <p class="text-[11px] text-slate-400 dark:text-slate-500">Conns</p>
+              <p class="font-mono text-base font-semibold text-slate-900 dark:text-slate-100">{{ traffic.connections }}</p>
+            </div>
+          </div>
+          <!-- HTTP metrics — each card renders only when its field is present -->
+          <div v-else class="grid grid-cols-3 gap-2">
             <div v-if="traffic.requestsPerMin != null" class="card px-2 py-1.5">
               <p class="text-[11px] text-slate-400 dark:text-slate-500">Req/min</p>
               <p class="font-mono text-base font-semibold text-slate-900 dark:text-slate-100">{{ traffic.requestsPerMin.toFixed(1) }}</p>

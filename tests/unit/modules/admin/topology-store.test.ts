@@ -143,7 +143,7 @@ describe("topology store", () => {
 
     const postgres = nodeById.get("postgres")!
     const pgData = store.nodeData(postgres)
-    expect(pgData.live).toBe(false)
+    expect(pgData.live).toBe(true) // postgres/redis now map to probed k8s workloads
     expect(pgData.status).toBeUndefined()
     expect(pgData.traffic).toBeUndefined()
   })

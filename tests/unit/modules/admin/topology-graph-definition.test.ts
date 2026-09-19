@@ -144,9 +144,9 @@ describe("topology graph definition (D55-3)", () => {
     expect(areaNodes("data-providers")).toHaveLength(16)
   })
 
-  it("marks the six probed deployments as live and nothing else", () => {
+  it("marks the six probed deployments + postgres/redis workloads as live and nothing else", () => {
     const live = topologyNodes.filter((n) => n.live).map((n) => n.id).sort()
-    expect(live).toEqual(["cachest", "openst", "portfoliost-admin", "portfoliost-instruments", "portfoliost-users-auth", "portfoliost-wallets"])
+    expect(live).toEqual(["cachest", "openst", "portfoliost-admin", "portfoliost-instruments", "portfoliost-users-auth", "portfoliost-wallets", "postgres", "redis"])
   })
 
   it("carries provider metadata with data types (and quotas where applicable)", () => {

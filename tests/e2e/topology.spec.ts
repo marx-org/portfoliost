@@ -177,6 +177,25 @@ test("clicking a node opens the details panel", async ({ page }) => {
   await expect(panel).toContainText("Neighbours")
 })
 
+test("storage workloads (postgres/redis) render and inspect without a live overlay in compose", async ({ page }) => {
+  await openTopology(page)
+
+  // compose has no Prometheus → the mock /topology endpoints return no rows for
+  // postgres/redis, so the nodes render with static content only (no overlay).
+  for (const id of ["postgres", "redis"]) {
+    const node = page.locator(`[data-node-id="${id}"]`).first()
+    await expect(node).toBeVisible()
+    await node.click()
+    const panel = page.getByTestId("topology-details-panel")
+    await expect(panel).toBeVisible()
+    // no live metrics sections — status overlay is absent in the compose mock
+    await expect(panel).not.toContainText("Replicas")
+    await expect(panel).not.toContainText("Source:")
+    await page.getByTestId("topology-panel-close").click()
+    await expect(panel).toBeHidden()
+  }
+})
+
 test("selecting a node rings it and dims unrelated nodes", async ({ page }) => {
   await openTopology(page)
 
