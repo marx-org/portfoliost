@@ -291,9 +291,16 @@ the existing plugin — same scraper infrastructure, new target site):
 
 The `obligacje.pl` bond search page (`/pl/narzedzia/wyszukiwarka-obligacji-notowanych`)
 lists **936 bonds** with symbol, emitent, maturity, coupon type, margin, current
-coupon.  A one-shot k8s Job imports the full catalogue into `ticker_reference` in
-`portfoliost-instruments` with `asset_type='corp_bond'` (enabling search without an
-openst roundtrip).  The daily CronJob re-imports to pick up newly listed bonds.
+coupon.  `openst` `src/importers/corp_bond_catalogue.py` scrapes the single
+server-rendered listing and emits a `tickerref-sync` CSV (`asset_type='corp_bond'`,
+`WSE::` keys); exposed as `GET /corp-bond/catalogue` (Redis-cached 24h) and proxied
+at cachest `OPENST_CORP_BOND_CATALOGUE` (12h). **Deployed (plan §35, 2026-09-19)**:
+daily CronJob `portfoliost-instruments-corpbondsync` (04:45 UTC) runs
+`corp-bond-catalogue-sync.js` in instruments — fetches the CSV through cachest,
+row-count-gates (refuses a truncated scrape), upserts into `ticker_reference`
+(`WSE::` keys only — never deletes, never touches stock/ETF rows), enabling search
+and the D81 price-bars dispatch without an openst roundtrip. Delisted bonds linger
+(harmless — their OHLCV 404s upstream).
 
 ### D81 — asset-class routing in price-bars — **DONE 2026-09-19** (plan §25.4; routing table implemented as-is: `getPriceBarSeries` dispatches on `ticker_reference.asset_type`, crypto→`/crypto/ohlcv`, bond→`/fixedincome/ohlcv`, corp_bond/fund→equity `/ohlcv`, stock/etf unchanged stooq-overflow path)
 
