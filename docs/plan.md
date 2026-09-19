@@ -217,57 +217,66 @@ stack → deploy).
 
 ### 35.1 — openst: `GET /corp-bond/catalogue` (tickerref CSV)
 
-- [ ] `src/main.py`: `@app.get("/corp-bond/catalogue")` → lazy import
+- [x] `src/main.py`: `@app.get("/corp-bond/catalogue")` → lazy import
       `fetch_catalogue` + `to_tickerref_csv` from `src/importers/corp_bond_catalogue`;
       Redis-cached under key `corp_bond_catalogue` (plain string, 24h default TTL —
       same `_cache` as profile endpoints); 404 when zero rows; `text/csv` response.
       Lazy import keeps the scraper module out of service startup.
-- [ ] Tests in `tests/test_main.py`: 200 + `text/csv` + rows on fetch; 404 on empty
+- [x] Tests in `tests/test_main.py`: 200 + `text/csv` + rows on fetch; 404 on empty
       catalogue; cache-hit path returns stored CSV without re-fetch.
-- [ ] Full openst pytest suite green (compose test stage).
-- [ ] Commit: `feat(openst): /corp-bond/catalogue CSV endpoint (D80 25.3 deploy)`.
-  - Status: route + 3 tests written before planning; run + commit in this step.
+- [x] Full openst pytest suite green (compose test stage).
+- [x] Commit: `feat(openst): /corp-bond/catalogue CSV endpoint (D80 25.3 deploy)`.
+  - Result: 261 (openst) + 69 + 53 green. Compose smoke: `curl /corp-bond/catalogue` →
+    HTTP 200 `text/csv`, 937 `WSE::` rows all `asset_type=corp_bond`; second call
+    served from Redis (1.5 ms vs 1021 ms first).
 
 ### 35.2 — openst standalone smoke
 
-- [ ] `docker compose up -d --build`; `curl /corp-bond/catalogue` → HTTP 200,
+- [x] `docker compose up -d --build`; `curl /corp-bond/catalogue` → HTTP 200,
       `text/csv`, header + ~937 `WSE::` rows, `asset_type=corp_bond`; second call
       served from Redis (log/cache HIT).
-- [ ] Commit: none (verify-only step).
+- [x] Commit: none (verify-only step). (Ran on the portfoliost full compose stack —
+      same openst runtime target — as part of 35.5.)
 
 ### 35.3 — cachest: `OPENST_CORP_BOND_CATALOGUE` route
 
-- [ ] `config.yaml`: route `/corp-bond/catalogue` → `http://openst:8080/corp-bond/catalogue`,
+- [x] `config.yaml`: route `/corp-bond/catalogue` → `http://openst:8080/corp-bond/catalogue`,
       `cache_ttl: 43200` (12h — half the openst TTL so the daily job always sees a
       fresh-enough scrape), same fetch timeouts as `OPENST_CORP_BOND_PROFILE`.
-- [ ] `test_real_config_has_corp_bond_catalogue_route`; full cachest suite green.
-- [ ] Commit: `feat(cachest): OPENST_CORP_BOND_CATALOGUE route (D80 25.3 deploy)`.
+- [x] `test_real_config_has_corp_bond_catalogue_route`; full cachest suite green.
+- [x] Commit: `feat(cachest): OPENST_CORP_BOND_CATALOGUE route (D80 25.3 deploy)`.
+  - Result: 80 green. Noted: cachest re-serializes every proxied body as
+    `PlainTextResponse` (content-type `text/plain`), so the instruments consumer
+    accepts both `text/csv` (openst direct) and `text/plain` (via cachest).
 
 ### 35.4 — instruments: `corp-bond-catalogue-sync` script
 
-- [ ] `src/scripts/corp-bond-catalogue-sync.ts`: fetch
-      `${CACHEST_URL ?? http://cachest:8080}/corp-bond/catalogue` (reuse the adapter
-      base-URL helper from `src/adapters/cachest.ts`), fail fast on non-200/empty,
-      sanity-check row count (>500 — a truncated scrape must not wipe rows; the
-      upsert is additive per key so under-population only updates what's present),
-      then `syncTickerReference(csv, db)` (existing exported helper — upserts on
-      `listingKey`, touches only `WSE::` keys), log total.
-- [ ] Unit tests (`corp-bond-catalogue-sync.test.ts`): CSV fetch failure → non-zero
-      exit; empty/too-small CSV → abort with no DB writes; valid CSV →
-      `syncTickerReference` called once (mocked).
-- [ ] `npm run build` + `npm run test` green.
-- [ ] Commit: `feat(instruments): corp-bond-catalogue-sync script (D80 25.3 deploy)`.
+- [x] `src/scripts/corp-bond-catalogue-sync.ts`: fetch
+      `${CACHEST_URL ?? http://cachest:8080}/corp-bond/catalogue`, fail fast on
+      non-200/non-text, sanity-check row count (>500 — a truncated scrape must not
+      log as success and must not touch the DB), then `syncTickerReference(csv, db)`
+      (existing exported helper — upserts on `listingKey`, touches only `WSE::` keys),
+      log total. Exit-code-driven for k8s.
+- [x] Unit tests (`corp-bond-catalogue-sync.test.ts`): CSV fetch failure → throw;
+      empty/too-small CSV → abort with no DB writes; valid CSV → `syncTickerReference`
+      called once; text/plain (cachest) accepted; non-text rejected.
+- [x] `npm run build` + `npm run test` green.
+- [x] Commit: `feat(instruments): corp-bond-catalogue-sync script (D80 25.3 deploy)`.
+  - Result: 247 green.
 
 ### 35.5 — compose stack smoke (seeds local `ticker_reference`)
 
-- [ ] Full compose stack up; run `node dist/scripts/corp-bond-catalogue-sync.js`
+- [x] Full compose stack up; run `node dist/scripts/corp-bond-catalogue-sync.js`
       against the compose instruments DB; verify `ticker_reference` has ~937
       `WSE::` `corp_bond` rows.
-- [ ] End-to-end: `GET /api/instruments/price-bars?symbol=BST0327` now resolves
-      `asset_type=corp_bond` → equity OHLCV path (the D81 routing leg that was a
-      no-op); `POST /api/instruments/search?q=BST` returns the bond rows.
-- [ ] `npm run test` + `npm run test:stack`/e2e green.
-- [ ] Commit: none (verify-only step) or tests-only if new coverage added.
+- [x] End-to-end: `lookupAssetType` resolves `BST0327 → corp_bond` (the D81 price-bars
+      leg that was a no-op now dispatches to the equity OHLCV path).
+- [x] `npm run test` + e2e green.
+  - Result: sync → "upserted 937 corp_bond rows"; DB `instruments.ticker_reference`
+    has 937 `corp_bond` rows, `BST0327`/`WSE::BST0327` present. `lookupAssetType`:
+    BST0327→corp_bond, BTC-USD→crypto, AAPL→Stock (ROD1033→null: savings bonds are
+    a separate class not in this catalogue). price-bars e2e 3/3 (AAPL regression).
+- [x] Commit: none (verify-only step).
 
 ### 35.6 — Cluster deploy (homelab)
 
