@@ -130,15 +130,23 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
 
 ### 25.5 — D82: contracts patch + admin surface
 
-- [ ] `@marx2/contracts` `openapi.yaml`: add `fund | bond | corp_bond | crypto` to
+- [x] `@marx2/contracts` `openapi.yaml`: add `fund | bond | corp_bond | crypto` to
       `InstrumentType`; patch bump; reinstall; `gen:types`.
-- [ ] `src/adapters/translate.ts`: add `corp_bond → CORP_BOND`, `fund → FUND`
+- [x] `src/adapters/translate.ts`: add `corp_bond → CORP_BOND`, `fund → FUND`
       (BOND and CRYPTO already at `translate.ts:289`).
-- [ ] portfoliost-admin: read-only table for `openst.bond_series` (symbol, name,
+- [x] portfoliost-admin: read-only table for `openst.bond_series` (symbol, name,
       issue/maturity, rate_rule, margin; row count) and `openst.cpi_12m` (24 rows;
       staleness warning > 40 days).
-- [ ] `npm run build` + `npm run test` + `npm run test:mock` pass.
-- [ ] Commit: `feat(contracts+admin): InstrumentType widening + bond/CPI admin (D82)`.
+- [x] `npm run build` + `npm run test` + `npm run test:mock` pass.
+- [x] Commit: `feat(contracts+admin): InstrumentType widening + bond/CPI admin (D82)`.
+  - Result (2026-09-19): `InstrumentType` enum (STOCK, ETF, BOND, CRYPTO, FUND,
+    CORP_BOND) added to `InstrumentDetail.type` + `SearchResult.type`; CI published
+    `@marx2/contracts@1.6.26`. Instruments: `toInstrumentType` helper, detail/search
+    mappings widened, contracts bump + gen:types (commit `adb69c9`; 239 tests green).
+    Admin: read-only `GET /api/admin/bond-catalogue/bond-series` + `/cpi` over the
+    shared DB's `openst` schema (commit `3b2078e`; 77 tests green incl. 5 PGlite).
+    SPA: `BondCatalogueView.vue` + admin tab (commit `b5c51b3`; build clean,
+    293 unit + 190 mock green).
 
 ## Topology — cinematic observability experience
 
