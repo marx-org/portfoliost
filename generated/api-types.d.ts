@@ -1072,6 +1072,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portfolios/{id}/recompute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["portfolioId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Force-rebuild portfolio history (delete + rebuild value snapshots) */
+        post: operations["portfolioRecompute"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portfolios/{id}/positions": {
         parameters: {
             query?: never;
@@ -2928,6 +2947,10 @@ export interface components {
         };
         SetLabelsRequest: {
             labelIds: string[];
+        };
+        BackfillRecomputeResponse: {
+            /** @enum {string} */
+            backfillStatus: "pending" | "complete" | "failed";
         };
         PortfolioAnalytics: {
             /** @enum {string|null} */
@@ -5230,6 +5253,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PortfolioAnalytics"];
+                };
+            };
+        };
+    };
+    portfolioRecompute: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["portfolioId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Recompute enqueued */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BackfillRecomputeResponse"];
+                };
+            };
+            /** @description Portfolio not owned by the caller or missing */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
