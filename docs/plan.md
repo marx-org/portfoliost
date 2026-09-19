@@ -274,7 +274,20 @@ containing the full sync (v1.0.0 was the bare scaffold).
       tag bumps for the admin + portfoliost releases. `kubectl kustomize` renders
       cleanly. Commit: `chore(homelab): portfoliost-sheets-sync admin job secret`.
 - [ ] E2E: trigger the sync from the admin panel against the cluster; assert
-      `GET /api/import/sync-runs` shows a completed run with `insertedWtx > 0`.
+       `GET /api/import/sync-runs` shows a completed run with `insertedWtx > 0`.
+
+**Known issue (2026-09-19, fix later) — pfire postgres CPU saturation from price-bar
+backfill.** After the full sheets re-import (~2000 txs → 100+ positions), the
+value-snapshot backfill hammers `instruments.price_bars_all` with per-symbol
+`select max(date) … where symbol = ?` + cursor `FETCH 100` loops, 10+ concurrent,
+each 15–21 s. The pfire postgres pod (node `kura`) pegs the node at ~100 % CPU;
+probe timeouts cascade cluster-wide (metallb/longhorn/loki …) and **k8s deployment
+rollouts in `pfire` time out** ("timeout waiting for Deployment InProgress") —
+Helm/Flux then rolls back. Symptom chain observed 2026-09-19: wallets v1.1.38 +
+admin v1.0.46 rollbacks; `pg_terminate_backend` on the active queries immediately
+drops node load to ~16 %. Fix candidates: bound backfill concurrency, index
+`price_bars_all(symbol, date)` (check existing index), batch the max-date lookups,
+or rate-limit the backfill worker.
 
 ### 24.10 — Closeout
 
