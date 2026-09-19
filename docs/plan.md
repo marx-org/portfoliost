@@ -85,23 +85,42 @@ as a shared helper and reuse in both the price-bars route and the quote route.
 
 ### 34.1 — Read-only inventory of no-price positions + per-class quote probe
 
-- [ ] `psql` (read-only, prod DB): `select symbol, asset_type, country,
+- [x] `psql` (read-only, prod DB): `select symbol, asset_type, country,
       price_source, current_price from positions where is_open and
       (current_price is null or current_price = 0)` → group by `asset_type`;
       confirm the overlap with `country='Other'`. Expect Catalyst codes to already
       carry `asset_type=corp_bond` from the D80 catalogue sync (§35); if any are
       missing, add them to the openst catalogue CSV (importer), not by hand-seeding.
-- [ ] For each distinct unresolved symbol (one per class): probe live through the
+      **Result (2026-09-20): 82 open rows, all `price_source='manual'`, all
+      `price_as_of NULL`** — stale since the §28.6 recompute (2026-09-19 21:47 UTC),
+      where 18 rows (AMZN, GOOGL, PL `.WA`, RIO.L and even corp bond `BST0327` =
+      100.52) got quotes in the same pass. Groups: 25 savings bonds (BOND, Other),
+      4 name-stored TFI funds + `ALLIANZ SE` (STOCK, Other), and ~53 plain
+      US/PL/foreign stocks (IBKR, Rach. rejestrowy PKO BP, IKE…) whose quotes work
+      live (stale state, self-heal on next read); 1 `SAP.DE` OPTION (no options
+      branch — out of scope). No open crypto positions currently (Crypto portfolio
+      empty); the crypto branch stays for completeness. Catalyst codes: none are
+      open positions today (BST0327 is, with a price) — no missing catalogue rows.
+- [x] For each distinct unresolved symbol (one per class): probe live through the
       stack and record the exact outcome — e.g. `ROD1033` → `/equity/quote/ROD1033`
       (expect 404) vs `/fixedincome/ohlcv/ROD1033` (200, last close);
       `BST0327`/`ARH` bare vs `BST0327.WA` → `/equity/quote/...` (biznesradar
       scrape); `BTC` vs `BTC-USD` → `/crypto/quote/...`; `NNEP25.TFI` ·
       `ALV.DE` → `/equity/quote/...`. Save rows/status to
       `openst/tests/fixtures/no-prices/` as JSON fixtures.
-- [ ] Record the required symbol normalization per class (`.WA` for Catalyst
+      **Result: fixtures committed** — `no-price-inventory.json` (82 rows) +
+      `quote-probes.json` (live prod openst, read-only).
+- [x] Record the required symbol normalization per class (`.WA` for Catalyst
       bonds, `-USD` pair form for crypto, bare for savings bonds) and the exact
       quote provider (obligacje computed close vs biznesradar vs crypto.route).
-- [ ] Commit: `chore(openst): no-price asset inventory + quote probes`.
+      **Verified forms:** corp bond `BST0327` **and** `BST0327.WA` both 200 on the
+      equity quote (biznesradar dispatch, D80) → no normalization for
+      corp_bond/fund; crypto pair `BTC-USD` only (bare `BTC` 404) → stored symbol
+      must be the pair; savings bond bare `ROD1033` (equity 404,
+      `/fixedincome/ohlcv` computed close 200); fund `NNEP25.TFI` 200; foreign
+      `ALV.DE` / `7974.T` / `SAP.DE` 200. **Shape gotcha:** the crypto quote row
+      uses `price` (not `last_price`) — `toQuote` (or the adapter) must map it.
+- [x] Commit: `chore(openst): no-price asset inventory + quote probes`.
 
 ### 34.2 — openst: `/fixedincome/quote/{symbol}` (savings-bond current price)
 
@@ -196,10 +215,17 @@ as a shared helper and reuse in both the price-bars route and the quote route.
 - [ ] Archive §34 to `plan-archive.md`; add §28.6 cross-reference.
 - [ ] Commit: `chore: §34 closeout (asset-class quotes)`.
 
-Open questions (verify in 34.1, do not guess before):
-- Catalyst corp-bond current price: biznesradar market quote (`/notowania/BST0327.WA`)
-  vs obligacje computed close — pick per probe result.
-- Stored crypto symbol form at import time (`BTC` vs `BTC-USD`) determines whether
-  a normalization step is needed in `venueFreeSymbol` or the wallets store.
+Open questions (verified in 34.1, 2026-09-20):
+- ~~Catalyst corp-bond current price: biznesradar market quote vs obligacje
+  computed close —~~ **resolved:** the equity quote (biznesradar) serves it —
+  `BST0327` got a live quote through the existing path during the §28.6 recompute;
+  obligacje computed close stays for savings bonds only.
+- ~~Stored crypto symbol form (`BTC` vs `BTC-USD`) determines whether a
+  normalization step is needed —~~ **resolved:** no open crypto positions exist
+  today; `ticker_reference` maps `BTC → BTC-USD`; bare `BTC` 404s on
+  `/crypto/quote` → the crypto dispatch must normalize a bare ticker to the
+  `-USD` pair (see 34.5).
 - Retail savings bonds have no market price by definition — "quote" = today's
-  computed close from the obligacje engine and is the intended behaviour, not a bug.
+  computed close from the obligacje engine and is the intended behaviour, not a
+  bug. **Confirmed:** `/fixedincome/ohlcv/ROD1033` returns computed daily closes
+  (151.73 on 2026-09-04) for the full recent window.
