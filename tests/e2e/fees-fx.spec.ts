@@ -8,17 +8,17 @@ async function login(page: import("@playwright/test").Page) {
   await expect(page).toHaveURL(/\/en\/investments/)
 }
 
-async function createEurWallet(page: import("@playwright/test").Page) {
-  const name = `E2E FX ${Date.now()}`
+async function createWallet(page: import("@playwright/test").Page, currency: string) {
+  const name = `E2E FX ${currency} ${Date.now()}`
   await page.goto("/en/wallets")
   await page.getByRole("button", { name: "New wallet" }).first().click()
   const dialog = page.getByRole("dialog", { name: "Create wallet" })
   await dialog.getByRole("textbox", { name: "Name" }).fill(name)
-  await dialog.getByLabel("Wallet currency").selectOption("EUR")
+  await dialog.getByLabel("Wallet currency").selectOption(currency)
   await dialog.getByRole("button", { name: "Create" }).click()
   await expect(dialog).not.toBeVisible()
 
-  // fund the fresh EUR wallet so the cross-currency buy can settle
+  // fund the fresh wallet so the cross-currency buy can settle
   const card = page.locator(".card").filter({ hasText: name })
   await card.getByRole("button", { name: "Deposit", exact: true }).click()
   const cash = page.getByRole("dialog", { name: "Cash movement" })
@@ -30,7 +30,11 @@ async function createEurWallet(page: import("@playwright/test").Page) {
 
 test("buy dialog: wallet-driven FX section → automatic suggests, custom submits a manual rate", async ({ page }) => {
   await login(page)
-  const walletName = await createEurWallet(page)
+  // the demo user's wallets are the ones created in this test (wallets.json
+  // seeds belong to a different mock userId), so create both currencies to
+  // control the wallet selection deterministically
+  const usdWalletName = await createWallet(page, "USD")
+  const eurWalletName = await createWallet(page, "EUR")
   await page.goto("/en/investments")
 
   // self-contained: create a fresh portfolio so no other spec can touch it
@@ -56,13 +60,16 @@ test("buy dialog: wallet-driven FX section → automatic suggests, custom submit
   await buy.getByTestId("add-position-quantity").fill("1")
   await buy.getByTestId("add-position-price").fill("50")
 
-  // default cash wallet is USD and TXN settles in USD -> no FX conversion needed
   const fxSection = buy.getByTestId("add-position-fx-section")
+
+  // paying from a USD cash wallet = TXN settles in USD -> no FX conversion needed
+  const walletSelect = buy.getByTestId("add-position-wallet")
+  const usdOption = walletSelect.locator("option").filter({ hasText: usdWalletName })
+  await walletSelect.selectOption((await usdOption.getAttribute("value"))!)
   await expect(fxSection).toBeHidden()
 
   // paying from a EUR wallet turns on the transaction FX leg (wallet-driven target)
-  const walletSelect = buy.getByTestId("add-position-wallet")
-  const eurOption = walletSelect.locator("option").filter({ hasText: walletName })
+  const eurOption = walletSelect.locator("option").filter({ hasText: eurWalletName })
   await walletSelect.selectOption((await eurOption.getAttribute("value"))!)
   await expect(fxSection).toBeVisible()
   await expect(buy.getByText("Transaction exchange rate (USD → EUR)")).toBeVisible()

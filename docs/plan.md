@@ -240,12 +240,19 @@ both build against it.
 
 ### 28.6 — Mock parity + full re-import + validation
 
-- [ ] `portfoliost/mocks/`: import/position fixtures gain `sector`/`country`/`countryCode`
+- [x] `portfoliost/mocks/`: import/position fixtures gain `sector`/`country`/`countryCode`
       samples; `npm run mock:seed` unchanged unless seeds add positions.
-- [ ] Full gates: `npm run build` + `npm run test` + `npm run test:mock` in
-      `portfoliost`; `npm run test` + `npm run lint` in contracts/wallets/sheets-sync;
-      dockerized `npm run test:e2e`.
-- [ ] Commit: `test(portfoliost): mock parity for sector/country positions`.
+      Verdict: fixtures **already** carry `sector`/`country` — `portfolio_positions.json`,
+      `portfolio_transactions.json`, `mocks/db-seed/constants.mjs` `SEED_POSITIONS`, and the
+      mock POST fallback. `countryCode` is a wallets-import-only payload field (dropped before
+      storage; no positions column, no SPA screen expects it), so nothing to add.
+- [x] Full gates: `npm run build` + `npm run test` + `npm run test:mock` in
+      `portfoliost`; npm build/test in contracts/wallets/sheets-sync/instruments; dockerized
+      `npm run test:e2e` (78 passed, 1 skipped). E2E hardening covered along the way:
+      deterministic stooq-first ordering for overlapping price-bar dates (instruments),
+      self-contained fees-fx wallet handling, wallet refill + merge-tolerant buy specs,
+      structural holdings/transactions group asserts, scoped portfolio-tab nav.
+- [x] Commit: `test(portfoliost): mock parity for sector/country positions`.
 - [ ] **Production re-import (requires explicit user approval):** rebuild the
       `portfoliost-sheets-sync` image, run the Job against the live spreadsheet
       (wipe + re-import), then verify read-only via `psql`:
