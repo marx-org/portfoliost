@@ -180,3 +180,119 @@ Open questions (verify in 34.1, do not guess before):
 ---
 ---
 
+---
+
+## 35. Deploy the corp-bond catalogue sync — D80 carry-over (plan §25.3 / §25.6)
+
+Proposal: [instruments-provider-module.md](proposals/instruments-provider-module.md) —
+D80 "Catalyst bond catalogue". The 25.3 one-shot catalogue importer
+(`openst/src/importers/corp_bond_catalogue.py`) was built and tested but never
+deployed: the cluster `ticker_reference` still holds Stock/ETF rows only, so the
+D81 price-bars routing (25.4) is a no-op for `corp_bond`/`bond`/`crypto`
+(`asset_type` lookup falls back to `stock` for unlisted tickers).
+
+Context: the importer scrapes a single server-rendered `obligacje.pl` catalogue
+page (937 unique bonds) and emits a `tickerref-sync` CSV with `asset_type`
+pinned to `corp_bond`, listing keys `WSE::{SYMBOL}`. **Periodicity — daily.**
+The plan (D80) already specified "the daily CronJob re-imports to pick up newly
+listed bonds"; the scrape is one page fetch, cached in openst Redis 24h, and the
+upsert touches only `WSE::` keys, so a daily 04:45 UTC pass (staggered after the
+04:30 openst bond/CPI imports) is cheap and idempotent. Weekly adanos tickersync
+(04:30 Mon) is untouched — the two CSVs cover disjoint listing keys.
+
+Repos touched: `openst` (new HTTP endpoint over the existing importer — **in
+progress: route + 3 tests written, suite pending**), `cachest` (route + TTL),
+`portfoliost-instruments` (new `corp-bond-catalogue-sync` script reusing
+`syncTickerReference`), homelab (new `corpbondsync` CronJob in the instruments
+helmrelease via app-template `type: cronjob`; tag bumps for all five images).
+No contracts change (no wire shape changes). No nginx change (no new path
+prefix at the gateway — the new endpoints live behind the existing
+`/api/instruments`-adjacent cachest URL space and are consumed job-side).
+
+Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
+Step order follows the provider tier (openst → smoke → cachest → instruments →
+stack → deploy).
+
+---
+
+### 35.1 — openst: `GET /corp-bond/catalogue` (tickerref CSV)
+
+- [ ] `src/main.py`: `@app.get("/corp-bond/catalogue")` → lazy import
+      `fetch_catalogue` + `to_tickerref_csv` from `src/importers/corp_bond_catalogue`;
+      Redis-cached under key `corp_bond_catalogue` (plain string, 24h default TTL —
+      same `_cache` as profile endpoints); 404 when zero rows; `text/csv` response.
+      Lazy import keeps the scraper module out of service startup.
+- [ ] Tests in `tests/test_main.py`: 200 + `text/csv` + rows on fetch; 404 on empty
+      catalogue; cache-hit path returns stored CSV without re-fetch.
+- [ ] Full openst pytest suite green (compose test stage).
+- [ ] Commit: `feat(openst): /corp-bond/catalogue CSV endpoint (D80 25.3 deploy)`.
+  - Status: route + 3 tests written before planning; run + commit in this step.
+
+### 35.2 — openst standalone smoke
+
+- [ ] `docker compose up -d --build`; `curl /corp-bond/catalogue` → HTTP 200,
+      `text/csv`, header + ~937 `WSE::` rows, `asset_type=corp_bond`; second call
+      served from Redis (log/cache HIT).
+- [ ] Commit: none (verify-only step).
+
+### 35.3 — cachest: `OPENST_CORP_BOND_CATALOGUE` route
+
+- [ ] `config.yaml`: route `/corp-bond/catalogue` → `http://openst:8080/corp-bond/catalogue`,
+      `cache_ttl: 43200` (12h — half the openst TTL so the daily job always sees a
+      fresh-enough scrape), same fetch timeouts as `OPENST_CORP_BOND_PROFILE`.
+- [ ] `test_real_config_has_corp_bond_catalogue_route`; full cachest suite green.
+- [ ] Commit: `feat(cachest): OPENST_CORP_BOND_CATALOGUE route (D80 25.3 deploy)`.
+
+### 35.4 — instruments: `corp-bond-catalogue-sync` script
+
+- [ ] `src/scripts/corp-bond-catalogue-sync.ts`: fetch
+      `${CACHEST_URL ?? http://cachest:8080}/corp-bond/catalogue` (reuse the adapter
+      base-URL helper from `src/adapters/cachest.ts`), fail fast on non-200/empty,
+      sanity-check row count (>500 — a truncated scrape must not wipe rows; the
+      upsert is additive per key so under-population only updates what's present),
+      then `syncTickerReference(csv, db)` (existing exported helper — upserts on
+      `listingKey`, touches only `WSE::` keys), log total.
+- [ ] Unit tests (`corp-bond-catalogue-sync.test.ts`): CSV fetch failure → non-zero
+      exit; empty/too-small CSV → abort with no DB writes; valid CSV →
+      `syncTickerReference` called once (mocked).
+- [ ] `npm run build` + `npm run test` green.
+- [ ] Commit: `feat(instruments): corp-bond-catalogue-sync script (D80 25.3 deploy)`.
+
+### 35.5 — compose stack smoke (seeds local `ticker_reference`)
+
+- [ ] Full compose stack up; run `node dist/scripts/corp-bond-catalogue-sync.js`
+      against the compose instruments DB; verify `ticker_reference` has ~937
+      `WSE::` `corp_bond` rows.
+- [ ] End-to-end: `GET /api/instruments/price-bars?symbol=BST0327` now resolves
+      `asset_type=corp_bond` → equity OHLCV path (the D81 routing leg that was a
+      no-op); `POST /api/instruments/search?q=BST` returns the bond rows.
+- [ ] `npm run test` + `npm run test:stack`/e2e green.
+- [ ] Commit: none (verify-only step) or tests-only if new coverage added.
+
+### 35.6 — Cluster deploy (homelab)
+
+- [ ] Push `openst`, `cachest`, `portfoliost-instruments` → GHA green → `gh release list`
+      verifies the real `v*` tags (never tag manually).
+- [ ] homelab: bump `openst` (5 occurrences: app + 4 cronjobs), `cachest` (1),
+      `portfoliost-instruments` (2: app + tickersync) to the new tags; add
+      `corpbondsync` CronJob to the instruments helmrelease — app-template
+      `type: cronjob`, `schedule: "45 4 * * *"`, `concurrencyPolicy: Forbid`,
+      `command: ["node", "dist/scripts/corp-bond-catalogue-sync.js"]`,
+      `DATABASE_URL` from `postgres-pfire-pguser-portfoliost` (same secret as
+      `tickersync`), env `CACHEST_URL=http://cachest:8080`, resources 50m/128Mi
+      → 512Mi. No KEDA/ingress changes (no new routes).
+- [ ] Commit + push homelab; Flux reconciles in ~1 min; `flux reconcile`/`kubectl`
+      verify HelmReleased.
+- [ ] Trigger the CronJob once (`kubectl create job --from=cronjob/corpbondsync
+      -n pfire corpbondsync-now`), check logs: rows synced.
+- [ ] Verify in cluster: `ticker_reference` corp_bond row count ~937 via psql;
+      spot-check a `BST0327` price-bars call through the live instruments service.
+- [ ] Commit: none (deploy verified by the bump commit).
+
+### 35.7 — Closeout
+
+- [ ] Update `instruments-provider-module.md` (D80 catalogue note: deployed, daily
+      CronJob `corpbondsync`) + `openst-coverage.md` (catalogue endpoint row).
+- [ ] Mark the §25.6 carry-over note resolved (plan-archive.md, one-line addendum).
+- [ ] Archive §35 to `plan-archive.md`.
+- [ ] Commit: `chore: D80 corp-bond catalogue sync deploy closeout`.
