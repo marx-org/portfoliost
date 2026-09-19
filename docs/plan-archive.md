@@ -1,8 +1,56 @@
-# plan.md — example-service.ai parity (Investments main page + portfolio transactions) - archived work
+# plan-archive.md — archived work
 
 Long-running plan. Each step is implemented, verified (build + unit + mock + e2e), committed, and then marked here.
 
 Legend: `[ ]` pending · `[x]` done
+
+Single archive since 2026-09-19 — `plan-archive2.md` merged here; its sections were renumbered to
+0 / 29–33 (was 1–5), 17 kept, and the duplicate D77 pointer (was 16) dropped. The live `plan.md` §25 (D80/D81/D82) stays there.
+
+---
+
+# General rules
+
+## Testing strategy, mocking, and migration
+
+### Endpoint migration approach
+
+- [ ] Pick endpoint to migrate (for example: `GET /api/users/preferences`).
+- [ ] Implement in respective module, for example `portfoliost-backend`.
+- [ ] Write backend unit tests.
+- [ ] Add seed data if needed.
+- [ ] Switch gateway route to respective module, for example `deploy/services.env`:
+  `API_USERS_URL` → `http://portfoliost-backend:3000`.
+- [ ] Add E2E test for the endpoint.
+- [ ] Delete mock handler.
+- [ ] Verify: build + unit + mock + e2e. Commit.
+
+### Subsequent endpoints
+
+- [X] `/api/auth/*` + `/api/users/*`
+- [X] `/api/portfolios/*`
+- [X] `/api/wallets/*`
+- [ ] `/api/watchlists/*`
+- [X] `/api/instruments/*`
+- [ ] `/api/charting/*`
+
+### Final mock removal steps
+- [ ] Delete `mocks/` directory.
+- [ ] Remove `example-service-mock` service from `docker-compose.yml`.
+- [ ] Remove `Dockerfile.mock`.
+- [ ] Remove `npm run test:mock` script.
+- [ ] Remove `scripts/regen-seed.mjs` and `discovery/raw/`.
+- [ ] Update `AGENTS.md` to reflect new architecture.
+
+---
+
+## 0. Database preparation
+
+- [x] enable `postgres_fdw` extension
+- [x] make sure all stooq tables are available in the `stooq` DB on the same Postgres instance
+- [x] mapp all stooq tables as foreign tables in `portfoliost-instruments` DB
+
+---
 
 ## 1. Investments main page + portfolio transactions (example-service parity)
 
@@ -263,6 +311,8 @@ Gradual migration: local mock stays as-is for development, cluster uses PocketID
 
 - [Testing Strategy — Mock Phase-Out and Database Environment Tiers](proposals/testing-strategy.md)
 
+---
+
 ## 6. Testing Strategy Implementation
 
 ### 6.1 (was Phase 1) — Environment-Aware SQLite + Seed System
@@ -401,6 +451,8 @@ Proposal: [backend-topology.md](proposals/backend-topology.md) (accepted 2026-08
 - [x] T6c (2026-08-23, `0f1178c`): `/profile` fills ISIN/sector/country/exchange from the reference table when the provider omits them (provider data wins when present).
 - [x] T6d (2026-08-23): cluster — DATABASE_URL from `postgres-pfire-pguser-portfoliost`, weekly `tickersync` CronJob (Mondays 04:30 UTC, `--url` live mode, Forbid concurrency), boot limit 128Mi→512Mi (seed OOM'd at 128Mi). Verified: v1.0.7 running, migrations applied, 61,692 rows seeded in cluster Postgres. Commits `91fc34010`, `cff51aca9` (homelab).
 
+---
+
 ## 9. Instruments module (provider tier realized)
 
 Proposal: [instruments-provider-module.md](proposals/instruments-provider-module.md) — second extracted module; data from openst/cachest via in-module adapters (D2); compose gains redis/openst/cachest for local testing. Local verification only (no cluster changes this phase).
@@ -449,6 +501,8 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass (
 ### 9.11 (was I11) — closeout
 - [x] plan.md final marks + proposal source-map cross-check corrected from implementation findings. — `docs/proposals/instruments-provider-module.md` D13 table updated with I8a/I8b status per endpoint (eps-surprises/peers/seasonality/IR now derived in module; ownership = empty-content stub pending provider; compare is single-symbol composition); `docs/openst-coverage.md` gaps annotated. Stale "Later phases" `/__meta` note corrected (instruments ships one).
 
+---
+
 ## 10. Fees & FX-rate entry (contract / mock / UI)
 
 Proposal: [fees-and-custom-fx.md](proposals/fees-and-custom-fx.md) (accepted 2026-08-24, D25–D33). FX foundation and supported-currency registry first, then: fees may carry their own currency (default = transaction currency) and transaction/fee each accept a custom exchange rate (`automatic` default). Applies to portfolio AND wallet transactions; finalizes wire shapes the wallets module (§11) consumes.
@@ -470,6 +524,8 @@ Proposal: [fees-and-custom-fx.md](proposals/fees-and-custom-fx.md) (accepted 202
 - [x] 10.12 WalletCashModals — FX disclosures on deposit/withdraw (transaction + fee legs); transfer keeps elastic target leg (D22) and gains the fee leg
 - [x] 10.13 Options form parity — FeeFields/FxRateFields replace hardcoded-USD fee entry (D41)
 
+---
+
 ## 11. Wallets & transactions module (`portfoliost-wallets`)
 
 Proposal: [wallets-module.md](proposals/wallets-module.md) (accepted 2026-08-24, decisions D16–D23). Cash-wallet domain as its own module: wallets, cash ledger transactions, unified recent-transactions feed, balance history, multicurrency (local FX store: ECB/frankfurter primary + openst/cachest fallback). Multi-user: every table and query is user-scoped (D24). No implementation started yet.
@@ -487,6 +543,8 @@ Proposal: [wallets-module.md](proposals/wallets-module.md) (accepted 2026-08-24,
 - [x] 11.11 Gateway + compose wiring, contract tests green against mock AND module, e2e switch via `API_WALLETS_URL`
 - [x] 11.12 Cluster rollout — HelmRelease, ingress path, FX-sync CronJob
 
+---
+
 ## 12. Instrument logos (provider-resolved, permanently stored)
 
 Proposal: [logos.md](proposals/logos.md) (accepted 2026-08-25, D34–D37). Resolve logos once through the provider tier, persist binaries on disc + metadata in Postgres, serve from our own infrastructure; generated initials as terminal fallback.
@@ -499,6 +557,8 @@ Verified provider facts (2026-08-25): FMP's legacy `financialmodelingprep.com/im
 - [x] 12.4 `/api/logos/:symbol` (+`/logos/:symbol` parity alias) serving local files with immutable caching; deterministic initials SVG fallback (ported from mock), never persisted; auth-exempt (SPA `<img>` tags carry no JWT); gateway flip `API_LOGOS_URL` → instruments; mock handler retired
 - [x] 12.5 disc volume: bind mount `../portfoliost-instruments/data/logos` in compose; cluster HelmRelease persistence deferred with the module's cluster rollout (D15 scope)
 - [x] 12.6 stack-test logo checks (real/mock distinguishing) + e2e: WSE ticker renders a logo (real or initials); file persisted on disc; I10 full suite green
+
+---
 
 ## 13. Shared Redis for the provider tier (cluster)
 
@@ -516,6 +576,8 @@ Target: apps stay stateless; the namespace-level shared instance (`redis`, pinne
 - [x] 13.2 openst HelmRelease — drop localhost redis sidecar; `REDIS_HOST=redis`, `${SECRET_REDIS_PASS}`, `REDIS_DB=2`
 - [x] 13.3 cutover complete (2026-08-25): sidecars gone (single `app` container on both), shared redis carries openst db2 + cachest db1 (ghostfolio db0 untouched); stale `REDIS_HOST=localhost` env removed from cachest HR; orphaned `cachest-redis` PVC deleted
 - [x] 13.4 local compose hygiene — pin floating minor (`redis:7-alpine` → `redis:7.4-alpine`) across portfoliost / openst / cachest compose files (dev-only isolation unaffected)
+
+---
 
 ## 14. Admin module (`portfoliost-admin`)
 
@@ -599,6 +661,8 @@ Proposal: [admin-module.md](proposals/admin-module.md) (D42–D52). Read-only ad
 - [x] **Admin HelmRelease**: reference mirrored secret (`pocket-id-static-api-key` / key `token`), drop `optional: true`, bump to v1.0.3.
 - [x] Create `portfoliost-admin/README.md` documenting mirroring setup.
 - [x] Commit + push. — homelab `b30442710`.
+
+---
 
 ## 15. Portfolio management in the wallets module (replace all portfolio mocks)
 
@@ -1303,6 +1367,67 @@ Note: as only a single fetcher can be registered per (provider, model) key — a
   `*.TFI`, `*.FIZ`, and Catalyst bond symbols.
 - [x] Archive this section to `plan-archive.md` once all steps are `[x]`.
 
+---
+
+## 17. D78 — biznesradar search + quote fallback (PL fund/bond lookup end-to-end)
+
+### Finding (2026-09-14 — post-deploy live probe for `BST0327.WA`)
+
+`GET /equity/search/bst0327.wa` 404s and biznesradar is never called. Root cause:
+
+- openst search only tries `SEARCH_PROVIDERS = ["sec", "nasdaq", "cboe"]`
+  (`openst/src/openbb_client.py:17`); all three return "Results not found" for the bond → openst
+  `_cached_or_404` → 404.
+- cachest passes that through: `[not-found] 'http://openst…:8080/equity/search/bst0327.wa'
+  returned HTTP 404` → instruments search yields nothing.
+- biznesradar **cannot** serve search today: D77 wired it only into
+  `PRICE_PROVIDERS` (OHLCV). The plugin registers exactly one fetcher under the
+  `EquityHistorical` model key (`openbb_biznesradar/__init__.py`), so
+  `obb.equity.search(provider="biznesradar")` has no fetcher to dispatch to.
+- Downstream dead-end even with a search hit: the instruments detail fetch for the bond calls openst
+  quote/profile, which run
+  `QUOTE_PROVIDERS = ["fmp", "yfinance", "cboe"]` /
+  `PROFILE_PROVIDERS = ["fmp", "yfinance"]` — none resolve `BST0327.WA`. biznesradar only backs
+  `price.historical`.
+- biznesradar.pl surface (probed 2026-09-14): the bond resolves at
+  `/notowania/BST0327` (the D77 scraper hits it), but the public
+  `/szukaj?wartosc=BST0327` results page does **not** index by symbol — a search fetcher must probe
+  `/notowania/{symbol}` existence rather than rely on `/szukaj`.
+
+### Decision (2026-09-14)
+
+Build the **search + quote fallback** path (full flow), not search-only.
+
+### Steps
+
+- [x] **17.1** — biznesradar `EquitySearch` fetcher (`models/equity_search.py`):
+    - Input `q`; normalize → symbol (uppercase; keep `.WA`/`.TFI`/`.FIZ`).
+    - Probe `GET /notowania/{symbol}` (shared rate-limit helper from D77 scraper); 200 + expected
+      table ⇒ `[{name, symbol, cik: null}]` (name from page title / table header); 404/missing
+      table ⇒ `[]`.
+    - Register under OpenBB `EquitySearch` in `fetcher_dict`.
+- [x] **17.2** — append `"biznesradar"` to `SEARCH_PROVIDERS` (last). Unit tests: mock `httpx.get`
+  on `/notowania/{q}` 200 vs 404; openbb_client search-fallback test (sec/nasdaq/cboe empty →
+  biznesradar hit).
+- [x] **17.3** — biznesradar quote fetcher (`models/equity_quote.py`, OpenBB
+  `EquityQuote`): scrape today/last close + change/volume from `/notowania/{symbol}`
+  → `{symbol, name, price, change, change_percent, previous_close, day_high,
+  day_low, volume}` (fields used by `price.quote`); stub gracefully when the row is missing.
+  Register under `EquityQuote`.
+- [x] **17.4** — openst wiring: append `"biznesradar"` to `QUOTE_PROVIDERS`
+  (last) and, for full PL coverage, `PROFILE_PROVIDERS` (biznesradar
+  `EquityProfile` minimal: `{name, symbol, currency:"PLN"}` or empty list → fall through to existing
+  providers). openbb_client fallback tests for both.
+- [x] **17.5** — verify: openst compose suite (all pass) + plugin suite; cachest unchanged (same
+  routes, no new route needed); full compose stack smoke:
+  `curl /equity/search/bst0327.wa` → 200 with a search hit, then instruments
+  `/api/instruments/BST0327.WA` detail resolves via quote/profile fallback. Keep
+  `npm run test:stack` green.
+- [x] **17.6** — commit openst (+ plan), push `main`, wait for GHA image build, bump homelab
+  helmrelease, verify in cluster (search + detail for `BST0327.WA`).
+
+---
+
 ## 18. D78 — crypto via `openbb-crypto` extension in openst
 
 Proposal: [instruments-provider-module.md](proposals/instruments-provider-module.md) — D78 (2026-09-14).
@@ -1582,132 +1707,6 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ---
 
-## 20. Crypto search + asset-type labels (D78 gap-fix)
-
-Proposal: [instruments-provider-module.md](proposals/instruments-provider-module.md) — D78
-gap-fix (2026-09-15). Step 18 shipped only `/crypto/ohlcv/{pair}` + `/crypto/quote/{pair}`; the
-search/profile half of D78 (`openst /crypto/search/{query}` + `/crypto/profile/{pair}`) was
-skipped, so the SPA search could never surface a crypto pair.
-
-Scope (4 repos): openst (two routes + client fn), cachest (two routes), portfoliost-instruments
-(crypto search leg + `type: "CRYPTO"`), SPA — **no change needed**: the search modal already
-renders the `result.type` badge (`InstrumentSearchModal.vue:102`). Bonds: `BOND` type surfaces
-once D79 seeds `ticker_reference` (mapping added in step 20.5, no crypto-blocking).
-
-Verified live in cluster (2026-09-15, openst v1.1.16):
-- `obb.crypto.search("btc", provider="fmp")` works; **fmp-only** (yfinance/tiingo reject it);
-  `FMP_API_KEY` already in `openst-secrets`.
-- Rows are FMP-style pairs (`TBTCUSD`, `BTCBUSD`, …) — **not** the yfinance pairs
-  (`BTC-USD`) the OHLCV/quote routes accept. `fmp` OHLCV rejects `BTC-USD` (402); yfinance is
-  the pair authority. Search results therefore need symbol normalization in instruments.
-- `ticker_reference` has only `Stock` (45,210) + `ETF` (16,601) — no crypto rows. The SPA
-  placeholder already promises "crypto" (`InstrumentSearchModal.vue:74`).
-
-Rules: one step = one commit; a step is marked `[x]` only after its tests pass
-(unit + docker-compose level per openst and cachest CLAUDE.md; portfoliost build + vitest).
-
----
-
-### 20.1 — openst: `get_crypto_search` client function
-
-- [x] In `openst/src/openbb_client.py` add `get_crypto_search(query: str) -> list[dict]`,
-  fmp-only loop mirroring `search_equities` (rate-limit block, empty → continue → `[]`).
-- [x] Unit tests in `openst/tests/test_openbb_client.py`: monkeypatched `obb.crypto.search`
-  returns rows → pass-through; empty df → `[]`; rate-limited provider → blocked + next.
-- [x] Tests: openst full suite via `docker compose --profile test run --rm test`.
-- [x] Commit: `feat(openbb_client): crypto search client fn (fmp-only)`.
-
-### 20.2 — openst: `/crypto/search/{query}` + `/crypto/profile/{pair}` routes
-
-- [x] In `openst/src/main.py` add `GET /crypto/search/{query}` (mirror of `/equity/search`:
-  `_cached_or_404`, lowercase-normalized query) and `GET /crypto/profile/{pair}` (quote →
-  `{ symbol, name, currency }` from the two search/quote fields that exist; pair kept as-is).
-- [x] Route tests in `openst/tests/test_main.py`: search returns rows / 404 on empty; profile
-  maps quote fields / 404 on missing quote.
-- [x] Tests: full openst suite; compose-level smoke `curl /crypto/search/btc` → rows, second
-  call → `X-Cache: HIT`; `curl /crypto/profile/btc-usd` → 200.
-- [x] Commit: `feat(main): crypto search + profile routes (D78 gap-fix)`.
-
-### 20.3 — cachest: `OPENST_CRYPTO_SEARCH` + `OPENST_CRYPTO_PROFILE`
-
-- [x] `cachest/config.yaml`: `OPENST_CRYPTO_SEARCH` `/crypto/search/{query}` (TTL 7d — universe
-  changes rarely, matches `OPENST_SEARCH`) and `OPENST_CRYPTO_PROFILE` `/crypto/profile/{pair}`
-  (TTL 6h, matches `OPENST_CRYPTO_QUOTE`).
-- [x] Tests: `cachest/tests/test_config.py` gains an assertion per new route.
-- [x] Tests: full cachest suite via compose.
-- [x] Commit: `feat(config): OPENST_CRYPTO_SEARCH + OPENST_CRYPTO_PROFILE routes`.
-
-### 20.4 — openst standalone smoke
-
-- [x] `docker compose up -d redis openst`; single curls:
-  `/crypto/search/btc`, `/crypto/search/eth`, `/crypto/profile/BTC-USD` — rows + payload shape
-  recorded in the step result.
-- [x] Verify Redis cache: second `curl` each → `X-Cache: HIT`.
-- [x] Commit note: `chore: verify crypto search + profile smoke`.
-
-  **Observed 2026-09-15 (openst local build, host `:8081` — `8080` held by portfoliost-gateway):**
-  - `/crypto/search/btc` → 200, 30 rows, shape `{symbol, name, exchange, ico_date,
-    circulating_supply, total_supply}`; eth/ethereum/bitcoin/sol/ada/etc. also 200.
-  - `/crypto/search/eth` → **404**. Upstream anomaly: FMP returns a row with `ico_date=NaN` for
-    this query, and OpenBB `FMPCryptoSearchData` model validation rejects it → whole search
-    errors (→ honest 404). Typing `ETH` won't suggest via raw search; step 20.5's curated
-    base→pair map must cover `eth→ETH-USD`.
-  - `/crypto/profile/BTC-USD` → 200 `{"symbol":"BTC-USD","name":null,"currency":"USD"}`.
-  - Redis cache confirmed: `crypto_search:btc` + `crypto_profile:BTC-USD` keys present, second
-    curls served instantly (openst itself emits no `X-Cache` header — that's cachest 20.6).
-
-### 20.5 — instruments: crypto search leg + symbol normalization
-
-- [x] `portfoliost-instruments/src/adapters/cachest.ts`: add `fetchCryptoSearch(query)` →
-  `${BASE_URL}/crypto/search/${q}`.
-- [x] `portfoliost-instruments/src/adapters/symbol.ts` (or a new `crypto.ts`): normalize an FMP
-  row to a yfinance pair + display name. Curated primary map (base coin → pair, ≥ ~30 majors,
-  e.g. `btc→BTC-USD`, `eth→ETH-USD`, `sol→SOL-USD`) so typing `BTC`/`ETH` suggests the exact
-  pair; fallback heuristic drops FMP-wrap prefixes/`USD` and only emits `<BASE>-USD` when the
-  base parses as a bare coin mnemonic (no `tBTC`, `BTC.BUSD`, leveraged/wrapped variants).
-- [x] `src/routes/instruments.ts` `/search`: run crypto search alongside the existing tiers
-  (not as last-only fallback — equity search "btc" already returns BTCS Inc. etc., so crypto
-  must be additive), merge + de-dupe by symbol, type `"CRYPTO"` (source `"CRYPTO"`).
-- [x] `src/adapters/translate.ts`: `toSearchResponse`/new `toCryptoSearchResponse` emit
-  `type: "CRYPTO"`; widen `toReferenceSearchResponse` `assetType` mapping to emit `BOND`/`CRYPTO`
-  when present (D79-ready; ticker_reference still has none).
-- [x] Tests: unit tests for normalization (BTC → BTC-USD, wrapped `TBTCUSD` excluded, `BTCBUSD`
-  excluded) + route test: q=btc returns a merged list containing `BTC-USD` type CRYPTO.
-- [x] Tests: `npm run build` + `npm run test` in portfoliost-instruments.
-- [x] Commit: `feat(search): crypto leg + type CRYPTO with yfinance-pair normalization`.
-
-### 20.6 — full compose stack smoke
-
-- [x] In portfoliost compose, rebuild + run `redis openst cachest instruments`.
-- [x] Smoke through cachest: `curl "http://localhost:8090/crypto/search/btc"` MISS→HIT;
-  instruments `/api/instruments/search?q=btc` (via worked-upstream) contains `BTC-USD`/CRYPTO.
-- [x] Run `npm run test:stack` — existing contract checks stay green.
-- [x] Commit note: `chore: verify crypto search through full compose stack`.
-
-  **Verification (live, 2026-09-15):** rebuilt `openst cachest instruments` images in portfoliost
-  compose (`NODE_AUTH_TOKEN` set); cachest `/crypto/search/btc` → `x-cache: MISS` then `HIT`;
-  instruments `/api/instruments/search?q=btc` via gateway → 50 rows with 6 `CRYPTO`, `BTC-USD`
-  first (`type=CRYPTO`, `source=CRYPTO`); `q=eth` → `ETH-USD` first despite the upstream FMP NaN
-  `ico_date` rejection (curated suggestion). `npm run test:stack` → 32/32, upstream `real`. The
-  smoke exposed that the 50-row cap occluded the crypto leg behind the reference DB's "btc" name
-  flood — fixed by leading the merge with the curated crypto exact-pair
-  (`portfoliost-instruments` `f3b5f5b`).
-
-### 20.7 — closeout
-
-- [x] Update `docs/openst-coverage.md`: crypto **search** row (fmp-only, `/crypto/search/{query}`)
-  + note crypto search symbols normalize to yfinance pairs in instruments; keep date current.
-- [x] Archive this section to `plan-archive.md` once all steps are `[x]`.
-
-  **Result (2026-09-15):** `openst-coverage.md` gained the crypto **search** row
-  (`/crypto/search/{query}` via `crypto.search`, fmp-only) with the instruments
-  symbol-normalization note (curated 38-major map + bare-mnemonic fallback + leading
-  exact-pair suggestion) and the `ico_date=NaN` upstream anomaly note; coverage date already
-  2026-09-15. Open question resolved: search surfaces native pairs flagged `CRYPTO` via the
-  curated map, suggestion keeps `BTC-USD`/`ETH-USD` above the 50-row cap. All four repos
-  committed; section archived.
-
----
 ## 19. D79 — retail savings bonds: `openbb_obligacje` provider in openst
 
 Proposal: [instruments-provider-module.md](proposals/instruments-provider-module.md) — D79.
@@ -2074,6 +2073,133 @@ Smoke results through cachest :8090:
 ---
 
   **D79 — DONE (2026-09-16):** all steps verified through test:stack 32/32 + compose smoke; archived from plan.md.
+
+---
+
+## 20. Crypto search + asset-type labels (D78 gap-fix)
+
+Proposal: [instruments-provider-module.md](proposals/instruments-provider-module.md) — D78
+gap-fix (2026-09-15). Step 18 shipped only `/crypto/ohlcv/{pair}` + `/crypto/quote/{pair}`; the
+search/profile half of D78 (`openst /crypto/search/{query}` + `/crypto/profile/{pair}`) was
+skipped, so the SPA search could never surface a crypto pair.
+
+Scope (4 repos): openst (two routes + client fn), cachest (two routes), portfoliost-instruments
+(crypto search leg + `type: "CRYPTO"`), SPA — **no change needed**: the search modal already
+renders the `result.type` badge (`InstrumentSearchModal.vue:102`). Bonds: `BOND` type surfaces
+once D79 seeds `ticker_reference` (mapping added in step 20.5, no crypto-blocking).
+
+Verified live in cluster (2026-09-15, openst v1.1.16):
+- `obb.crypto.search("btc", provider="fmp")` works; **fmp-only** (yfinance/tiingo reject it);
+  `FMP_API_KEY` already in `openst-secrets`.
+- Rows are FMP-style pairs (`TBTCUSD`, `BTCBUSD`, …) — **not** the yfinance pairs
+  (`BTC-USD`) the OHLCV/quote routes accept. `fmp` OHLCV rejects `BTC-USD` (402); yfinance is
+  the pair authority. Search results therefore need symbol normalization in instruments.
+- `ticker_reference` has only `Stock` (45,210) + `ETF` (16,601) — no crypto rows. The SPA
+  placeholder already promises "crypto" (`InstrumentSearchModal.vue:74`).
+
+Rules: one step = one commit; a step is marked `[x]` only after its tests pass
+(unit + docker-compose level per openst and cachest CLAUDE.md; portfoliost build + vitest).
+
+---
+
+### 20.1 — openst: `get_crypto_search` client function
+
+- [x] In `openst/src/openbb_client.py` add `get_crypto_search(query: str) -> list[dict]`,
+  fmp-only loop mirroring `search_equities` (rate-limit block, empty → continue → `[]`).
+- [x] Unit tests in `openst/tests/test_openbb_client.py`: monkeypatched `obb.crypto.search`
+  returns rows → pass-through; empty df → `[]`; rate-limited provider → blocked + next.
+- [x] Tests: openst full suite via `docker compose --profile test run --rm test`.
+- [x] Commit: `feat(openbb_client): crypto search client fn (fmp-only)`.
+
+### 20.2 — openst: `/crypto/search/{query}` + `/crypto/profile/{pair}` routes
+
+- [x] In `openst/src/main.py` add `GET /crypto/search/{query}` (mirror of `/equity/search`:
+  `_cached_or_404`, lowercase-normalized query) and `GET /crypto/profile/{pair}` (quote →
+  `{ symbol, name, currency }` from the two search/quote fields that exist; pair kept as-is).
+- [x] Route tests in `openst/tests/test_main.py`: search returns rows / 404 on empty; profile
+  maps quote fields / 404 on missing quote.
+- [x] Tests: full openst suite; compose-level smoke `curl /crypto/search/btc` → rows, second
+  call → `X-Cache: HIT`; `curl /crypto/profile/btc-usd` → 200.
+- [x] Commit: `feat(main): crypto search + profile routes (D78 gap-fix)`.
+
+### 20.3 — cachest: `OPENST_CRYPTO_SEARCH` + `OPENST_CRYPTO_PROFILE`
+
+- [x] `cachest/config.yaml`: `OPENST_CRYPTO_SEARCH` `/crypto/search/{query}` (TTL 7d — universe
+  changes rarely, matches `OPENST_SEARCH`) and `OPENST_CRYPTO_PROFILE` `/crypto/profile/{pair}`
+  (TTL 6h, matches `OPENST_CRYPTO_QUOTE`).
+- [x] Tests: `cachest/tests/test_config.py` gains an assertion per new route.
+- [x] Tests: full cachest suite via compose.
+- [x] Commit: `feat(config): OPENST_CRYPTO_SEARCH + OPENST_CRYPTO_PROFILE routes`.
+
+### 20.4 — openst standalone smoke
+
+- [x] `docker compose up -d redis openst`; single curls:
+  `/crypto/search/btc`, `/crypto/search/eth`, `/crypto/profile/BTC-USD` — rows + payload shape
+  recorded in the step result.
+- [x] Verify Redis cache: second `curl` each → `X-Cache: HIT`.
+- [x] Commit note: `chore: verify crypto search + profile smoke`.
+
+  **Observed 2026-09-15 (openst local build, host `:8081` — `8080` held by portfoliost-gateway):**
+  - `/crypto/search/btc` → 200, 30 rows, shape `{symbol, name, exchange, ico_date,
+    circulating_supply, total_supply}`; eth/ethereum/bitcoin/sol/ada/etc. also 200.
+  - `/crypto/search/eth` → **404**. Upstream anomaly: FMP returns a row with `ico_date=NaN` for
+    this query, and OpenBB `FMPCryptoSearchData` model validation rejects it → whole search
+    errors (→ honest 404). Typing `ETH` won't suggest via raw search; step 20.5's curated
+    base→pair map must cover `eth→ETH-USD`.
+  - `/crypto/profile/BTC-USD` → 200 `{"symbol":"BTC-USD","name":null,"currency":"USD"}`.
+  - Redis cache confirmed: `crypto_search:btc` + `crypto_profile:BTC-USD` keys present, second
+    curls served instantly (openst itself emits no `X-Cache` header — that's cachest 20.6).
+
+### 20.5 — instruments: crypto search leg + symbol normalization
+
+- [x] `portfoliost-instruments/src/adapters/cachest.ts`: add `fetchCryptoSearch(query)` →
+  `${BASE_URL}/crypto/search/${q}`.
+- [x] `portfoliost-instruments/src/adapters/symbol.ts` (or a new `crypto.ts`): normalize an FMP
+  row to a yfinance pair + display name. Curated primary map (base coin → pair, ≥ ~30 majors,
+  e.g. `btc→BTC-USD`, `eth→ETH-USD`, `sol→SOL-USD`) so typing `BTC`/`ETH` suggests the exact
+  pair; fallback heuristic drops FMP-wrap prefixes/`USD` and only emits `<BASE>-USD` when the
+  base parses as a bare coin mnemonic (no `tBTC`, `BTC.BUSD`, leveraged/wrapped variants).
+- [x] `src/routes/instruments.ts` `/search`: run crypto search alongside the existing tiers
+  (not as last-only fallback — equity search "btc" already returns BTCS Inc. etc., so crypto
+  must be additive), merge + de-dupe by symbol, type `"CRYPTO"` (source `"CRYPTO"`).
+- [x] `src/adapters/translate.ts`: `toSearchResponse`/new `toCryptoSearchResponse` emit
+  `type: "CRYPTO"`; widen `toReferenceSearchResponse` `assetType` mapping to emit `BOND`/`CRYPTO`
+  when present (D79-ready; ticker_reference still has none).
+- [x] Tests: unit tests for normalization (BTC → BTC-USD, wrapped `TBTCUSD` excluded, `BTCBUSD`
+  excluded) + route test: q=btc returns a merged list containing `BTC-USD` type CRYPTO.
+- [x] Tests: `npm run build` + `npm run test` in portfoliost-instruments.
+- [x] Commit: `feat(search): crypto leg + type CRYPTO with yfinance-pair normalization`.
+
+### 20.6 — full compose stack smoke
+
+- [x] In portfoliost compose, rebuild + run `redis openst cachest instruments`.
+- [x] Smoke through cachest: `curl "http://localhost:8090/crypto/search/btc"` MISS→HIT;
+  instruments `/api/instruments/search?q=btc` (via worked-upstream) contains `BTC-USD`/CRYPTO.
+- [x] Run `npm run test:stack` — existing contract checks stay green.
+- [x] Commit note: `chore: verify crypto search through full compose stack`.
+
+  **Verification (live, 2026-09-15):** rebuilt `openst cachest instruments` images in portfoliost
+  compose (`NODE_AUTH_TOKEN` set); cachest `/crypto/search/btc` → `x-cache: MISS` then `HIT`;
+  instruments `/api/instruments/search?q=btc` via gateway → 50 rows with 6 `CRYPTO`, `BTC-USD`
+  first (`type=CRYPTO`, `source=CRYPTO`); `q=eth` → `ETH-USD` first despite the upstream FMP NaN
+  `ico_date` rejection (curated suggestion). `npm run test:stack` → 32/32, upstream `real`. The
+  smoke exposed that the 50-row cap occluded the crypto leg behind the reference DB's "btc" name
+  flood — fixed by leading the merge with the curated crypto exact-pair
+  (`portfoliost-instruments` `f3b5f5b`).
+
+### 20.7 — closeout
+
+- [x] Update `docs/openst-coverage.md`: crypto **search** row (fmp-only, `/crypto/search/{query}`)
+  + note crypto search symbols normalize to yfinance pairs in instruments; keep date current.
+- [x] Archive this section to `plan-archive.md` once all steps are `[x]`.
+
+  **Result (2026-09-15):** `openst-coverage.md` gained the crypto **search** row
+  (`/crypto/search/{query}` via `crypto.search`, fmp-only) with the instruments
+  symbol-normalization note (curated 38-major map + bare-mnemonic fallback + leading
+  exact-pair suggestion) and the `ico_date=NaN` upstream anomaly note; coverage date already
+  2026-09-15. Open question resolved: search surfaces native pairs flagged `CRYPTO` via the
+  curated map, suggestion keeps `BTC-USD`/`ETH-USD` above the 50-row cap. All four repos
+  committed; section archived.
 
 ---
 
@@ -3188,8 +3314,6 @@ Zero console errors on the topology page.
 
 ---
 
----
-
 ## 27. Force-recompute buttons on charts + reusable chart components
 
 Investigation (2026-09-19) — after a full sheets re-import, some portfolios/wallets
@@ -3363,6 +3487,8 @@ build against `@marx2/contracts`.
 - [x] Archive to `plan-archive.md`.
 - [x] Commit: `chore: charts recompute closeout`.
 
+---
+
 ## 28. Google Sheets import: venue-correct symbols + real country/sector (D24 follow-up)
 
 Proposal: [google-sheets-sync.md](proposals/google-sheets-sync.md) — fix two defects
@@ -3531,3 +3657,442 @@ both build against it.
 - [x] Update `AGENTS.md`/KB if the sync-surface notes need refreshing.
 - [x] Archive §28 into `plan-archive.md`.
 - [x] Commit: `chore: D24 follow-up closeout (venue symbols + country/sector)`.
+
+---
+
+## 29. Portfolio analytics — price data warehouse + value snapshots
+
+Proposal: [price-data-architecture.md](proposals/price-data-architecture.md).
+
+Architecture summary:
+
+- `portfoliost-instruments` gains multiple foreign tables (`stooq_daily_us/pl/world`) via
+  `postgres_fdw` pointing at the existing `stooq` DB on the same Postgres instance.
+- `instruments.price_bars` stores overflow prices (recent tail + symbols not in stooq).
+- `instruments.price_bars_all` VIEW unifies stooq foreign tables + overflow in one SQL call.
+- `instruments.price_bar_metadata` tracks circuit-breaker state per symbol.
+- Split detection tables (`split_candidates`, `split_adjustments`) handle stooq/overflow boundary discontinuities.
+- `value_snapshots` in `portfoliost-wallets` (migration already done — 0 rows) feeds the analytics endpoint.
+
+### 29.1 — price_bars schema, foreign tables, and unified view — [x] DONE
+
+In `portfoliost-instruments`, add to `instruments` schema via Drizzle migration:
+
+- [x] Migration 0003: `price_bars`, `price_bar_metadata`, `split_candidates`, `split_adjustments`.
+- [x] Guarded `price_bars_all` view over all eight stooq daily datasets + overflow.
+- [x] homelab `pfire-init-sql` ConfigMap wired into `postgrescluster-pfire.yaml` (8 FDW foreign tables).
+- [x] docker-compose `pricebars-sim` one-shot (post_fdw stand-in, self-verifies the view).
+- [x] Unit tests (`src/db/price-bars.test.ts`) + build + 91 tests green.
+- [x] Released to prod: `portfoliost-instruments` v1.0.17 (CI → ghcr + tag/release), helmrelease v1.0.16→v1.0.17, Flux reconciled, rollout complete.
+- [x] Prod verified: migration 0003 applied, view created over foreign tables, FDW pushdown query returns rows (AAPL 10,577).
+
+In the `instruments` schema:
+
+**`instruments.price_bars`** — overflow table (recent tail + symbols not in stooq):
+```sql
+CREATE TABLE instruments.price_bars (
+  symbol   TEXT         NOT NULL,   -- system format: AAPL, KRU.WA, RHM.DE
+  date     DATE         NOT NULL,
+  close    NUMERIC(28,8) NOT NULL,
+  source   TEXT         NOT NULL DEFAULT 'openst',
+  PRIMARY KEY (symbol, date)
+);
+```
+
+**`instruments.price_bar_metadata`** — circuit breaker per symbol:
+```sql
+CREATE TABLE instruments.price_bar_metadata (
+  symbol          TEXT PRIMARY KEY,
+  last_fetched_at TIMESTAMPTZ,
+  fetch_status    TEXT NOT NULL DEFAULT 'ok'  -- 'ok' | 'failed'
+);
+```
+
+**`instruments.split_candidates`** and **`instruments.split_adjustments`** — split detection workflow:
+```sql
+CREATE TABLE instruments.split_candidates (
+  symbol               TEXT         NOT NULL,
+  detected_at          DATE         NOT NULL,
+  last_stooq_date      DATE,
+  last_stooq_close     NUMERIC(28,8),
+  first_overflow_date  DATE,
+  first_overflow_close NUMERIC(28,8),
+  ratio                NUMERIC(10,6),
+  suggested_factor     NUMERIC(10,6),
+  suggested_ratio      TEXT,
+  status               TEXT         NOT NULL DEFAULT 'pending',
+  reviewed_at          TIMESTAMPTZ,
+  reviewed_by          TEXT,
+  PRIMARY KEY (symbol, detected_at)
+);
+
+CREATE TABLE instruments.split_adjustments (
+  symbol       TEXT         NOT NULL,
+  detected_at  DATE         NOT NULL,
+  factor       NUMERIC(10,6) NOT NULL,
+  split_ratio  TEXT,
+  PRIMARY KEY (symbol, detected_at)
+);
+```
+
+**postgres_fdw setup** — homelab `databaseInitSQL` ConfigMap (`pfire-init-sql`) wired into `postgrescluster-pfire.yaml`:
+- Install `postgres_fdw` extension in `portfoliost` DB.
+- Create `stooq_server` pointing at `stooq` DB on `localhost`.
+- Create user mapping for `portfoliost` role.
+- Create foreign tables for **all eight stooq daily datasets**: `daily_us`, `daily_pl`, `daily_jp`, `daily_world`, `daily_uk`, `daily_hk`, `daily_hu`, `daily_macro` (as `instruments.stooq_daily_*`).
+- All `IF NOT EXISTS` — idempotent on cluster bootstrap / pod restart.
+
+**`instruments.price_bars_all`** VIEW — unifies all sources (created *guarded* in migration 0003, so no plain local stooq tables are created in prod to collide with the FDW foreign tables):
+- `stooq_daily_us`: `replace(ticker, '.US', '')` as symbol, split adjustment applied via LEFT JOIN on `split_adjustments`.
+- `stooq_daily_pl`, `stooq_daily_uk`, `stooq_daily_jp`, `stooq_daily_hk`, `stooq_daily_hu`, `stooq_daily_world`, `stooq_daily_macro`: ticker passthrough (exact mapping TBC after import).
+- `price_bars` overflow: direct.
+
+**docker-compose simulation** — postgres_fdw is unavailable locally, so the `pricebars-sim` one-shot service (idempotent, post-migration) creates plain stand-in `stooq_daily_*` tables + the same view, seeds a few rows, and self-verifies the view unifies US (split-adjusted), world (passthrough) and overflow rows. PGlite unit tests use the same stand-in DDL (`src/db/price-bars.ts`).
+
+Unit test (`src/db/price-bars.test.ts`): schema compiles, upsert into `price_bars` is idempotent, VIEW returns rows from both stooq + overflow sources, split-adjusted close applied.
+
+**Performance note** — the single-view read approach is kept (no per-ticker table routing yet); a candidate optimization (ticker-routed single-table reads) is documented at the end of `docs/proposals/price-data-architecture.md` to re-evaluate if the real imported data is too slow.
+
+### 29.2 — price history read endpoint — [x] DONE
+
+`GET /api/instruments/:symbol/price-bars?from=YYYY-MM-DD&to=YYYY-MM-DD`
+
+- [x] Wire route `GET /api/instruments/:symbol/price-bars`.
+- [x] Query `price_bars_all` for range; detect gap (`MAX(date)` vs today > 3 days).
+- [x] Circuit breaker via `price_bar_metadata` (failed + >1h → serve stale with `{ stale: true }`).
+- [x] Fetch missing days from cachest → openst via `fetchOhlcv`, upsert into `price_bars`, update `price_bar_metadata`.
+- [x] Split boundary check on first overflow write.
+- [x] Return complete series incl. `stale` flag.
+- [x] Contract-typed response against `@marx2/contracts` (`PriceBarSeries` schema, `@marx2/contracts@1.6.3`).
+- [x] Unit tests: `src/services/price-bars.test.ts` — 8 tests (queryView, hasGap, recentlyFailed, fresh series, gap fill + upsert, circuit breaker, split detection, no-action on continuous boundary). 99 instruments tests green.
+- [x] docker-compose verification: endpoint verified live (AAPL split-adjusted series returned, stale=true on cachest miss). e2e spec `tests/e2e/price-bars.spec.ts` (3 tests: valid series, 401 no auth, 400 bad params). Full playwright suite 27 passed, 1 skipped.
+
+Logic:
+1. Query `price_bars_all` for requested range (one SQL call — covers stooq + overflow).
+2. Find `MAX(date)` for symbol in result. If `today - MAX(date) > 3 days`: gap exists.
+3. Check `price_bar_metadata.fetch_status` — if `'failed'` and `last_fetched_at > 1h ago`: return what we have with `{ stale: true }`.
+4. Fetch missing days from cachest → openst via existing `fetchOhlcv(symbol, start, end)`.
+5. Upsert fetched rows into `price_bars`. Update `price_bar_metadata`.
+6. If this is the **first overflow write for this symbol** (`SELECT MIN(date) FROM price_bars WHERE symbol = ?` = today): run split boundary check (compare last stooq close vs first overflow close, insert into `split_candidates` if ratio matches a known split factor ±3% or is outside 0.85–1.15).
+7. Return complete series. Include `{ stale: boolean }`.
+
+Ticker routing (via `exchange_reference` + `ticker_reference` — no hardcoded mapping):
+- US symbol (NASDAQ/NYSE) → stooq `daily_us`, ticker format `AAPL.US`
+- Polish symbol (WSE) → stooq `daily_pl`, format TBC
+- German/other → stooq `daily_world`, format TBC
+
+### 29.3 — passive write-through from existing quote/history fetches — [x] DONE
+
+- [x] `backgroundUpsertBars(db, symbol, rows)` added to `src/services/price-bars.ts` — fire-and-forget, errors swallowed, invalid rows filtered.
+- [x] Hooked into `/:symbol/history` after `fetchOhlcv` returns rows (11-year daily window).
+- [x] Hooked into `/:symbol/price?date=` after `fetchOhlcv` returns rows.
+- [x] 3 unit tests: persists bars, idempotent update, silently skips invalid rows. 102 instruments tests green.
+
+### 29.4 — snapshot-on-read in refreshQuotes — [x] DONE
+
+- [x] `snapshotPortfolioValue(db, portfolioId, liveValues, now)` added to `src/services/quotes.ts` — computes `Σ marketValue × fx` and `Σ (avg × qty) × fx`; upserts into `value_snapshots` ON CONFLICT DO UPDATE.
+- [x] Called fire-and-forget (`void ... .catch(() => undefined)`) at the end of `refreshQuotes`, using live `marketValue` collected during the per-position loop (not stale DB rows).
+- [x] Falls back to `rate=1` when FX table unavailable or pair missing.
+- [x] 3 unit tests: correct sums, idempotent upsert, full `refreshQuotes` integration (snapshot row written after quote persist). 144 wallets tests green.
+
+### 29.5 — backfill job: historical value_snapshots — [x] DONE
+
+- [x] `portfolio_backfill_metadata` table added to schema + migration `0002_square_sunspot.sql`.
+- [x] `src/services/backfill.ts`: `runBackfill()` — queries MIN(executed_at), builds daily qty_held from BUY/SELL, fetches price series per symbol via instruments `GET /price-bars`, carry-forward on gaps, bulk-upserts `value_snapshots` in chunks of 100; `getBackfillStatus()`; `toDateStr()` normalises PGlite Date/string timestamps.
+- [x] `GET /:id/analytics` replaced stub: < 2 snapshot rows → trigger backfill void + return `{backfillStatus:"pending"}`; otherwise read snapshots filtered by timeframe (6M/1Y/2Y/ALL), compute totalValue/totalReturn/monthlyReturns, return full series.
+- [x] 10 unit tests: calendarDays, buildPriceMap carry-forward, single-symbol upsert, weekend carry, idempotency, status transitions. 154 wallets tests green.
+
+### 29.6 — wire GET /:id/analytics — [x] DONE
+
+- [x] Analytics stub replaced in `portfoliost-wallets/src/routes/portfolios.ts`: backfill trigger + snapshot read + timeframe filter (6M/1Y/2Y/ALL) + monthlyReturns + backfillStatus. (Implemented as part of step 29.5.)
+
+### 29.7 — frontend: polling + loading banner — [x] DONE
+
+- [x] `@marx2/contracts@1.6.4`: `backfillStatus` + `timeframe` added to `PortfolioAnalytics`; SPA types regenerated.
+- [x] `PortfolioCard.vue`: `backfillPending` ref + `startPolling()`/`stopPolling()` — polls every 5s, stops on `complete` or after 5 min; banner shown while pending; `onUnmounted` cleanup.
+- [x] `PortfolioPerformanceTab.vue`: same polling via `getPortfolioAnalytics` → `store.analytics`; banner below Performance Chart.
+- [x] Both render existing `timeSeries` immediately; build green; 164 mock tests pass.
+
+### 29.8 — tests — [x] DONE
+
+`portfoliost-instruments`:
+- [x] `src/services/price-bars.test.ts` extended: `stooqTickerFor` (bare, suffix, lowercase), `ohlcvToClose` (valid, index fallback, bad date, NaN close), `matchSplitFactor` (2:1, 4:1, reverse, ambiguous, continuous), `checkSplitBoundary` ambiguous ratio → `suggested_factor=NULL`, continuous → no candidate, carry-forward view gap behaviour. 123 tests total green.
+- [x] `src/services/price-bars-stooq.test.ts` (new): VIEW routing — US `.US` suffix stripped, PL/world passthrough, split_adjustments factor applied, overflow unified, split NOT applied to overflow rows. 10 test files, 123 tests green.
+
+`portfoliost-wallets`:
+- [x] `src/services/snapshots.test.ts` (new): today snapshot 2 USD positions, multi-currency PLN/EUR via EUR-base fxRates, empty portfolio → value=0, backfill 3 positions × 10 days correct daily values, empty transactions → 0 snapshots, 6M timeframe filter. 17 test files, 160 tests green.
+
+### 29.9 — post-import hook + admin Market Data tab — [x] DONE
+
+**Post-import hook** `POST /internal/stooq-imported` on instruments:
+- [x] `src/services/stooq-import-hook.ts`: `runPostImportHook()` — MAX(date) from stooq table, deletes superseded `price_bars` overflow rows, deletes `split_adjustments`, auto-dismisses `split_candidates`, writes `latestDate`/`rowsDeleted` to `admin.job_run`.
+- [x] Route registered in `src/index.ts`; called fire-and-forget from admin job poller on `Succeeded` transition.
+- [x] 6 unit tests: dataset/table mapping, US rows deleted + kept, split_candidates dismissed, empty table returns null, PL passthrough. 129 instruments tests green.
+
+**Admin market-data endpoints** (new `src/market-data.ts` in portfoliost-admin):
+- [x] `GET /api/admin/market-data/split-candidates` — pending first, history collapsed.
+- [x] `POST /api/admin/market-data/split-candidates/:symbol/apply` — inserts `split_adjustments`, marks applied.
+- [x] `POST /api/admin/market-data/split-candidates/:symbol/dismiss` — marks dismissed.
+- [x] `GET /api/admin/market-data/overflow-summary` — total + top-10 symbols.
+- [x] Wired via `registerMarketDataRoutes(admin)` + `setMarketDataDb(db)` in server.ts.
+
+**SPA: Admin Market Data tab**:
+- [x] `@marx2/contracts@1.6.5`: `SplitCandidate`, `OverflowSummary` schemas + 4 market-data paths + stooq-imported hook path.
+- [x] `src/api/admin.ts`: `fetchSplitCandidates`, `applySplitCandidate`, `dismissSplitCandidate`, `fetchOverflowSummary`, `fetchStooqImportLog`.
+- [x] `src/modules/admin/MarketDataView.vue`: Stooq datasets panel, split candidates panel (Apply/Dismiss actions + custom factor input + history section), overflow summary table.
+- [x] Route `admin-market-data` + nav link "Market Data" in AdminLayout. Build green; 164 mock tests pass.
+
+---
+
+## 30. Portfolio analytics — performance, risk, derived content, cluster
+
+Proposal: [benchmarks.md](proposals/benchmarks.md) (D46–D50).
+
+### 30.1 — Shared series/returns service — [x] DONE
+
+- [x] `returnColumns.ts` (`buildTwr`, `buildMwr`, `buildSimple`, `buildMonthlyReturns`) — flow-aware TWR chain-link, XIRR/MWR, simple indexed return.
+- [x] `cashFlows.ts` (`dailyNetCashFlows`) — BUY/SELL daily net flow with FX conversion; DIVIDEND excluded.
+- [x] Annualized daily log-return volatility (√252 × stddev) computed per benchmark series in `buildBenchmarkSeries`.
+- [x] `recomputeReturnColumns` called after every snapshot write / recalc.
+
+### 30.2 — Enhanced analytics endpoint — [x] DONE
+
+- [x] `GET /:id/analytics` serves contract-typed `cumulativeTwr` / `cumulativeMwr` / `cumulativeSimple` per snapshot point + `benchmarks[]` (D47/D48).
+- [x] Benchmark lines: **transaction-mirroring** (D50) — portfolio cash flows replayed into the benchmark instrument; `buildBenchmarkSeries` in `services/backfill.ts`.
+- [x] `benchmarkCalcType` query param threaded through; unknown tickers dropped (never 4xx).
+- [x] `timeframeCutoff` exported; handles `1W` (days), `1M`/`3M`/`6M`/`1Y`/`2Y` (calendar), `ALL`.
+- [x] Contract updated (`@marx2/contracts` v1.6.7–1.6.9): `returnPercent`/`volatility` on benchmark items, `cumulativeMwr`/`cumulativeTwr` on perf points, `1W` added to timeframe enum.
+- [x] Unit tests in `src/routes/analytics.test.ts` (10 tests).
+
+### 30.3 — SPA: Customize dialog + return-type selector — [x] DONE
+
+- [x] `PortfolioPerformanceTab.vue`: **Customize** (Chart controls) dialog — standard benchmark picker (SPY/QQQ/DIA/IWM/VTI/EFA/AGG) + **Add Custom Benchmark** via instrument search component; **Return Type** selector (MWR/TWR/Simple); `setReturnType` refetches on change; backfill-poll refetch keeps `benchmarks` param.
+- [x] Phantom "Benchmark" legend line removed.
+- [x] `PortfolioAnalyticsTimeframe` union extended to `"1W"|"1M"|"3M"|"6M"|"1Y"|"2Y"|"ALL"` (7 buttons in `PortfolioPerformanceTab.vue` + `PortfolioCard.vue`).
+- [x] Y-axis labelled `"Index (start = 100)"` with `v.toFixed(2)` formatter; tooltip updated.
+- [x] Monthly Returns bar chart: flow-adjusted month-over-month TWR, `%`-formatted axes.
+- [x] Chart heights pinned (equity 300 / Returns 220).
+- [x] Mock: `ANALYTICS_BY_TIMEFRAME` + `EMPTY_BY_TIMEFRAME` extended for 1W/1M/3M; mock-test loop covers all 7 timeframes (169 tests).
+
+### 30.4 — Background history recalc queue — [x] DONE
+
+- [x] `services/recalc-queue.ts`: per-portfolio debounce+coalescing queue (`RECALC_GRACE_MS` 3000 ms), AbortController kill+restart, livelock valve (MAX_RESTARTS=10 → fallback timer), `__resetRecalcQueueForTests`.
+- [x] `recalcPortfolioHistory` + `computeSnapshotBatch` in `services/backfill.ts`: abort-aware, atomic DELETE+INSERT (replace semantics — clears on no BUY/SELL).
+- [x] `notifyTransactionsChanged` wired into POST/PATCH/DELETE `/:id/transactions` + POST/DELETE `/:id/positions`.
+- [x] Tests: `services/recalc-queue.test.ts` (coalescing, kill+restart, per-portfolio independence), `services/backfill.test.ts` (replace/clear/abort-never-writes). Full suite 178 pass.
+
+### 30.5 — Tests — [x] DONE
+
+- [x] `analytics.test.ts` (10 tests: timeframe cutoffs 1W/1M/3M/6M/1Y/2Y/ALL, benchmark series, no-ticker returns `[]`, drop unknown ticker).
+- [x] `recalc-queue.test.ts` + `backfill.test.ts` (see 30.4 above).
+- [x] SPA 125 unit + 169 mock tests green; wallets 178 tests green.
+
+### 30.6 — Risk metrics endpoint — [x] DONE
+
+- [x] `GET /:id/risk-metrics`: maxDrawdown / sharpe / sortino / calmar / win-rate (volatility already computed in benchmark series — reuse).
+- [x] `src/services/riskMetrics.ts`: pure functions — `maxDrawdown`, `annualizedVolatility`, `sharpeRatio`, `sortinoRatio` (fallback to Sharpe on all-positive days), `calmarRatio`, `winRate`, `annualizedReturn`, `periodReturnPercent`, `annualizedReturnWithheldReason`, `computeRiskMetrics`.
+- [x] Route in `portfoliost-wallets/src/routes/portfolios.ts`: ownership check, timeframe-filtered snapshot query, contract-typed response (`PortfolioRiskMetrics`).
+- [x] `src/services/riskMetrics.test.ts` (40 tests) + `src/routes/risk-metrics.test.ts` (9 tests). 227 wallets tests green; build green.
+
+### 30.7 — Risk tests
+- [ ] Withholding-rule and empty-history tests.
+
+### 30.8 — Dividends composition
+- [ ] Dividends composition within holding windows.
+
+### 30.9 — Calendar composition
+- [ ] Calendar composition.
+
+### 30.10 — Compare enrichment
+- [ ] Compare enrichment from instruments metrics.
+
+### 30.11 — Summary-metrics / income source switch
+- [ ] Wire "Based on" sub-option (External Capital vs Cost Basis) for non-TWR modes (deferred per D49).
+- [ ] Positions selector narrowing — pass position subset to backend analytic series (deferred per D49).
+
+### 30.12 — Cluster cutover
+- [ ] Homelab ingress paths → `portfoliost-wallets:3000`.
+- [ ] Separated snapshot Kubernetes Jobs (D11 job-pod pattern, not in-process scheduler).
+
+### 30.13 — Live verification
+- [ ] `/__meta`, CRUD + analytics through host; e2e green.
+
+### 30.14 — Closeout
+- [ ] plan/proposal status marks; retire `mocks/portfolios/index.js`; docs sweep.
+
+---
+
+## 31. Labels (proposal `docs/proposals/labels.md`, D65–D72)
+
+- [x] **31.1 Contract** — `Label`/`LabelInput`/`SetLabelsRequest` schemas + `labels` arrays on `Position`/`Transaction`/`CashTransaction`/`RecentCashTransaction` + 7 endpoints (GET/POST `/labels`, PATCH/DELETE `/labels/{id}`, POST set-labels for position/portfolio-tx/wallet-tx) + `labels` query param on 4 listing endpoints in `openapi.yaml`. Published `@marx2/contracts@1.6.10` (commit `cedfbd8`). Installed in wallets + regenerated `api-types.d.ts`.
+- [x] **31.2 Backend: migration** — `labels`, `position_labels`, `transaction_labels`, `wallet_transaction_labels` tables + indexes in `src/db/schema.ts`; `drizzle/0004_silky_gorgon.sql`; fixed stale snapshot chain (commit `48c8017`).
+- [x] **31.3 Backend: labels CRUD** — `src/routes/labels.ts` GET/POST/PATCH/DELETE `/labels` with zod validation, 409 on duplicate name, 404 on foreign label (D24 scoping), `nextPaletteColor()` auto-assign (D66).
+- [x] **31.4 Backend: set-labels + serialization** — `src/routes/position-labels.ts`, `transaction-labels.ts`, `wallet-transaction-labels.ts` (replace semantics, D67/D68); shared `src/services/labels.ts`; serialize `labels` in `positionWire`/`serializeTx` (portfolio-transactions), `history.ts` wallet-tx/recent-transactions serializers, `transactions.ts` `serializeTx` (`labels: []`).
+- [x] **31.5 Backend: filtering** — `?labels=` comma-separated AND filter (entity must have all labels) wired into portfolio-transactions (positions + tx + cross-portfolio), history.ts (wallet-tx + recent-transactions) via shared `attachLabelCondition`/`entityIdsWithAllLabels`.
+- [x] **31.6 Backend: tests** — `src/routes/labels.test.ts` (19 tests): CRUD + palette wrapping, unique-name 409 (fixed PGlite `err.cause` detection), D24 scoping 404s, replace semantics on all three entity types, alphabetical sorting, AND filtering. 246 wallets tests green.
+- [x] **31.7 SPA: contract types** — install bumped `@marx2/contracts`, run `gen:types`.
+- [x] **31.8 SPA: labelColors utility** — shared palette mapping (hex to Tailwind class pairs).
+- [x] **31.9 SPA: LabelBadge component** — shared badge component with `+N` overflow.
+- [x] **31.10 SPA: LabelManager dialog** — CRUD UI for labels.
+- [x] **31.11 SPA: set-label popover** — per-row label assignment in holdings + transactions + cash-transactions tables.
+- [x] **31.12 SPA: label filter** — multi-select chip filter in `PortfolioHoldingsTab` + `TransactionsTable` + `CashTransactionsView`.
+- [x] **31.13 SPA: tests** — vitest unit tests for components + Playwright e2e for full flow.
+- [x] **31.14 Integration test** — docker-compose end-to-end: create label → assign to position/transaction/cash-transaction → verify filter.
+
+---
+
+## 32. Portfolio-card sparkline: period buttons "don't work" (investigation)
+
+## Symptom
+
+The small performance chart on the main page (`src/modules/portfolios/PortfolioCard.vue`) never renders — it stays on "Loading chart... / Historical data is loading" regardless of the period button clicked (`1W/1M/3M/6M/1Y/2Y/ALL`). The full chart in `PortfolioPerformanceTab.vue` is affected the same way (shows "No analytics available") — it only appears to "work" because its buttons/state react; the chart itself is empty too.
+
+## What the buttons actually do (verified live)
+
+- The card's `@click.stop` on the button row (line 257) does prevent the click from bubbling to the card's `goToDetail` — no navigation happens.
+- `changeTimeframe()` (line 92) sets the local `timeframe` ref and calls `loadChart()` → `getPortfolioAnalytics(id, timeframe)`.
+- Network shows the correct per-period requests fire, e.g. `?timeframe=6M` then after clicking `1W` → `?timeframe=1W`. The active-button highlight (`bg-blue-50 text-blue-700`) also updates.
+- So the frontend is fine; the chart is empty because the backend always returns:
+  `{"timeframe":"1W","backfillStatus":"pending","performance":{"timeSeries":[]},...}`.
+
+## Backend root cause
+
+`/api/portfolios/:id/analytics` is served by **`portfoliost-wallets`** (gateway `API_PORTFOLIOS_URL=http://wallets:3000`), not the example-service-mock. In `src/routes/portfolios.ts` the endpoint returns "pending + empty" when `value_snapshots` has < 2 rows and triggers a fire-and-forget backfill (`src/services/backfill.ts` `runBackfill`).
+
+The backfill **computes** a full daily series but the bulk INSERT **fails**. From `portfolios.portfolio_backfill_metadata.error_message`:
+
+```
+Failed query: insert into "portfolios"."value_snapshots"
+("portfolio_id","snapshot_date","value","invested","net_flow",
+ "cumulative_twr","cumulative_mwr","cumulative_simple") ...
+```
+
+The running DB's `value_snapshots` table has only 5 columns (`portfolio_id, snapshot_date, value, invested, net_flow`) — the 3 return-type columns from migration `0003_return_columns.sql` are missing:
+
+```sql
+ALTER TABLE "portfolios"."value_snapshots" ADD COLUMN "cumulative_twr" numeric(20, 8);
+ALTER TABLE "portfolios"."value_snapshots" ADD COLUMN "cumulative_mwr" numeric(20, 8);
+ALTER TABLE "portfolios"."value_snapshots" ADD COLUMN "cumulative_simple" numeric(20, 8);
+```
+
+## Why migration 0003 was skipped (drizzle ordering bug)
+
+`drizzle/meta/_journal.json` entry `idx: 3` (`0003_return_columns`) has `when: 1757060000000` (≈ Sep 2025) while `0004_silky_gorgon` has `when: 1788717226995`. In `drizzle-orm/pg-core/dialect.cjs` the migrator applies a migration only when:
+
+```js
+if (!lastDbMigration || Number(lastDbMigration.created_at) < migration.folderMillis) { ... }
+```
+
+`lastDbMigration` is picked by `order by created_at desc limit 1` = 0004. Since `0003.folderMillis < 0004.created_at`, 0003 is **never applied** on any DB that already has 0004. A fresh DB applies everything in idx order so it would work there — only existing/already-migrated DBs hit this.
+
+`drizzle_wallets.__drizzle_migrations` confirms: hashes for 0000 (`811e90e9`), 0001 (`308f9a83`), 0002 (`df934ed4`), 0004 (`19e7157b`) are present; 0003 (`e942fb64`) is absent.
+
+## How to fix
+
+- [ ] Fix `drizzle/meta/_journal.json`: set `0003_return_columns`.`when` to a value **greater** than `0004_silky_gorgon` (`1788717226995`) so the migrator picks it up (e.g. `1789000000000`).
+- [ ] Re-apply migrations: `docker exec portfoliost-wallets npm run db:migrate` (wallets entrypoint runs this on every start, so `docker compose restart wallets` also works). Verify `\d portfolios.value_snapshots` then includes `cumulative_twr/mwr/simple`.
+- [ ] Re-trigger backfill: backend fires it automatically on the next `/analytics` call because the stored status is `failed` (not `pending`) and still `n < 2`; a page reload suffices. Confirm `value_snapshots` is populated and `portfolio_backfill_metadata.status = complete`.
+- [ ] Verify in browser: the sparkline renders on `/en/investments` and period buttons switch the series; `PortfolioPerformanceTab` chart populates too.
+- Note: no mock seeding needed — the example-service-mock `portfolio_analytics_*.json` files are not used by this endpoint; data comes from transactions → backfill → `value_snapshots`.
+
+---
+
+## 33. SEC investor-relations wiring (code done 2026-09-07; deploy pending)
+
+Goal: surface the SEC data now exposed by openst/cachest (added 2026-09-07) in the
+SPA Research → Investor Relations tab, replacing the current stub/dummy transcript
+with real SEC content. Nginx ingress is already correct (routes `/api/instruments`
+→ `portfoliost-instruments`; no cluster change needed).
+
+## Background / status (verified)
+
+`docs/openst-coverage.md` (section "Covered by openst today" + "Next steps") is the
+ground truth. openst now exposes via `openbb-sec==1.6.7`, all keyless (SEC EDGAR):
+
+| Instrument need | openst route | cachest proxy | OpenBB cmd |
+|---|---|---|---|
+| insider trading (Form 4) | `/equity/ownership/{t}` | `/ownership/{t}` | `ownership.insider_trading` |
+| institutional (Form 13F) | `/equity/ownership/institutional/{t}` | `/ownership/institutional/{t}` | `ownership.form_13f` |
+| SEC filings (10-K/10-Q/8-K) | `/equity/filings/{t}` | `/filings/{t}` | `fundamental.filings` |
+| MD&A text | `/equity/fundamentals/{t}/mda` | `/fundamentals/{t}/mda` | `fundamental.management_discussion_analysis` |
+
+Instruments backend adapter `src/adapters/cachest.ts` **already has** `fetchFilings`,
+`fetchMda`, `fetchInsiderTrading`, `fetchInstitutionalOwnership` (added previously)
+but **nothing consumes them yet** — no route/service imports them.
+
+Current instruments IR code (no SEC yet):
+- `src/routes/instruments.ts:749` `GET /:symbol/investor-relations` → derives events
+  from real reported quarters via `toInvestorRelations()` (real data, but `audioUrl`
+  is always null).
+- `src/routes/instruments.ts:772` `GET /:symbol/investor-relations/:eventId/transcript`
+  → `toIrTranscript()` returns a **structured empty stub** (`transcript: []`,
+  `participant: []`).
+
+SPA (`portfoliost` repo):
+- `src/modules/instruments/ResearchInvestorRelations.vue` lists events; renders an
+  "Audio" link only when `event.audioUrl` exists (real backend → never shown) and an
+  "Open" link when `event.url` exists (never set). **No transcript/document view.**
+- `src/api/instruments.ts:121` `getTranscript()` is defined but **never called** by
+  any component (return type is `Promise<unknown>`, not typed to contract).
+- `src/modules/instruments/ResearchOverview.vue:334` "Open transcript" button just
+  routes to `research-ir` (the list), not to a transcript view.
+- Mock dummy data lives in `mocks/shared/data/raw/ir_transcript.json` (full Q&A
+  transcript for AAPL) and `ir_events_aapl.json`; mock server
+  `mocks/instruments/index.js:245` serves them. This is the "dummy data" to replace.
+
+## Design decision (A chosen; confirmed with owner)
+
+**Approach A — map filings+MD&A into existing shapes.** SEC filing events
+(10-K/10-Q/8-K/20-F/6-K) are added as `InvestorRelationEvent` entries alongside the
+derived earnings calls; the transcript endpoint serves MD&A text. Contract additions:
+`reportUrl`+`formType` on the event, `body` on the transcript (v1.6.11), and typed
+`participant`/`transcript` items (v1.6.12). Form 4/5/144 filings are excluded to keep
+the list investor-relevant.
+
+## Steps
+
+1. [x] Decide approach A vs B with the owner; if shapes change, edit
+   `portfoliost-contracts/openapi.yaml` (`InvestorRelationEvent` / `IRTranscript`),
+   push → CI bumps `@marx2/contracts` → `NODE_AUTH_TOKEN=$(gh auth token) npm install
+   @marx2/contracts@<new>` in `portfoliost` and `portfoliost-instruments` → run
+   `npm run gen:types` in both → commit updated `package-lock.json` +
+   `generated/api-types.d.ts`. **→ Approach A chosen. Two bumps: v1.6.11 (event
+   `reportUrl`/`formType`, transcript `body`) and v1.6.12 (typed `participant`/
+   `transcript` items).**
+2. [x] **Instruments backend**: import `fetchFilings`/`fetchMda` from
+   `src/adapters/cachest.ts`; extend `toInvestorRelations()` (or a sibling translator
+   in `src/adapters/translate.ts`) to blend SEC filing events. Catch cachest
+   `UpstreamError`/404 gracefully (filings may be missing for some tickers).
+   **→ `secFilingEvent()` keeps 10-K/10-Q/8-K/20-F/6-K only (Form 4/5/144 excluded);
+   output capped at 48 events.**
+3. [x] **Instruments backend**: extend `toIrTranscript()` (or new fn) to return real
+   MD&A text from `fetchMda()` instead of the empty stub; map into the `IRTranscript`
+   contract shape. Wire the `/investor-relations/:eventId/transcript` route to call
+   `fetchMda`. **→ year/quarter derived from date-style event ids, else from the MD&A
+   record (`calendar_year`/`calendar_period`), never from accession numbers.**
+4. [x] **Instruments backend tests** (`src/routes/instruments.test.ts`): mock
+   `fetchFilings`/`fetchMda` in the cachest mock (lines ~27) and add coverage for the
+   new event blend + real transcript.
+5. [x] **SPA**: build a transcript/document view component (e.g.
+   `ResearchInvestorRelationsTranscript.vue` or a route) that calls `getTranscript()`
+   (type it against `components["schemas"]["IRTranscript"]`) and renders participants
+   + transcript/speaker blocks (see `ir_transcript.json` for the shape to render).
+6. [x] **SPA**: in `ResearchInvestorRelations.vue`, link each transcript/filing event
+   to the new view (replace the dead Audio/Open links). In `ResearchOverview.vue`,
+   point "Open transcript" at the new view.
+7. [x] **SPA tests**: vitest for the new components + API; update mock server if the
+   contract shape changed; add Playwright e2e for IR → open transcript.
+8. [x] **Verify full portfoliost suite** (`npm run build`, `npm run test`,
+   `npm run test:mock`, `npm run test:e2e`) + instruments (`npm run build`/`test`).
+   **→ Also fixed `openst/src/get_mda` (pivot long-frame MD&A; b4e10e2) and purged
+   stale `sec_mda:*` / `fundamentals:*:mda` Redis keys. E2E research spec: 12 passed,
+   1 data-dependent skip. Pre-existing unrelated e2e failures in auth.spec.ts and
+   portfolios.spec.ts (heldings-grouping / add-position) reproduced on clean tree.**
+9. [x] **Commit per repo** (`portfoliost-instruments`, `portfoliost`; only
+   `portfoliost-contracts` if shapes changed) → GHA rebuild → bump helmrelease tags
+   in homelab for the changed images → deploy (homelab-deploy skill).
+   **→ Commits pushed: contracts 2a05e85 (v1.6.12), openst b4e10e2,
+   portfoliost-instruments d33033f, portfoliost e6940f5. GHA image rebuild +
+   homelab deploy still pending.**
+10. [x] **Verify in cluster**: open `/en/research/AAPL.US/investor-relations`; confirm
+   SEC filings show and opening one shows real MD&A content.
