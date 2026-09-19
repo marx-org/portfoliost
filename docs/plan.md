@@ -25,25 +25,44 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
 
 ### 25.1 — HTML fixture capture: `obligacje.pl` bond detail + search pages
 
-- [ ] `curl` `obligacje.pl/pl/obligacja/BST0327` → save to
+- [x] `curl` `obligacje.pl/pl/obligacja/BST0327` → save to
       `openst/tests/fixtures/obligacje_bond_profile_BST0327.html`.
-- [ ] `curl` `obligacje.pl/pl/narzedzia/wyszukiwarka-obligacji-notowanych` (page 1) →
+- [x] `curl` `obligacje.pl/pl/narzedzia/wyszukiwarka-obligacji-notowanych` (page 1) →
       save to `openst/tests/fixtures/obligacje_bond_catalogue_page1.html`.
-- [ ] Record: CSS selectors for emitent, ISIN, market, nominal, coupon type, margin,
+- [x] Record: CSS selectors for emitent, ISIN, market, nominal, coupon type, margin,
       maturity; pagination URL pattern; total bond count (≈936).
-- [ ] Commit: `test(openst): fixture HTML for obligacje.pl bond profile + catalogue (D80)`.
+- [x] Commit: `test(openst): fixture HTML for obligacje.pl bond profile + catalogue (D80)`.
+  - Recorded in `openst/tests/fixtures/obligacje/README.md`: detail fields in
+    `table.table-9`, maturity under `Wązne daty → Dzień wykupu`; catalogue is a
+    **single server-rendered page** (client-side DataTables, no pagination) with
+    937 rows / 932 unique symbols; margin is a dedicated catalogue column, not on
+    the detail page (it lives in the coupon-type text).
 
 ### 25.2 — `CorporateBondProfileFetcher` in `openbb_biznesradar`
 
-- [ ] `openst/plugins/openbb_biznesradar/fetchers/corp_bond_profile.py`: scrapes
+- [x] `openst/plugins/openbb_biznesradar/fetchers/corp_bond_profile.py`: scrapes
       `obligacje.pl/pl/obligacja/{symbol}`; returns emitent, ISIN, market, nominal,
       coupon type, margin, maturity, `asset_type="corp_bond"`, `country="PL"`,
       `currency="PLN"`.
-- [ ] `EquityInfoFetcher.__call__` dispatches on Catalyst pattern `[A-Z]{3}\d{4}(\.WA)?$`
+- [x] `EquityInfoFetcher.__call__` dispatches on Catalyst pattern `[A-Z]{3}\d{4}(\.WA)?$`
       → new fetcher; all other symbols keep existing path.
-- [ ] Unit tests against fixture; regression: existing profile tests unchanged.
-- [ ] Full openst compose suite passes.
-- [ ] Commit: `feat(openbb_biznesradar): CorporateBondProfileFetcher (D80)`.
+- [x] Unit tests against fixture; regression: existing profile tests unchanged.
+- [x] Full openst compose suite passes.
+- [x] Commit: `feat(openbb_biznesradar): CorporateBondProfileFetcher (D80)`.
+  - Implemented as `openbb_biznesradar/obligacje.py` (scraper) +
+    `openbb_biznesradar/models/corp_bond_profile.py` (fetcher), matching the
+    plugin's existing layout; bond-specific fields ride as provider-specific
+    extras, same pattern as `openbb_obligacje` (D79).
+  - Dispatch implemented on `EquityProfileFetcher.fetch_data` — the OpenBB router
+    entry point (`Fetcher` has no `__call__`; per OpenBB provider docs the router
+    calls `fetch_data`). Pattern extended with an optional `-K` suffix
+    (`BOS0735-K`). The `[A-Z]{3}\d{4}` shape is ambiguous with savings-bond codes
+    (ROD1033/EDO0936), so the dispatch probes the bond page and falls back to the
+    biznesradar probe on 404/error; savings bonds are unaffected — their profile
+    lives on `/fixedincome/profile`, not the biznesradar provider.
+  - Suite now: 247 (openst) + 69 (openbb_biznesradar) + 53 (openbb_obligacje),
+    all green; Dockerfile test stage runs the plugin suites as separate pytest
+    invocations (a combined run hits a `tests` package-name collision).
 
 ### 25.3 — openst smoke + cachest route + corp-bond catalogue
 
