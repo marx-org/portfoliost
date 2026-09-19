@@ -243,6 +243,12 @@ const router = createRouter({
               meta: { admin: true },
             },
             {
+              path: "bond-catalogue",
+              name: "admin-bond-catalogue",
+              component: () => import("@/modules/admin/BondCatalogueView.vue"),
+              meta: { admin: true },
+            },
+            {
               path: "topology",
               name: "admin-topology",
               component: () => import("@/modules/admin/TopologyView.vue"),

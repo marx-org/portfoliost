@@ -10,6 +10,7 @@ const tabs = [
   { name: "admin-users",       label: "Users" },
   { name: "admin-jobs",        label: "Jobs" },
   { name: "admin-market-data", label: "Market Data" },
+  { name: "admin-bond-catalogue", label: "Bond Catalogue" },
 ]
 </script>
 

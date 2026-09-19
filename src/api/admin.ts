@@ -68,3 +68,40 @@ export function fetchOverflowSummary(): Promise<OverflowSummary> {
 export function fetchStooqImportLog(): Promise<Array<components["schemas"]["StooqImportLogEntry"]>> {
   return http.get("/api/admin/jobs/stooq-import/log")
 }
+
+// D82 — openst bond catalogue + CPI series (admin-internal read-only; these
+// tables live in the `openst` Postgres schema, not the SPA-facing contract).
+export interface BondCatalogueRow {
+  symbol: string
+  name: string
+  issueDate: string | null
+  maturityDate: string | null
+  rateRule: string | null
+  margin: string | null
+}
+
+export interface BondCatalogueResponse {
+  count: number
+  rows: BondCatalogueRow[]
+}
+
+export interface CpiRow {
+  date: string
+  value: string
+}
+
+export interface CpiSummary {
+  rowCount: number
+  stale: boolean
+  lastDate: string | null
+  ageDays: number | null
+  rows: CpiRow[]
+}
+
+export function fetchBondCatalogue(): Promise<BondCatalogueResponse> {
+  return http.get<BondCatalogueResponse>("/api/admin/bond-catalogue/bond-series")
+}
+
+export function fetchCpiSeries(): Promise<CpiSummary> {
+  return http.get<CpiSummary>("/api/admin/bond-catalogue/cpi")
+}
