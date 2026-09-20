@@ -88,7 +88,11 @@ function overviewMetricsFor(symbol, research) {
 
 function historyFor(symbol, resolution, compare) {
   const base = resolution === "monthly" ? loadRaw("history_monthly.json") : loadRaw("history_daily.json")
-  const h = { ...base, symbol }
+  const research = loadResearch(symbol)
+  // §36 — the series is denominated in the instrument's currency (research
+  // fixture carries it; the shared raw fixture is a USD stand-in otherwise).
+  const currency = research?.basics?.currency || research?.overview?.currency || base.currency || "USD"
+  const h = { ...base, symbol, currency }
   if (!compare) return h
   const prices = base.closePrices
   if (!prices) return h
@@ -99,7 +103,7 @@ function historyFor(symbol, resolution, compare) {
     prev = prev * (1 + instRet * 0.6 + 0.0002)
     return round2(prev)
   })
-  h.compare = { name: compare === "qqq" ? "Invesco QQQ" : compare === "iwm" ? "iShares Russell 2000" : "S&P 500 (proxy)", closePrices: bench, timestamps: base.timestamps }
+  h.compare = { name: compare === "qqq" ? "Invesco QQQ" : compare === "iwm" ? "iShares Russell 2000" : "S&P 500 (proxy)", closePrices: bench, timestamps: base.timestamps, currency: "USD" }
   return h
 }
 

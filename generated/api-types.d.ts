@@ -2363,12 +2363,14 @@ export interface components {
                 [key: string]: unknown;
             }[];
         };
+        /** @enum {string} */
+        InstrumentType: "STOCK" | "ETF" | "BOND" | "CRYPTO" | "FUND" | "CORP_BOND";
         InstrumentDetail: {
             id?: string;
             symbol?: string;
             name?: string;
             exchange?: string;
-            type?: string;
+            type?: components["schemas"]["InstrumentType"];
             currency?: string;
         };
         InstrumentProfile: {
@@ -2515,7 +2517,7 @@ export interface components {
         SearchResult: {
             symbol?: string;
             name?: string;
-            type?: string;
+            type?: components["schemas"]["InstrumentType"];
             exchange?: string;
             countryCode?: string | null;
             source?: string;
@@ -2700,7 +2702,8 @@ export interface components {
             symbol: string;
             timeframe: string;
             stale: boolean;
-            currency?: string | null;
+            /** @description ISO-4217 currency of the closes (resolved from the profile/ticker reference; "USD" when unknown) */
+            currency: string;
             dates: string[];
             closes: number[];
         };
@@ -3457,6 +3460,12 @@ export interface components {
             instrumentName?: string | null;
             /** @default STOCK */
             assetType: string;
+            sector?: string | null;
+            industry?: string | null;
+            /** @description ISO-2 country code (e.g. PL) sourced from the import catalog */
+            country?: string | null;
+            /** @description Legacy 2/3-letter country code when it differs from the ISO-2 country */
+            countryCode?: string | null;
             /** @description Post-restatement quantity used in calculations */
             quantity: number;
             /** @description Post-restatement unit price used in calculations */
