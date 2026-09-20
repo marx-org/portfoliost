@@ -175,6 +175,9 @@ async function main() {
   check("premium.ownership has 3 groups", ["institutional", "mutualFund", "insider"].every((k) => Array.isArray(ownership.json[k]) && ownership.json[k].length > 0), JSON.stringify(ownership.json).slice(0, 160))
   const dividends = await request("/instruments/AAPL/dividends", { token })
   check("premium.dividends history", Array.isArray(dividends.json.history) && dividends.json.history.length >= 8, `len ${dividends.json.history && dividends.json.history.length}`)
+  // §36 — a WSE (Polish) instrument carries PLN dividends, not a USD default
+  const sntDividends = await request("/instruments/SNT/dividends", { token })
+  check("premium.dividends SNT is PLN", sntDividends.status === 200 && Array.isArray(sntDividends.json.history) && sntDividends.json.history.length > 0 && sntDividends.json.history.every((r) => r.currency === "PLN"), JSON.stringify(sntDividends.json).slice(0, 160))
   const projections = await request("/instruments/AAPL/projections", { token })
   check("premium.projections", projections.json.priceTarget && projections.json.recommendation, JSON.stringify(projections.json).slice(0, 160))
   const seasonality = await request("/instruments/AAPL/seasonality?years=5&metric=avg", { token })
