@@ -267,5 +267,49 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
 - [ ] Update `docs/openst-coverage.md` note on LSE pricing unit (pence/GBp upstream) so the
       translation stays covered; archive §39 to `plan-archive.md`.
 
-_(No pending work — all sections complete and archived.)_
+## 40. Remove `ALIAS_OVERRIDES` — resolve sheet naming at the import step, keep `ticker_reference` pure adanos (2026-09-20)
+
+Proposal: [google-sheets-sync.md](proposals/google-sheets-sync.md) f/up (incident-style cleanup of plan §24.9). `portfoliost-instruments` re-applies 4 sheet-specific aliases (`LSE::DTLA`, `LSE::IUFS`, `NASDAQ::RGEN`, `NASDAQ::ASML`) onto the adanos-synced `ticker_reference` after every sync run (commit `010921b`, persistence hack). That is **patching upstream reference data per one user's Google Sheet** — reset by every adanos upsert, brittle. The correct layer is the import: the sheets-sync resolver is **catalog-first**, and the live Podsumowanie catalog already carries all 4 assets with authoritative symbols (`podsumowanie.json`: `Repligen Corp`→`NASDAQ:RGEN`/`RGEN.US` line 1562, `ASML Holding NV`→`NASDAQ:ASML`/`ASML.US` line 1722, `iShares $ Treasury Bond 20+yr …`→`LON:DTLA`/`DTLA.L` line 4842, `iShares S&P 500 Financials …`→`LON:IUFS`/`IUFS.L` line 7482). The catalog + name-first resolver landed the same day as the hotfix (2026-09-19, `33723dc`/`cfbd292` vs `010921b`) — the aliases closed a pre-catalog gap that no longer exists. Target: after a wipe & re-import, positions carry the adanos-aligned tickers (RGEN/ASML/DTLA/IUFS), and `ticker_reference` stays 100 % upstream adanos + routing-critical curated rows — no sheet-compat patches.
+
+Constraints: `NAME_VENUE_OVERRIDES` (`instrument-resolver.ts:170-196`) **stays** — it is an import-side fix (§38.3 precedent, user-confirmed); only reference-table patching is removed. §38.4 (single-entry fold-group short-circuit) must land **first** — it is what lets the catalog win for rows whose sheet symbol/giełda disagrees with the catalog entry. No sheet edits. Wipe & re-import on homelab needs user approval (§28, §24.9 job).
+
+Rules: one step = one commit; a step is `[x]` only after its tests pass (unit in the touched repo + docker-compose mock per AGENTS.md).
+
+---
+
+### 40.1 — Prove the 4 names already resolve at import (no patch needed)
+
+- [ ] In `portfoliost-sheets-sync`, after §38.4: add `instrument-resolver.test.ts` cases for the 4 live sheet rows — RGEN + ASML name-only (empty symbol col, like sheet rows 159/167/852), DTLA + IUFS symbol+venue `/LON` (rows 703/1673/1878) — asserting they resolve via the catalog (single-entry `byCatalogName`, §38.4) to `RGEN.US` / `ASML.US` / `DTLA.L` / `IUFS.L`, `matched: true`, and **not** via any `ticker_reference` alias. The CATALOG fixture already contains all 4 entries.
+- [ ] Live check (same method as §38.4): resolve the current live Transakcje rows for these 4 names against the live catalog + live `ticker_reference` index (job's own credentials), adanos aliases only — confirm `matched: true`, correct ticker, zero name-as-symbol for these rows. Record sheet row numbers in the commit message.
+- [ ] If any name still misses the catalog (fold mismatch), fix it **in the resolver** with a `NAME_VENUE_OVERRIDES` entry (import-side, per §38.3) — never in `ticker_reference`.
+- Tests: full `npm test` in `portfoliost-sheets-sync` green.
+- Commit.
+
+### 40.2 — Delete `ALIAS_OVERRIDES` + `applyAliasOverrides` from `portfoliost-instruments`
+
+- [ ] `src/scripts/tickerref-sync.ts`: remove the `ALIAS_OVERRIDES` constant + doc block (lines 19-35), the `applyAliasOverrides` function + doc (37-52), and the call/log in `main()` (329-330). Update the module doc comment (7-9): "pure upstream adanos sync + curated routing rows; no sheet-compat patches re-applied".
+- [ ] `src/scripts/tickerref-sync.test.ts`: replace the §24.9 describe block (77-107) with a **purity regression test** — after `syncTickerReference(FIXTURE, db)` the alias column equals exactly the adanos fixture value (or null) for every row; delete the now-unused `ALIAS_OVERRIDES` / `applyAliasOverrides` imports (line 6).
+- [ ] Grep the repo + homelab manifests for any other `ALIAS_OVERRIDES` / `applyAliasOverrides` reference; the CronJob/`--url` invocation is unchanged.
+- Tests: `npm test` + `npm run build` in `portfoliost-instruments` green.
+- Commit.
+
+### 40.3 — Align mock seed to pure adanos
+
+- [ ] `portfoliost/mocks/db-seed/instruments/ticker_reference.csv`: restore the 4 rows to pure adanos aliases — `NASDAQ::RGEN` (line 29291) drop the injected `repligen corp` fragment, `NASDAQ::ASML` (26108) drop `asml holding nv`; check `LSE::DTLA` (22933) / `LSE::IUFS` (23830) against the live `core_listings.csv` and keep only what adanos actually carries (drop the full-name fragments if adanos has none). Verify the real adanos values by fetching `DEFAULT_SOURCE_URL` (or the bundled seed) for these `listing_key`s; regenerate via `npm run mock:seed` if the flow supports it, else hand-edit.
+- [ ] Search/mock/e2e expectations that hit the sheet-variant spellings (`repligen corp`, `asml holding nv`, the `(Acc)` iShares names): point them at the adanos name/alias (`repligen`, `asml`) — see consequences below.
+- Tests: `npm run test:mock` + `npm run test:e2e` green.
+- Commit.
+
+### 40.4 — Prod rollout + wipe & re-import (needs user approval — touches homelab)
+
+- [ ] Push `portfoliost-instruments` to `main`; verify the real GHA release tag (`gh release list --repo Marx2/portfoliost-instruments`, never tag manually); pin it in `~/prv/homelab/…/portfoliost-instruments/…/helmrelease.yaml`, commit + push, Flux applies.
+- [ ] Re-run the tickerref sync in cluster (existing CronJob / `--url` one-shot); query `instruments.ticker_reference` for the 4 keys — aliases now equal pure adanos, `updated_at` refreshed.
+- [ ] Re-run the sheets-sync wipe & re-import from the admin panel (`POST /api/admin/jobs/sheets-sync/run {wipe:true}`, user approval §28). Confirm `portfolios.positions.symbol` for the 4 names = `RGEN`/`ASML`/`DTLA`/`IUFS` (catalog-resolved), `matched: true`, and the sync run reports zero unmatched for them.
+- [ ] SPA smoke (Playwright, compose or prod): the 4 positions show correct tickers; identity search by pure adanos names resolves.
+- Tests: resolver suite + docker-compose suite green; archive §40 to `plan-archive.md` noting the deleted §24.9 persistence mechanism.
+- Commit.
+
+---
+
+**Consequences (explicit, accepted):** SPA identity search over pure adanos loses the sheet-variant spellings the overrides had injected (`repligen corp`, `asml holding nv`, iShares `(Acc)` full names) — search by the exact adanos name/alias still resolves. If this bites later, the fix is an import-side resolver alias, never a `ticker_reference` patch. `NAME_VENUE_OVERRIDES` stays by design; §38 funds are unaffected (old GS/NN names → `.TFI` symbols already live at the import step, §38.3, and curated TFI rows carry only current names, §38.2).
 
