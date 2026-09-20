@@ -123,8 +123,10 @@ fix); only reference-table patching is removed. Prod wipe & re-import needs user
 
 ### 40.3 — Align mock seed to pure adanos
 
-- [ ] Restore the 4 rows to pure adanos aliases (drop the injected full-name fragments).
+- [x] Restore the 4 rows to pure adanos aliases (drop the injected full-name fragments).
   `npm run test:mock` green.
+  (DTLA → empty alias, IUFS → `s&p 500 financials sector`, RGEN → `repligen`; ASML was already
+  pure (`asml`). All 4 rows verified byte-identical to the live adanos core_listings.csv.)
 
 ### 40.4 — Prod rollout + wipe & re-import (PENDING — needs user approval, touches homelab)
 

@@ -22930,7 +22930,7 @@ LSE::DRX,DRX,LSE,Drax Group PLC,Stock,Utilities,,United Kingdom,GB,GB00B1VNSX38,
 LSE::DSCV,DSCV,LSE,Discoverie Group PLC,Stock,Information Technology,,United Kingdom,GB,GB0000055888,discoverie group|discoverie,GB0000055888,primary_listing
 LSE::DSG,DSG,LSE,Dillistone Group PLC,Stock,Information Technology,,United Kingdom,GB,GB00B13QQB40,dillistone group|dillistone,GB00B13QQB40,primary_listing
 LSE::DSW,DSW,LSE,DSW Capital PLC,Stock,Industrials,,United Kingdom,GB,GB00BNG9H550,dsw capital,GB00BNG9H550,primary_listing
-LSE::DTLA,DTLA,LSE,iShares $ Treasury Bond 20+yr UCITS ETF USD (Acc),ETF,,Fixed Income,Ireland,IE,IE00BFM6TC58,ishares treasury bond 20 yr ucits etf usd a,IE00BFM6TC58,primary_listing
+LSE::DTLA,DTLA,LSE,iShares $ Treasury Bond 20+yr UCITS ETF USD (Acc),ETF,,Fixed Income,Ireland,IE,IE00BFM6TC58,,IE00BFM6TC58,primary_listing
 LSE::DTLE,DTLE,LSE,iShares $ Treasury Bond 20+yr UCITS ETF EUR Hedged (Dist),ETF,,Fixed Income,Ireland,IE,IE00BD8PGZ49,,IE00BD8PGZ49,primary_listing
 LSE::DTVL,DTVL,LSE,Dish TV India Limited,Stock,Communication Services,,India,IN,US25471A4013,dish tv india,US25471A4013,primary_listing
 LSE::DUKE,DUKE,LSE,Duke Royalty Ltd,Stock,Financials,,Guernsey,GG,GG00BYZSSY63,duke royalty,GG00BYZSSY63,primary_listing
@@ -23827,7 +23827,7 @@ LSE::IUAE,IUAE,LSE,iShares US Aggregate Bond UCITS ETF EUR Hedged (Acc),ETF,,Fix
 LSE::IUAG,IUAG,LSE,iShares US Aggregate Bond UCITS ETF USD (Dist),ETF,,Fixed Income,Ireland,IE,IE00B44CGS96,,IE00B44CGS96,primary_listing
 LSE::IUCB,IUCB,LSE,SPDR Barclays 3-10 U.S. Corporate Bond UCITS,ETF,,Fixed Income,Ireland,IE,IE00BYV12Y75,barclays 3-10 u.s. corporate bond,IE00BYV12Y75,primary_listing
 LSE::IUCM,IUCM,LSE,iShares S&P 500 Communication Sector UCITS ETF USD Acc,ETF,,Equity,Ireland,IE,IE00BDDRF478,s&p 500 communication sector,IE00BDDRF478,primary_listing
-LSE::IUFS,IUFS,LSE,iShares S&P 500 Financials Sector UCITS ETF USD (Acc),ETF,,Equity,Ireland,IE,IE00B4JNQZ49,s&p 500 financials sector|ishares s p 500 financials sector ucits etf usd a,IE00B4JNQZ49,primary_listing
+LSE::IUFS,IUFS,LSE,iShares S&P 500 Financials Sector UCITS ETF USD (Acc),ETF,,Equity,Ireland,IE,IE00B4JNQZ49,s&p 500 financials sector,IE00B4JNQZ49,primary_listing
 LSE::IUGA,IUGA,LSE,iShares US Aggregate Bond UCITS ETF,ETF,,Fixed Income,Ireland,IE,IE00BDFGJ841,,IE00BDFGJ841,primary_listing
 LSE::IUKD,IUKD,LSE,iShares UK Dividend UCITS,ETF,,Equity,Ireland,IE,IE00B0M63060,uk dividend,IE00B0M63060,primary_listing
 LSE::IUKP,IUKP,LSE,iShares UK Property UCITS,ETF,,Real Estate,Ireland,IE,IE00B1TXLS18,,IE00B1TXLS18,primary_listing
@@ -29288,7 +29288,7 @@ NASDAQ::RFEM,RFEM,NASDAQ,First Trust RiverFront Dynamic Emerging Markets ETF,ETF
 NASDAQ::RFIL,RFIL,NASDAQ,RF Industries Ltd,Stock,Information Technology,,United States,US,US7495521053,rf industries,US7495521053,primary_listing
 NASDAQ::RGC,RGC,NASDAQ,Regencell Bioscience Holdings Ltd,Stock,Health Care,,Cayman Islands,KY,KYG7487R1002,regencell bioscience holdings|regencell bioscience,KYG7487R1002,primary_listing
 NASDAQ::RGCO,RGCO,NASDAQ,RGC Resources Inc,Stock,Utilities,,United States,US,US74955L1035,rgc resources,US74955L1035,primary_listing
-NASDAQ::RGEN,RGEN,NASDAQ,Repligen Corporation,Stock,Health Care,,United States,US,US7599161095,repligen|repligen corp,US7599161095,primary_listing
+NASDAQ::RGEN,RGEN,NASDAQ,Repligen Corporation,Stock,Health Care,,United States,US,US7599161095,repligen,US7599161095,primary_listing
 NASDAQ::RGLD,RGLD,NASDAQ,Royal Gold Inc,Stock,Materials,,United States,US,US7802871084,royal gold,US7802871084,primary_listing
 NASDAQ::RGLO,RGLO,NASDAQ,Global Equity Active ETF,ETF,,Equity,United States,US,,global equity active,NASDAQ::RGLO,primary_listing_missing_isin
 NASDAQ::RGNX,RGNX,NASDAQ,Regenxbio Inc,Stock,Health Care,,United States,US,US75901B1070,regenxbio,US75901B1070,primary_listing
