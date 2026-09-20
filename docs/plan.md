@@ -93,61 +93,6 @@ docker-compose mock suite per AGENTS.md).
 
 ---
 
-## 40. Remove `ALIAS_OVERRIDES` — keep `ticker_reference` pure adanos (2026-09-20)
-
-`portfoliost-instruments` re-applies 4 sheet-specific aliases (`LSE::DTLA`, `LSE::IUFS`,
-`NASDAQ::RGEN`, `NASDAQ::ASML`) onto the adanos-synced `ticker_reference` after every sync run
-(commit `010921b`, persistence hack) — patching upstream reference data per one user's Google
-Sheet. The live Podsumowanie catalog already carries all 4 with authoritative symbols, so after the
-§38.4 short-circuit the catalog resolves them at import. `NAME_VENUE_OVERRIDES` **stays** (import-side
-fix); only reference-table patching is removed. Prod wipe & re-import needs user approval (§28).
-
-### 40.1 — Prove the 4 names already resolve at import (no patch needed)
-
-- [x] `instrument-resolver.test.ts` cases for RGEN/ASML (name-only) and DTLA/IUFS (symbol + venue)
-  resolve via the catalog to `RGEN.US` / `ASML.US` / `DTLA.L` / `IUFS.L`, `matched: true`, not via
-  any `ticker_reference` alias. `npm test` in `portfoliost-sheets-sync` green.
-  (sheets-sync `eeb21e8`: live Podsumowanie rows added to the CATALOG fixture, the 4 ex-patched
-  rows added to REF_ROWS with pure adanos aliases; the same rows stay `matched: false` without the
-  catalog, so only the catalog can resolve them. US listings resolve bare — `RGEN`/`ASML` — per the
-  resolver's venue-suffix convention.)
-
-### 40.2 — Delete `ALIAS_OVERRIDES` + `applyAliasOverrides` from `portfoliost-instruments`
-
-- [x] Remove the `ALIAS_OVERRIDES` constant, `applyAliasOverrides`, and the `main()` call/log from
-  `tickerref-sync.ts` (still present — `ALIAS_OVERRIDES` at `tickerref-sync.ts:28/41/43`, call at
-  `:307`); module doc now "pure upstream adanos sync + curated routing rows; no sheet-compat
-  patches re-applied." Purity regression test: after sync, the alias column equals the adanos
-  fixture value for every row. `npm test` + `npm run build` in `portfoliost-instruments` green.
-  (instruments `35f3cb3`; the §24.9 override describe block was replaced by the purity test.)
-
-### 40.3 — Align mock seed to pure adanos
-
-- [x] Restore the 4 rows to pure adanos aliases (drop the injected full-name fragments).
-  `npm run test:mock` green.
-  (DTLA → empty alias, IUFS → `s&p 500 financials sector`, RGEN → `repligen`; ASML was already
-  pure (`asml`). All 4 rows verified byte-identical to the live adanos core_listings.csv.)
-
-### 40.4 — Prod rollout + wipe & re-import (PENDING — needs user approval, touches homelab)
-
-- [ ] Push `portfoliost-instruments` to `main`; verify the real GHA release tag (never tag
-  manually); pin it in the homelab `helmrelease.yaml`, commit + push, Flux applies.
-- [ ] Re-run the tickerref sync in cluster; confirm the 4 keys carry pure adanos aliases.
-- [ ] Re-run the sheets-sync wipe & re-import from the admin panel (`POST
-  /api/admin/jobs/sheets-sync/run {wipe:true}`, user approval §28); confirm the 4 positions =
-  `RGEN`/`ASML`/`DTLA`/`IUFS`, `matched: true`, zero unmatched for them.
-- [ ] SPA smoke (Playwright): the 4 positions show correct tickers; identity search by pure adanos
-  names resolves.
-- [ ] Archive §40 to `plan-archive.md` noting the deleted §24.9 persistence mechanism. Commit.
-
----
-
-**Consequences (accepted):** SPA identity search over pure adanos loses the sheet-variant spellings
-the overrides had injected — search by the exact adanos name/alias still resolves. If that bites
-later, the fix is an import-side resolver alias, never a `ticker_reference` patch.
-
----
-
 ## 41. Rebuild `ticker_reference` from a clean truncate + tickerref-sync rerun (2026-09-21)
 
 §38.5 pruned the 6 stale `TFI::*` rows surgically. A full clean-baseline rebuild — `TRUNCATE
@@ -169,5 +114,5 @@ reference `ticker_reference` (verified 2026-09-21), so the truncate cannot casca
 
 ---
 
-**Still open (all gated on user approval — homelab):** §40.1–40.4 (ALIAS_OVERRIDES removal +
-prod rollout + wipe & re-import); §41 clean-baseline `ticker_reference` rebuild (after §40.2).
+**Still open (gated on user approval — homelab):** §41 clean-baseline `ticker_reference`
+rebuild (after §40.2, which has landed).
