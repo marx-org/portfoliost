@@ -8,6 +8,7 @@ import { seedWallets } from "./wallets.mjs"
 import { seedPortfolios } from "./portfolios.mjs"
 import { seedUserPreferences } from "./user-preferences.mjs"
 import { seedTickerReference } from "./ticker-reference.mjs"
+import { seedOpenstNoPriceBonds } from "./openst.mjs"
 
 const DATABASE_URL =
   process.env.DATABASE_URL ||
@@ -30,6 +31,7 @@ try {
 
   await seedUserPreferences(sql)
   await seedTickerReference(sql)
+  await seedOpenstNoPriceBonds(sql)
 
   console.log("[db-seed] done")
 } catch (err) {

@@ -190,6 +190,39 @@ async function main() {
   const presets = await request("/charting/presets", { token })
   check("charting.presets", presets.status === 200, `got ${presets.status}`)
 
+  // ── Plan 34 — no-price asset classes ─────────────────────────
+  const npList = await request("/portfolios", { token })
+  const npPortfolio = npList.json.find((p) => p.name === "NoPrice")
+  check("no-price portfolio seeded", Boolean(npPortfolio), `portfolios ${JSON.stringify((npList.json || []).map((p) => p.name))}`)
+  if (npPortfolio) {
+    const npPos = await request(`/portfolios/${npPortfolio.id}/positions`, { token })
+    check("no-price positions seeded", npPos.status === 200 && Array.isArray(npPos.json) && npPos.json.length === 3, `got ${npPos.status} len ${npPos.json && npPos.json.length}`)
+    check(
+      "no-price positions current-price parity",
+      npPos.json.every((p) =>
+        p.country === "Other" &&
+        p.currentPrice > 0 &&
+        p.marketValue === Math.round(p.quantity * p.currentPrice * 100) / 100 &&
+        p.unrealizedGainLoss === Math.round(p.quantity * (p.currentPrice - p.averageCostBasis) * 100) / 100
+      ),
+      JSON.stringify((npPos.json || []).map((p) => ({ symbol: p.symbol, cur: p.currentPrice, mv: p.marketValue, pl: p.unrealizedGainLoss }))).slice(0, 220),
+    )
+    for (const p of npPos.json || []) {
+      const q = await request(`/instruments/${encodeURIComponent(p.symbol)}/quote`, { token })
+      check(
+        `no-price quote ${p.symbol}`,
+        q.status === 200 && q.json.currentPrice === p.currentPrice && q.json.currency === p.instrumentCurrency,
+        `got ${q.status} ${JSON.stringify(q.json || {}).slice(0, 120)}`,
+      )
+      const price = await request(`/instruments/${encodeURIComponent(p.symbol)}/price`, { token })
+      check(
+        `no-price price ${p.symbol}`,
+        price.status === 200 && price.json.price === p.currentPrice && price.json.currency === p.instrumentCurrency,
+        `got ${price.status} ${JSON.stringify(price.json || {}).slice(0, 120)}`,
+      )
+    }
+  }
+
   // ── Portfolios ──────────────────────────────────────────────
   const portfolios = await request("/portfolios", { token })
   check("portfolios.list", portfolios.status === 200 && Array.isArray(portfolios.json) && portfolios.json.length >= 1, `got ${portfolios.status} len ${portfolios.json && portfolios.json.length}`)

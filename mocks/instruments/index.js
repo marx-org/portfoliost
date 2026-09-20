@@ -1,12 +1,23 @@
 import { requireAuth } from "../lib/auth.js"
-import { loadRaw, loadResearch, loadUniverse, normalize, researchSymbols } from "../lib/data.js"
+import { loadJson, loadRaw, loadResearch, loadUniverse, normalize, researchSymbols } from "../lib/data.js"
 import { logoPath } from "../lib/data.js"
+
+function noPriceQuoteFor(symbol) {
+  const quote = noPriceFixture().quotes?.[normalize(symbol)]
+  return quote && typeof quote.currentPrice === "number" ? quote : null
+}
+
+function noPriceFixture() {
+  return loadJson("no-price-portfolio.json")
+}
 
 function getSymbol(ctx) {
   return normalize(ctx.params.symbol)
 }
 
 function quoteFrom(symbol, research) {
+  const noPriceQuote = noPriceQuoteFor(symbol)
+  if (noPriceQuote) return { ...noPriceQuote, symbol }
   const q = loadRaw("quote_aapl.json")
   const price = research ? research.basics.price : q.currentPrice
   const prevClose = research ? research.basics.prevClose : q.previousClose
@@ -232,6 +243,15 @@ export function register(app) {
   app.get("/api/instruments/:symbol/price", (ctx) => {
     if (!requireAuth(ctx)) return
     const symbol = getSymbol(ctx)
+    const noPriceQuote = noPriceQuoteFor(symbol)
+    if (noPriceQuote) {
+      return ctx.res.json({
+        symbol,
+        date: ctx.query.date || new Date().toISOString().slice(0, 10),
+        price: noPriceQuote.currentPrice,
+        currency: noPriceQuote.currency || "USD",
+      })
+    }
     const research = loadResearch(symbol)
     const price = research ? research.basics.price : loadRaw("quote_aapl.json").currentPrice
     ctx.res.json({

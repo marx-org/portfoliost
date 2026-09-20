@@ -101,6 +101,11 @@ services:
       context: ../openst
       target: runtime
     container_name: portfoliost-openst
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
     depends_on:
       redis:
         condition: service_healthy
@@ -241,6 +246,7 @@ services:
       SEED_PORTFOLIOS: "true"
     depends_on:
       postgres:   { condition: service_healthy }
+      openst:     { condition: service_healthy }
       users-auth: { condition: service_healthy }
       wallets:    { condition: service_healthy }
       instruments: { condition: service_healthy }

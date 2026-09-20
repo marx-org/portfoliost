@@ -1,6 +1,6 @@
 import { requireAuth } from "../lib/auth.js"
 import { resolveFeeFx } from "../lib/demo-fx.js"
-import { loadRaw, loadResearch, normalize } from "../lib/data.js"
+import { loadJson, loadRaw, loadResearch, normalize } from "../lib/data.js"
 import { paginatePage, uuid, nowIso } from "../lib/http.js"
 import { benchmarkSeries, benchmarkSymbols } from "./benchmarks.js"
 
@@ -13,6 +13,14 @@ const recomputedIds = new Set()
 const allTxs = new Map()
 let txInited = false
 let shares = null
+
+function noPriceFixture() {
+  return loadJson("no-price-portfolio.json")
+}
+
+function noPricePortfolio() {
+  return noPriceFixture().portfolio
+}
 
 function allShares() {
   if (!shares) shares = JSON.parse(JSON.stringify(loadRaw("portfolios_shares.json")))
@@ -52,6 +60,7 @@ function timelineFor(timeframe) {
 
 function findPortfolio(id) {
   if (created.has(id)) return created.get(id)
+  if (id === noPricePortfolio().id) return noPricePortfolio()
   const existing = loadRaw("portfolios_summaries.json").find((p) => p.id === id)
   return existing || null
 }
@@ -63,7 +72,12 @@ function withDataFile(id, baseName, emptyName) {
 
 function positionsFor(id) {
   if (!positionsByPortfolio.has(id)) {
-    const base = newPortfolioIds.has(id) ? [] : loadRaw("portfolio_positions.json")
+    const np = noPricePortfolio()
+    const base = id === np.id
+      ? noPriceFixture().positions
+      : newPortfolioIds.has(id)
+        ? []
+        : loadRaw("portfolio_positions.json")
     positionsByPortfolio.set(id, (Array.isArray(base) ? base : []).map((p) => ({ ...p })))
   }
   return positionsByPortfolio.get(id)
@@ -72,6 +86,8 @@ function positionsFor(id) {
 // Live price wins over the stored one — the holdings price column reflects the
 // current quote (research data), never the (possibly stale/null) DB value.
 function currentPriceFor(symbol) {
+  const npQuote = noPriceFixture().quotes?.[normalize(symbol)]
+  if (npQuote && typeof npQuote.currentPrice === "number") return npQuote.currentPrice
   const research = loadResearch(symbol)
   if (research && research.basics && typeof research.basics.price === "number") return research.basics.price
   const fallback = loadRaw("quote_aapl.json")
@@ -190,7 +206,10 @@ export function register(app) {
     if (!requireAuth(ctx)) return
     const byId = new Map(loadRaw("portfolios_summaries.json").map((p) => [p.id, p]))
     for (const [id, p] of created) byId.set(id, p)
-    ctx.res.json([...byId.values()])
+    const list = [...byId.values()]
+    const np = noPricePortfolio()
+    if (!list.some((p) => p.id === np.id)) list.push(np)
+    ctx.res.json(list)
   })
 
   app.get("/api/portfolios/light", (ctx) => {
