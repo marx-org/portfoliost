@@ -53,6 +53,8 @@ export interface HistoryCompareSeries {
   name: string
   closePrices: number[]
   timestamps: number[]
+  /** §36 — the benchmark's trading currency (US ETF proxies → USD). */
+  currency?: string
 }
 
 export async function getHistoricalClose(symbol: string, date: string): Promise<number | null> {

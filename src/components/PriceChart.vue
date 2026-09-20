@@ -5,6 +5,7 @@ import type { HistoryCompareSeries } from "@/api/instruments"
 import { getAllTransactions, getPortfolioTransactions } from "@/api/portfolios"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { formatCurrency, formatNumber } from "@/utils/format"
+import { crossCurrencyCaption, needsPercentComparison, percentNormalize } from "@/utils/compareSeries"
 import type { components } from "../../generated/api-types"
 
 type Transaction = components["schemas"]["Transaction"]
@@ -41,6 +42,8 @@ const timestamps = ref<number[]>([])
 const prices = ref<number[]>([])
 const bench = ref<HistoryCompareSeries | null>(null)
 const loadedCompare = ref<CompareKey>("none")
+// §36 — the instrument's trading currency (from /history), for the price axis
+const chartCurrency = ref<string>("USD")
 
 const portfolioStore = usePortfolioStore()
 const showTransactions = ref(props.defaultShowTransactions ?? false)
@@ -106,6 +109,7 @@ async function load(compareKey: CompareKey) {
     prices.value = h.closePrices
     bench.value = h.compare ?? null
     loadedCompare.value = compareKey
+    chartCurrency.value = h.currency || "USD"
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Failed to load price history"
   } finally {
@@ -190,9 +194,19 @@ const series = computed(() => {
     new Date(t * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" }),
   )
 
+  // §36 — cross-currency overlay: a benchmark priced in a different currency
+  // can only be compared honestly percent-normalized (no FX recalculation).
+  // When forced, BOTH series are re-based to % so they share one axis.
+  const benchCcy = bench.value?.currency || "USD"
+  const benchPercentForced =
+    !!bench.value &&
+    compare.value !== "none" &&
+    mode.value === "Price" &&
+    needsPercentComparison(chartCurrency.value, benchCcy)
+
   function transform(data: number[]): number[] {
     const slice = data.slice(startIdx)
-    if (mode.value === "Price") return slice
+    if (mode.value === "Price") return benchPercentForced ? percentNormalize(slice) : slice
     const base = slice[0] || 0
     if (mode.value === "Percent") return slice.map((p) => (base ? ((p - base) / base) * 100 : 0))
     let runningMax = -Infinity
@@ -207,13 +221,53 @@ const series = computed(() => {
     const benchSlice = bench.value.closePrices.slice(startIdx)
     const bBase = benchSlice[0] || 0
     const bData =
-      mode.value === "Price"
+      mode.value === "Price" && !benchPercentForced
         ? benchSlice
-        : benchSlice.map((p) => (bBase ? ((p - bBase) / bBase) * 100 : 0))
+        : benchPercentForced
+          ? percentNormalize(benchSlice)
+          : benchSlice.map((p) => (bBase ? ((p - bBase) / bBase) * 100 : 0))
     out.push({ name: bench.value.name, data: bData })
   }
   return { dates, data: out }
 })
+
+// §36 — y-axis unit for the current window. "pct" when a cross-currency overlay
+// forces both series onto a percent-normalized axis; "price" otherwise.
+const axisUnit = computed<"price" | "pct">(() => {
+  const benchCcy = bench.value?.currency || "USD"
+  const forced =
+    !!bench.value &&
+    compare.value !== "none" &&
+    mode.value === "Price" &&
+    needsPercentComparison(chartCurrency.value, benchCcy)
+  return forced ? "pct" : "price"
+})
+
+/** §36 — non-null when the benchmark overlay is percent-normalized due to a currency gap. */
+const crossCurrencyNote = computed(() =>
+  axisUnit.value === "pct" ? crossCurrencyCaption(chartCurrency.value, bench.value?.currency || "USD") : null,
+)
+
+// Remount the chart whenever the data/currency/unit it displays changes.
+// vue3-apexcharts deep-clones options via JSON.stringify on updateOptions,
+// which silently drops the y-axis formatter function; a fresh mount is the
+// only reliable way to guarantee the axis carries the correct unit + currency.
+// Keyed on POST-load values (loadedCompare/chartCurrency) so the remount
+// happens *after* the data arrives — never mid-fetch, which would leave a
+// trailing updateOptions to strip the formatter again.
+const chartKey = computed(
+  () => `${loadedCompare.value}|${chartCurrency.value}|${axisUnit.value}|${mode.value}|${props.symbol}`,
+)
+
+// Stable axis state for the y-axis label formatter closure. The formatter is
+// (re)created each time `chartOptions` is evaluated and reads current reactive
+// values at call time, so a freshly mounted chart always carries the correct
+// unit + currency.
+function yLabelFormatter(v: number): string {
+  return mode.value === "Price" && axisUnit.value === "price"
+    ? formatCurrency(v, chartCurrency.value)
+    : `${v.toFixed(2)}%`
+}
 
 function isoDate(ms: number): string {
   const d = new Date(ms)
@@ -417,7 +471,9 @@ function tooltipCustom({ series, dataPointIndex, w }: {
   for (let s = 0; s < w.config.series.length; s++) {
     const name = w.config.series[s].name ?? ""
     const value = series[s]?.[dataPointIndex]
-    const formatted = typeof value === "number" ? (mode.value === "Price" ? formatCurrency(value) : `${value.toFixed(2)}%`) : "—"
+    const isPriceUnit = mode.value === "Price" && axisUnit.value === "price"
+    const formatted =
+      typeof value === "number" ? (isPriceUnit ? formatCurrency(value, chartCurrency.value) : `${value.toFixed(2)}%`) : "—"
     lines.push(`<div class="apexcharts-tooltip-series-group"><span>${name}: ${formatted}</span></div>`)
   }
   let txHtml = ""
@@ -459,7 +515,7 @@ const chartOptions = computed(() => ({
   },
   yaxis: {
     labels: {
-      formatter: (v: number) => (mode.value === "Price" ? `$${v.toLocaleString("en-US", { maximumFractionDigits: 2 })}` : `${v.toFixed(2)}%`),
+      formatter: yLabelFormatter,
     },
   },
   stroke: { curve: "smooth" as const, width: 2 },
@@ -582,15 +638,15 @@ function downloadCsv(): void {
         <span class="text-slate-500 dark:text-slate-400">Total Chg</span>
         <span class="font-semibold" :class="summary.change >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
           {{
-            mode === "Price"
-              ? `$${signed(summary.change, 2)}`
+            mode === "Price" && axisUnit === "price"
+              ? formatCurrency(summary.change, chartCurrency)
               : `${signed(summary.changePct)}%`
           }}
         </span>
-        <span v-if="mode === 'Price'" class="text-xs text-slate-400 dark:text-slate-500">{{ signed(summary.changePct) }}%</span>
-        <span v-if="mode === 'Price'" class="text-slate-500 dark:text-slate-400">CAGR</span>
+        <span v-if="mode === 'Price' && axisUnit === 'price'" class="text-xs text-slate-400 dark:text-slate-500">{{ signed(summary.changePct) }}%</span>
+        <span v-if="mode === 'Price' && axisUnit === 'price'" class="text-slate-500 dark:text-slate-400">CAGR</span>
         <span
-          v-if="mode === 'Price' && summary.cagr !== null"
+          v-if="mode === 'Price' && axisUnit === 'price' && summary.cagr !== null"
           class="font-semibold tabular-nums"
           :class="summary.cagr >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
         >
@@ -627,20 +683,26 @@ function downloadCsv(): void {
         <h2 class="text-base font-semibold">{{ symbol }} - {{ timeframe }} ({{ mode }})</h2>
         <button type="button" class="btn-secondary text-sm" @click="fullscreen = false">Close</button>
       </div>
+      <p v-if="crossCurrencyNote" class="mb-2 text-xs font-medium text-amber-600 dark:text-amber-400">{{ crossCurrencyNote }}</p>
       <component
+        :key="`fs-${chartKey}`"
         :is="'apexchart'"
         v-if="series.data.length && series.data[0].data.length"
         :options="chartOptions"
         :series="series.data"
       />
     </div>
-    <component
-      :is="'apexchart'"
-      v-else-if="series.data.length && series.data[0].data.length"
-      :options="chartOptions"
-      :series="series.data"
-    />
-    <p v-else class="text-sm text-slate-500 dark:text-slate-400">No price history available.</p>
+    <template v-else>
+      <p v-if="crossCurrencyNote" class="mb-2 text-xs font-medium text-amber-600 dark:text-amber-400">{{ crossCurrencyNote }}</p>
+      <component
+        :key="chartKey"
+        :is="'apexchart'"
+        v-if="series.data.length && series.data[0].data.length"
+        :options="chartOptions"
+        :series="series.data"
+      />
+      <p v-else class="text-sm text-slate-500 dark:text-slate-400">No price history available.</p>
+    </template>
     <p class="mt-2 text-right text-xs text-slate-400 dark:text-slate-500">Powered by Example service</p>
   </div>
 </template>
