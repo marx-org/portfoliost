@@ -9,10 +9,261 @@ Legend: `[ ]` pending · `[x]` done
 
 _(No pending work — all sections complete and archived.)_
 
-<!-- Topology moved to plan-archive.md (closeout 2026-09-20) -->
+## 38. TFI fund renames land as display names in positions — catalog shadows ticker_reference (import fix, 2026-09-20)
 
-<!-- §34 moved to plan-archive.md (closeout 2026-09-20) -->
+Proposal: none (incident-style fix). Renamed GS TFI → NN/ING TFI funds keep landing in
+`portfolios.positions` with `symbol = "GOLDMAN SACHS AKCJI"`/`"NN OBLIGACJI"` (a display name)
+instead of a `.TFI` quote symbol. Touches `portfoliost-sheets-sync` (resolver),
+`portfoliost-instruments`
+(ticker_reference curation), `portfoliost` (mock parity). Constraint: no data migration — wipe &
+re-import after the import path is fixed; user approved reimporting all data.
 
-<!-- §36 moved to plan-archive.md (closeout 2026-09-20) -->
+**Root cause (verified, 2026-09-20):** the Podsumowanie catalog has rows for these funds with a
+**null Yahoo symbol** — `byAktywo("Goldman Sachs Akcji").yahooSymbol` is asserted `toBeNull()`
+(`portfoliost-sheets-sync/src/podsumowanie-parser.test.ts:59-63`). The resolver's catalog-first
+precedence (`byCatalogName`, plan §28.3, refined §34.7) matches the name, `fromCatalog` yields
+`ticker = entry.symbol ?? row.aktywo` = the display name, `yahooSymbol = null`, `matched: true`
+→ `ticker_reference` is **never consulted** for these rows → wallets import writes the name as
+symbol. The curated `TFI::` rows in prod are additionally stale: bare tickers (`GSAK`, `GSEM60`)
+with exchange
+`GPW` (not in `exchange_reference`), empty aliases — while resolver tests and mock seed expect
+`.TFI` tickers, exchange `TFI`, and aliases.
 
-<!-- §37 moved to plan-archive.md (closeout 2026-09-20) -->
+Rules: one step = one commit; a step is marked `[x]` only after its tests pass (unit in the touched
+repo + docker-compose mock suite per AGENTS.md).
+
+**Open questions (user decision needed before 38.5):**
+
+1. **RESOLVED (2026-09-20): sheet side stays OLD** — the Google Sheet Transakcje/Podsumowanie rows
+   keep writing "Goldman Sachs Akcji" / "Goldman Sachs Emerytura 2060/2065" / "NN Emerytura 2025/2030"
+   / "NN Obligacji". So `ticker_reference` rows must **map the old sheet names → the new ING `.TFI`
+   symbols in code**: the reference row's folded name/aliases must still match the old names (so the
+   §38.3 fall-through lands), while `ticker`/`yahooSymbol` become the new ING symbol.
+2. **RESOLVED (2026-09-20): rejected fall-through — use `NAME_VENUE_OVERRIDES` instead.** A
+   precedence change would alter catalog-first semantics for any symbol-less catalog row. The 6
+   funds are instead hardcoded in the resolver's `NAME_VENUE_OVERRIDES` (pre-catalog step 1), keyed
+   by the OLD folded sheet names → the new ING `.TFI` symbols. This is exactly the §34.7 mechanism
+   ("overrides for assets whose live Podsumowanie row is stale … sheet edits are not allowed"),
+   no resolver order change (see §38.3).
+
+---
+
+### 38.1 — Record the authoritative GS→ING fund symbol mapping
+
+- [x] Changed-then-current fund symbols (verified via live biznesradar pages 2026-09-20):
+  `GSAK.TFI` → `INGAKC.TFI`, `GSEM60.TFI` → `NNEP60.TFI`, `GSEM65.TFI` → `NNEP65.TFI`,
+  `NNOB.TFI` → `INGOBL.TFI`, `NNEP25.TFI` unchanged ("ING Emerytura 2025"), `NNEP30.TFI`
+  unchanged ("ING Emerytura 2030").
+- [x] Verify each of the 6 current symbols returns 200 through the openst/cachest instrument tier
+  (`/equity/profile`) — verified live in-cluster 2026-09-20, all 6 return 200:
+  `INGAKC.TFI`, `NNEP60.TFI`, `NNEP65.TFI`, `NNEP25.TFI`, `NNEP30.TFI`, `INGOBL.TFI`.
+- Commit (records the verified map; no code).
+
+### 38.2 — Fix curated TFI rows in tickerref-sync (prod reference data)
+
+- [ ] In `portfoliost-instruments/src/scripts/tickerref-sync.ts` `curatedListingRows()` → `tfiFunds`
+  (lines 81-99): change the tuples to the §38.1 symbols — `ticker` = new ING `.TFI` symbol
+  (`INGAKC.TFI`, `NNEP60.TFI`, `NNEP65.TFI`, `NNEP25.TFI`, `NNEP30.TFI`, `INGOBL.TFI`), exchange
+  `TFI`. **The resolver override in §38.3 now handles the OLD sheet-name → new-symbol mapping**, so
+  `ticker_reference` name/alias is free to carry the NEW ING fund names (e.g. `name` = "ING Akcji
+  Polskich", alias `ing akcji|ing akcji polskich`) — matching modern aggregator surfacing and the
+  search path; the old GS/NN names need not be aliased here. Mock seed already uses the reference
+  shape (`mocks/db-seed/instruments/ticker_reference.csv` lines 61696-61701:
+  `NNEP30.TFI,TFI`, `GSAK.TFI,TFI`, …, name + alias) — align its names to the new ING names too.
+- [ ] Prod currently has `TFI::GSAK`/`TFI::GSEM60`/`TFI::GSEM65`/`TFI::NNOB` with bare ticker,
+  exchange `GPW`, empty aliases (verified from live DB 2026-09-20) — these come from §24.1 and were
+  applied to prod despite the comment claiming otherwise (comment: "applied to compose only",
+  actually present in prod). Renaming the key (`TFI::GSAK` → `TFI::INGAKC.TFI`) orphans the old rows
+  on the next upsert-run. Decide: prune obsolete `TFI::*` keys in `curatedListingRows` (delete
+  `listing_key` not in the curated set), or keep old rows but make sure they no longer match by
+  alias/name. Recommend pruning.
+- [ ] `exchange_reference` has **no `TFI` row** in prod (verified live) nor in mock
+  (`exchange_reference.csv` has no TFI). `fromTickerRef` joins suffix via `exchange_reference`; with
+  no row the suffix is empty → `yahooSymbol = ticker` → exactly `INGAKC.TFI`. So a TFI exchange row
+  is optional; adding one (country PL, yahoo_suffix empty) makes it explicit. Decide and align mock.
+- [ ] Tests: update `tickerref-sync.test.ts` expectations to the new tickers/names; add a test that
+  re-running after the rename prunes/updates cleanly (no orphaned `TFI::GSAK`).
+- [ ] Re-run the ticker sync job against homelab and confirm `instruments.ticker_reference` rows.
+- [ ] Commit.
+- Tests: `npm test` in `portfoliost-instruments`.
+
+### 38.3 — Fix resolver: map the 6 old fund names to ING `.TFI` via `NAME_VENUE_OVERRIDES`
+
+- [ ] The Podsumowanie catalog **contains the 6 fund rows** (verified: fixture
+  `src/tests/fixtures/podsumowanie.json` — "Goldman Sachs Akcji" line 324, "Goldman Sachs Emerytura
+  2065/2060" lines 284/1044, "NN Emerytura 2025/2030" lines 1084/964, "NN Obligacji" line 1004) all
+  with `-`/empty Yahoo symbol, `-` Symbol giełdowy. `podsumowanie-parser.ts` `nonEmpty()` maps `-`
+  → null, so these rows are name-only. The `NAME_VENUE_OVERRIDES` comment at
+  `instrument-resolver.ts:164-196` already states the mechanism's purpose ("overrides for assets
+  whose live Podsumowanie row is known to be stale … sheet edits are not allowed") — exactly this
+  case, so the fix is code-side and follows the existing Allianz/Nintendo pattern.
+- [ ] Add the 6 funds to `NAME_VENUE_OVERRIDES` (`instrument-resolver.ts:170-196`), keyed by the
+  **old folded names** (sheet stays old per open question 1), mapping to the §38.1 symbols:
+  `"goldman sachs akcji"` → `INGAKC.TFI`, `"goldman sachs emerytura 2060"` → `NNEP60.TFI`,
+  `"goldman sachs emerytura 2065"` → `NNEP65.TFI`, `"nn emerytura 2025"` → `NNEP25.TFI`,
+  `"nn emerytura 2030"` → `NNEP30.TFI`, `"nn obligacji"` → `INGOBL.TFI`. Each entry:
+  `ticker`, `assetType: "fund"`, `yahooSymbol` (the `.TFI` ticker itself — `exchange_reference` has
+  no TFI row so suffix is empty), `sector: null`, `industry: null`, `country: "PL"`,
+  `countryCode: null`. The override runs before the catalog (step 1) so the pure-name catalog match
+  is bypassed — **no resolver precedence change needed** (open question 2 resolved).
+- [ ] Override `assetType: "fund"` flows to `transakcje-mapper.ts:166` → `.toUpperCase()` → position
+  `FUND` (verified code path; no Bond/cash leak for "NN Obligacji" whose Kategoria is Obligacje).
+- [ ] Tests in `instrument-resolver.test.ts`: add rows for the 6 fund names resolving to the `.TFI`
+  override (yahooSymbol = ticker, assetType `fund`); assert Allianz/Nintendo overrides still win and
+  existing catalog/reference tests stay green.
+- [ ] Commit.
+- Tests: `npm test` in `portfoliost-sheets-sync`.
+
+### 38.4 — Cover the remaining unmatched rows (run 51: "11 unmatched", only 10 printed)
+
+**Root cause REWRITTEN (2026-09-20, live-sheet verification):** the 4 unmatched names are NOT absent
+from the live Podsumowanie catalog — each has **exactly one** catalog entry carrying a valid Yahoo
+symbol. They went unmatched because `byCatalogName` (`instrument-resolver.ts:203-216`) applies the
+`(symbol, giełda)` pair-filter even to a **single-entry** fold group, contradicting its own doc
+comment ("A single entry wins; several entries … are narrowed by (symbol, giełda)"). Sheet rows
+carrying a symbol/giełda that disagrees with the catalog entry zero-out the pool → falls to
+ticker_reference → no match → name-as-symbol. Verified against the live sheet (fetched via the job's
+own credentials, 2026-09-20) and live catalog groups:
+
+| name (run-51 rows) | sheet row symbol/giełda | live catalog entry (single) |
+| --- | --- | --- |
+| `Vonovia SE` (670, 1045) | `VNV` / `ETR` (symbol typo) | `VNA` / `ETR`, Yahoo `VNA.F` |
+| `JM AB` (587) | `JM` / `ETR` (giełda typo, should be STO) | `JM` / `STO`, Yahoo `JM.ST` |
+| `Novo Nordisk A/S` (1407, 1595, 1841) | `NVO` / `AS` (giełda ← unrecognized) | `NVO` / `NYSE`, Yahoo `NVO` |
+| `Beta ETF Bitcoin … (PLN)` (1668, 1754, 1850, 1997) | `ETFBTCPL.WA` / `WSE` | `ETFBTCPL` / `WSE`, Yahoo `ETFBTCPL.WA` |
+
+**Fix (code-side, no sheet edits):** in `byCatalogName`, return `fromCatalog(group[0], row)` directly
+when `group.length === 1` — single fold-group match wins regardless of the row's (symbol, giełda).
+This is exactly the intent already encoded at the top of the file (lines 4-8) and mirrors §34.7's
+`NAME_VENUE_OVERRIDES` rationale ("a mismatching (Symbol, Giełda) pair cannot filter the row out"),
+which becomes redundant for these names (keep the overrides). The catalog symbol/venue stays
+authoritative per entry. Novo resolves to the catalog's `NVO`/NYSE (its fold group is single in the
+catalog even though ticker_reference has both CPH::NOVO-B and NYSE::NVO — catalog wins first).
+
+***Hidden 11th row identified (2026-09-20):*** run-51 printed unmatched rows sorted by sheet row
+(587 → 1997) and then `slice(0, 10)`; the 11th is the next unmatched row > 1997 = **`Novo Nordisk
+A/S` sheet row 2015** (`NVO` / `AS`) — the same failing pattern as rows 1407/1595/1841. Verified by
+re-running resolution locally against the live sheet + live `ticker_reference` index. **The current
+live sheet (post-run-51 edits) carries 27 unmatched rows across 12 names, all sharing the same
+single-entry-narrowed mechanism** (Estee Lauder ×5 `EL/NASDAQ` vs catalog `NYSE`, Constellation ×5
+`CSU/TO` vs catalog `TSE`, HubSpot ×2, iShares Biotech ×2 `BTEK/LON`, Vercom SA, Yum China `PAYC`
+typo, …). The §38.4 single-entry short-circuit resolves **all** of them wholesale — the catalog
+entry's symbol/venue stays authoritative regardless of the sheet's symbol/giełda columns; no
+per-name aliases, curated rows, or venue decisions needed for any of the 12.
+
+- [ ] Logging gap: `sync.ts` prints `unmatched.slice(0, 10)` — run 51 reported 11. Either print all
+  (the list is at most a few dozen) or assert `unmatched.length === printed.length`. This hid the
+  11th (now identified: Novo 2015).
+- [ ] Change `byCatalogName` (`instrument-resolver.ts:203-216`): short-circuit single-entry fold
+  groups before the (symbol, giełda) filter; keep the pair-narrowing for multi-entry groups only.
+  Confirm no other asset's resolution regresses (the filter only ever removes catalog matches for
+  single-entry groups, so behavior only changes unmatched rows).
+- [ ] Tests in `instrument-resolver.test.ts`: add CATALOG entries like the live rows (e.g. Vonovia
+  VNA/ETR + Yahoo VNA.F) asserted to resolve for rows carrying a typos symbol/giełda (`VNV`/`ETR`);
+  assert multi-entry groups are still narrowed by (symbol, giełda) (existing Dupe Asset / SAP XETRA
+  tests already cover this). Also add a test that the hidden 11th is printed (logging fix).
+- [ ] Commit.
+- Tests: extend `instrument-resolver.test.ts`; full resolver suite green.
+
+### 38.5 — Import re-run + verification (after 38.2–38.4)
+
+- [ ] Re-run the sheets-sync import (wipe & re-import) per user approval; confirm
+  `portfolios.positions.symbol` for the 6 funds is now the `.TFI` symbol and asset_type `FUND`.
+- [ ] Confirm the resolver test suite + docker-compose mock suite green.
+- [ ] Commit.
+
+### 38.6 — Mock parity (resolver tests vs prod shape vs mock seed)
+
+- [ ] Align mock seed `mocks/db-seed/instruments/ticker_reference.csv` TFI rows and
+  `mocks/instruments/index.js` search (universe has no fund rows) with the §38.2 shape.
+- [ ] Align `instrument-resolver.test.ts` REF_ROWS TFI fixtures with prod after §38.2.
+- Tests: mock API tests (`npm run test:mock`) + e2e search for "ing akcji".
+
+---
+
+## 39. LSE prices arrive in pence (GBp) — quote values 100× inflated (incident 2026-09-20)
+
+Proposal: none (incident-style fix). Biznesradar prices LSE equities in **pence** and labels
+the currency `GBp`. `toQuote` in `portfoliost-instruments/src/adapters/translate.ts` passes
+price fields and the non-ISO `GBp` code through verbatim; `portfoliost-wallets/src/services/quotes.ts`
+then stores `current_price = 357.50` for CSN.L (real price ≈ £3.575), so
+`market_value = qty × price` is 100× inflated and FX conversion multiplies the error
+(CSN.L in "IKE Marek": £307,807.50 / PLN 1,563,947.40 instead of ≈ £3,078 / ≈ PLN 15,639).
+
+**Verified in prod (2026-09-20):**
+- `cachest /equity/quote/CSN.L` → `last_price 357.5, currency "GBp"`; `/equity/profile/CSN.L` → `currency "GBp"`.
+- `wallets.fx_rates` are correct (EUR-based ECB, GBP 0.8588 / PLN 4.3635) — FX is innocent.
+- Imported `portfolios.transactions` are correct (cost basis from user data: £4,305 / PLN 21,873.39 ✓).
+- Corrupted: `positions.current_price/market_value/unrealized_gain_loss` for pence-quoted symbols,
+  and `value_snapshots` rows written after the first quote pass (IKE Marek 2026-09-20: 2,299,938.75 vs
+  prior day 36,872.97). `instruments.price_bars_all` has 0 rows for CSN.L → price charts not corrupted.
+- Blast radius also includes the SPA: `AddPositionDialog.vue`/Buy action pre-fill the transaction
+  price from the corrupted quote (`position.currentPrice`), so accepting the pre-fill stores a
+  100× price in the transaction.
+
+**Fix location:** the instruments module's translation boundary (proposal D2 — translation adapters
+live in the owning module; §36 precedent: currency resolution done locally, not in openst).
+`GBp` is not ISO-4217; the contract `Quote.currency`/`InstrumentDetail.currency` must be ISO, so
+normalize `GBp → GBP` + divide all price fields by 100 in `toQuote`, and `GBp → GBP` in
+`toInstrumentDetail`. No openst/cachest change (provider tier stays provider-faithful).
+
+Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
+
+---
+
+### 39.1 — Normalize GBp → GBP in `portfoliost-instruments` translation
+
+- [x] `src/adapters/translate.ts` — in `toQuote`: when `str(q.currency)` equals `GBp`
+      (case-insensitive), divide `last_price`, `prev_close`, `open`, `high`, `low`, `bid`, `ask`
+      (and the derived `change`) by 100 and emit `currency: "GBP"`. Keep the division out of
+      `percentChange` (unit-free). Add a small exported helper (e.g. `normalizeQuoteUnit` or an
+      inline block) so the test can target it.
+- [x] `src/adapters/translate.ts` — in `toInstrumentDetail`: map `GBp` profile currency to `GBP`.
+- [x] `src/adapters/translate.test.ts`: toQuote test with a pence-shaped row
+      (`last_price: 357.5, currency: "GBp"`) asserting `currentPrice ≈ 3.575`, `currency "GBP"`,
+      change/bid/ask ÷100, percentChange unchanged; plus a no-op test for a GBP row and a USD row
+      (regression: no division for ISO codes). Also covered: `toInstrumentProfile` currency
+      (wallets fetchProfile consumes the `/profile` route).
+- Tests: full `npm run test` (vitest) in `portfoliost-instruments` green. ✓ 285/285 + `tsc` build.
+- [x] Commit. (`b71c9ec`, 2026-09-20)
+
+### 39.2 — Harden `portfoliost-wallets` quote pass against non-ISO quote currency
+
+- [ ] `src/services/quotes.ts` — `fetchProfile`: only accept `instrumentCurrency` when it is a
+      3-letter ISO code (rejects `GBp`); `fetchQuote`: guard `currency` the same way (default
+      behavior for the position's stored currency unchanged). This stops a future unit-suffixed
+      code from overwriting a correct `positions.instrument_currency`.
+- [ ] `src/services/quotes.test.ts`: a mocked profile/quote returning `currency: "GBp"` must NOT
+      change `instrumentCurrency`; returning `GBP` still updates it.
+- Tests: full `npm run test` in `portfoliost-wallets` green.
+- Commit.
+
+### 39.3 — Deploy via GHA + heal prod data (needs user approval — touches homelab)
+
+- [ ] Push `portfoliost-instruments` + `portfoliost-wallets` to `main`; verify real tags with
+      `gh release list --repo Marx2/portfoliost-instruments` / `…portfoliost-wallets` (GHA auto-bumps,
+      never tag manually).
+- [ ] Pin the new tags in `~/prv/homelab/homelab/cluster/apps/pfire/{portfoliost-instruments,portfoliost-wallets}/app/helmrelease.yaml`, commit + push; Flux applies in ~1 min.
+- [ ] Verify with kubectl (`KUBECONFIG=$HOME/.kube/homylab-tailscale`, ns `pfire`): pod rollout, then
+      live `cachest /equity/quote/CSN.L` through the NEW instruments pod returns
+      `currentPrice ≈ 3.575, currency GBP` via `/api/instruments/CSN.L/quote`.
+- [ ] Heal stale position rows: GET the affected portfolios' positions (or an internal refreshQuotes
+      path) so stale positions re-quote; assert `CSN.L.current_price ≈ 3.575` and
+      `market_value ≈ 3078.08` in `portfolios.positions`.
+- [ ] Heal `value_snapshots`: delete the corrupted rows written after the incident window for the
+      affected portfolio(s) (IKE Marek 2026-09-20: `value = 2299938.75`) — the next read-path
+      snapshot rewrites today's row; confirm the value returns to the ~36–37k PLN neighborhood.
+      (Only delete rows newer than the first pence-quoted quote pass; no full wipe.)
+
+### 39.4 — Verification + closeout
+
+- [ ] SPA check (Playwright, prod or compose): holdings row for CSN.L shows price ≈ £3.57 /
+      ≈ 18.15 PLN, market value ≈ £3,078 / ≈ PLN 15,639; Add-position pre-fill for a `.L` symbol
+      shows pounds, not pence.
+- [ ] Mock parity check: grep `portfoliost/mocks` for `GBp` — none expected; if the mock universe
+      has no LSE pence rows, no mock change needed (record that).
+- [ ] Update `docs/openst-coverage.md` note on LSE pricing unit (pence/GBp upstream) so the
+      translation stays covered; archive §39 to `plan-archive.md`.
+
+_(No pending work — all sections complete and archived.)_
+
