@@ -259,16 +259,23 @@ as a shared helper and reuse in both the price-bars route and the quote route.
 
 ### 34.7 — Venue-unresolved stocks + catalog (sheets-sync, requires approval)
 
-- [ ] Podsumowanie catalog (`portfoliost-sheets-sync`): add venue-qualified
-      `Symbol Yahoo` rows for Allianz SE (`ALV.DE`) and Nintendo Co (venue
-      decided against a live stooq/yahoo probe in 34.1); `Kraj` → DE/JP.
-- [ ] Version coupling (D24): the new sheets-sync image must not send keys a
-      deployed `portfoliost-wallets` rejects — check the live wallets tag in
-      homelab before pinning the sheets-sync release.
-- [ ] Re-run the prod sync Job (wipe + re-import — **explicit user approval**);
-      verify read-only: Allianz/Nintendo positions now have country and a
-      `price_source='quote'` current price.
-- [ ] Commit: `feat(sheets-sync): resolve Allianz/Nintendo venues (34)`.
+- [x] Live `Podsumowanie` edits were off-limits, so `portfoliost-sheets-sync`
+      resolves the stale rows with a code-side `NAME_VENUE_OVERRIDES` map:
+      Allianz SE → `ALV.DE` / DE, Nintendo Co Ltd → `7974.T` / JP (venue decided
+      against live probes in 34.1). The fixture carries the same target values.
+- [x] Version coupling (D24): the new sheets-sync image sends no new payload
+      keys; live `portfoliost-wallets` stayed at `v1.1.41` while sheets-sync was
+      pinned to `v1.0.5`.
+- [x] Re-ran the prod sync Job (wipe + re-import — explicit user approval);
+      read-only verification:
+      - Allianz open position: `ALV.DE`, country DE, `price_source='quote'`,
+        current price populated after a portfolio quote refresh.
+      - Nintendo: stored as `7974.T`, country JP; the only position is closed
+        (quantity 0), so no open quote row exists, and `/api/instruments/7974.T/quote`
+        returns a live JPY price.
+- [x] Commits:
+      - `feat(sheets-sync): resolve Allianz/Nintendo venues (34)`
+      - `fix(sheets-sync): code-side Allianz/Nintendo venue override (34)`
 
 ### 34.8 — Closeout
 
