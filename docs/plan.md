@@ -229,14 +229,16 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
 
 ### 39.2 — Harden `portfoliost-wallets` quote pass against non-ISO quote currency
 
-- [ ] `src/services/quotes.ts` — `fetchProfile`: only accept `instrumentCurrency` when it is a
+- [x] `src/services/quotes.ts` — `fetchProfile`: only accept `instrumentCurrency` when it is a
       3-letter ISO code (rejects `GBp`); `fetchQuote`: guard `currency` the same way (default
       behavior for the position's stored currency unchanged). This stops a future unit-suffixed
       code from overwriting a correct `positions.instrument_currency`.
-- [ ] `src/services/quotes.test.ts`: a mocked profile/quote returning `currency: "GBp"` must NOT
-      change `instrumentCurrency`; returning `GBP` still updates it.
-- Tests: full `npm run test` in `portfoliost-wallets` green.
-- Commit.
+- [x] `src/services/quotes.test.ts`: a mocked profile/quote returning `currency: "GBp"` must NOT
+      change `instrumentCurrency`; returning `GBP` still updates it. Note: the gate is
+      `isIsoCurrency` — 3 letters, but any mixed-casing `gbp` (GBp/gbp/gBP) is rejected, since
+      lowercased it is indistinguishable from the ISO `GBP` code; only exact `GBP` passes.
+- Tests: full `npm run test` in `portfoliost-wallets` green. ✓ 318/318 + `tsc` build.
+- [x] Commit. (`f41f7f0`, 2026-09-20)
 
 ### 39.3 — Deploy via GHA + heal prod data (needs user approval — touches homelab)
 
