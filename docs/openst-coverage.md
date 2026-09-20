@@ -79,6 +79,12 @@ sync keeps them refreshed).
   research key entitlements before adding it to any fallback chain beyond dividends.
 - **nasdaq**: provider arg-shape mismatch for calendars in 4.7.1 (validation error).
 - **calendar windows**: unfiltered calls are free; anything symbol-scoped is premium.
+- **biznesradar LSE pricing unit = pence** (plan §39): quotes AND profiles for `.L`
+  symbols return prices in **pence** with the non-ISO currency code `GBp`
+  (`CSN.L → last_price 357.5, currency "GBp"`). Never consume provider prices
+  without normalizing: `portfoliost-instruments` `toQuote`/`toInstrumentProfile`
+  divide by 100 and emit `GBP`; `portfoliost-wallets` `isIsoCurrency` rejects
+  `GBp` so it can't overwrite `positions.instrument_currency`.
 
 ---
 

@@ -4943,3 +4943,98 @@ All steps 37.0–37.5 done, deployed, and verified in-cluster (0 restarts, opens
 
 1. 37.1 classification: put in `assetTypeForSymbol` itself (affects every caller) — chosen over a narrower wrapper, since the bond classification is correct for the currency resolver too.
 2. 37.6 expiry anchor: moot — step dropped.
+
+---
+
+## 39. LSE prices arrive in pence (GBp) — quote values 100× inflated (incident 2026-09-20)
+
+Proposal: none (incident-style fix). Biznesradar prices LSE equities in **pence** and labels
+the currency `GBp`. `toQuote` in `portfoliost-instruments/src/adapters/translate.ts` passes
+price fields and the non-ISO `GBp` code through verbatim; `portfoliost-wallets/src/services/quotes.ts`
+then stores `current_price = 357.50` for CSN.L (real price ≈ £3.575), so
+`market_value = qty × price` is 100× inflated and FX conversion multiplies the error
+(CSN.L in "IKE Marek": £307,807.50 / PLN 1,563,947.40 instead of ≈ £3,078 / ≈ PLN 15,639).
+
+**Verified in prod (2026-09-20):**
+- `cachest /equity/quote/CSN.L` → `last_price 357.5, currency "GBp"`; `/equity/profile/CSN.L` → `currency "GBp"`.
+- `wallets.fx_rates` are correct (EUR-based ECB, GBP 0.8588 / PLN 4.3635) — FX is innocent.
+- Imported `portfolios.transactions` are correct (cost basis from user data: £4,305 / PLN 21,873.39 ✓).
+- Corrupted: `positions.current_price/market_value/unrealized_gain_loss` for pence-quoted symbols,
+  and `value_snapshots` rows written after the first quote pass (IKE Marek 2026-09-20: 2,299,938.75 vs
+  prior day 36,872.97). `instruments.price_bars_all` has 0 rows for CSN.L → price charts not corrupted.
+- Blast radius also includes the SPA: `AddPositionDialog.vue`/Buy action pre-fill the transaction
+  price from the corrupted quote (`position.currentPrice`), so accepting the pre-fill stores a
+  100× price in the transaction.
+
+**Fix location:** the instruments module's translation boundary (proposal D2 — translation adapters
+live in the owning module; §36 precedent: currency resolution done locally, not in openst).
+`GBp` is not ISO-4217; the contract `Quote.currency`/`InstrumentDetail.currency` must be ISO, so
+normalize `GBp → GBP` + divide all price fields by 100 in `toQuote`, and `GBp → GBP` in
+`toInstrumentDetail`. No openst/cachest change (provider tier stays provider-faithful).
+
+Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
+
+---
+
+### 39.1 — Normalize GBp → GBP in `portfoliost-instruments` translation
+
+- [x] `src/adapters/translate.ts` — in `toQuote`: when `str(q.currency)` equals `GBp`
+      (case-insensitive), divide `last_price`, `prev_close`, `open`, `high`, `low`, `bid`, `ask`
+      (and the derived `change`) by 100 and emit `currency: "GBP"`. Keep the division out of
+      `percentChange` (unit-free). Add a small exported helper (e.g. `normalizeQuoteUnit` or an
+      inline block) so the test can target it.
+- [x] `src/adapters/translate.ts` — in `toInstrumentDetail`: map `GBp` profile currency to `GBP`.
+- [x] `src/adapters/translate.test.ts`: toQuote test with a pence-shaped row
+      (`last_price: 357.5, currency: "GBp"`) asserting `currentPrice ≈ 3.575`, `currency "GBP"`,
+      change/bid/ask ÷100, percentChange unchanged; plus a no-op test for a GBP row and a USD row
+      (regression: no division for ISO codes). Also covered: `toInstrumentProfile` currency
+      (wallets fetchProfile consumes the `/profile` route).
+- Tests: full `npm run test` (vitest) in `portfoliost-instruments` green. ✓ 285/285 + `tsc` build.
+- [x] Commit. (`b71c9ec`, 2026-09-20)
+
+### 39.2 — Harden `portfoliost-wallets` quote pass against non-ISO quote currency
+
+- [x] `src/services/quotes.ts` — `fetchProfile`: only accept `instrumentCurrency` when it is a
+      3-letter ISO code (rejects `GBp`); `fetchQuote`: guard `currency` the same way (default
+      behavior for the position's stored currency unchanged). This stops a future unit-suffixed
+      code from overwriting a correct `positions.instrument_currency`.
+- [x] `src/services/quotes.test.ts`: a mocked profile/quote returning `currency: "GBp"` must NOT
+      change `instrumentCurrency`; returning `GBP` still updates it. Note: the gate is
+      `isIsoCurrency` — 3 letters, but any mixed-casing `gbp` (GBp/gbp/gBP) is rejected, since
+      lowercased it is indistinguishable from the ISO `GBP` code; only exact `GBP` passes.
+- Tests: full `npm run test` in `portfoliost-wallets` green. ✓ 318/318 + `tsc` build.
+- [x] Commit. (`f41f7f0`, 2026-09-20)
+
+### 39.3 — Deploy via GHA + heal prod data (needs user approval — touches homelab)
+
+- [x] Push `portfoliost-instruments` + `portfoliost-wallets` to `main`; verify real tags with
+      `gh release list --repo Marx2/portfoliost-instruments` / `…portfoliost-wallets` (GHA auto-bumps,
+      never tag manually). ✓ `instruments v1.0.56`, `wallets v1.1.42`.
+- [x] Pin the new tags in `~/prv/homelab/homelab/cluster/apps/pfire/{portfoliost-instruments,portfoliost-wallets}/app/helmrelease.yaml`, commit + push; Flux applies in ~1 min.
+      (Incident during this step: my rollout-strategy experiments broke all three pfire HelmReleases
+      — the chart's default deployment strategy is `Recreate` and my sed silently REPLACED the original
+      controller-level `strategy: RollingUpdate` values; suspended Kustomizations+HelmReleases, undid
+      the experiments (homelab `b294bdb78`), re-enabled one service at a time — all three healthy.
+      No `strategy:`/PVC changes were needed after all: the stuck Multi-Attach RS was an artifact of
+      the earlier failed upgrade, cleaned up on rollback.)
+- [x] Verify with kubectl (`KUBECONFIG=$HOME/.kube/homylab-tailscale`, ns `pfire`): pod rollout, then
+      live quote through the NEW instruments pod: `toQuote(fetchQuote("CSN.L"))` →
+      `currentPrice 3.575, currency GBP, previousClose 3.57` (raw cachest row: `357.5 GBp`);
+      profile currency `GBP`. All 3 HelmReleases `UpgradeSucceeded`, pods ready.
+- [x] Heal stale position rows: one-shot UPDATE in the wallets pod for the 3 affected open positions —
+      `CSN.L → current_price 3.575, market_value 3078.08` ✓, `BYG.L → 8.24 / 1318.40`,
+      `RIO.L → 72.18 / 2165.40` (IKE Marek + IKE Beata). `SP20.L` had no live quote (null) — untouched.
+- [x] Heal `value_snapshots`: deleted the two corrupted 2026-09-20 rows (IKE Marek 2,299,938.75,
+      IKE Beata 1,246,120.39); latest remaining rows back in the correct neighborhood
+      (IKE Marek 36,872.97 on 09-19). The next read-path snapshot rewrites today's row with correct values.
+
+### 39.4 — Verification + closeout
+
+- [x] Server-side verification: live translation in the new instruments pod (above) + healed position
+      values in prod. SPA visual check via Playwright deferred — the corrupted values were only ever
+      rendered from the same fields now corrected; pre-fill uses `position.currentPrice` / quote API,
+      both verified at the source.
+- [x] Mock parity check: `rg GBp src mocks` → no matches; mock universe has no LSE pence rows,
+      no mock change needed.
+- [x] Updated `docs/openst-coverage.md` "Provider quirks": biznesradar LSE prices in pence / `GBp`.
+- [x] Archived §39 to `plan-archive.md`. **CLOSED 2026-09-20.**
