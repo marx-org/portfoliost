@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue"
+import { computed, onMounted, onUnmounted, ref, watchEffect } from "vue"
 import { useRoute } from "vue-router"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { getPortfolioAnalytics, getPortfolioRiskMetrics, recomputePortfolio } from "@/api/portfolios"
 import type { PortfolioBenchmarkCalcType, PortfolioAnalyticsTimeframe } from "@/api/portfolios"
+import type { PortfolioPositions } from "@/api/types"
 import { formatPercent, formatSignedCurrency } from "@/utils/format"
+import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
+import { getLatestRate } from "@/api/fx"
 import InstrumentSearchModal from "@/modules/instruments/InstrumentSearchModal.vue"
 import PortfolioPerformanceChart from "@/components/PortfolioPerformanceChart.vue"
 
@@ -204,6 +207,44 @@ const performers = computed(() => {
     bottom: [...sorted].reverse().slice(0, 5),
   }
 })
+
+// §36 — P/L is denominated in each position's instrumentCurrency. When that
+// differs from the display currency, add a converted sub-line using the live
+// rate via @marx2/contracts/fx (D27). Rates are fetched once per distinct
+// instrument currency that differs from the display currency.
+const displayStore = useDisplayCurrencyStore()
+const displayCurrency = displayStore.currency
+
+// instrumentCurrency -> rate (1 unit of instrumentCcy in displayCurrency)
+const rateByCcy = ref<Record<string, number>>({})
+
+watchEffect(() => {
+  const wanted = new Set<string>()
+  for (const p of performers.value.top) {
+    const ccy = p.instrumentCurrency?.toUpperCase()
+    if (ccy && ccy !== displayCurrency.toUpperCase()) wanted.add(ccy)
+  }
+  for (const ccy of wanted) {
+    if (rateByCcy.value[ccy]) continue
+    void (async () => {
+      const rate = await getLatestRate(ccy, displayCurrency)
+      if (rate && typeof rate.rate === "number" && rate.rate > 0) {
+        rateByCcy.value = { ...rateByCcy.value, [ccy]: rate.rate }
+      }
+    })()
+  }
+})
+
+/** P/L converted to the display currency (null when ccy matches or no rate). */
+function convertedPnl(p: PortfolioPositions[number]): number | null {
+  const ccy = p.instrumentCurrency?.toUpperCase()
+  if (!ccy || p.unrealizedGainLoss == null) return null
+  if (ccy === displayCurrency.toUpperCase()) return null
+  const rate = rateByCcy.value[ccy]
+  if (!rate) return null
+  // getLatestRate(ccy, displayCurrency).rate is a direct 1 ccy = rate display
+  return p.unrealizedGainLoss * rate
+}
 </script>
 
 <template>
@@ -278,8 +319,11 @@ const performers = computed(() => {
               <p class="text-xs text-slate-500 dark:text-slate-400">{{ p.companyName }}</p>
             </div>
             <div class="text-right">
-              <p class="font-medium tabular-nums" :class="gainClass(p.unrealizedGainLoss)">{{ formatSignedCurrency(p.unrealizedGainLoss) }}</p>
-              <p class="text-xs tabular-nums" :class="gainClass(p.percentageChange)">{{ formatPercent(p.percentageChange) }}</p>
+              <p class="font-medium tabular-nums" :class="gainClass(p.unrealizedGainLoss)">{{ formatSignedCurrency(p.unrealizedGainLoss, p.instrumentCurrency) }}</p>
+              <p class="text-xs tabular-nums" :class="gainClass(p.percentageChange)">
+                <span v-if="convertedPnl(p) != null" class="opacity-70">{{ formatSignedCurrency(convertedPnl(p), displayCurrency) }}&nbsp;</span>
+                {{ formatPercent(p.percentageChange) }}
+              </p>
             </div>
           </li>
         </ul>
@@ -295,8 +339,11 @@ const performers = computed(() => {
               <p class="text-xs text-slate-500 dark:text-slate-400">{{ p.companyName }}</p>
             </div>
             <div class="text-right">
-              <p class="font-medium tabular-nums" :class="gainClass(p.unrealizedGainLoss)">{{ formatSignedCurrency(p.unrealizedGainLoss) }}</p>
-              <p class="text-xs tabular-nums" :class="gainClass(p.percentageChange)">{{ formatPercent(p.percentageChange) }}</p>
+              <p class="font-medium tabular-nums" :class="gainClass(p.unrealizedGainLoss)">{{ formatSignedCurrency(p.unrealizedGainLoss, p.instrumentCurrency) }}</p>
+              <p class="text-xs tabular-nums" :class="gainClass(p.percentageChange)">
+                <span v-if="convertedPnl(p) != null" class="opacity-70">{{ formatSignedCurrency(convertedPnl(p), displayCurrency) }}&nbsp;</span>
+                {{ formatPercent(p.percentageChange) }}
+              </p>
             </div>
           </li>
         </ul>

@@ -15,6 +15,9 @@ export const DEMO_FX = {
 
 export const SEED_POSITIONS = [
   { id: "473eccd2-cb32-4433-99d8-a04ad6460223", symbol: "META", companyName: "Meta Platforms Inc", quantity: 22, averageCostBasis: 553.91, sector: "Communication Services", industry: "Media", country: "US" },
+  // §36.4 — cross-currency (PLN) position so Top Performers is verified with a
+  // non-USD instrument currency. P/L is computed live in PLN from the quote.
+  { id: "5f1c2a3b-8d4e-4c7f-9a6b-2d4e6f8a0c1b", symbol: "SNT.WA", companyName: "Synektik Sa", quantity: 400, averageCostBasis: 100, instrumentCurrency: "PLN", sector: "Health Care", industry: "Medical Devices", country: "PL" },
   { id: "d5e732d3-cdbf-46e6-b3da-fa044a8071a3", symbol: "CART", companyName: "Maplebear Inc", quantity: 239, averageCostBasis: 43.305, sector: "Consumer Discretionary", industry: "Retail", country: "US" },
   { id: "6f5c0b6c-f8d3-4274-b2e3-3c97cd18abb4", symbol: "MSFT", companyName: "Microsoft Corp", quantity: 32, averageCostBasis: 461.91, sector: "Technology", industry: "Technology", country: "US" },
   { id: "a2547fe3-e56a-4ef5-9dfd-af5d453952da", symbol: "NVDA", companyName: "NVIDIA Corp", quantity: 64, averageCostBasis: 198.95, sector: "Technology", industry: "Semiconductors", country: "US" },
@@ -31,6 +34,8 @@ export const SEED_TRANSACTIONS = [
   { id: "6cc47a79-9924-49eb-9656-3d3d0f15d184", positionId: "d5e732d3-cdbf-46e6-b3da-fa044a8071a3", instrumentSymbol: "CART", instrumentName: "Maplebear Inc", quantity: 239, price: 43.305, totalAmount: 10349.895, sector: "Consumer Discretionary", country: "US" },
   { id: "6eb309da-c3f7-4b40-a3f8-9dd8f0e9335d", positionId: "6f5c0b6c-f8d3-4274-b2e3-3c97cd18abb4", instrumentSymbol: "MSFT", instrumentName: "Microsoft Corp", quantity: 32, price: 461.91, totalAmount: 14781.12, sector: "Technology", country: "US" },
   { id: "29d3487e-54d9-4ede-8268-3210f67cf9dc", positionId: "a2547fe3-e56a-4ef5-9dfd-af5d453952da", instrumentSymbol: "NVDA", instrumentName: "NVIDIA Corp", quantity: 64, price: 198.95, totalAmount: 12732.8, sector: "Technology", country: "US" },
+  // §36.4 — PLN (cross-currency) position; totalAmount is in PLN.
+  { id: "b81d4c6e-2f5a-4d9b-a7c3-6e0f1a2b3c4d", positionId: "5f1c2a3b-8d4e-4c7f-9a6b-2d4e6f8a0c1b", instrumentSymbol: "SNT.WA", instrumentName: "Synektik Sa", quantity: 400, price: 100, totalAmount: 40000, instrumentCurrency: "PLN", sector: "Health Care", country: "PL" },
   { id: "c34b04e5-5e1a-403b-bfb6-38633b34a547", positionId: "e89fcd87-b81a-448c-8690-86f36ac9ee70", instrumentSymbol: "PLTR", instrumentName: "Palantir Technologies Inc", quantity: 72, price: 122.74, totalAmount: 8837.28, sector: "Technology", country: "US" },
   { id: "5ad1db1f-74f8-4592-b0ab-8af317be383b", positionId: "28ef1a40-2ec6-4870-a8de-ec44a92380de", instrumentSymbol: "INTU", instrumentName: "Intuit Inc", quantity: 30, price: 314.605, totalAmount: 9438.15, sector: "Technology", country: "US" },
   { id: "412ea88e-186d-40e7-a7e5-f44ccf3608f4", positionId: "bbcfde5c-0bef-499c-9b54-261da4c6a1a6", instrumentSymbol: "LRCX", instrumentName: "Lam Research Corp", quantity: 25, price: 292.13, totalAmount: 7303.25, sector: "Technology", country: "US" },

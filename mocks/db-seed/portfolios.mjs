@@ -61,7 +61,7 @@ export async function seedPortfolios(sql) {
           (${pos.id}, ${SEED_USER_ID}, ${SEED_PORTFOLIO_ID}, ${pos.symbol},
            ${pos.companyName}, ${"STOCK"},
            ${pos.quantity.toFixed(8)}, ${pos.averageCostBasis.toFixed(8)},
-           ${"USD"}, ${"USD"}, ${pos.sector}, ${pos.industry}, ${pos.country},
+           ${pos.instrumentCurrency ?? "USD"}, ${pos.instrumentCurrency ?? "USD"}, ${pos.sector}, ${pos.industry}, ${pos.country},
            true, ${posOpenedAt}, ${createdAt}, ${updatedAt})
       `
     }
@@ -79,7 +79,7 @@ export async function seedPortfolios(sql) {
           (${t.id}, ${SEED_USER_ID}, ${SEED_PORTFOLIO_ID}, ${t.positionId},
            ${SEED_WALLET_ID}, ${"BUY"}, ${t.instrumentSymbol}, ${t.instrumentName},
            ${t.sector}, ${t.country},
-           ${t.quantity.toFixed(8)}, ${t.price.toFixed(8)}, ${"USD"}, ${"USD"}, ${"STOCK"},
+           ${t.quantity.toFixed(8)}, ${t.price.toFixed(8)}, ${t.instrumentCurrency ?? "USD"}, ${t.instrumentCurrency ?? "USD"}, ${"STOCK"},
            ${"0"}, ${t.totalAmount.toFixed(8)}, ${"1"}, ${"automatic"}, ${"automatic"},
            false, false, ${txExecutedAt}, ${createdAt}, ${updatedAt})
       `
