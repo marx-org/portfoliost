@@ -61693,9 +61693,9 @@ ZSE_ZW::ZIMR,ZIMR,ZSE_ZW,ZIMRE HOLDINGS LIMITED,Stock,Financials,,Zimbabwe,ZW,ZW
 ZSE_ZW::ZSEH,ZSEH,ZSE_ZW,ZIMBABWE STOCK EXCHANGE HOLDINGS LIMITED,Stock,Financials,,Zimbabwe,ZW,ZW0009012494,zimbabwe stock exchange holdings|zimbabwe stock exchange,ZW0009012494,primary_listing
 CRYPTO::BTC-USD,BTC-USD,CRYPTO,Bitcoin,crypto,,,,,,btc|bitcoin,,primary_listing
 CRYPTO::ETH-USD,ETH-USD,CRYPTO,Ethereum,crypto,,,,,,eth|ethereum,,primary_listing
-TFI::NNEP30.TFI,NNEP30.TFI,TFI,NN Emerytura 2030,fund,,,Poland,PL,,nn emerytura 2030,,primary_listing
-TFI::NNEP25.TFI,NNEP25.TFI,TFI,NN Emerytura 2025,fund,,,Poland,PL,,nn emerytura 2025,,primary_listing
-TFI::GSEM65.TFI,GSEM65.TFI,TFI,Goldman Sachs Emerytura 2065,fund,,,Poland,PL,,goldman sachs emerytura 2065,,primary_listing
-TFI::GSEM60.TFI,GSEM60.TFI,TFI,Goldman Sachs Emerytura 2060,fund,,,Poland,PL,,goldman sachs emerytura 2060,,primary_listing
-TFI::GSAK.TFI,GSAK.TFI,TFI,Goldman Sachs Akcji,fund,,,Poland,PL,,goldman sachs akcji,,primary_listing
-TFI::NNOB.TFI,NNOB.TFI,TFI,NN Obligacji,fund,,,Poland,PL,,nn obligacji,,primary_listing
+TFI::INGAKC.TFI,INGAKC.TFI,TFI,ING Akcji (ING Parasol FIO),fund,,,Poland,PL,,ing akcji,,primary_listing
+TFI::NNEP60.TFI,NNEP60.TFI,TFI,ING Emerytura 2060 (ING Emerytura SFIO),fund,,,Poland,PL,,ing emerytura 2060,,primary_listing
+TFI::NNEP65.TFI,NNEP65.TFI,TFI,ING Emerytura 2065 (ING Emerytura SFIO),fund,,,Poland,PL,,ing emerytura 2065,,primary_listing
+TFI::NNEP25.TFI,NNEP25.TFI,TFI,ING Emerytura 2025 (ING Emerytura SFIO),fund,,,Poland,PL,,ing emerytura 2025,,primary_listing
+TFI::NNEP30.TFI,NNEP30.TFI,TFI,ING Emerytura 2030 (ING Emerytura SFIO),fund,,,Poland,PL,,ing emerytura 2030,,primary_listing
+TFI::INGOBL.TFI,INGOBL.TFI,TFI,ING Obligacji (ING FIO),fund,,,Poland,PL,,ing obligacji,,primary_listing
