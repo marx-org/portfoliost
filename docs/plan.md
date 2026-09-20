@@ -89,11 +89,15 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass (
 
 ### 37.5 — Cluster verification of the storm + right-size the memory limit
 
-- [ ] Deploy 37.1 + 37.2 (instruments image) and 37.3 + 37.4 (openst image) via GHA → pin in homelab helmreleases.
-- [ ] Reproduce the storm (dev-cluster, user-approved): clear the openst Redis keys (`fixedincome_*`, `price_ohlcv:*`) and `instruments.price_bars` + `price_bar_metadata` rows for a batch of ROD/EDO symbols; trigger portfolio recomputes (sheets-sync reimport or the admin recompute endpoint); watch `kubectl top pod openst-*` and openst logs.
-- [ ] Assert: `price_bar_metadata` for ROD/EDO flips `failed` → `ok`; `/price/ohlcv/ROD*` no longer appears in openst logs; `/equity/*` 404 storm gone; memory peak stable.
-- [ ] Set the openst memory limit to ~2× the measured peak in `helmrelease.yaml` (requests stay 128Mi); commit + push; verify one full storm cycle survives with 0 restarts.
-- [ ] No unit tests (cluster verification is the gate, per AGENTS.md ops section).
+- [x] Deploy 37.1 + 37.2 (instruments `v1.0.55`) and 37.3 + 37.4 (openst `v1.1.28`) via GHA → pinned in homelab helmreleases (homelab `b58a7a755`).
+- [x] Reproduce the storm (dev-cluster, user-approved): invalidated `instruments.price_bars` + `price_bar_metadata` for batches of cold bonds, ran the REAL recompute gap-fill path (`getPriceBarSeries` via a script in the instruments pod) at conc=4 and conc=6, watched openst memory.
+- [x] Asserts — all verified in cluster:
+  - `price_bar_metadata` for cold bonds flips `failed` → `ok` (all 8 + 16 + 12 tested symbols; full history ending 2026-09-20).
+  - Bond OHLCV hits **only** `/fixedincome/ohlcv` (bond engine); **0** `/equity/*` probes for bond symbols (was: guaranteed 404 storm, 2–15 s per probe).
+  - openst memory **flat at ~340 Mi** through every storm (was: 336 → 493 → 512 Mi climb → OOM); measured peak ~344 Mi.
+  - 503s only appear under >4-wide bursts = cachest's per-route rate limiter (`fetch_interval: 2 s` / `fetch_max_wait: 4 s`) self-throttling — pre-existing protective behaviour, now the safety net instead of an OOM.
+- [x] openst app memory limit 512 Mi → **700 Mi** (~2× measured peak) in `helmrelease.yaml` (homelab `f16623d12`); requests stay 128 Mi. Final storm: 12/12 ok, **0 restarts**, mem flat.
+- [x] No unit tests (cluster verification is the gate, per AGENTS.md ops section).
 
 ### 37.6 — (Optional polish) Align bond OHLCV/quote cache to CPI freshness
 
