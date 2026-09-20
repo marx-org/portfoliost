@@ -100,7 +100,7 @@ interface ColumnDef {
 }
 
 const allColumns: ColumnDef[] = [
-  { key: "symbol", label: "Symbol", sortable: false },
+  { key: "symbol", label: "Symbol", sortable: true },
   { key: "quantity", label: "Quantity", sortable: true },
   { key: "avgCost", label: "Avg Cost", sortable: true },
   { key: "price", label: "Price", sortable: true },

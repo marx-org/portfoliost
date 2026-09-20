@@ -63,6 +63,28 @@ describe("PortfolioHoldingsTab", () => {
     expect(wrapper.find("button[aria-label='Position actions']").exists()).toBe(true)
   })
 
+  it("sorts positions by symbol when the Symbol column header is clicked", async () => {
+    const base = position()
+    mocked.getPortfolioPositions.mockResolvedValue([
+      { ...base, id: "pos1", symbol: "META" } as never,
+      { ...base, id: "pos2", symbol: "AAPL", companyName: "Apple Inc" } as never,
+      { ...base, id: "pos3", symbol: "NVDA", companyName: "NVIDIA Corp" } as never,
+    ])
+
+    const wrapper = mount(PortfolioHoldingsTab)
+    await flushPromises()
+
+    const symbolHeader = wrapper.findAll("th").find((th) => th.text().includes("Symbol"))!
+    await symbolHeader.trigger("click")
+    const text = wrapper.text()
+    expect(text.indexOf("AAPL")).toBeLessThan(text.indexOf("META"))
+    expect(text.indexOf("META")).toBeLessThan(text.indexOf("NVDA"))
+
+    await symbolHeader.trigger("click")
+    const textDesc = wrapper.text()
+    expect(textDesc.indexOf("NVDA")).toBeLessThan(textDesc.indexOf("AAPL"))
+  })
+
   it("shows an empty state without positions", async () => {
     mocked.getPortfolioPositions.mockResolvedValue([])
     const wrapper = mount(PortfolioHoldingsTab)
