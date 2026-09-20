@@ -119,23 +119,24 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ### 36.3 — PriceChart: real currency + honest cross-currency comparison
 
-- [ ] `PriceChart.vue`: track `chartCurrency` from `h.currency` (fallback
-  instrument `instrumentCurrency` when the chart is embedded in a holdings
-  context, else `USD`) and use it in the Price-mode tooltip/axis
-  (`formatCurrency(value, chartCurrency)`). No conversion — the axis shows the
-  series' native currency.
-- [ ] Cross-currency compare: when the benchmark currency (SPY/QQQ/IWM → USD;
-  resolve once via quote/profile, cache per session) differs from `chartCurrency`
-  and mode is `Price`, auto-switch the overlay to percent-normalized data (both
-  series re-based to 100/0%) with a small caption "Percent — currencies differ
-  (PLN vs USD)"; keep raw-price overlay only when currencies match.
-  No FX amounts are shown, so `@marx2/contracts/fx` is not invoked.
-- [ ] Tests: unit test the percent-normalization + currency-mismatch decision
-  (new pure helper `compareSeries.ts` in `src/utils/` or colocated);
-  `vue-tsc`/build green; Playwright e2e: open the chart for a PLN-seeded
-  position, assert the tooltip currency is PLN and the benchmark overlay is
-  percent-normalized with the caption.
-- [ ] Commit.
+- [x] `PriceChart.vue`: tracks `chartCurrency` from `h.currency` and formats
+  the Price-mode y-axis, tooltip, and Total Chg summary in the instrument's
+  trading currency (no conversion — the axis shows the series' native ccy).
+- [x] Cross-currency compare: `compareSeries.ts` pure helpers decide/apply
+  percent-normalization. When the benchmark currency (now emitted as `USD` by
+  the instruments module's compare overlay) differs from `chartCurrency` in
+  Price mode, BOTH series are re-based to % with a "Percent — currencies
+  differ (PLN vs USD)" caption; same-currency keeps raw prices. No
+  `@marx2/contracts/fx` invoked (no FX amounts shown).
+- [x] Keyed remount: vue3-apexcharts JSON-clones options on `updateOptions`
+  and drops the y-axis formatter function, so the chart remounts after each
+  load (`init` preserves function options).
+- [x] Tests: `compareSeries.test.ts` unit (301 total green), build green,
+  E2E `chart-currency.spec.ts` — SNT.WA shows PLN axis + "currencies differ
+  (PLN vs USD)" note; AAPL vs SPY stays raw USD with no note. Full e2e suite:
+  81 passed + 2 new; only pre-existing `wallets-watchlists` "edit and delete"
+  fails (verified failing on clean baseline too, unrelated to this work).
+- [x] Commit: `portfoliost-instruments` (compare currency), `portfoliost` (charts).
 
 ### 36.4 — Top/Bottom Performers: P/L in the instrument's currency
 
