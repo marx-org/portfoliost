@@ -75,30 +75,29 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ### 36.1 — Instruments: correct `currency` on `/history` and `/price-bars`
 
-- [ ] `portfoliost-contracts`: `contracts/openapi.yaml` — `PriceBarSeries.currency`
+- [x] `portfoliost-contracts`: `contracts/openapi.yaml` — `PriceBarSeries.currency`
   `z.string().nullable()` → `type: string` (it becomes authoritative, resolved
-  server-side). Push to `main`, wait for the CI patch bump, install
-  `@marx2/contracts@<new>` in `portfoliost-instruments` and `portfoliost`
-  (`NODE_AUTH_TOKEN=$(gh auth token) npm install ...`), run `npm run gen:types` in
-  `portfoliost`, commit the lockfile + `generated/api-types.d.ts`.
-- [ ] `portfoliost-instruments`: resolve the instrument currency once
-  (profile `currency`, degrading to `ticker_reference.country_code` → ISO-4217
-  map, then `"USD"`) and pass it through:
-  - `toPriceHistory` takes a `currency` parameter (drop the hardcoded `"USD"`);
-  - `GET /:symbol/history` passes it; bond/crypto fallback paths keep working
-    (crypto → quote-pair currency, bonds → PLN);
-  - `price-bars.ts` fills `currency` instead of `null` (tickerref lookup).
-- [ ] Mocks (`portfoliost`): `mocks/instruments/index.js` `historyFor` serves one
-  shared `history_daily.json` fixture (hardcoded `currency: "USD"`) for every
-  symbol — set `h.currency` from `research.basics.currency` when the symbol has
-  a research file (default `"USD"`). Same for the compare overlay (currency is
-  the instrument's, per the real endpoint shape). Regenerate seeds if touched.
-- [ ] Tests: `translate.test.ts` / `price-bars.test.ts` unit tests — non-USD
-  symbol (e.g. SNT.WA → PLN, BTC-USD → USD) yields the right currency on both
-  routes. Instruments repo suite green. Compose stack smoke: `curl` through
-  cachest-gateway `/api/instruments/SNT.WA/history?resolution=daily` and
-  `/price-bars?from=&to=` show `"currency":"PLN"`. `npm run test:stack` green.
-- [ ] Commit.
+  server-side). Pushed to `main`, CI published **v1.6.27**; installed in
+  `portfoliost-instruments` and `portfoliost`, `npm run gen:types` run,
+  lockfile + `generated/api-types.d.ts` committed.
+- [x] `portfoliost-instruments`: new `src/services/instrument-currency.ts`
+  resolves the currency (crypto pair form → quote ccy; bond/corp_bond/fund →
+  PLN; `ticker_reference.country_code` → ISO-4217 map; `"USD"` fallback —
+  never throws, no upstream HTTP) and passes it through:
+  - `toPriceHistory` takes a `currency` parameter (hardcoded `"USD"` dropped);
+  - `GET /:symbol/history` passes it (bond/crypto fallback paths keep working);
+  - `getPriceBarSeries` fills `currency` instead of `null`.
+- [x] Mocks (`portfoliost`): `mocks/instruments/index.js` `historyFor` sets
+  `h.currency` from `research.basics.currency` (the shared `history_daily.json`
+  fixture was a hardcoded USD stand-in); compare overlay carries `currency:
+  "USD"` explicitly.
+- [x] Tests: `instrument-currency.test.ts` (venue-scoped SNT.WA→PLN vs SNT on
+  another venue, crypto pairs, bonds, USD fallbacks), `toPriceHistory`
+  currency-param test, `price-bars.test.ts` currency assertions
+  (BTC-USD→USD, ROD1033→PLN, LBST201→PLN). Instruments suite 270 green.
+  Compose smoke (real tier): SNT.WA history/price-bars → `PLN`, AAPL → `USD`.
+  `npm run test:mock` 199 green, `npm run test:stack` 32/32.
+- [x] Commit: `portfoliost-instruments@` (36.1 commit), `portfoliost@9cd792e`.
 
 ### 36.2 — Instruments: dividends in the instrument's real currency
 
