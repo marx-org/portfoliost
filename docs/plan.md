@@ -237,25 +237,25 @@ as a shared helper and reuse in both the price-bars route and the quote route.
 
 ### 34.6 — Full compose stack smoke + mock parity
 
-- [ ] `docker compose up -d --build`; curl via cachest for one savings bond, one
+- [x] `docker compose up -d --build`; curl via cachest for one savings bond, one
       Catalyst bond, one crypto pair, one PL fund, and AAPL regression; second
       call → Redis HIT per route. The savings-bond case is deterministic because
       `mock-db-seed` now seeds a minimal `openst.bond_series` + `openst.cpi_12m`
       row for `ROD1033`; the live classes (Catalyst/crypto/fund/AAPL) are a
       manual smoke and their exact prices are recorded, not asserted.
-- [ ] `wallets refreshQuotes` parity is proven by the same route it calls:
+- [x] `wallets refreshQuotes` parity is proven by the same route it calls:
       `GET /api/instruments/:symbol/quote` returns 200 + a price for `ROD1033`
       (real stack, E2E) and for the mock `NoPrice` bond/crypto/fund symbols
       (mock API), so wallets no longer marks them `priceSource='fallback'`.
-- [ ] `portfoliost/mocks/`: add the synthetic `NoPrice` portfolio (bond/crypto/
+- [x] `portfoliost/mocks/`: add the synthetic `NoPrice` portfolio (bond/crypto/
       fund positions, `country='Other'`) + per-symbol mock quotes; `test:mock`
       asserts positions carry a live current price and `/instruments/:symbol/quote`
       matches it. `tests/e2e/no-price-quote-parity.spec.ts` asserts the same
       against the running mock and the deterministic `ROD1033` real-stack quote.
-- [ ] `npm run test` + `npm run test:mock` + `npm run test:e2e` pass (incl.
+- [x] `npm run test` + `npm run test:mock` + `npm run test:e2e` pass (incl.
       `price-bars.spec.ts` regression — stooq-first ordering from `0c03214` must
       keep holding).
-- [ ] Commit: `test(portfoliost): no-price bond/crypto position parity`.
+- [x] Commit: `test(portfoliost): no-price bond/crypto position parity`.
 
 ### 34.7 — Venue-unresolved stocks + catalog (sheets-sync, requires approval)
 
