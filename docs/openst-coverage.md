@@ -28,6 +28,7 @@ intrinio key present but broken). sec is keyless (SEC EDGAR).
 | crypto quote | `/crypto/quote/{p}` | `crypto.price.historical` (derived latest row) | yfinance, fmp, tiingo | snapshot from latest `historical` row (no `crypto.price.quote` in openbb-crypto 1.6.2); change/change_percent from ≥2 rows; cached 6h at cachest `OPENST_CRYPTO_QUOTE` |
 | crypto search | `/crypto/search/{query}` | `crypto.search` | fmp | **fmp-only** (`CRYPTO_SEARCH_PROVIDERS`). Rows are coin-venue pairs (`BTCUSD`, `TBTCUSD`, `BTC.BUSD`, …) — **not** yfinance pairs; instruments normalise them to `BASE-USD` via a curated 38-major base→pair map (`btc→BTC-USD`, `eth→ETH-USD`, `matic→POL-USD` …) + bare-mnemonic fallback, and lead results with the curated exact-pair suggestion so `BTC-USD` survives the 50-row cap. Upstream FMP validation anomalies (e.g. `ico_date=NaN` → OpenBB model rejection) make a whole query 404 at openst; instruments swallows the failed leg additively. Cached 7d at cachest `OPENST_CRYPTO_SEARCH` |
 | fixed income — retail savings bonds OHLCV/profile/search (D79) | `/fixedincome/ohlcv/{t}?start&end`, `/fixedincome/profile/{t}`, `/fixedincome/search/{q}` | `equity.price.historical` / `equity.profile` / `equity.search` provider `obligacje` | obligacje (keyless) | pure-Python engine (`openbb_obligacje` plugin) prices savings bonds `EDO*`, `ROD*`, `OTS*`, `ROR*`, `DOR*`, `TOS*`, `COI*`, `ROS*` from issue params + CPI 12m — no market price exists for retail savings bonds. No fixed-income router in OpenBB 4.7.x, so fetchers register under the **equity** model keys. Data in Postgres `openst` schema: `bond_series` (catalogue, `obligacjeskarbowe.pl`, 449 historical emissions backfilled via `--mode archive` — URL id typos in archived EDO codes handled by fetching the raw selector `url_id`; DB-first `search_bonds`/`get_bond_profile` read the table directly with OpenBB fallback) + `cpi_12m` (`obligacje.pl`). **Recurrence (D79 22)** — CronJobs in the openst HelmRelease: `openst-bond-import` daily 04:30 UTC `--mode incremental` (new emissions go on sale on the 1st, so a daily pass catches each one inside its sale window) plus `openst-bond-archive` on the 3rd at 06:00 UTC `--mode archive` re-enumerating the full catalogue as the self-heal backstop; idempotent (`ON CONFLICT DO NOTHING`), one log line per emission parsed and per symbol inserted. OHLCV window must include the emission's issue date (pre-issuance window → 404). Cached at cachest `OPENST_BOND_OHLCV` (6h) / `OPENST_BOND_PROFILE` (24h) |
+| fixed income — retail savings bond quote (plan 34.2) | `/fixedincome/quote/{t}` | deterministic `openbb_obligacje` close (no OpenBB quote command) | Postgres `bond_series` + `cpi_12m` | “quote” = today’s computed close/open/high/low/prev-close from the savings-bond engine, not a market quote; returns the standard quote shape with `currency=PLN` and cached 6h at cachest `OPENST_BOND_QUOTE` |
 
 All four SEC surfaces are keyless (SEC EDGAR). cachest proxies them at
 `/ownership/{t}`, `/ownership/institutional/{t}`, `/filings/{t}`,
@@ -56,6 +57,21 @@ MD&A, but a true Q&A audio transcript is still out of tier.
    underlying documents (10-K/10-Q/8-K + report URLs) and MD&A supplies the
    management discussion text. A true earnings-call Q&A **audio transcript**
    (`fundamental.transcript`) is still FMP-only/premium — no audio in tier.
+
+## Asset-class quote dispatch (portfoliost-instruments, plan §34)
+
+`GET /api/instruments/:symbol/quote` resolves the asset class from
+`instruments.ticker_reference` and then routes as follows:
+
+| Asset class | Quote source | Notes |
+| --- | --- | --- |
+| `savings_bond` | cachest `OPENST_BOND_QUOTE` → openst `/fixedincome/quote/{symbol}` | deterministic computed close; 404 falls back to the equity path |
+| `crypto` | cachest `OPENST_CRYPTO_QUOTE` → openst `/crypto/quote/{pair}` | pair-aware lookup (`BTC-USD`, then bare `BTC`) |
+| `corp_bond` / `fund` / default | cachest `OPENST_QUOTE` → openst `/equity/quote/{symbol}` | existing biznesradar/yfinance/FMP path |
+
+The curated bootstrap rows for crypto/fund references are upserted by
+`tickerref-sync --curated-only` (run once after the §34 deploy; the weekly
+sync keeps them refreshed).
 
 ## Provider quirks worth remembering
 

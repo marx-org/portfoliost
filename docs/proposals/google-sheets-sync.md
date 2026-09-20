@@ -1,6 +1,6 @@
 # google-sheets-sync — discovery & column mapping
 
-> Status: **final/done (2026-09-19)** — `portfoliost-sheets-sync` Job (§24 of
+> Status: **final/done (2026-09-20)** — `portfoliost-sheets-sync` Job (§24 of
 > plan.md) imports `Transakcje` into `wallets.wallet_transactions` and
 > `portfolios.transactions`/`positions` via the wallets import API (§23); triggered
 > on demand from the portfoliost-admin panel. The live-sheet inspection of
@@ -28,6 +28,11 @@
 >   `GOLDMAN SACHS AKCJI`-style row to a random `* Stock` when the catalog misses)
 >   now self-heals on the next quotes pass because the stored `sector`/`country`
 >   win over the provider guess, no wipe needed.
+> - **Plan §34.7 venue override (2026-09-20)** — live `Podsumowanie` edits were
+>   off-limits, so the sync carries a code-side `NAME_VENUE_OVERRIDES` map for the
+>   two stale foreign stock rows: Allianz SE → `ALV.DE` / DE and Nintendo Co Ltd →
+>   `7974.T` / JP. An approved prod wipe + re-import verified the stored symbols,
+>   countries and live quote resolution.
 >
 > Data read-only from the `Transakcje` sheet of spreadsheet
 > `1iDzR0OTHvqPbjjRSnAI4SdoD7sZOGy8uT9991sPFFps`. Access via the **Sheets REST API**

@@ -3,6 +3,7 @@
 **Status**: accepted (2026-08-23)
 **D77 (PL fund/bond OHLCV)**: **done** (2026-09-14) — biznesradar provider wiring
 **D79 (retail savings bonds)**: **done** (2026-09-16) — openbb_obligacje provider wiring
+**Plan §34 (asset-class quote dispatch)**: **done** (2026-09-20) — `/:symbol/quote` routes savings bonds to openst `/fixedincome/quote`, crypto to `/crypto/quote`, and corp bonds/funds/default instruments to the existing equity quote path.
 **Builds on**: [backend-topology.md](backend-topology.md) (D1–D11), [MODULARISATION.md](../MODULARISATION.md)
 **Scope**: second extracted module `portfoliost-instruments`; local verification only (cluster rollout deferred to a later phase).
 
@@ -39,7 +40,7 @@ contract shapes (`generated/api-types`). Provider access goes through **cachest 
 | `/:symbol` (detail) | composite: quote + profile adapters, research fallback | aggregation is module logic (D2) |
 | `/:symbol/profile` | openst→cachest | verified: `equity.profile` fmp + yfinance |
 | `/:symbol/metrics`, `/overview-metrics` | openst→cachest | verified: `fundamental.metrics` yfinance/fmp (+ `ratios` fmp) |
-| `/:symbol/quote`, `/price` | openst→cachest | verified: `price.quote` yfinance/fmp |
+| `/:symbol/quote`, `/price` | openst→cachest | verified: `price.quote` yfinance/fmp; plan §34 adds asset-class dispatch (savings bond → fixedincome quote, crypto → crypto quote, other → equity quote) |
 | `/:symbol/history?resolution=` | openst→cachest | verified: `price.historical`; extend openst route with `start`/`end` + OHLCV |
 | `/:symbol/fundamentals` | openst→cachest | verified: `fundamental.income/balance/cash` fmp/yfinance |
 | `/:symbol/eps-surprises` | **derived in module** (I8b) | original plan: keep mock call (estimates all 402). Shipped: quarterly income statements → actual EPS/revenue; estimates = prior-year quarter baseline. Live. |
