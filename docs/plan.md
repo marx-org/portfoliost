@@ -51,38 +51,41 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass (
 
 ### 37.0 — Immediate mitigation: scale openst to 2 replicas (homelab)
 
-- [ ] `~/prv/homelab/homelab/cluster/apps/pfire/openst/app/helmrelease.yaml`: `replicas: 1` → `replicas: 2`. Commit + push; Flux applies in ~1 min.
-- [ ] Verify: `kubectl get pods -n pfire | grep openst` shows 2 Running; service round-robins.
-- [ ] No tests (infra config-only; verified by kubectl). Commit in homelab repo.
+- [x] `~/prv/homelab/homelab/cluster/apps/pfire/openst/app/helmrelease.yaml`: `replicas: 1` → `replicas: 2`. Commit + push; Flux applies in ~1 min.
+- [x] Verify: `kubectl get pods -n pfire | grep openst` shows 2 Running; service round-robins.
+- [x] No tests (infra config-only; verified by kubectl). Commit in homelab repo (db0433c9f, 2026-09-20).
 
 ### 37.1 — Route savings bonds to the bond tier in the recompute path (portfoliost-instruments)
 
-- [ ] `src/services/quote-dispatch.ts`: export `SAVINGS_BOND` (or a `isSavingsBond(symbol)` helper) so it has one source of truth.
-- [ ] `src/db/tickerref-queries.ts` (or the lookup wrapper): when `ticker_reference` returns null for a symbol matching `SAVINGS_BOND`, classify it as `bond` — i.e. extend the asset-type resolution used by `price-bars.ts` (`lookupAssetType`) so `upstreamFor` routes `ROD*/EDO*` to `fetchBondOhlcv` without probing the equity tier. Keep `quote-dispatch.ts` behavior unchanged (its regex fallback stays as safety net).
-- [ ] `src/services/price-bars.ts`: use the extended resolution in `getPriceBarSeries` gap-fill (and any other `lookupAssetType` call sites) so cold savings bonds fetch `fixedincome/ohlcv` once and land in `price_bars` overflow with `fetchStatus: "ok"`.
-- [ ] Tests: unit — `upstreamFor`/gap-fill for `ROD1035` calls the fixedincome adapter, never the equity `fetchOhlcv` (mock the adapters, assert); existing stock/etf routing unchanged. `npm run test` green, `npm run build` green.
-- [ ] Commit.
+- [x] `src/adapters/symbol.ts`: single source of truth — `SAVINGS_BOND` regex + `isSavingsBond()` helper (venue-suffix and case tolerant).
+- [x] `src/db/tickerref-queries.ts`: `assetTypeForSymbol` short-circuits savings-bond codes to `"bond"` before the reference lookup — `price-bars.ts` (`upstreamFor`) therefore routes `ROD*/EDO*` to `fetchBondOhlcv` without probing the equity tier. `quote-dispatch.ts` unchanged (its regex fallback stays as safety net).
+- [x] `src/services/price-bars.ts`: no change needed — the gap fill calls `lookupAssetType` (= `assetTypeForSymbol`), so cold savings bonds now fetch `fixedincome/ohlcv` once and land in `price_bars` overflow with `fetchStatus: "ok"`.
+- [x] Tests: unit — `assetTypeForSymbol` classifies `ROD*/EDO*` (incl. `.WA` form) as bond with non-bond symbols unchanged; `getPriceBarSeries` cold-bond gap-fill calls `fetchBondOhlcv`, never `fetchOhlcv`/`fetchCryptoOhlcv`, persists overflow + `fetchStatus ok`. `npm run test` 273 green, `npm run build` (tsc) green.
+- [x] Commit: `3fb590a` (pushed → GHA builds the image; cluster deploy happens in §37.5).
 
 ### 37.2 — Stop equity-tier probes for savings bonds in SPA-facing routes (portfoliost-instruments)
 
-- [ ] `/profile` and `/detail` routes: for `SAVINGS_BOND` symbols, call `fetchBondProfile` first (skip the equity probe entirely).
-- [ ] `/metrics` and `/fundamentals`: for `SAVINGS_BOND` symbols, return a structured 404 ("not applicable for savings bonds") without any upstream equity call.
-- [ ] `/quote` (route): for `SAVINGS_BOND` symbols, dispatch straight to `fetchFixedincomeQuote` (no equity 404 round-trip) — keep the existing fallback for safety.
-- [ ] Tests: unit per route (no `fetchQuote`/`fetchProfile`/`fetchMetrics`/fundamentals adapter call for `ROD*`); e2e if a compose-level test exists for the research page. `npm run test` + `npm run build` green.
-- [ ] Commit.
+- [x] `/:symbol` (detail) + `/:symbol/profile`: `isSavingsBond` → `fetchBondProfile` first, no equity probe. Bond-profile failure maps to the upstream error (no equity retry).
+- [x] `/:symbol/metrics` + `/:symbol/overview-metrics` + `/:symbol/fundamentals`: structured 404 "Not applicable for savings bonds", zero upstream calls.
+- [x] `/:symbol/calendar`: empty entries (PLN) without the equity calendar/profile probes.
+- [x] `/:symbol/history` + `/:symbol/price?date=`: `fetchOhlcvWithBondFallback` resolves emissions through the bond engine only (no equity OHLCV walk).
+- [x] `/quote`, `/price`, price-bars already bond-correct after §37.1 (`fetchQuoteByAssetClass` + `upstreamFor`); regex fallback in quote-dispatch kept as safety net.
+- [x] Tests: 9 new route tests (no `fetchProfile`/`fetchMetrics`/`fetchFundamentals`/calendar/`fetchOhlcv` calls for `ROD*`; bond failure mapping). `npm run test` 282 green, `npm run build` green.
+- [x] Commit: `b0dc693` (pushed).
 
 ### 37.3 — Negative-cache 404s in openst (short TTL)
 
-- [ ] `openst/src/main.py` `_cached_or_404`: when `fetch()` returns `None`, store a short-TTL sentinel (e.g. 6 h, `__null__`) in Redis and return 404; on sentinel hit, 404 without calling the fetch. Do NOT negative-cache `[]` (price_ohlcv treats `[]` as a valid empty result). Add a module-level constant `NEGATIVE_TTL`.
-- [ ] Tests: `tests/test_main.py` — a `None` fetch is cached (second call doesn't invoke fetch, same 404); an `[]` result is not negative-cached; a success after a negative entry evicts it (set TTL ordering test or explicit key clear check).
-- [ ] `docker compose up -d` smoke: hit a dead ticker twice, second call fast + no upstream logs. Full openst suite green.
-- [ ] Commit.
+- [x] `openst/src/main.py` `_cached_or_404`: a `None` fetch result stores a `NEGATIVE_TTL` (6 h) `__openst_null__` sentinel in Redis; subsequent requests 404 fast without re-running the provider walk. `[]` (valid empty result) is never negative-cached. While the sentinel is active the fetch is skipped; after TTL expiry the fetch runs again and a success overwrites it.
+- [x] Tests: `tests/test_main.py` — 404 is negative-cached (single upstream call); sentinel expiry + success overwrite; `[]` never negative-cached.
+- [x] `docker compose --profile test run --rm test` green (271 main + 69 + 53 plugin).
+- [x] Commit: `e5c7f99` (pushed). Note: the compose test target reuses the last built image — `docker compose --profile test build test` before `run` after edits.
 
 ### 37.4 — Bound in-flight upstream work in openst (semaphore)
 
-- [ ] `openst/src/main.py`: process-wide `threading.Semaphore` (e.g. 8) acquired inside `_cached_or_404`'s fetch path (and the catalogue route's fetch) so a burst queues instead of piling dozens of 2–15 s multi-provider walks in the threadpool.
-- [ ] Tests: unit — N concurrent cache-miss fetches with a fake slow fetch never exceed the semaphore bound (count in-flight via a counter in the fake). Full openst suite green.
-- [ ] Commit.
+- [x] `openst/src/main.py`: process-wide `threading.Semaphore` (`UPSTREAM_MAX_INFLIGHT`, default 8, env-tunable) acquired around the fetch in `_cached_or_404` and the corp-bond catalogue scrape, so a burst queues instead of piling dozens of 2–15 s multi-provider walks in the threadpool.
+- [x] Tests: `tests/test_concurrency.py` — 9 concurrent cache-miss requests through a bound-3 gate never exceed 3 in-flight (parking fetch + controller) and still get real parallelism.
+- [x] Full compose suite green (272 + 69 + 53).
+- [x] Commit: `acf294a` (pushed).
 
 ### 37.5 — Cluster verification of the storm + right-size the memory limit
 
