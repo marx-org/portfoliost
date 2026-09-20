@@ -104,17 +104,22 @@ fix); only reference-table patching is removed. Prod wipe & re-import needs user
 
 ### 40.1 — Prove the 4 names already resolve at import (no patch needed)
 
-- [ ] `instrument-resolver.test.ts` cases for RGEN/ASML (name-only) and DTLA/IUFS (symbol + venue)
+- [x] `instrument-resolver.test.ts` cases for RGEN/ASML (name-only) and DTLA/IUFS (symbol + venue)
   resolve via the catalog to `RGEN.US` / `ASML.US` / `DTLA.L` / `IUFS.L`, `matched: true`, not via
   any `ticker_reference` alias. `npm test` in `portfoliost-sheets-sync` green.
+  (sheets-sync `eeb21e8`: live Podsumowanie rows added to the CATALOG fixture, the 4 ex-patched
+  rows added to REF_ROWS with pure adanos aliases; the same rows stay `matched: false` without the
+  catalog, so only the catalog can resolve them. US listings resolve bare — `RGEN`/`ASML` — per the
+  resolver's venue-suffix convention.)
 
 ### 40.2 — Delete `ALIAS_OVERRIDES` + `applyAliasOverrides` from `portfoliost-instruments`
 
-- [ ] Remove the `ALIAS_OVERRIDES` constant, `applyAliasOverrides`, and the `main()` call/log from
+- [x] Remove the `ALIAS_OVERRIDES` constant, `applyAliasOverrides`, and the `main()` call/log from
   `tickerref-sync.ts` (still present — `ALIAS_OVERRIDES` at `tickerref-sync.ts:28/41/43`, call at
   `:307`); module doc now "pure upstream adanos sync + curated routing rows; no sheet-compat
   patches re-applied." Purity regression test: after sync, the alias column equals the adanos
   fixture value for every row. `npm test` + `npm run build` in `portfoliost-instruments` green.
+  (instruments `35f3cb3`; the §24.9 override describe block was replaced by the purity test.)
 
 ### 40.3 — Align mock seed to pure adanos
 
