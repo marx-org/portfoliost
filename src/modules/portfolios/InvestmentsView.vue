@@ -50,6 +50,15 @@ async function handleMergedRecompute() {
   }
 }
 
+// D26: every currency selector is fed exclusively by the /api/currencies registry
+const currenciesStore = useCurrenciesStore()
+if (!currenciesStore.loaded) void currenciesStore.load()
+const currencies = computed(() => currenciesStore.options.map((c) => c.code))
+const currencySymbol = (code: string) => currenciesStore.info(code)?.symbol ?? code
+const displayCurrencyStore = useDisplayCurrencyStore()
+const { currency: displayCurrency } = storeToRefs(displayCurrencyStore)
+const showCurrencyMenu = ref(false)
+
 // Merged series is denominated in the base currency (store.totalMetrics) —
 // convert to the display currency before plotting (getLatestRate once).
 const mergedSourceCcy = computed(() => (store.totalMetrics?.baseCurrency ?? "USD").toUpperCase())
@@ -70,15 +79,6 @@ const mergedChartSeries = computed(() => {
   const rate = mergedChartRate.value ?? 1
   return (merged.value?.performance?.timeSeries ?? []).map((p) => ({ ...p, value: (p.value ?? 0) * rate }))
 })
-
-// D26: every currency selector is fed exclusively by the /api/currencies registry
-const currenciesStore = useCurrenciesStore()
-if (!currenciesStore.loaded) void currenciesStore.load()
-const currencies = computed(() => currenciesStore.options.map((c) => c.code))
-const currencySymbol = (code: string) => currenciesStore.info(code)?.symbol ?? code
-const displayCurrencyStore = useDisplayCurrencyStore()
-const { currency: displayCurrency } = storeToRefs(displayCurrencyStore)
-const showCurrencyMenu = ref(false)
 
 const strategies = [
   { value: "GROWTH", label: "Growth" },

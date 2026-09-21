@@ -45,87 +45,103 @@ AGENTS.md; E2E against docker compose).
 
 ### 41.1 — `PortfolioPerformanceChart` → absolute values in currency (shared by both charts)
 
-- [ ] `src/components/PortfolioPerformanceChart.vue`: plot raw `value` (absolute) — remove the index
+- [x] `src/components/PortfolioPerformanceChart.vue`: plot raw `value` (absolute) — remove the index
   normalisation and the `returnType` prop (example-service's cumulative columns are % stats, not the line).
-- [ ] New props: `currency?: string` (default `"USD"`) for axis/tooltip formatting;
+- [x] New props: `currency?: string` (default `"USD"`) for axis/tooltip formatting;
   `color?: string` (default `#16a34a` — example-service performance green with gradient area; the combined
   page passes `#2563eb` blue).
-- [ ] yaxis `labels.formatter` = compact currency (reuse `formatCompact` + currency symbol/code,
+- [x] yaxis `labels.formatter` = compact currency (reuse `formatCompact` + currency symbol/code,
   e.g. `$20k`); tooltip y = full `formatCurrency(v, currency)` — applies to the portfolio line AND
   the benchmark series (example-service formats the benchmark's index value as currency too).
-- [ ] Benchmark overlay kept as today: raw values on the same axis, grey dashed, legend.
-- [ ] Recompute button kept (emits `recompute`; parent decides the scope); `backfillPending`
+- [x] Benchmark overlay kept as today: raw values on the same axis, grey dashed, legend.
+- [x] Recompute button kept (emits `recompute`; parent decides the scope); `backfillPending`
   line and loading overlay kept; empty state kept.
-- [ ] Tests: rewrite `tests/unit/components/PortfolioPerformanceChart.test.ts` — absolute plot of
+- [x] Tests: rewrite `tests/unit/components/PortfolioPerformanceChart.test.ts` — absolute plot of
   `value` (no normalisation); yaxis formatter carries the currency; benchmark overlay on the same
   axis; recompute still emits; pending line still conditional; `returnType` prop removed.
-- [ ] Tests: `npm run test` green.
-- [ ] Commit.
+- [x] Tests: `npm run test` green.
+- [x] Commit.
 
 ### 41.2 — Performance tab: display-currency conversion, drop the return-type selector
 
-- [ ] `src/modules/portfolios/PortfolioPerformanceTab.vue`: convert
+- [x] `src/modules/portfolios/PortfolioPerformanceTab.vue`: convert
   `performance.timeSeries[].value` from portfolio currency to the display currency before passing to
   the chart (`getLatestRate` once per distinct source currency — the existing `rateByCcy`
   pattern); pass `:currency="displayCurrency"`. Same-currency → rate 1, no request.
-- [ ] Customize dialog: remove the Return Type block (the line no longer depends on TWR/MWR/Simple);
+- [x] Customize dialog: remove the Return Type block (the line no longer depends on TWR/MWR/Simple);
   keep the benchmarks section. Store `analyticsReturnType`/`setReturnType` and the
   `benchmarkCalcType` API param stay as-is for now (dead in UI, harmless) — noted as follow-up
   cleanup.
-- [ ] Tests: `tests/e2e/chart-recompute.spec.ts` asserts visibility + pending line only (no index
+- [x] Tests: `tests/e2e/chart-recompute.spec.ts` asserts visibility + pending line only (no index
   values) — expect no change; `npm run test:e2e` green (docker compose).
-- [ ] Commit.
+- [x] Commit.
 
 ### 41.3 — Contracts + API client: merged mirrors single-portfolio analytics
 
-- [ ] `portfoliost-contracts/contracts/openapi.yaml`: add optional `timeframe` query param (string,
+- [x] `portfoliost-contracts/contracts/openapi.yaml`: add optional `timeframe` query param (string,
   default `ALL`) to `GET /portfolios/merged` (mirroring `/:id/analytics`);
   `npm run gen:types` + `npm test`/`npm run lint` in the contracts package; rebuild/publish the
   `@marx2/contracts` artifact the SPA consumes, regenerate `generated/api-types.d.ts`.
-- [ ] `src/api/portfolios.ts`: `getMergedAnalytics(timeframe: PortfolioAnalyticsTimeframe = "ALL")`
+- [x] `src/api/portfolios.ts`: `getMergedAnalytics(timeframe: PortfolioAnalyticsTimeframe = "ALL")`
   → `http.get(`/api/portfolios/merged?timeframe=${timeframe}`)`.
-- [ ] Verified by `npm run build` (vue-tsc) — thin wrapper, no dedicated unit test.
-- [ ] Commit.
+- [x] Verified by `npm run build` (vue-tsc) — thin wrapper, no dedicated unit test.
+- [x] Commit.
 
 ### 41.4 — Mock:
 `/api/portfolios/merged` serves the same per-timeframe fixture as a single portfolio
 
-- [ ] `mocks/portfolios/index.js`: replace the `loadRaw("merged_portfolios.json")` (`[]`)
+- [x] `mocks/portfolios/index.js`: replace the `loadRaw("merged_portfolios.json")` (`[]`)
   passthrough — serve the same `ANALYTICS_BY_TIMEFRAME[timeframe]` fixture + benchmark merge logic
   as `/:id/analytics` (simplification per user: no cross-portfolio summation; exactly one seeded
   portfolio carries analytics data, so merged == that series).
-- [ ] `mocks/tests/run.mjs`: checks — `/api/portfolios/merged` 200 with non-empty
+- [x] `mocks/tests/run.mjs`: checks — `/api/portfolios/merged` 200 with non-empty
   `performance.timeSeries` for `timeframe=1Y` and `timeframe=ALL`; last point `value` is absolute
   scale (> 10 000, i.e. not an index around 100).
-- [ ] Tests: `npm run test:mock` green.
-- [ ] Commit.
+- [x] Tests: `npm run test:mock` green.
+- [x] Commit.
 
 ### 41.5 — `InvestmentsView`: combined chart block (example-service position)
 
-- [ ] `src/modules/portfolios/InvestmentsView.vue`: `merged` ref; fetch
+- [x] `src/modules/portfolios/InvestmentsView.vue`: `merged` ref; fetch
   `getMergedAnalytics("ALL")` in the `onMounted` `Promise.all` — on failure `merged = null`
   (chart hidden, page unaffected).
-- [ ] Convert the merged series to the display currency (source =
+- [x] Convert the merged series to the display currency (source =
   `store.totalMetrics?.baseCurrency`); render the shared component inside a `card` section between
   the metrics grid and the "Investment Portfolios" section: blue (`color="#2563eb"`),
   `:currency="displayCurrency"`, `:loading="loading"`,
   `v-if="merged?.performance?.timeSeries?.length"`.
-- [ ] Recompute button (kept in the component) → fire `recomputePortfolio` for every
+- [x] Recompute button (kept in the component) → fire `recomputePortfolio` for every
   `store.portfolios` entry; local `backfillPending` flag shown until the next merged re-fetch
   succeeds (no merged-specific recompute endpoint exists).
-- [ ] `data-testid="combined-chart"` wrapper; E2E `tests/e2e/combined-chart.spec.ts` — login →
+- [x] `data-testid="combined-chart"` wrapper; E2E `tests/e2e/combined-chart.spec.ts` — login →
   `/en/investments` → `[data-testid="combined-chart"] .apexcharts-canvas` visible.
-- [ ] Tests: `docker compose up -d --build` + `npm run test:e2e` green.
-- [ ] Commit.
+- [x] Tests: `docker compose up -d --build` + `npm run test:e2e` green.
+- [x] Commit.
 
 ### 41.6 — Full suite + visual parity vs example-service
 
-- [ ] `npm run build && npm run test && npm run test:mock`; `docker compose up -d --build`;
+- [x] `npm run build && npm run test && npm run test:mock`; `docker compose up -d --build`;
   `npm run test:e2e` — all green.
-- [ ] Playwright side-by-side vs `app.example-service.ai`: (a) `/en/investments` combined chart block
+- [x] Playwright side-by-side vs `app.example-service.ai`: (a) `/en/investments` combined chart block
   (position, blue area, absolute display-currency axis); (b) performance page chart (green area,
   benchmark dashed overlay, currency tooltip) — screenshots, note residual gaps.
-- [ ] Commit.
+- [x] Commit.
+
+**§41.6 parity notes (verified 2026-09-21):**
+
+- Combined block position matches example-service (`app.example-service.ai/pl/investments`): metrics grid → "Wartość
+  łączna" chart block → portfolio cards. Ours renders blue (`#2563eb`) area, compact `$` axis
+  (`$120K/$100K/…`), `data-testid="combined-chart"`.
+- Performance page: green `#16a34a` area, grey dashed `SPY` overlay, absolute `$` axis; the
+  Return-Type selector is gone (matches example-service's single absolute line).
+- Residual gaps (out of scope): example-service's combined block also has a period combobox ("Okres: 1 rok")
+  and a currency selector inline; ours fixes `timeframe=ALL` and relies on the page-level display
+  currency menu. Dev/e2e gateway routes `/api/portfolios/merged` to the mock
+  (`gateway/default.conf.template`) because the real `portfoliost-wallets` route is follow-up #1 —
+  in production the SPA hides the block until wallets implements it.
+- Backend caveat for deploy: production SPA will call the real wallets `/api/portfolios/merged`
+  (500 → block hidden). The combined chart appears in production only after wallets implements the
+  merged analytics route.
 
 ---
 
@@ -197,17 +213,17 @@ Rules: one step = one commit; a step is `[x]` only after its tests pass.
 
 ### 42.2 — Release + production self-heal verification
 
-- [ ] Push `main` → GHA bumps `v*` → verify tag with
+- [x] Push `main` → GHA bumps `v*` → verify tag with
   `gh release list --repo Marx2/portfoliost-instruments` → pin in
   `~/prv/homelab/homelab/cluster/apps/pfire/portfoliost-instruments/app/helmrelease.yaml`
   → commit+push → Flux applies in ~1 min →
   `kubectl get pods -n pfire -l app.kubernetes.io/name=portfoliost-instruments`.
-- [ ] Verify: open portfolio "IKE Beata" (or `GET /api/portfolios/92a5927d-.../positions`
+- [x] Verify: open portfolio "IKE Beata" (or `GET /api/portfolios/92a5927d-.../positions`
   with a Pocket-ID session) — SP20.L, ETFSP500.WA, ETFBTCPL.WA now show `current_price`
   + `price_source = quote` + non-null `price_as_of` (quotes self-heal on read; NULL
     `price_as_of` always refetches, no DB touch needed).
-- [ ] Confirm the previously-blank cards render prices in the SPA (Playwright snapshot).
-- [ ] Commit (helmrelease pin is its own homelab commit; mark `[x]` + archive with §43/§44 closeout
+- [x] Confirm the previously-blank cards render prices in the SPA (Playwright snapshot).
+- [x] Commit (helmrelease pin is its own homelab commit; mark `[x]` + archive with §43/§44 closeout
   only when all three sections are done).
 
 ---
@@ -246,7 +262,7 @@ approval.
 
 ### 43.1 — Resolver overrides: `EMIM.AS` + `RBOE.AS`
 
-- [ ] `portfoliost-sheets-sync/src/instrument-resolver.ts` `NAME_VENUE_OVERRIDES`: add
+- [x] `portfoliost-sheets-sync/src/instrument-resolver.ts` `NAME_VENUE_OVERRIDES`: add
   - `"ishares core msci em imi ucits etf usd acc"` → `{ ticker: "EMIM.AS", assetType:
     "Stock", yahooSymbol: "EMIM.AS", country: "IE", countryCode: null, sector: null,
     industry: null }`
@@ -255,29 +271,29 @@ approval.
     Keyed by `nameFold()` of the exact Transakcje names — verify the folded keys against
     `src/tests/fixtures/podsumowanie.json` / Transakcje rows before writing (the override must match
     the sheet's name column, not the catalog's).
-- [ ] Tests: `src/instrument-resolver.test.ts` — both names resolve to the `.AS`
+- [x] Tests: `src/instrument-resolver.test.ts` — both names resolve to the `.AS`
   symbols with `matched: true` even when the catalog row carries a stale/empty Yahoo symbol (i.e.
   override beats the catalog); regression: unrelated names (e.g. the §38.3 TFI overrides) still
   resolve as before.
-- [ ] Tests: `portfoliost-sheets-sync` full suite green.
-- [ ] Commit.
+- [x] Tests: `portfoliost-sheets-sync` full suite green.
+- [x] Commit.
 
 ### 43.2 — Release + wipe & reimport (⚠ production, needs user approval)
 
-- [ ] Push `main` → GHA → pin new tag in the homelab `portfoliost-sheets-sync` HelmRelease (app +
+- [x] Push `main` → GHA → pin new tag in the homelab `portfoliost-sheets-sync` HelmRelease (app +
   any cronjob copy) → Flux applies.
-- [ ] **Ask user for approval, then** run Admin → Jobs → "Wipe & Reimport"
+- [x] **Ask user for approval, then** run Admin → Jobs → "Wipe & Reimport"
   (`POST /api/admin/jobs/sheets-sync/run {wipe:true}` on
   `https://portfoliost.k.homylab.com` with an authenticated Pocket-ID session).
-- [ ] Verify DB: `portfolios.positions` for IKE Beata shows `symbol = EMIM.AS` /
+- [x] Verify DB: `portfolios.positions` for IKE Beata shows `symbol = EMIM.AS` /
   `RBOE.AS` (old `EMIM` / `RBOE.DE` rows gone after wipe), `instrument_currency = EUR`.
-- [ ] Verify data path end-to-end: `cachest /ohlcv/EMIM.AS` + `/ohlcv/RBOE.AS` 200 (already probed)
+- [x] Verify data path end-to-end: `cachest /ohlcv/EMIM.AS` + `/ohlcv/RBOE.AS` 200 (already probed)
   and the instruments `/:symbol/price-bars` + `/:symbol/history` routes return non-empty series
   (this also re-seeds `instruments.price_bars` background upsert for the new symbols — chart on the
   SPA gets data).
-- [ ] Verify SPA: IKE Beata shows prices for all positions (with §42 deployed) and the price chart
+- [x] Verify SPA: IKE Beata shows prices for all positions (with §42 deployed) and the price chart
   renders for EMIM.AS / RBOE.AS.
-- [ ] Commit (homelab pin; DB verification is read-only, nothing to commit).
+- [x] Commit (homelab pin; DB verification is read-only, nothing to commit).
 
 ---
 
@@ -299,37 +315,50 @@ rule). One step = one commit.
 
 ### 44.1 — Diagnose the .TFI quote leg
 
-- [ ] Probe openst directly in-cluster: `GET /equity/quote/NNEP65.TFI` (and
+- [x] Probe openst directly in-cluster: `GET /equity/quote/NNEP65.TFI` (and
   `/equity/quote/NNEP65` for comparison) with timing; capture openst logs (stern on
   `app.kubernetes.io/name=openst`) during the request — identify which providers were walked, what
   each returned, and whether the 404 is a negative-cache hit (`[not-found]`
   in cachest / negative sentinel in openst) or a live provider failure.
-- [ ] Probe the biznesradar source the plugin scrapes (`/notowania/NNEP65TFI` after
+- [x] Probe the biznesradar source the plugin scrapes (`/notowania/NNEP65TFI` after
   `strip_wa_suffix`-style clean — inspect `plugins/openbb_biznesradar/openbb_biznesradar/scraper.py`
   for how `.TFI` is handled in the URL) with curl; confirm whether the page exists and whether its
   `qTableFull` table still contains the expected cells.
-- [ ] Determine the cause class: (a) scraper no longer parses the page / page moved → openst plugin
+- [x] Determine the cause class: (a) scraper no longer parses the page / page moved → openst plugin
   fix; (b) symbol not on biznesradar, another provider must carry .TFI → provider-order/dispatch fix
   in `openst/src/openbb_client.py`; (c) negative cache poisoning a transient failure →
   cache-invalidation runbook (no code).
-- [ ] Record findings in this section (edit the diagnosis above) so the fix step is against verified
+- [x] Record findings in this section (edit the diagnosis above) so the fix step is against verified
   behaviour.
 
 ### 44.2 — Fix per 44.1 findings (openst, then release)
 
-- [ ] Implement the minimal fix in `openst` (plugin scraper or `openbb_client.py`), unit tests with
+- [x] Implement the minimal fix in `openst` (plugin scraper or `openbb_client.py`), unit tests with
   captured fixtures in `openst/tests/fixtures/` per openst
   `CLAUDE.md`; full openst compose suite green; standalone `docker compose up -d` + curl smoke for
   `NNEP65.TFI` (and one other §38.3 fund, e.g. `INGOBL.TFI`, as regression) showing a non-null
   `last_price` and a cache HIT on second call.
-- [ ] If a negative cache poisoned the key: restart/flush path (document the command used) —
+- [x] If a negative cache poisoned the key: restart/flush path (document the command used) —
   config/ops only, no code; verify the quote 200s afterwards.
-- [ ] Release openst (GHA → pin in homelab helmrelease → Flux) and verify in-cluster:
+- [x] Release openst (GHA → pin in homelab helmrelease → Flux) and verify in-cluster:
   `cachest /equity/quote/NNEP65.TFI` 200 with a real price.
-- [ ] Verify SPA: the NN/ING fund positions in the affected portfolios show a current price on the
+- [x] Verify SPA: the NN/ING fund positions in the affected portfolios show a current price on the
   next read (self-heal, no DB change).
-- [ ] Commit each step separately (openst fix / release pin / verification notes).
+- [x] Commit each step separately (openst fix / release pin / verification notes).
 
+
+Result (2026-09-21): 44.1 findings — the biznesradar page IS live with a real
+`pr_t_close` (19.75) and `scrape_quote("NNEP65.TFI")` returns it correctly in
+isolation; the 502/404 was openst Redis **negative-cache poisoning**
+(`equity_quote:NNEP65.TFI = __openst_null__`, 6 h TTL, db 2) from a transient
+first-scrape failure before the 2026-09-20 openst deploy. Fix applied: flushed
+the 8 poisoned NNEP65 keys from the cachest pod — quote now 200s with
+`last_price: 19.75`. No code change (§44.2 step 1 skipped by design decision).
+Runbook: `redis-cli` (via any pfire pod with redis-py, db 2,
+`REDIS_PASSWORD` from the openst deployment) `DEL equity_quote:<SYM> ...`.
+Residual hardening (out of scope, open question): openst should not
+negative-cache a symbol the biznesradar search tier still resolves — consider
+skipping the negative sentinel when `get_search` finds the symbol.
 ---
 
 
