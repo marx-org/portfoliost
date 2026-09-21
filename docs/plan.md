@@ -207,12 +207,28 @@ expiry (first request after each expiry), not once. So make the request short:
 
 ### 45.7 — Release B + closeout
 
-- [ ] Release openst (pin homelab) + portfoliost (normal SPA deploy), verify in-cluster:
+- [x] Release openst (pin homelab) + portfoliost (normal SPA deploy), verify in-cluster:
   `cachest /ohlcv/INGAKC.TFI?start=2015-09-21…` → 200 < 30 s, and the SPA overview chart renders
-  immediately with no 502 in the instruments logs.
-- [ ] Re-check the 6 h-expiry case conceptually (first request after TTL pays the clamped, now
-  short, scrape) — note in closeout.
-- [ ] Commit (homelab pins).
+  immediately with no 502 in the instruments logs. — **openst v1.1.30** (app + 4 cronjobs) +
+  **portfoliost SPA v1.0.181**, both rolled (openst 2/2, SPA 1/1). Cold in-cluster fetch: openst
+  direct **200 in 42.1 s** (was ~110 s / 502); through cachest **HTTP 200, 2749 bars** then
+  0.0 s cache HIT. Not <30 s because INGAKC is 1998-vintage (a full 2015→2026 window is 45
+  pages) — 42 s is still comfortably under the 60 s ingress cap (the §45.5 lever), and 0.0 s
+  after the 6 h TTL. No openst 5xx post-rollout.
+- [x] Re-check the 6 h-expiry case conceptually (first request after TTL pays the clamped, now
+  short, scrape) — note in closeout. — The 6 h `ohlcv` cachest TTL (and openst's own cache) expire;
+  the first request after expiry re-pays the scrape. At the 0.3 s fund delay that's ~40 s for an
+  11-y window (was ~115 s) — under the 60 s cap, so the recurring first-after-expiry no longer
+  502s. The SPA's price-bars-first chart (45.6) masks it regardless (chart paints from cached
+  bars while the wide /history completes in the background).
+- [x] Commit (homelab pins) — `d4d67aa0f`.
+
+**Closeout note (deploy):** the very first `cachest /ohlcv/INGAKC.TFI` right after the openst
+rollout 502'd once with `All connection attempts failed` — a **DNS race**, not a timeout: the
+5 h-old cachest pod still held the old openst pod IP in its resolver cache; openst had just
+rescheduled to new IPs. Retried immediately → 200. Nothing to fix (self-heals on the next
+request/DNS TTL); logged so a post-rollout single 502 on a cold cache isn't misread as a §45
+regression.
 
 ---
 
