@@ -7,112 +7,99 @@ Legend: `[ ]` pending · `[x]` done
 
 ---
 
-## 38. TFI fund renames land as display names in positions — catalog shadows ticker_reference (import fix, 2026-09-20)
+## 41. Combined (all-portfolios) value chart on the main portfolios page (example-service parity, 2026-09-21)
 
-Renamed GS TFI → NN/ING TFI funds landed in `portfolios.positions` with `symbol` = the display
-name ("GOLDMAN SACHS AKCJI", "NN OBLIGACJI") instead of a `.TFI` quote symbol. Fixed at the import
-step: the resolver (in `portfoliost-sheets-sync`, the google-sync module) owns the name → `.TFI`
-mapping; `ticker_reference` stays pure upstream adanos + curated crypto routing rows. No sheet
-edits; no reference-table patching; no resolver precedence change.
+User request (no proposal file): the example-service portfolio dashboard shows a large combined
+(all-portfolios) value chart between the header metrics and the portfolio cards; portfoliost's
+main page (`InvestmentsView`, `/en/investments`) is missing it. Reuse the existing
+`PortfolioPerformanceChart.vue` — adapted with a `combined` variant (absolute values, currency
+axis, no Recompute button) — fed by `GET /api/portfolios/merged`.
 
-Root cause: the Podsumowanie catalog rows for these 6 funds carry a **null Yahoo symbol**, so the
-catalog-first resolver matched the name, yielded the display name, `matched: true` — and
-`ticker_reference` was never consulted. The curated `TFI::` rows in prod were also stale (bare
-tickers, exchange `GPW`, empty aliases).
+State of the endpoint: `openapi.yaml` already defines `GET /portfolios/merged`
+(operationId `getMergedPortfolios`, returns `PortfolioAnalytics`, no query params); the mock
+currently answers `[]` (the example-service capture was empty); the real `portfoliost-wallets` route is
+**not** implemented yet (follow-up, separate repo — SPA degrades gracefully: chart simply hidden).
+Mock semantics: per-date sum of the shared analytics fixture across the portfolios listed in
+`portfolios_total_metrics.json` → `portfolioBreakdown` (each seeded portfolio serves the same
+`portfolio_analytics_all.json` fixture, so N× per date is the true sum, and the series stays
+consistent with the header Total Value).
 
-Resolution (user-directed, 2026-09-20): "ticker manipulation only in google-sync code." The old
-sheet-name → new ING `.TFI` mapping lives **exclusively** in the resolver's `NAME_VENUE_OVERRIDES`
-(import-side, §34.7 precedent). `ticker_reference` carries **no** curated `.TFI` fund rows. Mock
-seed carries the funds only with valid, up-to-date ING names.
+Scope: portfoliost SPA + mocks only.
 
-Rules: one step = one commit; a step is `[x]` only after its tests pass (unit in the touched repo +
-docker-compose mock suite per AGENTS.md).
-
-### 38.1 — Record the authoritative GS→ING fund symbol mapping
-
-- [x] Changed-then-current fund symbols (verified via live biznesradar pages 2026-09-20):
-  `GSAK.TFI` → `INGAKC.TFI`, `GSEM60.TFI` → `NNEP60.TFI`, `GSEM65.TFI` → `NNEP65.TFI`,
-  `NNOB.TFI` → `INGOBL.TFI`, `NNEP25.TFI` unchanged ("ING Emerytura 2025"), `NNEP30.TFI`
-  unchanged ("ING Emerytura 2030").
-- [x] Each of the 6 current symbols returns 200 through the openst/cachest instrument tier
-  (`/equity/profile`) — verified live in-cluster 2026-09-20, all 6 return 200.
-
-### 38.2 — Drop curated TFI rows from tickerref-sync (reference stays pure)
-
-- [x] Removed the `tfiFunds` block from `curatedListingRows()` in
-  `portfoliost-instruments/src/scripts/tickerref-sync.ts` — `curatedListingRows()` now returns only
-  the crypto pair rows. `ticker_reference` carries no curated `.TFI` fund rows. (Commit `3646694`.)
-- [x] `tickerref-sync.test.ts` curated describe block no longer asserts any `TFI::` row.
-  `npm test` in `portfoliost-instruments` green (286 passed).
-
-### 38.3 — Resolver maps the 6 old fund names to ING `.TFI` via `NAME_VENUE_OVERRIDES`
-
-- [x] Added the 6 funds to `NAME_VENUE_OVERRIDES` (`portfoliost-sheets-sync/src/instrument-resolver.ts`),
-  keyed by the **old folded sheet names** (sheet stays old), mapping to the §38.1 symbols:
-  `goldman sachs akcji` → `INGAKC.TFI`, `goldman sachs emerytura 2060` → `NNEP60.TFI`,
-  `goldman sachs emerytura 2065` → `NNEP65.TFI`, `nn emerytura 2025` → `NNEP25.TFI`,
-  `nn emerytura 2030` → `NNEP30.TFI`, `nn obligacji` → `INGOBL.TFI`. Each entry:
-  `ticker`, `assetType: "fund"`, `yahooSymbol` (the `.TFI` ticker; no `exchange_reference` TFI row
-  so suffix is empty), `sector: null`, `industry: null`, `country: "PL"`, `countryCode: null`.
-  Runs before the catalog (step 1), bypassing the null-symbol catalog match — no resolver
-  precedence change. (Commit `852010b`.)
-- [x] `assetType: "fund"` flows to `transakcje-mapper.ts` → `.toUpperCase()` → position `FUND`.
-- [x] `instrument-resolver.test.ts`: 6 fund rows resolve to the `.TFI` override; Allianz/Nintendo
-  overrides still win; existing catalog/reference tests stay green. `npm test` in
-  `portfoliost-sheets-sync` green.
-
-### 38.4 — Single-entry fold-group short-circuit (fixes the other unmatched rows)
-
-- [x] `byCatalogName` (`instrument-resolver.ts`) now returns `fromCatalog(group[0], row)` directly
-  when `group.length === 1` — a single catalog fold entry wins regardless of the sheet's
-  (symbol, giełda). Sheet rows carrying a typos symbol/venue no longer zero-out a valid single
-  catalog match. Multi-entry groups are still narrowed by (symbol, giełda). (Commit `4f75f81`.)
-- [x] `instrument-resolver.test.ts`: CATALOG entries like the live rows (e.g. Vonovia `VNA`/`ETR`
-  + Yahoo `VNA.F`) resolve for rows carrying a typos symbol/venue; multi-entry groups still
-  narrowed by (symbol, giełda). `npm test` in `portfoliost-sheets-sync` green (108 passed).
-
-### 38.6 — Mock parity (mock seed + resolver fixtures)
-
-- [x] Mock seed `mocks/db-seed/instruments/ticker_reference.csv` TFI rows aligned to valid,
-  up-to-date ING fund names (no old GS/NN aliases). (Commit `8dd0424`.)
-- [x] `instrument-resolver.test.ts` REF_ROWS TFI fixtures aligned with the mock/prod shape.
-  (Commit `c1ca76c`.)
-
-### 38.5 — Prod wipe & re-import (DONE 2026-09-20)
-
-- [x] Deployed the latest to homelab (Flux `01bf64441`): `portfoliost-sheets-sync` **v1.0.6**
-  (§38.3 + §38.4 resolver) via admin `SHEETS_SYNC_IMAGE`; `portfoliost-instruments` **v1.0.57**
-  (§38.2). Verified running.
-- [x] Re-ran the sheets-sync wipe & re-import (syncRun 61): **0 unmatched** (was 11) — §38.4
-  fold-short-circuit + §38.3 fund override both live.
-- [x] Verified `portfolios.positions.symbol` for the 6 funds is the `.TFI` symbol and asset_type
-  `FUND`: `INGAKC.TFI`, `NNEP60.TFI`, `NNEP65.TFI`, `NNEP25.TFI`, `NNEP30.TFI`, `INGOBL.TFI`.
-- [x] Pruned the 6 orphaned stale `TFI::*` rows (`GSAK`/`GSEM60`/`GSEM65`/`NNEP25`/`NNEP30`/`NNOB`,
-  bare ticker, exchange `GPW`, empty aliases — §24.1): targeted `DELETE`, verified 0 `TFI::*` rows
-  remain. (Full clean-baseline truncate + rerun deferred to §41.)
+Rules: one step = one commit; a step is `[x]` only after its tests pass (unit + mock suite per
+AGENTS.md; E2E against docker compose).
 
 ---
 
-## 41. Rebuild `ticker_reference` from a clean truncate + tickerref-sync rerun (2026-09-21)
+### 41.1 — `PortfolioPerformanceChart`: `combined` variant (absolute values, currency axis, no Recompute)
 
-§38.5 pruned the 6 stale `TFI::*` rows surgically. A full clean-baseline rebuild — `TRUNCATE
-instruments.ticker_reference` then re-run the tickerref-sync — is the end-state target: it
-guarantees the table is exactly what `portfoliost-instruments` produces (post §40.2: pure adanos +
-curated crypto), dropping any other stale/manual rows in one pass.
+- [ ] `src/components/PortfolioPerformanceChart.vue`: add props
+  `variant?: "portfolio" | "combined"` (default `"portfolio"`) and `currency?: string` (default `"USD"`);
+  extend the header doc comment.
+- [ ] `options` computed, `combined` mode: series data = raw `[ts, value]` points (no index
+  normalisation); yaxis `labels.formatter` = compact + currency (reuse `formatCompact` from
+  `@/utils/format`, e.g. `100k USD`), yaxis title hidden; tooltip y = full `formatCurrency(v, currency)`;
+  no benchmark overlay (combined ignores the `benchmarks` prop); single blue line `#2563eb`.
+- [ ] Template: hide the Recompute button row when `variant === "combined"`.
+- [ ] `portfolio` variant behaviour unchanged (all existing tests stay green).
+- [ ] Tests: `tests/unit/components/PortfolioPerformanceChart.test.ts` — new cases: combined plots
+  raw `value` un-normalised; yaxis formatter output carries the currency code; recompute button
+  absent in combined; benchmarks ignored in combined.
+- [ ] Tests: `npm run test` green.
+- [ ] Commit.
 
-Safe now: a later sheets-sync wipe & re-import will run anyway, so a transient empty
-`ticker_reference` window during the ~62k-row re-population causes no lasting data loss — positions
-already reference `.TFI`/adanos symbols resolved **at import**, not the reference rows. No FKs
-reference `ticker_reference` (verified 2026-09-21), so the truncate cannot cascade.
+### 41.2 — API client: `getMergedAnalytics()`
 
-- [ ] After §40.2 lands (ALIAS_OVERRIDES removed), `TRUNCATE instruments.ticker_reference` in prod.
-- [ ] Re-run the tickerref-sync (CronJob / `--url` one-shot); confirm row count, the 4 §40 keys
-  carry pure adanos aliases, crypto rows present, zero `TFI::*` rows.
-- [ ] Re-run the sheets-sync wipe & re-import (user approval) to re-resolve positions against the
-  rebuilt reference; confirm zero unmatched.
+- [ ] `src/api/portfolios.ts`: add
+  `getMergedAnalytics(): Promise<components["schemas"]["PortfolioAnalytics"]>` →
+  `http.get("/api/portfolios/merged")` (operation already in `generated/api-types.d.ts`).
+- [ ] Thin http wrapper — verified by `npm run build` (vue-tsc); no dedicated unit test.
+- [ ] Commit.
+
+### 41.3 — Mock: `GET /api/portfolios/merged` serves merged analytics
+
+- [ ] `mocks/portfolios/index.js`: replace `ctx.res.json(loadRaw("merged_portfolios.json"))` with
+  `ctx.res.json(mergedAnalytics())`.
+- [ ] `mergedAnalytics()`: load `portfolio_analytics_all.json` (shared fixture, ALL timeframe) +
+  `portfolios_total_metrics.json`; per-date sum of `value`, `positionValue`, `walletCashBalance`,
+  `investedCapital`, `costBasis` across each `portfolioBreakdown` entry; return
+  `{ timeframe: "ALL", portfolioCurrency: metrics.baseCurrency, performance: { totalValue,
+  totalInvested, totalReturn: totalGainLoss, totalReturnPercent, timeSeries }, benchmarks: [] }`.
+  Empty (no fixture / no breakdown) → empty `timeSeries` (SPA hides the chart).
+- [ ] `mocks/tests/run.mjs`: add checks — `/api/portfolios/merged` returns 200 with non-empty
+  `performance.timeSeries`; last point `value` within 2% of
+  `portfolios_total_metrics.json` → `totalValue`.
+- [ ] Tests: `npm run test:mock` green.
+- [ ] Commit.
+
+### 41.4 — `InvestmentsView`: render the combined chart (example-service position)
+
+- [ ] `src/modules/portfolios/InvestmentsView.vue`: `merged` ref; fetch `getMergedAnalytics()` in
+  the `onMounted` `Promise.all` — on failure set `merged = null` (chart hidden, page unaffected).
+- [ ] Render a `card` section between the metrics grid and the "Investment Portfolios" section
+  (example-service layout: big chart above the cards, no title, no timeframe control — ALL history):
+  `<section data-testid="combined-chart">` → `PortfolioPerformanceChart` with
+  `variant="combined"`, `:time-series="merged?.performance?.timeSeries ?? []"`,
+  `:currency="merged?.portfolioCurrency ?? store.totalMetrics?.baseCurrency ?? 'USD'"`,
+  `:loading="loading"`; `v-if="merged?.performance?.timeSeries?.length"`.
+- [ ] E2E: `tests/e2e/combined-chart.spec.ts` — login → `/en/investments` →
+  `[data-testid="combined-chart"] .apexcharts-canvas` visible.
+- [ ] Tests: `docker compose up -d --build` + `npm run test:e2e` green.
+- [ ] Commit.
+
+### 41.5 — Full suite + visual parity vs example-service
+
+- [ ] `npm run build && npm run test && npm run test:mock`; `docker compose up -d --build`;
+  `npm run test:e2e` — all green.
+- [ ] Playwright side-by-side: portfoliost `/en/investments` vs `app.example-service.ai` portfolio page —
+  combined chart block position/look; screenshot diff, note residual gaps.
 - [ ] Commit.
 
 ---
 
-**Still open (gated on user approval — homelab):** §41 clean-baseline `ticker_reference`
-rebuild (after §40.2, which has landed).
+Open follow-up (out of scope, wallets repo): implement the real `GET /api/portfolios/merged` in
+`portfoliost-wallets` (sum value snapshots across all portfolios → base currency,
+`PortfolioAnalytics` shape) so production serves the chart; until then the SPA hides it gracefully.
+
+---
+
