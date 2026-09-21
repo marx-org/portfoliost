@@ -69,17 +69,19 @@ instruments: vitest + stack; SPA: build + unit + e2e per `AGENTS.md`).
 
 ### 47.3 — Contracts: `currencySource` on quote/history/profile
 
-- [ ] `portfoliost-contracts/contracts/openapi.yaml`: add `currencySource` (enum
+- [x] `portfoliost-contracts/contracts/openapi.yaml`: add `currencySource` (enum
   `"provider" | "estimated" | "unknown"`) to `Quote`, `PriceHistory`, and `InstrumentProfile`/detail
   schemas; document semantics (provider = upstream declared it; estimated = local suffix/exchange
-  resolution; unknown = nothing known — `currency` may be null).
-- [ ] Push to `main` → CI bumps patch + publishes; verify tag with
-  `gh release list --repo Marx2/portfoliost-contracts`.
-- [ ] Consumers: `NODE_AUTH_TOKEN=$(gh auth token) npm install @marx2/contracts@<new>` in
-  portfoliost-instruments and portfoliost, `npm run gen:types` in portfoliost, commit lock +
-  `generated/api-types.d.ts`.
-- [ ] Tests: contracts package suite green in `portfoliost-contracts/contracts/`.
-- [ ] Commit (contracts + both consumer repos, separate commits per repo).
+  resolution; unknown = nothing known — `currency` may be null). Also made `PriceHistory.currency`
+  nullable (was non-null) to match Quote/Profile.
+- [x] Push to `main` → CI bumps patch + publishes; verify tag with
+  `gh release list --repo Marx2/portfoliost-contracts` — released **v1.6.30** (2026-09-22).
+- [x] Consumers: `NODE_AUTH_TOKEN=$(gh auth token) npm install @marx2/contracts@1.6.30` in
+  portfoliost-instruments and portfoliost, `npm run gen:types` in both, commit lock +
+  generated types.
+- [x] Tests: contracts package suite green (16) + yaml lint; instruments vitest green (297) + tsc;
+  SPA build (vue-tsc) + unit green (308).
+- [x] Commit (contracts `197eaa0` → v1.6.30; instruments `860ed1e`; portfoliost `8a01ee1`).
 
 ### 47.4 — instruments: single currency resolver, no USD guessing
 
