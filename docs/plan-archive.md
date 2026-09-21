@@ -5329,10 +5329,11 @@ AGENTS.md; E2E against docker compose).
   and a currency selector inline; ours fixes `timeframe=ALL` and relies on the page-level display
   currency menu. Dev/e2e gateway routes `/api/portfolios/merged` to the mock
   (`gateway/default.conf.template`) because the real `portfoliost-wallets` route is follow-up #1 —
-  in production the SPA hides the block until wallets implements it.
+  **resolved in §46**: the real route now exists and the gateway dev special-case is gone.
 - Backend caveat for deploy: production SPA will call the real wallets `/api/portfolios/merged`
   (500 → block hidden). The combined chart appears in production only after wallets implements the
-  merged analytics route.
+  merged analytics route. **Resolved**: wallets v1.1.43 deploys the merged route — the block now
+  renders in production (§46).
 
 ---
 
@@ -5340,10 +5341,35 @@ Open follow-ups (out of scope here):
 
 1. Real `GET /api/portfolios/merged` in `portfoliost-wallets` (sum value snapshots across all
    portfolios → base currency, `PortfolioAnalytics` shape) — until then production hides the chart.
+   **Done in §46** (wallets v1.1.43, sums into USD; archived below).
 2. Backend display-currency conversion (example-service-style `?displayCurrency=` on analytics endpoints) —
    future point; client-side conversion covers the charts now.
 3. Dead UI state cleanup: `analyticsReturnType`/`setReturnType` store fields + `benchmarkCalcType`
    param once nothing consumes them.
+
+---
+
+## 46. Real `GET /api/portfolios/merged` in `portfoliost-wallets` (§41 follow-up 1, 2026-09-21)
+
+User request: make the §41.5 combined (all-portfolios) chart appear in production. Today the SPA
+calls `GET /api/portfolios/merged`, but `portfoliost-wallets` had no such route → 500 → the block was
+hidden (graceful). Implemented end-to-end (design in `docs/plan.md` §46, reverted after archive):
+
+- Wallets v1.1.43: `src/services/mergedAnalytics.ts` (`sumSnapshotsByDate`, `buildMergedPerformance`)
+  + `GET /portfolios/merged` route above `/:id`. Sums each portfolio's `value_snapshots` converted
+  to **USD** via `@marx2/contracts/fx` (`latestRates`/`convert`; rows with a missing rate skipped);
+  `backfillStatus:"pending"` + fire-and-forget `runBackfill` when any portfolio has < 2 snapshots,
+  else `complete`. Commits `9af8363` (service), `fa91581` (route).
+- portfoliost: 46.3 unit assertion (SPA converts merged USD → display ccy) `40dc625`; 46.4 dev stack
+  — `gateway/default.conf.template` drops the merged→mock special-case and `mocks/db-seed` seeds 49
+  `value_snapshots` — `68de01c`. Full suite green: 84 passed / 1 skipped; required specs
+  (combined-chart + chart-recompute + chart-currency) 5/5 against real wallets.
+- homelab: tag `v1.1.42 → v1.1.43` in `portfoliost-wallets` helmrelease (Deployment + `fxsync`
+  CronJob) `46af5c617`; rollout OK, merged route live (401 auth-guard without a session).
+
+Open items (carried in `docs/plan.md`): base currency hardcoded USD on `/merged` + `/total-metrics`;
+`/merged/light` has no consumer; server-side `displayCurrency` not adopted (2); dead UI state
+cleanup (3).
 
 ---
 

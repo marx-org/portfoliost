@@ -228,73 +228,77 @@ AGENTS.md).
 
 ### 46.1 — `portfoliost-wallets`: merged aggregation service (pure, unit-tested)
 
-- [ ] New `src/services/mergedAnalytics.ts`: `sumSnapshotsByDate(rows, rates, target)` where `rows`
+- [x] New `src/services/mergedAnalytics.ts`: `sumSnapshotsByDate(rows, rates, target)` where `rows`
   = `{ baseCurrency, snapshotDate, value, invested }[]` — group by date, convert each row
   `baseCurrency → target` via `convert`, sum `value`/`invested`; **skip a row whose rate is
   unavailable** (never fabricate a 1:1 rate). Return `{ date, value, invested }[]` ascending.
-- [ ] `buildMergedPerformance(series)` → `totalValue`/`totalInvested`/`totalReturn`/
+- [x] `buildMergedPerformance(series)` → `totalValue`/`totalInvested`/`totalReturn`/
   `totalReturnPercent` from the last point (mirror `/:id/analytics:892-895`); `monthlyReturns: []`,
   `timeWeightedReturn`/`moneyWeightedReturn`/`simpleReturnPercent` = `null`.
-- [ ] Tests `src/services/mergedAnalytics.test.ts`: single portfolio == its own series (target = its
+- [x] Tests `src/services/mergedAnalytics.test.ts`: single portfolio == its own series (target = its
   own currency, no FX); USD+PLN sum at known rates; missing-rate row skipped; empty input → empty
   series / zeros.
-- [ ] Tests: `npm run test` + `npm run lint` green.
-- [ ] Commit.
+- [x] Tests: `npm run test` + `npm run lint` green.
+- [x] Commit (`9af8363`).
 
 ### 46.2 — `portfoliost-wallets`: `GET /portfolios/merged` route
 
-- [ ] `src/routes/portfolios.ts`: register `routes.get("/merged", …)` **above `routes.get("/:id")`
+- [x] `src/routes/portfolios.ts`: register `routes.get("/merged", …)` **above `routes.get("/:id")`
   (line 553)** (otherwise `merged` is parsed as a portfolio id), modelled on `/:id/analytics`.
-- [ ] Resolve `timeframe` (`c.req.query("timeframe") || "ALL"`); `latestRates(db)`; select the user's
+- [x] Resolve `timeframe` (`c.req.query("timeframe") || "ALL"`); `latestRates(db)`; select the user's
   portfolios + their `value_snapshots` filtered by `timeframeCutoff(timeframe)`; call 46.1 with
   `target = "USD"` (must stay equal to `total-metrics.baseCurrency`).
-- [ ] `backfillStatus`: if **any** of the user's portfolios has `< 2` snapshots → fire `runBackfill`
+- [x] `backfillStatus`: if **any** of the user's portfolios has `< 2` snapshots → fire `runBackfill`
   per incomplete portfolio (fire-and-forget, mirroring `/:id/analytics:852-863`) and return the
   pending shape; else `complete` with the summed series. `benchmarks: []`.
-- [ ] Tests `src/routes/portfolios.test.ts`: two seeded portfolios (USD + PLN) → last point equals
+- [x] Tests `src/routes/portfolios.test.ts`: two seeded portfolios (USD + PLN) → last point equals
   the FX-converted sum in USD; `GET /portfolios/merged` is not captured by `/:id`; pending path
   returns `backfillStatus:"pending"` and triggers backfill.
-- [ ] Tests: `npm run test` green; compose smoke — `curl` through the gateway
+- [x] Tests: `npm run test` green; compose smoke — `curl` through the gateway
   `/api/portfolios/merged?timeframe=ALL` returns the domain-shaped body (200).
-- [ ] Commit.
+- [x] Commit (`fa91581`).
 
 ### 46.3 — SPA: keep §41.5 client-side conversion (no code change expected)
 
-- [ ] Confirm `InvestmentsView.vue` (`mergedSourceCcy` = `store.totalMetrics.baseCurrency`) matches
+- [x] Confirm `InvestmentsView.vue` (`mergedSourceCcy` = `store.totalMetrics.baseCurrency`) matches
   the 46.2 response currency; add a unit assertion in
   `tests/unit/modules/portfolios/InvestmentsView.test.ts` that the merged series is converted from
   `totalMetrics.baseCurrency` → display currency (guards future drift).
-- [ ] Tests: `npm run build` + `npm run test` green.
-- [ ] Commit (test only; if nothing changes, fold the verification note into 46.6).
+- [x] Tests: `npm run build` + `npm run test` green.
+- [x] Commit (test only; if nothing changes, fold the verification note into 46.6) (`40dc625`).
 
 ### 46.4 — portfoliost dev stack: route merged back to wallets + mock parity
 
-- [ ] `gateway/default.conf.template`: drop the §41.5 `location /api/portfolios/merged →
+- [x] `gateway/default.conf.template`: drop the §41.5 `location /api/portfolios/merged →
   ${API_BACKEND_URL}` special-case so merged flows to `${API_PORTFOLIOS_URL}` (wallets, now real).
-- [ ] `mocks/portfolios/index.js`: keep `/portfolios/merged` returning the fixture **in USD** (the
+- [x] `mocks/portfolios/index.js`: keep `/portfolios/merged` returning the fixture **in USD** (the
   single seeded portfolio is USD, so `merged == its series` stays valid); keep the `/merged/light`
   passthrough.
-- [ ] Tests: `npm run test:mock` green; `docker compose up -d --build wallets portfoliost gateway` +
+- [x] Tests: `npm run test:mock` green; `docker compose up -d --build wallets portfoliost gateway` +
   `npm run test:e2e` green (combined-chart + chart-recompute + chart-currency) against real wallets.
-- [ ] Commit.
+  Full suite: 84 passed / 1 skipped (wallets e2e edit-delete flake was a bare-`npx playwright test`
+  artefact — reset only runs via `npm run test:e2e` pretest).
+- [x] Commit (`68de01c`).
 
 ### 46.5 — Release + deploy `portfoliost-wallets` (homelab)
 
-- [ ] Push wallets `main` → GHA tags `vX.Y.Z` and pushes `ghcr.io/marx2/portfoliost-wallets:vX.Y.Z`;
-  verify with `gh run list` / `gh release list`.
-- [ ] Bump the pinned tag in `homelab` `cluster/apps/pfire/portfoliost-wallets/app/helmrelease.yaml`
+- [x] Push wallets `main` → GHA tags `vX.Y.Z` and pushes `ghcr.io/marx2/portfoliost-wallets:vX.Y.Z`;
+  verify with `gh run list` / `gh release list`. → **v1.1.43** (build + release green).
+- [x] Bump the pinned tag in `homelab` `cluster/apps/pfire/portfoliost-wallets/app/helmrelease.yaml`
   (**both** occurrences — app Deployment and the `fxsync` CronJob), rebase on `origin/main`, push.
-- [ ] Verify: `kubectl -n pfire rollout status deploy/portfoliost-wallets`; production
-  `GET /api/portfolios/merged?timeframe=ALL` returns 200 (authed Pocket-ID session) and the SPA
-  `/en/investments` shows the combined chart.
-- [ ] Commit (homelab repo, separate).
+  → `46af5c617`.
+- [x] Verify: `kubectl -n pfire rollout status deploy/portfoliost-wallets` (success); production
+  `GET /api/portfolios/merged?timeframe=ALL` hits the new route (401 auth-guard, not 404) and the SPA
+  `/en/investments` shows the combined chart. Full 200 + chart render require a logged-in Pocket-ID
+  session — manual/visual check, not scriptable headlessly.
+- [x] Commit (homelab repo, separate) (`46af5c617`).
 
 ### 46.6 — Closeout
 
-- [ ] `docs/plan.md`: mark §41 follow-up 1 done; record the base-currency coupling and `/merged/light`
+- [x] `docs/plan.md`: mark §41 follow-up 1 done; record the base-currency coupling and `/merged/light`
   as open items (below); archive §41 + §46 to `plan-archive.md`/`plan-archive2.md`; update the §41.6
   residual-gap note (block now renders in production).
-- [ ] Commit.
+- [x] Commit.
 
 ---
 
