@@ -266,6 +266,23 @@ Instruments normalizes a trailing `.WA`/`.US` venue suffix off bond search queri
 `bondSearchLeg`). Cluster one-shot Job `openst-bond-archive` (`openst@v1.1.22`, Flux)
 populated `openst.bond_series` — 449 rows, `ROD1033` margin 1.50.
 
+**Verified 2026-09-21 — first-year fee floor makes young capitalized bonds quote flat
+at nominal (not a bug, per MF rules):** the `openbb_obligacje` engine (engine.py
+`redemption_value`, lines 271 + 274–275) yields the *net-of-fee cash-out value* with a
+100 PLN floor in the first annual period, so an EDO emission inside its first year shows
+quote ≈ 100 until accrued interest exceeds the 3.00 PLN early-redemption fee.  Observed
+live on portfolio "Obligacje PKO SA Beata": `EDO0735` (issued 2025-07-01, in year 2;
+rate y1 6.1% = CPI Jun-2025 + 2.0, fully capitalized to K₁ = 106.10) quotes 104.17 (P/L
++4170), while `EDO0636` (issued 2026-06-01, ~3.5 months old; rate y1 5.1% = CPI May-2026
+3.1% + 2.0) quotes exactly 100.00 — accrued interest ≈ 1.56 PLN < fee 3.00 → value
+clamped to nominal → P/L 0.  Both symbols travel the identical `/fixedincome/quote` path;
+there is no per-series branch.  Quotes/gains self-correct once year-1 accrual passes the
+fee (~day 215, ≈ 7 months in), then grow and jump ~5% at the year boundary when interest
+capitalizes into the nominal.  If a future plan wants portfolios to display accrued value
+**gross** of the early-redemption fee (the fee is only realized if the bond is actually
+redeemed early), that is a deliberate deviation from the MF-published redemption tables,
+not a defect.
+
 ### D80 — Catalyst corporate bonds: profile metadata + catalogue — **DONE 2026-09-19** (plan §25.2/§25.3)
 
 Catalyst-listed corporate bonds (BST, INS, KRI, ARH, VOX, NVA + `YMM` maturity
