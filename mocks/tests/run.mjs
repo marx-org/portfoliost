@@ -244,6 +244,21 @@ async function main() {
   }
   const detail2 = await request(`/portfolios/${pid}`, { token })
   check("portfolios.detail", detail2.status === 200 && detail2.json.id === pid, `got ${detail2.status}`)
+  const merged1Y = await request("/portfolios/merged?timeframe=1Y", { token })
+  const mergedAll = await request("/portfolios/merged?timeframe=ALL", { token })
+  const lastMerged1Y = (merged1Y.json?.performance?.timeSeries ?? []).filter((p) => p.value > 0).pop()
+  const lastMergedAll = (mergedAll.json?.performance?.timeSeries ?? []).filter((p) => p.value > 0).pop()
+  check(
+    "portfolios.merged serves the analytics fixture for 1Y + ALL",
+    merged1Y.status === 200 && Array.isArray(merged1Y.json.performance.timeSeries) && merged1Y.json.performance.timeSeries.length > 0 &&
+    mergedAll.status === 200 && Array.isArray(mergedAll.json.performance.timeSeries) && mergedAll.json.performance.timeSeries.length > 0,
+    `${merged1Y.status} ${mergedAll.status}`,
+  )
+  check(
+    "portfolios.merged last value absolute scale (> 10000, not an index)",
+    lastMerged1Y?.value > 10000 && lastMergedAll?.value > 10000,
+    `1Y ${lastMerged1Y?.value} ALL ${lastMergedAll?.value}`,
+  )
   const summaryMetrics = await request(`/portfolios/${pid}/summary-metrics`, { token })
   check("portfolios.summary-metrics", summaryMetrics.status === 200 && "totalValue" in summaryMetrics.json, `got ${summaryMetrics.status}`)
   for (const tf of ["1W", "1M", "3M", "6M", "1Y", "2Y", "ALL"]) {

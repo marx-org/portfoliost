@@ -227,7 +227,19 @@ export function register(app) {
 
   app.get("/api/portfolios/merged", (ctx) => {
     if (!requireAuth(ctx)) return
-    ctx.res.json(loadRaw("merged_portfolios.json"))
+    // §41.4 — merged mirrors a single portfolio's analytics (exactly one seeded
+    // portfolio carries analytics data, so merged == that series). No
+    // cross-portfolio summation; benchmark overlay logic shared with /:id/analytics.
+    const timeframe = timelineFor(ctx.query.timeframe)
+    const base = loadRaw(ANALYTICS_BY_TIMEFRAME[timeframe])
+    const benchParam = ctx.query.benchmarks ?? ctx.query.benchmark
+    const wanted = benchParam
+      ? String(benchParam).split(",").map((s) => s.trim().toUpperCase()).filter(Boolean)
+      : []
+    const available = benchmarkSymbols()
+    const symbols = wanted.filter((s) => available.includes(s))
+    const benchmarks = symbols.map((s) => benchmarkSeries(s, timeframe))
+    ctx.res.json({ ...base, benchmarks })
   })
 
   app.get("/api/portfolios/merged/light", (ctx) => {
