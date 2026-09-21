@@ -85,17 +85,21 @@ instruments: vitest + stack; SPA: build + unit + e2e per `AGENTS.md`).
 
 ### 47.4 — instruments: single currency resolver, no USD guessing
 
-- [ ] `src/routes/instruments.ts`: replace the blind fallbacks — `/quote`:
-  `currency: q.currency ?? resolveInstrumentCurrency(...)` with `currencySource` derived by
-  comparing the provider value vs the local resolution (match → `provider`; provider
-  missing/mismatch → `estimated`; both absent → `unknown` + `currency: null`); `/profile` and
-  `/history` get the same treatment (history already resolves locally — now tag it `estimated`
-  unless provider agrees).
-- [ ] Keep `resolveInstrumentCurrency` as the only local resolver (no new heuristics); its final
-  `"USD"` catch becomes `"unknown"`/null propagation.
-- [ ] Tests: vitest route/adapter cases for all three `currencySource` outcomes incl. the NNEP65 vs
-  INGAKC fixtures; existing suite green.
-- [ ] Commit (portfoliost-instruments).
+- [x] `src/routes/instruments.ts`: replace the blind fallbacks — `/quote`,
+  `/profile`, `/:symbol` detail, `/history`, `/price` all thread a `resolveCurrency(db,
+  routeSymbol, providerCurrency)` resolution into `toQuote`/`toInstrumentProfile`/
+  `toInstrumentDetail`/`toPriceHistory` and emit `currency` + `currencySource`
+  (match → `provider`; provider missing/mismatch → local `estimated`; both absent →
+  `unknown` + `currency: null`).
+- [x] Keep `resolveInstrumentCurrency` as the only local resolver (no new heuristics); its
+  `"USD"` catches (unmapped country, no row, no db, error) now degrade to `null`.
+- [x] Tests: vitest cases for all three `currencySource` outcomes at the resolver
+  (`resolveCurrency`: match / mismatch / provider-only / pence-GBp / local-only / both-silent)
+  and the adapter layer (quote/profile/detail/history); 307/307 green, tsc clean.
+  **Dividends deferred**: the route keeps the §36 USD-on-uncertainty fallback for rows
+  without a row-level currency (contract `DividendsData` currency is non-null); thread the
+  nullable resolution in a later step.
+- [x] Commit (portfoliost-instruments `630ec57`).
 
 ### 47.5 — SPA: kill the USD fallback, red-flag unknown/estimated currency
 
@@ -328,3 +332,172 @@ The `/api/currencies` registry moves to instruments with the table (its availabi
   - `instruments-provider-module.md`: record `fx_rates` + importer + registry as instruments
     responsibilities.
 - [ ] No tests (docs); commit (portfoliost).
+
+---
+
+## 49. Dividends end-to-end: parity with example-service (2026-09-26)
+
+From the dividend-state audit + live example-service capture (TEST DIV portfolio, dividend
+submitted and read back from example-service's own API — observed, not guessed). Example service stores
+dividends **as DIVIDEND rows in the standard transactions table** (no separate
+dividend entity): `quantity × price = gross`, `taxes` separate, **`totalAmount =`
+gross − tax (net)**, `exchangeRate` at the receive date, wallet credited the net.
+
+Our state today: the entry point already exists (HoldingsTab position menu →
+AddPositionDialog kind="dividend"), the `taxes` column already exists in the contract
+and wallets schema — but the SPA never sends it, the POST/PATCH routes don't accept
+it, `totalAmount` is gross (not net), there's no notes field, no total/per-share
+toggle, and `GET /api/portfolios/:id/dividends` is a **stub returning zeros** in prod
+(the mock serves research data, hiding the gap). The instruments calendar route also
+carries the §47 "?? USD" anti-pattern and `CalendarData.dividend` (payment dates) is a
+dead field the SPA renders but nothing ever fills.
+
+Scope: portfoliost-contracts (`notes`), portfoliost-wallets (taxes/notes in
+tx create+edit, net-totalAmount for DIVIDEND, real `/dividends` endpoint), portfoliost
+SPA (dedicated dividend dialog with example-service fields, Dividends tab, currency fixes in
+research), mocks. Depends on §47 (currency resolver, no-USD rule) — implement after
+§47.4 so the research-side fixes use the final resolver.
+
+---
+
+### 49.1 — Contracts: `notes` + explicit dividend semantics
+
+- [ ] `portfoliost-contracts/contracts/openapi.yaml`: add `notes: { type: string,
+  nullable: true }` to `Transaction` and to the transaction create/update request
+  schema; document on `Transaction` that for `type: DIVIDEND`, `price` is the
+  per-share gross, `quantity × price` is the gross, `taxes` is the withholding tax,
+  and `totalAmount` is the **net** (gross − taxes) — the example-service convention (verified
+  against the live API 2026-09-26).
+- [ ] Push `main` → CI patch bump + publish; `gh release list --repo Marx2/portfoliost-contracts`
+  to verify the tag.
+- [ ] Consumers: `NODE_AUTH_TOKEN=$(gh auth token) npm install @marx2/contracts@<new>`
+  in portfoliost-wallets and portfoliost; `npm run gen:types` in portfoliost; commit
+  locks + generated types (per-repo commits).
+- [ ] Tests: contracts suite green in `portfoliost-contracts/contracts/`.
+- [ ] Commit (contracts + consumers).
+
+### 49.2 — Wallets schema: `notes` column
+
+- [ ] `portfoliost-wallets/src/db/schema.ts`: add `notes: text("notes")` to the
+  portfolio-transactions table; drizzle migration (nullable, no backfill — dev mode,
+  portfolios rebuild on wipe & reimport if needed).
+- [ ] Tests: migration applies on a fresh PGLite; schema test updated; suite green.
+- [ ] Commit (portfoliost-wallets).
+
+### 49.3 — Wallets API: accept taxes+notes, net totalAmount, real `/dividends`
+
+- [ ] `src/routes/portfolio-transactions.ts` POST `/:id/transactions`: extend
+  `TransactionCreateSchema` with `taxes` (nullable number ≥ 0) + `notes`; for
+  `type === "DIVIDEND"` compute `totalAmount = quantity × price − (taxes ?? 0)`
+  (net — example-service convention; BUY/SELL untouched); validation: `taxes ≤ gross`
+  (422 otherwise); persist `taxes` + `notes`; wallet credit already uses
+  `quantity × price` → change to the **net** for DIVIDEND in `createWalletLink`.
+- [ ] PATCH `/:id/transactions/:txId`: same field handling + recompute
+  (taxes change re-derives net totalAmount and wallet delta).
+- [ ] `GET /:id/dividends` (portfolios.ts:1048, currently a stub): implement from
+  real DIVIDEND rows — items `{symbol, instrumentName, date, quantity, gross
+  (=qty×price), taxes, amount (net), currency, exchangeRate, convertedAmount,
+  notes}` sorted date desc + `totalDividends` (net, sum) + `count`; contract shape
+  reuses the `DividendsData`-adjient portfolio response (extend it in 49.1 if the
+  current shape is insufficient — it currently only models instrument research
+  rows, which is why the mock fakes it).
+- [ ] Tests: vitest round-trips — dividend with tax (net persisted, wallet credited
+  net, `taxes > gross` → 422), dividend without tax (net = gross), notes
+  round-trip, GET dividends aggregates + totals, BUY/SELL totals unchanged; full
+  wallets suite green.
+- [ ] Commit (portfoliost-wallets).
+
+### 49.4 — SPA: dedicated dividend dialog (example-service parity)
+
+- [ ] New `RecordDividendDialog.vue` (does NOT reuse AddPositionDialog — different
+  field set), opened from the existing HoldingsTab "Dividend" action:
+  - header: instrument + "HOLDING: {qty}";
+  - entry-mode toggle **Total / Per share** (per share auto-fills quantity with
+    held shares; total mode hides quantity);
+  - cash-portfolio (wallet) selector, preselected = portfolio's linked wallet;
+  - fields: **Gross amount** (mode-dependent), **Withholding tax** (optional, ≥ 0),
+    **Receive date** (default today), **Notes** (optional);
+  - FX leg reuses the existing automatic/custom rate machinery (`rateSource`,
+    D29/D38 `FxRateFields`) when wallet/transaction currency differs from
+    instrument currency — no new rate code;
+  - live summary: gross / − tax / **net** (transaction currency) + converted net
+    in wallet currency; validate `tax ≤ gross` client-side.
+- [ ] Wire the dialog into HoldingsTab (replace the kind="dividend" path through
+  AddPositionDialog); submit to the existing POST with `taxes` + `notes`.
+- [ ] EditTransactionModal: when the edited tx is DIVIDEND, surface the same
+  gross/tax/notes fields (per-share display derived).
+- [ ] Tests: unit for mode math (total↔per-share, net = gross − tax) +
+  e2e (docker compose, mock updated in 49.7): record a dividend with tax in the
+  per-share mode → transaction row shows DIVIDEND with net total, wallet balance
+  credited net.
+- [ ] Commit (portfoliost).
+
+### 49.5 — SPA: portfolio Dividends tab + transactions table
+
+- [ ] `PortfolioDividendsTab.vue`: render the real endpoint (49.3) — per-row
+  symbol/date/gross/tax/net (with currency per row), totals; replace the current
+  research-backed mock data source in prod (tab stays fed by the same endpoint in
+  mock mode, now returning the same shape from real txs).
+- [ ] `TransactionsTable.vue`: for DIVIDEND rows render the tax column when
+  non-zero and a notes tooltip; verify the existing blue "DIVIDEND" badge is
+  kept.
+- [ ] Tests: e2e — a recorded dividend (49.4) appears in the Dividends tab with
+  gross/tax/net and in the transactions table.
+- [ ] Commit (portfoliost).
+
+### 49.6 — SPA + instruments: dividend currency correctness (§47 alignment)
+
+- [ ] `portfoliost-instruments` calendar route (~line 814): replace
+  `profileData?.currency ?? "USD"` with `resolveInstrumentCurrency(getDb(),
+  routeSymbol)` (the §47 single resolver); add `/dividends` route to §47.4's
+  `currencySource` treatment.
+- [ ] Dead-field decision: `CalendarData.dividend` (payment dates) is never
+  populated and the SPA renders an always-empty "Upcoming Dividend" card —
+  **remove** the field from the contract + `toCalendar` + the SPA card (or
+  populate from provider if §47.1's fixtures show the calendar carries payment
+  dates — check at implementation; default: remove).
+- [ ] `ResearchDividends.vue`: `instrCcy = history[0]?.currency ?? "USD"` → use
+  the §47 badge rules (unknown → plain number + red badge); `ResearchCalendar.vue`
+  ex-dividend amounts follow the fixed route currency.
+- [ ] Tests: instrument route tests for the calendar currency source; SPA unit
+  for the instrCcy chain; suite green.
+- [ ] Commit (instruments) + Commit (portfoliost) + Commit (contracts, if the
+  dead field is removed).
+
+### 49.7 — Mocks: parity
+
+- [ ] `mocks/portfolios`: `POST/PATCH transactions` accept `taxes` + `notes`,
+  compute net totalAmount for DIVIDEND, credit wallet net; `GET /:id/dividends`
+  returns real tx rows (drop the research-data fake) with the 49.3 shape.
+- [ ] `mocks/tests/run.mjs`: round-trips mirroring 49.3's wallet cases.
+- [ ] Tests: `npm run test:mock` + e2e green.
+- [ ] Commit (portfoliost).
+
+### 49.8 — Closeout
+
+- [ ] Full gate: `npm run build` + `npm run test` + `npm run test:mock` +
+  `npm run test:e2e` (SPA), wallets + instruments suites, contracts suite.
+- [ ] Deploy wallets (+ instruments if 49.6 touches it) per the homelab flow;
+  verify in prod: record a dividend with tax in a real portfolio → row shows
+  net total, wallet credited net, Dividends tab shows it; delete the test row.
+- [ ] Update `fees-and-custom-fx.md` addendum (taxes on DIVIDEND = withholding,
+  net-totalAmount convention); archive §49 to `plan-archive.md`.
+
+---
+
+**§49 design decisions (resolved at planning):**
+- **Dividend = DIVIDEND transaction row** (example-service parity, confirmed against the
+  live API) — no separate dividend entity; `totalAmount` is the **net**
+  (gross − withholding tax), wallet is credited the net, `taxes` kept separately
+  (column already exists; only wire it through).
+- **Entry point**: position menu (already present) → new dedicated
+  `RecordDividendDialog` (example-service's dialog field set); the Transactions tab gets
+  no dividend button (example-service doesn't either).
+- **Entry modes**: Total and Per-share (per-share auto-fills held quantity).
+- **FX**: receive-date rate via the existing D29 automatic/custom machinery;
+  conversion math stays `@marx2/contracts/fx` (D27).
+- **`/portfolios/:id/dividends`** aggregates real DIVIDEND rows (no research
+  data); the dead `CalendarData.dividend` field is removed by default unless
+  §47.1's fixtures show the provider carries payment dates.
+- **Ordering**: §49 runs after §47 (currency fixes reuse its resolver); no
+  dependency on §48.
