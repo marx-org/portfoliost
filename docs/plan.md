@@ -61,22 +61,22 @@ workflow: spec → publish → consumer bumps) → 45.3 (instruments null-defaul
 
 ### 45.1 — Problem A (openst): biznesradar quote+profile carry the page's currency
 
-- [ ] `openst/plugins/openbb_biznesradar/openbb_biznesradar/scraper.py`: read
+- [x] `openst/plugins/openbb_biznesradar/openbb_biznesradar/scraper.py`: read
   `<meta itemprop="priceCurrency" content="...">` from the `/notowania/{symbol}`
   page (one shared parse helper; the profile probe already fetches the same page — `probe_notowania`
   should return the currency too, or add
   `scrape_currency(symbol)`); `scrape_quote` adds `currency` to its dict when the meta tag is
   present (missing tag → key omitted, not `None`, so the model stays backwards-compatible).
-- [ ] `models/equity_quote.py`: document the new optional key. `models/equity_profile.py`:
+- [x] `models/equity_quote.py`: document the new optional key. `models/equity_profile.py`:
   `EquityInfoData` has no `currency` field — verify how the corp_bond profile already emits
   `currency: "PLN"` (test_corp_bond_profile.py:169) and mirror that mechanism for funds.
-- [ ] Capture fixture: save the INGAKC.TFI `/notowania` HTML to
+- [x] Capture fixture: save the INGAKC.TFI `/notowania` HTML to
   `openst/plugins/openbb_biznesradar/tests/fixtures/` (single request, manual); unit tests: currency
   parsed from the meta tag; quote dict includes `PLN`; missing tag → no key. Full openst compose
   suite green.
-- [ ] Standalone smoke: `docker compose up -d`, `curl /equity/quote/INGAKC.TFI`
+- [x] Standalone smoke: `docker compose up -d`, `curl /equity/quote/INGAKC.TFI`
   → `"currency": "PLN"`; second call is a cache HIT.
-- [ ] Commit.
+- [x] Commit.
 
 ### 45.2 — Problem A: nullable `currency` in the shared contract (user decision: do the follow-up)
 
@@ -86,38 +86,38 @@ position/price schemas that carry a price currency) is a required `string`, whic
 `?? "USD"` guess. User decision (2026-09-21): make them nullable so an unknown currency can never
 be silently guessed (100× off semantics, the §39 pence precedent).
 
-- [ ] `portfoliost-contracts/contracts/openapi.yaml`: `currency` → nullable
+- [x] `portfoliost-contracts/contracts/openapi.yaml`: `currency` → nullable
   (`nullable: true` / `oneOf [string, null]` per the file's existing conventions) for the quote /
   profile currency fields (keep `PriceHistory.currency` and FX/registry currencies as-is unless
   they hit the same guess path — decide per schema and note why). Update the §`currency` doc
   comments ("USD when unknown" at line ~842 becomes "null when unknown").
-- [ ] Push `main` → CI auto-bumps the patch version + publishes `@marx2/contracts@<new>`
+- [x] Push `main` → CI auto-bumps the patch version + publishes `@marx2/contracts@<new>`
   (never hand-edit package.json).
-- [ ] Consumers: `NODE_AUTH_TOKEN=$(gh auth token) npm install @marx2/contracts@<new>` +
+- [x] Consumers: `NODE_AUTH_TOKEN=$(gh auth token) npm install @marx2/contracts@<new>` +
   `npm run gen:types` in `portfoliost-instruments` (has gen:types) and `portfoliost` (SPA has
   gen:types per AGENTS.md; check `portfoliost-wallets` too) — commit `package-lock.json` +
   `generated/api-types.d.ts` per repo (code changes that adapt to the nullable type are 45.3 /
   the release step, not this one).
-- [ ] Tests: `npm test` in `portfoliost-contracts/contracts` green.
-- [ ] Commit per repo (contracts push is its own CI cycle).
+- [x] Tests: `npm test` in `portfoliost-contracts/contracts` green.
+- [x] Commit per repo (contracts push is its own CI cycle).
 
 ### 45.3 — Problem A (instruments): drop the `USD` guess now that the contract is nullable
 
 Precondition: 45.2's regenerated types are installed in `portfoliost-instruments`.
 
-- [ ] `portfoliost-instruments/src/adapters/translate.ts`: `toQuote` — `currency` →
+- [x] `portfoliost-instruments/src/adapters/translate.ts`: `toQuote` — `currency` →
   `toIsoCurrency(str(q.currency)) ?? null` (no `"USD"` guess); `toInstrumentProfile` —
   `currency ?? (isBond ? "PLN" : null)`. Verify every other `toXxx` that copies a currency field
   compiles against the nullable contract type.
-- [ ] Tests: `translate.test.ts` — currency-less row → `currency: null` (quote + profile
+- [x] Tests: `translate.test.ts` — currency-less row → `currency: null` (quote + profile
   non-bond), bond → `PLN`, PLN row (the 45.1 shape) passes through, GBp/USD regressions unchanged.
   Full instruments suite green.
-- [ ] Wallets: `fetchProfile` already skips null (`isIsoCurrency`) → no code change expected;
+- [x] Wallets: `fetchProfile` already skips null (`isIsoCurrency`) → no code change expected;
   verify it compiles against the regenerated types and that a null-currency profile keeps the
   stored `instrument_currency` (add a `quotes.test.ts` case if the path is contract-typed).
-- [ ] SPA: any component reading `quote.currency`/profile currency must tolerate null (display
+- [x] SPA: any component reading `quote.currency`/profile currency must tolerate null (display
   fallback); vue-tsc catches the rest; `npm run build && npm run test && npm run test:mock` green.
-- [ ] Commit.
+- [x] Commit.
 
 ### 45.4 — Release A (openst → instruments) + verify currency end-to-end
 
