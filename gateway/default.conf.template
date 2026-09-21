@@ -41,11 +41,8 @@ server {
     # users-auth module (auth + users + profile/preferences/onboarding)
     location /api/auth           { proxy_pass ${API_USERS_AUTH_URL}; }
     location /api/users          { proxy_pass ${API_USERS_AUTH_URL}; }
-    # §41.5 — merged (all-portfolios) analytics. The real wallets route is a
-    # follow-up (plan §41 follow-up 1); the dev/e2e stack serves it from the
-    # mock so the combined chart has data. Longest-prefix match wins over
-    # /api/portfolios below.
-    location /api/portfolios/merged { proxy_pass ${API_BACKEND_URL}; }
+    # /api/portfolios/merged (combined analytics) is a real wallets route now
+    # (plan §46) — longest-prefix match resolves it from /api/portfolios below.
     location /api/portfolios     { proxy_pass ${API_PORTFOLIOS_URL}; }
     location /api/wallets        { proxy_pass ${API_WALLETS_URL}; }
     location /api/labels         { proxy_pass ${API_WALLETS_URL}; }
