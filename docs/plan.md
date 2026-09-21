@@ -51,19 +51,21 @@ instruments: vitest + stack; SPA: build + unit + e2e per `AGENTS.md`).
 
 ### 47.2 — openst: consistent currency for the known universe
 
-- [ ] In `plugins/openbb_biznesradar/openbb_biznesradar/scraper.py`, add
+- [x] In `plugins/openbb_biznesradar/openbb_biznesradar/scraper.py`, add
   `default_currency_for_symbol(symbol) -> str | None` — `.TFI`/`.FIZ` suffix → `"PLN"` (Catalyst/TFI
   universe is PLN by construction, same assumption as instruments' `resolveInstrumentCurrency`),
   otherwise `None`.
-- [ ] `scrape_quote` and `probe_notowania_full`/profile path: when `_currency_from_soup` returns
+- [x] `scrape_quote` and `probe_notowania_full`/profile path: when `_currency_from_soup` returns
   `None`, use `default_currency_for_symbol(symbol)`; omit the key only when both are `None`
   (backwards-compatible row shape).
-- [ ] Tests: new pytest cases in the plugin test suite using the 47.1 fixtures — (a) meta present →
-  meta wins, (b) meta absent + `.TFI` → `PLN`, (c) meta absent + non-Polish symbol → key omitted.
-  Full openst suite green.
-- [ ] Compose smoke: `docker compose up -d redis openst`, `curl /equity/quote/NNEP65.TFI` and
-  `/equity/quote/INGAKC.TFI` → both carry `"currency": "PLN"`; second call is a cache HIT.
-- [ ] Commit (openst).
+- [x] Tests: new pytest cases in the plugin test suite using the 47.1 fixtures — (a) meta present →
+  meta wins, (b) meta absent + `.TFI` → `PLN` (+ `.FIZ`), (c) meta absent + non-Polish symbol → key
+  omitted. Full openst suite green (279 + 91 + 53).
+- [x] Compose smoke: `docker compose up -d redis openst`, `curl /equity/quote/NNEP65.TFI` and
+  `/equity/quote/INGAKC.TFI` → both carry `"currency": "PLN"`; second call is a cache HIT (verified
+  via Redis TTL not reset). Host 8080 was taken by the portfoliost compose stack, so the app ran as
+  a one-off container on `:8091` against the same compose network.
+- [x] Commit (openst `fc33bcf`).
 
 ### 47.3 — Contracts: `currencySource` on quote/history/profile
 
