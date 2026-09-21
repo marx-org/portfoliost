@@ -154,23 +154,33 @@ Why not "just wait patiently": the nginx ingress (60 s `proxy-read-timeout`, uns
 kills the request at 60 s regardless of the UI, and the slow path recurs on every 6 h cachest TTL
 expiry (first request after each expiry), not once. So make the request short:
 
-- [ ] `openst/plugins/openbb_biznesradar/openbb_biznesradar/`: add a
+- [x] `openst/plugins/openbb_biznesradar/openbb_biznesradar/`: add a
   `first_nav_month(symbol)` probe — fetch the **oldest** page of
   `/notowania-historyczne/{symbol}` (pagination is newest-first: the last page, or a binary search
   over the page index with the `exhausted` row check) → the fund's oldest NAV date. Cache it in
   openst's Redis (long TTL — fund inception never changes; key
-  `fund_first_nav:<symbol>`). One extra page per fund lifetime, not per request.
-- [ ] `openst/src/main.py` `/price/ohlcv/{ticker}` handler: for `_is_fund(ticker)` symbols,
+  `fund_first_nav:<symbol>`). One extra page per fund lifetime, not per request. — implemented as
+  `scraper.probe_first_nav` (page-1 footer's highest `pages_pos` index → that last page's min
+  row date; 2 fetches); `fund_first_nav:<symbol>` cached 30 d.
+- [x] `openst/src/main.py` `/price/ohlcv/{ticker}` handler: for `_is_fund(ticker)` symbols,
   clamp `start = max(start, first_nav)` when the probe resolves (probe failure → keep the
   requested start, never block the request); log the clamp.
-- [ ] Optionally pair with a lower politeness delay for funds in
+- [x] Optionally pair with a lower politeness delay for funds in
   `equity_historical.py` (e.g. 0.2 s) so 11 y of real NAVs (INGAKC ~2016: ≈ 66 months ≈ 13 s) sits
-  comfortably under the 60 s ingress cap with margin.
-- [ ] Unit tests with a captured oldest-page fixture (openst): clamp applied, probe-miss keeps
-  original start, non-fund tickers untouched; full openst compose suite green.
-- [ ] Standalone smoke: `docker compose up -d`, `curl /price/ohlcv/INGAKC.TFI?start=2015-09-21&end=
-  2026-09-21` → 200 in <30 s (previously ~110 s / 502); repeat = cache HIT.
-- [ ] Commit.
+  comfortably under the 60 s ingress cap with margin. — **`BIZNESRADAR_FUND_FETCH_DELAY_S`
+  (default 0.3 s)**. ⚠️ The plan assumed INGAKC incepts ~2016; it is actually a **1998-vintage
+  fund** (oldest NAV 1998-03-11, 143 pages). So the **clamp does NOT shorten its 2015-start
+  window** (1998 < 2015) — the **fund delay is the real lever** that pulls an old fund's 11-yr
+  request (~45 pages) under the cap. The clamp still saves pre-inception pages for *younger*
+  funds. Both shipped.
+- [x] Unit tests with a captured oldest-page fixture (openst): clamp applied, probe-miss keeps
+  original start, non-fund tickers untouched; full openst compose suite green. — fixtures
+  `INGAKC.TFI_history_p1.html` / `_history_last.html` captured; 279+87+53 green.
+- [x] Standalone smoke: `docker compose up -d`, `curl /price/ohlcv/INGAKC.TFI?start=2015-09-21&end=
+  2026-09-21` → 200 in <30 s (previously ~110 s / 502); repeat = cache HIT. — measured **40.3 s
+  first call** (2749 bars), **0.03 s** cache HIT. (40 s, not 30 — the 1998 inception means a
+  full 2015→2026 window; still under the 60 s cap with margin, down from ~115 s.)
+- [x] Commit. — `d62cd65`.
 
 ### 45.6 — Problem B: graceful UI (price-bars now, full history in background)
 
