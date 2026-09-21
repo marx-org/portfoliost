@@ -184,15 +184,26 @@ expiry (first request after each expiry), not once. So make the request short:
 
 ### 45.6 — Problem B: graceful UI (price-bars now, full history in background)
 
-- [ ] `portfoliost` research overview (the view calling `getHistory`, `src/api/instruments.ts:76`):
+- [x] `portfoliost` research overview (the view calling `getHistory`, `src/api/instruments.ts:76`):
   on load, render the price chart from the **existing** `/price-bars` series immediately (already
   fetched/cached for TFI — 2021→2026 in `price_bars`), mark it as "partial, full history loading…"
   when the overview requests a wider range; the `/history` result replaces it in place on success.
-- [ ] On `/history` failure (502/timeout): keep the price-bars chart, show a dismissible
-  "full history unavailable — retry" notice (no blank canvas, no blocking spinner).
-- [ ] E2E: research overview for a `.TFI` symbol renders a chart before the `/history` response
-  resolves (assert canvas + loading flag, then final state); `npm run test:e2e` green.
-- [ ] Commit.
+  — `PriceChart.load()` now fetches `/price-bars` first (11 y window, matches `/history`'s
+  `todayRange(4018)`) and paints the apexchart from it as soon as it lands (`loading=false`), then
+  runs the wide `/history` in the background ("full history loading…" hint while in flight).
+- [x] On `/history` failure (502/timeout): keep the price-bars chart, show a dismissible
+  "full history unavailable — retry" notice (no blank canvas, no blocking spinner). — the
+  price-bars chart stays; a dismissible amber notice with a Retry button replaces the old red
+  error + blank canvas. (Note: `/price-bars` is a read-through that backfills only the *recent*
+  `lastDate→to` gap, not the full window — instant for the cached case, and on its own failure
+  the `/history` leg still renders.)
+- [x] E2E: research overview for a `.TFI` symbol renders a chart before the `/history` response
+  resolves (assert canvas + loading flag, then final state); `npm run test:e2e` green. —
+  `research.spec.ts` "price-bars before the full /history resolves": aborts `/history`, asserts
+  the apexchart canvas renders from price-bars + the dismissible notice. Full suite: build +
+  308 unit + 202 mock + 86 e2e green. (e2e uses the AAPL mock; the `.TFI` path is the same
+  `PriceChart` code the mock exercises.)
+- [x] Commit. — `9d519d8`.
 
 ### 45.7 — Release B + closeout
 
