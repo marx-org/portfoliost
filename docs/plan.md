@@ -7,99 +7,135 @@ Legend: `[ ]` pending · `[x]` done
 
 ---
 
-## 41. Combined (all-portfolios) value chart on the main portfolios page (example-service parity, 2026-09-21)
+## 41. Combined (all-portfolios) chart + absolute-value performance chart (example-service parity, 2026-09-21)
 
-User request (no proposal file): the example-service portfolio dashboard shows a large combined
-(all-portfolios) value chart between the header metrics and the portfolio cards; portfoliost's
-main page (`InvestmentsView`, `/en/investments`) is missing it. Reuse the existing
-`PortfolioPerformanceChart.vue` — adapted with a `combined` variant (absolute values, currency
-axis, no Recompute button) — fed by `GET /api/portfolios/merged`.
+User request (no proposal file): the example-service dashboard main page shows a large combined
+(all-portfolios) value chart above the portfolio cards — portfoliost's main page
+(`InvestmentsView`, `/en/investments`) is missing it. **One shared `PortfolioPerformanceChart`
+component, no variant prop** — the charts differ only in the data delivered (combined vs single
+portfolio). Per user: "switch to absolute values everywhere; the current portfolio charts are
+broken anyway" (the component currently renders index start=100 driven by TWR/MWR/simple
+columns).
 
-State of the endpoint: `openapi.yaml` already defines `GET /portfolios/merged`
-(operationId `getMergedPortfolios`, returns `PortfolioAnalytics`, no query params); the mock
-currently answers `[]` (the example-service capture was empty); the real `portfoliost-wallets` route is
-**not** implemented yet (follow-up, separate repo — SPA degrades gracefully: chart simply hidden).
-Mock semantics: per-date sum of the shared analytics fixture across the portfolios listed in
-`portfolios_total_metrics.json` → `portfolioBreakdown` (each seeded portfolio serves the same
-`portfolio_analytics_all.json` fixture, so N× per date is the true sum, and the series stays
-consistent with the header Total Value).
+Example service verified live 2026-09-21 (performance page of Top10 + observed API):
+- Chart line = `performance.timeSeries[].value`, **absolute currency amounts** (0 → ~109k USD);
+  y-axis compact currency (`$20k`…), tooltip full currency (`$94,508.33`); green gradient area.
+- Benchmark overlay KEPT: raw **indexed** values (start=100) drawn on the same absolute axis —
+  grey dashed, flat near 0 (example-service quirk, mirrored); tooltip currency-formatted (`$100.31`).
+- `cumulativeTwr`/`cumulativeMwr` are **percentages** in example-service's payload — they do NOT drive
+  the line; the line is always `value`.
+- Analytics call shape: `GET /portfolios/{id}/analytics?timeframe=3M&benchmarks=SPY&displayCurrency=USD`
+  (example-service converts server-side; portfoliost converts client-side instead — see below).
+- Main-page combined chart: blue gradient area, full available history (no timeframe control).
 
-Scope: portfoliost SPA + mocks only.
+Currency rule (user): the chart must render in the **display currency** now; full
+app-wide display-currency switching (example-service-style backend `displayCurrency`) is a future point.
+Client-side conversion via `getLatestRate` (the §36 `PortfolioPerformanceTab` rateByCcy pattern).
+
+Endpoint state: `openapi.yaml` defines `GET /portfolios/merged` (operationId
+`getMergedPortfolios`, returns `PortfolioAnalytics`); mock answers `[]` (empty example-service capture);
+the real `portfoliost-wallets` route is **not** implemented (follow-up, separate repo — SPA
+degrades gracefully: chart hidden on fetch failure).
+
+Scope: portfoliost SPA + mocks + contracts spec param only.
 
 Rules: one step = one commit; a step is `[x]` only after its tests pass (unit + mock suite per
 AGENTS.md; E2E against docker compose).
 
 ---
 
-### 41.1 — `PortfolioPerformanceChart`: `combined` variant (absolute values, currency axis, no Recompute)
+### 41.1 — `PortfolioPerformanceChart` → absolute values in currency (shared by both charts)
 
-- [ ] `src/components/PortfolioPerformanceChart.vue`: add props
-  `variant?: "portfolio" | "combined"` (default `"portfolio"`) and `currency?: string` (default `"USD"`);
-  extend the header doc comment.
-- [ ] `options` computed, `combined` mode: series data = raw `[ts, value]` points (no index
-  normalisation); yaxis `labels.formatter` = compact + currency (reuse `formatCompact` from
-  `@/utils/format`, e.g. `100k USD`), yaxis title hidden; tooltip y = full `formatCurrency(v, currency)`;
-  no benchmark overlay (combined ignores the `benchmarks` prop); single blue line `#2563eb`.
-- [ ] Template: hide the Recompute button row when `variant === "combined"`.
-- [ ] `portfolio` variant behaviour unchanged (all existing tests stay green).
-- [ ] Tests: `tests/unit/components/PortfolioPerformanceChart.test.ts` — new cases: combined plots
-  raw `value` un-normalised; yaxis formatter output carries the currency code; recompute button
-  absent in combined; benchmarks ignored in combined.
+- [ ] `src/components/PortfolioPerformanceChart.vue`: plot raw `value` (absolute) — remove the
+  index normalisation and the `returnType` prop (example-service's cumulative columns are % stats, not
+  the line).
+- [ ] New props: `currency?: string` (default `"USD"`) for axis/tooltip formatting;
+  `color?: string` (default `#16a34a` — example-service performance green with gradient area; the combined
+  page passes `#2563eb` blue).
+- [ ] yaxis `labels.formatter` = compact currency (reuse `formatCompact` + currency symbol/code,
+  e.g. `$20k`); tooltip y = full `formatCurrency(v, currency)` — applies to the portfolio line
+  AND the benchmark series (example-service formats the benchmark's index value as currency too).
+- [ ] Benchmark overlay kept as today: raw values on the same axis, grey dashed, legend.
+- [ ] Recompute button kept (emits `recompute`; parent decides the scope); `backfillPending`
+  line and loading overlay kept; empty state kept.
+- [ ] Tests: rewrite `tests/unit/components/PortfolioPerformanceChart.test.ts` — absolute plot of
+  `value` (no normalisation); yaxis formatter carries the currency; benchmark overlay on the same
+  axis; recompute still emits; pending line still conditional; `returnType` prop removed.
 - [ ] Tests: `npm run test` green.
 - [ ] Commit.
 
-### 41.2 — API client: `getMergedAnalytics()`
+### 41.2 — Performance tab: display-currency conversion, drop the return-type selector
 
-- [ ] `src/api/portfolios.ts`: add
-  `getMergedAnalytics(): Promise<components["schemas"]["PortfolioAnalytics"]>` →
-  `http.get("/api/portfolios/merged")` (operation already in `generated/api-types.d.ts`).
-- [ ] Thin http wrapper — verified by `npm run build` (vue-tsc); no dedicated unit test.
+- [ ] `src/modules/portfolios/PortfolioPerformanceTab.vue`: convert
+  `performance.timeSeries[].value` from portfolio currency to the display currency before passing
+  to the chart (`getLatestRate` once per distinct source currency — the existing `rateByCcy`
+  pattern); pass `:currency="displayCurrency"`. Same-currency → rate 1, no request.
+- [ ] Customize dialog: remove the Return Type block (the line no longer depends on
+  TWR/MWR/Simple); keep the benchmarks section. Store `analyticsReturnType`/`setReturnType` and
+  the `benchmarkCalcType` API param stay as-is for now (dead in UI, harmless) — noted as
+  follow-up cleanup.
+- [ ] Tests: `tests/e2e/chart-recompute.spec.ts` asserts visibility + pending line only (no index
+  values) — expect no change; `npm run test:e2e` green (docker compose).
 - [ ] Commit.
 
-### 41.3 — Mock: `GET /api/portfolios/merged` serves merged analytics
+### 41.3 — Contracts + API client: merged mirrors single-portfolio analytics
 
-- [ ] `mocks/portfolios/index.js`: replace `ctx.res.json(loadRaw("merged_portfolios.json"))` with
-  `ctx.res.json(mergedAnalytics())`.
-- [ ] `mergedAnalytics()`: load `portfolio_analytics_all.json` (shared fixture, ALL timeframe) +
-  `portfolios_total_metrics.json`; per-date sum of `value`, `positionValue`, `walletCashBalance`,
-  `investedCapital`, `costBasis` across each `portfolioBreakdown` entry; return
-  `{ timeframe: "ALL", portfolioCurrency: metrics.baseCurrency, performance: { totalValue,
-  totalInvested, totalReturn: totalGainLoss, totalReturnPercent, timeSeries }, benchmarks: [] }`.
-  Empty (no fixture / no breakdown) → empty `timeSeries` (SPA hides the chart).
-- [ ] `mocks/tests/run.mjs`: add checks — `/api/portfolios/merged` returns 200 with non-empty
-  `performance.timeSeries`; last point `value` within 2% of
-  `portfolios_total_metrics.json` → `totalValue`.
+- [ ] `portfoliost-contracts/contracts/openapi.yaml`: add optional `timeframe` query param
+  (string, default `ALL`) to `GET /portfolios/merged` (mirroring `/:id/analytics`);
+  `npm run gen:types` + `npm test`/`npm run lint` in the contracts package; rebuild/publish the
+  `@marx2/contracts` artifact the SPA consumes, regenerate `generated/api-types.d.ts`.
+- [ ] `src/api/portfolios.ts`: `getMergedAnalytics(timeframe: PortfolioAnalyticsTimeframe = "ALL")`
+  → `http.get(`/api/portfolios/merged?timeframe=${timeframe}`)`.
+- [ ] Verified by `npm run build` (vue-tsc) — thin wrapper, no dedicated unit test.
+- [ ] Commit.
+
+### 41.4 — Mock: `/api/portfolios/merged` serves the same per-timeframe fixture as a single portfolio
+
+- [ ] `mocks/portfolios/index.js`: replace the `loadRaw("merged_portfolios.json")` (`[]`)
+  passthrough — serve the same `ANALYTICS_BY_TIMEFRAME[timeframe]` fixture + benchmark merge logic
+  as `/:id/analytics` (simplification per user: no cross-portfolio summation; exactly one seeded
+  portfolio carries analytics data, so merged == that series).
+- [ ] `mocks/tests/run.mjs`: checks — `/api/portfolios/merged` 200 with non-empty
+  `performance.timeSeries` for `timeframe=1Y` and `timeframe=ALL`; last point `value` is absolute
+  scale (> 10 000, i.e. not an index around 100).
 - [ ] Tests: `npm run test:mock` green.
 - [ ] Commit.
 
-### 41.4 — `InvestmentsView`: render the combined chart (example-service position)
+### 41.5 — `InvestmentsView`: combined chart block (example-service position)
 
-- [ ] `src/modules/portfolios/InvestmentsView.vue`: `merged` ref; fetch `getMergedAnalytics()` in
-  the `onMounted` `Promise.all` — on failure set `merged = null` (chart hidden, page unaffected).
-- [ ] Render a `card` section between the metrics grid and the "Investment Portfolios" section
-  (example-service layout: big chart above the cards, no title, no timeframe control — ALL history):
-  `<section data-testid="combined-chart">` → `PortfolioPerformanceChart` with
-  `variant="combined"`, `:time-series="merged?.performance?.timeSeries ?? []"`,
-  `:currency="merged?.portfolioCurrency ?? store.totalMetrics?.baseCurrency ?? 'USD'"`,
-  `:loading="loading"`; `v-if="merged?.performance?.timeSeries?.length"`.
-- [ ] E2E: `tests/e2e/combined-chart.spec.ts` — login → `/en/investments` →
-  `[data-testid="combined-chart"] .apexcharts-canvas` visible.
+- [ ] `src/modules/portfolios/InvestmentsView.vue`: `merged` ref; fetch
+  `getMergedAnalytics("ALL")` in the `onMounted` `Promise.all` — on failure `merged = null`
+  (chart hidden, page unaffected).
+- [ ] Convert the merged series to the display currency (source =
+  `store.totalMetrics?.baseCurrency`); render the shared component inside a `card` section between
+  the metrics grid and the "Investment Portfolios" section: blue (`color="#2563eb"`),
+  `:currency="displayCurrency"`, `:loading="loading"`, `v-if="merged?.performance?.timeSeries?.length"`.
+- [ ] Recompute button (kept in the component) → fire `recomputePortfolio` for every
+  `store.portfolios` entry; local `backfillPending` flag shown until the next merged re-fetch
+  succeeds (no merged-specific recompute endpoint exists).
+- [ ] `data-testid="combined-chart"` wrapper; E2E `tests/e2e/combined-chart.spec.ts` — login →
+  `/en/investments` → `[data-testid="combined-chart"] .apexcharts-canvas` visible.
 - [ ] Tests: `docker compose up -d --build` + `npm run test:e2e` green.
 - [ ] Commit.
 
-### 41.5 — Full suite + visual parity vs example-service
+### 41.6 — Full suite + visual parity vs example-service
 
 - [ ] `npm run build && npm run test && npm run test:mock`; `docker compose up -d --build`;
   `npm run test:e2e` — all green.
-- [ ] Playwright side-by-side: portfoliost `/en/investments` vs `app.example-service.ai` portfolio page —
-  combined chart block position/look; screenshot diff, note residual gaps.
+- [ ] Playwright side-by-side vs `app.example-service.ai`: (a) `/en/investments` combined chart block
+  (position, blue area, absolute display-currency axis); (b) performance page chart (green area,
+  benchmark dashed overlay, currency tooltip) — screenshots, note residual gaps.
 - [ ] Commit.
 
 ---
 
-Open follow-up (out of scope, wallets repo): implement the real `GET /api/portfolios/merged` in
-`portfoliost-wallets` (sum value snapshots across all portfolios → base currency,
-`PortfolioAnalytics` shape) so production serves the chart; until then the SPA hides it gracefully.
+Open follow-ups (out of scope here):
+1. Real `GET /api/portfolios/merged` in `portfoliost-wallets` (sum value snapshots across all
+   portfolios → base currency, `PortfolioAnalytics` shape) — until then production hides the chart.
+2. Backend display-currency conversion (example-service-style `?displayCurrency=` on analytics endpoints) —
+   future point; client-side conversion covers the charts now.
+3. Dead UI state cleanup: `analyticsReturnType`/`setReturnType` store fields + `benchmarkCalcType`
+   param once nothing consumes them.
 
 ---
 
