@@ -3,7 +3,7 @@ import { computed, onMounted, onUnmounted, ref, watchEffect } from "vue"
 import { useRoute } from "vue-router"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { getPortfolioAnalytics, getPortfolioRiskMetrics, recomputePortfolio } from "@/api/portfolios"
-import type { PortfolioBenchmarkCalcType, PortfolioAnalyticsTimeframe } from "@/api/portfolios"
+import type { PortfolioAnalyticsTimeframe } from "@/api/portfolios"
 import type { PortfolioPositions } from "@/api/types"
 import { formatPercent, formatSignedCurrency } from "@/utils/format"
 import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
@@ -38,25 +38,17 @@ const benchmarkOptions = [
   { symbol: "AGG", name: "Aggregate Bond" },
 ]
 
-const returnTypeOptions: Array<{ value: PortfolioBenchmarkCalcType; label: string }> = [
-  { value: "timeWeighted", label: "Time-Weighted Return (TWR)" },
-  { value: "moneyWeighted", label: "Money-Weighted Return (cumulative)" },
-  { value: "simple", label: "Simple Return" },
-]
-
 const customizeOpen = ref(false)
 const showAddBenchmark = ref(false)
 
 // Draft state — local to the modal, only committed on Apply
 const draftBenchmarks = ref<string[]>([])
-const draftReturnType = ref<PortfolioBenchmarkCalcType>("timeWeighted")
 
 const knownSymbols = new Set(benchmarkOptions.map((o) => o.symbol))
 const customDraftBenchmarks = computed(() => draftBenchmarks.value.filter((s) => !knownSymbols.has(s)))
 
 function openCustomize() {
   draftBenchmarks.value = [...store.analyticsBenchmarks]
-  draftReturnType.value = store.analyticsReturnType
   customizeOpen.value = true
 }
 
@@ -85,10 +77,6 @@ function addBenchmark(symbol: string, _name: string) {
 async function applyCustomize() {
   customizeOpen.value = false
   const benchmarksChanged = JSON.stringify([...draftBenchmarks.value].sort()) !== JSON.stringify([...store.analyticsBenchmarks].sort())
-  const returnTypeChanged = draftReturnType.value !== store.analyticsReturnType
-  if (returnTypeChanged) {
-    await store.setReturnType(draftReturnType.value, id)
-  }
   if (benchmarksChanged) {
     await store.setBenchmarks(draftBenchmarks.value, id)
   }
@@ -245,6 +233,29 @@ function convertedPnl(p: PortfolioPositions[number]): number | null {
   // getLatestRate(ccy, displayCurrency).rate is a direct 1 ccy = rate display
   return p.unrealizedGainLoss * rate
 }
+
+// §41.2 — the chart always plots absolute values; when the analytics series is
+// denominated in the portfolio currency and that differs from the display
+// currency, convert once per source currency via getLatestRate, then pass the
+// converted series + :currency to the shared chart component.
+const portfolioCcy = computed(() => (store.detail?.currency ?? "USD").toUpperCase())
+const chartRate = ref<number | null>(null)
+
+watchEffect(() => {
+  const src = portfolioCcy.value
+  const dst = displayCurrency.toUpperCase()
+  if (!src) { chartRate.value = null; return }
+  if (src === dst) { chartRate.value = 1; return }
+  chartRate.value = null
+  void getLatestRate(src, dst).then((r) => {
+    if (r && typeof r.rate === "number" && r.rate > 0) chartRate.value = r.rate
+  })
+})
+
+const chartSeries = computed(() => {
+  const rate = chartRate.value ?? 1
+  return (store.analytics?.performance?.timeSeries ?? []).map((p) => ({ ...p, value: (p.value ?? 0) * rate }))
+})
 </script>
 
 <template>
@@ -270,9 +281,9 @@ function convertedPnl(p: PortfolioPositions[number]): number | null {
         </div>
       </div>
       <PortfolioPerformanceChart
-        :time-series="store.analytics?.performance?.timeSeries ?? []"
+        :time-series="chartSeries"
         :benchmarks="store.analytics?.benchmarks ?? []"
-        :return-type="store.analyticsReturnType"
+        :currency="displayCurrency"
         :backfill-pending="backfillPending || recomputeBusy"
         :loading="store.analyticsLoading"
         :height="300"
@@ -359,17 +370,6 @@ function convertedPnl(p: PortfolioPositions[number]): number | null {
       </div>
 
       <div class="space-y-5">
-        <div>
-          <p class="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">Return Type</p>
-          <select
-            v-model="draftReturnType"
-            class="input w-full"
-            data-testid="perf-controls-return-type"
-          >
-            <option v-for="opt in returnTypeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-          </select>
-        </div>
-
         <div>
           <div class="mb-2 flex items-center justify-between">
             <p class="text-sm font-medium text-slate-700 dark:text-slate-300">Benchmarks</p>
