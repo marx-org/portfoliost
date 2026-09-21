@@ -397,8 +397,8 @@ research), mocks. Depends on §47 (currency resolver, no-USD rule) — implement
 - [ ] `GET /:id/dividends` (portfolios.ts:1048, currently a stub): implement from
   real DIVIDEND rows — items `{symbol, instrumentName, date, quantity, gross
   (=qty×price), taxes, amount (net), currency, exchangeRate, convertedAmount,
-  notes}` sorted date desc + `totalDividends` (net, sum) + `count`; contract shape
-  reuses the `DividendsData`-adjient portfolio response (extend it in 49.1 if the
+  notes}` sorted date desc + `totalDividends` (net, sum) + `count`; contract shape reuses a
+  `DividendsData`-adjacent portfolio response (extend it in 49.1 if the
   current shape is insufficient — it currently only models instrument research
   rows, which is why the mock fakes it).
 - [ ] Tests: vitest round-trips — dividend with tax (net persisted, wallet credited
@@ -451,11 +451,10 @@ research), mocks. Depends on §47 (currency resolver, no-USD rule) — implement
   `profileData?.currency ?? "USD"` with `resolveInstrumentCurrency(getDb(),
   routeSymbol)` (the §47 single resolver); add `/dividends` route to §47.4's
   `currencySource` treatment.
-- [ ] Dead-field decision: `CalendarData.dividend` (payment dates) is never
-  populated and the SPA renders an always-empty "Upcoming Dividend" card —
-  **remove** the field from the contract + `toCalendar` + the SPA card (or
-  populate from provider if §47.1's fixtures show the calendar carries payment
-  dates — check at implementation; default: remove).
+- [ ] Dead-field fix deferred to 49.9: `CalendarData.dividend` (payment dates) is not
+  populated today and the SPA renders an always-empty "Upcoming Dividend" card —
+  49.9 implements the dividend calendar (payment dates) end-to-end; until then the
+  SPA card stays hidden (`v-if` on data presence), not removed.
 - [ ] `ResearchDividends.vue`: `instrCcy = history[0]?.currency ?? "USD"` → use
   the §47 badge rules (unknown → plain number + red badge); `ResearchCalendar.vue`
   ex-dividend amounts follow the fixed route currency.
@@ -481,7 +480,39 @@ research), mocks. Depends on §47 (currency resolver, no-USD rule) — implement
   verify in prod: record a dividend with tax in a real portfolio → row shows
   net total, wallet credited net, Dividends tab shows it; delete the test row.
 - [ ] Update `fees-and-custom-fx.md` addendum (taxes on DIVIDEND = withholding,
-  net-totalAmount convention); archive §49 to `plan-archive.md`.
+  net-totalAmount convention); archive §49 (up to 49.8) to `plan-archive.md`;
+  §49.9 stays pending (provider tier, separate closeout).
+
+### 49.9 — Dividend calendar: ex-dividend + payment dates (provider tier, later)
+
+Implements the dividend-calendar half of the portfolio/instrument calendar feature
+(deferred from 49.6). Provider tier first per the standard step ordering;
+follows the planner's openst→cachest→instruments→SPA sequence.
+
+- [ ] Probe: `obb.equity.calendar.dividend` rows + the dividend-history DataFrame
+  (openst `get_dividend_history`) — capture which providers expose
+  `payment_date` (vs ex-date only); save fixtures under
+  `openst/tests/fixtures/`. One request per symbol, no automation.
+- [ ] openst: where the provider exposes it, add `payment_date` to
+  `get_dividend_history` rows (`{"date", "amount", "payment_date"?}`) and pass
+  calendar `dividend` rows through untouched (they already carry raw columns via
+  `_df_records`); unit tests with fixtures; full openst suite green; compose smoke
+  (curl one US dividend payer, cache HIT on second call).
+- [ ] cachest: no new route (dividend history + calendar dividend are existing
+  passthroughs) — verify the fetcher preserves the new `payment_date` field
+  (quick check + `test_real_config_has_...` style assertion if it does field
+  filtering); full cachest suite green.
+- [ ] instruments: `toCalendar` maps `payment_date` into `CalendarData.dividend[]`
+  (`{date, title: "Dividend Payment", year, amount}`) alongside the existing
+  `exDividend[]` (ex-dividend dates keep populating `exDividend` — both arrays
+  fed, amounts from the same rows); `/dividends` history rows gain
+  `paymentDate` (nullable) in the contract; SPA `ResearchDividends.vue` shows the
+  payment date per row when present; the always-empty "Upcoming Dividend" card in
+  `ResearchCalendar.vue` becomes live; `toDividends` passes `paymentDate` through.
+- [ ] Tests: instruments vitest (row with/without payment_date), SPA e2e (calendar
+  shows both ex-date and payment-date sections for a seeded dividend payer).
+- [ ] Closeout: contract bump + consumer installs, deploy openst/instruments,
+  archive §49 fully to `plan-archive.md`.
 
 ---
 
@@ -497,7 +528,8 @@ research), mocks. Depends on §47 (currency resolver, no-USD rule) — implement
 - **FX**: receive-date rate via the existing D29 automatic/custom machinery;
   conversion math stays `@marx2/contracts/fx` (D27).
 - **`/portfolios/:id/dividends`** aggregates real DIVIDEND rows (no research
-  data); the dead `CalendarData.dividend` field is removed by default unless
-  §47.1's fixtures show the provider carries payment dates.
+  data); the dividend **calendar** (ex-date + payment date) is supported via
+  49.9 (provider tier, later step) — until then the SPA payment-date card stays
+  hidden and `CalendarData.dividend` stays empty (field kept, not removed).
 - **Ordering**: §49 runs after §47 (currency fixes reuse its resolver); no
   dependency on §48.
