@@ -73,6 +73,28 @@ test("research shows quick-switch logo row", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "NVDA", exact: true }).first()).toBeVisible({ timeout: 15000 })
 })
 
+test("price chart renders from price-bars before the full /history resolves (plan §45.6)", async ({ page }) => {
+  // Hold the wide /history response in flight while letting /price-bars through,
+  // so we can assert the chart paints from the cached price-bars immediately
+  // (no blank spinner) and shows the "full history loading…" state.
+  await login(page)
+  await page.route("**/api/instruments/**/history**", (route) => {
+    // park the history request (never fulfill it) to simulate a slow scrape
+    route.abort().catch(() => {})
+  })
+  await page.goto(`/en/research/AAPL/overview`)
+
+  const chartCard = page.locator(".card", { hasText: "Price Chart" })
+  await expect(chartCard.getByText("Price Chart")).toBeVisible({ timeout: 15000 })
+  // The chart must render from price-bars even though /history was aborted:
+  // an apexchart canvas appears (the "No price history available" fallback is absent).
+  await expect(chartCard.locator(".apexcharts-canvas").first()).toBeVisible({ timeout: 15000 })
+  // With /history down, the price-bars chart stays (no blank canvas) and a
+  // dismissible "full history unavailable" notice is shown (not a blocking spinner).
+  await expect(page.getByText("Full history unavailable")).toBeVisible({ timeout: 15000 })
+  await expect(page.getByRole("button", { name: "Dismiss" })).toBeVisible()
+})
+
 test("price chart shows Total Chg and CAGR", async ({ page }) => {
   // Detect upstream OHLCV availability before asserting chart content
   const historyResp = page.waitForResponse(

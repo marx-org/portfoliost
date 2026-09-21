@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue"
-import { getHistory } from "@/api/instruments"
+import { getHistory, getPriceBars } from "@/api/instruments"
 import type { HistoryCompareSeries } from "@/api/instruments"
 import { getAllTransactions, getPortfolioTransactions } from "@/api/portfolios"
 import { usePortfolioStore } from "@/stores/portfolios"
@@ -37,6 +37,12 @@ const showCompare = ref(false)
 const fullscreen = ref(false)
 const loading = ref(true)
 const error = ref<string | null>(null)
+const historyLoading = ref(false)
+const historyFailed = ref(false)
+// §45.6 — true while the chart is showing only price-bars (wide /history
+// still loading or failed). Drives the "full history loading…" / notice UI.
+const onlyPartial = ref(false)
+const showingPartial = computed(() => onlyPartial.value && historyLoading.value)
 
 const timestamps = ref<number[]>([])
 const prices = ref<number[]>([])
@@ -100,20 +106,57 @@ function toggleTransactions(checked: boolean): void {
   }
 }
 
+async function setFromPriceBars(symbol: string): Promise<boolean> {
+  error.value = null
+  historyFailed.value = false
+  try {
+    // 11 years of daily bars matches what /history requests (todayRange(4018)).
+    const to = new Date().toISOString().slice(0, 10)
+    const from = new Date(Date.now() - 4018 * 86400_000).toISOString().slice(0, 10)
+    const bars = await getPriceBars(symbol, from, to)
+    if (bars.dates.length > 0) {
+      timestamps.value = bars.dates.map((d) => Math.floor(Date.parse(d + "T00:00:00Z") / 1000))
+      prices.value = [...bars.closes]
+      if (bars.currency) chartCurrency.value = bars.currency
+      return true
+    }
+  } catch {
+    // price-bars empty/failed: leave an empty chart; the history leg still runs.
+  }
+  return false
+}
+
 async function load(compareKey: CompareKey) {
   loading.value = true
   error.value = null
+  onlyPartial.value = false
+  // §45.6 — price-bars first (cached, instant): render the chart as soon as
+  // these land so a slow /history (e.g. a .TFI first scrape) never leaves a
+  // blank spinner. Mark it "partial" while the wide history is in flight.
+  const hasBars = await setFromPriceBars(props.symbol)
+  loading.value = false // the chart can paint now, even before /history resolves
+  if (hasBars) {
+    onlyPartial.value = true
+    historyLoading.value = true
+  }
+
+  const compareKeyForHistory = compareKey === "none" ? undefined : compareKey
   try {
-    const h = await getHistory(props.symbol, "daily", compareKey === "none" ? undefined : compareKey)
+    const h = await getHistory(props.symbol, "daily", compareKeyForHistory)
     timestamps.value = h.timestamps
     prices.value = h.closePrices
     bench.value = h.compare ?? null
     loadedCompare.value = compareKey
     chartCurrency.value = h.currency || "USD"
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : "Failed to load price history"
+    onlyPartial.value = false
+    error.value = null
+  } catch {
+    // Keep the price-bars chart; surface a dismissible notice + retry instead
+    // of a blank canvas / blocking spinner.
+    historyFailed.value = true
+    error.value = "Full history unavailable — showing recent prices."
   } finally {
-    loading.value = false
+    historyLoading.value = false
   }
 }
 
@@ -124,10 +167,14 @@ onMounted(() => {
 watch(compare, (k) => {
   if (k !== loadedCompare.value) load(k)
 })
-
 watch(
   () => props.symbol,
   () => {
+    // symbol changed: reset state and re-run the two-stage load
+    bench.value = null
+    loadedCompare.value = "none"
+    onlyPartial.value = false
+    void load(compare.value)
     if (showTransactions.value) fetchTransactions()
   },
 )
@@ -669,8 +716,15 @@ function downloadCsv(): void {
       </div>
     </div>
 
-    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading price history...</p>
+    <!-- §45.6 — full-history leg state: a dismissible notice (on failure) or a
+         "loading…" hint (while the wide /history runs) over the price-bars
+         chart. The chart itself renders from price-bars immediately. -->
+    <div v-if="historyFailed" class="mb-3 flex items-center justify-between gap-3 rounded-lg bg-amber-50 dark:bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
+      <span>Full history unavailable — showing recent prices. <button type="button" class="font-semibold underline underline-offset-2 hover:opacity-80" @click="load(compare)">Retry</button></span>
+      <button type="button" class="text-amber-500 hover:opacity-70" aria-label="Dismiss" @click="historyFailed = false">&times;</button>
+    </div>
+    <p v-else-if="showingPartial" class="mb-3 text-sm text-slate-500 dark:text-slate-400">Showing recent prices — full history loading&hellip;</p>
+    <p v-else-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading price history...</p>
 
     <p v-if="showTransactions && transactionsError" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ transactionsError }}</p>
     <p v-if="showTransactions && transactionsLoading" class="text-sm text-slate-500 dark:text-slate-400">Loading transactions...</p>

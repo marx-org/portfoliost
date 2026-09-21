@@ -57,6 +57,19 @@ export interface HistoryCompareSeries {
   currency?: string
 }
 
+// §45.6 — the cached daily close series (stooq + overflow write-through).
+// Instant even when the upstream /history scrape is slow: this is the fast
+// "price-bars now, full history in the background" source for the research
+// chart. `dates` are ISO YYYY-MM-DD; `closes` align 1:1 with `dates`.
+export async function getPriceBars(
+  symbol: string,
+  from: string,
+  to: string,
+): Promise<components["schemas"]["PriceBarSeries"]> {
+  const q = new URLSearchParams({ from, to })
+  return http.get<components["schemas"]["PriceBarSeries"]>(`/api/instruments/${symbol}/price-bars?${q}`)
+}
+
 export async function getHistoricalClose(symbol: string, date: string): Promise<number | null> {
   try {
     const res = await http.get<{ price: number | null }>(`/api/instruments/${symbol}/price?date=${date}`)

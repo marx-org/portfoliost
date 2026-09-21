@@ -159,6 +159,19 @@ export function register(app) {
     ctx.res.json(historyFor(symbol, ctx.query.resolution, ctx.query.compare))
   })
 
+  // §45.6 — the cached daily close series (price-bars). Derived from the daily
+  // history fixture (timestamps → ISO dates, 1:1 closes) so the SPA's
+  // "price-bars now, full history in background" flow has an instant source.
+  app.get("/api/instruments/:symbol/price-bars", (ctx) => {
+    if (!requireAuth(ctx)) return
+    const symbol = getSymbol(ctx)
+    const base = loadRaw("history_daily.json")
+    const research = loadResearch(symbol)
+    const currency = research?.basics?.currency || research?.overview?.currency || base.currency || "USD"
+    const dates = (base.timestamps || []).map((t) => new Date(t * 1000).toISOString().slice(0, 10))
+    ctx.res.json({ symbol, timeframe: "daily", stale: false, currency, dates, closes: base.closePrices || [] })
+  })
+
   app.get("/api/instruments/:symbol/fundamentals", (ctx) => {
     if (!requireAuth(ctx)) return
     const symbol = getSymbol(ctx)
