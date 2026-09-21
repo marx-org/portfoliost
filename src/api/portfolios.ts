@@ -134,6 +134,10 @@ export async function deletePortfolioTransaction(id: string, txId: string): Prom
 
 export type PortfolioBenchmarkCalcType = "moneyWeighted" | "timeWeighted" | "simple"
 
+export async function getMergedAnalytics(timeframe: PortfolioAnalyticsTimeframe = "ALL"): Promise<PortfolioAnalytics1Y> {
+  return http.get<PortfolioAnalytics1Y>(`/api/portfolios/merged?timeframe=${timeframe}`)
+}
+
 export async function getPortfolioAnalytics(
   id: string,
   timeframe: PortfolioAnalyticsTimeframe = "1Y",

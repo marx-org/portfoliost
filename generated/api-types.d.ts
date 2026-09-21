@@ -5017,7 +5017,10 @@ export interface operations {
     };
     getMergedPortfolios: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Performance timeframe for the merged series (defaults to all available history) */
+                timeframe?: "1W" | "1M" | "3M" | "6M" | "1Y" | "2Y" | "ALL";
+            };
             header?: never;
             path?: never;
             cookie?: never;
