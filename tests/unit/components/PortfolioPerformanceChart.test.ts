@@ -2,65 +2,90 @@ import { mount } from "@vue/test-utils"
 import { describe, expect, it } from "vitest"
 import PortfolioPerformanceChart from "@/components/PortfolioPerformanceChart.vue"
 
-const ts = (date: string, extra: Record<string, number | null> = {}) => ({ date, value: 100, ...extra })
+const ts = (date: string, value = 100) => ({ date, value })
 
-describe("PortfolioPerformanceChart (§27.4)", () => {
-  it("indexes the TWR series starting at 100", () => {
+type ChartOptions = {
+  series: Array<{ name: string; data: [number, number][] }>
+  yaxis: { labels: { formatter: (v: number) => string } }
+  tooltip: { y: { formatter: (v: number) => string } }
+  colors: string[]
+  stroke: { dashArray: number[] }
+}
+
+function chartOptions(w: ReturnType<typeof mount>): ChartOptions {
+  return (w.vm as unknown as { options: ChartOptions }).options
+}
+
+describe("PortfolioPerformanceChart (§41.1)", () => {
+  it("plots raw absolute values (no index normalisation)", () => {
     const w = mount(PortfolioPerformanceChart, {
       props: {
-        timeSeries: [ts("2026-07-01", { cumulativeTwr: 100 }), ts("2026-07-02", { cumulativeTwr: 102.5 })],
-        returnType: "timeWeighted",
+        timeSeries: [ts("2026-07-01", 500), ts("2026-07-02", 94000)],
       },
       global: { stubs: { apexchart: true } },
     })
-    const opts = (w.vm as unknown as { options: { series: Array<{ name: string; data: [number, number][] }> } }).options
-    expect(opts.series[0].data.map(([, v]) => v)).toEqual([100, 102.5])
+    const opts = chartOptions(w)
+    expect(opts.series[0].data.map(([, v]) => v)).toEqual([500, 94000])
   })
 
-  it("indexes the MWR series starting at 100", () => {
+  it("formats the y-axis as compact currency", () => {
     const w = mount(PortfolioPerformanceChart, {
       props: {
-        timeSeries: [ts("2026-07-01", { cumulativeMwr: 100 }), ts("2026-07-02", { cumulativeMwr: 99.1 })],
-        returnType: "moneyWeighted",
+        timeSeries: [ts("2026-07-01", 500)],
+        currency: "USD",
       },
       global: { stubs: { apexchart: true } },
     })
-    const opts = (w.vm as unknown as { options: { series: Array<{ data: [number, number][] }> } }).options
-    expect(opts.series[0].data.map(([, v]) => v)).toEqual([100, 99.1])
+    const opts = chartOptions(w)
+    expect(opts.yaxis.labels.formatter(94000)).toMatch(/\$/)
+    expect(opts.yaxis.labels.formatter(94000)).toMatch(/K/i)
   })
 
-  it("falls back to raw-value normalisation (start = 100) when columns are null", () => {
+  it("formats the tooltip as full currency (portfolio + benchmark)", () => {
     const w = mount(PortfolioPerformanceChart, {
       props: {
-        timeSeries: [{ date: "2026-07-01", value: 200, cumulativeTwr: null }, { date: "2026-07-02", value: 220, cumulativeTwr: null }],
-        returnType: "timeWeighted",
+        timeSeries: [ts("2026-07-01", 500)],
+        benchmarks: [{ name: "S&P 500", timeSeries: [{ date: "2026-07-01", value: 100.31 }] }],
+        currency: "USD",
       },
       global: { stubs: { apexchart: true } },
     })
-    const opts = (w.vm as unknown as { options: { series: Array<{ data: [number, number][] }> } }).options
-    expect(opts.series[0].data.map(([, v]) => v)).toEqual([100, 110])
+    const opts = chartOptions(w)
+    expect(opts.tooltip.y.formatter(94508.33)).toBe("$94,508.33")
   })
 
-  it("overlays benchmark series", () => {
+  it("overlays the benchmark on the same axis, grey dashed", () => {
     const w = mount(PortfolioPerformanceChart, {
       props: {
-        timeSeries: [ts("2026-07-01", { cumulativeTwr: 100 }), ts("2026-07-02", { cumulativeTwr: 101 })],
+        timeSeries: [ts("2026-07-01", 500), ts("2026-07-02", 94000)],
         benchmarks: [
           { symbol: "SPY", name: "S&P 500", timeSeries: [{ date: "2026-07-01", value: 100 }, { date: "2026-07-02", value: 100.4 }] },
         ],
-        returnType: "timeWeighted",
       },
       global: { stubs: { apexchart: true } },
     })
-    const opts = (w.vm as unknown as { options: { series: Array<{ name: string; data: [number, number][] }> } }).options
+    const opts = chartOptions(w)
+    // Same axis: the raw indexed benchmark values are drawn on the absolute scale.
     expect(opts.series).toHaveLength(2)
     expect(opts.series[1].name).toBe("S&P 500")
     expect(opts.series[1].data.map(([, v]) => v)).toEqual([100, 100.4])
+    expect(opts.stroke.dashArray).toEqual([0, 4])
+  })
+
+  it("applies a custom line colour for the combined chart", () => {
+    const w = mount(PortfolioPerformanceChart, {
+      props: {
+        timeSeries: [ts("2026-07-01", 500)],
+        color: "#2563eb",
+      },
+      global: { stubs: { apexchart: true } },
+    })
+    expect(chartOptions(w).colors[0]).toBe("#2563eb")
   })
 
   it("shows the pending line only when backfillPending and emits recompute", async () => {
     const w = mount(PortfolioPerformanceChart, {
-      props: { timeSeries: [ts("2026-07-01", { cumulativeTwr: 100 })], returnType: "timeWeighted", backfillPending: false },
+      props: { timeSeries: [ts("2026-07-01", 500)], backfillPending: false },
       global: { stubs: { apexchart: true } },
     })
     expect(w.text()).not.toContain("Historical data is loading")

@@ -26,6 +26,12 @@ export function formatCompact(value: number | null | undefined): string {
   return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 }).format(value)
 }
 
+export function formatCompactCurrency(value: number | null | undefined, currency = "USD"): string {
+  if (value === null || value === undefined || Number.isNaN(value)) return "—"
+  const ccy = currency && /^[A-Za-z]{3}$/.test(currency) ? currency : "USD"
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: ccy, notation: "compact", maximumFractionDigits: 1 }).format(value)
+}
+
 export function formatDate(value: string | number | Date | null | undefined): string {
   if (!value) return "—"
   const d = typeof value === "number" ? new Date(value) : new Date(value)
