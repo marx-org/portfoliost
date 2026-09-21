@@ -3,8 +3,10 @@ import { createPinia, setActivePinia, type Pinia } from "pinia"
 import { useCurrenciesStore } from "@/stores/currencies"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import InvestmentsView from "@/modules/portfolios/InvestmentsView.vue"
+import PortfolioPerformanceChart from "@/components/PortfolioPerformanceChart.vue"
 import * as portfoliosApi from "@/api/portfolios"
 import * as walletsApi from "@/api/wallets"
+import * as fxApi from "@/api/fx"
 
 vi.mock("@/api/portfolios", async (importOriginal) => {
   const actual = await importOriginal<typeof portfoliosApi>()
@@ -15,6 +17,8 @@ vi.mock("@/api/portfolios", async (importOriginal) => {
     getPortfolioAnalytics: vi.fn(),
     getPortfolioPositions: vi.fn(),
     createPortfolio: vi.fn(),
+    getMergedAnalytics: vi.fn(),
+    recomputePortfolio: vi.fn(),
   }
 })
 
@@ -23,8 +27,13 @@ vi.mock("@/api/wallets", () => ({
   getWalletTotalBalance: vi.fn(),
 }))
 
+vi.mock("@/api/fx", () => ({
+  getLatestRate: vi.fn(),
+}))
+
 const mocked = vi.mocked(portfoliosApi)
 const mockedWallets = vi.mocked(walletsApi)
+const mockedFx = vi.mocked(fxApi)
 
 let pinia: Pinia
 
@@ -83,6 +92,11 @@ function mountView() {
       stubs: {
         RouterLink: { template: "<a><slot /></a>" },
         apexchart: { template: "<div class='apexchart-stub' />" },
+        PortfolioPerformanceChart: {
+          name: "PortfolioPerformanceChart",
+          props: ["timeSeries", "currency", "color", "loading", "backfillPending", "height"],
+          template: "<div class='perf-chart-stub' />",
+        },
       },
     },
   })
@@ -112,8 +126,12 @@ describe("InvestmentsView", () => {
     mocked.getPortfolioAnalytics.mockResolvedValue({
       performance: { timeSeries: [{ date: "2026-01-01", value: 100 }], monthlyReturns: [] },
     } as never)
+    mocked.getMergedAnalytics.mockResolvedValue({
+      performance: { timeSeries: [{ date: "2026-01-01", value: 1000 }], monthlyReturns: [] },
+    } as never)
     mockedWallets.getWallets.mockResolvedValue([])
     mockedWallets.getWalletTotalBalance.mockResolvedValue({ totalBalance: 0, totalAvailableBalance: 0 } as never)
+    mockedFx.getLatestRate.mockResolvedValue({ rate: 0.9, asOf: "2026-09-21" })
   })
 
   it("renders the total metrics cards", async () => {
@@ -173,5 +191,39 @@ describe("InvestmentsView", () => {
 
     await wrapper.find("button.btn-secondary").trigger("click")
     expect(wrapper.text()).toContain("EUR")
+  })
+
+  it("converts the merged series from totalMetrics.baseCurrency to the display currency (§46.3), when the display currency changes", async () => {
+    localStorage.setItem("portfoliost_display_currency", "EUR")
+    mocked.getPortfolioTotalMetrics.mockResolvedValue({
+      totalValue: 1200,
+      totalInvested: 1000,
+      totalGainLoss: 200,
+      returnPercentage: 20,
+      baseCurrency: "USD",
+      portfolioBreakdown: [],
+    } as never)
+    mocked.getMergedAnalytics.mockResolvedValue({
+      performance: {
+        timeSeries: [
+          { date: "2026-01-01", value: 1000 },
+          { date: "2026-01-02", value: 1200 },
+        ],
+        monthlyReturns: [],
+      },
+    } as never)
+
+    const wrapper = mountView()
+    await flushPromises()
+    await flushPromises()
+
+    // Source currency = totalMetrics.baseCurrency (the wallets merged route's USD).
+    expect(mockedFx.getLatestRate).toHaveBeenCalledWith("USD", "EUR")
+    const chart = wrapper.findComponent(PortfolioPerformanceChart)
+    const series = chart.props("timeSeries") as Array<{ date: string; value: number }>
+    expect(series).toHaveLength(2)
+    expect(series[0].value).toBeCloseTo(900, 6) // 1000 × 0.9
+    expect(series[1].value).toBeCloseTo(1080, 6) // 1200 × 0.9
+    expect(chart.props("currency")).toBe("EUR")
   })
 })
