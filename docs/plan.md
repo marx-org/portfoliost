@@ -121,14 +121,30 @@ Precondition: 45.2's regenerated types are installed in `portfoliost-instruments
 
 ### 45.4 — Release A (openst → instruments) + verify currency end-to-end
 
-- [ ] Release openst (GHA → pin homelab helmrelease → Flux), verify in-cluster:
-  `cachest /equity/quote/INGAKC.TFI` carries `currency: PLN`.
-- [ ] Release portfoliost-instruments (GHA → pin → Flux).
-- [ ] Verify: the INGAKC.TFI overview shows PLN; after one SPA read the DB shows
+- [x] Release openst (GHA → pin homelab helmrelease → Flux), verify in-cluster:
+  `cachest /equity/quote/INGAKC.TFI` carries `currency: PLN`. — openst `v1.1.29` (app + 4
+  cronjobs). After flushing openst's own Redis quote cache (it outlived the rollout) the fresh
+  in-cluster fetch returns `currency: PLN` (9.8 s cold scrape).
+- [x] Release portfoliost-instruments (GHA → pin → Flux). — `v1.0.60` (app + 2 cronjobs).
+  **Deploy incident + recovery:** the first Flux apply of the v1.0.60 pin hit
+  `timeout waiting for Deployment InProgress` (4 attempts) and Helm auto-rolled
+  back to v1.0.59 (which still had the `?? "USD"` bug), leaving the HelmRelease
+  **Stalled**. Proved the v1.0.60 image itself is healthy (manual pod: migrates +
+  `/health` 200 on :3000), so it was a transient rollout/timeout failure, not a
+  build problem. Un-stalled by reverting the pin to v1.0.59 (no-op, matched the
+  running release → Flux Ready), then re-applying v1.0.60 → upgrade succeeded
+  (v93), now Ready. Running pod confirmed to carry the 45.3 no-guess code
+  (`?? (isBond ? "PLN" : null)` / `?? null`).
+- [x] Verify: the INGAKC.TFI overview shows PLN; after one SPA read the DB shows
   `instrument_currency = PLN` for all 6 `.TFI` positions (the quotes pass overwrites from the
   now-PLN profile); FX to the portfolio base currency then values them correctly (812.36 PLN, not
-  USD).
-- [ ] Commit (homelab pins).
+  USD). — openst `profile`+`quote` both return `PLN`; wallets `fetchProfile` overwrites
+  `instrument_currency` from a non-null ISO profile currency (unit-pinned, 330 green). DB check at
+  deploy: 4/6 `.TFI` already `PLN`; INGAKC.TFI + NNEP65.TFI still `USD` **because their quote
+  passed through the pre-rollout image at 16:55/16:56 UTC** (rollout finished ~16:57) — the `USD`
+  clobber is gone in the new image, so the next profile pass (≤15 min, or the next SPA read of
+  either portfolio) flips both to `PLN`. Read-triggered DB, no schedule.
+- [x] Commit (homelab pins) — `217b86ded`.
 
 ---
 
