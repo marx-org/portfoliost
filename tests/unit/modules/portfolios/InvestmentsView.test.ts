@@ -226,4 +226,25 @@ describe("InvestmentsView", () => {
     expect(series[1].value).toBeCloseTo(1080, 6) // 1200 × 0.9
     expect(chart.props("currency")).toBe("EUR")
   })
+
+  it("shows the combined block currency and switches the merged timeframe (§46.7)", async () => {
+    localStorage.removeItem("portfoliost_display_currency")
+    const wrapper = mountView()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain("Portfolio Value: USD")
+
+    const timeframes = wrapper.find('[data-testid="combined-chart-timeframes"]')
+    const buttons = timeframes.findAll("button")
+    const allBtn = buttons.find((b) => b.text() === "ALL")!
+    const y1Btn = buttons.find((b) => b.text() === "1Y")!
+    expect(allBtn.attributes("aria-pressed")).toBe("true")
+
+    await y1Btn.trigger("click")
+    await flushPromises()
+
+    expect(mocked.getMergedAnalytics).toHaveBeenLastCalledWith("1Y")
+    expect(y1Btn.attributes("aria-pressed")).toBe("true")
+    expect(allBtn.attributes("aria-pressed")).toBe("false")
+  })
 })

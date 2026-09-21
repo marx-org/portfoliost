@@ -147,23 +147,26 @@ async function handleRecompute() {
   }
 }
 
-const monthlyOptions = computed(() => {
-  const returns = store.analytics?.performance?.monthlyReturns ?? []
-  return {
-    chart: { type: "bar" as const, toolbar: { show: false } },
-    colors: ["#2563eb"],
-    series: [{ name: "Return %", data: returns.map((m) => m.returnPercent) }],
-    xaxis: { categories: returns.map((m) => m.month) },
-    yaxis: {
-      labels: { formatter: (v: number) => `${Math.round(v)}%` },
-    },
-    plotOptions: { bar: { columnWidth: "50%", borderRadius: 3 } },
-    dataLabels: { enabled: false },
-    tooltip: {
-      y: { formatter: (v: number) => `${v.toFixed(2)}%` },
-    },
-  }
-})
+// Config-only options (no `series`) so a refresh takes the updateSeries() path
+// and keeps the axis formatter — see PortfolioPerformanceChart §recompute repro.
+const monthlySeries = computed(() => [
+  {
+    name: "Return %",
+    data: (store.analytics?.performance?.monthlyReturns ?? []).map((m) => ({ x: m.month, y: m.returnPercent })),
+  },
+])
+const monthlyOptions = {
+  chart: { type: "bar" as const, toolbar: { show: false } },
+  colors: ["#2563eb"],
+  yaxis: {
+    labels: { formatter: (v: number) => `${Math.round(v)}%` },
+  },
+  plotOptions: { bar: { columnWidth: "50%", borderRadius: 3 } },
+  dataLabels: { enabled: false },
+  tooltip: {
+    y: { formatter: (v: number) => `${v.toFixed(2)}%` },
+  },
+}
 
 const seriesValues = computed(() => (store.analytics?.performance?.timeSeries ?? []).map((p) => p.value ?? 0))
 
@@ -262,14 +265,15 @@ const chartSeries = computed(() => {
   <div class="space-y-6">
     <div class="card p-6">
       <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 class="text-base font-semibold">Performance Chart</h2>
+        <h2 class="text-base font-semibold">Performance Chart: {{ displayCurrency }}</h2>
         <div class="flex flex-wrap items-center gap-1">
           <button
             v-for="tf in timeframes"
             :key="tf.value"
             type="button"
             class="btn-secondary text-xs"
-            :class="store.analyticsTimeframe === tf.value ? 'bg-blue-600 text-white' : ''"
+            :class="store.analyticsTimeframe === tf.value ? 'border-blue-600 bg-blue-50 text-blue-700 dark:border-blue-600 dark:bg-blue-500/10 dark:text-blue-400' : ''"
+            :aria-pressed="store.analyticsTimeframe === tf.value"
             :disabled="store.analyticsLoading"
             @click="changeTimeframe(tf.value)"
           >
@@ -315,7 +319,7 @@ const chartSeries = computed(() => {
 
     <div class="card p-6">
       <h2 class="mb-3 text-base font-semibold">Returns Chart</h2>
-      <component :is="'apexchart'" v-if="monthlyOptions.series[0].data.length" :options="monthlyOptions" :series="monthlyOptions.series" height="220" />
+      <component :is="'apexchart'" v-if="monthlySeries[0].data.length" :options="monthlyOptions" :series="monthlySeries" height="220" />
       <p v-else class="text-sm text-slate-500 dark:text-slate-400">No monthly data available.</p>
     </div>
 

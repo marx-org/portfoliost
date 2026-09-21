@@ -38,22 +38,23 @@ const props = withDefaults(
 
 const emit = defineEmits<{ recompute: [] }>()
 
-const options = computed(() => {
-  const toPoint = (p: PerformancePoint): [number, number] => [new Date(p.date ?? "").getTime(), p.value ?? 0]
+const toPoint = (p: PerformancePoint): [number, number] => [new Date(p.date ?? "").getTime(), p.value ?? 0]
 
-  const series = props.timeSeries.map(toPoint)
+// Config-only options (no `series`). The object is memoised by
+// (currency, colour, benchmark names) so a pure data refresh — e.g. after
+// Recompute — keeps the same `options` reference: vue3-apexcharts then takes
+// the updateSeries() path, which preserves the y-axis formatter. Recreating
+// the options object on every data change re-initialises the chart and drops
+// axis formatters (repro: after Recompute the y-axis rendered
+// "200000.00000000" ticks instead of "$200K").
+let chartOptionsCache: { key: string; value: ChartOptions } | null = null
+type ChartOptions = ReturnType<typeof buildChartOptions>
+
+function buildChartOptions() {
   const benchmarks = props.benchmarks ?? []
-  const benchCols = benchmarks.map(() => "#94a3b8")
   return {
     chart: { type: "line" as const, toolbar: { show: false }, zoom: { enabled: false } },
-    colors: [props.color, ...benchCols],
-    series: [
-      { name: "Portfolio", data: series },
-      ...benchmarks.map((b) => ({
-        name: b.name || b.symbol || "Benchmark",
-        data: (b.timeSeries ?? []).map((p) => [new Date(p.date ?? "").getTime(), p.value ?? 0]),
-      })),
-    ],
+    colors: [props.color, ...benchmarks.map(() => "#94a3b8")],
     xaxis: { type: "datetime" as const, labels: { datetimeUTC: false } },
     yaxis: {
       labels: { formatter: (v: number) => formatCompactCurrency(v, props.currency) },
@@ -65,9 +66,36 @@ const options = computed(() => {
     stroke: { width: [2, ...benchmarks.map(() => 1)], dashArray: [0, ...benchmarks.map(() => 4)] },
     dataLabels: { enabled: false },
   }
+}
+
+const chartOptions = computed(() => {
+  const benchmarks = props.benchmarks ?? []
+  const key = [
+    props.currency,
+    props.color,
+    ...benchmarks.map((b) => b.name || b.symbol || "Benchmark"),
+  ].join("|")
+  if (chartOptionsCache?.key === key) return chartOptionsCache.value
+  const value = buildChartOptions()
+  chartOptionsCache = { key, value }
+  return value
 })
 
-defineExpose({ options })
+const seriesData = computed(() => {
+  const benchmarks = props.benchmarks ?? []
+  return [
+    { name: "Portfolio", data: props.timeSeries.map(toPoint) },
+    ...benchmarks.map((b) => ({
+      name: b.name || b.symbol || "Benchmark",
+      data: (b.timeSeries ?? []).map((p) => [new Date(p.date ?? "").getTime(), p.value ?? 0]),
+    })),
+  ]
+})
+
+// Merged config + data object (unit-test compatibility).
+const options = computed(() => ({ ...chartOptions.value, series: seriesData.value }))
+
+defineExpose({ options, chartOptions, seriesData })
 </script>
 
 <template>
@@ -85,7 +113,7 @@ defineExpose({ options })
       </button>
     </div>
     <div class="relative">
-      <component :is="'apexchart'" v-if="timeSeries.length" :options="options" :series="options.series" :height="height" />
+      <component :is="'apexchart'" v-if="timeSeries.length" :options="chartOptions" :series="seriesData" :height="height" />
       <p v-else class="text-sm text-slate-500 dark:text-slate-400">No analytics available.</p>
       <div v-if="loading" class="absolute inset-0 flex items-center justify-center rounded-lg bg-white/70 dark:bg-slate-900/70">
         <span class="text-sm font-medium text-slate-500 dark:text-slate-400">Refreshing...</span>

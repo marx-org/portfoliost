@@ -6,7 +6,7 @@ import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
 import { useCurrenciesStore } from "@/stores/currencies"
 import { storeToRefs } from "pinia"
 import { formatCurrency, formatPercent, formatSignedCurrency } from "@/utils/format"
-import { getMergedAnalytics, recomputePortfolio } from "@/api/portfolios"
+import { getMergedAnalytics, recomputePortfolio, type PortfolioAnalyticsTimeframe } from "@/api/portfolios"
 import type { PortfolioAnalytics } from "@/api/types"
 import { getLatestRate } from "@/api/fx"
 import InvestmentsTabs from "@/modules/portfolios/InvestmentsTabs.vue"
@@ -26,14 +26,43 @@ const error = ref<string | null>(null)
 const merged = ref<PortfolioAnalytics | null>(null)
 const mergedBackfillPending = ref(false)
 const mergedBusy = ref(false)
+const mergedLoading = ref(false)
 
+// §46.7 — the combined chart is timeframe-selectable (example-service has a period
+// selector on the block; the real `merged` endpoint supports timeframe).
+const mergedTimeframes: Array<{ value: PortfolioAnalyticsTimeframe; label: string }> = [
+  { value: "1W", label: "1W" },
+  { value: "1M", label: "1M" },
+  { value: "3M", label: "3M" },
+  { value: "6M", label: "6M" },
+  { value: "1Y", label: "1Y" },
+  { value: "2Y", label: "2Y" },
+  { value: "ALL", label: "ALL" },
+]
+const mergedTimeframe = ref<PortfolioAnalyticsTimeframe>("ALL")
+
+let mergedReqSeq = 0
 async function refetchMerged() {
+  const seq = ++mergedReqSeq
+  mergedLoading.value = true
   try {
-    merged.value = await getMergedAnalytics("ALL")
+    const data = await getMergedAnalytics(mergedTimeframe.value)
+    if (seq !== mergedReqSeq) return // stale response for an older timeframe — drop it
+    merged.value = data
     mergedBackfillPending.value = false
   } catch {
+    if (seq !== mergedReqSeq) return
     merged.value = null
+    mergedBackfillPending.value = false
+  } finally {
+    if (seq === mergedReqSeq) mergedLoading.value = false
   }
+}
+
+function changeMergedTimeframe(timeframe: PortfolioAnalyticsTimeframe) {
+  if (mergedTimeframe.value === timeframe || mergedLoading.value) return
+  mergedTimeframe.value = timeframe
+  void refetchMerged()
 }
 
 async function handleMergedRecompute() {
@@ -273,12 +302,28 @@ async function submitCreateWallet() {
     </template>
 
     <div v-if="merged?.performance?.timeSeries?.length" class="card mb-6 p-6" data-testid="combined-chart">
-      <h2 class="mb-3 text-base font-semibold">Portfolio Value</h2>
+      <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 class="text-base font-semibold">Portfolio Value: {{ displayCurrency }}</h2>
+        <div class="flex flex-wrap items-center gap-1" data-testid="combined-chart-timeframes">
+          <button
+            v-for="tf in mergedTimeframes"
+            :key="tf.value"
+            type="button"
+            class="btn-secondary text-xs"
+            :class="mergedTimeframe === tf.value ? 'border-blue-600 bg-blue-50 text-blue-700 dark:border-blue-600 dark:bg-blue-500/10 dark:text-blue-400' : ''"
+            :aria-pressed="mergedTimeframe === tf.value"
+            :disabled="mergedLoading || mergedBusy"
+            @click="changeMergedTimeframe(tf.value)"
+          >
+            {{ tf.label }}
+          </button>
+        </div>
+      </div>
       <PortfolioPerformanceChart
         :time-series="mergedChartSeries"
         :currency="displayCurrency"
         color="#2563eb"
-        :loading="loading"
+        :loading="mergedLoading"
         :backfill-pending="mergedBackfillPending"
         :height="300"
         @recompute="handleMergedRecompute"

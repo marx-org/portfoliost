@@ -83,6 +83,24 @@ describe("PortfolioPerformanceChart (§41.1)", () => {
     expect(chartOptions(w).colors[0]).toBe("#2563eb")
   })
 
+  it("keeps the config object data-free so refreshes take the updateSeries() path (§46.7)", () => {
+    const w = mount(PortfolioPerformanceChart, {
+      props: {
+        timeSeries: [ts("2026-07-01", 500), ts("2026-07-02", 94000)],
+      },
+      global: { stubs: { apexchart: true } },
+    })
+    const vm = w.vm as unknown as {
+      chartOptions: Record<string, unknown>
+      seriesData: Array<{ name: string; data: [number, number][] }>
+    }
+    // A data change must not recreate the whole options object (that
+    // re-initialises the chart and drops the y-axis compact-currency
+    // formatter); the series is bound separately.
+    expect("series" in vm.chartOptions).toBe(false)
+    expect(vm.seriesData[0].data.map(([, v]) => v)).toEqual([500, 94000])
+  })
+
   it("shows the pending line only when backfillPending and emits recompute", async () => {
     const w = mount(PortfolioPerformanceChart, {
       props: { timeSeries: [ts("2026-07-01", 500)], backfillPending: false },
