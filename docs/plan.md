@@ -30,17 +30,24 @@ instruments: vitest + stack; SPA: build + unit + e2e per `AGENTS.md`).
 
 ### 47.1 — Fixture capture: NNEP65.TFI quote currency truth
 
-- [ ] `curl` `https://biznesradar.pl/notowania/NNEP65.TFI` and `INGAKC.TFI` (and one `.WA` control,
-  e.g. `BST0327.WA`); save raw HTML to `openst/plugins/openbb_biznesradar/tests/fixtures/` (new
-  dir + conftest helper if needed).
-- [ ] Settle the cache question: the live page **does** carry the `priceCurrency` meta for both
-  funds, yet the prod openst pod returned no currency for NNEP65 — suspect stale Redis. Use cachest's
-  existing per-ticker cache purge (`POST /stats/invalidate-ticker/{prefix}/{ticker}` in
-  `cachest/main.py`) to clear the NNEP65.TFI quote keys, re-curl the quote, and record whether a
-  fresh scrape now carries `currency` (stale cache → 47.2 is hardening; fresh scrape still no
-  currency → 47.2 fixes it directly).
-- [ ] Tests: fixtures exist and are byte-stable; no commit until captured.
-- [ ] Commit (openst).
+- [x] `curl` `https://biznesradar.pl/notowania/NNEP65.TFI` and `INGAKC.TFI` (and one `.WA` control,
+  e.g. `BST0327.WA`); save raw HTML to `openst/tests/fixtures/biznesradar/NNEP65.TFI_notowania.html`
+  (fixture dir lives at the openst repo root, next to the existing `INGAKC.TFI_notowania.html` /
+  `BST0327.html` captured in §45 — the `.WA` control is fetched WITHOUT the suffix, biznesradar
+  404s on `.WA`).
+- [x] Settle the cache question (**RESOLVED 2026-09-22 — stale openst Redis, not cachest**): the live
+  page carries the `priceCurrency` meta (captured fixture `content="PLN"`), and a fresh scrape
+  carries `currency: "PLN"`. Prod served a stale openst-level value: `equity_quote:NNEP65.TFI` in
+  openst's Redis (db 2) was cached ~11 h earlier without currency (TTL 86400 s). Purging that key
+  (Redis `DEL`, since the openst pod has no per-ticker purge route) and re-curling
+  `/equity/quote/NNEP65.TFI` immediately returned `"currency": "PLN"`. ⇒ 47.2 is **hardening**
+  (provider meta stays the source of truth; the cache is the bug, not the scraper).
+- [x] Tests: fixtures exist and are byte-stable (`test_nnep65_fixture_carries_currency` pins the
+  PLN truth — re-capture without the meta fails). Full openst suite green via
+  `docker compose --profile test run --rm test` (279 + 87 + 53 passed).
+- [x] Commit (openst `b5f71c5`).
+- [ ] ~(cachest)~ — no cachest change needed (its `/stats/invalidate-ticker/equity/quote:NNEP65.TFI`
+  route works, but the stale layer was openst's own Redis).
 
 ### 47.2 — openst: consistent currency for the known universe
 
