@@ -1,20 +1,75 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue"
+import { computed, onMounted, ref, watchEffect } from "vue"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { useWalletsStore } from "@/stores/wallets"
 import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
 import { useCurrenciesStore } from "@/stores/currencies"
 import { storeToRefs } from "pinia"
 import { formatCurrency, formatPercent, formatSignedCurrency } from "@/utils/format"
+import { getMergedAnalytics, recomputePortfolio } from "@/api/portfolios"
+import type { PortfolioAnalytics } from "@/api/types"
+import { getLatestRate } from "@/api/fx"
 import InvestmentsTabs from "@/modules/portfolios/InvestmentsTabs.vue"
 import PortfolioCard from "@/modules/portfolios/PortfolioCard.vue"
 import CashWalletCard from "@/modules/portfolios/CashWalletCard.vue"
 import AddPositionDialog from "@/modules/portfolios/AddPositionDialog.vue"
+import PortfolioPerformanceChart from "@/components/PortfolioPerformanceChart.vue"
 
 const store = usePortfolioStore()
 const walletsStore = useWalletsStore()
 const loading = ref(true)
 const error = ref<string | null>(null)
+
+// §41.5 — combined (all-portfolios) value chart, example-service position on the main
+// investments page. degrades gracefully: on fetch failure merged = null and the
+// chart block stays hidden.
+const merged = ref<PortfolioAnalytics | null>(null)
+const mergedBackfillPending = ref(false)
+const mergedBusy = ref(false)
+
+async function refetchMerged() {
+  try {
+    merged.value = await getMergedAnalytics("ALL")
+    mergedBackfillPending.value = false
+  } catch {
+    merged.value = null
+  }
+}
+
+async function handleMergedRecompute() {
+  if (mergedBusy.value) return
+  mergedBusy.value = true
+  mergedBackfillPending.value = true
+  try {
+    await Promise.all(store.portfolios.map((p) => recomputePortfolio(p.id)))
+    await refetchMerged()
+  } catch {
+    // network error — stay idle; the user can retry
+  } finally {
+    mergedBusy.value = false
+  }
+}
+
+// Merged series is denominated in the base currency (store.totalMetrics) —
+// convert to the display currency before plotting (getLatestRate once).
+const mergedSourceCcy = computed(() => (store.totalMetrics?.baseCurrency ?? "USD").toUpperCase())
+const mergedChartRate = ref<number | null>(null)
+
+watchEffect(() => {
+  const src = mergedSourceCcy.value
+  const dst = displayCurrency.value.toUpperCase()
+  if (!src) { mergedChartRate.value = null; return }
+  if (src === dst) { mergedChartRate.value = 1; return }
+  mergedChartRate.value = null
+  void getLatestRate(src, dst).then((r) => {
+    if (r && typeof r.rate === "number" && r.rate > 0) mergedChartRate.value = r.rate
+  })
+})
+
+const mergedChartSeries = computed(() => {
+  const rate = mergedChartRate.value ?? 1
+  return (merged.value?.performance?.timeSeries ?? []).map((p) => ({ ...p, value: (p.value ?? 0) * rate }))
+})
 
 // D26: every currency selector is fed exclusively by the /api/currencies registry
 const currenciesStore = useCurrenciesStore()
@@ -83,6 +138,7 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+  void refetchMerged()
 })
 
 function setDisplayCurrency(currency: string) {
@@ -215,6 +271,19 @@ async function submitCreateWallet() {
         </div>
       </div>
     </template>
+
+    <div v-if="merged?.performance?.timeSeries?.length" class="card mb-6 p-6" data-testid="combined-chart">
+      <h2 class="mb-3 text-base font-semibold">Portfolio Value</h2>
+      <PortfolioPerformanceChart
+        :time-series="mergedChartSeries"
+        :currency="displayCurrency"
+        color="#2563eb"
+        :loading="loading"
+        :backfill-pending="mergedBackfillPending"
+        :height="300"
+        @recompute="handleMergedRecompute"
+      />
+    </div>
 
     <section v-if="!loading" class="mb-10">
       <div class="mb-4 flex items-center justify-between">
