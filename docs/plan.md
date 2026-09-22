@@ -331,7 +331,7 @@ fixture value, and the suite starts from a fresh seed (48.4c).
 
 ### 48.6 — Closeout
 
-- [ ] **48.6a** Deploy: push instruments + wallets `main` (GHA `v*` bump); pin new tags in
+- [x] **48.6a** Deploy: push instruments + wallets `main` (GHA `v*` bump); pin new tags in
   `~/prv/homelab/.../pfire/<name>/app/helmrelease.yaml` in the **same** Flux reconcile that
   (i) adds the instruments `fxsync` CronJob (daily incremental, mirroring the old wallets spec —
   the 48.1 deferral), (ii) removes the wallets `fxsync`/`fx-backfill` CronJobs (removing them
@@ -339,7 +339,7 @@ fixture value, and the suite starts from a fresh seed (48.4c).
   SPA ingress re-point from 48.3d (`portfoliost/app/helmrelease.yaml` — `/api/currencies` +
   `/api/fx` → instruments; the old instruments image 404s on both paths, so it cannot land
   earlier).
-- [ ] **48.6b** Prod deep import (user runs the kubectl commands — no cluster access from the
+- [x] **48.6b** Prod deep import (user runs the kubectl commands — no cluster access from the
   agent side): `kubectl -n pfire exec deploy/portfoliost-instruments -- node
   dist/scripts/fx-backfill.js 1999-01-04`; verify `select count(*), min(rate_date), max(rate_date)
   from instruments.fx_rates` ≈ 208k rows / floor 1999-01-04.
