@@ -21,7 +21,8 @@
       "openPositions": 3,
       "closedPositions": 0
     },
-    "positionCount": 3
+    "positionCount": 3,
+    "baseCurrency": "USD"
   },
   "positions": [
     {

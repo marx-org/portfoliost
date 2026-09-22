@@ -340,7 +340,7 @@ export function register(app) {
 
   app.post("/api/portfolios", (ctx) => {
     if (!requireAuth(ctx)) return
-    const { name, description, strategy = "GROWTH", currency = "USD", isPublic = false, walletId } = ctx.body || {}
+    const { name, description, strategy = "GROWTH", currency = "USD", baseCurrency = "USD", isPublic = false, walletId } = ctx.body || {}
     if (!name) {
       return ctx.res.status(422).json({ error: "ValidationError", message: "name is required", statusCode: 422 })
     }
@@ -355,6 +355,7 @@ export function register(app) {
       strategy,
       type: "regular",
       currency,
+      baseCurrency,
       walletId: wallet ? wallet.id : null,
       totalInvested: 0,
       currentValue: 0,

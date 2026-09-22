@@ -145,14 +145,26 @@ describe("InvestmentsView", () => {
     expect(wrapper.text()).toContain("20.00%")
   })
 
-  it("renders investment and cash portfolio sections with cards", async () => {
+  it("renders investment and cash portfolio sections with cards (converted cash total, §48.6e B4)", async () => {
     mockedWallets.getWallets.mockResolvedValue([
       { id: "w1", userId: "u1", name: "Portfel USD 1", currency: "USD", balance: 500, availableBalance: 500, isDefault: true, createdAt: "", updatedAt: "" },
       { id: "w2", userId: "u1", name: "Portfel EUR 1", currency: "EUR", balance: 200, availableBalance: 200, isDefault: false, createdAt: "", updatedAt: "" },
     ] as never)
+    // The endpoint values every wallet in the REQUESTED base currency (display
+    // USD here; EUR→USD @ 1.1): 500 + 200×1.1 = 720, weights from converted.
+    mockedWallets.getWalletTotalBalance.mockResolvedValue({
+      totalBalance: 720,
+      totalAvailableBalance: 720,
+      baseCurrency: "USD",
+      walletBreakdown: [
+        { id: "w1", name: "Portfel USD 1", currency: "USD", balance: 500, availableBalance: 500, weight: 69.44 },
+        { id: "w2", name: "Portfel EUR 1", currency: "EUR", balance: 200, availableBalance: 200, weight: 30.56 },
+      ],
+    } as never)
     const wrapper = mountView()
     await flushPromises()
 
+    expect(mockedWallets.getWalletTotalBalance).toHaveBeenCalledWith("USD")
     expect(wrapper.text()).toContain("Investment Portfolios")
     expect(wrapper.text()).toContain("Cash Portfolios")
     expect(wrapper.text()).toContain("Top10")
@@ -160,8 +172,10 @@ describe("InvestmentsView", () => {
     expect(wrapper.text()).toContain("10 open positions")
     expect(wrapper.text()).toContain("Portfel USD 1")
     expect(wrapper.text()).toContain("Total Balance")
-    expect(wrapper.text()).toContain("USD 71%")
-    expect(wrapper.text()).toContain("EUR 29%")
+    expect(wrapper.text()).toContain("$720.00")
+    // Converted weights — NOT the raw 500/200 (71/29) native split.
+    expect(wrapper.text()).toContain("USD 69%")
+    expect(wrapper.text()).toContain("EUR 31%")
   })
 
   it("shows the create dialog and creates a portfolio", async () => {
@@ -225,6 +239,12 @@ describe("InvestmentsView", () => {
     expect(series[0].value).toBeCloseTo(900, 6) // 1000 × 0.9
     expect(series[1].value).toBeCloseTo(1080, 6) // 1200 × 0.9
     expect(chart.props("currency")).toBe("EUR")
+
+    // §48.6e B5 — the total-metrics cards (baseCurrency USD) convert to the
+    // display currency with the same rate, never a $ value under a € label.
+    expect(wrapper.text()).toContain("€1,080.00") // 1200 × 0.9
+    expect(wrapper.text()).toContain("€900.00") // 1000 × 0.9
+    expect(wrapper.text()).toContain("+€180.00") // 200 × 0.9
   })
 
   it("shows the combined block currency and switches the merged timeframe (§46.7)", async () => {

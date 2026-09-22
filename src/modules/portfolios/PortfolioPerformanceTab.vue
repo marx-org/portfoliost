@@ -7,6 +7,7 @@ import type { PortfolioAnalyticsTimeframe } from "@/api/portfolios"
 import type { PortfolioPositions } from "@/api/types"
 import { formatPercent, formatSignedCurrency } from "@/utils/format"
 import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
+import { storeToRefs } from "pinia"
 import { getLatestRate } from "@/api/fx"
 import InstrumentSearchModal from "@/modules/instruments/InstrumentSearchModal.vue"
 import PortfolioPerformanceChart from "@/components/PortfolioPerformanceChart.vue"
@@ -203,8 +204,10 @@ const performers = computed(() => {
 // differs from the display currency, add a converted sub-line using the live
 // rate via @marx2/contracts/fx (D27). Rates are fetched once per distinct
 // instrument currency that differs from the display currency.
+// §48.6e B3 — ref (not snapshot): switching the display currency in place
+// must re-convert the chart + P/L sub-lines without a re-mount.
 const displayStore = useDisplayCurrencyStore()
-const displayCurrency = displayStore.currency
+const { currency: displayCurrency } = storeToRefs(displayStore)
 
 // instrumentCurrency -> rate (1 unit of instrumentCcy in displayCurrency)
 const rateByCcy = ref<Record<string, number>>({})
@@ -213,12 +216,12 @@ watchEffect(() => {
   const wanted = new Set<string>()
   for (const p of performers.value.top) {
     const ccy = p.instrumentCurrency?.toUpperCase()
-    if (ccy && ccy !== displayCurrency.toUpperCase()) wanted.add(ccy)
+    if (ccy && ccy !== displayCurrency.value.toUpperCase()) wanted.add(ccy)
   }
   for (const ccy of wanted) {
     if (rateByCcy.value[ccy]) continue
     void (async () => {
-      const rate = await getLatestRate(ccy, displayCurrency)
+      const rate = await getLatestRate(ccy, displayCurrency.value)
       if (rate && typeof rate.rate === "number" && rate.rate > 0) {
         rateByCcy.value = { ...rateByCcy.value, [ccy]: rate.rate }
       }
@@ -230,34 +233,50 @@ watchEffect(() => {
 function convertedPnl(p: PortfolioPositions[number]): number | null {
   const ccy = p.instrumentCurrency?.toUpperCase()
   if (!ccy || p.unrealizedGainLoss == null) return null
-  if (ccy === displayCurrency.toUpperCase()) return null
+  if (ccy === displayCurrency.value.toUpperCase()) return null
   const rate = rateByCcy.value[ccy]
   if (!rate) return null
   // getLatestRate(ccy, displayCurrency).rate is a direct 1 ccy = rate display
   return p.unrealizedGainLoss * rate
 }
 
-// §41.2 — the chart always plots absolute values; when the analytics series is
-// denominated in the portfolio currency and that differs from the display
-// currency, convert once per source currency via getLatestRate, then pass the
-// converted series + :currency to the shared chart component.
-const portfolioCcy = computed(() => (store.detail?.currency ?? "USD").toUpperCase())
+// §41.2/§48.6e B3 — the analytics series (and its benchmark overlays) are
+// denominated in the portfolio BASE currency (wallets `baseCurrency` — NOT
+// `currency`, which API-created portfolios default to USD while their
+// positions declare a different base). Convert once per source currency via
+// getLatestRate, then pass the converted series + :currency to the shared
+// chart component.
+const portfolioCcy = computed(() => {
+  const d = store.detail
+  return ((d?.baseCurrency ?? "").toUpperCase() || (d?.currency ?? "USD").toUpperCase())
+})
 const chartRate = ref<number | null>(null)
 
 watchEffect(() => {
   const src = portfolioCcy.value
-  const dst = displayCurrency.toUpperCase()
+  const dst = displayCurrency.value.toUpperCase()
   if (!src) { chartRate.value = null; return }
   if (src === dst) { chartRate.value = 1; return }
   chartRate.value = null
   void getLatestRate(src, dst).then((r) => {
-    if (r && typeof r.rate === "number" && r.rate > 0) chartRate.value = r.rate
+    // Unresolvable pair degrades to 1:1 (§48.3) — the chart still renders
+    // (native values) instead of hanging on a pending state forever.
+    chartRate.value = r && typeof r.rate === "number" && r.rate > 0 ? r.rate : 1
   })
 })
 
 const chartSeries = computed(() => {
   const rate = chartRate.value ?? 1
   return (store.analytics?.performance?.timeSeries ?? []).map((p) => ({ ...p, value: (p.value ?? 0) * rate }))
+})
+
+// Benchmark overlays share the portfolio base currency — same rate.
+const chartBenchmarks = computed(() => {
+  const rate = chartRate.value ?? 1
+  return (store.analytics?.benchmarks ?? []).map((b) => ({
+    ...b,
+    timeSeries: (b.timeSeries ?? []).map((p) => ({ ...p, value: (p.value ?? 0) * rate })),
+  }))
 })
 </script>
 
@@ -286,7 +305,7 @@ const chartSeries = computed(() => {
       </div>
       <PortfolioPerformanceChart
         :time-series="chartSeries"
-        :benchmarks="store.analytics?.benchmarks ?? []"
+        :benchmarks="chartBenchmarks"
         :currency="displayCurrency"
         :backfill-pending="backfillPending || recomputeBusy"
         :loading="store.analyticsLoading"

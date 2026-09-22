@@ -9,6 +9,7 @@ import { formatCurrency, formatPercent, formatSignedCurrency } from "@/utils/for
 import { getMergedAnalytics, recomputePortfolio, type PortfolioAnalyticsTimeframe } from "@/api/portfolios"
 import type { PortfolioAnalytics } from "@/api/types"
 import { getLatestRate } from "@/api/fx"
+import { getWalletTotalBalance } from "@/api/wallets"
 import InvestmentsTabs from "@/modules/portfolios/InvestmentsTabs.vue"
 import PortfolioCard from "@/modules/portfolios/PortfolioCard.vue"
 import CashWalletCard from "@/modules/portfolios/CashWalletCard.vue"
@@ -109,6 +110,15 @@ const mergedChartSeries = computed(() => {
   return (merged.value?.performance?.timeSeries ?? []).map((p) => ({ ...p, value: (p.value ?? 0) * rate }))
 })
 
+// §48.6e B5 — the total-metrics values are denominated in `baseCurrency`
+// (USD, post wallets conversion); the summary cards render them in the
+// display currency via the same base→display rate as the merged chart
+// (null while the rate resolves — "—", never a mislabelled amount).
+function toDisplay(v: number | undefined | null): number | null {
+  if (v == null || mergedChartRate.value == null) return null
+  return v * mergedChartRate.value
+}
+
 const strategies = [
   { value: "GROWTH", label: "Growth" },
   { value: "VALUE", label: "Value" },
@@ -125,18 +135,41 @@ const strategies = [
   { value: "BALANCED", label: "Balanced" },
 ]
 
-const cashBreakdown = computed(() => {
-  const byCurrency = new Map<string, number>()
-  for (const w of walletsStore.wallets) {
-    byCurrency.set(w.currency, (byCurrency.get(w.currency) ?? 0) + (w.balance ?? 0))
-  }
-  const total = [...byCurrency.values()].reduce((s, v) => s + v, 0)
-  return [...byCurrency.entries()]
-    .map(([currency, balance]) => ({ currency, balance, pct: total > 0 ? (balance / total) * 100 : 0 }))
-    .sort((a, b) => b.balance - a.balance)
-})
+// §48.6e B4 — "Cash balance" must be the CONVERTED total: the endpoint values
+// every wallet in the requested base currency (per-wallet rate via
+// instruments' fx). Fetch it for the display currency and re-fetch on display
+// or wallet-list changes; never sum native balances under a foreign symbol.
+// `null` while resolving — the template renders "—" (a mislabelled amount is
+// never shown). Per-currency shares come from the breakdown `weight` (each
+// wallet's converted share of the total).
+const cashTotal = ref<number | null>(null)
+const cashBreakdown = ref<Array<{ currency: string; pct: number }>>([])
+let cashTotalSeq = 0
 
-const cashTotal = computed(() => cashBreakdown.value.reduce((s, c) => s + c.balance, 0))
+watchEffect(() => {
+  const seq = ++cashTotalSeq
+  const ccy = displayCurrency.value.toUpperCase()
+  void walletsStore.wallets // dep: re-fetch after wallet mutations on this page
+  cashTotal.value = null
+  cashBreakdown.value = []
+  void getWalletTotalBalance(ccy)
+    .then((res) => {
+      if (seq !== cashTotalSeq) return
+      cashTotal.value = res.totalBalance ?? null
+      const byCurrency = new Map<string, number>()
+      for (const w of res.walletBreakdown ?? []) {
+        const ccy = (w.currency ?? "").toUpperCase()
+        if (!ccy) continue
+        byCurrency.set(ccy, (byCurrency.get(ccy) ?? 0) + (w.weight ?? 0))
+      }
+      cashBreakdown.value = [...byCurrency.entries()]
+        .map(([currency, pct]) => ({ currency, pct }))
+        .sort((a, b) => b.pct - a.pct)
+    })
+    .catch(() => {
+      if (seq === cashTotalSeq) cashTotal.value = null
+    })
+})
 const showCreate = ref(false)
 const newPortfolio = ref({ name: "", description: "", strategy: "GROWTH", currency: "USD", walletId: "" })
 const creating = ref(false)
@@ -235,7 +268,7 @@ async function submitCreateWallet() {
         <div class="card flex items-center gap-2 px-3 py-1.5">
           <span class="text-xs text-slate-500 dark:text-slate-400">Cash balance</span>
           <span class="text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100" data-testid="cash-balance">
-            {{ formatCurrency(cashTotal) }}
+            {{ formatCurrency(cashTotal, displayCurrency) }}
           </span>
           <span v-for="c in cashBreakdown" :key="c.currency" class="text-xs text-slate-500 dark:text-slate-400">
             {{ c.currency }} {{ formatPercent(c.pct, 0) }}
@@ -274,11 +307,11 @@ async function submitCreateWallet() {
       <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div class="card p-5">
           <p class="text-sm text-slate-500 dark:text-slate-400">Total Value</p>
-          <p class="mt-1 text-2xl font-semibold tabular-nums">{{ formatCurrency(store.totalMetrics.totalValue, displayCurrency) }}</p>
+          <p class="mt-1 text-2xl font-semibold tabular-nums">{{ formatCurrency(toDisplay(store.totalMetrics.totalValue), displayCurrency) }}</p>
         </div>
         <div class="card p-5">
           <p class="text-sm text-slate-500 dark:text-slate-400">Total Invested</p>
-          <p class="mt-1 text-2xl font-semibold tabular-nums">{{ formatCurrency(store.totalMetrics.totalInvested, displayCurrency) }}</p>
+          <p class="mt-1 text-2xl font-semibold tabular-nums">{{ formatCurrency(toDisplay(store.totalMetrics.totalInvested), displayCurrency) }}</p>
         </div>
         <div class="card p-5">
           <p class="text-sm text-slate-500 dark:text-slate-400">Total Gain / Loss</p>
@@ -286,7 +319,7 @@ async function submitCreateWallet() {
             class="mt-1 text-2xl font-semibold tabular-nums"
             :class="(store.totalMetrics?.totalGainLoss ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'"
           >
-            {{ formatSignedCurrency(store.totalMetrics?.totalGainLoss ?? 0, displayCurrency) }}
+            {{ formatSignedCurrency(toDisplay(store.totalMetrics?.totalGainLoss), displayCurrency) }}
           </p>
         </div>
         <div class="card p-5">
@@ -352,7 +385,7 @@ async function submitCreateWallet() {
           <h2 class="text-lg font-semibold">Cash Portfolios</h2>
           <div v-if="walletsStore.wallets.length" class="mt-0.5 flex items-center gap-3 text-sm">
             <span class="text-slate-500 dark:text-slate-400">Total Balance</span>
-            <span class="font-semibold tabular-nums" data-testid="cash-total-balance">{{ formatCurrency(cashTotal) }}</span>
+            <span class="font-semibold tabular-nums" data-testid="cash-total-balance">{{ formatCurrency(cashTotal, displayCurrency) }}</span>
             <span v-for="c in cashBreakdown" :key="c.currency" class="text-xs text-slate-500 dark:text-slate-400">
               {{ c.currency }} {{ formatPercent(c.pct, 0) }}
             </span>

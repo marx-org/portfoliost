@@ -41,12 +41,12 @@ const emit = defineEmits<{ recompute: [] }>()
 const toPoint = (p: PerformancePoint): [number, number] => [new Date(p.date ?? "").getTime(), p.value ?? 0]
 
 // Config-only options (no `series`). The object is memoised by
-// (currency, colour, benchmark names) so a pure data refresh — e.g. after
-// Recompute — keeps the same `options` reference: vue3-apexcharts then takes
-// the updateSeries() path, which preserves the y-axis formatter. Recreating
-// the options object on every data change re-initialises the chart and drops
-// axis formatters (repro: after Recompute the y-axis rendered
-// "200000.00000000" ticks instead of "$200K").
+// (currency, colour, benchmark names) so a data swap that keeps the same
+// configuration reuses the identical `options` reference (vue3-apexcharts
+// then skips its updateOptions path, whose JSON deep-clone would drop the
+// y-axis formatter function). §48.6e B3: the data itself is guaranteed to
+// reach the chart by the `chartKey` remount below, which rebuilds the chart
+// from scratch with the current series + formatter.
 let chartOptionsCache: { key: string; value: ChartOptions } | null = null
 type ChartOptions = ReturnType<typeof buildChartOptions>
 
@@ -92,6 +92,27 @@ const seriesData = computed(() => {
   ]
 })
 
+// §48.6e B3 — remount key (PriceChart §47.6/§48.5 precedent): vue3-apexcharts'
+// prop-update path is unreliable in this stack — a data swap after mount is
+// never pushed into the running instance (and its JSON deep-clone drops the
+// y-axis formatter on updateOptions). A fresh mount is the only reliable way
+// to guarantee the chart shows the current series in the current currency.
+// The fingerprint (length + first/last values per series) changes on every
+// real data swap: analytics load, Recompute, and the §48.6e display-currency
+// re-conversion; currency/colour/height/benchmark names cover config changes.
+const chartKey = computed(() => {
+  const benchmarks = props.benchmarks ?? []
+  const tail = (pts?: Array<{ value?: number }>) => (pts?.at(-1)?.value ?? "").toString()
+  return [
+    props.currency,
+    props.color,
+    props.height,
+    benchmarks.map((b) => b.name || b.symbol || "Benchmark").join(","),
+    `${props.timeSeries.length}|${(props.timeSeries[0]?.value ?? "").toString()}|${tail(props.timeSeries)}`,
+    ...benchmarks.map((b) => `${(b.timeSeries ?? []).length}|${tail(b.timeSeries)}`),
+  ].join("~")
+})
+
 // Merged config + data object (unit-test compatibility).
 const options = computed(() => ({ ...chartOptions.value, series: seriesData.value }))
 
@@ -113,7 +134,7 @@ defineExpose({ options, chartOptions, seriesData })
       </button>
     </div>
     <div class="relative">
-      <component :is="'apexchart'" v-if="timeSeries.length" :options="chartOptions" :series="seriesData" :height="height" />
+      <component :is="'apexchart'" :key="chartKey" v-if="timeSeries.length" :options="chartOptions" :series="seriesData" :height="height" />
       <p v-else class="text-sm text-slate-500 dark:text-slate-400">No analytics available.</p>
       <div v-if="loading" class="absolute inset-0 flex items-center justify-center rounded-lg bg-white/70 dark:bg-slate-900/70">
         <span class="text-sm font-medium text-slate-500 dark:text-slate-400">Refreshing...</span>

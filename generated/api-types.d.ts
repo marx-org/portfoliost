@@ -2848,6 +2848,7 @@ export interface components {
             strategy: string;
             type: string;
             currency: string;
+            baseCurrency?: string;
             /** Format: uuid */
             walletId: string;
             totalInvested: number;

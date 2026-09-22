@@ -1,7 +1,8 @@
 import { requireAuth } from "../lib/auth.js"
 import { loadRaw } from "../lib/data.js"
 import { paginatePage, uuid, nowIso } from "../lib/http.js"
-import { currenciesPayload, resolveFeeFx } from "../lib/demo-fx.js"
+import { currenciesPayload, resolveFeeFx, DEMO_RATES } from "../lib/demo-fx.js"
+import { crossRate } from "@marx2/contracts/fx"
 
 const wallets = new Map()
 const cashTx = new Map()
@@ -183,18 +184,37 @@ export function register(app) {
     if (!requireAuth(ctx)) return
     const all = allWallets()
     if (!all.length) return ctx.res.json(loadRaw("wallets_total_balance.json"))
-    const totalBalance = all.reduce((s, w) => s + w.balance, 0)
-    const totalAvailableBalance = all.reduce((s, w) => s + w.availableBalance, 0)
-    ctx.res.json({
-      ...loadRaw("wallets_total_balance.json"),
-      totalBalance: round2(totalBalance),
-      totalAvailableBalance: round2(totalAvailableBalance),
-      walletBreakdown: all.map((w) => ({
+    // plan §48.6e B4 — value every wallet in the REQUESTED base currency
+    // (the real service's `?baseCurrency=`, default USD) at the latest demo
+    // rate; unquotable pairs degrade 1:1 (never a native sum under a foreign
+    // label).
+    const base = String(ctx.query.baseCurrency ?? "USD").toUpperCase()
+    const rateFor = (ccy) => (ccy === base ? 1 : crossRate(ccy, base, DEMO_RATES) ?? 1)
+    let rawTotal = 0
+    let rawAvailable = 0
+    const breakdown = all.map((w) => {
+      const rate = rateFor(w.currency)
+      rawTotal += w.balance * rate
+      rawAvailable += w.availableBalance * rate
+      return {
         id: w.id,
         name: w.name,
         balance: w.balance,
         availableBalance: w.availableBalance,
         currency: w.currency,
+        convertedBalance: round2(w.balance * rate),
+        exchangeRate: rate,
+      }
+    })
+    const totalBalance = round2(rawTotal)
+    ctx.res.json({
+      ...loadRaw("wallets_total_balance.json"),
+      totalBalance,
+      totalAvailableBalance: round2(rawAvailable),
+      baseCurrency: base,
+      walletBreakdown: breakdown.map((r) => ({
+        ...r,
+        weight: totalBalance > 0 ? round2((r.convertedBalance / totalBalance) * 100) : 0,
       })),
     })
   })

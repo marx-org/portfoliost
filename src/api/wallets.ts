@@ -48,8 +48,9 @@ export async function getWallets(): Promise<Wallets> {
   return http.get<Wallets>("/api/wallets")
 }
 
-export async function getWalletTotalBalance(): Promise<WalletsTotalBalance> {
-  return http.get<WalletsTotalBalance>("/api/wallets/total-balance")
+export async function getWalletTotalBalance(baseCurrency?: string): Promise<WalletsTotalBalance> {
+  const q = baseCurrency ? `?baseCurrency=${encodeURIComponent(baseCurrency)}` : ""
+  return http.get<WalletsTotalBalance>(`/api/wallets/total-balance${q}`)
 }
 
 export async function createWallet(input: { name: string; currency?: string }): Promise<Wallets[number]> {
