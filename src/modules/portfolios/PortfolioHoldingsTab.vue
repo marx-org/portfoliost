@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue"
+import { computed, onMounted, ref, watch, watchEffect } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
 import { storeToRefs } from "pinia"
 import { removePortfolioPosition, getPortfolioTransactions } from "@/api/portfolios"
-import { formatCurrency, formatNumber, formatPercent, formatSignedCurrency } from "@/utils/format"
+import { getLatestRate } from "@/api/fx"
+import { formatAmount, formatNumber, formatPercent, formatSignedAmount } from "@/utils/format"
 import { researchSymbol } from "@/utils/research"
 import type { PortfolioPositions } from "@/api/types"
 import EditPositionDialog from "@/modules/portfolios/EditPositionDialog.vue"
@@ -178,6 +179,45 @@ function sortIndicator(key: string): string {
 
 const totalValue = computed(() => store.positions.filter((p) => p.isOpen).reduce((s, p) => s + (p.marketValue || 0), 0))
 const totalUnrealized = computed(() => store.positions.filter((p) => p.isOpen).reduce((s, p) => s + (p.unrealizedGainLoss || 0), 0))
+
+// §48.6e B2 — the backend's `converted*` position fields are denominated in
+// the portfolio BASE currency (wallets D21b), not the user's display
+// currency. Each position declares that denomination in `displayCurrency`
+// (it can differ from the portfolio's `currency`, e.g. API-created
+// portfolios default to a USD base). Convert once per
+// (base → displayCurrency) via getLatestRate (the §36/§41 client-side
+// pattern). Until the rate resolves the converted sub-lines render without
+// a value — a mislabelled amount is never shown.
+const portfolioCcy = computed(() => {
+  const pos = store.positions.find((p) => p.isOpen)
+  return (pos?.displayCurrency ?? "").toUpperCase() || null
+})
+const toDisplayRate = ref<number | null>(null)
+
+watchEffect(() => {
+  const src = portfolioCcy.value
+  const dst = displayCurrency.value.toUpperCase()
+  if (!src) { toDisplayRate.value = null; return }
+  if (src === dst) { toDisplayRate.value = 1; return }
+  toDisplayRate.value = null
+  void getLatestRate(src, dst).then((r) => {
+    if (r && typeof r.rate === "number" && r.rate > 0) toDisplayRate.value = r.rate
+  })
+})
+
+/** Portfolio-currency value → display currency (null while the rate is unknown). */
+function toDisplay(v: number | null | undefined): number | null {
+  if (v == null) return null
+  const rate = toDisplayRate.value
+  return rate == null ? null : Math.round(v * rate * 100) / 100
+}
+
+// Subtotal/total rows: converted when the rate is known; otherwise rendered
+// in the portfolio currency, or as a plain number when it is still unknown
+// (never a foreign symbol over a native sum).
+const totalsCcy = computed(() => (toDisplayRate.value != null ? displayCurrency.value : portfolioCcy.value))
+const totalValueDisplay = computed(() => (toDisplayRate.value == null ? totalValue.value : totalValue.value * toDisplayRate.value))
+const totalUnrealizedDisplay = computed(() => (toDisplayRate.value == null ? totalUnrealized.value : totalUnrealized.value * toDisplayRate.value))
 
 function gainClass(value: number | undefined): string {
   return (value ?? 0) >= 0 ? "text-green-600" : "text-red-600"
@@ -391,7 +431,7 @@ function onPickerSaved() {
                 <DualCurrencyCell
                   :primary="pos.averageCostBasis"
                   :primary-currency="pos.instrumentCurrency"
-                  :converted="(pos as any).convertedAverageCostBasis"
+                  :converted="toDisplay((pos as any).convertedAverageCostBasis)"
                   :display-currency="displayCurrency"
                 />
               </td>
@@ -399,7 +439,7 @@ function onPickerSaved() {
                 <DualCurrencyCell
                   :primary="pos.currentPrice"
                   :primary-currency="pos.instrumentCurrency"
-                  :converted="(pos as any).convertedCurrentPrice"
+                  :converted="toDisplay((pos as any).convertedCurrentPrice)"
                   :display-currency="displayCurrency"
                 />
               </td>
@@ -407,14 +447,14 @@ function onPickerSaved() {
                 <DualCurrencyCell
                   :primary="pos.marketValue"
                   :primary-currency="pos.instrumentCurrency"
-                  :converted="(pos as any).convertedMarketValue"
+                  :converted="toDisplay((pos as any).convertedMarketValue)"
                   :display-currency="displayCurrency"
                 />
                 <p class="text-xs text-slate-400 dark:text-slate-500">
                   Cost <DualCurrencyCell
                     :primary="pos.totalCostBasis"
                     :primary-currency="pos.instrumentCurrency"
-                    :converted="(pos as any).convertedTotalCostBasis"
+                    :converted="toDisplay((pos as any).convertedTotalCostBasis)"
                     :display-currency="displayCurrency"
                   />
                 </p>
@@ -423,7 +463,7 @@ function onPickerSaved() {
                 <DualCurrencyPnlCell
                   :primary="pos.unrealizedGainLoss"
                   :primary-currency="pos.instrumentCurrency"
-                  :converted="(pos as any).convertedUnrealizedGainLoss"
+                  :converted="toDisplay((pos as any).convertedUnrealizedGainLoss)"
                   :display-currency="displayCurrency"
                   :percent="pos.percentageChange"
                 />
@@ -464,8 +504,8 @@ function onPickerSaved() {
               <td v-if="visibleColumns.includes('quantity')" class="px-5 py-3"></td>
               <td v-if="visibleColumns.includes('avgCost')" class="px-5 py-3"></td>
               <td v-if="visibleColumns.includes('price')" class="px-5 py-3"></td>
-              <td v-if="visibleColumns.includes('marketValue')" class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(groupTotal(g.items), displayCurrency) }}</td>
-              <td v-if="visibleColumns.includes('unrealized')" class="px-5 py-3 text-right tabular-nums">{{ formatSignedCurrency(g.items.reduce((s, p) => s + (p.unrealizedGainLoss || 0), 0), displayCurrency) }}</td>
+              <td v-if="visibleColumns.includes('marketValue')" class="px-5 py-3 text-right tabular-nums">{{ formatAmount(groupTotal(g.items) * (toDisplayRate ?? 1), totalsCcy) }}</td>
+              <td v-if="visibleColumns.includes('unrealized')" class="px-5 py-3 text-right tabular-nums">{{ formatSignedAmount(g.items.reduce((s, p) => s + (p.unrealizedGainLoss || 0), 0) * (toDisplayRate ?? 1), totalsCcy) }}</td>
               <td v-if="visibleColumns.includes('weight')" class="px-5 py-3"></td>
               <td class="px-5 py-3"></td>
             </tr>
@@ -476,8 +516,8 @@ function onPickerSaved() {
               <td v-if="visibleColumns.includes('quantity')" class="px-5 py-3"></td>
               <td v-if="visibleColumns.includes('avgCost')" class="px-5 py-3"></td>
               <td v-if="visibleColumns.includes('price')" class="px-5 py-3"></td>
-              <td v-if="visibleColumns.includes('marketValue')" class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(totalValue, displayCurrency) }}</td>
-              <td v-if="visibleColumns.includes('unrealized')" class="px-5 py-3 text-right tabular-nums" :class="gainClass(totalUnrealized)">{{ formatSignedCurrency(totalUnrealized, displayCurrency) }}</td>
+              <td v-if="visibleColumns.includes('marketValue')" class="px-5 py-3 text-right tabular-nums">{{ formatAmount(totalValueDisplay, totalsCcy) }}</td>
+              <td v-if="visibleColumns.includes('unrealized')" class="px-5 py-3 text-right tabular-nums" :class="gainClass(totalUnrealized)">{{ formatSignedAmount(totalUnrealizedDisplay, totalsCcy) }}</td>
               <td v-if="visibleColumns.includes('weight')" class="px-5 py-3"></td>
               <td class="px-5 py-3"></td>
             </tr>

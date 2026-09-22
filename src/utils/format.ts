@@ -13,6 +13,13 @@ export function formatAmount(value: number | null | undefined, currency: string 
   return formatCurrency(value, ccy)
 }
 
+/** §48.6e B2 — signed variant of formatAmount (same no-silent-USD rule). */
+export function formatSignedAmount(value: number | null | undefined, currency: string | null | undefined): string {
+  if (value === null || value === undefined || Number.isNaN(value)) return "—"
+  const sign = value > 0 ? "+" : ""
+  return `${sign}${formatAmount(value, currency)}`
+}
+
 export function formatNumber(value: number | null | undefined, digits = 2): string {
   if (value === null || value === undefined || Number.isNaN(value)) return "—"
   return new Intl.NumberFormat("en-US", { maximumFractionDigits: digits }).format(value)
