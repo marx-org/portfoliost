@@ -227,7 +227,7 @@ fixtures (mock-only, never run in the cluster). Tests never assume the 48.1 deep
 deep import is not part of the test stack. A test needing a specific rate asserts the seeded
 fixture value, and the suite starts from a fresh seed (48.4c).
 
-- [ ] **48.4a** Chart resilience + benchmark data: (1) reproduce — force a 502 on
+- [x] **48.4a** Chart resilience + benchmark data: (1) reproduce — force a 502 on
   `GET /api/instruments/SNT.WA/history` (background full-history fetch) while
   `price-bars`-rendered series is visible, assert the series is kept; fix the error path
   (research overview data flow / `PriceChart.vue`) so a failed `/history` never clears an
@@ -236,13 +236,22 @@ fixture value, and the suite starts from a fresh seed (48.4c).
   seed (portfoliost-instruments) so benchmark overlays work on the fresh stack.
   Tests: `chart-currency.spec.ts` green (both SNT.WA tests + the AAPL same-currency test);
   full e2e green.
-- [ ] **48.4b** Self-contained wallet-mutation test: rewrite
+  _Done: `PriceChart.vue` gained a load-generation guard + "empty /history never wipes a
+  rendered series" (shows a notice instead); `chart-currency.spec.ts` has the new 502-burst
+  resilience test. Benchmark leg of `/history` (portfoliost-instruments) now reads the
+  benchmark's local `price_bars_all` first (SPY/QQQ/IWM bars seeded by `pricebars-sim`,
+  which also got deterministic 11y weekday series for all 15 e2e symbols + SNT.WA),
+  provider-only as fallback; main leg falls back to local bars on provider 502/empty.
+  4 new instruments route tests; chart-currency 4/4._
+- [x] **48.4b** Self-contained wallet-mutation test: rewrite
   `wallets-watchlists.spec.ts:103` to create its own wallet + its own transactions (the
   `fees-fx.spec.ts` `createWallet` pattern) instead of mutating seed-wallet rows; audit the
   other specs for seed-state reads they depend on (`refillUsdWallet` stays — buy specs share
   the seed wallet — but must work from the seeded balance on every fresh stack).
   Tests: full e2e green.
-- [ ] **48.4c** Reset gate: `npm run test:e2e` starts from a clean seed state. Add a pre-step
+  _Done: test creates `E2E Ledger <ts>` + two uniquely-described deposits, edits and
+  deletes its own rows (spec 9/9)._
+- [x] **48.4c** Reset gate: `npm run test:e2e` starts from a clean seed state. Add a pre-step
   that recreates the postgres volume and re-ups the stack without rebuilding
   (`docker compose down -v && docker compose up -d` — re-runs migrations, `pricebars-sim`,
   `mock-db-seed`), or a lighter TRUNCATE-all-app-schemas + re-run `mock-db-seed` script
@@ -250,7 +259,24 @@ fixture value, and the suite starts from a fresh seed (48.4c).
   `test:e2e` npm script (or `test:e2e:clean` invoked by `test:e2e`).
   Tests: **run the full e2e suite back-to-back twice — both runs fully green**
   (repeatability proof).
-- [ ] **48.4d** Commit (portfoliost).
+  _Done: `scripts/reset-mock-state.sh` (TRUNCATE all app-schema base tables + re-run
+  `pricebars-sim` + `mock-db-seed`, ~11s, benchmarked vs ~90s for `down -v && up -d`, choice
+  documented in the script header), wired via the existing `pretest:e2e`. Back-to-back
+  `npm run test:e2e`: run 1 = 93 passed / 1 skipped, run 2 = 93 passed / 1 skipped (the skip
+  is research.spec's pre-existing provider auto-skip, present at baseline)._
+- [x] **48.4e** Nth-run state leaks (found while proving 48.4c on un-reset runs):
+  (1) wallets `GET /api/portfolios/merged` and `/:id/analytics` treated any portfolio with
+  `< 2 value_snapshots` as backfill-pending forever — but a portfolio whose only trades
+  are from today can never produce snapshots (`backfill.ts` window is
+  [first BUY/SELL, yesterday]), so each test-created portfolio poisoned every later merged
+  call on the same day → combined chart vanished. Fix: `hasBackfillableHistory()` (mirrors
+  the backfill window rule) now gates the pending check; 2 unit tests (pending only with
+  older history; same-day-only portfolio → complete + empty).
+  (2) `research-currency.spec.ts` never unregistered its `page.route` rewrites — late SPA
+  polls hit the handlers after test end ("route.fetch: Test ended"), which skipped the
+  next test in the worker. Fix: `page.unrouteAll({ behavior: "ignoreErrors" })` at test end.
+  Verified: combined-chart spec green on a dirty (un-reset) stack; full suite green.
+- [ ] **48.4d** Commit (portfoliost + portfoliost-instruments + portfoliost-wallets).
 
 ### 48.5 — SPA: chart currency selector + converted series
 

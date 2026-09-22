@@ -47,6 +47,11 @@ const historyFailed = ref(false)
 // still loading or failed). Drives the "full history loading…" / notice UI.
 const onlyPartial = ref(false)
 const showingPartial = computed(() => onlyPartial.value && historyLoading.value)
+// Plan §48.4a — generation token for the two-stage load: the compare picker
+// can fire a new load() while the previous /history is still in flight.
+// Stale responses must not overwrite state owned by the newer load, or a
+// failed late /history wipes the series the current load already rendered.
+const loadSeq = ref(0)
 
 const timestamps = ref<number[]>([])
 const prices = ref<number[]>([])
@@ -145,6 +150,7 @@ async function setFromPriceBars(symbol: string): Promise<boolean> {
 }
 
 async function load(compareKey: CompareKey) {
+  const seq = ++loadSeq.value
   loading.value = true
   error.value = null
   onlyPartial.value = false
@@ -152,6 +158,7 @@ async function load(compareKey: CompareKey) {
   // these land so a slow /history (e.g. a .TFI first scrape) never leaves a
   // blank spinner. Mark it "partial" while the wide history is in flight.
   const hasBars = await setFromPriceBars(props.symbol)
+  if (seq !== loadSeq.value) return // a newer load owns the state now
   loading.value = false // the chart can paint now, even before /history resolves
   if (hasBars) {
     onlyPartial.value = true
@@ -161,23 +168,35 @@ async function load(compareKey: CompareKey) {
   const compareKeyForHistory = compareKey === "none" ? undefined : compareKey
   try {
     const h = await getHistory(props.symbol, "daily", compareKeyForHistory)
-    timestamps.value = h.timestamps
-    prices.value = h.closePrices
-    bench.value = h.compare ?? null
-    loadedCompare.value = compareKey
-    // §47.6 — the history may legitimately carry no currency (unknown); keep
-    // it empty rather than guessing USD.
-    chartCurrency.value = h.currency ?? ""
-    dataVersion.value++
-    onlyPartial.value = false
-    error.value = null
+    if (seq !== loadSeq.value) return
+    if (h.timestamps.length === 0) {
+      // Plan §48.4a — an empty provider series (502 burst, uncovered symbol)
+      // must never wipe a series already rendered from price-bars: keep it
+      // and surface the failure notice instead.
+      if (timestamps.value.length > 0) {
+        historyFailed.value = true
+        error.value = "Full history unavailable — showing recent prices."
+      }
+    } else {
+      timestamps.value = h.timestamps
+      prices.value = h.closePrices
+      bench.value = h.compare ?? null
+      loadedCompare.value = compareKey
+      // §47.6 — the history may legitimately carry no currency (unknown); keep
+      // it empty rather than guessing USD.
+      chartCurrency.value = h.currency ?? ""
+      dataVersion.value++
+      onlyPartial.value = false
+      error.value = null
+    }
   } catch {
+    if (seq !== loadSeq.value) return
     // Keep the price-bars chart; surface a dismissible notice + retry instead
     // of a blank canvas / blocking spinner.
     historyFailed.value = true
     error.value = "Full history unavailable — showing recent prices."
   } finally {
-    historyLoading.value = false
+    if (seq === loadSeq.value) historyLoading.value = false
   }
 }
 
@@ -191,10 +210,15 @@ watch(compare, (k) => {
 watch(
   () => props.symbol,
   () => {
-    // symbol changed: reset state and re-run the two-stage load
+    // symbol changed: reset state and re-run the two-stage load. The series is
+    // cleared first so a symbol with no data never shows the previous symbol's
+    // bars (and the empty-history guard in load() can't mistake them for its own).
     bench.value = null
     loadedCompare.value = "none"
     onlyPartial.value = false
+    historyFailed.value = false
+    timestamps.value = []
+    prices.value = []
     void load(compare.value)
     if (showTransactions.value) fetchTransactions()
   },

@@ -64,6 +64,9 @@ test("estimated currency shows the amber (estimated) badge (AMAT)", async ({ pag
   const badge = page.getByTestId("currency-warning")
   await expect(badge).toBeVisible()
   await expect(badge).toHaveText("USD (estimated)")
+
+  // Drop the rewrites before teardown so late SPA polls can't hit the handler.
+  await page.unrouteAll({ behavior: "ignoreErrors" })
 })
 
 test("unknown currency red-flags and renders prices without a USD label (AMD)", async ({ page }) => {
@@ -81,4 +84,6 @@ test("unknown currency red-flags and renders prices without a USD label (AMD)", 
   expect(text).toMatch(/\d/)
   expect(text).not.toContain("$")
   expect(text).not.toMatch(/USD|EUR|PLN|GBP/)
+
+  await page.unrouteAll({ behavior: "ignoreErrors" })
 })

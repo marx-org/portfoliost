@@ -103,28 +103,59 @@ test("wallets: History opens wallet detail screen", async ({ page }) => {
 test("wallets: wallet detail recent transactions support edit and delete with confirmation", async ({ page }) => {
   await login(page)
 
-  await page.locator(".card", { hasText: "Portfel USD 1" }).first().click()
-  await expect(page).toHaveURL(/\/en\/portfolios\/wallets\/1a1f2d68-686c-4f8b-ba34-a67846163275/)
+  // Self-contained (plan §48.4b): the test creates its own wallet and its own
+  // transactions instead of mutating the seed wallet's ledger — other specs
+  // deposit into the shared seed wallet, which pushes the seeded rows out of
+  // the bounded Recent-transactions list (default limit 10).
+  const ts = Date.now()
+  const walletName = `E2E Ledger ${ts}`
+  const salaryDesc = `E2E salary ${ts}`
+  const bondDesc = `E2E bond buy ${ts}`
+
+  await page.goto("/en/wallets")
+  await page.getByRole("button", { name: "New wallet" }).first().click()
+  const createDialog = page.getByRole("dialog", { name: "Create wallet" })
+  await createDialog.getByRole("textbox", { name: "Name" }).fill(walletName)
+  await createDialog.getByRole("button", { name: "Create" }).click()
+  await expect(createDialog).not.toBeVisible()
+
+  const card = page.locator(".card").filter({ hasText: walletName })
+  for (const [amount, desc] of [
+    ["250", salaryDesc],
+    ["100", bondDesc],
+  ] as const) {
+    await card.getByRole("button", { name: "Deposit", exact: true }).click()
+    const cash = page.getByRole("dialog", { name: "Cash movement" })
+    await cash.locator("#wc-amount").fill(amount)
+    await cash.getByLabel("Description").fill(desc)
+    await cash.getByRole("button", { name: "Deposit", exact: true }).click()
+    await expect(cash).not.toBeVisible()
+  }
+
+  // Open the wallet detail (Recent Transactions) from the investments page.
+  await page.goto("/en/investments")
+  await page.locator(".card", { hasText: walletName }).getByRole("button", { name: "History", exact: true }).first().click()
+  await expect(page).toHaveURL(/\/en\/portfolios\/wallets\/.*/)
 
   await expect(page.getByRole("button", { name: "Edit transaction" }).first()).toBeVisible()
   await expect(page.getByRole("button", { name: "Delete transaction" }).first()).toBeVisible()
 
-  const editRow = page.locator("tbody tr", { hasText: "Salary deposit" }).first()
+  const editRow = page.locator("tbody tr", { hasText: salaryDesc }).first()
   await editRow.getByRole("button", { name: "Edit transaction" }).click()
   const editDialog = page.getByRole("dialog", { name: "Edit transaction" })
   await expect(editDialog).toBeVisible()
-  await editDialog.getByLabel("Description").fill("Salary deposit edited")
+  await editDialog.getByLabel("Description").fill(`${salaryDesc} edited`)
   await editDialog.getByRole("button", { name: "Update Transaction" }).click()
   await expect(page.getByText("Transaction updated")).toBeVisible()
-  await expect(page.locator("tbody tr", { hasText: "Salary deposit edited" })).toBeVisible()
+  await expect(page.locator("tbody tr", { hasText: `${salaryDesc} edited` })).toBeVisible()
 
-  const deleteRow = page.locator("tbody tr", { hasText: "Buy EUR bonds" }).first()
+  const deleteRow = page.locator("tbody tr", { hasText: bondDesc }).first()
   await deleteRow.getByRole("button", { name: "Delete transaction" }).click()
   const confirm = page.getByRole("dialog", { name: "Delete transaction" })
   await expect(confirm).toBeVisible()
   await confirm.getByRole("button", { name: "Delete", exact: true }).click()
   await expect(page.getByText("Transaction deleted")).toBeVisible()
-  await expect(page.locator("tbody tr", { hasText: "Buy EUR bonds" })).toHaveCount(0)
+  await expect(page.locator("tbody tr", { hasText: bondDesc })).toHaveCount(0)
 })
 
 test("wallets: clicking the wallet card opens wallet detail screen", async ({ page }) => {

@@ -78,3 +78,45 @@ test("price chart keeps raw prices for same-currency benchmark (AAPL vs SPY)", a
   const ylabels = await priceChartYAxis(page)
   expect(ylabels.some((t) => t.includes("$"))).toBe(true)
 })
+
+/**
+ * Plan §48.4a — chart resilience against a provider-tier 502 burst: the
+ * background /history leg fails while the price-bars-rendered series is
+ * visible (this is what happens under parallel e2e load). The series must be
+ * kept — a failed /history never clears an already-rendered chart.
+ */
+test("price chart keeps the rendered series when /history 502s (provider burst)", async ({ page }) => {
+  await login(page)
+  await page.goto("/en/research/SNT.WA/overview")
+
+  await expect(page.getByRole("heading", { name: "Price Chart" })).toBeVisible({ timeout: 20000 })
+  await expect(page.locator(".apexcharts-canvas").first()).toBeVisible({ timeout: 20000 })
+  // Precondition: a series is rendered (price-bars or full history).
+  await expect
+    .poll(async () => (await priceChartYAxis(page)).length, { timeout: 15000 })
+    .toBeGreaterThan(0)
+
+  // Force a 502 on the background full-history fetch for this symbol.
+  await page.route("**/api/instruments/SNT.WA/history*", (route) =>
+    route.fulfill({
+      status: 502,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "BadGateway", message: "upstream 502" }),
+    }),
+  )
+
+  // Selecting a comparison re-fires the two-stage load → /history leg 502s.
+  await page.getByText("Add comparison").click()
+  await page.getByText("S&P 500").click()
+
+  // The failure is surfaced as a dismissible notice…
+  await expect(page.getByText(/Full history unavailable/)).toBeVisible({ timeout: 15000 })
+  // …and the series is never wiped: the chart falls back to the price-bars
+  // data (possibly different axis values than the full-history series) but
+  // always keeps a rendered, axis-labeled series.
+  await expect
+    .poll(async () => (await priceChartYAxis(page)).length, { timeout: 15000 })
+    .toBeGreaterThan(0)
+  await expect(page.getByText("No price history available")).toHaveCount(0)
+  await expect(page.locator(".apexcharts-canvas").first()).toBeVisible()
+})
