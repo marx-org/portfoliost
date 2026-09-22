@@ -118,63 +118,109 @@ The `/api/currencies` registry moves to instruments with the table (its availabi
 
 ### 48.3 — Re-point wallets settlement at instruments' FX; move registry; drop local FX
 
-- [ ] `portfoliost-instruments`: expose `GET /api/internal/fx-rates?from&to` (same shape wallets'
-  internal route had) **and move `GET /api/currencies` to instruments** — the registry's
-  availability SoT is the `fx_rates` table itself (D26), so the endpoint follows the table. Gateway
-  re-routes `/api/currencies` to `INSTRUMENTS_URL`; SPA consumers already point at instruments for
-  this flow. Display metadata (name/symbol/minorUnits) stays the static contracts catalog (D26) —
-  only the availability join moves.
-- [ ] `portfoliost-wallets`: replace the local `fxRates` schema reads in `fee-fx.ts`,
-  `cashFlows.ts`, and `backfill.ts` with a client to instruments' FX —
-  `GET /api/internal/fx-rates` (see 48.2: a resolved-rate lookup taking `from`/`to`/`date`, the
-  same shape as wallets' existing internal route, reachable via `INSTRUMENTS_URL`). Conversion
-  math stays `@marx2/contracts/fx` (D27) — only the *data source* moves, so this is a URL swap,
-  not a rewrite.
-- [ ] Drop `wallets.fx_rates` + `fx_sync_state` (drizzle migration) — development mode, the deep
-  import in 48.1 is the only FX data load; remove the wallets `fxsync`/`fx-backfill` CronJobs +
-  `fx-import.ts` + their tests. Remove the wallets `/api/currencies` route (now served by
-  instruments).
-- [ ] **Retire wallets' FX join in `backfill.ts`**: the position-value path now calls instruments
-  `/price-bars?currency=<portfolio base>` and multiplies `close × qty` with no local FX lookup —
-  the "only quantity multiplication" property. **Precedence rule:** whenever a price endpoint can
-  convert on the fly (`?currency=`), consumers use it *instead of* fetching raw rates and
-  converting manually; `GET /api/internal/fx-rates` stays for genuine rate-only needs (settlement,
-  one-off lookups) and is expected to see reduced traffic after this.
-  In development mode the correctness proof is a
-  golden-value test over a seeded mixed-currency portfolio (unit level, not a prod diff), since
-  real portfolio values are rebuilt on the next wipe & reimport.
-- [ ] Tests: settlement round-trips (fee fx, cash flows, balance history) green against
-  instruments-sourced rates; `/api/currencies` (now served by instruments) still lists all 30
-  currencies; full wallets suite.
-- [ ] Commit (portfoliost-wallets).
+#### 48.3a — Instruments: serve the endpoints the data moved with — DONE (`6da496f`)
+
+- [x] `GET /api/internal/fx-rates?from&to[&date]` — same `{rate, asOf}` shape wallets' internal
+  route had, with a 10-day walk-back when the exact date is missing; JWT service-to-service auth.
+- [x] Move `GET /api/currencies` to instruments — the registry's availability SoT is the
+  `fx_rates` table itself (D26), so the endpoint follows the table. Display metadata
+  (name/symbol/minorUnits) stays the static contracts catalog (D26) — only the availability join
+  moves.
+- [x] Move `GET /api/fx/latest` (implementation finding — not in the original list): the SPA fee
+  dialog already calls it through the gateway `/api/fx/` (`src/api/fx.ts` → `getLatestRate`).
+  Endpoints follow the data; the SPA is untouched, only the gateway upstream moves (48.3d).
+- [x] Move `GET /api/admin/fx-rates` (implementation finding — not in the original list): the D47
+  paginated rate listing lives with the table; `portfoliost-admin`'s proxy is re-pointed in 48.3d.
+- [x] Tests (8 route cases) + full instruments suite (21 files / 334 tests green).
+- [x] Commit (portfoliost-instruments) `6da496f`.
+
+#### 48.3b — Wallets: pair-rate client + re-point settlement consumers — CODE DONE, COMMIT PENDING
+
+- [x] New `src/services/instruments-fx.ts` against `INSTRUMENTS_URL`: `resolvedFxRate(auth, from,
+  to, date?)` → `{rate, asOf} | null`, memoized `fxTo(auth, to)`, `resolveRates(auth, to, froms)`
+  → `Map<ccy, number | null>`. Degrades to 1:1 on 404/unreachable (the old "no table" behavior);
+  an unresolvable pair maps to `null` and keeps the old "converted field is null" semantics.
+  Conversion math stays `@marx2/contracts/fx` (D27) — only the data source moves.
+- [x] Re-point every local `fxRates`/`latestRates` reader. Consumer set was **broader than the
+  original plan list** (implementation finding): `fee-fx.ts`, `cashFlows.ts`, `valuation.ts`,
+  `quotes.ts`, `backfill.ts` (invested cost basis), `portfolio-transactions.ts` (4× `positionWire`
+  call sites), `portfolios.ts` (merged analytics), `mergedAnalytics.ts` (rate callback now a pure
+  `(from) => number | null` parameter).
+- [x] **Retire wallets' FX join in the `backfill.ts` price path**: the value path fetches
+  `/price-bars?currency=<portfolio base>` for positions whose instrument currency is known and
+  non-base (null stays native — §45.3 never guess) and multiplies `qty × converted close` only —
+  the "only quantity multiplication" property. `invested` still converts cost basis via the pair
+  client (genuine rate-only need). **Precedence rule held:** where a price endpoint can convert on
+  the fly (`?currency=`), consumers use it instead of fetching raw rates.
+- [x] Test stand-in `src/test-fx-mock.ts`: stubs `globalThis.fetch` for
+  `/api/internal/fx-rates`, computing pair cross-rates from a seeded EUR table via
+  `contracts/fx` `crossRate` (D27 — no local formula). Reworked 9 test files (schema, history,
+  movements, portfolios, cashFlows, mergedAnalytics, quotes, snapshots, valuation); the fx-rates
+  seed becomes `mockInstrumentsFx({ table, asOf })`.
+- [x] Wallets suite green: 26 files / 311 tests, `tsc --noEmit` clean. (One import.test.ts
+  bootstrap timeout under full-parallel load is pre-existing flake — passes in isolation and on
+  re-run; not FX-related.)
+
+#### 48.3c — Wallets: drop the local FX — IN PROGRESS
+
+- [x] Removed (working tree, uncommitted): `routes/registry.ts` (+ `/api/currencies`),
+  `routes/admin.ts` (+ `/api/admin/fx-rates`), `services/fx-import.ts` (+tests),
+  `scripts/fx-sync.ts`, `scripts/fx-backfill.ts`, `fxRates`/`fxSyncState` from `db/schema.ts`,
+  both route mounts in `index.ts`, the `fx:sync`/`fx:backfill` npm scripts.
+- [ ] Drop migration for `wallets.fx_rates` + `wallets.fx_sync_state` (generated:
+  `drizzle/0004_shallow_triton.sql`, two `DROP TABLE ... CASCADE` — review + commit with code).
+- [ ] Mock stack: strip `fx_rates` references from `mocks/db-seed/wallets.mjs` +
+  `mocks/lib/demo-fx.js` (portfoliost repo — the compose stack seeds the real wallets DB, which
+  no longer has the tables).
+- [ ] **Golden-value test** (dev-mode correctness proof, unit level): a seeded mixed-currency
+  portfolio's snapshot value/invested asserted against hand-computed D27 cross-rates. (Real
+  portfolio values are rebuilt on the next wipe & reimport, so no prod diff needed.)
+- [ ] `npm run build` + full wallets suite green; commit (portfoliost-wallets).
+
+#### 48.3d — Re-route the front door — PENDING
+
+- [ ] Gateway `gateway/default.conf.template`: `/api/currencies` **and** `/api/fx/` →
+  `${API_INSTRUMENTS_URL}` (both currently `${API_WALLETS_URL}`).
+- [ ] `portfoliost-admin` proxy (`src/index.ts` ~line 72): `/currencies/rates` →
+  `${INSTRUMENTS_URL}/api/admin/fx-rates` (currently wallets).
+- [ ] Verify `/api/currencies` (now served by instruments) still lists all 30 currencies;
+  settlement round-trips (fee fx, cash flows, balance history) green against instruments-sourced
+  rates (covered by the reworked 48.3b suite).
+- [ ] Commit (portfoliost gateway + portfoliost-admin); tick §48.3 in this plan.
 
 ### 48.4 — SPA: chart currency selector + converted series
 
-- [ ] `PriceChart.vue`: the currency in the title becomes a `<select>` (options from the shared
-  `/api/currencies` registry per `AGENTS.md` — never hardcoded; default = instrument base
+- [ ] **48.4a** `PriceChart.vue`: the currency in the title becomes a `<select>` (options from the
+  shared `/api/currencies` registry per `AGENTS.md` — never hardcoded; default = instrument base
   currency). Selecting a currency re-fetches the series with `?currency=` and renders the
   converted closes; title shows the *selected* currency; a small `fxFrom` caveat appears when
   `fxFrom` is inside the visible window ("FX rates from {fxFrom}; earlier bars in {baseCcy}").
-- [ ] Comparison overlay: benchmarks (SPY/QQQ/IWM, USD) are fetched with `?currency=<selected>`
-  too, so the overlay shares the selected currency; the §47 percent-normalization fallback remains
-  only for genuinely unconvertible cases.
-- [ ] `useCurrenciesStore` (or equivalent) already exists — wire the selector to it; verify no
-  hard-coded currency list is introduced.
-- [ ] Tests: unit for the selector→param mapping and the `fxFrom` caveat predicate; e2e (docker
-  compose mock — extend the mock price endpoints to honor `?currency=`) asserting the title,
-  converted axis, and caveat render.
-- [ ] Commit (portfoliost).
+- [ ] **48.4b** Comparison overlay: benchmarks (SPY/QQQ/IWM, USD) are fetched with
+  `?currency=<selected>` too, so the overlay shares the selected currency; the §47
+  percent-normalization fallback remains only for genuinely unconvertible cases.
+- [ ] **48.4c** `useCurrenciesStore` (or equivalent) already exists — wire the selector to it;
+  verify no hard-coded currency list is introduced.
+- [ ] **48.4d** Tests: unit for the selector→param mapping and the `fxFrom` caveat predicate; e2e
+  (docker compose mock — extend the mock price endpoints to honor `?currency=`) asserting the
+  title, converted axis, and caveat render.
+- [ ] **48.4e** Commit (portfoliost).
 
 ### 48.5 — Closeout
 
-- [ ] Deploy: push instruments + wallets `main` (GHA `v*` bump), pin new tags in
-  `~/prv/homelab/.../pfire/<name>/app/helmrelease.yaml`; enable the new instruments FX CronJob and
-  disable the wallets one; verify with kubectl.
-- [ ] Verify in prod: (a) `instruments.fx_rates` holds the deep series; (b) `wallets.fx_rates`
-  is gone and settlement still settles correctly; (c) `/api/currencies` served by instruments
-  lists the full registry; (d) a PLN chart in USD shows converted closes with the selector;
-  (e) portfolio history values unchanged.
-- [ ] Update `openst-coverage.md` / price-data docs; archive §48 to `plan-archive.md`.
+- [ ] **48.5a** Deploy: push instruments + wallets `main` (GHA `v*` bump); pin new tags in
+  `~/prv/homelab/.../pfire/<name>/app/helmrelease.yaml` in the **same** Flux reconcile that
+  (i) adds the instruments `fxsync` CronJob (daily incremental, mirroring the old wallets spec —
+  the 48.1 deferral) and (ii) removes the wallets `fxsync`/`fx-backfill` CronJobs — removing them
+  earlier would run the pre-§48 wallets image which still needs the table.
+- [ ] **48.5b** Prod deep import (user runs the kubectl commands — no cluster access from the
+  agent side): `kubectl -n pfire exec deploy/portfoliost-instruments -- node
+  dist/scripts/fx-backfill.js 1999-01-04`; verify `select count(*), min(rate_date), max(rate_date)
+  from instruments.fx_rates` ≈ 208k rows / floor 1999-01-04.
+- [ ] **48.5c** Verify in prod: (a) `instruments.fx_rates` holds the deep series; (b)
+  `wallets.fx_rates` is gone (0004 applied) and settlement still settles correctly; (c)
+  `/api/currencies` served by instruments lists the full registry; (d) a PLN chart in USD shows
+  converted closes with the selector; (e) portfolio history values unchanged.
+- [ ] **48.5d** Update `openst-coverage.md` / price-data docs; archive §48 to `plan-archive.md`.
 
 ### 48.6 — Rewrite related proposals to the new architecture
 
