@@ -154,16 +154,23 @@ instruments: vitest + stack; SPA: build + unit + e2e per `AGENTS.md`).
 
 ### 47.7 — SPA: mode toggle must reflect the effective % normalization
 
-- [ ] The caption "Percent — currencies differ (EUR vs USD)" is correct and stays — it explains why
+- [x] The caption "Percent — currencies differ (EUR vs USD)" is correct and stays — it explains why
   the user was switched to percent view. The only defect: the mode toggle still highlights "Price"
   while the plot is percent-normalized, so the highlight and the caption contradict.
-- [ ] When `axisUnit === "pct"` is forced by a currency mismatch, mark the effective mode on the
+- [x] When `axisUnit === "pct"` is forced by a currency mismatch, mark the effective mode on the
   toggle itself — e.g. the active "Price" button renders `Price → %` (or a badge) — without changing
   the user's `mode` selection (it must survive removing the benchmark, so switching back to Price
   mode works).
-- [ ] Tests: unit test for the forced-state predicate; e2e asserting both the "Price" highlight and
+- [x] Tests: unit test for the forced-state predicate; e2e asserting both the "Price" highlight and
   the forced-% indicator are visible together.
-- [ ] Commit (portfoliost).
+- [x] Commit (portfoliost).
+
+> Done (bda9df6). Extracted the forced-state predicate into a `forcedPct` computed (shared by
+> `axisUnit`, `series`, and the toggle) — it is the unit-tested `needsPercentComparison`
+> (compareSeries.test.ts, incl. the empty-currency cases from §47.6). The active Price button
+> renders `Price → %` (data-testid=mode-price-forced-pct) while forced; `mode` is untouched so
+> removing the benchmark restores plain Price. e2e (chart-currency.spec.ts) asserts the highlighted
+> "Price → %" button and the cross-currency caption are visible together.
 
 ### 47.8 — Closeout
 
