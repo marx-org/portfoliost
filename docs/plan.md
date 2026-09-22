@@ -103,17 +103,32 @@ instruments: vitest + stack; SPA: build + unit + e2e per `AGENTS.md`).
 
 ### 47.5 — SPA: kill the USD fallback, red-flag unknown/estimated currency
 
-- [ ] `ResearchOverview.vue`: `instrCcy` becomes `profile.currency ?? quote.currency` — **no**
+- [x] `ResearchOverview.vue`: `instrCcy` becomes `profile.currency ?? quote.currency` — **no**
   `"USD"`; when null, render prices without a currency code (plain number) + a red
   `Currency unknown` badge next to the price; when `currencySource === "estimated"`, render an
   amber/red `PLN (estimated)` hint.
-- [ ] Audit and remove every other hardcoded `"USD"` currency fallback in `src/` (`rg '\?\? "USD"'`
+- [x] Audit and remove every other hardcoded `"USD"` currency fallback in `src/` (`rg '\?\? "USD"'`
   and `rg 'currency.*"USD"'` in the research + chart paths) — same treatment: null → no label +
   warning badge.
-- [ ] Tests: unit test for the `instrCcy` chain; e2e (docker compose mock — extend the mock
+- [x] Tests: unit test for the `instrCcy` chain; e2e (docker compose mock — extend the mock
   instruments endpoints to cover provider/estimated/unknown) asserting the badge appears and no fake
   USD label renders.
-- [ ] Commit (portfoliost).
+- [x] Commit (portfoliost).
+
+> Done (39298c0, + d6c4ecc chart fix). `formatAmount(value, currency)` renders a plain number when
+> the currency is null/unknown; `resolveInstrumentCurrency(profile, quote)` carries the
+> `currencySource` signal and upgrades "estimated" to "provider" when a carrier provider-declares
+> the same currency. `CurrencyWarningBadge` (data-testid=currency-warning) sits next to the header
+> price. Mock instruments endpoints now emit currency/currencySource from the research fixtures
+> (SNT.WA provider/PLN, AMAT estimated/USD, AMD unknown/null) with contract checks in
+> mocks/tests/run.mjs (211 green). e2e `research-currency.spec.ts` covers provider (real stack,
+> no badge), estimated + unknown (page.route-injected carriers) with no fake USD label.
+> Pre-existing chart-currency e2e flap fixed in d6c4ecc: the price-bars→history data swap needed a
+> final remount (dataVersion in the remount key) or the y-axis formatter was dropped by
+> vue3-apexcharts' updateOptions deep-clone. The `PriceChart` `chartCurrency` "USD" defaults
+> (init + history fallback) are deliberately left for §47.6 (`chartCurrency=""` init); the
+> benchmark `bench?.currency || "USD"` is a defensive default for a field the backend always
+> declares (compare series are USD ETF proxies).
 
 ### 47.6 — SPA: chart currency in title + stable chart height
 
