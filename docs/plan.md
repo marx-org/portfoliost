@@ -355,14 +355,19 @@ fixture value, and the suite starts from a fresh seed (48.4c).
     `TypeError: Cannot read properties of undefined (reading 'toLowerCase')` on load; `main`
     empty. Known unimplemented stub — fix when the charting section is actually built (out of
     §48 scope).
-  - [ ] **B2 — holdings table shows portfolio-base `converted*` under the profile currency
-    symbol:** PLN portfolio + USD profile renders `PLN 104,190.00 / $104,190.00` (identity).
-    Wallets converts to `portfolio.baseCurrency` (`resolveRates(to=baseCurrency)` in
-    portfolio-transactions.ts; position carries `displayCurrency: "PLN"`); the SPA renders
-    those fields with the profile display-currency symbol, ignoring `displayCurrency`. Example service
-    contract (example-service-real-api.yaml positions) = display currency. Decide the owner: wallets
-    converts to the requested display currency (parity) or the SPA converts client-side via
-    `/api/fx/latest`.
+  - [x] **B2 — holdings table shows portfolio-base `converted*` under the profile currency
+     symbol: DONE (ec9e115).** SPA-side client-side conversion (the documented §41/D21b
+     approach, not example-service `?currency=` parity): `PortfolioHoldingsTab` resolves the
+     position-declared base currency (`displayCurrency` — NOT `detail.currency`;
+     API-created portfolios default to a USD base) → the display currency once via
+     `getLatestRate`, converts every `converted*` sub-line + the totals
+     (`formatAmount`/new `formatSignedAmount`), and hides sub-lines / renders plain
+     totals until the rate resolves (never a mislabelled amount). Unit tests
+     (`PortfolioHoldingsTab.test.ts`, incl. the position-declared-base case) + self-contained
+     e2e (`holdings-display-currency.spec.ts`: own wallets/portfolio, SNT.WA PLN + AAPL USD,
+     display switched USD→PLN). Residual (separate surface, not B2): the portfolio-detail
+     summary cards (`PortfolioDetailView`) still render `summaryMetrics` with the display
+     symbol — track under B3's umbrella.
   - [ ] **B3 — portfolio performance chart renders native values under the display-currency
     axis:** Obligacje (119,190 PLN) shows a "$120K/$100K" axis on "Performance Chart: USD".
     Analytics `timeSeries` is correct in portfolio currency — convert the series to the display
@@ -377,6 +382,16 @@ fixture value, and the suite starts from a fresh seed (48.4c).
     (≈31,421 correct) — drives the investments header total, "Portfolio Value" chart and
     return %. Fix in wallets: convert each portfolio value to `baseCurrency` (rate via
     instruments fx) before aggregating.
+  - [x] **B6 — every apexchart overflowed its fixed-height wrapper (found 2026-09-22 during
+     B2 verification): DONE (a2c754a).** Root cause: vue3-apexcharts (1.8+ incl. the locked
+     1.11.1) deep-merges its own `height`/`width` props (defaults `"auto"`/`"100%"`) OVER
+     `options.chart`, so `chart.height: 380` was silently replaced by `"auto"` and apexcharts
+     5.16 fell back to `svgWidth / 1.61` (863/1.61 = 536.0248px — every chart on a page had
+     the identical SVG height regardless of its option). Fix: local `ApexChart` wrapper
+     (forwards `options.chart.height` to the wrapper prop) registered globally as `apexchart`
+     — all 12 usages unchanged; a version upgrade does NOT fix it (the clobber exists in
+     every 1.8–1.11 release). e2e `chart-title-stability.spec.ts` now asserts the Price Chart
+     svg height equals the 380px wrapper and the svg stays inside the card.
 
 ### 48.7 — Rewrite related proposals to the new architecture
 
