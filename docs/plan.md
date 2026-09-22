@@ -325,8 +325,9 @@ fixture value, and the suite starts from a fresh seed (48.4c).
   4-arg `getHistory` signature). Helper `priceChartYAxis` now `trimStart()`s the h2 text
   (flex title carries the select)._
 - [x] **48.5e** Commit (portfoliost).
-  _Suite: build ✓, unit 328 ✓, test:mock 219 ✓, e2e 94 passed / 1 skipped (pre-existing
-  research.spec provider auto-skip) — full suite green on the re-seeded stack._
+  _Done: portfoliost `29cbe5a`. Suite: build ✓, unit 328 ✓, test:mock 219 ✓, e2e 94 passed /
+  1 skipped (pre-existing research.spec provider auto-skip) — full suite green on the
+  re-seeded stack._
 
 ### 48.6 — Closeout
 
