@@ -276,7 +276,8 @@ fixture value, and the suite starts from a fresh seed (48.4c).
   polls hit the handlers after test end ("route.fetch: Test ended"), which skipped the
   next test in the worker. Fix: `page.unrouteAll({ behavior: "ignoreErrors" })` at test end.
   Verified: combined-chart spec green on a dirty (un-reset) stack; full suite green.
-- [ ] **48.4d** Commit (portfoliost + portfoliost-instruments + portfoliost-wallets).
+- [x] **48.4d** Commit (portfoliost + portfoliost-instruments + portfoliost-wallets).
+  _Done: portfoliost 7d50999, portfoliost-instruments d46e03e, portfoliost-wallets 8d1720e._
 
 ### 48.5 — SPA: chart currency selector + converted series
 
