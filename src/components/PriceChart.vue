@@ -4,7 +4,7 @@ import { getHistory, getPriceBars } from "@/api/instruments"
 import type { HistoryCompareSeries } from "@/api/instruments"
 import { getAllTransactions, getPortfolioTransactions } from "@/api/portfolios"
 import { usePortfolioStore } from "@/stores/portfolios"
-import { formatCurrency, formatNumber } from "@/utils/format"
+import { formatAmount, formatCurrency, formatNumber } from "@/utils/format"
 import { crossCurrencyCaption, needsPercentComparison, percentNormalize } from "@/utils/compareSeries"
 import type { components } from "../../generated/api-types"
 
@@ -15,6 +15,10 @@ const props = defineProps<{
   portfolioId?: string | null
   defaultShowTransactions?: boolean
   maxTransactions?: number
+  /** §47.6 — the resolved instrument currency (plan §47.5 source), shown in the
+   * chart titles. Optional: the chart still resolves its own axis currency from
+   * /history; the prop only avoids a second fetch for the title. */
+  currency?: string | null
 }>()
 
 type Timeframe = "1D" | "5D" | "1W" | "1M" | "3M" | "6M" | "1Y" | "3Y" | "5Y" | "10Y" | "YTD" | "MAX"
@@ -48,14 +52,21 @@ const timestamps = ref<number[]>([])
 const prices = ref<number[]>([])
 const bench = ref<HistoryCompareSeries | null>(null)
 const loadedCompare = ref<CompareKey>("none")
-// §36 — the instrument's trading currency (from /history), for the price axis
-const chartCurrency = ref<string>("USD")
+// §36 — the instrument's trading currency (from /history), for the price axis.
+// §47.6 — initialized empty (never "USD"): while unresolved the axis and
+// tooltips show plain numbers instead of a guessed currency.
+const chartCurrency = ref<string>("")
 // §47.5 — bumped on every data swap (price-bars → full history). The remount
 // key includes it so the FINAL remount always happens after the last data
 // mutation — otherwise the price-bars→history updateOptions re-renders the
 // already-remounted chart and vue3-apexcharts' deep-clone silently drops the
 // y-axis formatter, leaving bare numbers on the axis.
 const dataVersion = ref(0)
+
+/** §47.6 — currency shown in the chart titles. Prefers the resolved prop
+ * (plan §47.5 source, no second fetch), else the axis currency once resolved.
+ * Empty while unknown → the titles omit the currency instead of guessing. */
+const titleCurrency = computed(() => (props.currency || chartCurrency.value || "").toUpperCase())
 
 const portfolioStore = usePortfolioStore()
 const showTransactions = ref(props.defaultShowTransactions ?? false)
@@ -154,7 +165,9 @@ async function load(compareKey: CompareKey) {
     prices.value = h.closePrices
     bench.value = h.compare ?? null
     loadedCompare.value = compareKey
-    chartCurrency.value = h.currency || "USD"
+    // §47.6 — the history may legitimately carry no currency (unknown); keep
+    // it empty rather than guessing USD.
+    chartCurrency.value = h.currency ?? ""
     dataVersion.value++
     onlyPartial.value = false
     error.value = null
@@ -321,9 +334,11 @@ const chartKey = computed(
 // values at call time, so a freshly mounted chart always carries the correct
 // unit + currency.
 function yLabelFormatter(v: number): string {
-  return mode.value === "Price" && axisUnit.value === "price"
-    ? formatCurrency(v, chartCurrency.value)
-    : `${v.toFixed(2)}%`
+  if (mode.value === "Price" && axisUnit.value === "price") {
+    // §47.6 — plain number while the currency is unresolved/unknown.
+    return chartCurrency.value ? formatCurrency(v, chartCurrency.value) : formatNumber(v)
+  }
+  return `${v.toFixed(2)}%`
 }
 
 function isoDate(ms: number): string {
@@ -530,7 +545,7 @@ function tooltipCustom({ series, dataPointIndex, w }: {
     const value = series[s]?.[dataPointIndex]
     const isPriceUnit = mode.value === "Price" && axisUnit.value === "price"
     const formatted =
-      typeof value === "number" ? (isPriceUnit ? formatCurrency(value, chartCurrency.value) : `${value.toFixed(2)}%`) : "—"
+      typeof value === "number" ? (isPriceUnit ? formatAmount(value, chartCurrency.value) : `${value.toFixed(2)}%`) : "—"
     lines.push(`<div class="apexcharts-tooltip-series-group"><span>${name}: ${formatted}</span></div>`)
   }
   let txHtml = ""
@@ -621,7 +636,7 @@ function downloadCsv(): void {
 <template>
   <div class="card p-6">
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-      <h2 class="text-base font-semibold">Price Chart</h2>
+      <h2 class="text-base font-semibold">Price Chart{{ titleCurrency ? ` (${titleCurrency})` : "" }}</h2>
       <div class="flex items-center gap-2">
         <button
           v-for="t in timeframes"
@@ -694,11 +709,11 @@ function downloadCsv(): void {
       <div v-if="summary" class="ml-auto flex items-center gap-4 text-sm">
         <span class="text-slate-500 dark:text-slate-400">Total Chg</span>
         <span class="font-semibold" :class="summary.change >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
-          {{
-            mode === "Price" && axisUnit === "price"
-              ? formatCurrency(summary.change, chartCurrency)
-              : `${signed(summary.changePct)}%`
-          }}
+           {{
+             mode === "Price" && axisUnit === "price"
+               ? formatAmount(summary.change, chartCurrency)
+               : `${signed(summary.changePct)}%`
+           }}
         </span>
         <span v-if="mode === 'Price' && axisUnit === 'price'" class="text-xs text-slate-400 dark:text-slate-500">{{ signed(summary.changePct) }}%</span>
         <span v-if="mode === 'Price' && axisUnit === 'price'" class="text-slate-500 dark:text-slate-400">CAGR</span>
@@ -744,7 +759,7 @@ function downloadCsv(): void {
 
     <div v-if="fullscreen" class="fixed inset-0 z-50 overflow-auto bg-white dark:bg-slate-900 p-6" @dblclick="fullscreen = false">
       <div class="mb-3 flex items-center justify-between">
-        <h2 class="text-base font-semibold">{{ symbol }} - {{ timeframe }} ({{ mode }})</h2>
+        <h2 class="text-base font-semibold">{{ symbol }} - {{ timeframe }} ({{ mode }}{{ titleCurrency ? ` · ${titleCurrency}` : "" }})</h2>
         <button type="button" class="btn-secondary text-sm" @click="fullscreen = false">Close</button>
       </div>
       <p v-if="crossCurrencyNote" class="mb-2 text-xs font-medium text-amber-600 dark:text-amber-400">{{ crossCurrencyNote }}</p>
@@ -758,14 +773,19 @@ function downloadCsv(): void {
     </div>
     <template v-else>
       <p v-if="crossCurrencyNote" class="mb-2 text-xs font-medium text-amber-600 dark:text-amber-400">{{ crossCurrencyNote }}</p>
-      <component
-        :key="chartKey"
-        :is="'apexchart'"
-        v-if="series.data.length && series.data[0].data.length"
-        :options="chartOptions"
-        :series="series.data"
-      />
-      <p v-else class="text-sm text-slate-500 dark:text-slate-400">No price history available.</p>
+      <!-- §47.6 — fixed-height wrapper (matches the chart's `height: 380` option)
+           so the plot box is stable and the card does not reflow when the
+           cross-currency note / loading notice / summary appear. -->
+      <div class="h-[380px]">
+        <component
+          :key="chartKey"
+          :is="'apexchart'"
+          v-if="series.data.length && series.data[0].data.length"
+          :options="chartOptions"
+          :series="series.data"
+        />
+        <p v-else class="flex h-full items-center justify-center text-sm text-slate-500 dark:text-slate-400">No price history available.</p>
+      </div>
     </template>
     <p class="mt-2 text-right text-xs text-slate-400 dark:text-slate-500">Powered by Example service</p>
   </div>

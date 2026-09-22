@@ -377,7 +377,7 @@ const targetSpread = computed(() => {
         </div>
       </div>
 
-      <PriceChart :symbol="symbol" />
+      <PriceChart :symbol="symbol" :currency="instrCcy" />
     </template>
   </div>
 </template>

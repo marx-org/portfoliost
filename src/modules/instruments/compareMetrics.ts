@@ -1,5 +1,5 @@
 import type { components } from "@/api/types"
-import { formatAmount, formatCompact, formatCurrency, formatNumber, formatPercent } from "@/utils/format"
+import { formatAmount, formatCompact, formatNumber, formatPercent } from "@/utils/format"
 
 type ResearchCompare = components["schemas"]["ResearchCompare"]
 
@@ -11,7 +11,10 @@ export interface CompareMetric {
 }
 
 export const COMPARE_METRICS: CompareMetric[] = [
-  { key: "price", label: "Price", fmt: (r) => formatAmount(r.price, r.currency ?? null), chartFmt: (v) => formatCurrency(v) },
+  // §47.6 — the compare chart axis spans multiple (possibly mixed-currency)
+  // instruments, so it shows a plain number rather than a guessed USD label;
+  // each row's own currency is rendered by `fmt` in the table.
+  { key: "price", label: "Price", fmt: (r) => formatAmount(r.price, r.currency ?? null), chartFmt: (v) => formatNumber(v) },
   { key: "marketCap", label: "Market Cap", fmt: (r) => formatCompact(r.marketCap), chartFmt: (v) => formatCompact(v) },
   { key: "peRatio", label: "P/E (TTM)", fmt: (r) => formatNumber(r.peRatio), chartFmt: (v) => formatNumber(v) },
   { key: "forwardPe", label: "Forward P/E", fmt: (r) => formatNumber(r.forwardPe), chartFmt: (v) => formatNumber(v) },

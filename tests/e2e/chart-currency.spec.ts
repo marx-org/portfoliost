@@ -18,7 +18,7 @@ async function login(page: import("@playwright/test").Page) {
 async function priceChartYAxis(page: import("@playwright/test").Page): Promise<string[]> {
   return page.evaluate(() => {
     const cards = [...document.querySelectorAll('[class*="card"]')] as HTMLElement[]
-    const chartCard = cards.find((c) => c.querySelector("h2")?.textContent === "Price Chart")
+    const chartCard = cards.find((c) => (c.querySelector("h2")?.textContent ?? "").startsWith("Price Chart"))
     return chartCard ? [...chartCard.querySelectorAll(".apexcharts-yaxis text")].map((t) => t.textContent ?? "") : []
   })
 }
