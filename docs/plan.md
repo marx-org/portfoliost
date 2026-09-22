@@ -134,7 +134,7 @@ The `/api/currencies` registry moves to instruments with the table (its availabi
 - [x] Tests (8 route cases) + full instruments suite (21 files / 334 tests green).
 - [x] Commit (portfoliost-instruments) `6da496f`.
 
-#### 48.3b — Wallets: pair-rate client + re-point settlement consumers — CODE DONE, COMMIT PENDING
+#### 48.3b — Wallets: pair-rate client + re-point settlement consumers — DONE (in `9cf4e42`)
 
 - [x] New `src/services/instruments-fx.ts` against `INSTRUMENTS_URL`: `resolvedFxRate(auth, from,
   to, date?)` → `{rate, asOf} | null`, memoized `fxTo(auth, to)`, `resolveRates(auth, to, froms)`
@@ -161,32 +161,43 @@ The `/api/currencies` registry moves to instruments with the table (its availabi
   bootstrap timeout under full-parallel load is pre-existing flake — passes in isolation and on
   re-run; not FX-related.)
 
-#### 48.3c — Wallets: drop the local FX — IN PROGRESS
+#### 48.3c — Wallets: drop the local FX — DONE (in `9cf4e42`; mock-stack commit pending with 48.3d)
 
-- [x] Removed (working tree, uncommitted): `routes/registry.ts` (+ `/api/currencies`),
+- [x] Removed: `routes/registry.ts` (+ `/api/currencies`),
   `routes/admin.ts` (+ `/api/admin/fx-rates`), `services/fx-import.ts` (+tests),
   `scripts/fx-sync.ts`, `scripts/fx-backfill.ts`, `fxRates`/`fxSyncState` from `db/schema.ts`,
   both route mounts in `index.ts`, the `fx:sync`/`fx:backfill` npm scripts.
-- [ ] Drop migration for `wallets.fx_rates` + `wallets.fx_sync_state` (generated:
-  `drizzle/0004_shallow_triton.sql`, two `DROP TABLE ... CASCADE` — review + commit with code).
-- [ ] Mock stack: strip `fx_rates` references from `mocks/db-seed/wallets.mjs` +
-  `mocks/lib/demo-fx.js` (portfoliost repo — the compose stack seeds the real wallets DB, which
-  no longer has the tables).
-- [ ] **Golden-value test** (dev-mode correctness proof, unit level): a seeded mixed-currency
-  portfolio's snapshot value/invested asserted against hand-computed D27 cross-rates. (Real
-  portfolio values are rebuilt on the next wipe & reimport, so no prod diff needed.)
-- [ ] `npm run build` + full wallets suite green; commit (portfoliost-wallets).
+- [x] Drop migration for `wallets.fx_rates` + `wallets.fx_sync_state` (generated:
+  `drizzle/0004_shallow_triton.sql`, two `DROP TABLE ... CASCADE`) — committed with code.
+- [x] Mock stack: strip `fx_rates` references from `mocks/db-seed/wallets.mjs` (demo FX rows now
+  INSERT into `instruments.fx_rates` — the real service drops `wallets.fx_rates` in 0004) +
+  stale comment in `mocks/lib/demo-fx.js`. (portfoliost repo — committed with 48.3d.)
+- [x] **Golden-value test** (dev-mode correctness proof, unit level):
+  `backfill.test.ts` "golden value — mixed-currency portfolio" — USD portfolio holding USD/PLN/EUR
+  instruments; one stub stands in for the whole instruments service (price-bars honors
+  `?currency=` by converting closes, internal fx-rates serves the pair rate). Asserts: non-base
+  symbols are requested with `?currency=<base>`, base as-is; hand-computed value/invested/netFlow
+  (PLN→USD = 1.08/4.3, EUR→USD = 1.08) over two days.
+- [x] `npm run build` + full wallets suite green (26 files / 312 tests); commit (portfoliost-wallets)
+  `9cf4e42`.
 
-#### 48.3d — Re-route the front door — PENDING
+#### 48.3d — Re-route the front door — DONE (commits below; homelab ingress edit held for 48.5)
 
-- [ ] Gateway `gateway/default.conf.template`: `/api/currencies` **and** `/api/fx/` →
-  `${API_INSTRUMENTS_URL}` (both currently `${API_WALLETS_URL}`).
-- [ ] `portfoliost-admin` proxy (`src/index.ts` ~line 72): `/currencies/rates` →
-  `${INSTRUMENTS_URL}/api/admin/fx-rates` (currently wallets).
-- [ ] Verify `/api/currencies` (now served by instruments) still lists all 30 currencies;
-  settlement round-trips (fee fx, cash flows, balance history) green against instruments-sourced
-  rates (covered by the reworked 48.3b suite).
-- [ ] Commit (portfoliost gateway + portfoliost-admin); tick §48.3 in this plan.
+- [x] Gateway `gateway/default.conf.template`: `/api/currencies` **and** `/api/fx/` →
+  `${API_INSTRUMENTS_URL}` (both previously `${API_WALLETS_URL}`).
+- [x] `portfoliost-admin` proxy (`src/index.ts`): `/currencies/rates` →
+  `${API_INSTRUMENTS_URL}/api/admin/fx-rates` (previously wallets) + test updated; `API_INSTRUMENTS_URL`
+  already present in compose + homelab env. `API_WALLETS_URL` stays for the other admin features
+  (market-data, sheets-sync, service-probe).
+- [x] Mock stack: `mocks/db-seed/wallets.mjs` demo FX rows now INSERT into `instruments.fx_rates`
+  (the compose seed targets the real wallets DB, which 0004 drops); stale `demo-fx.js` comment.
+- [x] Commits: portfoliost `4442361` (gateway + mock seed), portfoliost-admin `35a8df3` (proxy).
+- [ ] **Homelab ingress** (`cluster/apps/pfire/portfoliost/app/helmrelease.yaml`): `/api/currencies`
+  + `/api/fx` paths re-pointed wallets → instruments — **edited locally, push deferred to 48.5a**
+  (must land in the same Flux reconcile as the new instruments tag, or prod 404s: the old
+  instruments image doesn't serve these paths yet).
+- [x] `/api/currencies` still lists all 30 currencies: covered by instruments `fx.test.ts`
+  (served from `fx_rates`); settlement round-trips green in the 48.3b wallets suite.
 
 ### 48.4 — SPA: chart currency selector + converted series
 
@@ -210,8 +221,11 @@ The `/api/currencies` registry moves to instruments with the table (its availabi
 - [ ] **48.5a** Deploy: push instruments + wallets `main` (GHA `v*` bump); pin new tags in
   `~/prv/homelab/.../pfire/<name>/app/helmrelease.yaml` in the **same** Flux reconcile that
   (i) adds the instruments `fxsync` CronJob (daily incremental, mirroring the old wallets spec —
-  the 48.1 deferral) and (ii) removes the wallets `fxsync`/`fx-backfill` CronJobs — removing them
-  earlier would run the pre-§48 wallets image which still needs the table.
+  the 48.1 deferral), (ii) removes the wallets `fxsync`/`fx-backfill` CronJobs (removing them
+  earlier would run the pre-§48 wallets image which still needs the table), and (iii) pushes the
+  SPA ingress re-point from 48.3d (`portfoliost/app/helmrelease.yaml` — `/api/currencies` +
+  `/api/fx` → instruments; the old instruments image 404s on both paths, so it cannot land
+  earlier).
 - [ ] **48.5b** Prod deep import (user runs the kubectl commands — no cluster access from the
   agent side): `kubectl -n pfire exec deploy/portfoliost-instruments -- node
   dist/scripts/fx-backfill.js 1999-01-04`; verify `select count(*), min(rate_date), max(rate_date)
