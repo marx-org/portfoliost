@@ -50,6 +50,12 @@ const bench = ref<HistoryCompareSeries | null>(null)
 const loadedCompare = ref<CompareKey>("none")
 // §36 — the instrument's trading currency (from /history), for the price axis
 const chartCurrency = ref<string>("USD")
+// §47.5 — bumped on every data swap (price-bars → full history). The remount
+// key includes it so the FINAL remount always happens after the last data
+// mutation — otherwise the price-bars→history updateOptions re-renders the
+// already-remounted chart and vue3-apexcharts' deep-clone silently drops the
+// y-axis formatter, leaving bare numbers on the axis.
+const dataVersion = ref(0)
 
 const portfolioStore = usePortfolioStore()
 const showTransactions = ref(props.defaultShowTransactions ?? false)
@@ -118,6 +124,7 @@ async function setFromPriceBars(symbol: string): Promise<boolean> {
       timestamps.value = bars.dates.map((d) => Math.floor(Date.parse(d + "T00:00:00Z") / 1000))
       prices.value = [...bars.closes]
       if (bars.currency) chartCurrency.value = bars.currency
+      dataVersion.value++
       return true
     }
   } catch {
@@ -148,6 +155,7 @@ async function load(compareKey: CompareKey) {
     bench.value = h.compare ?? null
     loadedCompare.value = compareKey
     chartCurrency.value = h.currency || "USD"
+    dataVersion.value++
     onlyPartial.value = false
     error.value = null
   } catch {
@@ -299,11 +307,13 @@ const crossCurrencyNote = computed(() =>
 // vue3-apexcharts deep-clones options via JSON.stringify on updateOptions,
 // which silently drops the y-axis formatter function; a fresh mount is the
 // only reliable way to guarantee the axis carries the correct unit + currency.
-// Keyed on POST-load values (loadedCompare/chartCurrency) so the remount
-// happens *after* the data arrives — never mid-fetch, which would leave a
-// trailing updateOptions to strip the formatter again.
+// Keyed on POST-load values (loadedCompare/chartCurrency/dataVersion) so the
+// remount happens *after* the data arrives — and dataVersion guarantees a
+// final remount after the price-bars→history swap even when the currency is
+// unchanged (otherwise the trailing updateOptions strips the formatter and
+// the axis falls back to bare numbers).
 const chartKey = computed(
-  () => `${loadedCompare.value}|${chartCurrency.value}|${axisUnit.value}|${mode.value}|${props.symbol}`,
+  () => `${loadedCompare.value}|${chartCurrency.value}|${dataVersion.value}|${axisUnit.value}|${mode.value}|${props.symbol}`,
 )
 
 // Stable axis state for the y-axis label formatter closure. The formatter is
