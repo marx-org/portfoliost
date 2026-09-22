@@ -265,12 +265,7 @@ const series = computed(() => {
   // §36 — cross-currency overlay: a benchmark priced in a different currency
   // can only be compared honestly percent-normalized (no FX recalculation).
   // When forced, BOTH series are re-based to % so they share one axis.
-  const benchCcy = bench.value?.currency || "USD"
-  const benchPercentForced =
-    !!bench.value &&
-    compare.value !== "none" &&
-    mode.value === "Price" &&
-    needsPercentComparison(chartCurrency.value, benchCcy)
+  const benchPercentForced = forcedPct.value
 
   function transform(data: number[]): number[] {
     const slice = data.slice(startIdx)
@@ -299,17 +294,19 @@ const series = computed(() => {
   return { dates, data: out }
 })
 
-// §36 — y-axis unit for the current window. "pct" when a cross-currency overlay
-// forces both series onto a percent-normalized axis; "price" otherwise.
-const axisUnit = computed<"price" | "pct">(() => {
-  const benchCcy = bench.value?.currency || "USD"
-  const forced =
+// §36 — the forced % state: a benchmark is shown, the user picked Price mode,
+// and the currencies differ → both series must be percent-normalized.
+const forcedPct = computed(
+  () =>
     !!bench.value &&
     compare.value !== "none" &&
     mode.value === "Price" &&
-    needsPercentComparison(chartCurrency.value, benchCcy)
-  return forced ? "pct" : "price"
-})
+    needsPercentComparison(chartCurrency.value, bench.value?.currency || "USD"),
+)
+
+// §36 — y-axis unit for the current window. "pct" when a cross-currency overlay
+// forces both series onto a percent-normalized axis; "price" otherwise.
+const axisUnit = computed<"price" | "pct">(() => (forcedPct.value ? "pct" : "price"))
 
 /** §36 — non-null when the benchmark overlay is percent-normalized due to a currency gap. */
 const crossCurrencyNote = computed(() =>
@@ -661,7 +658,13 @@ function downloadCsv(): void {
           :class="mode === m ? 'bg-slate-800 text-white' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'"
           @click="mode = m"
         >
-          {{ m }}
+          <!-- §47.7 — the active "Price" mode renders "Price → %" while a
+               currency mismatch forces percent normalization, so the highlight
+               no longer contradicts the cross-currency caption. The user's
+               `mode` selection is untouched (survives removing the benchmark). -->
+          <span :data-testid="m === 'Price' && forcedPct ? 'mode-price-forced-pct' : undefined">
+            {{ m === "Price" && forcedPct ? "Price → %" : m }}
+          </span>
         </button>
       </div>
 

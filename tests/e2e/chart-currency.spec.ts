@@ -43,6 +43,24 @@ test("price chart shows native currency + cross-currency note (SNT.WA vs SPY)", 
   await expect(page.getByText(/currencies differ \(PLN vs USD\)/)).toBeVisible({ timeout: 20000 })
 })
 
+test("§47.7: forced % normalization is flagged on the active Price mode (SNT.WA vs SPY)", async ({ page }) => {
+  await login(page)
+  await page.goto("/en/research/SNT.WA/overview")
+
+  await expect(page.getByRole("heading", { name: /Price Chart/ })).toBeVisible({ timeout: 20000 })
+  await expect(page.locator(".apexcharts-canvas").first()).toBeVisible({ timeout: 20000 })
+
+  await page.getByText("Add comparison").click()
+  await page.getByText("S&P 500").click()
+  await expect(page.getByText(/currencies differ \(PLN vs USD\)/)).toBeVisible({ timeout: 20000 })
+
+  // The active mode button keeps the "Price" highlight (the user's selection
+  // is untouched) but flags the forced percent axis: "Price → %".
+  const priceButton = page.locator('button:has([data-testid="mode-price-forced-pct"])')
+  await expect(priceButton).toHaveText("Price → %")
+  await expect(priceButton).toHaveClass(/bg-slate-800/)
+})
+
 test("price chart keeps raw prices for same-currency benchmark (AAPL vs SPY)", async ({ page }) => {
   await login(page)
   await page.goto("/en/research/AAPL/overview")
