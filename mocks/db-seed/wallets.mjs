@@ -2,6 +2,8 @@
  * Seed: wallets schema — parity cash wallet + demo FX rates.
  * Ported from portfoliost-wallets/src/db/seed.ts (D76).
  * Idempotent: skips if any wallet already exists.
+ * The demo FX rows go into instruments.fx_rates — §48 moved the FX store out
+ * of the wallets schema (the real service drops wallets.fx_rates in 0004).
  */
 import { SEED_USER_ID, SEED_WALLET_ID, DEMO_FX } from "./constants.mjs"
 
@@ -24,11 +26,12 @@ export async function seedWallets(sql) {
     return
   }
 
-  // Demo FX bootstrap so currency selectors/valuations work before first real import
+  // Demo FX bootstrap so currency selectors/valuations work before first real import.
+  // §48: the table now lives in the instruments schema.
   const today = new Date().toISOString().slice(0, 10)
   for (const [currency, rate] of Object.entries(DEMO_FX)) {
     await sql`
-      INSERT INTO wallets.fx_rates (rate_date, currency, rate, source)
+      INSERT INTO instruments.fx_rates (rate_date, currency, rate, source)
       VALUES (${today}, ${currency}, ${rate.toFixed(10)}, ${"demo"})
       ON CONFLICT (rate_date, currency) DO NOTHING
     `

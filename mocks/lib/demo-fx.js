@@ -1,5 +1,5 @@
 // Interim FX source for the mock backend (fees-and-custom-fx proposal D25/D32).
-// Stands in for the wallets module's fx_rates table until §11 ships.
+// Stands in for the instruments module's fx_rates table (§48 moved it out of wallets).
 // Conversion math comes from the shared @marx2/contracts/fx helper (D27) —
 // the mock must never re-implement the formulas locally.
 import { convert, crossRate, resolveRate, settleFee } from "@marx2/contracts/fx"
