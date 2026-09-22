@@ -74,7 +74,7 @@ The `/api/currencies` registry moves to instruments with the table (its availabi
   Only source gap >10d: ISK 2008-12-09 → 2018-02-01 — a gap in ECB's own series (verified against
   frankfurter directly; Iceland left the ERM reference-rate publication in 2008), not an import
   defect. Unconvertible bars in that window are handled by the `fxFrom`/unconverted semantics.
-  The same deep import runs against prod in 48.5 after the deploy.**
+  The same deep import runs against prod in 48.6 after the deploy.**
 - [x] **No data migration.** We are in development mode: no production `fx_rates` history to
   preserve. The 48.1 one-off deep import into `instruments.fx_rates` is the only FX data load;
   wallets' existing `fx_rates` is simply dropped. (All portfolios will be rebuilt via
@@ -82,7 +82,7 @@ The `/api/currencies` registry moves to instruments with the table (its availabi
   any old converted/settled amounts are recomputed from scratch against the new FX source.)
 - [ ] Instrument CronJob mirroring the wallets `fxsync` CronJob (daily incremental) — Helm value
   + cron spec; unit test for the importer against a mocked frankfurter response.
-  (Importer unit tests done; the homelab cron spec lands in 48.5 with the tag pin — enabling it
+  (Importer unit tests done; the homelab cron spec lands in 48.6 with the tag pin — enabling it
   earlier would run the pre-§48 image which lacks `dist/scripts/fx-sync.js`.)
 - [x] Tests: importer upsert/idempotency, deep-import floor assertion; full instruments suite green.
 - [x] Commit (portfoliost-instruments).
@@ -181,7 +181,7 @@ The `/api/currencies` registry moves to instruments with the table (its availabi
 - [x] `npm run build` + full wallets suite green (26 files / 312 tests); commit (portfoliost-wallets)
   `9cf4e42`.
 
-#### 48.3d — Re-route the front door — DONE (commits below; homelab ingress edit held for 48.5)
+#### 48.3d — Re-route the front door — DONE (commits below; homelab ingress edit held for 48.6)
 
 - [x] Gateway `gateway/default.conf.template`: `/api/currencies` **and** `/api/fx/` →
   `${API_INSTRUMENTS_URL}` (both previously `${API_WALLETS_URL}`).
@@ -193,32 +193,87 @@ The `/api/currencies` registry moves to instruments with the table (its availabi
   (the compose seed targets the real wallets DB, which 0004 drops); stale `demo-fx.js` comment.
 - [x] Commits: portfoliost `4442361` (gateway + mock seed), portfoliost-admin `35a8df3` (proxy).
 - [ ] **Homelab ingress** (`cluster/apps/pfire/portfoliost/app/helmrelease.yaml`): `/api/currencies`
-  + `/api/fx` paths re-pointed wallets → instruments — **edited locally, push deferred to 48.5a**
+  + `/api/fx` paths re-pointed wallets → instruments — **edited locally, push deferred to 48.6a**
   (must land in the same Flux reconcile as the new instruments tag, or prod 404s: the old
   instruments image doesn't serve these paths yet).
 - [x] `/api/currencies` still lists all 30 currencies: covered by instruments `fx.test.ts`
   (served from `fx_rates`); settlement round-trips green in the 48.3b wallets suite.
 
-### 48.4 — SPA: chart currency selector + converted series
+### 48.4 — E2E repeatability + test-only FX fixtures (test fix)
 
-- [ ] **48.4a** `PriceChart.vue`: the currency in the title becomes a `<select>` (options from the
+The e2e suite must be **repeatable**: green on a fresh seed, and green on the Nth run against
+the same stack. Baseline (2026-09-22, `docker compose down -v` + full re-seed, fresh images):
+**89 pass / 3 fail / 1 skip**. The two §48-sensitive failures (fees-fx rate expectation,
+combined-chart render) went green on the fresh seed — the seed-only FX fixture
+(`mocks/db-seed`: 30 currencies × 1 day, `DEMO_FX` in `constants.mjs`, INSERTed into
+`instruments.fx_rates` at stack startup) is the right layer. The three remaining failures are
+state problems, not §48 regressions:
+
+- `chart-currency.spec.ts:26,46` (SNT.WA vs SPY): the Price Chart renders with an **empty
+  series** during the run (y-axis label count 0; the identical DOM query returns labels on
+  manual replay). Service logs show a provider-tier **502 burst in the same window**
+  (`SNT.WA/history` ×2, `SNT.WA/seasonality`, Top10 quote fan-out) — under parallel e2e load a
+  failed background `/history` fetch appears to wipe the series already rendered from
+  `price-bars`. Additionally: the "S&P 500" benchmark resolves to SPY, but **SPY has no bars in
+  the seeded `price_bars`** (9 symbols: AAPL, AMAT, AMD, CART, KO, MSFT, NOTSTOOQ, NVDA,
+  SNT.WA) — benchmark symbol resolution must be verified and benchmark bars seeded if missing.
+- `wallets-watchlists.spec.ts:103` (Salary deposit edit/delete): **cross-test race** —
+  `portfolios.spec.ts` `refillUsdWallet` deposits 10000 into the shared seed wallet in
+  parallel, pushing "Salary deposit" (12 days old) out of the bounded Recent-transactions
+  list. The test depends on global seed state that other specs mutate.
+
+**Rule (test-only FX):** e2e FX expectations derive **only** from the `mocks/db-seed` demo
+fixtures (mock-only, never run in the cluster). Tests never assume the 48.1 deep import; the
+deep import is not part of the test stack. A test needing a specific rate asserts the seeded
+fixture value, and the suite starts from a fresh seed (48.4c).
+
+- [ ] **48.4a** Chart resilience + benchmark data: (1) reproduce — force a 502 on
+  `GET /api/instruments/SNT.WA/history` (background full-history fetch) while
+  `price-bars`-rendered series is visible, assert the series is kept; fix the error path
+  (research overview data flow / `PriceChart.vue`) so a failed `/history` never clears an
+  already-rendered series; (2) find where the benchmark list resolves "S&P 500" → symbol
+  (rg the benchmark source); if that symbol lacks seeded bars, extend the `pricebars-sim`
+  seed (portfoliost-instruments) so benchmark overlays work on the fresh stack.
+  Tests: `chart-currency.spec.ts` green (both SNT.WA tests + the AAPL same-currency test);
+  full e2e green.
+- [ ] **48.4b** Self-contained wallet-mutation test: rewrite
+  `wallets-watchlists.spec.ts:103` to create its own wallet + its own transactions (the
+  `fees-fx.spec.ts` `createWallet` pattern) instead of mutating seed-wallet rows; audit the
+  other specs for seed-state reads they depend on (`refillUsdWallet` stays — buy specs share
+  the seed wallet — but must work from the seeded balance on every fresh stack).
+  Tests: full e2e green.
+- [ ] **48.4c** Reset gate: `npm run test:e2e` starts from a clean seed state. Add a pre-step
+  that recreates the postgres volume and re-ups the stack without rebuilding
+  (`docker compose down -v && docker compose up -d` — re-runs migrations, `pricebars-sim`,
+  `mock-db-seed`), or a lighter TRUNCATE-all-app-schemas + re-run `mock-db-seed` script
+  (benchmark both, pick the faster, document the choice in the script). Wire it into the
+  `test:e2e` npm script (or `test:e2e:clean` invoked by `test:e2e`).
+  Tests: **run the full e2e suite back-to-back twice — both runs fully green**
+  (repeatability proof).
+- [ ] **48.4d** Commit (portfoliost).
+
+### 48.5 — SPA: chart currency selector + converted series
+
+- [ ] **48.5a** `PriceChart.vue`: the currency in the title becomes a `<select>` (options from the
   shared `/api/currencies` registry per `AGENTS.md` — never hardcoded; default = instrument base
   currency). Selecting a currency re-fetches the series with `?currency=` and renders the
   converted closes; title shows the *selected* currency; a small `fxFrom` caveat appears when
   `fxFrom` is inside the visible window ("FX rates from {fxFrom}; earlier bars in {baseCcy}").
-- [ ] **48.4b** Comparison overlay: benchmarks (SPY/QQQ/IWM, USD) are fetched with
+- [ ] **48.5b** Comparison overlay: benchmarks (SPY/QQQ/IWM, USD) are fetched with
   `?currency=<selected>` too, so the overlay shares the selected currency; the §47
   percent-normalization fallback remains only for genuinely unconvertible cases.
-- [ ] **48.4c** `useCurrenciesStore` (or equivalent) already exists — wire the selector to it;
+- [ ] **48.5c** `useCurrenciesStore` (or equivalent) already exists — wire the selector to it;
   verify no hard-coded currency list is introduced.
-- [ ] **48.4d** Tests: unit for the selector→param mapping and the `fxFrom` caveat predicate; e2e
+- [ ] **48.5d** Tests: unit for the selector→param mapping and the `fxFrom` caveat predicate; e2e
   (docker compose mock — extend the mock price endpoints to honor `?currency=`) asserting the
-  title, converted axis, and caveat render.
-- [ ] **48.4e** Commit (portfoliost).
+  title, converted axis, and caveat render. The converted window needs a **deterministic
+  multi-day FX history** in `mocks/db-seed` — extend the demo fixtures with a fixed
+  N-day × demo-currency rate schedule (test-only fixture per the 48.4 rule; no live rates).
+- [ ] **48.5e** Commit (portfoliost).
 
-### 48.5 — Closeout
+### 48.6 — Closeout
 
-- [ ] **48.5a** Deploy: push instruments + wallets `main` (GHA `v*` bump); pin new tags in
+- [ ] **48.6a** Deploy: push instruments + wallets `main` (GHA `v*` bump); pin new tags in
   `~/prv/homelab/.../pfire/<name>/app/helmrelease.yaml` in the **same** Flux reconcile that
   (i) adds the instruments `fxsync` CronJob (daily incremental, mirroring the old wallets spec —
   the 48.1 deferral), (ii) removes the wallets `fxsync`/`fx-backfill` CronJobs (removing them
@@ -226,17 +281,17 @@ The `/api/currencies` registry moves to instruments with the table (its availabi
   SPA ingress re-point from 48.3d (`portfoliost/app/helmrelease.yaml` — `/api/currencies` +
   `/api/fx` → instruments; the old instruments image 404s on both paths, so it cannot land
   earlier).
-- [ ] **48.5b** Prod deep import (user runs the kubectl commands — no cluster access from the
+- [ ] **48.6b** Prod deep import (user runs the kubectl commands — no cluster access from the
   agent side): `kubectl -n pfire exec deploy/portfoliost-instruments -- node
   dist/scripts/fx-backfill.js 1999-01-04`; verify `select count(*), min(rate_date), max(rate_date)
   from instruments.fx_rates` ≈ 208k rows / floor 1999-01-04.
-- [ ] **48.5c** Verify in prod: (a) `instruments.fx_rates` holds the deep series; (b)
+- [ ] **48.6c** Verify in prod: (a) `instruments.fx_rates` holds the deep series; (b)
   `wallets.fx_rates` is gone (0004 applied) and settlement still settles correctly; (c)
   `/api/currencies` served by instruments lists the full registry; (d) a PLN chart in USD shows
   converted closes with the selector; (e) portfolio history values unchanged.
-- [ ] **48.5d** Update `openst-coverage.md` / price-data docs; archive §48 to `plan-archive.md`.
+- [ ] **48.6d** Update `openst-coverage.md` / price-data docs; archive §48 to `plan-archive.md`.
 
-### 48.6 — Rewrite related proposals to the new architecture
+### 48.7 — Rewrite related proposals to the new architecture
 
 - [ ] In `docs/proposals/` — addenda recording the 2026-09-26 ownership decision (not a silent
   rewrite of accepted history):
