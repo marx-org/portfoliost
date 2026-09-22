@@ -89,25 +89,32 @@ The `/api/currencies` registry moves to instruments with the table (its availabi
 
 ### 48.2 — `price_bars_as` read path + `?currency=` on price endpoints
 
-- [ ] `src/db/price-bars.ts`: add `getPriceBarSeries(..., targetCcy?)` — when `targetCcy` is set
+- [x] `src/db/price-bars.ts`: add `getPriceBarSeries(..., targetCcy?)` — when `targetCcy` is set
   and `≠ baseCcy`, run the parameterized join
   `close * (f.rate / fb.rate)` over `price_bars_all ⨝ fx_rates(target) ⨝ fx_rates(EUR base)`,
   `WHERE symbol=:s AND date BETWEEN :from AND :to`; when equal/absent, the existing plain read.
   Return `{ closes, dates, baseCurrency, currency, fxFrom }` where `fxFrom` = earliest `fx_rates`
   date covering the window (null when no conversion applied). Bars older than `fxFrom` are
   unconverted (left as base) — document this in the response.
-- [ ] EXPLAIN test: assert the query plan probes `price_bars` and both `fx_rates` PKs (no seq
+  (Implemented as `conversionJoinSql`/`queryViewAs` in services/price-bars.ts; `currency` = the
+  served/output currency — target when converted, native base otherwise. EUR is the implicit
+  fx base: no EUR row exists, the join uses 1.0.)
+- [x] EXPLAIN test: assert the query plan probes `price_bars` and both `fx_rates` PKs (no seq
   scan on `fx_rates`); seed a bounded window + a few currencies, assert converted values equal
   the D27 `contracts/fx` `crossRate` for the same inputs (pins SQL and TS implementations equal).
-- [ ] `src/routes/instruments.ts`: add optional `currency` query param to `/price-bars`, `/price`,
+- [x] `src/routes/instruments.ts`: add optional `currency` query param to `/price-bars`, `/price`,
   `/history`; resolve `baseCcy` via `resolveInstrumentCurrency` (the §47 single resolver); pass
   through to the read path; contract response gains `baseCurrency` + `fxFrom` (nullable).
-- [ ] Contract bump: `portfoliost-contracts` `PriceBarSeries`/`PriceHistory`/`PriceResponse` gain
+  Unsupported currency or unresolvable base → 400. `/history` + `/price` (provider-fetched rows)
+  convert via `contracts/fx` over `fxWindow`/`latestFxRates` (rate-only reads, db/fx-rates.ts);
+  benchmark overlay shares the selected currency.
+- [x] Contract bump: `portfoliost-contracts` `PriceBarSeries`/`PriceHistory`/`PriceResponse` gain
   `baseCurrency` + `fxFrom`; push → CI patch bump → `npm install` + `gen:types` in instruments and
-  SPA, commit lock + generated types.
-- [ ] Tests: vitest route cases — same-currency short-circuit, cross-currency converted values,
+  SPA, commit lock + generated types. (v1.6.31; the spec schema for the `/price` response is
+  `HistoricalPrice` — it gained the fields too.)
+- [x] Tests: vitest route cases — same-currency short-circuit, cross-currency converted values,
   `fxFrom` floor, unknown currency → 400; existing suite green.
-- [ ] Commit (portfoliost-instruments) + Commit (contracts + consumers).
+- [x] Commit (portfoliost-instruments) + Commit (contracts + consumers).
 
 ### 48.3 — Re-point wallets settlement at instruments' FX; move registry; drop local FX
 
