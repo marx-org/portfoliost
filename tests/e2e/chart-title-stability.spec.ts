@@ -1,9 +1,10 @@
 import { expect, test } from "@playwright/test"
 
 /**
- * §47.6 — the Price Chart title carries the resolved instrument currency
- * (`Price Chart (PLN)`) and the plot box stays put when the transactions
- * toggle / comparison / cross-currency note appear — no card reflow.
+ * §47.6 — the Price Chart title carries the resolved instrument currency and
+ * the plot box stays put when the transactions toggle / comparison /
+ * cross-currency note appear — no card reflow. Plan §48.5: the currency is
+ * shown as the title selector, defaulted to the instrument's base currency.
  */
 async function login(page: import("@playwright/test").Page) {
   await page.goto("/login")
@@ -42,7 +43,9 @@ test("price chart title shows the resolved currency (SNT.WA)", async ({ page }) 
   await login(page)
   await page.goto("/en/research/SNT.WA/overview")
 
-  await expect(page.getByRole("heading", { name: "Price Chart (PLN)" })).toBeVisible({ timeout: 20000 })
+  await expect(page.getByRole("heading", { name: /Price Chart/ })).toBeVisible({ timeout: 20000 })
+  // §48.5 — the title currency is the selector, defaulted to the base currency.
+  await expect(page.getByTestId("chart-currency-select")).toHaveValue("PLN")
 })
 
 test("plot box is stable across transactions + comparison toggles (SNT.WA)", async ({ page }) => {

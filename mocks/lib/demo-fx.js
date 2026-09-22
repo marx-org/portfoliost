@@ -24,6 +24,51 @@ export const DEMO_RATES = {
 
 const series = [{ date: DEMO_FX_DATE, rates: DEMO_RATES }]
 
+/**
+ * Plan §48.5 — the mock price endpoints honor ?currency= against a
+ * deterministic multi-day demo schedule (test-only, per the §48.4 rule):
+ * the last DEMO_FX_DAYS calendar days ending at the SERIES' last date, flat
+ * at DEMO_RATES. Flat keeps the converted values a fixed multiple of the
+ * native ones, so mock-API expectations are exact.
+ */
+export const DEMO_FX_DAYS = 30
+
+/**
+ * Convert a parallel price array against the demo schedule. Bars before the
+ * schedule start (or without a quotable pair) stay in the base currency —
+ * the same floor semantics as the real instruments service (plan §48.2).
+ * `fxFrom` = first converted bar date (null when nothing converted).
+ */
+export function convertSeriesAs(dates, prices, baseCcy, targetCcy) {
+  const out = prices.slice()
+  const last = dates[dates.length - 1]
+  if (!last || !baseCcy || !targetCcy) return { converted: out, fxFrom: null }
+  const from = new Date(new Date(`${last}T00:00:00Z`).getTime() - (DEMO_FX_DAYS - 1) * 86_400_000)
+    .toISOString()
+    .slice(0, 10)
+  let fxFrom = null
+  for (let i = 0; i < prices.length; i++) {
+    if (dates[i] < from) continue
+    const c = convert(prices[i], baseCcy, targetCcy, DEMO_RATES)
+    if (c !== undefined) {
+      out[i] = c
+      if (fxFrom === null) fxFrom = dates[i]
+    }
+  }
+  return { converted: out, fxFrom }
+}
+
+/** Plan §48.5 — ?currency= validation mirroring the real instruments service:
+ * 3-letter code from the demo table + the implicit EUR base, else a 400. */
+export function targetCurrencyParam(raw) {
+  if (raw === undefined || raw === null || raw === "") return { value: null }
+  const v = String(raw).trim().toUpperCase()
+  if (!/^[A-Z]{3}$/.test(v) || !["EUR", ...Object.keys(DEMO_RATES)].includes(v)) {
+    return { status: 400, message: `currency not supported: ${raw}` }
+  }
+  return { value: v }
+}
+
 /** tx/display ccy -> display ccy rate (mock display currency is USD). */
 export function displayRate(ccy, manualRate) {
   if (manualRate !== undefined && manualRate !== null) {

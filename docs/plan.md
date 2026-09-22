@@ -281,22 +281,52 @@ fixture value, and the suite starts from a fresh seed (48.4c).
 
 ### 48.5 — SPA: chart currency selector + converted series
 
-- [ ] **48.5a** `PriceChart.vue`: the currency in the title becomes a `<select>` (options from the
+- [x] **48.5a** `PriceChart.vue`: the currency in the title becomes a `<select>` (options from the
   shared `/api/currencies` registry per `AGENTS.md` — never hardcoded; default = instrument base
   currency). Selecting a currency re-fetches the series with `?currency=` and renders the
   converted closes; title shows the *selected* currency; a small `fxFrom` caveat appears when
   `fxFrom` is inside the visible window ("FX rates from {fxFrom}; earlier bars in {baseCcy}").
-- [ ] **48.5b** Comparison overlay: benchmarks (SPY/QQQ/IWM, USD) are fetched with
+  _Done: title h2 carries `data-testid=chart-currency-select` (registry options, base always
+  present — prepended if untracked; hidden until the base currency is known); both legs
+  (price-bars + history) re-fetch via `currencyQueryParam(selected, base)` — same-currency
+  short-circuits to null (no refetch); `baseCurrency`/`fxFrom` ride on the responses; the caveat
+  predicate is the pure `fxCaveat()` helper; the selector resets on symbol change and re-defaults
+  to the new base after the load. Fullscreen title + notes unchanged pattern._
+- [x] **48.5b** Comparison overlay: benchmarks (SPY/QQQ/IWM, USD) are fetched with
   `?currency=<selected>` too, so the overlay shares the selected currency; the §47
   percent-normalization fallback remains only for genuinely unconvertible cases.
-- [ ] **48.5c** `useCurrenciesStore` (or equivalent) already exists — wire the selector to it;
+  _Done: `getHistory(..., currency)` passes the param through — the server already converts the
+  compare series and reports `compare.currency = target`; `forcedPct`/`needsPercentComparison`
+  now only fire for genuinely unconvertible cases (verified in e2e: USD benchmark on a
+  PLN→USD-converted axis shows no "currencies differ" note)._
+- [x] **48.5c** `useCurrenciesStore` (or equivalent) already exists — wire the selector to it;
   verify no hard-coded currency list is introduced.
-- [ ] **48.5d** Tests: unit for the selector→param mapping and the `fxFrom` caveat predicate; e2e
+  _Done: `PriceChart.vue` warms the store on mount; `currencyOptions` is store-driven (EUR first,
+  popular, then the rest — the store's stable ordering). No currency list added to the component._
+- [x] **48.5d** Tests: unit for the selector→param mapping and the `fxFrom` caveat predicate; e2e
   (docker compose mock — extend the mock price endpoints to honor `?currency=`) asserting the
   title, converted axis, and caveat render. The converted window needs a **deterministic
   multi-day FX history** in `mocks/db-seed` — extend the demo fixtures with a fixed
   N-day × demo-currency rate schedule (test-only fixture per the 48.4 rule; no live rates).
-- [ ] **48.5e** Commit (portfoliost).
+  _Done: (1) new `src/utils/priceChartFx.ts` (`currencyQueryParam`, `fxCaveat`) +
+  `tests/unit/utils/priceChartFx.test.ts` (11 cases). (2) e2e
+  `chart-currency.spec.ts` "§48.5 — currency selector converts the series + caveat": default
+  PLN, select USD → converted `$` axis, last close = native × (DEMO_FX.USD/DEMO_FX.PLN) exact,
+  `fxFrom` = first converted bar, caveat renders, benchmark shares USD (no cross-currency note);
+  expectations derived from the seeded fixture only (imports `DEMO_FX`). (3) multi-day schedule:
+  `mocks/db-seed/constants.mjs` `DEMO_FX_DAYS=30` + `demoFxSchedule()` — 30 calendar days ending
+  today, FLAT at the DEMO_FX closes (flat keeps walk-back and exact-date rates identical to the
+  single-day fixture, so no existing value expectation shifts); `wallets.mjs` inserts the
+  schedule. (4) standalone mock price endpoints honor `?currency=` against the same schedule
+  semantics (`mocks/lib/demo-fx.js` `convertSeriesAs`/`targetCurrencyParam` + instruments
+  `/history` + `/price-bars`: converted tail, unconverted head, `fxFrom`, same-currency
+  short-circuit, 400 on unsupported target / unknown base); `mocks/tests/run.mjs` +9 checks.
+  `ResearchPriceChart.test.ts` updated (mocks `getPriceBars` + the currencies store; new
+  4-arg `getHistory` signature). Helper `priceChartYAxis` now `trimStart()`s the h2 text
+  (flex title carries the select)._
+- [x] **48.5e** Commit (portfoliost).
+  _Suite: build ✓, unit 328 ✓, test:mock 219 ✓, e2e 94 passed / 1 skipped (pre-existing
+  research.spec provider auto-skip) — full suite green on the re-seeded stack._
 
 ### 48.6 — Closeout
 

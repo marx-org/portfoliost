@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process"
 import { join, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
+import { DEMO_FX_DAYS, DEMO_RATES } from "../lib/demo-fx.js"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..")
 const PORT = Number(process.env.TEST_PORT || 4099)
@@ -185,6 +186,43 @@ async function main() {
   check("instruments.currency AMD history unknown/null", amdHist.status === 200 && amdHist.json.currency === null && amdHist.json.currencySource === "unknown", curPair(amdHist, "history"))
   const amdBars = await request("/instruments/AMD/price-bars", { token })
   check("instruments.currency AMD price-bars unknown/null", amdBars.status === 200 && amdBars.json.currency === null, curPair(amdBars, "price-bars"))
+
+  // §48.5 — the price endpoints honor ?currency= against the deterministic
+  // demo schedule (DEMO_FX_DAYS days flat at DEMO_RATES, ending at the
+  // series' last date): converted tail, unconverted head, fxFrom floor.
+  const sntNative = await request("/instruments/SNT.WA/price-bars", { token })
+  const sntUsd = await request("/instruments/SNT.WA/price-bars?currency=USD", { token })
+  check(
+    "instruments.currency price-bars ?currency=USD shape",
+    sntUsd.status === 200 && sntUsd.json.currency === "USD" && sntUsd.json.baseCurrency === "PLN" && typeof sntUsd.json.fxFrom === "string" && sntUsd.json.closes.length === sntNative.json.closes.length,
+    `got ${sntUsd.status} ${JSON.stringify(sntUsd.json && { currency: sntUsd.json.currency, baseCurrency: sntUsd.json.baseCurrency, fxFrom: sntUsd.json.fxFrom })}`,
+  )
+  if (sntUsd.status === 200 && sntNative.status === 200) {
+    const dates = sntNative.json.dates
+    const from = new Date(new Date(`${dates[dates.length - 1]}T00:00:00Z`).getTime() - (DEMO_FX_DAYS - 1) * 86_400_000).toISOString().slice(0, 10)
+    const fxFromExpected = dates.find((d) => d >= from) ?? null
+    check("instruments.currency price-bars fxFrom = first converted bar", sntUsd.json.fxFrom === fxFromExpected, `got ${sntUsd.json.fxFrom} want ${fxFromExpected}`)
+    const last = dates.length - 1
+    const rate = DEMO_RATES.USD / DEMO_RATES.PLN
+    check("instruments.currency price-bars last close converted", Math.abs(sntUsd.json.closes[last] - sntNative.json.closes[last] * rate) < 1e-6, `got ${sntUsd.json.closes[last]} want ${sntNative.json.closes[last] * rate}`)
+    check("instruments.currency price-bars pre-window bar stays native", sntUsd.json.closes[0] === sntNative.json.closes[0], `got ${sntUsd.json.closes[0]} want ${sntNative.json.closes[0]}`)
+  }
+  const sntSame = await request("/instruments/SNT.WA/price-bars?currency=PLN", { token })
+  check(
+    "instruments.currency price-bars same-currency short-circuit",
+    sntSame.status === 200 && sntSame.json.currency === "PLN" && sntSame.json.baseCurrency === "PLN" && sntSame.json.fxFrom === null && JSON.stringify(sntSame.json.closes) === JSON.stringify(sntNative.json.closes),
+    `got ${sntSame.status} fxFrom=${sntSame.json && sntSame.json.fxFrom}`,
+  )
+  const sntBtc = await request("/instruments/SNT.WA/price-bars?currency=BTC", { token })
+  check("instruments.currency price-bars unsupported target → 400", sntBtc.status === 400, `got ${sntBtc.status}`)
+  const amdUsd = await request("/instruments/AMD/price-bars?currency=USD", { token })
+  check("instruments.currency price-bars unknown base → 400", amdUsd.status === 400, `got ${amdUsd.status}`)
+  const sntHistUsd = await request("/instruments/SNT.WA/history?resolution=daily&compare=spy&currency=USD", { token })
+  check(
+    "instruments.currency history ?currency=USD + compare shares it",
+    sntHistUsd.status === 200 && sntHistUsd.json.currency === "USD" && sntHistUsd.json.baseCurrency === "PLN" && typeof sntHistUsd.json.fxFrom === "string" && sntHistUsd.json.compare && sntHistUsd.json.compare.currency === "USD",
+    `got ${sntHistUsd.status} ${JSON.stringify(sntHistUsd.json && { currency: sntHistUsd.json.currency, compare: sntHistUsd.json.compare && sntHistUsd.json.compare.currency, fxFrom: sntHistUsd.json.fxFrom })}`,
+  )
 
   // premium endpoints served in full
   for (const p of ["/instruments/MSFT/fundamentals", "/instruments/MSFT/ownership", "/instruments/MSFT/dividends", "/instruments/MSFT/calendar", "/instruments/MSFT/seasonality", "/instruments/MSFT/eps-surprises", "/instruments/MSFT/projections", "/instruments/MSFT/price?date=2026-08-11"]) {

@@ -61,12 +61,16 @@ export interface HistoryCompareSeries {
 // Instant even when the upstream /history scrape is slow: this is the fast
 // "price-bars now, full history in the background" source for the research
 // chart. `dates` are ISO YYYY-MM-DD; `closes` align 1:1 with `dates`.
+// Plan §48.5 — `currency` re-fetches the series converted server-side
+// (plan §48.2); null/undefined keeps the native base series.
 export async function getPriceBars(
   symbol: string,
   from: string,
   to: string,
+  currency?: string | null,
 ): Promise<components["schemas"]["PriceBarSeries"]> {
   const q = new URLSearchParams({ from, to })
+  if (currency) q.set("currency", currency)
   return http.get<components["schemas"]["PriceBarSeries"]>(`/api/instruments/${symbol}/price-bars?${q}`)
 }
 
@@ -79,13 +83,17 @@ export async function getHistoricalClose(symbol: string, date: string): Promise<
   }
 }
 
+// Plan §48.5 — `currency` fetches the series (and the benchmark overlay)
+// converted to the selected currency server-side (plan §48.2).
 export async function getHistory(
   symbol: string,
   resolution: "daily" | "monthly" = "daily",
   compare?: "spy" | "qqq" | "iwm",
+  currency?: string | null,
 ): Promise<HistoryDaily & { compare?: HistoryCompareSeries }> {
   const q = new URLSearchParams({ resolution })
   if (compare) q.set("compare", compare)
+  if (currency) q.set("currency", currency)
   return http.get<HistoryDaily & { compare?: HistoryCompareSeries }>(`/api/instruments/${symbol}/history?${q}`)
 }
 

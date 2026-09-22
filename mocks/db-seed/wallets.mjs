@@ -5,7 +5,7 @@
  * The demo FX rows go into instruments.fx_rates — §48 moved the FX store out
  * of the wallets schema (the real service drops wallets.fx_rates in 0004).
  */
-import { SEED_USER_ID, SEED_WALLET_ID, DEMO_FX } from "./constants.mjs"
+import { SEED_USER_ID, SEED_WALLET_ID, DEMO_FX, DEMO_FX_DAYS, demoFxSchedule } from "./constants.mjs"
 
 const SEED_TXS = [
   { type: "DEPOSIT",    amount:  2500,    daysAgo: 30, description: "Monthly transfer" },
@@ -28,15 +28,20 @@ export async function seedWallets(sql) {
 
   // Demo FX bootstrap so currency selectors/valuations work before first real import.
   // §48: the table now lives in the instruments schema.
-  const today = new Date().toISOString().slice(0, 10)
-  for (const [currency, rate] of Object.entries(DEMO_FX)) {
-    await sql`
-      INSERT INTO instruments.fx_rates (rate_date, currency, rate, source)
-      VALUES (${today}, ${currency}, ${rate.toFixed(10)}, ${"demo"})
-      ON CONFLICT (rate_date, currency) DO NOTHING
-    `
-  }
-  console.log(`[db-seed] fx_rates: inserted ${Object.keys(DEMO_FX).length} demo rows for ${today}`)
+  // §48.5: a deterministic DEMO_FX_DAYS-day schedule (flat at the DEMO_FX
+  // closes) so the chart's ?currency= conversion window has multi-day history.
+  const rows = demoFxSchedule()
+  const values = rows
+    .map((r) => `('${r.rateDate}', '${r.currency}', ${r.rate.toFixed(10)}, 'demo')`)
+    .join(", ")
+  await sql.unsafe(
+    `INSERT INTO instruments.fx_rates (rate_date, currency, rate, source)
+     VALUES ${values}
+     ON CONFLICT (rate_date, currency) DO NOTHING`,
+  )
+  console.log(
+    `[db-seed] fx_rates: inserted ${rows.length} demo rows (${DEMO_FX_DAYS} days × ${Object.keys(DEMO_FX).length} currencies)`,
+  )
 
   const balance = seededBalance()
   await sql.begin(async tx => {

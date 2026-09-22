@@ -13,6 +13,31 @@ export const DEMO_FX = {
   PHP: 62.4, RON: 4.97, SGD: 1.44, THB: 38.9, TRY: 36.8, ZAR: 19.6,
 }
 
+/** Plan §48.5d — days of demo FX history seeded into instruments.fx_rates. */
+export const DEMO_FX_DAYS = 30
+
+/**
+ * Deterministic multi-day demo FX schedule (plan §48.5d — test-only fixture
+ * per the §48.4 rule, never live rates): DEMO_FX_DAYS calendar days ending
+ * `endDateIso` (default: today, UTC), each currency FLAT at its DEMO_FX
+ * close. Flat keeps every resolved rate identical to the single-day fixture
+ * (walk-back and exact-date lookups agree), so no existing e2e value
+ * expectation shifts — the extra history only feeds the chart's
+ * ?currency= conversion window (mocks run against the real instruments
+ * service, whose price endpoints join instruments.fx_rates by date).
+ */
+export function demoFxSchedule(endDateIso = new Date().toISOString().slice(0, 10)) {
+  const end = new Date(`${endDateIso}T00:00:00Z`)
+  const rows = []
+  for (let i = DEMO_FX_DAYS - 1; i >= 0; i--) {
+    const rateDate = new Date(end.getTime() - i * 86_400_000).toISOString().slice(0, 10)
+    for (const [currency, rate] of Object.entries(DEMO_FX)) {
+      rows.push({ rateDate, currency, rate })
+    }
+  }
+  return rows
+}
+
 export const SEED_POSITIONS = [
   { id: "473eccd2-cb32-4433-99d8-a04ad6460223", symbol: "META", companyName: "Meta Platforms Inc", quantity: 22, averageCostBasis: 553.91, sector: "Communication Services", industry: "Media", country: "US" },
   // §36.4 — cross-currency (PLN) position so Top Performers is verified with a

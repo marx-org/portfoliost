@@ -1,6 +1,7 @@
 import { requireAuth } from "../lib/auth.js"
 import { loadJson, loadRaw, loadResearch, loadUniverse, normalize, researchSymbols } from "../lib/data.js"
 import { logoPath } from "../lib/data.js"
+import { convertSeriesAs, targetCurrencyParam } from "../lib/demo-fx.js"
 
 function noPriceQuoteFor(symbol) {
   const quote = noPriceFixture().quotes?.[normalize(symbol)]
@@ -107,12 +108,27 @@ function overviewMetricsFor(symbol, research) {
   return { ...research.metrics, symbol }
 }
 
-function historyFor(symbol, resolution, compare) {
+function historyFor(symbol, resolution, compare, targetCcy) {
   const base = resolution === "monthly" ? loadRaw("history_monthly.json") : loadRaw("history_daily.json")
   const ci = currencyInfo(loadResearch(symbol))
   // §36 — the series is denominated in the instrument's currency; §47.5 — the
   // sourcing signal rides along (null currency = unknown, never a USD guess).
-  const h = { ...base, symbol, currency: ci.currency, currencySource: ci.currencySource }
+  const h = { ...base, symbol, currency: ci.currency, currencySource: ci.currencySource, baseCurrency: ci.currency, fxFrom: null }
+  const dates = (base.timestamps || []).map((t) => new Date(t * 1000).toISOString().slice(0, 10))
+  // Plan §48.5 — ?currency= converts closes against the demo FX schedule
+  // (floor semantics; mirrors the real instruments service).
+  if (targetCcy && ci.currency && targetCcy !== ci.currency) {
+    const cc = convertSeriesAs(dates, base.closePrices || [], ci.currency, targetCcy)
+    const ch = convertSeriesAs(dates, base.highPrices || [], ci.currency, targetCcy)
+    const cl = convertSeriesAs(dates, base.lowPrices || [], ci.currency, targetCcy)
+    const co = convertSeriesAs(dates, base.openPrices || [], ci.currency, targetCcy)
+    h.closePrices = cc.converted
+    h.highPrices = ch.converted
+    h.lowPrices = cl.converted
+    h.openPrices = co.converted
+    h.currency = targetCcy
+    h.fxFrom = cc.fxFrom
+  }
   if (!compare) return h
   const prices = base.closePrices
   if (!prices) return h
@@ -123,7 +139,12 @@ function historyFor(symbol, resolution, compare) {
     prev = prev * (1 + instRet * 0.6 + 0.0002)
     return round2(prev)
   })
-  h.compare = { name: compare === "qqq" ? "Invesco QQQ" : compare === "iwm" ? "iShares Russell 2000" : "S&P 500 (proxy)", closePrices: bench, timestamps: base.timestamps, currency: "USD" }
+  const benchCurrency = targetCcy && ci.currency && targetCcy !== ci.currency ? targetCcy : "USD"
+  let benchPrices = bench
+  if (benchCurrency !== "USD") {
+    benchPrices = convertSeriesAs(dates, bench, "USD", benchCurrency).converted
+  }
+  h.compare = { name: compare === "qqq" ? "Invesco QQQ" : compare === "iwm" ? "iShares Russell 2000" : "S&P 500 (proxy)", closePrices: benchPrices, timestamps: base.timestamps, currency: benchCurrency }
   return h
 }
 
@@ -176,7 +197,11 @@ export function register(app) {
   app.get("/api/instruments/:symbol/history", (ctx) => {
     if (!requireAuth(ctx)) return
     const symbol = getSymbol(ctx)
-    ctx.res.json(historyFor(symbol, ctx.query.resolution, ctx.query.compare))
+    const target = targetCurrencyParam(ctx.query.currency)
+    if (target.status) return ctx.res.status(target.status).json({ error: "BadRequest", message: target.message })
+    // Plan §48.5 — an unresolvable base never converts (the real service
+    // answers 200 unconverted for /history; the floor is surfaced via fxFrom).
+    ctx.res.json(historyFor(symbol, ctx.query.resolution, ctx.query.compare, target.value))
   })
 
   // §45.6 — the cached daily close series (price-bars). Derived from the daily
@@ -185,10 +210,26 @@ export function register(app) {
   app.get("/api/instruments/:symbol/price-bars", (ctx) => {
     if (!requireAuth(ctx)) return
     const symbol = getSymbol(ctx)
+    const target = targetCurrencyParam(ctx.query.currency)
+    if (target.status) return ctx.res.status(target.status).json({ error: "BadRequest", message: target.message })
     const base = loadRaw("history_daily.json")
     const ci = currencyInfo(loadResearch(symbol))
+    // Plan §48.5 — ?currency= converts against the demo FX schedule; the real
+    // service 400s when the base currency is unknown (cannot convert).
+    if (target.value && !ci.currency) {
+      return ctx.res.status(400).json({ error: "BadRequest", message: "base currency unknown; cannot convert" })
+    }
     const dates = (base.timestamps || []).map((t) => new Date(t * 1000).toISOString().slice(0, 10))
-    ctx.res.json({ symbol, timeframe: "daily", stale: false, currency: ci.currency, dates, closes: base.closePrices || [] })
+    let closes = base.closePrices || []
+    let currency = ci.currency
+    let fxFrom = null
+    if (target.value && ci.currency && target.value !== ci.currency) {
+      const cc = convertSeriesAs(dates, closes, ci.currency, target.value)
+      closes = cc.converted
+      currency = target.value
+      fxFrom = cc.fxFrom
+    }
+    ctx.res.json({ symbol, timeframe: "daily", stale: false, currency, baseCurrency: ci.currency, fxFrom, dates, closes })
   })
 
   app.get("/api/instruments/:symbol/fundamentals", (ctx) => {

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test"
+import { DEMO_FX } from "../../mocks/db-seed/constants.mjs"
 
 /**
  * §36 — price charts display the instrument's native currency (not a hard
@@ -18,7 +19,9 @@ async function login(page: import("@playwright/test").Page) {
 async function priceChartYAxis(page: import("@playwright/test").Page): Promise<string[]> {
   return page.evaluate(() => {
     const cards = [...document.querySelectorAll('[class*="card"]')] as HTMLElement[]
-    const chartCard = cards.find((c) => (c.querySelector("h2")?.textContent ?? "").startsWith("Price Chart"))
+    // trimStart: the title h2 wraps "Price Chart" + the currency <select>
+    // (plan §48.5), so its textContent may carry leading whitespace.
+    const chartCard = cards.find((c) => (c.querySelector("h2")?.textContent ?? "").trimStart().startsWith("Price Chart"))
     return chartCard ? [...chartCard.querySelectorAll(".apexcharts-yaxis text")].map((t) => t.textContent ?? "") : []
   })
 }
@@ -119,4 +122,82 @@ test("price chart keeps the rendered series when /history 502s (provider burst)"
     .toBeGreaterThan(0)
   await expect(page.getByText("No price history available")).toHaveCount(0)
   await expect(page.locator(".apexcharts-canvas").first()).toBeVisible()
+})
+
+/**
+ * Plan §48.5 — the chart title currency is a selector (registry from
+ * /api/currencies, default = the instrument's base currency). Selecting a
+ * currency re-fetches both legs with ?currency= (server-side conversion),
+ * converts the axis, and caveats via fxFrom when the visible window holds
+ * unconverted bars. FX expectations derive from the seeded fixture only
+ * (mocks/db-seed DEMO_FX — the §48.4 rule).
+ */
+test("§48.5 — currency selector converts the series + caveat (SNT.WA PLN→USD)", async ({ page }) => {
+  await login(page)
+
+  // Capture both price-bars responses (native on load, converted after the
+  // selection) to assert exact fixture values.
+  const captured: { native?: { closes: number[]; dates: string[]; currency: string; baseCurrency?: string | null; fxFrom?: string | null }; usd?: typeof captured.native } = {}
+  await page.route("**/api/instruments/SNT.WA/price-bars*", async (route) => {
+    const url = new URL(route.request().url())
+    const resp = await route.fetch()
+    const body = await resp.json().catch(() => null)
+    if (body) {
+      if (url.searchParams.get("currency")) captured.usd = body
+      else captured.native = body
+    }
+    await route.fulfill({ response: resp, body: body ? JSON.stringify(body) : "" })
+  })
+
+  await page.goto("/en/research/SNT.WA/overview")
+
+  await expect(page.getByRole("heading", { name: /Price Chart/ })).toBeVisible({ timeout: 20000 })
+  await expect(page.locator(".apexcharts-canvas").first()).toBeVisible({ timeout: 20000 })
+  await expect
+    .poll(async () => (await priceChartYAxis(page)).length, { timeout: 15000 })
+    .toBeGreaterThan(0)
+
+  // Default = the instrument's base currency.
+  const select = page.getByTestId("chart-currency-select")
+  await expect(select).toBeVisible({ timeout: 10000 })
+  await expect(select).toHaveValue("PLN")
+  const ylabelsNative = await priceChartYAxis(page)
+  expect(ylabelsNative.some((t) => t.includes("PLN"))).toBe(true)
+
+  // Select USD → both legs re-fetch with ?currency=USD.
+  await select.selectOption("USD")
+  await expect(select).toHaveValue("USD")
+
+  // Converted axis: en-US Intl USD renders "$" — no bare "PLN" labels.
+  await expect
+    .poll(async () => {
+      const labels = await priceChartYAxis(page)
+      return labels.length > 0 && labels.every((t) => !t.includes("PLN")) && labels.some((t) => t.includes("$"))
+    }, { timeout: 30000 })
+    .toBe(true)
+
+  // The converted response: USD output, PLN base, converted tail at the
+  // seeded fixture rate (flat schedule — exact), unconverted head.
+  await expect.poll(async () => !!captured.usd, { timeout: 15000 }).toBe(true)
+  expect(captured.usd!.currency).toBe("USD")
+  expect(captured.usd!.baseCurrency).toBe("PLN")
+  const rate = DEMO_FX.USD / DEMO_FX.PLN
+  const last = captured.native!.closes.length - 1
+  expect(Math.abs(captured.usd!.closes[last] - captured.native!.closes[last] * rate)).toBeLessThan(1e-6)
+
+  // fxFrom floor: the first bar actually converted (the seeded 30-day
+  // schedule starts ~29 days before today, so the default 1Y window still
+  // shows unconverted bars) → the caveat renders.
+  const firstConverted = captured.usd!.closes.findIndex((c, i) => c !== captured.native!.closes[i])
+  expect(firstConverted).toBeGreaterThan(0)
+  const fxFrom = captured.native!.dates[firstConverted]
+  expect(captured.usd!.fxFrom).toBe(fxFrom)
+  await expect(page.getByText(`FX rates from ${fxFrom}; earlier bars in PLN`)).toBeVisible({ timeout: 15000 })
+
+  // §48.5b — the benchmark overlay shares the selected currency: with the
+  // USD benchmark on a now-USD axis there is no cross-currency note.
+  await page.getByText("Add comparison").click()
+  await page.getByText("S&P 500").click()
+  await expect(page.getByText("S&P 500 (SPY)").first()).toBeVisible({ timeout: 30000 })
+  expect(await page.getByText(/currencies differ/).count()).toBe(0)
 })

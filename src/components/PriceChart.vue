@@ -4,8 +4,10 @@ import { getHistory, getPriceBars } from "@/api/instruments"
 import type { HistoryCompareSeries } from "@/api/instruments"
 import { getAllTransactions, getPortfolioTransactions } from "@/api/portfolios"
 import { usePortfolioStore } from "@/stores/portfolios"
+import { useCurrenciesStore, type CurrencyInfo } from "@/stores/currencies"
 import { formatAmount, formatCurrency, formatNumber } from "@/utils/format"
 import { crossCurrencyCaption, needsPercentComparison, percentNormalize } from "@/utils/compareSeries"
+import { currencyQueryParam, fxCaveat } from "@/utils/priceChartFx"
 import type { components } from "../../generated/api-types"
 
 type Transaction = components["schemas"]["Transaction"]
@@ -61,6 +63,17 @@ const loadedCompare = ref<CompareKey>("none")
 // §47.6 — initialized empty (never "USD"): while unresolved the axis and
 // tooltips show plain numbers instead of a guessed currency.
 const chartCurrency = ref<string>("")
+// Plan §48.5 — the loaded series' native base currency + the FX floor of the
+// loaded conversion (plan §48.2); both ride on the price responses
+// (`baseCurrency` / `fxFrom`).
+const baseCurrency = ref<string>("")
+const fxFrom = ref<string | null>(null)
+// Plan §48.5 — the display currency picked in the title selector. Empty =
+// still on the instrument's base currency (the default).
+const selectedCurrency = ref<string>(props.currency ? props.currency.toUpperCase() : "")
+// Plan §48.5 — the ?currency= param the currently loaded series was fetched
+// with (null = native base series).
+const loadedCurrencyParam = ref<string | null>(null)
 // §47.5 — bumped on every data swap (price-bars → full history). The remount
 // key includes it so the FINAL remount always happens after the last data
 // mutation — otherwise the price-bars→history updateOptions re-renders the
@@ -68,12 +81,34 @@ const chartCurrency = ref<string>("")
 // y-axis formatter, leaving bare numbers on the axis.
 const dataVersion = ref(0)
 
-/** §47.6 — currency shown in the chart titles. Prefers the resolved prop
- * (plan §47.5 source, no second fetch), else the axis currency once resolved.
- * Empty while unknown → the titles omit the currency instead of guessing. */
-const titleCurrency = computed(() => (props.currency || chartCurrency.value || "").toUpperCase())
-
 const portfolioStore = usePortfolioStore()
+// Plan §48.5c — the selector's currency registry (shared /api/currencies).
+const currenciesStore = useCurrenciesStore()
+
+/** §47.6 / plan §48.5 — currency shown in the chart titles: the selected
+ * display currency first, else the resolved base, else the prop (plan §47.5
+ * source, no second fetch), else the axis currency. Empty while unknown →
+ * the titles omit the currency instead of guessing. */
+const titleCurrency = computed(() =>
+  (selectedCurrency.value || baseCurrency.value || props.currency || chartCurrency.value || "").toUpperCase(),
+)
+
+/** Plan §48.5a — title selector options from the shared /api/currencies
+ * registry (never hardcoded, AGENTS.md). The base currency is always present:
+ * if the registry lacks it (untracked base) it is prepended so the default
+ * selection still renders. */
+const currencyOptions = computed<CurrencyInfo[]>(() => {
+  const opts = currenciesStore.options
+  const base = (baseCurrency.value || props.currency || "").toUpperCase()
+  if (!base || opts.some((c) => c.code === base)) return opts
+  return [{ code: base, name: base, symbol: base, minorUnits: 2, popular: false }, ...opts]
+})
+/** The selector only makes sense once the base currency is known (the server
+ * 400s a conversion with an unresolvable base) and the registry has loaded. */
+const showCurrencySelect = computed(
+  () => !!currenciesStore.loaded && !!(baseCurrency.value || props.currency),
+)
+
 const showTransactions = ref(props.defaultShowTransactions ?? false)
 const txPortfolioId = ref<string | "all">("all")
 const transactions = ref<Transaction[]>([])
@@ -128,18 +163,24 @@ function toggleTransactions(checked: boolean): void {
   }
 }
 
-async function setFromPriceBars(symbol: string): Promise<boolean> {
+async function setFromPriceBars(symbol: string, currencyParam: string | null): Promise<boolean> {
   error.value = null
   historyFailed.value = false
   try {
     // 11 years of daily bars matches what /history requests (todayRange(4018)).
     const to = new Date().toISOString().slice(0, 10)
     const from = new Date(Date.now() - 4018 * 86400_000).toISOString().slice(0, 10)
-    const bars = await getPriceBars(symbol, from, to)
+    const bars = await getPriceBars(symbol, from, to, currencyParam)
     if (bars.dates.length > 0) {
       timestamps.value = bars.dates.map((d) => Math.floor(Date.parse(d + "T00:00:00Z") / 1000))
       prices.value = [...bars.closes]
       if (bars.currency) chartCurrency.value = bars.currency
+      // Plan §48.5 — native base + FX floor ride on the response (plan §48.2).
+      baseCurrency.value = bars.baseCurrency || bars.currency || ""
+      fxFrom.value = bars.fxFrom ?? null
+      // Default the selector to the instrument's base currency once resolved
+      // (no refetch: the same-currency param is null, i.e. this very load).
+      if (!selectedCurrency.value && baseCurrency.value) selectedCurrency.value = baseCurrency.value.toUpperCase()
       dataVersion.value++
       return true
     }
@@ -154,10 +195,14 @@ async function load(compareKey: CompareKey) {
   loading.value = true
   error.value = null
   onlyPartial.value = false
+  // Plan §48.5 — both legs honor the selected currency (?currency=, plan
+  // §48.2); null = the native base series.
+  const currencyParam = currencyQueryParam(selectedCurrency.value, baseCurrency.value || props.currency || null)
+  loadedCurrencyParam.value = currencyParam
   // §45.6 — price-bars first (cached, instant): render the chart as soon as
   // these land so a slow /history (e.g. a .TFI first scrape) never leaves a
   // blank spinner. Mark it "partial" while the wide history is in flight.
-  const hasBars = await setFromPriceBars(props.symbol)
+  const hasBars = await setFromPriceBars(props.symbol, currencyParam)
   if (seq !== loadSeq.value) return // a newer load owns the state now
   loading.value = false // the chart can paint now, even before /history resolves
   if (hasBars) {
@@ -167,7 +212,7 @@ async function load(compareKey: CompareKey) {
 
   const compareKeyForHistory = compareKey === "none" ? undefined : compareKey
   try {
-    const h = await getHistory(props.symbol, "daily", compareKeyForHistory)
+    const h = await getHistory(props.symbol, "daily", compareKeyForHistory, currencyParam)
     if (seq !== loadSeq.value) return
     if (h.timestamps.length === 0) {
       // Plan §48.4a — an empty provider series (502 burst, uncovered symbol)
@@ -185,6 +230,11 @@ async function load(compareKey: CompareKey) {
       // §47.6 — the history may legitimately carry no currency (unknown); keep
       // it empty rather than guessing USD.
       chartCurrency.value = h.currency ?? ""
+      // Plan §48.5 — base + FX floor from the full-history leg (the price-bars
+      // leg's values are the same series; the later write wins).
+      if (h.baseCurrency || h.currency) baseCurrency.value = h.baseCurrency ?? h.currency ?? ""
+      fxFrom.value = h.fxFrom ?? null
+      if (!selectedCurrency.value && baseCurrency.value) selectedCurrency.value = baseCurrency.value.toUpperCase()
       dataVersion.value++
       onlyPartial.value = false
       error.value = null
@@ -201,6 +251,8 @@ async function load(compareKey: CompareKey) {
 }
 
 onMounted(() => {
+  // Plan §48.5c — warm the shared currency registry for the title selector.
+  void currenciesStore.load()
   load("none")
   if (showTransactions.value) void ensurePortfoliosLoaded()
 })
@@ -219,8 +271,25 @@ watch(
     historyFailed.value = false
     timestamps.value = []
     prices.value = []
+    // Plan §48.5 — the currency selection belongs to the previous symbol;
+    // drop it and re-default to the new instrument's base after the load.
+    // loadedCurrencyParam resets too, so the currency watch below (declared
+    // after this one) sees no param change and does not double-load.
+    baseCurrency.value = ""
+    fxFrom.value = null
+    selectedCurrency.value = ""
+    loadedCurrencyParam.value = null
     void load(compare.value)
     if (showTransactions.value) fetchTransactions()
+  },
+)
+// Plan §48.5a — the selected display currency (or its default-to-base
+// resolution) changed: re-fetch both legs with ?currency=. A null param
+// means "native base series" (identity short-circuit, plan §48.2).
+watch(
+  () => currencyQueryParam(selectedCurrency.value, baseCurrency.value || props.currency || null),
+  (param) => {
+    if (param !== loadedCurrencyParam.value) void load(compare.value)
   },
 )
 watch(timeframe, () => {
@@ -337,6 +406,18 @@ const crossCurrencyNote = computed(() =>
   axisUnit.value === "pct" ? crossCurrencyCaption(chartCurrency.value, bench.value?.currency || "USD") : null,
 )
 
+/** Plan §48.5a — ISO date of the first VISIBLE bar (the sliced window's
+ * start; timeframe-independent). Drives the fxFrom caveat predicate. */
+const windowStartIso = computed(() => {
+  const n = timestamps.value.length
+  if (!n) return null
+  const startIdx = Math.max(0, n - slicePoints.value)
+  return isoDate(timestamps.value[startIdx] * 1000)
+})
+/** Plan §48.5a — caveat while the visible window holds unconverted bars
+ * (bars before `fxFrom` stay in the base currency — no FX carry-forward). */
+const fxCaveatNote = computed(() => fxCaveat(fxFrom.value, baseCurrency.value, windowStartIso.value))
+
 // Remount the chart whenever the data/currency/unit it displays changes.
 // vue3-apexcharts deep-clones options via JSON.stringify on updateOptions,
 // which silently drops the y-axis formatter function; a fresh mount is the
@@ -347,7 +428,8 @@ const crossCurrencyNote = computed(() =>
 // unchanged (otherwise the trailing updateOptions strips the formatter and
 // the axis falls back to bare numbers).
 const chartKey = computed(
-  () => `${loadedCompare.value}|${chartCurrency.value}|${dataVersion.value}|${axisUnit.value}|${mode.value}|${props.symbol}`,
+  () =>
+    `${loadedCompare.value}|${chartCurrency.value}|${dataVersion.value}|${axisUnit.value}|${mode.value}|${props.symbol}|${loadedCurrencyParam.value ?? ""}`,
 )
 
 // Stable axis state for the y-axis label formatter closure. The formatter is
@@ -657,7 +739,22 @@ function downloadCsv(): void {
 <template>
   <div class="card p-6">
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-      <h2 class="text-base font-semibold">Price Chart{{ titleCurrency ? ` (${titleCurrency})` : "" }}</h2>
+      <h2 class="flex items-center gap-2 text-base font-semibold">
+        Price Chart
+        <!-- Plan §48.5a — the title currency becomes a selector: options from
+             the shared /api/currencies registry, default = the instrument's
+             base currency. Selecting one re-fetches both legs with ?currency=. -->
+        <select
+          v-if="showCurrencySelect"
+          v-model="selectedCurrency"
+          data-testid="chart-currency-select"
+          class="rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-2 py-0.5 text-xs font-medium text-slate-700 dark:text-slate-200"
+        >
+          <option v-if="!selectedCurrency" value="" disabled>Select&hellip;</option>
+          <option v-for="c in currencyOptions" :key="c.code" :value="c.code">{{ c.code }}</option>
+        </select>
+        <span v-else-if="titleCurrency" class="font-normal text-slate-500 dark:text-slate-400">({{ titleCurrency }})</span>
+      </h2>
       <div class="flex items-center gap-2">
         <button
           v-for="t in timeframes"
@@ -790,6 +887,7 @@ function downloadCsv(): void {
         <button type="button" class="btn-secondary text-sm" @click="fullscreen = false">Close</button>
       </div>
       <p v-if="crossCurrencyNote" class="mb-2 text-xs font-medium text-amber-600 dark:text-amber-400">{{ crossCurrencyNote }}</p>
+      <p v-if="fxCaveatNote" class="mb-2 text-xs font-medium text-slate-500 dark:text-slate-400">{{ fxCaveatNote }}</p>
       <component
         :key="`fs-${chartKey}`"
         :is="'apexchart'"
@@ -800,6 +898,7 @@ function downloadCsv(): void {
     </div>
     <template v-else>
       <p v-if="crossCurrencyNote" class="mb-2 text-xs font-medium text-amber-600 dark:text-amber-400">{{ crossCurrencyNote }}</p>
+      <p v-if="fxCaveatNote" class="mb-2 text-xs font-medium text-slate-500 dark:text-slate-400">{{ fxCaveatNote }}</p>
       <!-- §47.6 — fixed-height wrapper (matches the chart's `height: 380` option)
            so the plot box is stable and the card does not reflow when the
            cross-currency note / loading notice / summary appear. -->

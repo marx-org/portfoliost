@@ -7,11 +7,27 @@ import { getAllTransactions, getPortfolioTransactions } from "@/api/portfolios"
 
 vi.mock("@/api/instruments", () => ({
   getHistory: vi.fn(),
+  getPriceBars: vi.fn().mockResolvedValue({
+    symbol: "AAPL",
+    timeframe: "daily",
+    stale: false,
+    currency: null,
+    baseCurrency: null,
+    fxFrom: null,
+    dates: [],
+    closes: [],
+  }),
 }))
 
 vi.mock("@/api/portfolios", () => ({
   getAllTransactions: vi.fn(),
   getPortfolioTransactions: vi.fn(),
+}))
+
+// §48.5 — the title selector reads the shared currency registry; keep the
+// unit test off the network (the e2e stack exercises the real registry).
+vi.mock("@/stores/currencies", () => ({
+  useCurrenciesStore: () => ({ options: [], loaded: false, load: vi.fn().mockResolvedValue(undefined) }),
 }))
 
 const mockedGetHistory = vi.mocked(getHistory)
@@ -105,7 +121,7 @@ describe("PriceChart", () => {
   it("fetches daily history for the symbol", async () => {
     mountChart()
     await flushPromises()
-    expect(mockedGetHistory).toHaveBeenCalledWith("AAPL", "daily", undefined)
+    expect(mockedGetHistory).toHaveBeenCalledWith("AAPL", "daily", undefined, null)
   })
 
   it("switches between price and percent modes", async () => {
@@ -130,7 +146,7 @@ describe("PriceChart", () => {
     await wrapper.findAll("button").find((b) => b.text().includes("S&P 500"))!.trigger("click")
     await flushPromises()
 
-    expect(mockedGetHistory).toHaveBeenCalledWith("AAPL", "daily", "spy")
+    expect(mockedGetHistory).toHaveBeenCalledWith("AAPL", "daily", "spy", null)
   })
 
   it("renders timeframe buttons", async () => {
