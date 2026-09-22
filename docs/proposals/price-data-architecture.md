@@ -711,3 +711,35 @@ Adopt this only if real measurements (on the cluster against the imported stooq 
 the `price_bars_all` approach is too slow for the H3 hot path — e.g. per-query latency on a
 typical `price-bars?from=&to=` call exceeds an acceptable budget. The single-view design is
 kept until then for simplicity and a single source of truth.
+
+---
+
+## Currency-converted price reads — `?currency=` (plan §48.2, implemented 2026-09-22)
+
+Addendum to this proposal: the price read path gained a server-side,
+**parameterized-join** currency conversion (plan §48.2) — no per-currency copies
+of the price tables.
+
+- `GET /price-bars`, `/price`, `/history` accept an optional `?currency=`.
+  `baseCcy` is resolved by the single §47 resolver (`resolveInstrumentCurrency`).
+  When `currency ≠ baseCcy` the read runs the parameterized join
+  `close * (f.rate / fb.rate)` over `price_bars_all ⨝ fx_rates(currency)
+  ⨝ fx_rates(EUR base)` for the requested window — a PK probe on both `fx_rates`
+  sides (verified by EXPLAIN test; no seq scan). Same-currency/absent keeps the
+  plain read. Unsupported currency or unresolvable base → 400.
+- **`fxFrom` floor semantics:** the response carries `baseCurrency`, the output
+  `currency`, and `fxFrom` — the earliest `fx_rates` date covering the window
+  (null when no conversion applied). Bars older than `fxFrom` are *unconverted*
+  (left in the base currency), never silently re-based — the SPA renders an
+  explicit caveat for that window. EUR is the implicit fx base (no EUR row; the
+  join uses 1.0).
+- **No new index:** the join is two PK lookups (`fx_rates (rate_date, currency)`)
+  plus the existing window scan on the bars; an `EXPLAIN` test pins the plan. A
+  conversion index would only pay off if the plan regresses, which the test
+  guards against.
+- `/history` + `/price` (provider-fetched rows, not the bars view) convert in
+  the service via `@marx2/contracts/fx` (D27) over the latest/`fxWindow` rates —
+  rate-only reads, same formula as the SQL join (an EX/unit test pins SQL and
+  TS implementations equal against `crossRate`).
+- Consumers (wallets valuation/backfill) prefer the `?currency=` conversion over
+  fetching raw rates — the precedence rule from plan §48.3b.

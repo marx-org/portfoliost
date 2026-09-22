@@ -205,6 +205,16 @@ Currency registry (fees-and-custom-fx D25/D26): the set of distinct currencies i
 `GET /api/currencies` joined with display metadata from the contracts catalog.
 The list auto-updates with every daily import — no separate registry to maintain.
 
+> **Addendum (plan §48, ownership decision 2026-09-26):** the FX store has **moved
+> out of wallets** — `fx_rates` + the importer now live in **instruments** (plan
+> §48.1) and the wallets tables were dropped in prod 2026-09-22 (plan §48.6c).
+> Wallets keeps *settlement* only — the D21 snapshot-on-write semantics are
+> unchanged — and reads rates from instruments' `GET /api/internal/fx-rates`
+> (plan §48.3b); an unresolvable pair degrades to 1:1 / null converted fields,
+> exactly the old "no row in the table" behavior. The `GET /api/currencies` +
+> `GET /api/fx/latest` / `GET /api/admin/fx-rates` endpoints moved with the table
+> (plan §48.3a); gateway routing updated in §48.6a.
+
 ### D21 — conversion semantics: snapshot on write (auto or manual)
 
 Two distinct needs:

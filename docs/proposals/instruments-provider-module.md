@@ -356,6 +356,32 @@ Deferred from D79. Required if Catalyst bond coupon calculation is ever added.
 - Same CronJob pattern as CPI: one-shot historical import + daily append.
 - No openst routes exposed — rate tables are engine inputs only.
 
+### D84 — FX rates: `fx_rates` store, importer, currency registry (plan §48, 2026-09-26)
+
+FX moved into instruments (plan §48.1) — daily market data belongs in the same
+module as the price series. Recorded here as an instruments responsibility:
+
+- **Store:** `instruments.fx_rates` (`rate_date`, `currency`, `rate`, `source`,
+  `fetched_at`; PK `(rate_date, currency)`, EUR-based daily closes) +
+  `instruments.fx_sync_state`. Deep import to 1999-01-04 (208,947 rows, 30
+  currencies in prod); the daily incremental `fxsync` CronJob mirrors the old
+  wallets spec (landed with the §48.6 deploy).
+- **Importer:** `src/services/fx-import.ts` (ported from wallets) —
+  frankfurter/ECB primary, `@marx2/contracts/fx` conventions (D27);
+  `syncDaily`/`importHistory`/`backfillCurrency`.
+- **Endpoints (endpoints follow the data):** `GET /api/internal/fx-rates?from&to[&date]`
+  (service-to-service, 10-day walk-back), `GET /api/currencies` (availability SoT
+  = distinct currencies in `fx_rates` + the contracts display-metadata catalog,
+  D26), `GET /api/fx/latest?from&to` (SPA display/fee conversions),
+  `GET /api/admin/fx-rates` (D47 listing). Gateway routes `/api/currencies` +
+  `/api/fx` → `API_INSTRUMENTS_URL`.
+- **Read-path conversion:** `?currency=` on the price endpoints (plan §48.2 —
+  parameterized join, `fxFrom` floor; see
+  [price-data-architecture.md](price-data-architecture.md)).
+
+Wallets keeps settlement only and reads instruments' FX (plan §48.3b); its local
+`fx_rates` was dropped in prod 2026-09-22 (plan §48.6c).
+
 ## Testing strategy (additions)
 
 - openst `openbb_obligacje`: unit tests with Postgres fixtures (in-memory PGlite or

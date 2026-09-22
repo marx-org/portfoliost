@@ -73,6 +73,20 @@ The curated bootstrap rows for crypto/fund references are upserted by
 `tickerref-sync --curated-only` (run once after the §34 deploy; the weekly
 sync keeps them refreshed).
 
+## FX — `fx_rates` + currency registry (portfoliost-instruments, plan §48)
+
+FX is **not** an openst concern — it lives in `portfoliost-instruments` (moved
+from wallets, plan §48.1; prod cutover verified 2026-09-22, plan §48.6c). No
+provider/openst route is involved.
+
+| Surface | Owner | Notes |
+| --- | --- | --- |
+| `instruments.fx_rates` + `fx_sync_state` | instruments | EUR-based daily closes, deep import to 1999-01-04 (208,947 rows, 30 ccy in prod); daily incremental `fxsync` CronJob (frankfurter/ECB) |
+| `GET /api/currencies` | instruments | availability SoT = distinct currencies in `fx_rates` + static display metadata from `@marx2/contracts` (D26) |
+| `GET /api/fx/latest?from&to` | instruments | SPA display/fee conversions (`crossRate`, D27); 10-day walk-back on `?date=` via the internal route |
+| `GET /api/internal/fx-rates?from&to[&date]` | instruments | service-to-service (JWT) — wallets settlement reads this; unresolvable pairs degrade 1:1/null |
+| `?currency=` on `/price-bars`, `/price`, `/history` | instruments | server-side parameterized-join conversion over `fx_rates` PKs; `baseCurrency`/`fxFrom` floor on the response (plan §48.2) |
+
 ## Provider quirks worth remembering
 
 - **intrinio**: nearly all probes fail with "Results not found" despite valid key —

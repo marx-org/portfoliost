@@ -42,6 +42,13 @@ Owned by the wallets module (`fx_rates`, EUR-based daily closes — details in
   static demo rate table inside the mock plays the same role so §10 UI/contract
   work is final-form from day one.
 
+> **Addendum (plan §48, ownership decision 2026-09-26):** `fx_rates` and the daily
+> importer are now owned by **instruments** — FX is daily market data and lives in
+> the same module as the price series (plan §48.1); the wallets
+> `fx_rates`/`fx_sync_state` tables were dropped in prod 2026-09-22 (plan §48.6c).
+> This decision stands as the original design; the current responsibilities are
+> recorded in [instruments-provider-module.md](instruments-provider-module.md) (D84).
+
 ### D26 — available-currencies registry (single source of truth)
 
 All currency selectors (fee currency, wallet creation, base-currency picks,
@@ -57,6 +64,14 @@ later portfolio settings) consume ONE registry:
   `/api/currencies` → `API_WALLETS_URL`). Interim (§10, pre-wallets): the mock
   serves the same shape from its demo rate table.
 - SPA fetches once per session and caches; selectors never hardcode lists.
+
+> **Addendum (plan §48, ownership decision 2026-09-26):** the availability SoT and
+> `GET /api/currencies` (along with `GET /api/fx/latest`) are now served by
+> **instruments** — the gateway routes `/api/currencies` + `/api/fx` →
+> `API_INSTRUMENTS_URL` (plan §48.3a/§48.6a). Semantics are unchanged: availability =
+> the currencies present in `fx_rates` (now in the instruments schema) + the static
+> contracts display-metadata catalog; SPA behavior is unchanged (fetch once, never
+> hardcode).
 
 ### D27 — uniform FX conversion helper (shared, pure, one formula everywhere)
 
