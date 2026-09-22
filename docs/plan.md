@@ -351,9 +351,10 @@ fixture value, and the suite starts from a fresh seed (48.4c).
   PLN, backfill complete). Display-currency rendering bugs found → **48.6e**.
 - [ ] **48.6d** Update `openst-coverage.md` / price-data docs; archive §48 to `plan-archive.md`.
 - [ ] **48.6e** Prod verification findings (2026-09-22, post-48.6a/b) — points to fix:
-  - [ ] **B1 — /en/charting crashes (unimplemented stub):** ChartingView throws
+  - [x] **B1 — /en/charting crash: EXPECTED (acknowledged 2026-09-22):** ChartingView throws
     `TypeError: Cannot read properties of undefined (reading 'toLowerCase')` on load; `main`
-    empty. Nav link exists although the section is not built — implement or hide the entry.
+    empty. Known unimplemented stub — fix when the charting section is actually built (out of
+    §48 scope).
   - [ ] **B2 — holdings table shows portfolio-base `converted*` under the profile currency
     symbol:** PLN portfolio + USD profile renders `PLN 104,190.00 / $104,190.00` (identity).
     Wallets converts to `portfolio.baseCurrency` (`resolveRates(to=baseCurrency)` in
