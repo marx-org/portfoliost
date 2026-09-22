@@ -2,7 +2,8 @@
 import { computed, onMounted, ref } from "vue"
 import { useRoute } from "vue-router"
 import { getProjections } from "@/api/instruments"
-import { formatCompact, formatCurrency, formatDate } from "@/utils/format"
+import CurrencyWarningBadge from "@/components/CurrencyWarningBadge.vue"
+import { formatAmount, formatCompact, formatDate } from "@/utils/format"
 
 interface PriceTarget {
   lastUpdated: string
@@ -43,8 +44,16 @@ const data = ref<Projections | null>(null)
 const error = ref<string | null>(null)
 const loading = ref(true)
 
-/** Instrument's native currency from the projections response; fallback USD */
-const instrCcy = computed(() => (data.value as Record<string, unknown> | null)?.currency as string ?? "USD")
+/** §47.5 — native currency from the projections response; no "USD" fallback.
+ * A null currency is surfaced as "unknown" so the view can red-flag it. */
+const instrCcy = computed<string | null>(
+  () => ((data.value as Record<string, unknown> | null)?.currency as string | null | undefined) ?? null,
+)
+const currencySource = computed<import("@/utils/instrumentCurrency").CurrencySource | null>(
+  () =>
+    ((data.value as Record<string, unknown> | null)?.currencySource as import("@/utils/instrumentCurrency").CurrencySource | null | undefined) ??
+    (instrCcy.value ? null : "unknown"),
+)
 
 onMounted(async () => {
   try {
@@ -100,11 +109,14 @@ function targetPosition(pt: PriceTarget): { left: string; right: string } {
           <h2 class="mb-4 text-base font-semibold">Price Target</h2>
           <div class="flex items-end gap-6">
             <div>
-              <p class="text-2xl font-semibold">{{ formatCurrency(data.priceTarget.current, instrCcy) }}</p>
+              <p class="flex items-center gap-2 text-2xl font-semibold">
+                {{ formatAmount(data.priceTarget.current, instrCcy) }}
+                <CurrencyWarningBadge :source="currencySource" :currency="instrCcy" />
+              </p>
               <p class="text-xs text-slate-500 dark:text-slate-400">Current price</p>
             </div>
             <div>
-              <p class="text-lg font-medium">{{ formatCurrency(data.priceTarget.mean, instrCcy) }}</p>
+              <p class="text-lg font-medium">{{ formatAmount(data.priceTarget.mean, instrCcy) }}</p>
               <p class="text-xs text-slate-500 dark:text-slate-400">Mean target</p>
             </div>
           </div>
@@ -115,8 +127,8 @@ function targetPosition(pt: PriceTarget): { left: string; right: string } {
             ></div>
           </div>
           <div class="mt-2 flex justify-between text-xs text-slate-500 dark:text-slate-400">
-            <span>{{ formatCurrency(data.priceTarget.low, instrCcy) }}</span>
-            <span>{{ formatCurrency(data.priceTarget.high, instrCcy) }}</span>
+            <span>{{ formatAmount(data.priceTarget.low, instrCcy) }}</span>
+            <span>{{ formatAmount(data.priceTarget.high, instrCcy) }}</span>
           </div>
           <p class="mt-4 text-xs text-slate-500 dark:text-slate-400">Updated {{ formatDate(data.priceTarget.lastUpdated) }}</p>
         </div>

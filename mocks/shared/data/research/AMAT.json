@@ -11,7 +11,8 @@
     "price": 280,
     "prevClose": 275.39,
     "sharesOutstanding": 4157174810,
-    "marketCap": 1164008946800
+    "marketCap": 1164008946800,
+    "currencySource": "estimated"
   },
   "overview": {
     "name": "Applied Materials Inc",

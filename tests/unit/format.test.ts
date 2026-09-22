@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
+  formatAmount,
   formatCompact,
   formatCurrency,
   formatDate,
@@ -18,6 +19,17 @@ describe("format", () => {
     expect(formatCurrency(null)).toBe("—")
     expect(formatCurrency(undefined)).toBe("—")
     expect(formatCurrency(NaN)).toBe("—")
+  })
+
+  it("formatAmount: no guessed currency — plain number when currency is null (§47.5)", () => {
+    expect(formatAmount(109916.76, null)).toBe("109,916.76")
+    expect(formatAmount(109916.76, undefined)).toBe("109,916.76")
+    expect(formatAmount(1916.6, null)).toBe("1,916.6")
+    expect(formatAmount(1000, "EUR")).toBe("€1,000.00")
+    expect(formatAmount(1000, "pln")).toBe("PLN\u00A01,000.00") // valid code is normalized, not guessed
+    expect(formatAmount(1000, "US")).toBe("1,000") // not a 3-letter code → plain number
+    expect(formatAmount(null, "USD")).toBe("—")
+    expect(formatAmount(NaN, "USD")).toBe("—")
   })
 
   it("formats percents", () => {

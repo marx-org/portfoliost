@@ -164,6 +164,28 @@ async function main() {
   const searchEmpty = await request("/instruments/search?q=ZZZQX", { token })
   check("instruments.search no results", searchEmpty.status === 200 && searchEmpty.json.count === 0, `got ${searchEmpty.status}`)
 
+  // §47.5 — currency + currencySource on the instrument carriers:
+  // SNT.WA = provider PLN, AMAT = estimated USD, AMD = unknown (null).
+  const curPair = (r, path) => `${r.json.currency}/${r.json.currencySource}`
+  const sntProfile = await request("/instruments/SNT.WA/profile", { token })
+  check("instruments.currency SNT.WA profile provider/PLN", sntProfile.status === 200 && sntProfile.json.currency === "PLN" && sntProfile.json.currencySource === "provider", curPair(sntProfile, "profile"))
+  const sntQuote = await request("/instruments/SNT.WA/quote", { token })
+  check("instruments.currency SNT.WA quote provider/PLN", sntQuote.status === 200 && sntQuote.json.currency === "PLN" && sntQuote.json.currencySource === "provider", curPair(sntQuote, "quote"))
+  const sntHist = await request("/instruments/SNT.WA/history?resolution=daily", { token })
+  check("instruments.currency SNT.WA history provider/PLN", sntHist.status === 200 && sntHist.json.currency === "PLN" && sntHist.json.currencySource === "provider", curPair(sntHist, "history"))
+  const amatProfile = await request("/instruments/AMAT/profile", { token })
+  check("instruments.currency AMAT profile estimated/USD", amatProfile.status === 200 && amatProfile.json.currency === "USD" && amatProfile.json.currencySource === "estimated", curPair(amatProfile, "profile"))
+  const amatQuote = await request("/instruments/AMAT/quote", { token })
+  check("instruments.currency AMAT quote estimated/USD", amatQuote.status === 200 && amatQuote.json.currency === "USD" && amatQuote.json.currencySource === "estimated", curPair(amatQuote, "quote"))
+  const amdProfile = await request("/instruments/AMD/profile", { token })
+  check("instruments.currency AMD profile unknown/null", amdProfile.status === 200 && amdProfile.json.currency === null && amdProfile.json.currencySource === "unknown", curPair(amdProfile, "profile"))
+  const amdQuote = await request("/instruments/AMD/quote", { token })
+  check("instruments.currency AMD quote unknown/null", amdQuote.status === 200 && amdQuote.json.currency === null && amdQuote.json.currencySource === "unknown", curPair(amdQuote, "quote"))
+  const amdHist = await request("/instruments/AMD/history?resolution=daily", { token })
+  check("instruments.currency AMD history unknown/null", amdHist.status === 200 && amdHist.json.currency === null && amdHist.json.currencySource === "unknown", curPair(amdHist, "history"))
+  const amdBars = await request("/instruments/AMD/price-bars", { token })
+  check("instruments.currency AMD price-bars unknown/null", amdBars.status === 200 && amdBars.json.currency === null, curPair(amdBars, "price-bars"))
+
   // premium endpoints served in full
   for (const p of ["/instruments/MSFT/fundamentals", "/instruments/MSFT/ownership", "/instruments/MSFT/dividends", "/instruments/MSFT/calendar", "/instruments/MSFT/seasonality", "/instruments/MSFT/eps-surprises", "/instruments/MSFT/projections", "/instruments/MSFT/price?date=2026-08-11"]) {
     const r = await request(p, { token })

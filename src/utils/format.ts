@@ -4,6 +4,15 @@ export function formatCurrency(value: number | null | undefined, currency = "USD
   return new Intl.NumberFormat("en-US", { style: "currency", currency: ccy, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
 }
 
+/** §47.5 — amount without a guessed currency: plain number when the currency
+ * is null/unknown (never a silent "USD" label). */
+export function formatAmount(value: number | null | undefined, currency: string | null | undefined): string {
+  if (value === null || value === undefined || Number.isNaN(value)) return "—"
+  const ccy = currency && /^[A-Za-z]{3}$/.test(currency) ? currency.toUpperCase() : null
+  if (!ccy) return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value)
+  return formatCurrency(value, ccy)
+}
+
 export function formatNumber(value: number | null | undefined, digits = 2): string {
   if (value === null || value === undefined || Number.isNaN(value)) return "—"
   return new Intl.NumberFormat("en-US", { maximumFractionDigits: digits }).format(value)

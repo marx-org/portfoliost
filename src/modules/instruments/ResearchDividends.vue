@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from "vue"
 import { useRoute } from "vue-router"
 import { getInstrumentDividends } from "@/api/instruments"
 import type { components } from "@/api/types"
-import { formatCurrency } from "@/utils/format"
+import { formatAmount } from "@/utils/format"
 
 const route = useRoute()
 const symbol = String(route.params.symbol).toUpperCase()
@@ -24,8 +24,8 @@ onMounted(async () => {
 
 const history = computed(() => data.value?.history ?? [])
 
-/** Instrument's native currency — from first dividend row; fallback USD */
-const instrCcy = computed(() => history.value[0]?.currency ?? "USD")
+/** §47.5 — native currency from the first dividend row; no "USD" fallback. */
+const instrCcy = computed<string | null>(() => history.value[0]?.currency ?? null)
 
 const stats = computed(() => {
   const rows = history.value
@@ -48,7 +48,7 @@ const chartOptions = computed(() => ({
   dataLabels: {
     enabled: false,
   },
-  yaxis: { labels: { formatter: (v: number) => formatCurrency(v, instrCcy.value) } },
+  yaxis: { labels: { formatter: (v: number) => formatAmount(v, instrCcy.value) } },
   grid: { borderColor: "#e2e8f0" },
 }))
 
@@ -71,11 +71,11 @@ function dateLabel(d: string): string {
         </div>
         <div class="card p-6">
           <p class="text-sm text-slate-500 dark:text-slate-400">Cumulative ({{ history[0]?.year }}–{{ stats.latestYear }})</p>
-          <p class="text-2xl font-semibold">{{ formatCurrency(stats.total, instrCcy) }}</p>
+          <p class="text-2xl font-semibold">{{ formatAmount(stats.total, instrCcy) }}</p>
         </div>
         <div class="card p-6">
           <p class="text-sm text-slate-500 dark:text-slate-400">Latest ({{ stats.latestYear }})</p>
-          <p class="text-2xl font-semibold">{{ formatCurrency(stats.latest, instrCcy) }}</p>
+          <p class="text-2xl font-semibold">{{ formatAmount(stats.latest, instrCcy) }}</p>
         </div>
       </div>
 
@@ -102,7 +102,7 @@ function dateLabel(d: string): string {
               <tr v-for="r in history" :key="r.date" class="border-b border-slate-100 dark:border-slate-800">
                 <td class="py-2 pr-3 font-medium">{{ dateLabel(r.date) }}</td>
                 <td class="py-2 pr-3 text-right">{{ r.year }}</td>
-                <td class="py-2 pr-3 text-right font-semibold text-green-700 dark:text-green-400">{{ formatCurrency(r.amount, r.currency) }}</td>
+                <td class="py-2 pr-3 text-right font-semibold text-green-700 dark:text-green-400">{{ formatAmount(r.amount, r.currency) }}</td>
                 <td class="py-2 pr-3">{{ r.currency }}</td>
                 <td class="py-2 pr-3 capitalize">{{ r.type }}</td>
               </tr>

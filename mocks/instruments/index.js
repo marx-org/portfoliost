@@ -15,10 +15,24 @@ function getSymbol(ctx) {
   return normalize(ctx.params.symbol)
 }
 
+/** §47.5 — the research fixture's currency + sourcing signal. A fixture may
+ * declare `basics.currencySource` ("provider" | "estimated") explicitly;
+ * otherwise a declared currency means "provider" and a missing one "unknown".
+ * Non-research symbols fall back to the raw USD fixture (declared). */
+function currencyInfo(research) {
+  if (!research) return { currency: "USD", currencySource: "provider" }
+  const basics = research.basics || {}
+  const overview = research.overview || {}
+  const currency = basics.currency ?? overview.currency ?? null
+  const currencySource = basics.currencySource ?? (currency ? "provider" : "unknown")
+  return { currency, currencySource }
+}
+
 function quoteFrom(symbol, research) {
   const noPriceQuote = noPriceQuoteFor(symbol)
-  if (noPriceQuote) return { ...noPriceQuote, symbol }
+  if (noPriceQuote) return { ...noPriceQuote, symbol, currencySource: noPriceQuote.currency ? "provider" : "unknown" }
   const q = loadRaw("quote_aapl.json")
+  const ci = currencyInfo(research)
   const price = research ? research.basics.price : q.currentPrice
   const prevClose = research ? research.basics.prevClose : q.previousClose
   return {
@@ -31,6 +45,8 @@ function quoteFrom(symbol, research) {
     previousClose: prevClose,
     change: round2(price - prevClose),
     percentChange: round2(((price - prevClose) / prevClose) * 100),
+    currency: ci.currency,
+    currencySource: ci.currencySource,
     regularMarketPrice: price,
   }
 }
@@ -38,19 +54,22 @@ function quoteFrom(symbol, research) {
 function detailFor(symbol, research) {
   const d = loadRaw("instruments_detail.json")
   const name = research ? research.overview.name : d.name
+  const ci = currencyInfo(research)
   return {
     id: `${symbol}.US`,
     symbol,
     name,
     exchange: research ? research.overview.exchange : d.exchange,
     type: research ? research.overview.type : d.type,
-    currency: research ? research.overview.currency : d.currency,
+    currency: ci.currency,
+    currencySource: ci.currencySource,
   }
 }
 
 function profileFor(symbol, research) {
   const p = loadRaw("instruments_profile.json")
-  if (!research) return p
+  const ci = currencyInfo(research)
+  if (!research) return { ...p, currencySource: ci.currencySource }
   return {
     ...p,
     ticker: symbol,
@@ -62,6 +81,8 @@ function profileFor(symbol, research) {
     marketcapUSD: research.basics.marketCap,
     shareOutstanding: research.basics.sharesOutstanding,
     description: (research.description ?? []).join("\n\n"),
+    currency: ci.currency,
+    currencySource: ci.currencySource,
   }
 }
 
@@ -88,11 +109,10 @@ function overviewMetricsFor(symbol, research) {
 
 function historyFor(symbol, resolution, compare) {
   const base = resolution === "monthly" ? loadRaw("history_monthly.json") : loadRaw("history_daily.json")
-  const research = loadResearch(symbol)
-  // §36 — the series is denominated in the instrument's currency (research
-  // fixture carries it; the shared raw fixture is a USD stand-in otherwise).
-  const currency = research?.basics?.currency || research?.overview?.currency || base.currency || "USD"
-  const h = { ...base, symbol, currency }
+  const ci = currencyInfo(loadResearch(symbol))
+  // §36 — the series is denominated in the instrument's currency; §47.5 — the
+  // sourcing signal rides along (null currency = unknown, never a USD guess).
+  const h = { ...base, symbol, currency: ci.currency, currencySource: ci.currencySource }
   if (!compare) return h
   const prices = base.closePrices
   if (!prices) return h
@@ -166,10 +186,9 @@ export function register(app) {
     if (!requireAuth(ctx)) return
     const symbol = getSymbol(ctx)
     const base = loadRaw("history_daily.json")
-    const research = loadResearch(symbol)
-    const currency = research?.basics?.currency || research?.overview?.currency || base.currency || "USD"
+    const ci = currencyInfo(loadResearch(symbol))
     const dates = (base.timestamps || []).map((t) => new Date(t * 1000).toISOString().slice(0, 10))
-    ctx.res.json({ symbol, timeframe: "daily", stale: false, currency, dates, closes: base.closePrices || [] })
+    ctx.res.json({ symbol, timeframe: "daily", stale: false, currency: ci.currency, dates, closes: base.closePrices || [] })
   })
 
   app.get("/api/instruments/:symbol/fundamentals", (ctx) => {
@@ -270,12 +289,14 @@ export function register(app) {
       })
     }
     const research = loadResearch(symbol)
+    const ci = currencyInfo(research)
     const price = research ? research.basics.price : loadRaw("quote_aapl.json").currentPrice
     ctx.res.json({
       symbol,
       date: ctx.query.date || new Date().toISOString().slice(0, 10),
       price,
-      currency: research ? research.basics.currency : "USD",
+      currency: ci.currency,
+      currencySource: ci.currencySource,
     })
   })
 

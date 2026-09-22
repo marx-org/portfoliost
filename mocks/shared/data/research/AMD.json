@@ -7,11 +7,12 @@
     "industry": "Semiconductors",
     "country": "US",
     "exchange": "US",
-    "currency": "USD",
+    "currency": null,
     "price": 190,
     "prevClose": 194,
     "sharesOutstanding": 9473411017,
-    "marketCap": 1799948093230
+    "marketCap": 1799948093230,
+    "currencySource": "unknown"
   },
   "overview": {
     "name": "Advanced Micro Devices Inc",
@@ -20,7 +21,7 @@
     "country": "US",
     "exchange": "US",
     "type": "STOCK",
-    "currency": "USD",
+    "currency": null,
     "symbol": "AMD",
     "price": 190,
     "prevClose": 194,

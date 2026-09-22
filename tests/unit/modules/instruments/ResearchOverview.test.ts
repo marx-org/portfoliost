@@ -224,4 +224,42 @@ describe("ResearchOverview", () => {
     expect(wrapper.find(".bg-red-50").exists()).toBe(true)
     expect(wrapper.find(".bg-red-50").text()).toContain("NotFound")
   })
+
+  it("§47.5: no currency badge when the profile declares one (provider)", async () => {
+    const wrapper = mountOverview()
+    await flushPromises()
+
+    expect(wrapper.find("[data-testid='currency-warning']").exists()).toBe(false)
+    expect(wrapper.text()).toContain("$307.56")
+  })
+
+  it("§47.5: red Currency unknown badge + plain price when nothing declares a currency", async () => {
+    mocked.getInstrumentProfile.mockResolvedValue({ ...makeProfile(), currency: null } as unknown as InstrumentsProfile)
+    mocked.getQuote.mockResolvedValue({ ...makeQuote(), currency: null } as unknown as QuoteAapl)
+    const wrapper = mountOverview()
+    await flushPromises()
+
+    const badge = wrapper.find("[data-testid='currency-warning']")
+    expect(badge.exists()).toBe(true)
+    expect(badge.text()).toBe("Currency unknown")
+    // price renders without a currency code — no "$" anywhere on the page
+    expect(wrapper.text()).toContain("307.56")
+    expect(wrapper.text()).not.toContain("$")
+  })
+
+  it("§47.5: amber 'PLN (estimated)' hint when the backend resolved the currency locally", async () => {
+    mocked.getInstrumentProfile.mockResolvedValue({
+      ...makeProfile(),
+      currency: "PLN",
+      currencySource: "estimated",
+    } as unknown as InstrumentsProfile)
+    mocked.getQuote.mockResolvedValue({ ...makeQuote(), currency: "PLN", currencySource: "estimated" } as unknown as QuoteAapl)
+    const wrapper = mountOverview()
+    await flushPromises()
+
+    const badge = wrapper.find("[data-testid='currency-warning']")
+    expect(badge.exists()).toBe(true)
+    expect(badge.text()).toBe("PLN (estimated)")
+    expect(wrapper.text()).toContain("PLN\u00A0307.56")
+  })
 })
