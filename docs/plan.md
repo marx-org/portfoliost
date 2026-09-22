@@ -343,11 +343,39 @@ fixture value, and the suite starts from a fresh seed (48.4c).
   agent side): `kubectl -n pfire exec deploy/portfoliost-instruments -- node
   dist/scripts/fx-backfill.js 1999-01-04`; verify `select count(*), min(rate_date), max(rate_date)
   from instruments.fx_rates` ≈ 208k rows / floor 1999-01-04.
-- [ ] **48.6c** Verify in prod: (a) `instruments.fx_rates` holds the deep series; (b)
-  `wallets.fx_rates` is gone (0004 applied) and settlement still settles correctly; (c)
-  `/api/currencies` served by instruments lists the full registry; (d) a PLN chart in USD shows
-  converted closes with the selector; (e) portfolio history values unchanged.
+- [x] **48.6c** Verify in prod: (a) `instruments.fx_rates` holds the deep series (208,947 rows,
+  1999-01-04→2026-09-22, 30 ccy); (b) `wallets.fx_rates` gone (to_regclass null) + values
+  consistent (cost basis, wallet balances convert at 0.26363845/1.1463); (c) `/api/currencies`
+  full registry (31) from instruments; (d) PKO.WA PriceChart selector PLN 60–130 axis → USD
+  15–35 via `?currency=USD` server-side (200); (e) native history intact (366d 100,000→119,190
+  PLN, backfill complete). Display-currency rendering bugs found → **48.6e**.
 - [ ] **48.6d** Update `openst-coverage.md` / price-data docs; archive §48 to `plan-archive.md`.
+- [ ] **48.6e** Prod verification findings (2026-09-22, post-48.6a/b) — points to fix:
+  - [ ] **B1 — /en/charting crashes (unimplemented stub):** ChartingView throws
+    `TypeError: Cannot read properties of undefined (reading 'toLowerCase')` on load; `main`
+    empty. Nav link exists although the section is not built — implement or hide the entry.
+  - [ ] **B2 — holdings table shows portfolio-base `converted*` under the profile currency
+    symbol:** PLN portfolio + USD profile renders `PLN 104,190.00 / $104,190.00` (identity).
+    Wallets converts to `portfolio.baseCurrency` (`resolveRates(to=baseCurrency)` in
+    portfolio-transactions.ts; position carries `displayCurrency: "PLN"`); the SPA renders
+    those fields with the profile display-currency symbol, ignoring `displayCurrency`. Example service
+    contract (example-service-real-api.yaml positions) = display currency. Decide the owner: wallets
+    converts to the requested display currency (parity) or the SPA converts client-side via
+    `/api/fx/latest`.
+  - [ ] **B3 — portfolio performance chart renders native values under the display-currency
+    axis:** Obligacje (119,190 PLN) shows a "$120K/$100K" axis on "Performance Chart: USD".
+    Analytics `timeSeries` is correct in portfolio currency — convert the series to the display
+    currency (same decision as B2).
+  - [ ] **B4 — investments "Cash balance" sums native wallet balances:** UI shows
+    -$1,074,977.97 = Σ native balances (PLN+USD+EUR added raw, $ symbol);
+    `/api/wallets/total-balance` correctly returns **-569,668.76 USD** (per-wallet
+    `exchangeRate` 0.26363845/1.1463). Example service parity: "Całkowite saldo … € · N walut" =
+    converted total. SPA should render the converted `totalBalance`.
+  - [ ] **B5 — /api/portfolios/total-metrics doesn't convert per-portfolio values:**
+    `totalValue` 526,478.49 "USD" aggregates the Obligacje portfolio's 119,190 **PLN** as USD
+    (≈31,421 correct) — drives the investments header total, "Portfolio Value" chart and
+    return %. Fix in wallets: convert each portfolio value to `baseCurrency` (rate via
+    instruments fx) before aggregating.
 
 ### 48.7 — Rewrite related proposals to the new architecture
 
