@@ -132,15 +132,25 @@ instruments: vitest + stack; SPA: build + unit + e2e per `AGENTS.md`).
 
 ### 47.6 — SPA: chart currency in title + stable chart height
 
-- [ ] `PriceChart.vue`: title becomes `Price Chart (PLN)` (currency from the same resolved source as
+- [x] `PriceChart.vue`: title becomes `Price Chart (PLN)` (currency from the same resolved source as
   47.5 — prop, not a second fetch); currency also in the fullscreen title. Initialize
   `chartCurrency` to `""` (never `"USD"`); while empty, y-axis shows plain numbers.
-- [ ] Fixed chart region: the `<div>` around the apexchart gets a fixed height wrapper (e.g.
+- [x] Fixed chart region: the `<div>` around the apexchart gets a fixed height wrapper (e.g.
   `h-[400px]`) so the card does not reflow when the cross-currency note / loading notice / summary
   appear; verify legend + notice no longer shift the plot.
-- [ ] Tests: e2e — screenshot/a11y diff before/after toggling transactions + comparison (chart plot
+- [x] Tests: e2e — screenshot/a11y diff before/after toggling transactions + comparison (chart plot
   box unchanged); build + unit green.
-- [ ] Commit (portfoliost).
+- [x] Commit (portfoliost).
+
+> Done (049aec9). Title `Price Chart (CCY)` from the `currency` prop (ResearchOverview passes the
+> §47.5 resolved `instrCcy`; holdings tab omits it → no suffix); fullscreen title appends
+> `· CCY`. `chartCurrency` initializes `""` — y-axis/tooltip/Total Chg render plain numbers via
+> `formatAmount` while unresolved (price-bars leg only sets it when the backend declares one).
+> `h-[380px]` wrapper (matches the chart's `height: 380` option) keeps the plot box stable across
+> the cross-currency note / notices. compareMetrics price `chartFmt` → plain number (mixed-currency
+> compare axis; per-row currency stays in the table). e2e `chart-title-stability.spec.ts`: title
+> `Price Chart (PLN)` + plot-box (`g.apexcharts-grid`) width×height stable across transactions +
+> comparison toggles; `chart-currency.spec.ts` card lookup now matches the suffixed title.
 
 ### 47.7 — SPA: mode toggle must reflect the effective % normalization
 
