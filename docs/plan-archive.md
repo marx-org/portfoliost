@@ -5808,6 +5808,14 @@ Decisions (2026-09-21, user): A → do the nullable-contract follow-up (45.2); B
 (45.5) + graceful UI (45.6), because "make the UI wait patiently" alone is impossible (nginx 60 s
 cap in front of the SPA) and the slow path recurs every 6 h cachest TTL expiry, not once.
 
+**Resolution pointer (2026-09-22):** Problem A (the fund price silently labeled USD) is fully
+closed by **§47** (archived below): openst now carries the page's `priceCurrency` on every
+biznesradar quote/profile with a known-universe `.TFI`/`.FIZ`→PLN default (47.1/47.2), the
+contracts make the currency nullable + carry a `currencySource` (47.3), `portfoliost-instruments`
+compares provider vs local resolution and never guesses USD (47.4), and the SPA red-flags
+unknown/estimated currency instead of rendering a fake label (47.5–47.7). Verified in prod:
+NNEP65.TFI + INGAKC.TFI both serve `currency: PLN` through cachest.
+
 
 
 ---
@@ -5946,3 +5954,198 @@ Open items (from the 2026-09-21 design review):
    map). Revisit only if per-date historical FX is needed, which would require server-side
    conversion.
 
+## 47. Quote-currency correctness: no silent USD fallback, provider consistency, currency UI signals (2026-09-26)
+
+Follow-up to §45 (archived): the research page labels the same TFI fund price as USD (NNEP65.TFI) or
+PLN (INGAKC.TFI) depending on whether openst's scrape of the biznesradar page found the
+`priceCurrency` meta tag, because every layer — openst, instruments routes (`q.currency ?? "USD"`),
+SPA (`profile.currency ?? quote.currency ?? "USD"`) — silently falls back to USD when the provider
+omits the currency.
+
+Scope: openst emits a consistent `currency` for its known universe (.TFI/.FIZ → PLN) when the page
+meta is absent; the instruments module becomes the single resolver (provider meta vs local
+`resolveInstrumentCurrency`), **never guessing USD**, and signals divergence to the SPA; the SPA
+drops every `"USD"` fallback, shows the currency in chart titles, red-flags unknown/estimated
+currencies, keeps chart height stable, and makes the mode toggle reflect the forced percent
+normalization when currencies differ.
+
+Touched repos: openst, portfoliost-contracts, portfoliost-instruments, portfoliost (SPA). Rules: one
+step = one commit; a step is `[x]` only after its tests pass (openst: pytest + compose smoke;
+instruments: vitest + stack; SPA: build + unit + e2e per `AGENTS.md`).
+
+---
+
+### 47.1 — Fixture capture: NNEP65.TFI quote currency truth
+
+- [x] `curl` `https://biznesradar.pl/notowania/NNEP65.TFI` and `INGAKC.TFI` (and one `.WA` control,
+  e.g. `BST0327.WA`); save raw HTML to `openst/tests/fixtures/biznesradar/NNEP65.TFI_notowania.html`
+  (fixture dir lives at the openst repo root, next to the existing `INGAKC.TFI_notowania.html` /
+  `BST0327.html` captured in §45 — the `.WA` control is fetched WITHOUT the suffix, biznesradar
+  404s on `.WA`).
+- [x] Settle the cache question (**RESOLVED 2026-09-22 — stale openst Redis, not cachest**): the live
+  page carries the `priceCurrency` meta (captured fixture `content="PLN"`), and a fresh scrape
+  carries `currency: "PLN"`. Prod served a stale openst-level value: `equity_quote:NNEP65.TFI` in
+  openst's Redis (db 2) was cached ~11 h earlier without currency (TTL 86400 s). Purging that key
+  (Redis `DEL`, since the openst pod has no per-ticker purge route) and re-curling
+  `/equity/quote/NNEP65.TFI` immediately returned `"currency": "PLN"`. ⇒ 47.2 is **hardening**
+  (provider meta stays the source of truth; the cache is the bug, not the scraper).
+- [x] Tests: fixtures exist and are byte-stable (`test_nnep65_fixture_carries_currency` pins the
+  PLN truth — re-capture without the meta fails). Full openst suite green via
+  `docker compose --profile test run --rm test` (279 + 87 + 53 passed).
+- [x] Commit (openst `b5f71c5`).
+- [ ] ~(cachest)~ — no cachest change needed (its `/stats/invalidate-ticker/equity/quote:NNEP65.TFI`
+  route works, but the stale layer was openst's own Redis).
+
+### 47.2 — openst: consistent currency for the known universe
+
+- [x] In `plugins/openbb_biznesradar/openbb_biznesradar/scraper.py`, add
+  `default_currency_for_symbol(symbol) -> str | None` — `.TFI`/`.FIZ` suffix → `"PLN"` (Catalyst/TFI
+  universe is PLN by construction, same assumption as instruments' `resolveInstrumentCurrency`),
+  otherwise `None`.
+- [x] `scrape_quote` and `probe_notowania_full`/profile path: when `_currency_from_soup` returns
+  `None`, use `default_currency_for_symbol(symbol)`; omit the key only when both are `None`
+  (backwards-compatible row shape).
+- [x] Tests: new pytest cases in the plugin test suite using the 47.1 fixtures — (a) meta present →
+  meta wins, (b) meta absent + `.TFI` → `PLN` (+ `.FIZ`), (c) meta absent + non-Polish symbol → key
+  omitted. Full openst suite green (279 + 91 + 53).
+- [x] Compose smoke: `docker compose up -d redis openst`, `curl /equity/quote/NNEP65.TFI` and
+  `/equity/quote/INGAKC.TFI` → both carry `"currency": "PLN"`; second call is a cache HIT (verified
+  via Redis TTL not reset). Host 8080 was taken by the portfoliost compose stack, so the app ran as
+  a one-off container on `:8091` against the same compose network.
+- [x] Commit (openst `fc33bcf`).
+
+### 47.3 — Contracts: `currencySource` on quote/history/profile
+
+- [x] `portfoliost-contracts/contracts/openapi.yaml`: add `currencySource` (enum
+  `"provider" | "estimated" | "unknown"`) to `Quote`, `PriceHistory`, and `InstrumentProfile`/detail
+  schemas; document semantics (provider = upstream declared it; estimated = local suffix/exchange
+  resolution; unknown = nothing known — `currency` may be null). Also made `PriceHistory.currency`
+  nullable (was non-null) to match Quote/Profile.
+- [x] Push to `main` → CI bumps patch + publishes; verify tag with
+  `gh release list --repo Marx2/portfoliost-contracts` — released **v1.6.30** (2026-09-22).
+- [x] Consumers: `NODE_AUTH_TOKEN=$(gh auth token) npm install @marx2/contracts@1.6.30` in
+  portfoliost-instruments and portfoliost, `npm run gen:types` in both, commit lock +
+  generated types.
+- [x] Tests: contracts package suite green (16) + yaml lint; instruments vitest green (297) + tsc;
+  SPA build (vue-tsc) + unit green (308).
+- [x] Commit (contracts `197eaa0` → v1.6.30; instruments `860ed1e`; portfoliost `8a01ee1`).
+
+### 47.4 — instruments: single currency resolver, no USD guessing
+
+- [x] `src/routes/instruments.ts`: replace the blind fallbacks — `/quote`,
+  `/profile`, `/:symbol` detail, `/history`, `/price` all thread a `resolveCurrency(db,
+  routeSymbol, providerCurrency)` resolution into `toQuote`/`toInstrumentProfile`/
+  `toInstrumentDetail`/`toPriceHistory` and emit `currency` + `currencySource`
+  (match → `provider`; provider missing/mismatch → local `estimated`; both absent →
+  `unknown` + `currency: null`).
+- [x] Keep `resolveInstrumentCurrency` as the only local resolver (no new heuristics); its
+  `"USD"` catches (unmapped country, no row, no db, error) now degrade to `null`.
+- [x] Tests: vitest cases for all three `currencySource` outcomes at the resolver
+  (`resolveCurrency`: match / mismatch / provider-only / pence-GBp / local-only / both-silent)
+  and the adapter layer (quote/profile/detail/history); 307/307 green, tsc clean.
+  **Dividends deferred**: the route keeps the §36 USD-on-uncertainty fallback for rows
+  without a row-level currency (contract `DividendsData` currency is non-null); thread the
+  nullable resolution in a later step.
+- [x] Commit (portfoliost-instruments `630ec57`).
+
+### 47.5 — SPA: kill the USD fallback, red-flag unknown/estimated currency
+
+- [x] `ResearchOverview.vue`: `instrCcy` becomes `profile.currency ?? quote.currency` — **no**
+  `"USD"`; when null, render prices without a currency code (plain number) + a red
+  `Currency unknown` badge next to the price; when `currencySource === "estimated"`, render an
+  amber/red `PLN (estimated)` hint.
+- [x] Audit and remove every other hardcoded `"USD"` currency fallback in `src/` (`rg '\?\? "USD"'`
+  and `rg 'currency.*"USD"'` in the research + chart paths) — same treatment: null → no label +
+  warning badge.
+- [x] Tests: unit test for the `instrCcy` chain; e2e (docker compose mock — extend the mock
+  instruments endpoints to cover provider/estimated/unknown) asserting the badge appears and no fake
+  USD label renders.
+- [x] Commit (portfoliost).
+
+> Done (39298c0, + d6c4ecc chart fix). `formatAmount(value, currency)` renders a plain number when
+> the currency is null/unknown; `resolveInstrumentCurrency(profile, quote)` carries the
+> `currencySource` signal and upgrades "estimated" to "provider" when a carrier provider-declares
+> the same currency. `CurrencyWarningBadge` (data-testid=currency-warning) sits next to the header
+> price. Mock instruments endpoints now emit currency/currencySource from the research fixtures
+> (SNT.WA provider/PLN, AMAT estimated/USD, AMD unknown/null) with contract checks in
+> mocks/tests/run.mjs (211 green). e2e `research-currency.spec.ts` covers provider (real stack,
+> no badge), estimated + unknown (page.route-injected carriers) with no fake USD label.
+> Pre-existing chart-currency e2e flap fixed in d6c4ecc: the price-bars→history data swap needed a
+> final remount (dataVersion in the remount key) or the y-axis formatter was dropped by
+> vue3-apexcharts' updateOptions deep-clone. The `PriceChart` `chartCurrency` "USD" defaults
+> (init + history fallback) are deliberately left for §47.6 (`chartCurrency=""` init); the
+> benchmark `bench?.currency || "USD"` is a defensive default for a field the backend always
+> declares (compare series are USD ETF proxies).
+
+### 47.6 — SPA: chart currency in title + stable chart height
+
+- [x] `PriceChart.vue`: title becomes `Price Chart (PLN)` (currency from the same resolved source as
+  47.5 — prop, not a second fetch); currency also in the fullscreen title. Initialize
+  `chartCurrency` to `""` (never `"USD"`); while empty, y-axis shows plain numbers.
+- [x] Fixed chart region: the `<div>` around the apexchart gets a fixed height wrapper (e.g.
+  `h-[400px]`) so the card does not reflow when the cross-currency note / loading notice / summary
+  appear; verify legend + notice no longer shift the plot.
+- [x] Tests: e2e — screenshot/a11y diff before/after toggling transactions + comparison (chart plot
+  box unchanged); build + unit green.
+- [x] Commit (portfoliost).
+
+> Done (049aec9). Title `Price Chart (CCY)` from the `currency` prop (ResearchOverview passes the
+> §47.5 resolved `instrCcy`; holdings tab omits it → no suffix); fullscreen title appends
+> `· CCY`. `chartCurrency` initializes `""` — y-axis/tooltip/Total Chg render plain numbers via
+> `formatAmount` while unresolved (price-bars leg only sets it when the backend declares one).
+> `h-[380px]` wrapper (matches the chart's `height: 380` option) keeps the plot box stable across
+> the cross-currency note / notices. compareMetrics price `chartFmt` → plain number (mixed-currency
+> compare axis; per-row currency stays in the table). e2e `chart-title-stability.spec.ts`: title
+> `Price Chart (PLN)` + plot-box (`g.apexcharts-grid`) width×height stable across transactions +
+> comparison toggles; `chart-currency.spec.ts` card lookup now matches the suffixed title.
+
+### 47.7 — SPA: mode toggle must reflect the effective % normalization
+
+- [x] The caption "Percent — currencies differ (EUR vs USD)" is correct and stays — it explains why
+  the user was switched to percent view. The only defect: the mode toggle still highlights "Price"
+  while the plot is percent-normalized, so the highlight and the caption contradict.
+- [x] When `axisUnit === "pct"` is forced by a currency mismatch, mark the effective mode on the
+  toggle itself — e.g. the active "Price" button renders `Price → %` (or a badge) — without changing
+  the user's `mode` selection (it must survive removing the benchmark, so switching back to Price
+  mode works).
+- [x] Tests: unit test for the forced-state predicate; e2e asserting both the "Price" highlight and
+  the forced-% indicator are visible together.
+- [x] Commit (portfoliost).
+
+> Done (bda9df6). Extracted the forced-state predicate into a `forcedPct` computed (shared by
+> `axisUnit`, `series`, and the toggle) — it is the unit-tested `needsPercentComparison`
+> (compareSeries.test.ts, incl. the empty-currency cases from §47.6). The active Price button
+> renders `Price → %` (data-testid=mode-price-forced-pct) while forced; `mode` is untouched so
+> removing the benchmark restores plain Price. e2e (chart-currency.spec.ts) asserts the highlighted
+> "Price → %" button and the cross-currency caption are visible together.
+
+### 47.8 — Closeout
+
+- [x] Deploy: push openst + portfoliost-instruments `main` (GHA `v*` bump), pin new tags in
+  `~/prv/homelab/.../pfire/<name>/app/helmrelease.yaml`, verify with kubectl + a live curl through
+  cachest.
+- [x] Verify in prod: NNEP65.TFI and INGAKC.TFI both show PLN (provider source) on the research
+  page; chart titles carry the currency.
+- [x] Update §45 archive entry with the resolution pointer; archive §47 to `plan-archive.md`; update
+  `openst-coverage.md` if it tracks quote currency.
+
+> Done (2026-09-22). Deployed: **openst v1.1.31** (2/2), **portfoliost-instruments v1.0.61**,
+> **portfoliost SPA v1.0.184** (homelab pin commit `95c3f774e`). Purged the stale openst Redis
+> `equity_quote:*` keys (db 2 — incl. the two §47.1 root-cause .TFI quotes) and cachest's equity
+> cache (61 keys) after the roll. Prod verify through cachest: `NNEP65.TFI` → `last_price 19.69,
+> currency PLN`, `INGAKC.TFI` → `last_price 808.48, currency PLN` (fresh scrapes, provider
+> source). Research-page UI render (PLN labels + `Price Chart (PLN)` titles) is covered by the
+> docker e2e suite; the in-prod instruments resolver path (`provider` match → `currencySource`
+> "provider") is unit-tested.
+
+---
+
+**§47 design decisions (resolved at planning):**
+- **Currency selector / FX-converted chart** → deferred to §48 (which supersedes the original
+  wallets-convert sketch: FX market rates moved to instruments, price endpoints convert
+  server-side, SPA chart label becomes a selector).
+- **Severity:** red = unknown (plain number, no currency code), amber = estimated (code shown +
+  hint).
+- **Cachest:** no new route needed (currency flows through the existing equity quote/profile
+  passthrough); 47.2's smoke curls openst directly, 47.8 verifies through cachest in prod. Flag if
+  cachest strips unknown fields (quick check of its fetcher passthrough at implementation time).
