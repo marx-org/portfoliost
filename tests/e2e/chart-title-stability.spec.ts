@@ -70,3 +70,32 @@ test("plot box is stable across transactions + comparison toggles (SNT.WA)", asy
   await page.waitForTimeout(1000)
   expectSameBox(base, await plotBox(page), "after comparison")
 })
+
+/**
+ * §48.6e B6 — the Price Chart's SVG must fill its fixed 380px wrapper
+ * exactly (options.chart.height honored), never the apexcharts "auto"
+ * golden-ratio fallback that overflows the card.
+ */
+test("price chart svg height matches the fixed 380px wrapper (AAPL)", async ({ page }) => {
+  await login(page)
+  await page.goto("/en/research/AAPL/overview")
+
+  await expect(page.getByRole("heading", { name: /Price Chart/ })).toBeVisible({ timeout: 20000 })
+  const card = page.getByRole("heading", { name: /Price Chart/ }).locator("xpath=ancestor::div[contains(@class,'card')][1]")
+  await expect(card.locator(".apexcharts-svg")).toBeVisible({ timeout: 20000 })
+
+  const heights = await card.evaluate((el) => {
+    const svg = el.querySelector("svg.apexcharts-svg") as SVGElement
+    const wrapper = svg.closest(".h-\\[380px\\]") as HTMLElement
+    return { svg: Number(svg.getAttribute("height")), wrapper: wrapper?.getBoundingClientRect().height ?? -1, card: el.getBoundingClientRect().height, cardScroll: el.scrollHeight }
+  })
+  expect(heights.wrapper).toBeCloseTo(380, 0)
+  expect(heights.svg).toBeCloseTo(380, 0)
+  // No overflow: the card (padded 380px wrapper + headers) is not taller than
+  // its scroll content would need, and the svg bottom stays inside the card.
+  const svgBottomInsideCard = await card.evaluate((el) => {
+    const svg = el.querySelector("svg.apexcharts-svg") as SVGElement
+    return svg.getBoundingClientRect().bottom <= el.getBoundingClientRect().bottom + 1
+  })
+  expect(svgBottomInsideCard).toBe(true)
+})
