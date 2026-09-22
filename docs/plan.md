@@ -61,24 +61,31 @@ The `/api/currencies` registry moves to instruments with the table (its availabi
 
 ### 48.1 — Move `fx_rates` + importer into instruments
 
-- [ ] `portfoliost-instruments/src/db/schema.ts`: add `fxRates` + `fxSyncState` tables in the
+- [x] `portfoliost-instruments/src/db/schema.ts`: add `fxRates` + `fxSyncState` tables in the
   `instruments` schema (identical shape to wallets': `rate_date date`, `currency char(3)`,
   `rate numeric(20,10)`, `source`, `fetched_at`; PK `(rate_date, currency)`); drizzle migration.
-- [ ] Port the importer from `portfoliost-wallets/src/services/fx-import.ts` into instruments
+- [x] Port the importer from `portfoliost-wallets/src/services/fx-import.ts` into instruments
   (`src/services/fx-import.ts`): `TRACKED_CURRENCIES`, `upsertRates`, `syncDaily`, `importHistory`
   (default start `1999-01-04`), `backfillCurrency` — same frankfurter/ECB source + `@marx2/contracts/fx`
   conventions.
-- [ ] One-off deep import: run `importHistory` (start `1999-01-04`) to backfill the full series
+- [x] One-off deep import: run `importHistory` (start `1999-01-04`) to backfill the full series
   into `instruments.fx_rates`; verify `min(rate_date)` ≈ 1999 and no >10-day gaps per currency.
-- [ ] **No data migration.** We are in development mode: no production `fx_rates` history to
+  **Done against the local dev DB (dev mode): 208,918 rows, floor exactly 1999-01-04, 30 currencies.
+  Only source gap >10d: ISK 2008-12-09 → 2018-02-01 — a gap in ECB's own series (verified against
+  frankfurter directly; Iceland left the ERM reference-rate publication in 2008), not an import
+  defect. Unconvertible bars in that window are handled by the `fxFrom`/unconverted semantics.
+  The same deep import runs against prod in 48.5 after the deploy.**
+- [x] **No data migration.** We are in development mode: no production `fx_rates` history to
   preserve. The 48.1 one-off deep import into `instruments.fx_rates` is the only FX data load;
   wallets' existing `fx_rates` is simply dropped. (All portfolios will be rebuilt via
   `google-sheets-sync` "Wipe & Reimport" — `POST /api/admin/jobs/sheets-sync/run {wipe:true}` — so
   any old converted/settled amounts are recomputed from scratch against the new FX source.)
 - [ ] Instrument CronJob mirroring the wallets `fxsync` CronJob (daily incremental) — Helm value
   + cron spec; unit test for the importer against a mocked frankfurter response.
-- [ ] Tests: importer upsert/idempotency, deep-import floor assertion; full instruments suite green.
-- [ ] Commit (portfoliost-instruments).
+  (Importer unit tests done; the homelab cron spec lands in 48.5 with the tag pin — enabling it
+  earlier would run the pre-§48 image which lacks `dist/scripts/fx-sync.js`.)
+- [x] Tests: importer upsert/idempotency, deep-import floor assertion; full instruments suite green.
+- [x] Commit (portfoliost-instruments).
 
 ### 48.2 — `price_bars_as` read path + `?currency=` on price endpoints
 
