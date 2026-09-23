@@ -51,11 +51,12 @@ describe("ResearchCalendar — §49.9 upcoming sections", () => {
     expect(pay[0].text()).toContain("$0.29")
   })
 
-  it("hides the Upcoming Dividend card when dividend[] is empty", async () => {
+  it("keeps the Upcoming Dividend card visible with an empty state when nothing is upcoming", async () => {
     const data = calendarData()
     data.dividend = []
     const wrapper = await mountWith(data)
-    expect(wrapper.findAll(".card").filter((c) => c.text().includes("Upcoming Dividend"))).toHaveLength(0)
-    expect(wrapper.text()).not.toContain("Upcoming Dividend")
+    const pay = wrapper.findAll(".card").filter((c) => c.text().includes("Upcoming Dividend"))
+    expect(pay).toHaveLength(1)
+    expect(pay[0].text()).toContain("No upcoming dividends.")
   })
 })
