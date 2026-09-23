@@ -6,6 +6,7 @@ import { useWalletsStore } from "@/stores/wallets"
 import { useCurrenciesStore } from "@/stores/currencies"
 import { formatCurrency } from "@/utils/format"
 import FxRateFields from "@/components/FxRateFields.vue"
+import DividendFields, { dividendTotals } from "@/components/DividendFields.vue"
 import type { PortfolioPositions } from "@/api/types"
 
 const props = defineProps<{
@@ -62,15 +63,7 @@ const assetLabel = computed(() => {
   const t = props.position?.assetType
   return t ? t.charAt(0) + t.slice(1).toLowerCase() : "Stock"
 })
-const quant = computed(() => (perShare.value ? Number(quantity.value) || 0 : Number(props.position?.quantity) || 1))
-const gross = computed(() => {
-  if (perShare.value) return Math.round((Number(quant.value) * (Number(perShareGross.value) || 0)) * 1e8) / 1e8
-  return Math.round((Number(grossTotal.value) || 0) * 1e8) / 1e8
-})
-const price = computed(() => (quant.value ? gross.value / quant.value : 0))
-const tax = computed(() => Math.round((Number(taxes.value) || 0) * 1e8) / 1e8)
-const net = computed(() => Math.round((gross.value - tax.value) * 1e8) / 1e8)
-const taxExceedsGross = computed(() => gross.value > 0 && tax.value > gross.value)
+const totals = computed(() => dividendTotals(perShare.value, grossTotal.value, perShareGross.value, quantity.value, taxes.value))
 
 const wallet = computed(() => walletsStore.wallets.find((w) => w.id === walletId.value))
 const walletCcy = computed(() => wallet.value?.currency.toUpperCase() ?? "")
@@ -81,9 +74,9 @@ const rate = computed(() => {
   if (rateSource.value === "automatic") return suggestion.value?.rate ?? 1
   return Number(exchangeRate.value) || 0
 })
-const convertedNet = computed(() => (needsFx.value && rate.value ? net.value * rate.value : null))
+const convertedNet = computed(() => (needsFx.value && rate.value ? totals.value.net * rate.value : null))
 
-const canSubmit = computed(() => gross.value > 0 && !taxExceedsGross.value && !!walletId.value)
+const canSubmit = computed(() => totals.value.gross > 0 && !totals.value.taxExceedsGross && !!walletId.value)
 
 function onSuggestion(r: { rate: number } | null): void {
   suggestion.value = r
@@ -97,13 +90,13 @@ async function submit(): Promise<void> {
     const payload: Parameters<typeof createPortfolioTransaction>[1] = {
       type: "DIVIDEND",
       symbol: props.position.symbol.toUpperCase(),
-      quantity: quant.value,
-      price: Math.round(price.value * 1e8) / 1e8,
+      quantity: totals.value.quant,
+      price: totals.value.price,
       positionId: props.position.id,
       currency: txCcy.value,
       walletId: walletId.value || undefined,
       executedAt: date.value ? new Date(`${date.value}T00:00:00Z`).toISOString() : new Date().toISOString(),
-      taxes: tax.value > 0 ? tax.value : undefined,
+      taxes: totals.value.tax > 0 ? totals.value.tax : undefined,
       notes: notes.value.trim() || undefined,
     }
     if (needsFx.value && rateSource.value === "manual" && exchangeRate.value) {
@@ -155,167 +148,48 @@ async function submit(): Promise<void> {
             <span class="font-semibold text-slate-900 dark:text-slate-100">{{ position.quantity }}</span>
           </p>
         </div>
-        <div class="mb-4 flex rounded-lg bg-slate-100 p-0.5 dark:bg-slate-800/60">
-          <button
-            type="button"
-            class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors"
-            :class="!perShare ? 'bg-white shadow-sm dark:bg-slate-700' : 'text-slate-500 dark:text-slate-400'"
-            :data-testid="`dividend-mode-total`"
-            @click="perShare = false"
-          >
-            Total Amount
-          </button>
-          <button
-            type="button"
-            class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors"
-            :class="perShare ? 'bg-white shadow-sm dark:bg-slate-700' : 'text-slate-500 dark:text-slate-400'"
-            :data-testid="`dividend-mode-pershare`"
-            @click="perShare = true"
-          >
-            Per Share
-          </button>
-        </div>
-
-        <label class="mb-1.5 block text-sm font-medium" for="dividend-wallet">Cash portfolio</label>
-        <select
-          id="dividend-wallet"
-          v-model="walletId"
-          class="input mb-4"
-          :data-testid="`dividend-wallet`"
+        <DividendFields
+          testid="dividend"
+          :tx-ccy="txCcy"
+          :ccy-symbol="ccySymbol"
+          :converted-net="needsFx ? convertedNet : null"
+          :converted-ccy="needsFx ? walletCcy : ''"
+          v-model:per-share="perShare"
+          v-model:gross-total="grossTotal"
+          v-model:per-share-gross="perShareGross"
+          v-model:quantity="quantity"
+          v-model:taxes="taxes"
+          v-model:date="date"
+          v-model:notes="notes"
         >
-          <option value="" disabled>Select cash portfolio</option>
-          <option v-for="w in walletsStore.wallets" :key="w.id" :value="w.id">
-            {{ w.name }} ({{ formatCurrency(w.balance, w.currency) }})
-          </option>
-        </select>
-
-        <template v-if="!perShare">
-          <label class="mb-1.5 block text-sm font-medium" for="dividend-gross">Gross dividend amount</label>
-          <div class="relative mb-4">
-            <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 dark:text-slate-400">{{ ccySymbol }}</span>
-            <input
-              id="dividend-gross"
-              :value="grossTotal"
-              type="number"
-              min="0"
-              step="any"
-              placeholder="0.00"
-              class="input pl-7"
-              :data-testid="`dividend-gross`"
-              @input="grossTotal = ($event.target as HTMLInputElement).value"
+          <template #after-toggle>
+            <label class="mb-1.5 mt-4 block text-sm font-medium" for="dividend-wallet">Cash portfolio</label>
+            <select
+              id="dividend-wallet"
+              v-model="walletId"
+              class="input mb-4"
+              :data-testid="`dividend-wallet`"
+            >
+              <option value="" disabled>Select cash portfolio</option>
+              <option v-for="w in walletsStore.wallets" :key="w.id" :value="w.id">
+                {{ w.name }} ({{ formatCurrency(w.balance, w.currency) }})
+              </option>
+            </select>
+          </template>
+          <template #before-summary>
+            <FxRateFields
+              leg="Transaction"
+              :from="txCcy"
+              :to="walletCcy"
+              :hidden="!needsFx"
+              :date="date"
+              v-model:rate-source="rateSource"
+              v-model:rate="exchangeRate"
+              @suggestion="onSuggestion"
+              testid="dividend-fx"
             />
-          </div>
-        </template>
-
-        <div v-else class="mb-4 grid grid-cols-2 gap-3">
-          <div>
-            <label class="mb-1.5 block text-sm font-medium" for="dividend-gross-pershare">Dividend per share</label>
-            <div class="relative">
-              <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 dark:text-slate-400">{{ ccySymbol }}</span>
-              <input
-                id="dividend-gross-pershare"
-                :value="perShareGross"
-                type="number"
-                min="0"
-                step="any"
-                placeholder="0.00"
-                class="input pl-7"
-                :data-testid="`dividend-gross`"
-                @input="perShareGross = ($event.target as HTMLInputElement).value"
-              />
-            </div>
-          </div>
-          <div>
-            <label class="mb-1.5 block text-sm font-medium" for="dividend-shares">Shares receiving dividend</label>
-            <input
-              id="dividend-shares"
-              v-model="quantity"
-              type="number"
-              min="0"
-              step="any"
-              class="input"
-              :data-testid="`dividend-shares`"
-            />
-          </div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="mb-1.5 flex items-center gap-1.5 text-sm font-medium" for="dividend-tax">
-              Withholding Tax
-              <span
-                class="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-slate-200 text-[10px] font-semibold text-slate-500 dark:bg-slate-700 dark:text-slate-300"
-                title="Tax withheld at source; subtracted from the gross dividend amount"
-              >i</span>
-            </label>
-            <div class="relative">
-              <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 dark:text-slate-400">{{ ccySymbol }}</span>
-              <input
-                id="dividend-tax"
-                v-model="taxes"
-                type="number"
-                min="0"
-                step="any"
-                placeholder="0.00"
-                class="input pl-7"
-                :data-testid="`dividend-tax`"
-              />
-            </div>
-          </div>
-          <div>
-            <label class="mb-1.5 block text-sm font-medium" for="dividend-date">Date received</label>
-            <input id="dividend-date" v-model="date" type="date" class="input" :data-testid="`dividend-date`" />
-          </div>
-        </div>
-
-        <p v-if="taxExceedsGross" class="mb-4 mt-1.5 text-xs text-red-600 dark:text-red-400" :data-testid="`dividend-tax-error`">
-          Withholding tax cannot exceed the gross dividend amount
-        </p>
-
-        <label class="mb-1.5 mt-4 block text-sm font-medium" for="dividend-notes">Notes (optional)</label>
-        <textarea
-          id="dividend-notes"
-          v-model="notes"
-          rows="3"
-          placeholder="e.g. Q4 2024 dividend"
-          class="input mb-4 resize-y"
-          :data-testid="`dividend-notes`"
-        ></textarea>
-
-        <FxRateFields
-          leg="Transaction"
-          :from="txCcy"
-          :to="walletCcy"
-          :hidden="!needsFx"
-          :date="date"
-          v-model:rate-source="rateSource"
-          v-model:rate="exchangeRate"
-          @suggestion="onSuggestion"
-          testid="dividend-fx"
-        />
-
-        <div class="rounded-xl bg-slate-50 p-3 text-sm dark:bg-slate-800/50" :data-testid="`dividend-summary`">
-          <div class="flex justify-between py-0.5">
-            <span class="text-slate-500 dark:text-slate-400">Gross Dividend</span>
-            <span class="tabular-nums">{{ gross.toFixed(2) }} {{ txCcy }}</span>
-          </div>
-          <div class="flex justify-between py-0.5">
-            <span class="text-slate-500 dark:text-slate-400">Withholding Tax</span>
-            <span class="tabular-nums text-red-600 dark:text-red-400" :data-testid="`dividend-tax-total`">
-              -{{ tax.toFixed(2) }} {{ txCcy }}
-            </span>
-          </div>
-          <div class="mt-1 flex justify-between border-t border-slate-200 pt-1.5 font-semibold dark:border-slate-700/60">
-            <span>Net Amount</span>
-            <span class="tabular-nums text-green-600 dark:text-green-400" :data-testid="`dividend-net`">{{ net.toFixed(2) }} {{ txCcy }}</span>
-          </div>
-          <div v-if="needsFx" class="flex justify-between py-0.5 text-xs text-slate-500 dark:text-slate-400">
-            <span>Net ({{ walletCcy }})</span>
-            <span class="tabular-nums" :data-testid="`dividend-converted`">
-              {{ convertedNet != null ? `${convertedNet.toFixed(2)} ${walletCcy}` : "—" }}
-            </span>
-          </div>
-        </div>
+          </template>
+        </DividendFields>
 
         <p v-if="error" class="mt-3 text-sm text-red-600 dark:text-red-400">{{ error }}</p>
       </div>
@@ -330,7 +204,7 @@ async function submit(): Promise<void> {
           :data-testid="`dividend-submit`"
           @click="submit"
         >
-          {{ busy ? "Recording..." : gross > 0 ? `Record dividend · ${net.toFixed(2)} ${txCcy}` : "Enter a dividend amount" }}
+          {{ busy ? "Recording..." : totals.gross > 0 ? `Record dividend · ${totals.net.toFixed(2)} ${txCcy}` : "Enter a dividend amount" }}
         </button>
       </div>
     </div>

@@ -57,6 +57,19 @@ test("record dividend nets the wallet and populates Dividends + Transactions Tax
   const dialog = page.getByRole("dialog", { name: "Record Dividend" })
   await expect(dialog).toBeVisible()
 
+  // §50.6 — example-service parity: title, shares-held header row, notes textarea
+  await expect(dialog.getByTestId("dividend-title")).toHaveText("Record dividend")
+  await expect(dialog.getByTestId("dividend-shares-held")).toContainText("Shares held:")
+  await expect(dialog.getByTestId("dividend-shares-held")).toContainText("10")
+  await expect(dialog.locator("textarea[data-testid='dividend-notes']")).toHaveCount(1)
+
+  // §50.6 — per-share mode: two-column row prefilled with the held quantity
+  await dialog.getByTestId("dividend-mode-pershare").click()
+  await expect(dialog.getByText("Dividend per share")).toBeVisible()
+  await expect(dialog.getByText("Shares receiving dividend")).toBeVisible()
+  await expect(dialog.getByTestId("dividend-shares")).toHaveValue("10")
+  await dialog.getByTestId("dividend-mode-total").click()
+
   // pick the funded wallet explicitly (the dialog prefers the portfolio-linked
   // wallet; it loads asynchronously, so select it deterministically)
   const walletSelect = dialog.getByTestId("dividend-wallet")
@@ -68,6 +81,8 @@ test("record dividend nets the wallet and populates Dividends + Transactions Tax
   await dialog.getByTestId("dividend-tax").fill("20")
   await expect(dialog.getByTestId("dividend-tax-error")).toBeVisible()
   await expect(dialog.getByTestId("dividend-submit")).toBeDisabled()
+  // §50.6 — summary shows the tax minus-signed (example-service: "-0,00 USD" red)
+  await expect(dialog.getByTestId("dividend-tax-total")).toHaveText("-20.00 USD")
 
   // gross 100, tax 20 → net 80.00 USD
   await dialog.getByTestId("dividend-gross").fill("100")

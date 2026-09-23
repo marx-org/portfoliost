@@ -7,6 +7,7 @@ import { formatCurrency, formatDate } from "@/utils/format"
 import { researchSymbol } from "@/utils/research"
 import FeeFields from "@/components/FeeFields.vue"
 import FxRateFields from "@/components/FxRateFields.vue"
+import DividendFields, { dividendTotals } from "@/components/DividendFields.vue"
 import { useCurrenciesStore } from "@/stores/currencies"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { useTargetCurrency } from "@/composables/useTargetCurrency"
@@ -55,8 +56,12 @@ const rateSource = ref<"automatic" | "manual">("automatic")
 const exchangeRate = ref("")
 const feeRateSource = ref<"automatic" | "manual">("automatic")
 const feeExchangeRate = ref("")
-const taxes = ref(0)
+const taxes = ref("")
 const notes = ref("")
+const perShare = ref(false)
+const grossInput = ref("")
+const perShareInput = ref("")
+const quantityStr = ref("")
 
 const portfolioStore = usePortfolioStore()
 const targetCurrency = useTargetCurrency(
@@ -82,8 +87,12 @@ watch(
       exchangeRate.value = props.transaction.exchangeRate != null ? String(props.transaction.exchangeRate) : ""
       feeRateSource.value = props.transaction.feeRateSource === "manual" ? "manual" : "automatic"
       feeExchangeRate.value = props.transaction.feeExchangeRate != null ? String(props.transaction.feeExchangeRate) : ""
-      taxes.value = props.transaction.taxes ?? 0
+      taxes.value = String(props.transaction.taxes ?? 0)
       notes.value = props.transaction.notes ?? ""
+      perShare.value = false
+      grossInput.value = String(Math.round(props.transaction.quantity * props.transaction.price * 1e8) / 1e8)
+      perShareInput.value = String(props.transaction.price)
+      quantityStr.value = String(props.transaction.quantity)
       if (!currenciesStore.loaded) void currenciesStore.load()
       busy.value = false
       error.value = null
@@ -105,9 +114,12 @@ const feeValue = computed(() => {
 const totalCost = computed(() => quantity.value * price.value + feeValue.value)
 
 const isDividend = computed(() => props.transaction?.type === "DIVIDEND")
-const gross = computed(() => Math.round(quantity.value * price.value * 1e8) / 1e8)
-const net = computed(() => Math.round((gross.value - (taxes.value || 0)) * 1e8) / 1e8)
-const taxExceedsGross = computed(() => gross.value > 0 && (taxes.value || 0) > gross.value)
+const dTotals = computed(() => dividendTotals(perShare.value, grossInput.value, perShareInput.value, quantityStr.value, taxes.value))
+const taxExceedsGross = computed(() => (isDividend.value ? dTotals.value.taxExceedsGross : false))
+const ccySymbol = computed(() => {
+  const ccy = (props.transaction?.currency ?? "USD").toUpperCase()
+  return currenciesStore.info(ccy)?.symbol ?? ccy
+})
 
 function typeLabel(type: string): string {
   return type.charAt(0) + type.slice(1).toLowerCase()
@@ -124,8 +136,8 @@ async function submit() {
   try {
     await updatePortfolioTransaction(props.transaction.portfolioId, props.transaction.id, {
       type: props.transaction.type,
-      quantity: quantity.value,
-      price: price.value,
+      quantity: isDividend.value ? dTotals.value.quant : quantity.value,
+      price: isDividend.value ? dTotals.value.price : price.value,
       fees: feeValue.value,
       executedAt: new Date(executedAt.value).toISOString(),
       walletId: walletId.value || undefined,
@@ -145,7 +157,7 @@ async function submit() {
         feeExchangeRate.value
           ? Number(feeExchangeRate.value)
           : undefined,
-      ...(isDividend.value ? { taxes: taxes.value || 0, notes: notes.value.trim() } : {}),
+      ...(isDividend.value ? { taxes: dTotals.value.tax, notes: notes.value.trim() } : {}),
     })
     emit("saved")
   } catch (err) {
@@ -184,14 +196,18 @@ function goResearch() {
         <div class="min-w-0 flex-1">
           <p class="font-medium text-slate-900 dark:text-slate-100">
             {{ transaction.instrumentSymbol }}
-            <span class="text-xs font-normal text-slate-400 dark:text-slate-500">(US)</span>
+            <span v-if="!isDividend" class="text-xs font-normal text-slate-400 dark:text-slate-500">(US)</span>
             <span class="ml-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-slate-500 dark:bg-slate-800 dark:text-slate-400">
               {{ typeLabel(transaction.assetType || "STOCK") }}
             </span>
           </p>
           <p class="truncate text-xs text-slate-500 dark:text-slate-400">{{ transaction.instrumentName || "—" }}</p>
+          <p v-if="isDividend" class="mt-1 text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500" data-testid="edit-tx-shares-held">
+            Shares:
+            <span class="font-semibold text-slate-900 dark:text-slate-100">{{ quantityStr }}</span>
+          </p>
         </div>
-        <div class="shrink-0 text-right">
+        <div v-if="!isDividend" class="shrink-0 text-right">
           <button type="button" class="text-xs text-blue-600 hover:underline" @click="goResearch">View chart</button>
           <p class="text-sm font-medium tabular-nums text-slate-900 dark:text-slate-100">{{ formatCurrency(transaction.price, transaction.currency) }}</p>
           <p class="text-[11px] text-slate-400 dark:text-slate-500">Historical Price ({{ formatDate(transaction.executedAt) }})</p>
@@ -199,54 +215,63 @@ function goResearch() {
       </div>
 
       <form @submit.prevent="submit">
-        <label for="etx-date" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">{{ isDividend ? "Date received" : "Purchase Date" }}</label>
-        <input id="etx-date" v-model="executedAt" type="date" required class="input mb-4" />
-
-        <label for="etx-wallet" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Cash portfolio</label>
-        <select id="etx-wallet" v-model="walletId" class="input mb-4">
-          <option v-for="w in walletsStore.wallets" :key="w.id" :value="w.id">
-            {{ w.name }} ({{ formatCurrency(w.balance, w.currency) }})
-          </option>
-        </select>
-
-        <div class="mb-4 grid grid-cols-2 gap-4">
-          <div>
-            <label for="etx-quantity" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Quantity</label>
-            <input id="etx-quantity" v-model.number="quantity" type="number" min="0" step="any" required class="input" />
-          </div>
-          <div>
-            <label for="etx-price" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Price per share ($)</label>
-            <input id="etx-price" v-model.number="price" type="number" min="0" step="any" required class="input" />
-          </div>
-        </div>
-
         <template v-if="isDividend">
-          <label for="etx-taxes" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Withholding Tax</label>
-          <input
-            id="etx-taxes"
-            v-model.number="taxes"
-            type="number"
-            min="0"
-            step="any"
-            class="input mb-2"
-            :class="{ '!border-red-500': taxExceedsGross }"
-            :data-testid="`edit-tx-tax`"
-          />
-          <p v-if="taxExceedsGross" class="mb-3 text-xs text-red-600 dark:text-red-400" :data-testid="`edit-tx-tax-error`">
-            Withholding tax cannot exceed the gross dividend amount
-          </p>
-          <label for="etx-notes" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Notes</label>
-          <input
-            id="etx-notes"
-            v-model="notes"
-            type="text"
-            placeholder="e.g., Q4 2024 dividend"
-            class="input mb-4"
-            :data-testid="`edit-tx-notes`"
-          />
+          <DividendFields
+            testid="edit-tx"
+            :tx-ccy="transaction.currency"
+            :ccy-symbol="ccySymbol"
+            v-model:per-share="perShare"
+            v-model:gross-total="grossInput"
+            v-model:per-share-gross="perShareInput"
+            v-model:quantity="quantityStr"
+            v-model:taxes="taxes"
+            v-model:date="executedAt"
+            v-model:notes="notes"
+          >
+            <template #after-toggle>
+              <label for="etx-wallet" class="mb-1 mt-4 block text-sm text-slate-600 dark:text-slate-300">Cash portfolio</label>
+              <select id="etx-wallet" v-model="walletId" class="input mb-4">
+                <option v-for="w in walletsStore.wallets" :key="w.id" :value="w.id">
+                  {{ w.name }} ({{ formatCurrency(w.balance, w.currency) }})
+                </option>
+              </select>
+            </template>
+            <template #before-summary>
+              <FxRateFields
+                leg="Transaction"
+                :from="transaction.currency"
+                :to="targetCurrency"
+                :date="executedAt"
+                v-model:rate-source="rateSource"
+                v-model:rate="exchangeRate"
+                testid="edit-tx-fx"
+              />
+            </template>
+          </DividendFields>
         </template>
 
-        <template v-if="!isDividend">
+        <template v-else>
+          <label for="etx-date" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Purchase Date</label>
+          <input id="etx-date" v-model="executedAt" type="date" required class="input mb-4" />
+
+          <label for="etx-wallet" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Cash portfolio</label>
+          <select id="etx-wallet" v-model="walletId" class="input mb-4">
+            <option v-for="w in walletsStore.wallets" :key="w.id" :value="w.id">
+              {{ w.name }} ({{ formatCurrency(w.balance, w.currency) }})
+            </option>
+          </select>
+
+          <div class="mb-4 grid grid-cols-2 gap-4">
+            <div>
+              <label for="etx-quantity" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Quantity</label>
+              <input id="etx-quantity" v-model.number="quantity" type="number" min="0" step="any" required class="input" />
+            </div>
+            <div>
+              <label for="etx-price" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Price per share ($)</label>
+              <input id="etx-price" v-model.number="price" type="number" min="0" step="any" required class="input" />
+            </div>
+          </div>
+
           <label for="etx-fees" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Transaction Fees</label>
           <FeeFields
             v-model:fees="fees"
@@ -255,55 +280,39 @@ function goResearch() {
             testid="edit-tx"
             input-id="etx-fees"
           />
+
+          <FxRateFields
+            leg="Transaction"
+            :from="transaction.currency"
+            :to="targetCurrency"
+            :date="executedAt"
+            v-model:rate-source="rateSource"
+            v-model:rate="exchangeRate"
+            testid="edit-tx-fx"
+          />
+
+          <FxRateFields
+            leg="Fee"
+            :from="feeCurrency"
+            :to="transaction.currency"
+            :date="executedAt"
+            :hidden="feesType !== 'fixed' || feeCurrency === transaction.currency"
+            v-model:rate-source="feeRateSource"
+            v-model:rate="feeExchangeRate"
+            testid="edit-tx-fee-fx"
+          />
+
+          <div class="mb-4 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/50">
+            <span class="text-sm text-slate-600 dark:text-slate-300">Total Cost</span>
+            <span class="text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ formatCurrency(totalCost, transaction.currency) }}</span>
+          </div>
         </template>
-
-        <FxRateFields
-          leg="Transaction"
-          :from="transaction.currency"
-          :to="targetCurrency"
-          :date="executedAt"
-          v-model:rate-source="rateSource"
-          v-model:rate="exchangeRate"
-          testid="edit-tx-fx"
-        />
-
-        <FxRateFields
-          v-if="!isDividend"
-          leg="Fee"
-          :from="feeCurrency"
-          :to="transaction.currency"
-          :date="executedAt"
-          :hidden="feesType !== 'fixed' || feeCurrency === transaction.currency"
-          v-model:rate-source="feeRateSource"
-          v-model:rate="feeExchangeRate"
-          testid="edit-tx-fee-fx"
-        />
-
-        <div v-if="isDividend" class="mb-4 space-y-1 rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/50">
-          <div class="flex items-center justify-between text-sm text-slate-600 dark:text-slate-300">
-            <span>Gross Dividend</span>
-            <span class="tabular-nums">{{ formatCurrency(gross, transaction.currency) }}</span>
-          </div>
-          <div class="flex items-center justify-between text-sm text-slate-600 dark:text-slate-300">
-            <span>Withholding Tax</span>
-            <span class="tabular-nums">{{ formatCurrency(taxes || 0, transaction.currency) }}</span>
-          </div>
-          <div class="flex items-center justify-between text-sm font-semibold text-slate-900 dark:text-slate-100">
-            <span>Net Amount</span>
-            <span class="tabular-nums" :data-testid="`edit-tx-net`">{{ formatCurrency(net, transaction.currency) }}</span>
-          </div>
-        </div>
-
-        <div v-else class="mb-4 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/50">
-          <span class="text-sm text-slate-600 dark:text-slate-300">Total Cost</span>
-          <span class="text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ formatCurrency(totalCost, transaction.currency) }}</span>
-        </div>
 
         <p v-if="error" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ error }}</p>
 
         <div class="flex justify-end gap-2">
           <button type="button" class="btn-ghost" @click="emit('close')">Cancel</button>
-          <button type="submit" class="btn-primary" :disabled="busy || !Number(quantity) || taxExceedsGross">
+          <button type="submit" class="btn-primary" :disabled="busy || taxExceedsGross || (isDividend ? !Number(quantityStr) : !Number(quantity))">
             {{ busy ? "Saving..." : "Save" }}
           </button>
         </div>

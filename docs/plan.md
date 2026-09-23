@@ -200,13 +200,58 @@ admin UI instead).
 
 ### 50.7 — Deploy final SPA + closeout
 
-- [ ] Bump the homelab SPA pin to the new HEAD tag; Flux roll; verify prod
-  (Admin → System version; Holdings → Dividend dialog matches the example-service
-  reference in both modes).
+- [ ] Bump the homelab SPA pin to the new HEAD tag (includes 50.8); Flux roll;
+  verify prod (Admin → System version; Holdings → Dividend dialog matches the
+  example-service reference in both modes; editing a DIVIDEND row shows the parity
+  layout).
 - [ ] Archive §50 to `docs/plan-archive.md`.
 - [ ] Tests: none beyond the 50.6 suite (deploy verified via the Admin System
   version panel + the prod UI check).
 - [ ] Commit (homelab pin bump).
+
+### 50.8 — Edit dividend transaction: example-service parity via shared DividendFields component
+
+Added 2026-09-23 on user request — editing a DIVIDEND row still shows the
+buy-style layout (Quantity / Price per share / Historical Price header).
+User direction: **one form in both places** — extract the §50.2–50.4 field
+layout into a shared component and use it in both
+`RecordDividendDialog.vue` and `EditTransactionModal.vue` (non-dividend
+branch of the edit modal untouched):
+
+- [ ] New `src/components/DividendFields.vue` — toggle (Total / Per share),
+  total-mode "Gross dividend amount" with registry currency-symbol prefix,
+  per-share two-column row "Dividend per share" + "Shares receiving
+  dividend" (editable), two-column row "Withholding Tax" (info tooltip) +
+  "Date received", tax>gross inline error, notes `<textarea rows="3">`,
+  summary card (gross / minus-signed red tax / green net + optional
+  cross-currency converted-net row). v-models: per-share, gross-total,
+  per-share-gross, quantity, taxes, date, notes (all strings); props:
+  tx-ccy, ccy-symbol, testid prefix (record → `dividend`, edit → `edit-tx`
+  — existing testids preserved), converted-net/converted-ccy (optional).
+  Exports pure `dividendTotals(...)` helper (quant/gross/tax/net/price/
+  taxExceedsGross) reused by both parents for payload math + submit gating.
+- [ ] `RecordDividendDialog.vue` — replace its inline field block with
+  `<DividendFields testid="dividend" .../>` (header card, wallet select,
+  FxRateFields, submit footer stay). All `dividend-*` testids unchanged.
+- [ ] `EditTransactionModal.vue` (dividend only): header card drops the
+  "View chart / Historical Price" right block + the hardcoded "(US)" span,
+  gains a "Shares: {quantity}" line; field block replaced with
+  `<DividendFields testid="edit-tx" .../>` (testids `edit-tx-gross`,
+  `edit-tx-shares`, `edit-tx-tax`, `edit-tx-notes`, `edit-tx-net` preserved —
+  per-share mode reuses `edit-tx-gross` exactly like the record dialog's
+  `dividend-gross`; `edit-tx-tax-total` added). Non-dividend layout
+  (Purchase Date / Quantity / Price per share / Fees) unchanged.
+- [ ] Wire: edit submit posts `quantity` + derived per-share `price`
+  (per-share mode: price = per-share input; total mode: price = gross ÷
+  quantity, 0 when quantity is 0) via `dividendTotals`.
+- [ ] Tests: new unit spec
+  `tests/unit/modules/portfolios/EditDividendTransaction.test.ts` — total
+  mode prefills gross = qty×price and submits derived price; per-share mode
+  edits price+quantity; tax>gross blocks + minus/red summary; notes textarea
+  present; BUY layout still shows Quantity/Price/Fees (existing FeeFxDialogs
+  suite green). RecordDividendDialog suite green without testid churn.
+  `npm run build` + `npm run test` + `npm run test:mock` green.
+- [ ] Commit.
 
 ---
 
