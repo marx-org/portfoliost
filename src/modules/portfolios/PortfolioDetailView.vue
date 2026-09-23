@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue"
+import { computed, onMounted, ref, watch, watchEffect } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
 import { useCurrenciesStore } from "@/stores/currencies"
 import { storeToRefs } from "pinia"
 import { deletePortfolio, updatePortfolio } from "@/api/portfolios"
+import { getLatestRate } from "@/api/fx"
 import { formatCurrency, formatPercent, formatSignedCurrency } from "@/utils/format"
 import AddPositionDialog from "@/modules/portfolios/AddPositionDialog.vue"
 
@@ -69,6 +70,46 @@ async function load() {
 const portfolioName = computed(() => store.detail?.name ?? store.portfolios.find((p) => p.id === id)?.name ?? "Portfolio")
 const strategy = computed(() => store.detail?.strategy ?? store.portfolios.find((p) => p.id === id)?.strategy ?? "—")
 const description = computed(() => store.detail?.description ?? store.portfolios.find((p) => p.id === id)?.description ?? "No description")
+
+// §48.6e B3 umbrella (B2 residual, 2026-09-23) — summaryMetrics are
+// denominated in the portfolio baseCurrency (wallets `summary_metrics`);
+// convert to the display currency once via getLatestRate (never a
+// mislabelled amount). Pending cross-currency rate renders "—"; an
+// unresolvable pair degrades to 1:1 (§48.3).
+const summaryRate = ref<number | null>(null)
+watchEffect(() => {
+  const src = (store.detail?.baseCurrency ?? "").toUpperCase()
+  const dst = displayCurrency.value.toUpperCase()
+  if (!src) {
+    summaryRate.value = null
+    return
+  }
+  if (src === dst) {
+    summaryRate.value = 1
+    return
+  }
+  summaryRate.value = null
+  void getLatestRate(src, dst).then((r) => {
+    summaryRate.value = r && typeof r.rate === "number" && r.rate > 0 ? r.rate : 1
+  })
+})
+const summaryPending = computed(() => {
+  const src = (store.detail?.baseCurrency ?? "").toUpperCase()
+  return !!src && src !== displayCurrency.value.toUpperCase() && summaryRate.value === null
+})
+const summary = computed(() => {
+  const m = store.summaryMetrics
+  if (!m) return null
+  const rate = summaryRate.value ?? 1
+  return {
+    ...m,
+    totalValue: m.totalValue * rate,
+    totalInvested: m.totalInvested * rate,
+    unrealizedGainLoss: m.unrealizedGainLoss * rate,
+    realizedGain: m.realizedGain * rate,
+    cumulativeDividends: m.cumulativeDividends * rate,
+  }
+})
 
 function gainClass(value: number | undefined): string {
   return (value ?? 0) >= 0 ? "text-green-600" : "text-red-600"
@@ -177,37 +218,37 @@ async function submitDelete() {
         </div>
       </div>
 
-      <div v-if="store.summaryMetrics" class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-6">
+      <div v-if="summary" class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-6">
         <div class="card p-4">
           <p class="text-sm text-slate-500 dark:text-slate-400">Total Value</p>
-          <p class="mt-1 text-xl font-semibold tabular-nums">{{ formatCurrency(store.summaryMetrics.totalValue, displayCurrency) }}</p>
+          <p class="mt-1 text-xl font-semibold tabular-nums">{{ summaryPending ? "—" : formatCurrency(summary.totalValue, displayCurrency) }}</p>
         </div>
         <div class="card p-4">
           <p class="text-sm text-slate-500 dark:text-slate-400">Total Invested</p>
-          <p class="mt-1 text-xl font-semibold tabular-nums">{{ formatCurrency(store.summaryMetrics.totalInvested, displayCurrency) }}</p>
+          <p class="mt-1 text-xl font-semibold tabular-nums">{{ summaryPending ? "—" : formatCurrency(summary.totalInvested, displayCurrency) }}</p>
         </div>
         <div class="card p-4">
           <p class="text-sm text-slate-500 dark:text-slate-400">Return</p>
-          <p class="mt-1 text-xl font-semibold tabular-nums" :class="gainClass(store.summaryMetrics.simpleReturnPercent)">
-            {{ formatPercent(store.summaryMetrics.simpleReturnPercent) }}
+          <p class="mt-1 text-xl font-semibold tabular-nums" :class="gainClass(summary.simpleReturnPercent)">
+            {{ formatPercent(summary.simpleReturnPercent) }}
           </p>
         </div>
         <div class="card p-4">
           <p class="text-sm text-slate-500 dark:text-slate-400">Unrealized P/L</p>
-          <p class="mt-1 text-xl font-semibold tabular-nums" :class="gainClass(store.summaryMetrics.unrealizedGainLoss)">
-            {{ formatSignedCurrency(store.summaryMetrics.unrealizedGainLoss, displayCurrency) }}
+          <p class="mt-1 text-xl font-semibold tabular-nums" :class="gainClass(summary.unrealizedGainLoss)">
+            {{ summaryPending ? "—" : formatSignedCurrency(summary.unrealizedGainLoss, displayCurrency) }}
           </p>
         </div>
         <div class="card p-4">
           <p class="text-sm text-slate-500 dark:text-slate-400">Realized</p>
-          <p class="mt-1 text-xl font-semibold tabular-nums" :class="gainClass(store.summaryMetrics.realizedGain)">
-            {{ formatSignedCurrency(store.summaryMetrics.realizedGain, displayCurrency) }}
+          <p class="mt-1 text-xl font-semibold tabular-nums" :class="gainClass(summary.realizedGain)">
+            {{ summaryPending ? "—" : formatSignedCurrency(summary.realizedGain, displayCurrency) }}
           </p>
         </div>
         <div class="card p-4">
           <p class="text-sm text-slate-500 dark:text-slate-400">Income</p>
-          <p class="mt-1 text-xl font-semibold tabular-nums" :class="gainClass(store.summaryMetrics.cumulativeDividends)">
-            {{ formatSignedCurrency(store.summaryMetrics.cumulativeDividends, displayCurrency) }}
+          <p class="mt-1 text-xl font-semibold tabular-nums" :class="gainClass(summary.cumulativeDividends)">
+            {{ summaryPending ? "—" : formatSignedCurrency(summary.cumulativeDividends, displayCurrency) }}
           </p>
         </div>
       </div>
