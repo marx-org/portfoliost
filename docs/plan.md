@@ -44,10 +44,18 @@ follows the planner's openst→cachest→instruments→SPA sequence.
     provider supplies it). Unit tests incl. nasdaq-shape fixture + blocked/rate-limit
     provider-skip under the new order; suite 282/91/53 green; compose smoke on AAPL:
     `payment_date` in row + Redis cache HIT (1.13 s → 0.00 s).
-- [ ] cachest: no new route (dividend history + calendar dividend are existing
+- [x] cachest: no new route (dividend history + calendar dividend are existing
   passthroughs) — verify the fetcher preserves the new `payment_date` field
   (quick check + `test_real_config_has_...` style assertion if it does field
   filtering); full cachest suite green.
+  - Done 2026-09-23 (`ff98a11`): both surfaces (`OPENST_CALENDAR_DIVIDEND`,
+    `OPENST_DIVIDENDS`) are unfiltered JSON passthroughs — no `extract.selector`,
+    no `json_field`, so `payment_date` round-trips untouched. Added real-config
+    assertions pinning that shape + a fetcher unit test proving a body carrying
+    `payment_date` passes through unchanged; suite 84 passed. (Side note: the
+    cachest compose `openst` service is stale-baked and now crash-loops on
+    startup — its `main.py` needs a `postgres` host the cachest stack lacks,
+    unrelated to this step; live E2E happens in the instruments compose.)
 - [ ] instruments: `toCalendar` maps `payment_date` into `CalendarData.dividend[]`
   (`{date, title: "Dividend Payment", year, amount}`) alongside the existing
   `exDividend[]` (ex-dividend dates keep populating `exDividend` — both arrays
