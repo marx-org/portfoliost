@@ -11,6 +11,7 @@ import { researchSymbol } from "@/utils/research"
 import type { PortfolioPositions } from "@/api/types"
 import EditPositionDialog from "@/modules/portfolios/EditPositionDialog.vue"
 import AddPositionDialog from "@/modules/portfolios/AddPositionDialog.vue"
+import RecordDividendDialog from "@/modules/portfolios/RecordDividendDialog.vue"
 import ConfirmDeleteModal from "@/modules/portfolios/ConfirmDeleteModal.vue"
 import DualCurrencyCell from "@/components/DualCurrencyCell.vue"
 import DualCurrencyPnlCell from "@/components/DualCurrencyPnlCell.vue"
@@ -528,9 +529,17 @@ function onPickerSaved() {
     </div>
 
     <AddPositionDialog
-      :open="positionAction !== null"
+      :open="positionAction !== null && positionAction.kind !== 'dividend'"
       :portfolio-id="id"
-      :position-action="positionAction ?? undefined"
+      :position-action="positionAction?.kind !== 'dividend' ? positionAction ?? undefined : undefined"
+      @close="onActionClose"
+      @saved="onActionSaved"
+    />
+
+    <RecordDividendDialog
+      :open="positionAction?.kind === 'dividend'"
+      :portfolio-id="id"
+      :position="positionAction?.kind === 'dividend' ? positionAction.position : null"
       @close="onActionClose"
       @saved="onActionSaved"
     />

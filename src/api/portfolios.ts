@@ -111,6 +111,9 @@ export async function createPortfolioTransaction(
     walletId?: string
     positionId?: string
     executedAt?: string
+    /** DIVIDEND withholding tax (gross − taxes = net totalAmount; must be ≤ quantity × price) */
+    taxes?: number
+    notes?: string
   },
 ): Promise<PortfolioTransactionsPage["items"][number]> {
   return http.post<PortfolioTransactionsPage["items"][number]>(`/api/portfolios/${id}/transactions`, input)

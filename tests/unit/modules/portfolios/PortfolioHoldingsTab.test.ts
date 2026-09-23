@@ -142,3 +142,39 @@ describe("PortfolioHoldingsTab — §48.6e B2 display-currency conversion", () =
     expect(wrapper.find("tfoot").text()).toContain("$40,960.00")
   })
 })
+
+describe("PortfolioHoldingsTab — dividend action routing (§49.4)", () => {
+  async function mountTabWithDividend() {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const store = usePortfolioStore()
+    store.detail = { currency: "PLN" } as never
+    store.positions = [position()] as never
+    mockedPortfolios.getPortfolioPositions.mockResolvedValue([position()] as never)
+    return mount(PortfolioHoldingsTab, {
+      global: {
+        plugins: [pinia],
+        stubs: { RouterLink: { template: '<a href="#"><slot /></a>' } },
+      },
+      shallow: true,
+    })
+  }
+
+  it("'Dividend' action opens RecordDividendDialog (not AddPositionDialog) with the held position (§49.4)", async () => {
+    const wrapper = await mountTabWithDividend()
+    await flushPromises()
+
+    await wrapper.findAll("button[aria-label='Position actions']")[0].trigger("click")
+    const dividendBtn = [...wrapper.findAll("button")].find((b) => b.text() === "Dividend")
+    expect(dividendBtn).toBeTruthy()
+    await dividendBtn!.trigger("click")
+    await flushPromises()
+
+    const rdd = wrapper.findComponent({ name: "RecordDividendDialog" })
+    const apd = wrapper.findComponent({ name: "AddPositionDialog" })
+    expect(rdd.exists()).toBe(true)
+    expect(rdd.props("open")).toBe(true)
+    expect((rdd.props("position") as { id: string }).id).toBe("pos-1")
+    expect(apd.props("open")).toBe(false)
+  })
+})

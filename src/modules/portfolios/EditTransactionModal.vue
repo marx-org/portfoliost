@@ -29,6 +29,8 @@ export interface EditTransaction {
   exchangeRate?: number | null
   feeRateSource?: "automatic" | "manual" | null
   feeExchangeRate?: number | null
+  taxes?: number | null
+  notes?: string | null
 }
 
 const props = defineProps<{
@@ -53,6 +55,8 @@ const rateSource = ref<"automatic" | "manual">("automatic")
 const exchangeRate = ref("")
 const feeRateSource = ref<"automatic" | "manual">("automatic")
 const feeExchangeRate = ref("")
+const taxes = ref(0)
+const notes = ref("")
 
 const portfolioStore = usePortfolioStore()
 const targetCurrency = useTargetCurrency(
@@ -78,6 +82,8 @@ watch(
       exchangeRate.value = props.transaction.exchangeRate != null ? String(props.transaction.exchangeRate) : ""
       feeRateSource.value = props.transaction.feeRateSource === "manual" ? "manual" : "automatic"
       feeExchangeRate.value = props.transaction.feeExchangeRate != null ? String(props.transaction.feeExchangeRate) : ""
+      taxes.value = props.transaction.taxes ?? 0
+      notes.value = props.transaction.notes ?? ""
       if (!currenciesStore.loaded) void currenciesStore.load()
       busy.value = false
       error.value = null
@@ -98,12 +104,21 @@ const feeValue = computed(() => {
 
 const totalCost = computed(() => quantity.value * price.value + feeValue.value)
 
+const isDividend = computed(() => props.transaction?.type === "DIVIDEND")
+const gross = computed(() => Math.round(quantity.value * price.value * 1e8) / 1e8)
+const net = computed(() => Math.round((gross.value - (taxes.value || 0)) * 1e8) / 1e8)
+const taxExceedsGross = computed(() => gross.value > 0 && (taxes.value || 0) > gross.value)
+
 function typeLabel(type: string): string {
   return type.charAt(0) + type.slice(1).toLowerCase()
 }
 
 async function submit() {
   if (!props.transaction) return
+  if (taxExceedsGross.value) {
+    error.value = "Withholding tax cannot exceed the gross dividend amount"
+    return
+  }
   busy.value = true
   error.value = null
   try {
@@ -130,6 +145,7 @@ async function submit() {
         feeExchangeRate.value
           ? Number(feeExchangeRate.value)
           : undefined,
+      ...(isDividend.value ? { taxes: taxes.value || 0, notes: notes.value.trim() } : {}),
     })
     emit("saved")
   } catch (err) {
@@ -183,7 +199,7 @@ function goResearch() {
       </div>
 
       <form @submit.prevent="submit">
-        <label for="etx-date" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Purchase Date</label>
+        <label for="etx-date" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">{{ isDividend ? "Date received" : "Purchase Date" }}</label>
         <input id="etx-date" v-model="executedAt" type="date" required class="input mb-4" />
 
         <label for="etx-wallet" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Cash portfolio</label>
@@ -204,14 +220,42 @@ function goResearch() {
           </div>
         </div>
 
-        <label for="etx-fees" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Transaction Fees</label>
-        <FeeFields
-          v-model:fees="fees"
-          v-model:fees-type="feesType"
-          v-model:fee-currency="feeCurrency"
-          testid="edit-tx"
-          input-id="etx-fees"
-        />
+        <template v-if="isDividend">
+          <label for="etx-taxes" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Withholding Tax</label>
+          <input
+            id="etx-taxes"
+            v-model.number="taxes"
+            type="number"
+            min="0"
+            step="any"
+            class="input mb-2"
+            :class="{ '!border-red-500': taxExceedsGross }"
+            :data-testid="`edit-tx-tax`"
+          />
+          <p v-if="taxExceedsGross" class="mb-3 text-xs text-red-600 dark:text-red-400" :data-testid="`edit-tx-tax-error`">
+            Withholding tax cannot exceed the gross dividend amount
+          </p>
+          <label for="etx-notes" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Notes</label>
+          <input
+            id="etx-notes"
+            v-model="notes"
+            type="text"
+            placeholder="e.g., Q4 2024 dividend"
+            class="input mb-4"
+            :data-testid="`edit-tx-notes`"
+          />
+        </template>
+
+        <template v-if="!isDividend">
+          <label for="etx-fees" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Transaction Fees</label>
+          <FeeFields
+            v-model:fees="fees"
+            v-model:fees-type="feesType"
+            v-model:fee-currency="feeCurrency"
+            testid="edit-tx"
+            input-id="etx-fees"
+          />
+        </template>
 
         <FxRateFields
           leg="Transaction"
@@ -224,6 +268,7 @@ function goResearch() {
         />
 
         <FxRateFields
+          v-if="!isDividend"
           leg="Fee"
           :from="feeCurrency"
           :to="transaction.currency"
@@ -234,7 +279,22 @@ function goResearch() {
           testid="edit-tx-fee-fx"
         />
 
-        <div class="mb-4 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/50">
+        <div v-if="isDividend" class="mb-4 space-y-1 rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/50">
+          <div class="flex items-center justify-between text-sm text-slate-600 dark:text-slate-300">
+            <span>Gross Dividend</span>
+            <span class="tabular-nums">{{ formatCurrency(gross, transaction.currency) }}</span>
+          </div>
+          <div class="flex items-center justify-between text-sm text-slate-600 dark:text-slate-300">
+            <span>Withholding Tax</span>
+            <span class="tabular-nums">{{ formatCurrency(taxes || 0, transaction.currency) }}</span>
+          </div>
+          <div class="flex items-center justify-between text-sm font-semibold text-slate-900 dark:text-slate-100">
+            <span>Net Amount</span>
+            <span class="tabular-nums" :data-testid="`edit-tx-net`">{{ formatCurrency(net, transaction.currency) }}</span>
+          </div>
+        </div>
+
+        <div v-else class="mb-4 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/50">
           <span class="text-sm text-slate-600 dark:text-slate-300">Total Cost</span>
           <span class="text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ formatCurrency(totalCost, transaction.currency) }}</span>
         </div>
@@ -243,7 +303,7 @@ function goResearch() {
 
         <div class="flex justify-end gap-2">
           <button type="button" class="btn-ghost" @click="emit('close')">Cancel</button>
-          <button type="submit" class="btn-primary" :disabled="busy || !Number(quantity)">
+          <button type="submit" class="btn-primary" :disabled="busy || !Number(quantity) || taxExceedsGross">
             {{ busy ? "Saving..." : "Save" }}
           </button>
         </div>
