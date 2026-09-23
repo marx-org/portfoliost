@@ -129,9 +129,9 @@ Rules: one step = one commit.
 - [x] Tests: none yet (capture step); fixtures are inputs to 52.4.
 - [x] Commit.
 
-### 52.4 — dividendmax plugin package (scrape design)
+### 52.4 — dividendmax plugin package (scrape design) (done 2026-09-24)
 
-- [ ] New `openst/plugins/openbb_dividendmax/` package: `__init__.py` registering the
+- [x] New `openst/plugins/openbb_dividendmax/` package: `__init__.py` registering the
   provider on `equity.fundamental.dividends` (model key `HistoricalDividends`;
   **NOT on `equity.calendar.dividend` — that query carries no symbol and
   dividendmax has no public cross-company calendar page, only per-company
@@ -143,13 +143,27 @@ Rules: one step = one commit.
   "Sign up"-gated and the standard model requires an amount); politeness delay +
   `DIVIDENDMAX_FETCH_DELAY_S` env like biznesradar. No API key (key-free public
   scrape, 52.3).
-- [ ] openbb_client: append `"dividendmax"` to `DIVIDEND_PROVIDERS` (after
+  - `client.py`: `parse_en_date`, `parse_subunit_amount` (`265c`/`4.5¢`/`7.77p`
+    → /100, rounded 4dp), `resolve_path` (exact ticker; `VOD.L`-style dot-prefix
+    fallback; US listing preferred on ties), `scrape_dividend_history` (2 polite
+    requests, 1 s default delay).
+  - `HistoricalDividendsData` extras: `payment_date`, `declaration_date`,
+    `currency`, `dividend_type`, `status`.
+  - Wired: `requirements.txt` (`-e ./plugins/openbb_dividendmax`), Dockerfile
+    test CMD (4th plugin pytest invocation — ImportPath collision pairing).
+- [x] openbb_client: append `"dividendmax"` to `DIVIDEND_PROVIDERS` (after
   nasdaq/fmp/intrinio so it only serves as fallback until explicitly preferred).
   **Not** added to `CALENDAR_PROVIDERS` — the calendar query has no symbol, so a
   per-company-page provider can't serve it (recorded in 52.6).
-- [ ] Unit tests in `plugins/openbb_dividendmax/tests/` against captured fixtures
+  - 2 client tests that pinned `call_count == 4` now assert
+    `len(DIVIDEND_PROVIDERS)`.
+- [x] Unit tests in `plugins/openbb_dividendmax/tests/` against captured fixtures
   (mocked HTTP); full openst docker compose suite green.
-- [ ] Commit.
+  - 21 new plugin tests; full suite 282/104/53/21.
+  - Live e2e verified in the test container: `obb.equity.fundamental.dividends(
+    "AAPL", provider="dividendmax")` → 58 rows with `payment_date`/
+    `declaration_date`/`currency` (2011–2026).
+- [x] Commit (openst 4f0e40d).
 
 ### 52.5 — cachest
 
