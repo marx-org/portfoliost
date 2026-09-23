@@ -66,20 +66,29 @@ Rules: one step = one commit.
 - [x] Tests: none yet (capture step); fixtures are inputs to 52.2.
 - [x] Commit.
 
-### 52.2 — biznesradar plugin: `calendar.dividend` on openbb_biznesradar
+### 52.2 — biznesradar plugin: `calendar.dividend` on openbb_biznesradar (done 2026-09-24)
 
-- [ ] `scraper.py`: fetch + parse the `/dywidendy/` table into rows
+- [x] `scraper.py`: fetch + parse the `/dywidendy/` table into rows
   `{ex_dividend_date~last-notowanie, payment_date, amount, status, symbol}` (Polish
   month-abbrev date parser added to the existing helpers); date-window filter applied
   client-side on the parsed rows.
-- [ ] `models/calendar_dividend.py` + provider registration in the plugin `__init__.py`
+  - `parse_pl_short_date` helper (validated over all 12 PL months in the fixtures)
+    parses `DD MMM YY` → 2000+YY; `_parse_pln_amount` handles `0,74 PLN`;
+    `_dywidendy_url(year)` builds `/,YYYY,4,2` (payment-date sort).
+  - `scrape_dividend_calendar(start, end)` fetches one page per year in the window
+    (single table, never paginated), keeps rows whose ex-/payment date falls within
+    the window, drops date-less (`bd.`) rows; symbol = pre-paren Profil token.
+- [x] `models/calendar_dividend.py` + provider registration in the plugin `__init__.py`
   so `obb.equity.calendar.dividend(start_date, end_date, provider="biznesradar")`
   resolves; calendar rows map to the OpenBB `DividendCalendar` shape.
-- [ ] Unit tests in `plugins/openbb_biznesradar/tests/test_calendar_dividend.py` against
+  - `CalendarDividendFetcher` with `status` kept as a provider extra; default window =
+  current year when start/end omitted; reversed window → empty list.
+- [x] Unit tests in `plugins/openbb_biznesradar/tests/test_calendar_dividend.py` against
   the captured HTML (mocked HTTP); full openst docker compose suite green (incl. the
   separate plugin pytest passes per the existing ImportPath collision pairing).
-- [ ] openbb_client: append `"biznesradar"` to `CALENDAR_PROVIDERS` (after fmp/nasdaq).
-- [ ] Commit.
+  - 104 plugin tests green; full suite 282/104/53.
+- [x] openbb_client: append `"biznesradar"` to `CALENDAR_PROVIDERS` (after fmp/nasdaq).
+- [x] Commit (openst 6ce9ec0).
 
 ### 52.3 — dividendmax fixture capture (API)
 
