@@ -7081,3 +7081,100 @@ whole-form model). `npm run build` + `npm run test` green (56 files /
 366 tests).
 
 ---
+
+## 52. Additional dividend providers: biznesradar calendar + dividendmax (closed 2026-09-24)
+
+Closed 2026-09-24. Two provider extensions to enrich dividend/payment-date
+coverage beyond nasdaq/fmp. **Pivot 2026-09-24 (user decision):** the
+dividendmax step shipped as a **key-free public-page scrape** instead of a
+paid API — no API key exists, and dividendmax.com serves everything publicly
+(`/suggest.json` + per-company `/dividends` page, both answer 200 with a plain
+Mozilla UA; the site's cross-company "Countdown" calendar is Premium).
+nasdaq-first (from §49.9) stays the default for US history.
+
+### 52.1 — Fixture capture: biznesradar /dywidendy/ (openst 03b1ca5)
+- [x] Captured `dywidendy-2026.html` (207 rows: 175 wypłacona / 29 uchwalona /
+  2 rekomendowana) + `dywidendy-2025.html` (217, all wypłacona) from
+  `/dywidendy/,YYYY,4,2` (sortCol 4 = Dzień wypłaty, payment-date order).
+- [x] Only the `Stopa dywidendy*` column is Premium-gated (`paid-content--short`
+  anchor); all other cells parse as plain text. Dates are Polish short
+  `DD MMM YY` (`05 sie 26`); missing cells are `bd.`. Single `qTableFull` table,
+  no pagination.
+
+### 52.2 — biznesradar `calendar.dividend` (openst 6ce9ec0)
+- [x] `scraper.py`: `parse_pl_short_date` (12 PL month abbrevs),
+  `_parse_pln_amount` (`0,74 PLN`), `_dywidendy_url(year)` (`/,YYYY,4,2`),
+  `scrape_dividend_calendar(start, end)` — one page per year in the window,
+  client-side window filter (ex-/payment date in range; `bd.` rows dropped),
+  symbol = pre-paren Profil token.
+- [x] `models/calendar_dividend.py` + `CalendarDividendFetcher` registered under
+  `CalendarDividend` (`status` kept as a provider extra; default window = current
+  year; reversed window → empty).
+- [x] `CALENDAR_PROVIDERS = ["fmp", "nasdaq", "biznesradar"]`; suite 282/104/53
+  green; 12 new plugin tests.
+
+### 52.3 — dividendmax fixture capture (scrape, not API) (openst 8d898e9)
+- [x] **Resolution:** `GET /suggest.json?q={query}` → unauthenticated
+  `[{search,id,name,ticker,flag,image,path}]`. Partial *name* matches included
+  (q=aapl → AAPL **and** APLY); one ticker can map to several listings
+  (q=vodafone → VOD UK plc + US ADR). Resolve by **exact ticker** (dot-suffix
+  fallback `VOD.L` → `VOD`), prefer US on ties.
+- [x] **History table:** `table[aria-label='Declared and forecast {NAME}
+  dividends']`, 9 cols (Status | Type | Decl. date | Ex-div date | Pay date |
+  Decl. Currency | Forecast amount | Decl. amount | Accuracy), no pagination,
+  ~20 yrs Paid + ~5 forecast years. Dates English `DD Mon YYYY` (missing `–`);
+  amounts subunit `265c`/`4.5¢`/`7.77p` (÷100); `Sign up` = gated forecast;
+  currency per-row (EUR/GBP/USD seen on Vodafone). Returns ex-date ✓, pay-date ✓,
+  declaration-date ✓, record-date ✗.
+- [x] TOS: personal non-commercial use, no reproduction/distribution → 2 polite
+  requests per symbol + long cache (house scraping convention, cf. biznesradar).
+
+### 52.4 — dividendmax plugin package (openst 4f0e40d)
+- [x] `openst/plugins/openbb_dividendmax/` — `client.py` (`parse_en_date`,
+  `parse_subunit_amount`, `resolve_path`, `scrape_dividend_history`) +
+  `HistoricalDividendsFetcher` (model key `HistoricalDividends`). **Not** a
+  calendar provider: `CalendarDividendQueryParams` carries no symbol and
+  dividendmax has no public cross-company calendar (that's Premium). **Paid rows
+  only** (forecast amounts are sign-up gated). Extras: `payment_date`,
+  `declaration_date`, `currency`, `dividend_type`, `status`.
+- [x] `DIVIDEND_PROVIDERS = ["nasdaq","yfinance","fmp","intrinio","dividendmax"]`
+  (fallback, last). Wired into requirements/Dockerfile (4th plugin pytest
+  invocation — ImportPath collision pairing). Live e2e: `dividendmax` AAPL → 58
+  rows, 58 with `payment_date`. Suite 282/104/53/21 green.
+
+### 52.5 — cachest (9799638)
+- [x] `OPENST_CALENDAR_DIVIDEND` + `OPENST_DIVIDENDS` are unfiltered JSON
+  passthroughs (no `json_field`/`extract.selector` in config.yaml) — the §52
+  provider extras pass through byte-for-byte. §49.9 real-config tests already pin
+  `not route.extract.selector`; added
+  `test_fetch_json_passthrough_keeps_dividendmax_and_biznesradar_fields`. Suite
+  85 passed.
+
+### 52.6 — Closeout (openst c53979b)
+- [x] Re-ran the §49.9 probe comparison (2026-09-24):
+  - **nasdaq AAPL** history: 83 rows, 54 with `payment_date` (keyed API, longest
+    US history).
+  - **dividendmax AAPL** history: 58 rows, **58/58** with `payment_date` +
+    `declaration_date` + per-row `currency` (~20-yr window).
+  - **biznesradar GPW calendar 2026**: 206 rows (ex-date, payment-date, amount,
+    status).
+  - **Merged calendar** (window 2026-08-20→2026-12-31): fmp premium-blocked
+    (402) + nasdaq bot-blocked (403, per §49.9) → **53 GPW rows surfaced** via
+    biznesradar (NTT, VRB, DBC, …).
+- [x] **Decision — dividendmax stays a fallback, NOT preferred:** nasdaq remains
+  the primary US history source (reliable keyed API, deeper history); dividendmax
+  is the last-resort fallback that adds UK/EU coverage + `payment_date`/
+  `declaration_date`/`currency` when the primaries return nothing. Promoting a
+  fragile Cloudflare/reCAPTCHA scraper to the hot path (first in the list) is not
+  worth it, and its TOS favors minimal volume.
+- [x] **Decision — biznesradar is the GPW coupon/payment calendar, realized via a
+  union-merge:** the global dividend calendar is consumed per-symbol downstream
+  (instruments `toCalendar` filters by symbol), so the old **first-non-empty**
+  strategy masked GPW rows whenever a US provider answered for the window.
+  `get_calendar("dividend", …)` now **merges** rows across `CALENDAR_PROVIDERS`
+  (dedup on symbol/ex/pay/amount) so GPW coupon/payment dates surface alongside
+  US; **earnings keeps first-non-empty**. 3 new unit tests; suite 285/104/53/21
+  green.
+- [x] Archived §52.
+
+---
