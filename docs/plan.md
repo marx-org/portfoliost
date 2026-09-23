@@ -34,12 +34,19 @@ nasdaq/fmp. Provider tier ordering per the standard step sequence; nasdaq-first
    Year selector is a path arg — `/dywidendy/,YYYY,{sortCol},{dir}`, sortCol 4 = Dzień
    wypłaty (gives a calendar-ordered page); dates are Polish short format "01 paź 26"
    (parse `DD MMM YY`, Polish month abbreviations).
-2. **dividendmax** — brand-new OpenBB provider plugin (OpenBB ships none, so this is
-   the only way to source that vendor); requires a dividendmax API key (**paid plan** —
-   budget/key decision is the user's; steps assume a key exists).
+2. **dividendmax** — brand-new OpenBB provider plugin for the dividendmax.com
+   website. **Pivot 2026-09-24 (user decision): no paid API key exists, and the
+   site serves everything publicly — scrape the public pages instead of a keyed
+   API** (same posture as the biznesradar plugin). Resolution: public
+   `GET /suggest.json?q={ticker}` (unauthenticated JSON → `path`); data: one
+   `/dividends` page per security, full history table server-rendered, no
+   pagination. TOS: personal non-commercial use, no reproduction/distribution —
+   low-volume (2 polite requests per symbol, long cache) per house scraping
+   convention. Steps below assume the key-free scrape design.
 
 Planned coverage outcome: fmp/nasdaq keep covering US, biznesradar covers GPW
-coupon/payment dates, dividendmax is a paid-quality fallback/enhancement.
+coupon/payment dates, dividendmax (public-page scrape, analyst-curated incl.
+declaration dates) is a quality fallback/enhancement.
 
 Rules: one step = one commit.
 
@@ -90,27 +97,56 @@ Rules: one step = one commit.
 - [x] openbb_client: append `"biznesradar"` to `CALENDAR_PROVIDERS` (after fmp/nasdaq).
 - [x] Commit (openst 6ce9ec0).
 
-### 52.3 — dividendmax fixture capture (API)
+### 52.3 — dividendmax fixture capture (done 2026-09-24 — scrape, not API)
 
-- [ ] Capture the real dividendmax API shape first (exact endpoints, auth header,
-  date columns, pagination are UNKNOWN — do not guess): with a valid key, ONE request
-  each for dividend history + the dividend calendar of one US payer; save raw
-  JSON/CSV under `openst/tests/fixtures/dividendmax/`; record endpoint path, columns,
-  and whether `payment_date`/`record_date`/`declaration_date` are returned.
-- [ ] Confirm vendor TOS allows programmatic access for this use and that rate/quota
-  fit the calendar window.
-- [ ] Tests: none yet (capture step); fixtures are inputs to 52.4.
-- [ ] Commit.
+- [x] Capture the real dividendmax shape first (endpoints/auth/date columns/pagination
+  were UNKNOWN — do not guess). No paid API key exists, and the site is fully
+  public, so per the 2026-09-24 user decision we captured the PUBLIC pages:
+  ONE request each for `GET /suggest.json?q=aapl` and `q=vodafone` (resolution) +
+  the `/dividends` page of one US payer (AAPL) and one UK payer (VOD). Saved raw
+  under `openst/tests/fixtures/dividendmax/` (`summary.json` records it all).
+  - **Resolution endpoint:** `GET /suggest.json?q={query}` → unauthenticated
+    `[{search, id, name, ticker, flag, image, path}]`. Partial name matches are
+    included (q=aapl → AAPL **and** APLY), and one ticker can map to multiple
+    listings (q=vodafone → VOD UK plc + VOD US ADR). So resolve by
+    **exact `ticker == query`** and prefer the US listing on ties.
+  - **History table:** `table[aria-label='Declared and forecast {NAME}
+    dividends']` (class `mdc-data-table__table`). 9 columns: Status | Type |
+    Decl. date | Ex-div date | Pay date | Decl. Currency | Forecast amount |
+    Decl. amount | Accuracy. No pagination — full history (~20 yrs of Paid rows)
+    plus ~5 forecast years in one page.
+  - **Dates:** `DD Mon YYYY` English (e.g. `31 Oct 2030`); missing = `–` (en dash).
+  - **Amounts:** subunit notation — `265c` / `4.5¢` (US cents) / `7.77p` (pence);
+    divide by 100. `Sign up` = forecast amount gated (irrelevant for Paid rows);
+    `—` = None. Use **Decl. amount** for Paid rows.
+  - **Currency** is per-row (`Decl. Currency`; EUR/GBP/USD seen on Vodafone).
+  - **Returned fields:** `ex_dividend_date` ✓, `payment_date` ✓,
+    `declaration_date` ✓, `record_date` ✗ (not present).
+  - **TOS:** personal non-commercial use only, no reproduction/distribution —
+    we do 2 polite requests per symbol with a long cache (house scraping
+    convention, cf. biznesradar). Site is Cloudflare + reCAPTCHA v3 guarded on
+    interactive routes, but both scrape targets answer 200 with a plain Mozilla UA.
+- [x] Tests: none yet (capture step); fixtures are inputs to 52.4.
+- [x] Commit.
 
-### 52.4 — dividendmax plugin package
+### 52.4 — dividendmax plugin package (scrape design)
 
 - [ ] New `openst/plugins/openbb_dividendmax/` package: `__init__.py` registering the
-  provider on `equity.fundamental.dividends` and `equity.calendar.dividend`, models/ +
-  a network client for the captured endpoints; `OPENBB_DIVIDENDMAX_API_KEY` in
-  `env.example`/`.env`.
-- [ ] openbb_client: append `"dividendmax"` to `DIVIDEND_PROVIDERS` and
-  `CALENDAR_PROVIDERS` (after nasdaq/fmp so it only serves as fallback until
-  explicitly preferred).
+  provider on `equity.fundamental.dividends` (model key `HistoricalDividends`;
+  **NOT on `equity.calendar.dividend` — that query carries no symbol and
+  dividendmax has no public cross-company calendar page, only per-company
+  history; the site's cross-company "Countdown" calendar is Premium**), models/ +
+  a network client for the captured public endpoints (`/suggest.json?q=` resolution
+  with exact-ticker + US-preferred disambiguation, then the `/dividends` history
+  table; English `DD Mon YYYY` dates, subunit amount notation, per-row currency,
+  `–`/`Sign up`/`—` handling; **Paid rows only** — Forecast amounts are
+  "Sign up"-gated and the standard model requires an amount); politeness delay +
+  `DIVIDENDMAX_FETCH_DELAY_S` env like biznesradar. No API key (key-free public
+  scrape, 52.3).
+- [ ] openbb_client: append `"dividendmax"` to `DIVIDEND_PROVIDERS` (after
+  nasdaq/fmp/intrinio so it only serves as fallback until explicitly preferred).
+  **Not** added to `CALENDAR_PROVIDERS` — the calendar query has no symbol, so a
+  per-company-page provider can't serve it (recorded in 52.6).
 - [ ] Unit tests in `plugins/openbb_dividendmax/tests/` against captured fixtures
   (mocked HTTP); full openst docker compose suite green.
 - [ ] Commit.
