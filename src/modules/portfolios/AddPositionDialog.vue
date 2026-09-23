@@ -17,7 +17,7 @@ import type { PortfolioPositions } from "@/api/types"
 type Position = PortfolioPositions[number]
 
 interface PositionAction {
-  kind: "buy" | "sell" | "dividend"
+  kind: "buy" | "sell"
   position: Position
 }
 
@@ -299,12 +299,11 @@ async function submitStock() {
   try {
     if (props.positionAction) {
       const { kind, position } = props.positionAction
-      const txType = kind === "buy" ? "BUY" : kind === "sell" ? "SELL" : "DIVIDEND"
-      const txQty = kind === "dividend" ? (position.quantity || 1) : quantity
+      const txType = kind === "buy" ? "BUY" : "SELL"
       const txPayload: Parameters<typeof createPortfolioTransaction>[1] = {
         type: txType,
         symbol,
-        quantity: txQty,
+        quantity,
         price: Number(stockForm.value.price) || 0,
         positionId: position.id,
         currency: position.instrumentCurrency || "USD",
@@ -323,7 +322,7 @@ async function submitStock() {
           }
         }
       } else if (stockForm.value.feesType === "pct" && Number(stockForm.value.fees) > 0) {
-        txPayload.fees = (txQty * Number(stockForm.value.price) * Number(stockForm.value.fees)) / 100
+        txPayload.fees = (quantity * Number(stockForm.value.price) * Number(stockForm.value.fees)) / 100
         txPayload.feesType = "pct"
       }
       if (stockForm.value.rateSource === "manual" && stockForm.value.exchangeRate) {
@@ -509,9 +508,9 @@ defineExpose({ pendingMarketPrice })
       class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
       @click.self="close"
     >
-      <div class="card max-h-[85vh] w-full max-w-md overflow-y-auto p-6" role="dialog" aria-modal="true" :aria-label="positionAction ? `${positionAction.kind === 'buy' ? 'Buy' : positionAction.kind === 'sell' ? 'Sell' : 'Dividend'} ${positionAction.position.symbol}` : 'Buy Position'">
+      <div class="card max-h-[85vh] w-full max-w-md overflow-y-auto p-6" role="dialog" aria-modal="true" :aria-label="positionAction ? `${positionAction.kind === 'buy' ? 'Buy' : 'Sell'} ${positionAction.position.symbol}` : 'Buy Position'">
         <div class="mb-4 flex items-center justify-between">
-          <h3 class="text-base font-semibold">{{ positionAction ? `${positionAction.kind === 'buy' ? 'Buy' : positionAction.kind === 'sell' ? 'Sell' : 'Dividend for'} ${positionAction.position.symbol}` : 'Buy Position' }}</h3>
+          <h3 class="text-base font-semibold">{{ positionAction ? `${positionAction.kind === 'buy' ? 'Buy' : 'Sell'} ${positionAction.position.symbol}` : 'Buy Position' }}</h3>
           <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="close">✕</button>
         </div>
         <TransactionFormFields
@@ -537,7 +536,7 @@ defineExpose({ pendingMarketPrice })
               <button type="button" class="btn-ghost" @click="close">Cancel</button>
               <button type="submit" class="btn-primary" :disabled="busy || !stockForm.symbol || !Number(stockForm.quantity)">
                 {{ busy ? "Saving..." : positionAction
-                  ? `${positionAction.kind === 'buy' ? 'Buy' : positionAction.kind === 'sell' ? 'Sell' : 'Record dividend'} for ${formatCurrency(totalCost, TX_CCY)}`
+                  ? `${positionAction.kind === 'buy' ? 'Buy' : 'Sell'} for ${formatCurrency(totalCost, TX_CCY)}`
                   : `Buy for ${formatCurrency(totalCost, TX_CCY)}`
                 }}
               </button>

@@ -46,6 +46,14 @@ const removeError = ref<string | null>(null)
 type ActionKind = "buy" | "sell" | "dividend"
 const positionAction = ref<{ kind: ActionKind; position: Position } | null>(null)
 
+// Buy/sell actions are narrowed before they reach AddPositionDialog (dividends
+// go to RecordDividendDialog, §49.4/§50.5).
+const apdAction = computed(() => {
+  const a = positionAction.value
+  if (!a || a.kind === "dividend") return undefined
+  return { kind: a.kind, position: a.position }
+})
+
 const editPosition = ref<Position | null>(null)
 
 const showCustomize = ref(false)
@@ -531,7 +539,7 @@ function onPickerSaved() {
     <AddPositionDialog
       :open="positionAction !== null && positionAction.kind !== 'dividend'"
       :portfolio-id="id"
-      :position-action="positionAction?.kind !== 'dividend' ? positionAction ?? undefined : undefined"
+      :position-action="apdAction"
       @close="onActionClose"
       @saved="onActionSaved"
     />
