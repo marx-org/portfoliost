@@ -3191,6 +3191,7 @@ export interface components {
                 issues?: Record<string, never>[];
             };
         };
+        /** @description A portfolio transaction row. For `type: DIVIDEND` the example-service convention applies (verified against the live API 2026-09-26): `price` is the per-share gross dividend, `quantity × price` is the gross total, `taxes` is the withholding tax, and `totalAmount` is the **net** (gross − taxes). BUY/SELL rows keep `totalAmount = quantity × price + fees`. */
         Transaction: components["schemas"]["FeeFxFields"] & {
             /** Format: uuid */
             id: string;
@@ -3207,6 +3208,8 @@ export interface components {
             quantity: number;
             price: number;
             fees: number;
+            /** @description Withholding tax on a DIVIDEND (gross − taxes = net totalAmount); null otherwise */
+            taxes?: number | null;
             totalAmount: number;
             currency: string;
             priceCurrency: string;
@@ -3233,6 +3236,8 @@ export interface components {
             originalQuantity?: number | null;
             /** @description Pre-split/pre-restatement price; frozen at creation */
             originalPrice?: number | null;
+            /** @description Optional user note on the transaction (e.g. dividend remittance details) */
+            notes?: string | null;
             labels?: components["schemas"]["Label"][];
         };
         FeeFxFields: {
@@ -3257,6 +3262,10 @@ export interface components {
             fees?: number;
             /** @enum {string} */
             feesType?: "fixed" | "pct";
+            /** @description Withholding tax on a DIVIDEND (nullable, ≥ 0). When set for `type: DIVIDEND`, totalAmount is stored net (quantity × price − taxes). */
+            taxes?: number | null;
+            /** @description Optional user note on the transaction */
+            notes?: string | null;
             /** Format: date-time */
             executedAt?: string;
             /** Format: uuid */
