@@ -97,6 +97,17 @@ describe("RecordDividendDialog (§49.4)", () => {
     expect((wrapper.find('[data-testid="dividend-wallet"]').element as HTMLSelectElement).value).toBe("w2")
   })
 
+  it("title + header card parity: title, logo, country, asset pill, shares held (§50.2)", async () => {
+    const wrapper = await openDialog()
+    expect(wrapper.find('[data-testid="dividend-title"]').text()).toBe("Record dividend")
+    const held = wrapper.find('[data-testid="dividend-shares-held"]')
+    expect(held.text()).toContain("Shares held:")
+    expect(held.text()).toContain("10")
+    expect(wrapper.find("img").attributes("src")).toBe("/api/logos/AAPL")
+    expect(wrapper.text()).toContain("(US)")
+    expect(wrapper.text()).toContain("Stock")
+  })
+
   it("total mode — net = gross − tax; submit posts DIVIDEND with taxes+notes (§49.4)", async () => {
     const wrapper = await openDialog()
     expect((wrapper.find('[data-testid="dividend-wallet"]').element as HTMLSelectElement).value).toBe("w1")

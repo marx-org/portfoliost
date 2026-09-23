@@ -57,6 +57,10 @@ watch(
 )
 
 const txCcy = computed(() => (props.position?.instrumentCurrency ?? props.position?.purchaseCurrency ?? "USD").toUpperCase())
+const assetLabel = computed(() => {
+  const t = props.position?.assetType
+  return t ? t.charAt(0) + t.slice(1).toLowerCase() : "Stock"
+})
 const quant = computed(() => (perShare.value ? Number(quantity.value) || 0 : Number(props.position?.quantity) || 1))
 const gross = computed(() => {
   if (perShare.value) return Math.round((Number(quant.value) * (Number(perShareGross.value) || 0)) * 1e8) / 1e8
@@ -124,26 +128,32 @@ async function submit(): Promise<void> {
   >
     <div class="card w-full max-w-md" role="dialog" aria-modal="true" aria-label="Record Dividend">
       <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-700/60">
-        <div class="flex items-center gap-3">
-          <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600/10 text-xs font-bold text-blue-600 dark:text-blue-400">
-            {{ position.symbol.slice(0, 4) }}
-          </div>
-          <div>
-            <div class="flex items-center gap-2 text-sm font-semibold">
-              {{ position.symbol }}
-              <span class="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                HOLDING: {{ position.quantity }}
-              </span>
-            </div>
-            <p class="text-xs text-slate-500 dark:text-slate-400">{{ position.companyName ?? txCcy }}</p>
-          </div>
-        </div>
+        <h2 class="text-base font-semibold" data-testid="dividend-title">Record dividend</h2>
         <button type="button" class="btn-ghost px-2 text-slate-400" aria-label="Close modal" @click="emit('close')">
           &times;
         </button>
       </div>
 
       <div class="p-5">
+        <div class="mb-4 rounded-xl border border-slate-200 p-3 dark:border-slate-700/60">
+          <div class="flex items-center gap-3">
+            <img :src="`/api/logos/${position.symbol}`" :alt="position.symbol" class="h-9 w-9 rounded-full bg-slate-100 dark:bg-slate-800" />
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2 text-sm font-semibold">
+                {{ position.symbol }}
+                <span class="text-xs font-normal text-slate-500 dark:text-slate-400">({{ position.country || "US" }})</span>
+                <span class="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                  {{ assetLabel }}
+                </span>
+              </div>
+              <p class="truncate text-xs text-slate-500 dark:text-slate-400">{{ position.companyName }}</p>
+            </div>
+          </div>
+          <p class="mt-2 text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500" data-testid="dividend-shares-held">
+            Shares held:
+            <span class="font-semibold text-slate-900 dark:text-slate-100">{{ position.quantity }}</span>
+          </p>
+        </div>
         <div class="mb-4 flex rounded-lg bg-slate-100 p-0.5 dark:bg-slate-800/60">
           <button
             type="button"
