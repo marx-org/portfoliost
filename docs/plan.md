@@ -165,13 +165,24 @@ Rules: one step = one commit.
     `declaration_date`/`currency` (2011–2026).
 - [x] Commit (openst 4f0e40d).
 
-### 52.5 — cachest
+### 52.5 — cachest (done 2026-09-24)
 
-- [ ] `calendar.dividend` + dividend history are existing passthroughs — verify the
+- [x] `calendar.dividend` + dividend history are existing passthroughs — verify the
   fetcher preserves the biznesradar/dividendmax rows (quick check +
   `test_real_config_has_...`-style assertion if it does field filtering); full cachest
   suite green.
-- [ ] Commit.
+  - Quick check: `OPENST_CALENDAR_DIVIDEND` (`/calendar/dividend`) and
+    `OPENST_DIVIDENDS` (`/dividends/{ticker}`) carry **no** `json_field` and **no**
+    `extract.selector` in `config.yaml` — the upstream JSON body is cached and
+    returned byte-for-byte, so the new provider extras (dividendmax
+    `currency`/`dividend_type`/`declaration_date`; biznesradar `status`) pass
+    through untouched. The §49.9 `test_real_config_has_dividend_{calendar,history}_route`
+    tests already pin `not route.extract.selector` + `json_field == ""` on both
+    routes.
+  - Added `test_fetch_json_passthrough_keeps_dividendmax_and_biznesradar_fields`
+    (byte-for-byte passthrough of rows carrying the §52 extras).
+  - Full cachest compose suite green: 85 passed.
+- [x] Commit (cachest 9799638).
 
 ### 52.6 — Closeout
 
