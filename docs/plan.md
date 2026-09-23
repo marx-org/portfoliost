@@ -32,11 +32,18 @@ follows the planner's openst→cachest→instruments→SPA sequence.
   - ⇒ openst step: pass `payment_date` through from nasdaq rows; to actually get payment dates in
     history, prefer **nasdaq** (or merge) before accepting the yfinance row, else `payment_date`
     stays null on the yfinance path.
-- [ ] openst: where the provider exposes it, add `payment_date` to
+- [x] openst: where the provider exposes it, add `payment_date` to
   `get_dividend_history` rows (`{"date", "amount", "payment_date"?}`) and pass
   calendar `dividend` rows through untouched (they already carry raw columns via
   `_df_records`); unit tests with fixtures; full openst suite green; compose smoke
   (curl one US dividend payer, cache HIT on second call).
+  - Done 2026-09-23: `DIVIDEND_PROVIDERS` reordered **nasdaq-first** (the only history
+    provider carrying `payment_date`; yfinance keeps its null path only in fallback);
+    `CALENDAR_PROVIDERS = ["fmp", "nasdaq"]` (both pass `payment_date` through `_df_records`);
+    row shape `{date, amount, payment_date?}` (`payment_date` present only when the
+    provider supplies it). Unit tests incl. nasdaq-shape fixture + blocked/rate-limit
+    provider-skip under the new order; suite 282/91/53 green; compose smoke on AAPL:
+    `payment_date` in row + Redis cache HIT (1.13 s → 0.00 s).
 - [ ] cachest: no new route (dividend history + calendar dividend are existing
   passthroughs) — verify the fetcher preserves the new `payment_date` field
   (quick check + `test_real_config_has_...` style assertion if it does field
