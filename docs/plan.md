@@ -132,20 +132,20 @@ research), mocks. Depends on §47 (currency resolver, no-USD rule) — implement
 
 ### 49.6 — SPA + instruments: dividend currency correctness (§47 alignment)
 
-- [ ] `portfoliost-instruments` calendar route (~line 814): replace
+- [x]] `portfoliost-instruments` calendar route (~line 814): replace
   `profileData?.currency ?? "USD"` with `resolveInstrumentCurrency(getDb(),
   routeSymbol)` (the §47 single resolver); add `/dividends` route to §47.4's
   `currencySource` treatment.
-- [ ] Dead-field fix deferred to 49.9: `CalendarData.dividend` (payment dates) is not
+- [x]] Dead-field fix deferred to 49.9: `CalendarData.dividend` (payment dates) is not
   populated today and the SPA renders an always-empty "Upcoming Dividend" card —
   49.9 implements the dividend calendar (payment dates) end-to-end; until then the
   SPA card stays hidden (`v-if` on data presence), not removed.
-- [ ] `ResearchDividends.vue`: `instrCcy = history[0]?.currency ?? "USD"` → use
+- [x]] `ResearchDividends.vue`: `instrCcy = history[0]?.currency ?? "USD"` → use
   the §47 badge rules (unknown → plain number + red badge); `ResearchCalendar.vue`
   ex-dividend amounts follow the fixed route currency.
-- [ ] Tests: instrument route tests for the calendar currency source; SPA unit
+- [x]] Tests: instrument route tests for the calendar currency source; SPA unit
   for the instrCcy chain; suite green.
-- [ ] Commit (instruments) + Commit (portfoliost) + Commit (contracts, if the
+- [x]] Commit (instruments) + Commit (portfoliost) + Commit (contracts, if the
   dead field is removed).
 
 ### 49.7 — Mocks: parity
