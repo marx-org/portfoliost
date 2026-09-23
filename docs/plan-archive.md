@@ -6794,6 +6794,23 @@ SPA `v1.0.208` (homelab pin `fb1d762df`), contracts `@marx2/contracts` `1.6.36`.
   verified on the Deployments (`v1.1.32`/`v1.0.64`/`v1.0.208`), all HelmReleases
   True, probes healthy. instruments rollout hit the known RWO logos-PVC
   multi-attach (new pod on a second node) — fixed via scale-to-0/back-to-1.
+- [x] Prod follow-up 2026-09-23 (user report: history rows OK, calendar all
+  empty): two stacked causes — (1) the `/calendar` window was `[today−45, today]`,
+  so no future rows could ever be "upcoming"; (2) worse, fmp free-tier HARD-rejects
+  a `from` more than ~30d back with 402 (premium) → openst's `_is_rate_limited`
+  false-blocked fmp for 24h, and the only other calendar provider (nasdaq.com API)
+  is bot-blocked (403) from our egress → no calendar provider yielded rows.
+  Fixed: instruments `v1.0.65`/`v1.0.66` (`fix(instruments)` `0ea4d0e`, `d59838f`)
+  — calendar window `[today−30, today+120]` (30d past = within the fmp free
+  lookback; 120d ahead covers a quarterly cycle); SPA `v1.0.209` (`088f5af`) —
+  Upcoming Dividend card mirrors its siblings (always visible, "No upcoming
+  dividends." empty state). Homelab pins `a7ee06124` (v1.0.65/v1.0.209) +
+  `6c3666c5f` (v1.0.66). Verified live in PROD: dividend calendar 200/27 rows,
+  earnings 200/83 rows with AAPL `2026-10-29`. AAPL absent from dividend rows
+  until its next dividend is declared (fmp lists declared dividends only).
+  Residual fragility (not fixed): fmp 402-premium still false-blocks for 24h via
+  the `"premium"`/`"402"` rate-limit patterns; the nasdaq.com calendar API is
+  unusable from our egress — the dividend calendar rests on fmp alone.
 
 
 ## 50. Dividend recording: example-service parity (deploy §49.4 dialog + close layout gaps)
