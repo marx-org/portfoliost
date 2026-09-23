@@ -71,26 +71,26 @@ research), mocks. Depends on §47 (currency resolver, no-USD rule) — implement
 
 ### 49.3 — Wallets API: accept taxes+notes, net totalAmount, real `/dividends`
 
-- [ ] `src/routes/portfolio-transactions.ts` POST `/:id/transactions`: extend
+- [x] `src/routes/portfolio-transactions.ts` POST `/:id/transactions`: extend
   `TransactionCreateSchema` with `taxes` (nullable number ≥ 0) + `notes`; for
   `type === "DIVIDEND"` compute `totalAmount = quantity × price − (taxes ?? 0)`
   (net — example-service convention; BUY/SELL untouched); validation: `taxes ≤ gross`
   (422 otherwise); persist `taxes` + `notes`; wallet credit already uses
   `quantity × price` → change to the **net** for DIVIDEND in `createWalletLink`.
-- [ ] PATCH `/:id/transactions/:txId`: same field handling + recompute
+- [x] PATCH `/:id/transactions/:txId`: same field handling + recompute
   (taxes change re-derives net totalAmount and wallet delta).
-- [ ] `GET /:id/dividends` (portfolios.ts:1048, currently a stub): implement from
+- [x] `GET /:id/dividends` (portfolios.ts:1048, currently a stub): implement from
   real DIVIDEND rows — items `{symbol, instrumentName, date, quantity, gross
   (=qty×price), taxes, amount (net), currency, exchangeRate, convertedAmount,
   notes}` sorted date desc + `totalDividends` (net, sum) + `count`; contract shape reuses a
   `DividendsData`-adjacent portfolio response (extend it in 49.1 if the
   current shape is insufficient — it currently only models instrument research
   rows, which is why the mock fakes it).
-- [ ] Tests: vitest round-trips — dividend with tax (net persisted, wallet credited
+- [x] Tests: vitest round-trips — dividend with tax (net persisted, wallet credited
   net, `taxes > gross` → 422), dividend without tax (net = gross), notes
   round-trip, GET dividends aggregates + totals, BUY/SELL totals unchanged; full
   wallets suite green.
-- [ ] Commit (portfoliost-wallets).
+- [x] Commit (portfoliost-wallets).
 
 ### 49.4 — SPA: dedicated dividend dialog (example-service parity)
 
