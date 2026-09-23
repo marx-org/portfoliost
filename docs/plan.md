@@ -111,11 +111,11 @@ research), mocks. Depends on §47 (currency resolver, no-USD rule) — implement
   AddPositionDialog); submit to the existing POST with `taxes` + `notes`.
 - [x]] EditTransactionModal: when the edited tx is DIVIDEND, surface the same
   gross/tax/notes fields (per-share display derived).
-- [ ] Tests: unit for mode math (total↔per-share, net = gross − tax) +
+- [x]] Tests: unit for mode math (total↔per-share, net = gross − tax) +
   e2e (docker compose, mock updated in 49.7): record a dividend with tax in the
   per-share mode → transaction row shows DIVIDEND with net total, wallet balance
   credited net.
-- [ ] Commit (portfoliost).
+- [x]] Commit (portfoliost).
 
 ### 49.5 — SPA: portfolio Dividends tab + transactions table
 
@@ -126,9 +126,9 @@ research), mocks. Depends on §47 (currency resolver, no-USD rule) — implement
 - [x]] `TransactionsTable.vue`: for DIVIDEND rows render the tax column when
   non-zero and a notes tooltip; verify the existing blue "DIVIDEND" badge is
   kept.
-- [ ] Tests: e2e — a recorded dividend (49.4) appears in the Dividends tab with
+- [x]] Tests: e2e — a recorded dividend (49.4) appears in the Dividends tab with
   gross/tax/net and in the transactions table.
-- [ ] Commit (portfoliost).
+- [x]] Commit (portfoliost).
 
 ### 49.6 — SPA + instruments: dividend currency correctness (§47 alignment)
 
@@ -150,12 +150,12 @@ research), mocks. Depends on §47 (currency resolver, no-USD rule) — implement
 
 ### 49.7 — Mocks: parity
 
-- [ ] `mocks/portfolios`: `POST/PATCH transactions` accept `taxes` + `notes`,
+- [x] `mocks/portfolios`: `POST/PATCH transactions` accept `taxes` + `notes`,
   compute net totalAmount for DIVIDEND, credit wallet net; `GET /:id/dividends`
   returns real tx rows (drop the research-data fake) with the 49.3 shape.
-- [ ] `mocks/tests/run.mjs`: round-trips mirroring 49.3's wallet cases.
-- [ ] Tests: `npm run test:mock` + e2e green.
-- [ ] Commit (portfoliost).
+- [x] `mocks/tests/run.mjs`: round-trips mirroring 49.3's wallet cases.
+- [x] Tests: `npm run test:mock` + e2e green.
+- [x] Commit (portfoliost).
 
 ### 49.8 — Closeout
 

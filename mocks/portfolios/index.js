@@ -2,6 +2,7 @@ import { requireAuth } from "../lib/auth.js"
 import { resolveFeeFx } from "../lib/demo-fx.js"
 import { loadJson, loadRaw, loadResearch, normalize } from "../lib/data.js"
 import { paginatePage, uuid, nowIso } from "../lib/http.js"
+import { createPortfolioWalletEntry, adjustPortfolioWalletEntry } from "../wallets/index.js"
 import { benchmarkSeries, benchmarkSymbols } from "./benchmarks.js"
 
 const created = new Map()
@@ -525,8 +526,12 @@ export function register(app) {
 
   app.get("/api/portfolios/:id/transactions", (ctx) => {
     if (!requireAuth(ctx)) return
-    if (ctx.query.type === "dividend") return ctx.res.json(transactionsPage(ctx, loadRaw("portfolio_transactions_dividend.json")))
     let data = portfolioTransactions(ctx.params.id)
+    if (ctx.query.type) {
+      const want = String(ctx.query.type).toUpperCase()
+      const items = data.items.filter((t) => String(t.type ?? "").toUpperCase() === want)
+      data = { items, total: items.length }
+    }
     if (ctx.query.positionId) {
       data = { items: data.items.filter((t) => t.positionId === ctx.query.positionId), total: 0 }
       data.total = data.items.length
@@ -559,13 +564,20 @@ export function register(app) {
       return ctx.res.status(422).json({ error: "ValidationError", message: fx.error })
     }
     const { rateSource, exchangeRate } = fx.fields
+    const txType = String(body.type || "BUY").toUpperCase()
+    const gross = round2(quantity * price)
+    const taxes = body.taxes != null ? Number(body.taxes) : null
+    if (txType === "DIVIDEND" && taxes != null && taxes > gross) {
+      return ctx.res.status(422).json({ error: "ValidationError", message: "taxes cannot exceed gross amount" })
+    }
+    const net = txType === "DIVIDEND" ? round2(gross - (taxes ?? 0)) : gross
     const tx = {
       id: uuid(),
       portfolioId: ctx.params.id,
       portfolioName: "",
       walletId: body.walletId ?? null,
       positionId: body.positionId ?? null,
-      type: body.type || "BUY",
+      type: txType,
       instrumentSymbol: (body.symbol || "AAPL").toUpperCase(),
       instrumentName: body.instrumentName ?? null,
       sector: body.sector ?? (research ? research.overview.sector : "Other"),
@@ -576,7 +588,9 @@ export function register(app) {
       feesType: fx.fields.feesType,
       feeCurrency: fx.fields.feeCurrency,
       feesSettled: Math.round(fx.feesSettled * 1e8) / 1e8,
-      totalAmount: round2(quantity * price),
+      taxes,
+      notes: body.notes ?? null,
+      totalAmount: net,
       currency,
       instrumentCurrency: body.instrumentCurrency || currency,
       assetType: body.assetType || "STOCK",
@@ -587,7 +601,7 @@ export function register(app) {
       executedAt: body.executedAt || nowIso(),
       createdAt: nowIso(),
       displayCurrency: "USD",
-      convertedTotalAmount: round2(quantity * price * exchangeRate),
+      convertedTotalAmount: round2(net * exchangeRate),
       convertedPrice: round2(price * exchangeRate),
       convertedFees:
         body.fees == null
@@ -600,6 +614,18 @@ export function register(app) {
       convertedRealizedGainLoss: null,
     }
     allTxs.set(tx.id, tx)
+    createPortfolioWalletEntry({
+      walletId: tx.walletId,
+      type: tx.type,
+      symbol: tx.instrumentSymbol,
+      totalAmount: tx.totalAmount,
+      fees: tx.fees,
+      currency,
+      executedAt: tx.executedAt,
+      portfolioId: tx.portfolioId,
+      txId: tx.id,
+      taxes: tx.taxes,
+    })
     ctx.res.status(201).json(tx)
   })
 
@@ -620,6 +646,13 @@ export function register(app) {
     if (fx.error) {
       return ctx.res.status(422).json({ error: "ValidationError", message: fx.error })
     }
+    const txType = String(mergedBody.type || "BUY").toUpperCase()
+    const gross = round2(quantity * price)
+    const taxes = body.taxes != null ? Number(body.taxes) : null
+    if (txType === "DIVIDEND" && taxes != null && taxes > gross) {
+      return ctx.res.status(422).json({ error: "ValidationError", message: "taxes cannot exceed gross amount" })
+    }
+    const net = txType === "DIVIDEND" ? round2(gross - (taxes ?? 0)) : gross
     const updated = {
       ...existing,
       ...body,
@@ -628,19 +661,38 @@ export function register(app) {
       quantity,
       price,
       fees,
+      taxes,
+      notes: body.notes != null ? body.notes : existing.notes ?? null,
       feeCurrency: fx.fields.feeCurrency,
       feesSettled: Math.round(fx.feesSettled * 1e8) / 1e8,
       rateSource: fx.fields.rateSource,
       exchangeRate: fx.fields.exchangeRate,
       feeRateSource: fx.fields.feeRateSource,
       feeExchangeRate: fx.fields.feeExchangeRate,
-      totalAmount: round2(quantity * price),
-      convertedTotalAmount: round2(quantity * price * fx.fields.exchangeRate),
+      totalAmount: net,
+      convertedTotalAmount: round2(net * fx.fields.exchangeRate),
       convertedPrice: round2(price * fx.fields.exchangeRate),
       convertedFees: round2((Number(fees) || 0) * fx.fields.exchangeRate),
       updatedAt: nowIso(),
     }
     allTxs.set(ctx.params.txId, updated)
+    // §49.7 — mirror the real wallets PATCH: apply the wallet delta for the
+    // changed signed value (BUY −(total+fees), SELL total−fees, DIVIDEND net).
+    if (existing.walletId) {
+      const oldType = String(existing.type || "BUY").toUpperCase()
+      const oldGross = round2((existing.quantity ?? 1) * (existing.price ?? 0))
+      const oldTaxes = existing.taxes != null ? Number(existing.taxes) : null
+      const oldNet = oldType === "DIVIDEND" ? round2(oldGross - (oldTaxes ?? 0)) : oldGross
+      const oldFees = Number(existing.fees) || 0
+      const oldSigned = oldType === "BUY" ? -(oldNet + oldFees) : oldType === "SELL" ? oldNet - oldFees : oldNet
+      const newSigned = txType === "BUY" ? -(net + Number(fees)) : txType === "SELL" ? net - Number(fees) : net
+      adjustPortfolioWalletEntry({
+        walletId: existing.walletId,
+        txId: existing.id,
+        delta: newSigned - oldSigned,
+        currency,
+      })
+    }
     ctx.res.json(updated)
   })
 
@@ -678,30 +730,34 @@ export function register(app) {
 
   app.get("/api/portfolios/:id/dividends", (ctx) => {
     if (!requireAuth(ctx)) return
-    const positions = heldPositions(ctx.params.id)
-    const rows = []
-    for (const p of positions) {
-      const research = loadResearch(p.symbol)
-      const history = research?.dividends?.history ?? []
-      for (const d of history) {
-        rows.push({
-          symbol: p.symbol,
-          companyName: p.companyName,
-          date: d.date,
-          year: d.year,
-          amount: d.amount,
-          currency: d.currency || p.instrumentCurrency,
-          type: d.type || "dividend",
-        })
+    // §49.7 — aggregate the portfolio's REAL DIVIDEND transactions (gross =
+    // quantity × price, amount = net = gross − taxes), newest first, mirroring
+    // the wallets module (plan §49.3).
+    const rows = portfolioTransactions(ctx.params.id).items
+      .filter((t) => String(t.type ?? "").toUpperCase() === "DIVIDEND")
+      .sort((a, b) => (a.executedAt < b.executedAt ? 1 : -1))
+    const items = rows.map((t) => {
+      const gross = round2((t.quantity ?? 1) * (t.price ?? 0))
+      const taxes = t.taxes != null ? Number(t.taxes) : null
+      const amount = Math.round((gross - (taxes ?? 0)) * 1e8) / 1e8
+      const exchangeRate = t.exchangeRate != null ? Number(t.exchangeRate) : null
+      return {
+        symbol: t.instrumentSymbol,
+        instrumentName: t.instrumentName,
+        date: t.executedAt,
+        quantity: t.quantity,
+        gross,
+        taxes,
+        amount,
+        currency: t.currency,
+        exchangeRate,
+        convertedAmount: exchangeRate != null ? round2(amount * exchangeRate) : null,
+        notes: t.notes ?? null,
       }
-    }
-    rows.sort((a, b) => (a.date < b.date ? 1 : -1))
-    const total = rows.reduce((s, r) => s + (r.amount || 0), 0)
-    ctx.res.json({
-      totalDividends: round2(total),
-      count: rows.length,
-      items: rows,
     })
+    const count = items.length
+    const totalDividends = round2(items.reduce((s, it) => s + (it.convertedAmount ?? it.amount), 0))
+    ctx.res.json({ totalDividends, count, items })
   })
 
   app.get("/api/portfolios/:id/calendar", (ctx) => {

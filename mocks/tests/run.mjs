@@ -765,6 +765,95 @@ async function main() {
     await request(`/portfolios/${pid2}/transactions/${ptx.json.id}`, { method: "DELETE", token })
   }
 
+  // ── Dividends end-to-end (§49.7) — real rows + net math + wallet credit ──
+  {
+    const allPortfolios = await request("/portfolios", { token })
+    const divPid = allPortfolios.json[0].id
+    const allWalletsList = await request("/wallets", { token })
+    const divWalletId = allWalletsList.json[0].id
+
+    const divTx = await request(`/portfolios/${divPid}/transactions`, {
+      method: "POST",
+      token,
+      body: {
+        type: "DIVIDEND",
+        symbol: "MSFT",
+        quantity: 1,
+        price: 100,
+        taxes: 20,
+        notes: "Q2 payout",
+        walletId: divWalletId,
+        executedAt: "2026-09-01T00:00:00.000Z",
+      },
+    })
+    check(
+      "dividends.create nets totalAmount (gross − taxes) and stores taxes/notes",
+      divTx.status === 201 &&
+        divTx.json.type === "DIVIDEND" &&
+        divTx.json.totalAmount === 80 &&
+        divTx.json.taxes === 20 &&
+        divTx.json.notes === "Q2 payout" &&
+        divTx.json.convertedTotalAmount === 80,
+      JSON.stringify(divTx.json || {}).slice(0, 220),
+    )
+    const divId = divTx.json.id
+
+    const divFilter = await request(`/portfolios/${divPid}/transactions?type=dividend`, { token })
+    check(
+      "dividends.type filter returns runtime DIVIDEND rows",
+      divFilter.status === 200 && divFilter.json.total === 1 && divFilter.json.items[0].id === divId,
+      `got ${divFilter.status} total ${divFilter.json.total}`,
+    )
+
+    const divRows = await request(`/portfolios/${divPid}/dividends`, { token })
+    const divRow = divRows.json.items?.[0]
+    check(
+      "dividends.endpoint aggregates real rows (gross/tax/net/notes)",
+      divRows.status === 200 &&
+        divRows.json.count === 1 &&
+        divRow &&
+        divRow.symbol === "MSFT" &&
+        divRow.gross === 100 &&
+        divRow.taxes === 20 &&
+        divRow.amount === 80 &&
+        divRow.notes === "Q2 payout",
+      JSON.stringify(divRows.json || {}).slice(0, 220),
+    )
+
+    const divCashList = await request(`/wallets/${divWalletId}/transactions`, { token })
+    const divCash = divCashList.json.items.find((t) => t.id === `pf-${divId}`)
+    check(
+      "dividends.wallet credited net with PORTFOLIO reference",
+      divCash && divCash.amount === 80 && divCash.reference === `PORTFOLIO_DIVIDEND_MSFT_${divId.slice(0, 8)}`,
+      JSON.stringify(divCash || {}).slice(0, 180),
+    )
+
+    const divPatched = await request(`/portfolios/${divPid}/transactions/${divId}`, {
+      method: "PATCH",
+      token,
+      body: { taxes: 30, notes: "Q2 payout (revised)" },
+    })
+    check(
+      "dividends.patch re-nets totalAmount and updates notes",
+      divPatched.status === 200 && divPatched.json.totalAmount === 70 && divPatched.json.taxes === 30,
+      JSON.stringify(divPatched.json || {}).slice(0, 220),
+    )
+    const divCashList2 = await request(`/wallets/${divWalletId}/transactions`, { token })
+    const divCash2 = divCashList2.json.items.find((t) => t.id === `pf-${divId}`)
+    check("dividends.patch wallet entry adjusted (net delta −10)", divCash2 && divCash2.amount === 70, JSON.stringify(divCash2 || {}).slice(0, 180))
+
+    const divBad = await request(`/portfolios/${divPid}/transactions`, {
+      method: "POST",
+      token,
+      body: { type: "DIVIDEND", symbol: "MSFT", quantity: 1, price: 100, taxes: 120 },
+    })
+    check("dividends.taxes > gross → 422", divBad.status === 422, `got ${divBad.status}`)
+
+    await request(`/portfolios/${divPid}/transactions/${divId}`, { method: "DELETE", token })
+    const divRowsAfter = await request(`/portfolios/${divPid}/dividends`, { token })
+    check("dividends.delete → rows removed", divRowsAfter.status === 200 && divRowsAfter.json.count === 0, `count ${divRowsAfter.json.count}`)
+  }
+
   // ── Import (§23) ────────────────────────────────────────────
   const importSource = "mock:tests"
   const wb = await request("/import/wallets/bootstrap", {

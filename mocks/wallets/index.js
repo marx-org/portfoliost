@@ -170,6 +170,64 @@ function allWallets() {
   return merged
 }
 
+// §49.7 — a portfolio transaction credits/debits the linked wallet the way the
+// real wallets' `createWalletLink` does: in the TRANSACTION currency (no FX),
+// BUY pays out total + fees, SELL receives proceeds − fees, DIVIDEND receives
+// its net amount (totalAmount already = gross − taxes).
+export function createPortfolioWalletEntry({ walletId, type, symbol, totalAmount, fees, currency, executedAt, portfolioId, txId, taxes }) {
+  if (!walletId) return null
+  seedCashTransactions()
+  const wallet = resolveWallet(walletId)
+  if (!wallet) return null
+  const t = String(type || "BUY").toUpperCase()
+  const amountN = Number(totalAmount) || 0
+  const feesN = Number(fees) || 0
+  const signed = t === "BUY" ? -(amountN + feesN) : t === "SELL" ? amountN - feesN : amountN
+  const updated = cashApply(wallet, signed, currency)
+  const list = cashTx.get(walletId) ?? []
+  list.push({
+    id: `pf-${txId}`,
+    walletId,
+    type: t === "BUY" ? "INVEST" : "DEPOSIT",
+    amount: signed,
+    currency: String(currency || "USD").toUpperCase(),
+    reference: `PORTFOLIO_${t}_${String(symbol || "???").toUpperCase()}_${String(txId).slice(0, 8)}`,
+    date: executedAt ?? nowIso(),
+    description: `Portfolio ${t.toLowerCase()}: ${symbol}`,
+    createdAt: nowIso(),
+    portfolioId,
+    fees: feesN || null,
+    taxes: taxes ?? null,
+    isInternalTransfer: false,
+  })
+  cashTx.set(walletId, list)
+  return updated
+}
+
+// §49.7 — PATCH parity: rewrite the ledger row to the new signed amount and
+// apply the delta to the linked wallet balance (same-currency only).
+export function adjustPortfolioWalletEntry({ walletId, txId, delta, currency }) {
+  if (!walletId) return null
+  const list = cashTx.get(walletId)
+  const row = list?.find((t) => t.id === `pf-${txId}`) ?? null
+  const wallet = resolveWallet(walletId)
+  if (!wallet) return null
+  const del = Number(delta) || 0
+  if (row) row.amount = round2(Number(row.amount) + del)
+  return cashApply(wallet, del, currency)
+}
+
+function cashApply(wallet, signed, currency) {
+  if (signed === 0 || String(currency || "USD").toUpperCase() !== String(wallet.currency ?? "USD").toUpperCase()) return wallet
+  const updated = {
+    ...wallet,
+    balance: round2(wallet.balance + signed),
+    availableBalance: round2(wallet.availableBalance + signed),
+  }
+  walletOverrides.set(wallet.id, updated)
+  return updated
+}
+
 export function register(app) {
   app.get("/api/currencies", (ctx) => {
     ctx.res.json(currenciesPayload())
