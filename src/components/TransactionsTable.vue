@@ -109,6 +109,12 @@ const groups = computed(() => {
     .map(([label, items]) => ({ label, items }))
 })
 
+// §49.5: show the Tax column only when the current page holds DIVIDEND tax rows
+const hasTaxRows = computed(() => transactions.value.some((tx) => !!(tx.taxes ?? 0) && tx.type.toUpperCase() === "DIVIDEND"))
+
+function txTaxes(tx: Tx): number | null { return tx.taxes ?? null }
+function txNotes(tx: Tx): string | undefined { return tx.notes ?? undefined }
+
 // ── Data loading ──────────────────────────────────────────────────────
 
 async function load(targetPage = page.value) {
@@ -275,9 +281,9 @@ function onPickerSaved() {
 // ── Column count for group colspan ────────────────────────────────────
 
 const colCount = computed(() =>
-  // date, type, symbol, qty, price, fees, amount, actions = 8
+  // date, type, symbol, qty, price, fees, [tax], amount, actions = 8/9
   // global adds portfolio + ccy = +2
-  props.mode === "global" ? 10 : 8
+  (props.mode === "global" ? 10 : 8) + (hasTaxRows.value ? 1 : 0)
 )
 </script>
 
@@ -311,21 +317,27 @@ const colCount = computed(() =>
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-slate-100 dark:border-slate-800 text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              <th
-                v-for="col in sortableColumns" :key="col.key"
-                :data-testid="`table-th-${col.key}`"
-                class="px-5 py-2.5 font-medium"
-                :class="['price','fees','amount','quantity'].includes(col.key) ? 'text-right' : ''"
-              >
-                <button
-                  type="button"
-                  class="inline-flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100"
-                  @click="toggleSort(col.key)"
+              <template v-for="col in sortableColumns" :key="col.key">
+                <th
+                  v-if="col.key === 'amount' && hasTaxRows"
+                  data-testid="table-th-tax"
+                  class="px-5 py-2.5 font-medium text-right"
+                >Tax</th>
+                <th
+                  :data-testid="`table-th-${col.key}`"
+                  class="px-5 py-2.5 font-medium"
+                  :class="['price','fees','amount','quantity'].includes(col.key) ? 'text-right' : ''"
                 >
-                  {{ col.label }}
-                  <span v-if="sortIndicator(col.key)" class="text-[10px]">{{ sortIndicator(col.key) }}</span>
-                </button>
-              </th>
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100"
+                    @click="toggleSort(col.key)"
+                  >
+                    {{ col.label }}
+                    <span v-if="sortIndicator(col.key)" class="text-[10px]">{{ sortIndicator(col.key) }}</span>
+                  </button>
+                </th>
+              </template>
               <!-- global-only: instrument currency badge -->
               <th v-if="mode === 'global'" class="px-5 py-2.5 font-medium text-xs">Ccy</th>
               <th class="px-5 py-2.5"><span class="sr-only">Actions</span></th>
@@ -373,6 +385,7 @@ const colCount = computed(() =>
                       <span class="text-xs font-normal text-slate-400 dark:text-slate-500">{{ assetLabel(tx) }}</span>
                     </span>
                     <span class="block text-xs text-slate-500 dark:text-slate-400">{{ tx.instrumentName }}</span>
+                    <span v-if="txNotes(tx)" class="text-[11px] font-normal text-amber-600 dark:text-amber-400" :title="txNotes(tx)">note</span>
                     <LabelChips v-if="tx.labels?.length" :labels="tx.labels" :max="3" class="mt-0.5" />
                   </span>
                 </router-link>
@@ -406,6 +419,19 @@ const colCount = computed(() =>
                   :converted-fees="tx.convertedFees"
                   :display-currency="tx.displayCurrency"
                 />
+              </td>
+
+              <!-- Tax (shown for the current page when any DIVIDEND row has withholding tax) -->
+              <td v-if="hasTaxRows" class="px-5 py-3 text-right tabular-nums">
+                <template v-if="txTaxes(tx)">
+                  <DualCurrencyCell
+                    :primary="txTaxes(tx)"
+                    :primary-currency="tx.instrumentCurrency ?? tx.currency"
+                    :converted="undefined"
+                    :display-currency="tx.displayCurrency"
+                  />
+                </template>
+                <span v-else class="text-slate-400">—</span>
               </td>
 
               <!-- Amount -->
@@ -443,7 +469,7 @@ const colCount = computed(() =>
 
             <!-- Group subtotal -->
             <tr v-if="g.label" class="border-t border-slate-200 dark:border-slate-700/60 bg-slate-50 dark:bg-slate-800/50 font-medium">
-              <td class="px-5 py-3 text-slate-500 dark:text-slate-400" :colspan="mode === 'global' ? 7 : 5">{{ g.label }} subtotal</td>
+              <td class="px-5 py-3 text-slate-500 dark:text-slate-400" :colspan="(mode === 'global' ? 7 : 6) + (hasTaxRows ? 1 : 0)">{{ g.label }} subtotal</td>
               <td
                 class="px-5 py-3 text-right font-medium tabular-nums"
                 :class="groupSubtotal(g.items) < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-700 dark:text-green-400'"

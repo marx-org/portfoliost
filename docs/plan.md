@@ -94,7 +94,7 @@ research), mocks. Depends on §47 (currency resolver, no-USD rule) — implement
 
 ### 49.4 — SPA: dedicated dividend dialog (example-service parity)
 
-- [ ] New `RecordDividendDialog.vue` (does NOT reuse AddPositionDialog — different
+- [x]] New `RecordDividendDialog.vue` (does NOT reuse AddPositionDialog — different
   field set), opened from the existing HoldingsTab "Dividend" action:
   - header: instrument + "HOLDING: {qty}";
   - entry-mode toggle **Total / Per share** (per share auto-fills quantity with
@@ -107,9 +107,9 @@ research), mocks. Depends on §47 (currency resolver, no-USD rule) — implement
     instrument currency — no new rate code;
   - live summary: gross / − tax / **net** (transaction currency) + converted net
     in wallet currency; validate `tax ≤ gross` client-side.
-- [ ] Wire the dialog into HoldingsTab (replace the kind="dividend" path through
+- [x]] Wire the dialog into HoldingsTab (replace the kind="dividend" path through
   AddPositionDialog); submit to the existing POST with `taxes` + `notes`.
-- [ ] EditTransactionModal: when the edited tx is DIVIDEND, surface the same
+- [x]] EditTransactionModal: when the edited tx is DIVIDEND, surface the same
   gross/tax/notes fields (per-share display derived).
 - [ ] Tests: unit for mode math (total↔per-share, net = gross − tax) +
   e2e (docker compose, mock updated in 49.7): record a dividend with tax in the
@@ -119,11 +119,11 @@ research), mocks. Depends on §47 (currency resolver, no-USD rule) — implement
 
 ### 49.5 — SPA: portfolio Dividends tab + transactions table
 
-- [ ] `PortfolioDividendsTab.vue`: render the real endpoint (49.3) — per-row
+- [x]] `PortfolioDividendsTab.vue`: render the real endpoint (49.3) — per-row
   symbol/date/gross/tax/net (with currency per row), totals; replace the current
   research-backed mock data source in prod (tab stays fed by the same endpoint in
   mock mode, now returning the same shape from real txs).
-- [ ] `TransactionsTable.vue`: for DIVIDEND rows render the tax column when
+- [x]] `TransactionsTable.vue`: for DIVIDEND rows render the tax column when
   non-zero and a notes tooltip; verify the existing blue "DIVIDEND" badge is
   kept.
 - [ ] Tests: e2e — a recorded dividend (49.4) appears in the Dividends tab with
