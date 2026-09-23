@@ -43,14 +43,28 @@ coupon/payment dates, dividendmax is a paid-quality fallback/enhancement.
 
 Rules: one step = one commit.
 
-### 52.1 — Fixture capture: biznesradar /dywidendy/
+### 52.1 — Fixture capture: biznesradar /dywidendy/ (done 2026-09-24)
 
-- [ ] ONE request (no automation): GET `https://www.biznesradar.pl/dywidendy/,2026,4,2`
+- [x] ONE request (no automation): GET `https://www.biznesradar.pl/dywidendy/,2026,4,2`
   (sorted by payment date) + the same sort for the previous year (for "wypłacona"
   rows) → save raw HTML under `openst/tests/fixtures/biznesradar-dywidendy/`; record
   which columns are Premium-gated and the exact date format.
-- [ ] Tests: none yet (capture step); fixtures are inputs to 52.2.
-- [ ] Commit.
+  - Captured `dywidendy-2026.html` (207 data rows: 175 wypłacona / 29 uchwalona /
+    2 rekomendowana / 1 empty) + `dywidendy-2025.html` (217 rows, all wypłacona),
+    both from `/dywidendy/,YYYY,4,2` (sortCol 4 = Dzień wypłaty, dir 2).
+  - Columns: `Profil` (link → `/dywidenda/{sym}`) | `Dywidenda za rok` (year int) |
+    `Data WZA` | `Ostatnie notowanie z prawem do dywidendy` (≈ ex-date) |
+    `Dzień wypłaty` (payment date) | `Dywidenda na akcję` (amount, "0,74 PLN" —
+    comma decimal + PLN) | `Stopa dywidendy*` | `Status`.
+  - Premium-gated: **only** `Stopa dywidendy*` — renders `<span class="paid-content
+    paid-content--short">` anchor to /premium/brpremium. All other cells parse as
+    plain text.
+  - Date format: Polish short `DD MMM YY` (e.g. "05 sie 26", "28 wrz 26",
+    "30 gru 26"); missing/not-yet cells are `bd.` inside `<span class="value--light">`.
+  - Single `qTableFull` table (`class="table table--accent-header ..."`), no
+    pagination on this page (all rows in one tbody).
+- [x] Tests: none yet (capture step); fixtures are inputs to 52.2.
+- [x] Commit.
 
 ### 52.2 — biznesradar plugin: `calendar.dividend` on openbb_biznesradar
 
