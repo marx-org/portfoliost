@@ -56,15 +56,26 @@ follows the planner's openst→cachest→instruments→SPA sequence.
     cachest compose `openst` service is stale-baked and now crash-loops on
     startup — its `main.py` needs a `postgres` host the cachest stack lacks,
     unrelated to this step; live E2E happens in the instruments compose.)
-- [ ] instruments: `toCalendar` maps `payment_date` into `CalendarData.dividend[]`
+- [x] instruments: `toCalendar` maps `payment_date` into `CalendarData.dividend[]`
   (`{date, title: "Dividend Payment", year, amount}`) alongside the existing
   `exDividend[]` (ex-dividend dates keep populating `exDividend` — both arrays
   fed, amounts from the same rows); `/dividends` history rows gain
   `paymentDate` (nullable) in the contract; SPA `ResearchDividends.vue` shows the
   payment date per row when present; the always-empty "Upcoming Dividend" card in
   `ResearchCalendar.vue` becomes live; `toDividends` passes `paymentDate` through.
-- [ ] Tests: instruments vitest (row with/without payment_date), SPA e2e (calendar
+  - Done 2026-09-23: contracts `0116287` (openapi `DividendsData.history[].paymentDate`
+    nullable); instruments `8a4fb17` (`toCalendar` feeds `dividend[]` alongside
+    `exDividend[]`; `toDividends` emits `paymentDate` null-able; regenerated types);
+    SPA `a098e18` (dividends table gains a Payment Date column — `—` when null, the
+    calendar Upcoming Dividend card goes live from `dividend[]`, mock seed emits
+    `paymentDate` on the 4 recent rows of every symbol, AAPL kept seeded); suite green.
+- [x] Tests: instruments vitest (row with/without payment_date), SPA e2e (calendar
   shows both ex-date and payment-date sections for a seeded dividend payer).
+  - Done 2026-09-23: instruments vitest 344 (toCalendar both-arrays +
+    payment-date-only rows; toDividends present/null `paymentDate` + route test
+    shape); SPA unit 366 + mock 227 + full `test:e2e` **101 passed / 1 skipped**
+    (research.e2e calendar asserts both cards against the live provider stack, e2e
+    `23b02c4` provider-agnostic).
 - [ ] Closeout: contract bump + consumer installs, deploy openst/instruments,
   archive §49 fully to `plan-archive.md`.
 
