@@ -6496,7 +6496,9 @@ fixture value, and the suite starts from a fresh seed (48.4c).
 - [x] **48.6d** Update `openst-coverage.md` / price-data docs; archive §48 to `plan-archive.md`.
 - [x] **48.6e** Prod verification findings (2026-09-22, post-48.6a/b) — all points resolved
   (B1 expected stub; B2/B6 verified in prod on v1.0.189; B3/B4/B5 fixed + dev-verified
-  2026-09-23, prod verification rides the next deploy):
+  2026-09-23; **prod-verified 2026-09-23 on SPA v1.0.193 + wallets v1.1.46, incl. two
+  verification-found residuals — detail summary cards (v1.0.193) and all-drawn cash weights
+  (v1.1.46) — §48 closed**):
   - [x] **B1 — /en/charting crash: EXPECTED (acknowledged 2026-09-22):** ChartingView throws
     `TypeError: Cannot read properties of undefined (reading 'toLowerCase')` on load; `main`
     empty. Known unimplemented stub — fix when the charting section is actually built (out of
@@ -6516,7 +6518,7 @@ fixture value, and the suite starts from a fresh seed (48.4c).
      (separate surface, not B2): the portfolio-detail summary cards (`PortfolioDetailView`)
      still render `summaryMetrics` with the display symbol — track under B3's umbrella.
   - [x] **B3 — portfolio performance chart renders native values under the display-currency
-     axis: FIXED (b0b3ab0, 2026-09-23; prod verification pending with the next deploy).** Analytics
+     axis: FIXED (b0b3ab0, 2026-09-23) — prod-verified 2026-09-23 (SPA v1.0.192).** Analytics
      `timeSeries` + benchmark overlays are denominated in the portfolio `baseCurrency` (new
      contracts field, v1.6.32 — NOT `currency`; API-created portfolios default to a USD base).
      The tab converts the series once via `getLatestRate(base→display)` and re-converts in place
@@ -6527,22 +6529,40 @@ fixture value, and the suite starts from a fresh seed (48.4c).
      rebuilds the formatter. Unresolvable FX pairs degrade to 1:1 (§48.3) — the chart never
      hangs. Unit (`PortfolioPerformanceTab.test.ts`) + self-contained e2e
      (`performance-display-currency.spec.ts`: live USD→PLN rate, y-axis max tick ≥
-     0.95·seriesMax·rate, no `$` symbol).
+     0.95·seriesMax·rate, no `$` symbol). **Prod (Obligacje PKO, PLN-based, 119,190 PLN):**
+     USD display → axis $0–$40K (~$31.4K series); in-place PLN switch → axis PLN 0–120K
+     (119,190 → 120K tick); 300 px tall. Residual found during verification (under B3's
+     umbrella): the portfolio-detail summary cards still rendered `summaryMetrics` native with
+     the display symbol — fixed in v1.0.193 (`PortfolioDetailView` summaryRate watchEffect +
+     converted `summary` computed, "—" while pending, 3 unit tests): same portfolio under USD
+     display now shows Total Value $31,423.07 / Invested $30,318.42 / P/L +$1,104.65 (was
+     "$119,190.00"), return 3.64% untouched.
   - [x] **B4 — investments "Cash balance" sums native wallet balances: FIXED (b0b3ab0,
-     2026-09-23; prod verification pending).** The SPA renders the CONVERTED total from
-     `/api/wallets/total-balance?baseCurrency=<display>` (the real endpoint already supported
-     the param; the mock now honors it, per-wallet `exchangeRate`/`weight`), and the per-currency
-     share chips use the breakdown `weight` (converted shares, not raw balances). Honest "—"
-     while the one-shot fetch is in flight — never a mislabelled amount. Self-contained e2e
+     2026-09-23) — prod-verified 2026-09-23 (SPA v1.0.192 + wallets v1.1.45/46).** The SPA renders
+     the CONVERTED total from `/api/wallets/total-balance?baseCurrency=<display>` (the real
+     endpoint already supported the param; the mock now honors it, per-wallet
+     `exchangeRate`/`weight`), and the per-currency share chips use the breakdown `weight`
+     (converted shares, not raw balances). Honest "—" while the one-shot fetch is in flight —
+     never a mislabelled amount. Self-contained e2e
      (`cash-balance-display-currency.spec.ts`): own funded PLN+USD wallets, rendered USD and PLN
-     totals match Σ balance × live `/api/fx/latest` rate within 0.2%.
+     totals match Σ balance × live `/api/fx/latest` rate within 0.2%. **Prod:** Cash balance
+     −PLN 2,160,795.42 = `/api/wallets/total-balance?baseCurrency=PLN` exactly (USD display
+     −$569,668.76); the old raw sum −1,074,977.97 is gone. Residual found during verification:
+     with ALL wallets drawn (negative total, the user's actual state) every chip rendered
+     "0%" — the `totalRounded > 0` guard in wallets `valuation.ts` — fixed in v1.1.46
+     (`!== 0`, signed shares + all-drawn unit test): prod chips now show USD 66% / PLN 32% /
+     EUR 2%.
   - [x] **B5 — /api/portfolios/total-metrics doesn't convert per-portfolio values: FIXED
-     (portfoliost-wallets a4f01dd, 2026-09-23; prod verification pending).** `/total-metrics`
-     now converts each position's market value by its `instrumentCurrency` and each
-     portfolio's `totalInvested` by its `baseCurrency` to the aggregate `baseCurrency` (USD)
-     via instruments FX before summing; unresolvable pairs degrade 1:1 (§48.3). Unit test (mock
-     fx table USD:2/PLN:4 → PLN→USD 0.5; mixed PLN+USD portfolios). SPA-side: the investments
-     summary cards convert the total-metrics values baseCurrency→display (b0b3ab0).
+     (portfoliost-wallets a4f01dd, 2026-09-23) — prod-verified 2026-09-23 (SPA v1.0.192 +
+     wallets v1.1.45).** `/total-metrics` now converts each position's market value by its
+     `instrumentCurrency` and each portfolio's `totalInvested` by its `baseCurrency` to the
+     aggregate `baseCurrency` (USD) via instruments FX before summing; unresolvable pairs
+     degrade 1:1 (§48.3). Unit test (mock fx table USD:2/PLN:4 → PLN→USD 0.5; mixed PLN+USD
+     portfolios). SPA-side: the investments summary cards convert the total-metrics values
+     baseCurrency→display (b0b3ab0). **Prod:** total-metrics totalValue 255,431.70 USD;
+     Obligacje PKO (PLN-based, 119,190 PLN) now counted as 31,423.07 USD (was 119,190 — the
+     PLN number passed through unconverted); page PLN display 968,871.18 = 255,431.70 × 3.79307
+     (live rate), invested 789,376.80, P/L 179,494.38.
   - [x] **B6 — every apexchart overflowed its fixed-height wrapper (found 2026-09-22 during
      B2 verification): DONE (a2c754a, verified in prod 2026-09-22 on v1.0.189).** Root cause: vue3-apexcharts (1.8+ incl. the locked
      1.11.1) deep-merges its own `height`/`width` props (defaults `"auto"`/`"100%"`) OVER

@@ -11,7 +11,8 @@ Legend: `[ ]` pending · `[x]` done
 ## 48. FX ownership → instruments (archived 2026-09-23)
 
 Closed — full record (48.1–48.7, incl. 48.6e B1–B6) in `plan-archive.md` §48.
-Open tail: B3/B4/B5 prod verification rides the next deploy (dev-verified 2026-09-23).
+Open tail: none — B3/B4/B5 (+ summary cards, all-drawn cash weights) prod-verified 2026-09-23
+on SPA v1.0.193 / wallets v1.1.46. §48 closed.
 
 ---
 
