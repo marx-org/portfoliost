@@ -6591,6 +6591,23 @@ fixture value, and the suite starts from a fresh seed (48.4c).
 - [x] No tests (docs); commit (portfoliost).
 
 ---
+**§49 design decisions (resolved at planning):**
+
+- **Dividend = DIVIDEND transaction row** (example-service parity, confirmed against the live API) — no
+  separate dividend entity; `totalAmount` is the **net**
+  (gross − withholding tax), wallet is credited the net, `taxes` kept separately (column already
+  exists; only wire it through).
+- **Entry point**: position menu (already present) → new dedicated
+  `RecordDividendDialog` (example-service's dialog field set); the Transactions tab gets no dividend button
+  (example-service doesn't either).
+- **Entry modes**: Total and Per-share (per-share auto-fills held quantity).
+- **FX**: receive-date rate via the existing D29 automatic/custom machinery; conversion math stays
+  `@marx2/contracts/fx` (D27).
+- **`/portfolios/:id/dividends`** aggregates real DIVIDEND rows (no research data); the dividend
+  **calendar** (ex-date + payment date) is supported via 49.9 (provider tier, later step) — until
+  then the SPA payment-date card stays hidden and `CalendarData.dividend` stays empty (field kept,
+  not removed).
+- **Ordering**: §49 runs after §47 (currency fixes reuse its resolver); no dependency on §48.
 
 ## 49. Dividends end-to-end: parity with example-service (2026-09-26)
 
@@ -6812,6 +6829,24 @@ SPA `v1.0.208` (homelab pin `fb1d762df`), contracts `@marx2/contracts` `1.6.36`.
   the `"premium"`/`"402"` rate-limit patterns; the nasdaq.com calendar API is
   unusable from our egress — the dividend calendar rests on fmp alone.
 
+**§50 design decisions (resolved at planning):**
+
+- **Deploy first, refine second** — v1.0.205 already ships the §49.4 dialog; the stale homelab pin
+  (v1.0.193) is why prod still shows the
+  `AddPositionDialog` dividend flow. 50.1 fixes that before any layout work.
+- **Accent color stays the portfoliost theme** (blue primary) — parity covers
+  layout/wording/behavior, not example-service's green branding.
+- **Keep portfoliost extensions** — the `FxRateFields` block and the
+  "Net (wallet ccy)" summary row stay (cross-currency support; no example-service counterpart in the
+  reference).
+- **Button copy** — "Enter a dividend amount" (empty) / "Record dividend · N N Ccy" (filled) kept;
+  example-service's filled-state copy isn't shown in the reference.
+- **Out of scope** — dividend *editing* (`EditTransactionModal` dividend branch) is a separate flow;
+  the hardcoded `:country="'US'"` on
+  `AddPositionDialog` → `TransactionFormFields` (affects buy/sell, visible as the wrong "(US)" in
+  the legacy screenshot) is a separate bug.
+
+---
 
 ## 50. Dividend recording: example-service parity (deploy §49.4 dialog + close layout gaps)
 
@@ -6996,5 +7031,53 @@ https://portfoliost.k.homylab.com: Admin → System shows the SPA at
 `v1.0.206`; Holdings → position menu → Dividend opens the record dialog at
 parity (Total + Per Share modes, TSM); Transactions → Edit on a DIVIDEND row
 (JNJ) shows the shared DividendFields layout with prefilled gross/date/shares.
+
+---
+## 51. Document the SPA component conventions (docs/COMPONENTS.md)
+
+Proposal: — (process doc, born from the §50.8 DividendFields extraction).
+
+The reusable field-group components in `src/components/` (FeeFields,
+FxRateFields, TransactionFormFields, DividendFields) follow a consistent
+house style that was only discoverable by reading the code — §50.8 needed a
+re-read of three components before the new one could be written consistently.
+One short reference so future components (and agents) follow the style
+without archaeology.
+
+Rules: one step = one commit.
+
+### 51.1 — Write docs/COMPONENTS.md + AGENTS.md pointer (done 2026-09-23)
+
+- [x] `docs/COMPONENTS.md` covering: where components live
+  (`src/components/` shared primitives/field groups vs `src/modules/<domain>/`
+  feature views & dialogs); SFC typing conventions (`<script setup lang="ts">`,
+  typed `defineProps` with JSDoc, `defineEmits` with `update:x` events — the
+  codebase does **not** use `defineModel`); the `testid` prop prefix +
+  `const tid = props.testid ?? "default"` pattern; the `:value` + `@input`
+  field-binding pattern; slots for parent-specific injections (e.g.
+  `#before-summary`, `#after-toggle`, FxRateFields `#manual`); pure shared
+  math exported from a plain `<script>` block (e.g. `dividendTotals`);
+  styling rules (shared classes in `src/styles/main.css` — `card`, `input`,
+  `label`, `btn-primary/secondary/ghost/danger` — always with `dark:`
+  variants, `tabular-nums` for numbers); currency rules (code/symbol only via
+  `useCurrenciesStore`, never hardcoded lists; FX math only via
+  `@marx2/contracts/fx` per D27); logo convention (`/api/logos/${symbol}`
+  img, `rounded-full bg-slate-100 dark:bg-slate-800`); testid stability (unit
+  + e2e suites select on them — refactors must preserve them); test layout
+  (`tests/unit/**` mirrors `src/`, e2e against docker compose,
+  `npm run build|test|test:mock|test:e2e` gates).
+- [x] One-line pointer in `AGENTS.md` under "UI guidelines" →
+  `docs/COMPONENTS.md`.
+- [x] Tests: none (doc-only; the full suite must stay green).
+- [x] Commit.
+
+Closeout note (2026-09-23): `docs/COMPONENTS.md` committed in
+`367270e` (the step's original commit, minted `v1.0.206`); the pointer
+line in `AGENTS.md` shipped in the same commit. Post-commit accuracy pass:
+recorded the real per-component `tid` defaults (`"fee-fields"`, `"fx"`,
+`"dividend"`) and the one `defineModel` exception
+(`TransactionFormFields`' `defineModel<TransactionFormModel>("form")`
+whole-form model). `npm run build` + `npm run test` green (56 files /
+366 tests).
 
 ---

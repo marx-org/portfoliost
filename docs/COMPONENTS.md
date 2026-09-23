@@ -5,7 +5,7 @@ the examples below are the existing components to imitate:
 
 | Concern | Reference |
 |---|---|
-| Field group with a `testid` prefix | `src/components/FeeFields.vue`, `src/components/FxRateFields.vue` |
+| Field group with a `testid` prefix | `src/components/FeeFields.vue` (`"fee-fields"`), `src/components/FxRateFields.vue` (`"fx"`) |
 | Bigger form section with slots + shared math | `src/components/TransactionFormFields.vue`, `src/components/DividendFields.vue` |
 | Feature view / dialog | `src/modules/portfolios/RecordDividendDialog.vue`, `src/modules/portfolios/EditTransactionModal.vue` |
 
@@ -25,7 +25,9 @@ the examples below are the existing components to imitate:
   JSDoc comments on non-obvious props; optional props via `withDefaults` or
   `?`.
 - v-model-style bindings use **explicit `defineEmits` with `update:x`
-  events** — the codebase does not use `defineModel`:
+  events** — the codebase does not use `defineModel`, with one exception:
+  `TransactionFormFields` uses `defineModel<TransactionFormModel>("form")` for
+  its whole-form object. New components should follow the `update:x` pattern:
 
   ```ts
   const emit = defineEmits<{
@@ -34,8 +36,8 @@ the examples below are the existing components to imitate:
   ```
 
 - Field-group components take a `testid?: string` prop and resolve a local
-  `const tid = props.testid ?? "default"`; every interactive element inside
-  gets `:data-testid="`${tid}-<field>`"`. Testids are **stable API** — unit
+  `const tid = props.testid ?? "<default>"` (defaults: `"fee-fields"`,
+  `"fx"`, `"dividend"`); every interactive element inside gets `:data-testid="`${tid}-<field>`"`. Testids are **stable API** — unit
   and e2e tests select on them; a rename requires updating those tests in the
   same commit.
 - Inputs bind `:value` + `@input="emit('update:x', ($event.target as HTMLInputElement).value)"`
