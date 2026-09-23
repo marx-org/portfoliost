@@ -160,6 +160,22 @@ describe("RecordDividendDialog (§49.4)", () => {
     expect(wrapper.find('[data-testid="dividend-net"]').text()).toContain("30.00")
   })
 
+  it("per-share mode — two-column row prefilled with held shares; notes is a textarea (§50.3)", async () => {
+    const wrapper = await openDialog()
+    await wrapper.find('[data-testid="dividend-mode-pershare"]').trigger("click")
+    expect(wrapper.text()).toContain("Dividend per share")
+    expect(wrapper.text()).toContain("Shares receiving dividend")
+    expect((wrapper.find('[data-testid="dividend-shares"]').element as HTMLInputElement).value).toBe("10")
+    const notes = wrapper.find("textarea")
+    expect(notes.exists()).toBe(true)
+    expect(notes.attributes("data-testid")).toBe("dividend-notes")
+  })
+
+  it("total mode — currency symbol prefix from the registry on money inputs (§50.3)", async () => {
+    const wrapper = await openDialog()
+    expect(wrapper.find("div.relative span").text()).toBe("$")
+  })
+
   it("tax > gross → client-side error, submit blocked (§49.4)", async () => {
     const wrapper = await openDialog()
     await wrapper.find('[data-testid="dividend-gross"]').setValue("100")

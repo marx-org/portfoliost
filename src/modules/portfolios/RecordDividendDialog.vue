@@ -57,6 +57,7 @@ watch(
 )
 
 const txCcy = computed(() => (props.position?.instrumentCurrency ?? props.position?.purchaseCurrency ?? "USD").toUpperCase())
+const ccySymbol = computed(() => currenciesStore.info(txCcy.value)?.symbol ?? txCcy.value)
 const assetLabel = computed(() => {
   const t = props.position?.assetType
   return t ? t.charAt(0) + t.slice(1).toLowerCase() : "Stock"
@@ -188,70 +189,98 @@ async function submit(): Promise<void> {
           </option>
         </select>
 
-        <label class="mb-1.5 block text-sm font-medium" for="dividend-shares" v-if="perShare">Shares</label>
-        <input
-          v-if="perShare"
-          id="dividend-shares"
-          v-model="quantity"
-          type="number"
-          min="0"
-          step="any"
-          class="input mb-4"
-          :data-testid="`dividend-shares`"
-        />
-
-        <label class="mb-1.5 block text-sm font-medium" for="dividend-gross">
-          {{ perShare ? "Dividend per share" : "Gross Dividend Amount" }}
-        </label>
-        <div class="mb-4">
-          <div class="flex items-center gap-2">
+        <template v-if="!perShare">
+          <label class="mb-1.5 block text-sm font-medium" for="dividend-gross">Gross dividend amount</label>
+          <div class="relative mb-4">
+            <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 dark:text-slate-400">{{ ccySymbol }}</span>
             <input
-              :id="perShare ? 'dividend-gross-pershare' : 'dividend-gross'"
-              :value="perShare ? perShareGross : grossTotal"
-              type="number"
-              min="0"
-              step="any"
-              :placeholder="perShare ? 'e.g. 0.85' : '0.00'"
-              class="input"
-              :data-testid="`dividend-gross`"
-              @input="perShare ? (perShareGross = ($event.target as HTMLInputElement).value) : (grossTotal = ($event.target as HTMLInputElement).value)"
-            />
-            <span class="whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">{{ txCcy }}</span>
-          </div>
-        </div>
-
-        <label class="mb-1.5 block text-sm font-medium" for="dividend-tax">Withholding Tax</label>
-        <div class="mb-1.5">
-          <div class="flex items-center gap-2">
-            <input
-              id="dividend-tax"
-              v-model="taxes"
+              id="dividend-gross"
+              :value="grossTotal"
               type="number"
               min="0"
               step="any"
               placeholder="0.00"
-              class="input"
-              :data-testid="`dividend-tax`"
+              class="input pl-7"
+              :data-testid="`dividend-gross`"
+              @input="grossTotal = ($event.target as HTMLInputElement).value"
             />
-            <span class="whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">{{ txCcy }}</span>
+          </div>
+        </template>
+
+        <div v-else class="mb-4 grid grid-cols-2 gap-3">
+          <div>
+            <label class="mb-1.5 block text-sm font-medium" for="dividend-gross-pershare">Dividend per share</label>
+            <div class="relative">
+              <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 dark:text-slate-400">{{ ccySymbol }}</span>
+              <input
+                id="dividend-gross-pershare"
+                :value="perShareGross"
+                type="number"
+                min="0"
+                step="any"
+                placeholder="0.00"
+                class="input pl-7"
+                :data-testid="`dividend-gross`"
+                @input="perShareGross = ($event.target as HTMLInputElement).value"
+              />
+            </div>
+          </div>
+          <div>
+            <label class="mb-1.5 block text-sm font-medium" for="dividend-shares">Shares receiving dividend</label>
+            <input
+              id="dividend-shares"
+              v-model="quantity"
+              type="number"
+              min="0"
+              step="any"
+              class="input"
+              :data-testid="`dividend-shares`"
+            />
           </div>
         </div>
-        <p v-if="taxExceedsGross" class="mb-4 text-xs text-red-600 dark:text-red-400" :data-testid="`dividend-tax-error`">
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="mb-1.5 flex items-center gap-1.5 text-sm font-medium" for="dividend-tax">
+              Withholding Tax
+              <span
+                class="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-slate-200 text-[10px] font-semibold text-slate-500 dark:bg-slate-700 dark:text-slate-300"
+                title="Tax withheld at source; subtracted from the gross dividend amount"
+              >i</span>
+            </label>
+            <div class="relative">
+              <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 dark:text-slate-400">{{ ccySymbol }}</span>
+              <input
+                id="dividend-tax"
+                v-model="taxes"
+                type="number"
+                min="0"
+                step="any"
+                placeholder="0.00"
+                class="input pl-7"
+                :data-testid="`dividend-tax`"
+              />
+            </div>
+          </div>
+          <div>
+            <label class="mb-1.5 block text-sm font-medium" for="dividend-date">Date received</label>
+            <input id="dividend-date" v-model="date" type="date" class="input" :data-testid="`dividend-date`" />
+          </div>
+        </div>
+
+        <p v-if="taxExceedsGross" class="mb-4 mt-1.5 text-xs text-red-600 dark:text-red-400" :data-testid="`dividend-tax-error`">
           Withholding tax cannot exceed the gross dividend amount
         </p>
 
-        <label class="mb-1.5 block text-sm font-medium" for="dividend-date">Date received</label>
-        <input id="dividend-date" v-model="date" type="date" class="input mb-4" :data-testid="`dividend-date`" />
-
-        <label class="mb-1.5 block text-sm font-medium" for="dividend-notes">Notes (optional)</label>
-        <input
+        <label class="mb-1.5 mt-4 block text-sm font-medium" for="dividend-notes">Notes (optional)</label>
+        <textarea
           id="dividend-notes"
           v-model="notes"
-          type="text"
-          placeholder="e.g., Q4 2024 dividend"
-          class="input mb-4"
+          rows="3"
+          placeholder="e.g. Q4 2024 dividend"
+          class="input mb-4 resize-y"
           :data-testid="`dividend-notes`"
-        />
+        ></textarea>
 
         <FxRateFields
           leg="Transaction"
