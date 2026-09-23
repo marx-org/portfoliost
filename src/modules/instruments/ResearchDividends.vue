@@ -4,6 +4,8 @@ import { useRoute } from "vue-router"
 import { getInstrumentDividends } from "@/api/instruments"
 import type { components } from "@/api/types"
 import { formatAmount } from "@/utils/format"
+import CurrencyWarningBadge from "@/components/CurrencyWarningBadge.vue"
+import type { CurrencySource } from "@/utils/instrumentCurrency"
 
 const route = useRoute()
 const symbol = String(route.params.symbol).toUpperCase()
@@ -24,8 +26,15 @@ onMounted(async () => {
 
 const history = computed(() => data.value?.history ?? [])
 
-/** §47.5 — native currency from the first dividend row; no "USD" fallback. */
-const instrCcy = computed<string | null>(() => history.value[0]?.currency ?? null)
+/**
+ * §47.5/§49.6 — native currency from the response's top-level resolved
+ * currency (never "USD"-guessed), falling back to the first dividend row;
+ * the §47.4 currencySource rides along for the warning badge.
+ */
+const instrCcy = computed<string | null>(
+  () => data.value?.currency ?? history.value[0]?.currency ?? null,
+)
+const currencySource = computed<CurrencySource | null>(() => data.value?.currencySource ?? null)
 
 const stats = computed(() => {
   const rows = history.value
@@ -80,7 +89,10 @@ function dateLabel(d: string): string {
       </div>
 
       <div class="card p-6">
-        <h2 class="mb-3 text-base font-semibold">Dividends per share - {{ symbol }}</h2>
+        <h2 class="mb-3 text-base font-semibold">
+          Dividends per share - {{ symbol }}
+          <CurrencyWarningBadge :source="currencySource" :currency="instrCcy" class="ml-2" />
+        </h2>
         <component :is="'apexchart'" v-if="history.length" :options="chartOptions" :series="chartOptions.series" />
         <p v-else class="text-sm text-slate-500 dark:text-slate-400">No dividend data available.</p>
       </div>

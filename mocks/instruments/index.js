@@ -274,7 +274,14 @@ export function register(app) {
     const symbol = getSymbol(ctx)
     const research = loadResearch(symbol)
     if (!research) return ctx.res.status(404).json({ error: "NotFound", message: `Unknown symbol ${symbol}` })
-    ctx.res.json(research.dividends)
+    // §49.6 — research /dividends carries a never-null currency + source (§47.4)
+    const ci = currencyInfo(research)
+    return ctx.res.json({
+      ...research.dividends,
+      currency: ci.currency ?? "USD",
+      currencySource: ci.currencySource,
+      history: (research.dividends.history || []).map((r) => ({ ...r, currency: r.currency ?? ci.currency ?? "USD" })),
+    })
   })
 
   app.get("/api/instruments/:symbol/calendar", (ctx) => {
@@ -282,7 +289,9 @@ export function register(app) {
     const symbol = getSymbol(ctx)
     const research = loadResearch(symbol)
     if (!research) return ctx.res.status(404).json({ error: "NotFound", message: `Unknown symbol ${symbol}` })
-    ctx.res.json(research.calendar)
+    // §49.6 — the calendar currency is the resolved instrument currency (never null)
+    const ci = currencyInfo(research)
+    return ctx.res.json({ ...research.calendar, currency: ci.currency ?? "USD" })
   })
 
   app.get("/api/instruments/:symbol/seasonality", (ctx) => {

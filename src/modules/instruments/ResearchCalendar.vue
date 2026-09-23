@@ -81,9 +81,11 @@ function dateLabel(d: string): string {
           <p v-else class="text-sm text-slate-500 dark:text-slate-400">No upcoming ex-dividend dates.</p>
         </div>
 
-        <div class="card p-6">
+        <!-- §49.6/49.9 — payment dates are not populated until the dividend
+             calendar step, so the card stays hidden until data is present. -->
+        <div v-if="dividends.length" class="card p-6">
           <h2 class="mb-3 text-base font-semibold">Upcoming Dividend</h2>
-          <ul v-if="upcomingDivs.length" class="space-y-2 text-sm">
+          <ul class="space-y-2 text-sm">
             <li v-for="e in upcomingDivs" :key="e.date" class="flex items-center justify-between gap-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 px-3 py-2">
               <div>
                 <p class="font-medium">{{ e.title ?? "Dividend" }}</p>
@@ -92,7 +94,6 @@ function dateLabel(d: string): string {
               <span class="font-semibold text-green-700 dark:text-green-400">{{ formatAmount(e.amount, instrCcy) }}</span>
             </li>
           </ul>
-          <p v-else class="text-sm text-slate-500 dark:text-slate-400">No upcoming dividend dates.</p>
         </div>
       </div>
 

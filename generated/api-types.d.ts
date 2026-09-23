@@ -2622,7 +2622,7 @@ export interface components {
             sumOfCurrentPositions: number;
             sumOfCurrentPositionsValue: number;
         };
-        /** @description Instrument research dividend history (`history`) OR the portfolio's own dividend rows (`totalDividends`/`count`/`items`) — see the exposing endpoint. For portfolio items, gross = quantity × price, taxes is the withholding tax, amount is the NET (gross − taxes) per the example-service convention, and convertedAmount is amount in the display currency. */
+        /** @description Instrument research dividend history (`history`) OR the portfolio's own dividend rows (`totalDividends`/`count`/`items`) — see the exposing endpoint. For portfolio items, gross = quantity × price, taxes is the withholding tax, amount is the NET (gross − taxes) per the example-service convention, and convertedAmount is amount in the display currency. The research `/dividends` endpoint always also sets `currency` + `currencySource` (plan §49.6, currency is never null); the portfolio endpoint does not. */
         DividendsData: {
             history?: {
                 date: string;
@@ -2631,6 +2631,10 @@ export interface components {
                 currency: string;
                 type: string;
             }[];
+            /** @description Research side only: the instrument's resolved trading currency — always set (fallback "USD" only on total uncertainty), see `currencySource` for how it was determined. */
+            currency?: string;
+            /** @description Research side only — how `currency` was determined (§47). */
+            currencySource?: components["schemas"]["CurrencySource"];
             /** @description Sum of net dividend amounts in the display currency */
             totalDividends?: number;
             count?: number;
