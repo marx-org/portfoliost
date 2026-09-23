@@ -18,15 +18,20 @@ follows the planner's openst→cachest→instruments→SPA sequence.
   `payment_date` (vs ex-date only); save fixtures under
   `openst/tests/fixtures/`. One request per symbol, no automation.
   - Probed 2026-09-23 (AAPL, `docker compose run test`, one request per provider), raw
-    captures in `openst/tests/fixtures/dividend-probe/` (`summary.json` + 3 CSV).
+    captures in `openst/tests/fixtures/dividend-probe/` (`summary.json`, `gap-probe.json` + 3 CSV).
   - `equity.fundamental.dividends`: **yfinance → ex-date + amount only (NO `payment_date`)**, the
     current first-success winner; **nasdaq → `payment_date` + `record_date` + `declaration_date`
-    present**; fmp → 402 premium (`limit > 5` blocked on the current plan); intrinio → "Results not found".
-  - `equity.calendar.dividend` (fmp): rows already carry `payment_date` (raw columns pass
-    through `_df_records` untouched) — calendar side needs no provider work.
-  - ⇒ openst step: pass `payment_date` through from nasdaq/yfinance rows; to actually get
-    payment dates in history, prefer **nasdaq** (or merge) before accepting the yfinance
-    row, else `payment_date` stays null on the yfinance path.
+    present** (USD); **tmx → `payment_date` present but CAD amounts for AAPL → skipped**; fmp → 402
+    premium (`limit > 5` blocked on the current plan); intrinio → "Results not found".
+  - `equity.calendar.dividend`: **fmp AND nasdaq** both valid providers, rows already carry
+    `payment_date` (raw columns pass through `_df_records` untouched) — calendar side needs no
+    provider work; add nasdaq as CALENDAR_PROVIDERS fallback.
+  - dividendmax is **not** an OpenBB provider (neither endpoint accepts it) — only fmp/intrinio/
+    nasdaq/tmx/yfinance (history) and fmp/nasdaq (calendar); a dividendmax source would need a
+    custom OpenBB plugin.
+  - ⇒ openst step: pass `payment_date` through from nasdaq rows; to actually get payment dates in
+    history, prefer **nasdaq** (or merge) before accepting the yfinance row, else `payment_date`
+    stays null on the yfinance path.
 - [ ] openst: where the provider exposes it, add `payment_date` to
   `get_dividend_history` rows (`{"date", "amount", "payment_date"?}`) and pass
   calendar `dividend` rows through untouched (they already carry raw columns via
@@ -137,3 +142,97 @@ Rules: one step = one commit.
   branch) is a separate flow; the hardcoded `:country="'US'"` on
   `AddPositionDialog` → `TransactionFormFields` (affects buy/sell, visible as
   the wrong "(US)" in the legacy screenshot) is a separate bug.
+
+---
+
+## 52. Additional dividend providers: biznesradar calendar + dividendmax plugin (optional, future)
+
+Proposal: — (user note 2026-09-23 from the §49.9 probe: OpenBB ships no
+dividendmax provider; openst currently covers payment dates via nasdaq).
+
+Two provider extensions to enrich dividend/payment-date coverage beyond
+nasdaq/fmp. Provider tier ordering per the standard step sequence; nasdaq-first
+(from §49.9) stays the default until this section closes.
+
+1. **biznesradar dividend calendar** — extend the EXISTING
+   `openst/plugins/openbb_biznesradar` plugin to serve `equity.calendar.dividend`
+   for the GPW market from `https://www.biznesradar.pl/dywidendy/` (no API key).
+   Inspected 2026-09-23 via Playwright: table columns Profil (→ `/dywidenda/{sym}`) |
+   Dywidenda za rok | Data WZA | Ostatnie notowanie z prawem do dywidendy (≈ ex-date) |
+   Dzień wypłaty (payment date) | Dywidenda na akcję | Stopa dywidendy* | Status
+   ("rekomendowana"/"uchwalona"/"wypłacona"); **only the yield column is Premium-gated**.
+   Year selector is a path arg — `/dywidendy/,YYYY,{sortCol},{dir}`, sortCol 4 = Dzień
+   wypłaty (gives a calendar-ordered page); dates are Polish short format "01 paź 26"
+   (parse `DD MMM YY`, Polish month abbreviations).
+2. **dividendmax** — brand-new OpenBB provider plugin (OpenBB ships none, so this is
+   the only way to source that vendor); requires a dividendmax API key (**paid plan** —
+   budget/key decision is the user's; steps assume a key exists).
+
+Planned coverage outcome: fmp/nasdaq keep covering US, biznesradar covers GPW
+coupon/payment dates, dividendmax is a paid-quality fallback/enhancement.
+
+Rules: one step = one commit.
+
+### 52.1 — Fixture capture: biznesradar /dywidendy/
+
+- [ ] ONE request (no automation): GET `https://www.biznesradar.pl/dywidendy/,2026,4,2`
+  (sorted by payment date) + the same sort for the previous year (for "wypłacona"
+  rows) → save raw HTML under `openst/tests/fixtures/biznesradar-dywidendy/`; record
+  which columns are Premium-gated and the exact date format.
+- [ ] Tests: none yet (capture step); fixtures are inputs to 52.2.
+- [ ] Commit.
+
+### 52.2 — biznesradar plugin: `calendar.dividend` on openbb_biznesradar
+
+- [ ] `scraper.py`: fetch + parse the `/dywidendy/` table into rows
+  `{ex_dividend_date~last-notowanie, payment_date, amount, status, symbol}` (Polish
+  month-abbrev date parser added to the existing helpers); date-window filter applied
+  client-side on the parsed rows.
+- [ ] `models/calendar_dividend.py` + provider registration in the plugin `__init__.py`
+  so `obb.equity.calendar.dividend(start_date, end_date, provider="biznesradar")`
+  resolves; calendar rows map to the OpenBB `DividendCalendar` shape.
+- [ ] Unit tests in `plugins/openbb_biznesradar/tests/test_calendar_dividend.py` against
+  the captured HTML (mocked HTTP); full openst docker compose suite green (incl. the
+  separate plugin pytest passes per the existing ImportPath collision pairing).
+- [ ] openbb_client: append `"biznesradar"` to `CALENDAR_PROVIDERS` (after fmp/nasdaq).
+- [ ] Commit.
+
+### 52.3 — dividendmax fixture capture (API)
+
+- [ ] Capture the real dividendmax API shape first (exact endpoints, auth header,
+  date columns, pagination are UNKNOWN — do not guess): with a valid key, ONE request
+  each for dividend history + the dividend calendar of one US payer; save raw
+  JSON/CSV under `openst/tests/fixtures/dividendmax/`; record endpoint path, columns,
+  and whether `payment_date`/`record_date`/`declaration_date` are returned.
+- [ ] Confirm vendor TOS allows programmatic access for this use and that rate/quota
+  fit the calendar window.
+- [ ] Tests: none yet (capture step); fixtures are inputs to 52.4.
+- [ ] Commit.
+
+### 52.4 — dividendmax plugin package
+
+- [ ] New `openst/plugins/openbb_dividendmax/` package: `__init__.py` registering the
+  provider on `equity.fundamental.dividends` and `equity.calendar.dividend`, models/ +
+  a network client for the captured endpoints; `OPENBB_DIVIDENDMAX_API_KEY` in
+  `env.example`/`.env`.
+- [ ] openbb_client: append `"dividendmax"` to `DIVIDEND_PROVIDERS` and
+  `CALENDAR_PROVIDERS` (after nasdaq/fmp so it only serves as fallback until
+  explicitly preferred).
+- [ ] Unit tests in `plugins/openbb_dividendmax/tests/` against captured fixtures
+  (mocked HTTP); full openst docker compose suite green.
+- [ ] Commit.
+
+### 52.5 — cachest
+
+- [ ] `calendar.dividend` + dividend history are existing passthroughs — verify the
+  fetcher preserves the biznesradar/dividendmax rows (quick check +
+  `test_real_config_has_...`-style assertion if it does field filtering); full cachest
+  suite green.
+- [ ] Commit.
+
+### 52.6 — Closeout
+
+- [ ] Re-run the §49.9 probe comparison (biznesradar GPW + dividendmax vs nasdaq/fmp
+  payment-date coverage); decide whether dividendmax becomes the preferred history
+  source and biznesradar the GPW coupon/payment calendar.
+- [ ] Archive §52 to `plan-archive.md`.
