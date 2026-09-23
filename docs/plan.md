@@ -7,33 +7,26 @@ Legend: `[ ]` pending · `[x]` done
 
 ---
 
-
-## 48. FX ownership → instruments (archived 2026-09-23)
-
-Closed — full record (48.1–48.7, incl. 48.6e B1–B6) in `plan-archive.md` §48.
-Open tail: none — B3/B4/B5 (+ summary cards, all-drawn cash weights) prod-verified 2026-09-23
-on SPA v1.0.193 / wallets v1.1.46. §48 closed.
-
----
-
-## 49. Dividends end-to-end: parity with example-service (2026-09-26, closed 2026-09-23)
-
-Implemented end-to-end (§49.1–§49.8): wallets DIVIDEND taxes/notes + net totalAmount,
-contracts 1.6.35, SPA dialog/Dividends tab/Tax column, currency chain, mock parity,
-e2e. Gate green; deployed via homelab pin bump (`Marx2/homelab` f1730a46c: wallets
-v1.1.50, instruments v1.0.63). Archived to `plan-archive.md`. Only the pending
-§49.9 (dividend calendar) remains below; its text is unchanged and stays in place.
-
 ### 49.9 — Dividend calendar: ex-dividend + payment dates (provider tier, later)
 
 Implements the dividend-calendar half of the portfolio/instrument calendar feature
 (deferred from 49.6). Provider tier first per the standard step ordering;
 follows the planner's openst→cachest→instruments→SPA sequence.
 
-- [ ] Probe: `obb.equity.calendar.dividend` rows + the dividend-history DataFrame
+- [x] Probe: `obb.equity.calendar.dividend` rows + the dividend-history DataFrame
   (openst `get_dividend_history`) — capture which providers expose
   `payment_date` (vs ex-date only); save fixtures under
   `openst/tests/fixtures/`. One request per symbol, no automation.
+  - Probed 2026-09-23 (AAPL, `docker compose run test`, one request per provider), raw
+    captures in `openst/tests/fixtures/dividend-probe/` (`summary.json` + 3 CSV).
+  - `equity.fundamental.dividends`: **yfinance → ex-date + amount only (NO `payment_date`)**, the
+    current first-success winner; **nasdaq → `payment_date` + `record_date` + `declaration_date`
+    present**; fmp → 402 premium (`limit > 5` blocked on the current plan); intrinio → "Results not found".
+  - `equity.calendar.dividend` (fmp): rows already carry `payment_date` (raw columns pass
+    through `_df_records` untouched) — calendar side needs no provider work.
+  - ⇒ openst step: pass `payment_date` through from nasdaq/yfinance rows; to actually get
+    payment dates in history, prefer **nasdaq** (or merge) before accepting the yfinance
+    row, else `payment_date` stays null on the yfinance path.
 - [ ] openst: where the provider exposes it, add `payment_date` to
   `get_dividend_history` rows (`{"date", "amount", "payment_date"?}`) and pass
   calendar `dividend` rows through untouched (they already carry raw columns via
