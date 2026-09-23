@@ -255,6 +255,46 @@ branch of the edit modal untouched):
 
 ---
 
+## 51. Document the SPA component conventions (docs/COMPONENTS.md)
+
+Proposal: — (process doc, born from the §50.8 DividendFields extraction).
+
+The reusable field-group components in `src/components/` (FeeFields,
+FxRateFields, TransactionFormFields, DividendFields) follow a consistent
+house style that was only discoverable by reading the code — §50.8 needed a
+re-read of three components before the new one could be written consistently.
+One short reference so future components (and agents) follow the style
+without archaeology.
+
+Rules: one step = one commit.
+
+### 51.1 — Write docs/COMPONENTS.md + AGENTS.md pointer
+
+- [ ] `docs/COMPONENTS.md` covering: where components live
+  (`src/components/` shared primitives/field groups vs `src/modules/<domain>/`
+  feature views & dialogs); SFC typing conventions (`<script setup lang="ts">`,
+  typed `defineProps` with JSDoc, `defineEmits` with `update:x` events — the
+  codebase does **not** use `defineModel`); the `testid` prop prefix +
+  `const tid = props.testid ?? "default"` pattern; the `:value` + `@input`
+  field-binding pattern; slots for parent-specific injections (e.g.
+  `#before-summary`, `#after-toggle`, FxRateFields `#manual`); pure shared
+  math exported from a plain `<script>` block (e.g. `dividendTotals`);
+  styling rules (shared classes in `src/styles/main.css` — `card`, `input`,
+  `label`, `btn-primary/secondary/ghost/danger` — always with `dark:`
+  variants, `tabular-nums` for numbers); currency rules (code/symbol only via
+  `useCurrenciesStore`, never hardcoded lists; FX math only via
+  `@marx2/contracts/fx` per D27); logo convention (`/api/logos/${symbol}`
+  img, `rounded-full bg-slate-100 dark:bg-slate-800`); testid stability (unit
+  + e2e suites select on them — refactors must preserve them); test layout
+  (`tests/unit/**` mirrors `src/`, e2e against docker compose,
+  `npm run build|test|test:mock|test:e2e` gates).
+- [ ] One-line pointer in `AGENTS.md` under "UI guidelines" →
+  `docs/COMPONENTS.md`.
+- [ ] Tests: none (doc-only; the full suite must stay green).
+- [ ] Commit.
+
+---
+
 **§50 design decisions (resolved at planning):**
 - **Deploy first, refine second** — v1.0.205 already ships the §49.4 dialog;
   the stale homelab pin (v1.0.193) is why prod still shows the
