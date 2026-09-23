@@ -284,3 +284,27 @@ endpoint from the demo rates: direct pairs via `crossRate`, cross pairs, and
 (D20/D39 carry-forward semantics). Precedence remains: manual rate wins, else
 the daily close. `mocks/tests/run.mjs` gains 5 round-trips (direct/cross,
 date-ignored, 400/422).
+
+## Addendum: taxes on DIVIDEND = withholding, `net` totalAmount (2026-09-23, §49)
+
+Example service dividends are recorded as **gross / tax / net** where the tax is a
+withholding on the dividend: `net = gross − tax`. This mirrors the fee
+conventions above (fees subtract from the position/transaction) and extends
+them to the dividend income case that has no fee field.
+
+- `Transaction.taxes` (nullable, currency = transaction currency) is the raw
+  withholding amount, **always ≤ gross** (validated client + API 422). `notes`
+  recorded alongside.
+- For DIVIDEND, **`totalAmount` is the NET** (`gross − taxes`, rounded to 2);
+  for BUY/SELL `totalAmount` stays the gross notional (fees live in `fees`).
+  `convertedTotalAmount` is the net × exchange rate — the SPA summary shows
+  "gross − tax = **net**".
+- Wallet credit: a DIVIDEND credits the wallet `net` (the cash actually
+  received); BUY debits `total + fees`, SELL credits `total − fees` — the §49
+  cases extend the §33 D33 wallet-coupling semantics.
+- `GET /:id/dividends` returns, per row, `gross` (qty×price) in the
+  transaction currency, `taxes`, `amount` (net), `convertedAmount`, `notes` —
+  the 49.3 wallets contract; `totalDividends`/`count` aggregate. Portfolio
+  mocks mirror this shape from real DIVIDEND rows instead of research data.
+- `DividendsData` carries an optional `currency` + `currencySource` (never
+  null) so a mixed-currency dividend list renders per-row correctly (§49.6).
