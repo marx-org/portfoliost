@@ -142,6 +142,18 @@ describe("RecordDividendDialog (§49.4)", () => {
     expect(wrapper.find('[data-testid="dividend-net"]').text()).toContain("150.00")
   })
 
+  it("summary parity — tax row minus-signed + red, net row green (§50.4)", async () => {
+    const wrapper = await openDialog()
+    await wrapper.find('[data-testid="dividend-gross"]').setValue("200")
+    await wrapper.find('[data-testid="dividend-tax"]').setValue("30")
+    const taxRow = wrapper.find('[data-testid="dividend-tax-total"]')
+    expect(taxRow.text()).toBe("-30.00 USD")
+    expect(taxRow.classes().join(" ")).toContain("text-red-600")
+    const netRow = wrapper.find('[data-testid="dividend-net"]')
+    expect(netRow.text()).toBe("170.00 USD")
+    expect(netRow.classes().join(" ")).toContain("text-green-600")
+  })
+
   it("per-share mode — gross = quantity × per share; submit posts per-share math", async () => {
     const wrapper = await openDialog()
     await wrapper.find('[data-testid="dividend-mode-pershare"]').trigger("click")

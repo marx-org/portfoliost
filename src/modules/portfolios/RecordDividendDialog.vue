@@ -301,11 +301,13 @@ async function submit(): Promise<void> {
           </div>
           <div class="flex justify-between py-0.5">
             <span class="text-slate-500 dark:text-slate-400">Withholding Tax</span>
-            <span class="tabular-nums">{{ tax.toFixed(2) }} {{ txCcy }}</span>
+            <span class="tabular-nums text-red-600 dark:text-red-400" :data-testid="`dividend-tax-total`">
+              -{{ tax.toFixed(2) }} {{ txCcy }}
+            </span>
           </div>
           <div class="mt-1 flex justify-between border-t border-slate-200 pt-1.5 font-semibold dark:border-slate-700/60">
             <span>Net Amount</span>
-            <span class="tabular-nums" :data-testid="`dividend-net`">{{ net.toFixed(2) }} {{ txCcy }}</span>
+            <span class="tabular-nums text-green-600 dark:text-green-400" :data-testid="`dividend-net`">{{ net.toFixed(2) }} {{ txCcy }}</span>
           </div>
           <div v-if="needsFx" class="flex justify-between py-0.5 text-xs text-slate-500 dark:text-slate-400">
             <span>Net ({{ walletCcy }})</span>
