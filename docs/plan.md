@@ -43,19 +43,22 @@ research), mocks. Depends on §47 (currency resolver, no-USD rule) — implement
 
 ### 49.1 — Contracts: `notes` + explicit dividend semantics
 
-- [ ] `portfoliost-contracts/contracts/openapi.yaml`: add `notes: { type: string,
+- [x] `portfoliost-contracts/contracts/openapi.yaml`: add `notes: { type: string,
   nullable: true }` to `Transaction` and to the transaction create/update request
   schema; document on `Transaction` that for `type: DIVIDEND`, `price` is the
   per-share gross, `quantity × price` is the gross, `taxes` is the withholding tax,
   and `totalAmount` is the **net** (gross − taxes) — the example-service convention (verified
-  against the live API 2026-09-26).
-- [ ] Push `main` → CI patch bump + publish; `gh release list --repo Marx2/portfoliost-contracts`
-  to verify the tag.
-- [ ] Consumers: `NODE_AUTH_TOKEN=$(gh auth token) npm install @marx2/contracts@<new>`
-  in portfoliost-wallets and portfoliost; `npm run gen:types` in portfoliost; commit
+  against the live API 2026-09-26). `taxes` also added (nullable) to
+  `Transaction` + `CreateTransactionRequest` (it was only on cash/import schemas).
+- [x] Push `main` → CI patch bump + publish; `gh release list --repo Marx2/portfoliost-contracts`
+  to verify the tag. → **v1.6.33** (verified 2026-09-23).
+- [x] Consumers: `NODE_AUTH_TOKEN=$(gh auth token) npm install @marx2/contracts@<new>`
+  in portfoliost-wallets, portfoliost **and portfoliost-admin** (admin also pins
+  the contract for its typegen); `npm run gen:types` in each; commit
   locks + generated types (per-repo commits).
-- [ ] Tests: contracts suite green in `portfoliost-contracts/contracts/`.
-- [ ] Commit (contracts + consumers).
+- [x] Tests: contracts suite green in `portfoliost-contracts/contracts/` (also
+  wallets + admin suites green after the bump).
+- [x] Commit (contracts + consumers).
 
 ### 49.2 — Wallets schema: `notes` column
 
