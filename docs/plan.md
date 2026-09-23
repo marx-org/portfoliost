@@ -62,11 +62,12 @@ research), mocks. Depends on §47 (currency resolver, no-USD rule) — implement
 
 ### 49.2 — Wallets schema: `notes` column
 
-- [ ] `portfoliost-wallets/src/db/schema.ts`: add `notes: text("notes")` to the
+- [x] `portfoliost-wallets/src/db/schema.ts`: add `notes: text("notes")` to the
   portfolio-transactions table; drizzle migration (nullable, no backfill — dev mode,
-  portfolios rebuild on wipe & reimport if needed).
-- [ ] Tests: migration applies on a fresh PGLite; schema test updated; suite green.
-- [ ] Commit (portfoliost-wallets).
+  portfolios rebuild on wipe & reimport if needed). → migration `drizzle/0005_special_professor_monster.sql`.
+- [x] Tests: migration applies on a fresh PGLite; schema test updated; suite green
+  (18 schema tests, 315 total).
+- [x] Commit (portfoliost-wallets).
 
 ### 49.3 — Wallets API: accept taxes+notes, net totalAmount, real `/dividends`
 
