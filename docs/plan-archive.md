@@ -6748,6 +6748,53 @@ research), mocks. Depends on §47 (currency resolver, no-USD rule) — implement
   net-totalAmount convention); archive §49 (up to 49.8) to `plan-archive.md`;
   §49.9 stays pending (provider tier, separate closeout).
 
+### 49.9 — Dividend calendar: ex-dividend + payment dates (closed 2026-09-23)
+
+Closed 2026-09-23. Payment dates live: openst `v1.1.32`, instruments `v1.0.64`,
+SPA `v1.0.208` (homelab pin `fb1d762df`), contracts `@marx2/contracts` `1.6.36`.
+
+- [x] Probe (2026-09-23, AAPL, one request per provider; raw captures in
+  `openst/tests/fixtures/dividend-probe/`): `equity.fundamental.dividends` —
+  yfinance = ex-date + amount only (NO `payment_date`), nasdaq = `payment_date` +
+  `record_date` + `declaration_date` (USD), tmx = `payment_date` but CAD amounts
+  for AAPL → skipped, fmp = 402 premium, intrinio = "Results not found".
+  `equity.calendar.dividend`: fmp AND nasdaq both valid, rows already carry
+  `payment_date` (raw columns pass through `_df_records` untouched). dividendmax is
+  **not** an OpenBB provider → would need a custom plugin (future §52).
+- [x] openst (commit `32615c0`, tag `v1.1.32`): `DIVIDEND_PROVIDERS` reordered
+  **nasdaq-first** (only history provider carrying `payment_date`; yfinance keeps
+  its null path in fallback); `CALENDAR_PROVIDERS = ["fmp", "nasdaq"]`; row shape
+  `{date, amount, payment_date?}`; unit tests incl. nasdaq-shape fixture +
+  provider-skip under the new order; suite 282/91/53 green; compose smoke on AAPL:
+  `payment_date` in row + Redis cache HIT.
+- [x] cachest (commit `ff98a11`): both surfaces (`OPENST_CALENDAR_DIVIDEND`,
+  `OPENST_DIVIDENDS`) are unfiltered JSON passthroughs — added real-config
+  assertions pinning the shape + a fetcher unit test proving `payment_date`
+  passes through unchanged; suite 84 passed. (Side note: the cachest compose
+  `openst` service is stale-baked and crash-loops on startup — needs a `postgres`
+  host the cachest stack lacks; unrelated, live E2E happens in the instruments
+  compose.)
+- [x] contracts (commit `0116287`, tag `v1.6.36`): `DividendsData.history[]` gains
+  `paymentDate` (nullable; only when the provider carries it — NASDAQ does);
+  suite 16 green.
+- [x] instruments (commits `8a4fb17`, `04ae671`, tag `v1.0.64`): `toCalendar`
+  feeds `CalendarData.dividend[]` (`{date, title: "Dividend Payment", year,
+  amount}`) from `payment_date` alongside `exDividend[]` (both arrays fed, amounts
+  from the same rows); `/dividends` rows gain nullable `paymentDate`; regenerated
+  types (pinned `@marx2/contracts ^1.6.36`, bootstrap node_modules patch retired);
+  build + 344 vitest green.
+- [x] SPA (commits `a098e18`, `23b02c4`, `bc83585`, tag `v1.0.208`): dividends
+  table gains a Payment Date column (`—` when null); `ResearchCalendar.vue`
+  Upcoming Dividend card goes live from `dividend[]`; mock seed emits `paymentDate`
+  on the 4 recent rows/symbol (AAPL kept seeded); pinned `@marx2/contracts 1.6.36`;
+  unit 366 + mock 227 + full `test:e2e` 101 passed / 1 skipped (research e2e
+  asserts both cards against the live provider stack, provider-agnostic).
+- [x] Closeout (homelab pin `fb1d762df` 2026-09-23): released + pushed
+  contracts → openst → instruments → SPA (GHA auto-tag). Flux reconciled; images
+  verified on the Deployments (`v1.1.32`/`v1.0.64`/`v1.0.208`), all HelmReleases
+  True, probes healthy. instruments rollout hit the known RWO logos-PVC
+  multi-attach (new pod on a second node) — fixed via scale-to-0/back-to-1.
+
 
 ## 50. Dividend recording: example-service parity (deploy §49.4 dialog + close layout gaps)
 

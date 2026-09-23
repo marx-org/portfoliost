@@ -7,77 +7,12 @@ Legend: `[ ]` pending · `[x]` done
 
 ---
 
-### 49.9 — Dividend calendar: ex-dividend + payment dates (provider tier, later)
+### 49.9 — Dividend calendar: ex-dividend + payment dates (closed 2026-09-23)
 
-Implements the dividend-calendar half of the portfolio/instrument calendar feature
-(deferred from 49.6). Provider tier first per the standard step ordering;
-follows the planner's openst→cachest→instruments→SPA sequence.
-
-- [x] Probe: `obb.equity.calendar.dividend` rows + the dividend-history DataFrame
-  (openst `get_dividend_history`) — capture which providers expose
-  `payment_date` (vs ex-date only); save fixtures under
-  `openst/tests/fixtures/`. One request per symbol, no automation.
-  - Probed 2026-09-23 (AAPL, `docker compose run test`, one request per provider), raw
-    captures in `openst/tests/fixtures/dividend-probe/` (`summary.json`, `gap-probe.json` + 3 CSV).
-  - `equity.fundamental.dividends`: **yfinance → ex-date + amount only (NO `payment_date`)**, the
-    current first-success winner; **nasdaq → `payment_date` + `record_date` + `declaration_date`
-    present** (USD); **tmx → `payment_date` present but CAD amounts for AAPL → skipped**; fmp → 402
-    premium (`limit > 5` blocked on the current plan); intrinio → "Results not found".
-  - `equity.calendar.dividend`: **fmp AND nasdaq** both valid providers, rows already carry
-    `payment_date` (raw columns pass through `_df_records` untouched) — calendar side needs no
-    provider work; add nasdaq as CALENDAR_PROVIDERS fallback.
-  - dividendmax is **not** an OpenBB provider (neither endpoint accepts it) — only fmp/intrinio/
-    nasdaq/tmx/yfinance (history) and fmp/nasdaq (calendar); a dividendmax source would need a
-    custom OpenBB plugin.
-  - ⇒ openst step: pass `payment_date` through from nasdaq rows; to actually get payment dates in
-    history, prefer **nasdaq** (or merge) before accepting the yfinance row, else `payment_date`
-    stays null on the yfinance path.
-- [x] openst: where the provider exposes it, add `payment_date` to
-  `get_dividend_history` rows (`{"date", "amount", "payment_date"?}`) and pass
-  calendar `dividend` rows through untouched (they already carry raw columns via
-  `_df_records`); unit tests with fixtures; full openst suite green; compose smoke
-  (curl one US dividend payer, cache HIT on second call).
-  - Done 2026-09-23: `DIVIDEND_PROVIDERS` reordered **nasdaq-first** (the only history
-    provider carrying `payment_date`; yfinance keeps its null path only in fallback);
-    `CALENDAR_PROVIDERS = ["fmp", "nasdaq"]` (both pass `payment_date` through `_df_records`);
-    row shape `{date, amount, payment_date?}` (`payment_date` present only when the
-    provider supplies it). Unit tests incl. nasdaq-shape fixture + blocked/rate-limit
-    provider-skip under the new order; suite 282/91/53 green; compose smoke on AAPL:
-    `payment_date` in row + Redis cache HIT (1.13 s → 0.00 s).
-- [x] cachest: no new route (dividend history + calendar dividend are existing
-  passthroughs) — verify the fetcher preserves the new `payment_date` field
-  (quick check + `test_real_config_has_...` style assertion if it does field
-  filtering); full cachest suite green.
-  - Done 2026-09-23 (`ff98a11`): both surfaces (`OPENST_CALENDAR_DIVIDEND`,
-    `OPENST_DIVIDENDS`) are unfiltered JSON passthroughs — no `extract.selector`,
-    no `json_field`, so `payment_date` round-trips untouched. Added real-config
-    assertions pinning that shape + a fetcher unit test proving a body carrying
-    `payment_date` passes through unchanged; suite 84 passed. (Side note: the
-    cachest compose `openst` service is stale-baked and now crash-loops on
-    startup — its `main.py` needs a `postgres` host the cachest stack lacks,
-    unrelated to this step; live E2E happens in the instruments compose.)
-- [x] instruments: `toCalendar` maps `payment_date` into `CalendarData.dividend[]`
-  (`{date, title: "Dividend Payment", year, amount}`) alongside the existing
-  `exDividend[]` (ex-dividend dates keep populating `exDividend` — both arrays
-  fed, amounts from the same rows); `/dividends` history rows gain
-  `paymentDate` (nullable) in the contract; SPA `ResearchDividends.vue` shows the
-  payment date per row when present; the always-empty "Upcoming Dividend" card in
-  `ResearchCalendar.vue` becomes live; `toDividends` passes `paymentDate` through.
-  - Done 2026-09-23: contracts `0116287` (openapi `DividendsData.history[].paymentDate`
-    nullable); instruments `8a4fb17` (`toCalendar` feeds `dividend[]` alongside
-    `exDividend[]`; `toDividends` emits `paymentDate` null-able; regenerated types);
-    SPA `a098e18` (dividends table gains a Payment Date column — `—` when null, the
-    calendar Upcoming Dividend card goes live from `dividend[]`, mock seed emits
-    `paymentDate` on the 4 recent rows of every symbol, AAPL kept seeded); suite green.
-- [x] Tests: instruments vitest (row with/without payment_date), SPA e2e (calendar
-  shows both ex-date and payment-date sections for a seeded dividend payer).
-  - Done 2026-09-23: instruments vitest 344 (toCalendar both-arrays +
-    payment-date-only rows; toDividends present/null `paymentDate` + route test
-    shape); SPA unit 366 + mock 227 + full `test:e2e` **101 passed / 1 skipped**
-    (research.e2e calendar asserts both cards against the live provider stack, e2e
-    `23b02c4` provider-agnostic).
-- [ ] Closeout: contract bump + consumer installs, deploy openst/instruments,
-  archive §49 fully to `plan-archive.md`.
+Closed — full record (probe, openst, cachest, contracts, instruments, tests,
+closeout) in `plan-archive.md` §49.9. Payment dates live in prod: openst
+`v1.1.32`, instruments `v1.0.64`, SPA `v1.0.208`, contracts `@marx2/contracts`
+`1.6.36` (homelab pin `fb1d762df`).
 
 ---
 
@@ -262,3 +197,143 @@ Rules: one step = one commit.
   payment-date coverage); decide whether dividendmax becomes the preferred history
   source and biznesradar the GPW coupon/payment calendar.
 - [ ] Archive §52 to `plan-archive.md`.
+
+---
+
+## 53. Main-page portfolio cards: stale charts, MWR overflow, current_value, snapshot FX (investigated 2026-09-23 in PROD)
+
+Proposal: — (investigation, no proposal doc — see "Findings" below).
+
+The investments-page portfolio cards (`PortfolioCard.vue`) render sparklines from the
+same `/api/portfolios/:id/analytics` data as the performance tab, but four distinct
+defects make them look wrong/stale in PROD:
+
+**Findings (verified against the homelab cluster, 2026-09-23):**
+
+1. **Card sparkline never re-renders after mount.** `PortfolioCard.vue` binds the
+   vue3-apexcharts `options` from a stable cached computed and lacks the `:key`
+   remount fingerprint that `PortfolioPerformanceChart.vue` already carries
+   (§48.6e B3 — prop updates are not pushed into the running instance in this
+   stack). Timeframe clicks and 5 s backfill-poll updates may leave the initial
+   series on screen.
+2. **MWR overflow kills backfill → `Crypto` permanently stuck on "Loading chart…".** `portfolio_backfill_metadata` for Crypto: status `failed`, error
+   `numeric field overflow` — `buildMwr`'s XIRR Newton solver diverges for
+   near-zero-capital / one-sided-flow histories and "converges" to a garbage rate;
+   `Math.pow(1+r, t)` then produced `cumulative_mwr ≈ 1.01e12` into a
+   `numeric(20,8)` column (`returnColumns.ts`). The card polls only on
+   `backfillStatus === "pending"`, so `failed` shows "Loading chart…" forever with
+   no diagnostics.
+3. **`portfolios.current_value` is never maintained** — all 10 portfolios are 0, so
+   every card shows "Value $0.00 · Return 0.00%" while the chart ends at real
+   values.
+4. **Two pipelines write `value_snapshots` with different FX rules.** Backfill
+   (`backfill.ts`) fetches closes server-side converted into the portfolio base
+   currency (plan §48.3); snapshot-on-read (`quotes.ts` `snapshotPortfolioValue`)
+   sums `positions.market_value × fx(instrument_currency→base)`, but the live-quote
+   path stores `current_price`/`market_value` in the **quote's native price
+   currency, unconverted** (§39). PROD proof (IBKR): TSM lot `current_price 452.00`
+   (USD close, matches `price_bars_all`) with `instrument_currency=USD` and MV 4 068 —
+   while the backfill valued the same day at 199 983 PLN, snapshot-on-read wrote
+   251 782 PLN (+26%, pure FX inconsistency between the two pipelines' price/rate
+   resolution). That 2026-09-23 row is what both charts now end on.
+
+Repos touched: `portfoliost-wallets` (53.1–53.2, 53.5–53.7), `portfoliost` SPA
+(53.3–53.4). No provider-tier (openst/cachest/instruments) work.
+
+Rules: one step = one commit; a step is marked `[x]` only after its tests pass
+(unit + docker-compose level).
+
+### 53.1 — wallets: guard MWR (and XIRR) against divergence
+
+- [ ] `src/services/returnColumns.ts`: `xirr()` returns `null` when the result is
+  non-finite or outside a sane band (|r| > 10); `buildMwr` then takes its existing
+  `buildSimple` fallback (it already does — the guard makes it reachable).
+- [ ] Unit tests in `returnColumns.test.ts` (create if absent, else extend):
+  (a) the Crypto-shaped case — small capital + one large deposit whose XIRR would
+  exceed the band → every `buildMwr` output is finite and |v| < 1e12 (column-bound
+  regression); (b) a healthy mixed-flow case still yields a real MWR (no
+  regression to the fallback).
+- [ ] Full wallets suite green (`npm run test`); `npm run build` clean.
+- [ ] Commit.
+
+### 53.2 — wallets: widen cumulative columns + reimport PROD
+
+- [ ] Belt-and-braces: change `cumulative_twr/mwr/simple` from `numeric(20,8)` to
+  `numeric(28,8)` in `src/db/schema.ts`; `npm run db:generate` → migration SQL
+  committed alongside.
+- [ ] Migration applies in dev docker-compose without error; wallets suite green.
+- [ ] PROD: **user-approved wipe & reimport** of the wallets DB (Admin → Jobs →
+  "Wipe & Reimport", `portfoliost-sheets-sync`), then verify
+  `portfolio_backfill_metadata` shows `complete` for **all** portfolios (incl.
+  Crypto) and no `numeric field overflow` in the error column. (Requires explicit
+  user approval at execution time — homelab mutation.)
+- [ ] Commit (schema + migration).
+
+### 53.3 — SPA: card chart remount + failed-backfill state
+
+- [ ] `src/modules/portfolios/PortfolioCard.vue`: add the `chartKey` remount
+  fingerprint (copy the pattern + comment from
+  `src/components/PortfolioPerformanceChart.vue`) to the `<apexchart>` so timeframe
+  switches and poll updates repaint the running instance.
+- [ ] Handle `analytics.backfillStatus === "failed"`: render "Chart unavailable"
+  + a small **Recompute** button (existing `recomputePortfolio` API) instead of the
+  eternal "Loading chart…"; stop the pending-only poll assumption.
+- [ ] Vitest: the chart key changes when the series fingerprint changes (same
+  assertions as the shared component's tests).
+- [ ] Playwright e2e (docker-compose stack): on the investments page, click 6M→1Y
+  on a card and assert the remount (canvas key/replacement or series count
+  change); `npm run test:e2e` green.
+- [ ] `npm run build`, `npm run test`, `npm run test:mock`, `npm run test:e2e`
+  green; commit.
+
+### 53.4 — Decision recorded: card sparkline stays shape-only, no FX conversion
+
+- [ ] No code change (user decision 2026-09-23): the card sparkline renders the
+  series shape only — no value labels, no tooltip (already the case: `dataLabels`
+  off, `tooltip.enabled=false`). It is therefore not converted to the display
+  currency; no numbers on the card are mislabeled by it. The numeric Value/
+  Invested/Return row is fixed by 53.5 instead.
+- [ ] Assert in 53.3's vitest/e2e that the sparkline renders no text/tooltip
+  (guards against a later "nice to have" re-introducing unconverted numbers).
+- [ ] Commit (test-only).
+
+### 53.5 — wallets: maintain `portfolios.current_value` from the latest snapshot
+
+- [ ] In the history-write paths (`backfill.ts` `runBackfill`/`recalcPortfolioHistory`
+  after the batch is committed, and `quotes.ts` `snapshotPortfolioValue` after its
+  upsert), set `portfolios.current_value` = the newest `value_snapshots.value` for
+  that portfolio (1-day-old is acceptable — user decision 2026-09-23). Factor into
+  one small exported helper (`syncCurrentValueFromSnapshots(db, portfolioId)`) and
+  call from both sites.
+- [ ] Unit tests: after a backfill/recalc the column equals the last snapshot
+  value; after a snapshot-on-read upsert it equals the new row; a portfolio whose
+  history is cleared (all txs removed) → `current_value` 0.
+- [ ] Existing detail/summary surfaces that read `currentValue` keep behaving
+  (no contract change — column already exists in the schema/contract).
+- [ ] Full wallets suite green; commit.
+
+### 53.6 — wallets: unify snapshot-on-read FX with the backfill rule
+
+- [ ] In `quotes.ts`: when accumulating `liveValues` for `snapshotPortfolioValue`,
+  carry the quote's own currency (`quote.currency`, already fetched, §39-validated
+  ISO code). In `snapshotPortfolioValue`, convert each leg as
+  `mv × fx(quoteCurrency → base)`; when no live quote exists (fallback branch) use
+  the position's stored `market_value` with `fx(instrument_currency → base)` as
+  today (stored MVs on fallback are the legacy native-mixed values — document the
+  residual).
+- [ ] Unit test (the regression that motivated this): a portfolio with one USD
+  lot (quote currency USD) + one PLN-denominated base lot, base currency PLN →
+  `snapshotPortfolioValue` output equals what `computeSnapshotBatch` produces for
+  the same fixtures (pipeline-agreement test).
+- [ ] Full wallets suite green; commit.
+
+### 53.7 — Closeout
+
+- [ ] Dev docker-compose smoke: seed a multi-currency portfolio, trigger backfill
+  + a quote refresh, assert same-day snapshot value is stable (53.6) and
+  `current_value` tracks the latest snapshot (53.5).
+- [ ] PROD (after 53.2's reimport, with user approval): Playwright against
+  `https://portfoliost.k.homylab.com` — card sparklines repaint on timeframe
+  click, no "Loading chart…" stuck cards, card Value matches the chart end value
+  (±1 day), Crypto card shows a chart.
+- [ ] Archive §53 to `plan-archive.md`.
