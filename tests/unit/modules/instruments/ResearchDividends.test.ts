@@ -15,8 +15,8 @@ vi.mock("@/api/instruments", async (importOriginal) => {
   }
 })
 
-function historyRow(currency: string) {
-  return { date: "2026-05-12", year: 2026, amount: 0.26, currency, type: "regular" }
+function historyRow(currency: string, paymentDate?: string) {
+  return { date: "2026-05-12", year: 2026, amount: 0.26, currency, type: "regular", paymentDate: paymentDate ?? null }
 }
 
 async function mountWith(response: unknown) {
@@ -51,5 +51,23 @@ describe("ResearchDividends — §49.6 instrCcy chain", () => {
   it("falls back to the first row currency when the response omits the top-level field", async () => {
     const wrapper = await mountWith({ history: [historyRow("PLN")] })
     expect(wrapper.text()).toContain("0.26")
+  })
+})
+
+describe("ResearchDividends — §49.9 payment date column", () => {
+  it("shows the payment date when present, an em dash when null", async () => {
+    const wrapper = await mountWith({
+      history: [historyRow("USD", "2026-05-15"), historyRow("USD")],
+      currency: "USD",
+      currencySource: "provider",
+    })
+    const rows = wrapper.findAll("tbody tr")
+    expect(rows[0].text()).toContain("May 15, 2026")
+    expect(rows[1].text()).toContain("—")
+  })
+
+  it("renders the Payment Date column header", async () => {
+    const wrapper = await mountWith({ history: [historyRow("USD")] })
+    expect(wrapper.findAll("th").some((th) => th.text() === "Payment Date")).toBe(true)
   })
 })

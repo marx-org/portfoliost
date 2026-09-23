@@ -258,13 +258,17 @@ function synthDividends(b, rnd) {
   for (let i = 0; i < 24; i++) {
     const idx = 23 - i
     const date = new Date(Date.UTC(2026, 7, 15) - idx * Math.round(365 / freq) * 86400000)
-    history.push({
+    const row = {
       date: date.toISOString().slice(0, 10),
       year: date.getUTCFullYear(),
       amount: round(0.25 + between(rnd, 0, 0.15), 4),
       currency: b.currency,
       type: freq === 4 ? "quarterly" : "annual",
-    })
+    }
+    // §49.9 — recent rows carry a payment date (the four most recent have one,
+    // older rows keep paymentDate null so the client's — path stays covered).
+    if (idx < 4) row.paymentDate = new Date(date.getTime() + 4 * 86400000).toISOString().slice(0, 10)
+    history.push(row)
   }
   return history
 }

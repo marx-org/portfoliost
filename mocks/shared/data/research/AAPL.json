@@ -572,28 +572,32 @@
         "year": 2023,
         "amount": 0.2828,
         "currency": "USD",
-        "type": "annual"
+        "type": "annual",
+        "paymentDate": "2023-08-20"
       },
       {
         "date": "2024-08-15",
         "year": 2024,
         "amount": 0.3151,
         "currency": "USD",
-        "type": "annual"
+        "type": "annual",
+        "paymentDate": "2024-08-19"
       },
       {
         "date": "2025-08-15",
         "year": 2025,
         "amount": 0.2848,
         "currency": "USD",
-        "type": "annual"
+        "type": "annual",
+        "paymentDate": "2025-08-19"
       },
       {
         "date": "2026-08-15",
         "year": 2026,
         "amount": 0.2689,
         "currency": "USD",
-        "type": "annual"
+        "type": "annual",
+        "paymentDate": "2026-08-19"
       }
     ]
   },
@@ -933,7 +937,7 @@
   },
   "aiInsights": {
     "symbol": "AAPL",
-    "generatedAt": "2026-08-11T20:46:59.178Z",
+    "generatedAt": "2026-09-23T19:22:25.225Z",
     "summary": "Apple Inc trades at a 26.4x forward P/E with 14.2% expected EPS growth. Balance sheet remains healthy with net debt to equity at 0.16.",
     "bullCase": [
       "Revenue growth is expected to continue at 22.5%",

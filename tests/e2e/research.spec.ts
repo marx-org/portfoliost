@@ -192,6 +192,23 @@ test("research tabs switch between all views", async ({ page }) => {
   await expect(page).toHaveURL(/\/en\/research\/AAPL\/overview/)
 })
 
+test("calendar shows both ex-dividend and payment-date sections for the seeded dividend payer", async ({ page }) => {
+  await openResearch(page, "calendar")
+  await expect(page.locator(".card", { hasText: "Upcoming Ex-Dividend" })).toBeVisible({ timeout: 15000 })
+  await expect(page.locator(".card", { hasText: "Upcoming Dividend" })).toBeVisible({ timeout: 15000 })
+  await expect(page.getByText("Ex-Dividend Nov 2026")).toBeVisible()
+  await expect(page.getByText("Dividend Dec 2026")).toBeVisible()
+})
+
+test("dividends table shows the payment date column for the seeded dividend payer", async ({ page }) => {
+  await openResearch(page, "dividends")
+  const table = page.locator(".card", { hasText: "Payment History" })
+  await expect(table).toBeVisible({ timeout: 15000 })
+  await expect(table.getByRole("columnheader", { name: "Payment Date" })).toBeVisible()
+  // §49.9 — the best-case seeded payer (AAPL) carries a payment date on recent rows
+  await expect(table.getByText("Aug 19, 2026")).toBeVisible()
+})
+
 test("investor relations opens a document and shows SEC MD&A content", async ({ page }) => {
   await openResearch(page, "investor-relations")
   await expect(page.getByText(/All \(/)).toBeVisible({ timeout: 15000 })

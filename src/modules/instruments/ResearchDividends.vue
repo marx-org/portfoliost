@@ -104,6 +104,7 @@ function dateLabel(d: string): string {
             <thead>
               <tr class="border-b border-slate-200 dark:border-slate-700/60 text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 <th class="py-2 pr-3">Date</th>
+                <th class="py-2 pr-3">Payment Date</th>
                 <th class="py-2 pr-3 text-right">Year</th>
                 <th class="py-2 pr-3 text-right">Amount</th>
                 <th class="py-2 pr-3">Currency</th>
@@ -113,6 +114,7 @@ function dateLabel(d: string): string {
             <tbody>
               <tr v-for="r in history" :key="r.date" class="border-b border-slate-100 dark:border-slate-800">
                 <td class="py-2 pr-3 font-medium">{{ dateLabel(r.date) }}</td>
+                <td class="py-2 pr-3">{{ r.paymentDate ? dateLabel(r.paymentDate) : "—" }}</td>
                 <td class="py-2 pr-3 text-right">{{ r.year }}</td>
                 <td class="py-2 pr-3 text-right font-semibold text-green-700 dark:text-green-400">{{ formatAmount(r.amount, r.currency) }}</td>
                 <td class="py-2 pr-3">{{ r.currency }}</td>
