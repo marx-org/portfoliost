@@ -128,14 +128,16 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ### 53.4 — Decision recorded: card sparkline stays shape-only, no FX conversion
 
-- [ ] No code change (user decision 2026-09-23): the card sparkline renders the
+- [x] No code change (user decision 2026-09-23): the card sparkline renders the
   series shape only — no value labels, no tooltip (already the case: `dataLabels`
   off, `tooltip.enabled=false`). It is therefore not converted to the display
   currency; no numbers on the card are mislabeled by it. The numeric Value/
   Invested/Return row is fixed by 53.5 instead.
-- [ ] Assert in 53.3's vitest/e2e that the sparkline renders no text/tooltip
-  (guards against a later "nice to have" re-introducing unconverted numbers).
-- [ ] Commit (test-only).
+- [x] Assert in 53.3's vitest that the sparkline renders no text/tooltip:
+  `PortfolioCard.test.ts` (capturing apexchart stub) pins `dataLabels.enabled ===
+  false`, `tooltip.enabled === false`, `xaxis.labels.show === false` (guards
+  against a later "nice to have" re-introducing unconverted numbers).
+- [x] Commit (test-only, portfoliost c3410ea).
 
 ### 53.5 — wallets: maintain `portfolios.current_value` from the latest snapshot
 
