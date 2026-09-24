@@ -1,5 +1,6 @@
-/** PortfolioCard.test.ts (§53.3) — sparkline remount key + failed-backfill state */
+/** PortfolioCard.test.ts (§53.3/§53.4) — sparkline remount key, failed-backfill state, shape-only guard */
 import { flushPromises, mount } from "@vue/test-utils"
+import { h } from "vue"
 import { createPinia, setActivePinia } from "pinia"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import PortfolioCard from "@/modules/portfolios/PortfolioCard.vue"
@@ -103,5 +104,38 @@ describe("PortfolioCard sparkline (§53.3)", () => {
     expect(mockedPortfolios.recomputePortfolio).toHaveBeenCalledWith("p1")
     expect(w.text()).not.toContain("Chart unavailable")
     expect(w.findComponent({ name: "apexchart" }).exists()).toBe(true)
+  })
+
+  it("sparkline is shape-only: no data labels, tooltip or axis text (§53.4)", async () => {
+    // User decision 2026-09-23: the card sparkline renders the series shape
+    // only — never converted to the display currency, so it must never carry
+    // numbers (value labels / tooltip / axis labels). Guard against a later
+    // "nice to have" re-introducing unconverted values on the card.
+    mockedPortfolios.getPortfolioAnalytics.mockResolvedValue(analytics([100, 102, 105]))
+    const captured: { options?: Record<string, unknown> } = {}
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    mount(PortfolioCard, {
+      props: { portfolio: PORTFOLIO },
+      global: {
+        plugins: [pinia],
+        stubs: {
+          apexchart: (props: { options?: Record<string, unknown> }) => {
+            if (props.options) captured.options = props.options
+            return h("div")
+          },
+          RouterLink: { template: '<a href="#"><slot /></a>' },
+        },
+      },
+    })
+    await flushPromises()
+    const opts = captured.options as {
+      dataLabels: { enabled: boolean }
+      tooltip: { enabled: boolean }
+      xaxis: { labels: { show: boolean } }
+    }
+    expect(opts.dataLabels.enabled).toBe(false)
+    expect(opts.tooltip.enabled).toBe(false)
+    expect(opts.xaxis.labels.show).toBe(false)
   })
 })
