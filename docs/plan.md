@@ -69,143 +69,13 @@ PROD wipe & re-import clean (2016 inserted, 0 errors). Full record in
 
 ---
 
-## 56. ticker_reference ambiguity: resolver silence for multi-exchange ticker collisions
-
-Proposal: — (user request 2026-09-24; follow-up to the §54.5 PROD finding; no proposal doc).
-
-The §54.5 PROD verification exposed a currency defect: the calendar for a
-portfolio holding un-suffixed **AMD** resolved currency **AUD** —
-`resolveInstrumentCurrency` (§47.5) matched `ticker_reference` and took
-`rows[0]` of four exact `AMD` listings (ASX Arrow Minerals, NASDAQ Advanced
-Micro Devices, NEO CDR, TASE Amiad Water). Verified in PROD 2026-09-24: the
-non-venue `searchTickerReference` ranks all exact matches identically (rank 0,
-same length) and the final tiebreak (`ticker` — identical across rows) leaves
-the order to heap luck; ASX won. The §47 contract says the resolver "returns
-null on any uncertainty — never guess", but a multi-exchange collision with no
-venue hint is exactly such uncertainty and is not treated as one.
-
-**A sheet-sync override is not the fix** (verified 2026-09-24, ruled out):
-the Podsumowanie catalog (§40 import-side symbol mapping) can only rewrite the
-imported symbol string, and the only disambiguating form is a venue suffix —
-but PROD `exchange_reference` has **no `yahoo_suffix` for NASDAQ or NYSE**
-(both empty; only e.g. WSE→WA), so no sheet value can qualify the listing, and
-a bare AMD→AMD mapping is a no-op. The defect is in the instruments resolver
-selection, not the sheet data; `ticker_reference` stays pure adanos
-(§40 — never patch).
-
-Repos touched: `portfoliost-instruments` only (no contracts change — response
-shapes are unchanged). Caller audit (all already written against the §47
-"null on uncertainty" contract): the calendar route (`?? "USD"` §49.6
-fallback — AMD then gets USD), `resolveCurrency` (§47.4 — a provider-declared
-currency now beats a silent local instead of losing to a wrong "estimated"
-local — the /dividends & profile surfaces are strictly improved), the
-price-bars route guard (§48.2 — an explicit `?currency=` conversion on an
-ambiguous symbol → 400 "base currency unknown" instead of a silently
-wrong-base conversion; default chart loads pass no `currency`, unaffected),
-and `price-bars.ts` baseCcy (null → no conversion, native series with
-`currency: null` — chart titles omit the currency per §47.6 rather than
-guessing).
-
-Rules: one step = one commit; a step is marked `[x]` only after its tests pass
-(unit + docker-compose level).
-
-### 56.1 — instruments: ambiguity → resolver silence in `resolveInstrumentCurrency`
-
-- [x] `src/services/instrument-currency.ts` — in the un-suffixed branch (no
-  exchange hint), fetch up to 10 `searchTickerReference` rows and, among rows
-  whose `ticker` exactly equals the route symbol, count distinct `exchange`
-  values: **>1 → return null** (silence); exactly 1 → resolve as today.
-  Venue-qualified path (suffix → exchange → exact listing) and the
-  bond/fund short-circuit are untouched.
-- [x] Unit tests (`instrument-currency.test.ts`): (a) AMD-shaped collision —
-  exact `AMD` rows on ASX + NASDAQ + NEO + TASE, no suffix → `null`; and
-  `resolveCurrency` with provider-declared USD → `{ USD, "provider" }`, not
-  `{ AUD, "estimated" }`; (b) a single-listing ticker still resolves via
-  country code; (c) venue-qualified `SNT.WA` with a cross-exchange `SNT`
-  collision still resolves to the WSE row (regression guard, §49.9
-  follow-up); (d) bond/savings short-circuit unchanged.
-- [x] Full instruments suite green (`npm run test`) + `npm run build`.
-- [x] Commit.
-
-### 56.2 — release + PROD verify
-
-- [x] Push → GHA patch-bump (pin the **real** tag from `gh release list`) →
-  bump the pin in the homelab instruments helmrelease — **all 4 occurrences**
-  (app + tickersync + corpbondsync + fxsyync cronjobs).
-- [x] Flux + kubectl verify (`KUBECONFIG=$HOME/.kube/homylab`); if the RWO
-  logos PVC multi-attach stalls the rollout (known gotcha), scale the
-  deployment to 0, wait, scale back to 1.
-- [ ] Playwright PROD: a portfolio holding un-suffixed AMD →
-  `GET /api/portfolios/:id/calendar` returns `currency: "USD"` for the AMD
-  holding (and the Calendar tab renders accordingly); the AMD research chart
-  still renders (default load = no conversion); an explicit display-currency
-  selection on AMD shows the §48.2 400 error state, not a silently converted
-  series. **Verified 2026-09-24 — first two clauses pass; third clause
-  exposed a gap:** the `price-bars` leg does return the §48.2 400, but
-  `PriceChart.vue` runs a second `/history` leg which has NO base-currency
-  guard — for ambiguous AMD it returns 200 with `currency: null` and
-  unconverted USD closes, and the UI keeps showing that series while the
-  title selector still reads the chosen display currency (PLN) — i.e. a
-  silently wrong-denomination series, exactly what the guard was meant to
-  prevent. Follow-up needed (instruments guard on `/history`, or PriceChart
-  error state on 400).
-- [ ] Commit (plan closeout) + archive §56.
-
- **Open question (decide before 56.2):** is silence → the §49.6 USD fallback
-sufficient, or do we also want **precise disambiguation** — wallets' calendar
-fan-out passes the position's `companyName` as a hint (`?company=`) and the
-resolver prefers the exactly-matching name row among colliding tickers? The
-hint variant fixes the rare non-US un-suffixed collision (e.g. a foreign
-ticker imported bare from IBKR) that the USD fallback would get wrong; it
-touches wallets + instruments (new API param), so it would land as a separate
-step if wanted.
-
- **Open question — DECIDED 2026-09-24 by the user:** implement the guard (a);
-no `?company=` hint. Silence → the §49.6 USD fallback stands as the resolution
-policy; the `?company=` disambiguation variant is NOT wanted.
-
-### 56.3 — instruments: base-currency guard on `/:symbol/history` + PriceChart refusal notice (user request 2026-09-24)
-
-The §56.2 PROD verify exposed a gap: `PriceChart.vue` fires a **two-stage**
-load (price-bars leg → full `/history` leg). The §48.2 base-currency guard
-lived only on the `price-bars` route. The `/history` leg had none: for an
-ambiguous un-suffixed ticker (AMD on 4 exchanges, resolver silent per
-§56.1) it returned `200` with `currency: null` and **unconverted native
-(USD) closes**, while the title currency selector still read the user's
-chosen display currency (PLN) — a silently wrong-denomination series, exactly
-what the guard exists to prevent. Decided 2026-09-24 (user): add the guard.
-
-- [x] `portfoliost-instruments src/routes/instruments.ts` — mirror the
-  `price-bars` §48.2 guard on `/:symbol/history`: when a `?currency=` target
-  is present and `resolveInstrumentCurrency` is silent (null), return
-  `400 { error:"BadRequest", message:"base currency unknown; cannot convert" }`
-  before touching the provider. No `?currency=` (default chart load) is
-  unaffected. Response shapes unchanged → **no contracts change**.
-- [x] instruments unit test (`instruments.test.ts`, the existing `GET
-  /:symbol/history — ?currency=` describe): an AMD-shaped 4-exchange
-collision → `?currency=PLN` returns 400 `base currency unknown` and never
-  calls the provider; the same symbol without `?currency=` still returns
-  the native series (`currency: null`).
-- [x] instruments suite green (`npm run test`) + `npm run build`.
-- [x] SPA `PriceChart.vue` — on a failed **currency-conversion** load
-  (both legs rejected because the target currency was requested), keep the
-  already-rendered native series and surface a distinct notice
-  ("Display currency unavailable for this instrument — chart stays in its
-  base currency.") instead of the misleading "Full history unavailable".
-  The native-load failure path (no `?currency=`) is unchanged.
-- [x] SPA unit test (`ResearchPriceChart.test.ts`): (a) while the base
-  currency is unknown the title currency selector is hidden (a conversion can
-  never be offered); (b) selecting a display currency that the server 400s
-  keeps the native series and shows the refusal notice, not
-  "Full history unavailable".
-- [x] SPA green: `npm run test` (unit) + `npm run test:mock` + `npm run build`.
-- [x] Commit (instruments); commit (SPA).
-
-**PROD verify (§56.3, user-approved pin bump):** re-release instruments, bump
-the 4 homelab pins, re-release SPA; then in PROD — AMD research chart with an
-explicit display-currency selection shows the refusal notice over the native
-series (not a silently converted/wrong-denomination series); default AMD load
-still renders.
+Closed 2026-09-24 — un-suffixed multi-exchange ticker collisions now leave
+`resolveInstrumentCurrency` silent (§56.1, instruments v1.0.68); the
+§56.2 PROD verify confirmed the calendar USD fix and exposed a missing
+base-currency guard on `/history` + a hardcoded banner in `PriceChart.vue`,
+both fixed in §56.3 (instruments v1.0.69, SPA v1.0.224; refusal state verified
+in PROD). Open question resolved: no `?company=` hint. Full record in
+`plan-archive.md` §56.
 
 ---
 
@@ -801,3 +671,141 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
   research PriceChart render, custom tooltip works on hover, console clean,
   no watermark, no v7 feature warnings.
 - [ ] Commit (plan closeout) + archive §59 to `plan-archive.md`.
+
+---
+
+## 60. Research "Go back" returns to the origin page (user request)
+
+Proposal: — (direct user request; no proposal doc).
+
+Bug (user-reported): the research page's "← Go back" link
+(`src/modules/instruments/ResearchView.vue:89`) is hardcoded to
+`/en/investments`. Coming into research from a specific portfolio (holdings
+/ calendar / compare tabs) or from the transactions list (global or
+per-portfolio), "Go back" drops the user to the main portfolios page
+instead of the page they came from.
+
+Fix: a context-aware back target. Every contextual entry point into research
+passes the current page's `route.fullPath` as a `from` query param; the
+research header's back link targets it (guarded to internal `/en/` paths).
+When `from` is absent (deep link / first load / direct nav) the fallback is
+`/en/investments` — today's behaviour. `from` is preserved across research
+tab switches and symbol quick-switches so the origin is not lost mid-research.
+`fullPath` (not just `path`) is used so transactions-list filter state
+survives the round trip.
+
+SPA-only (`portfoliost`); no contracts or backend changes. The sidebar
+"Research" nav item (`SidebarNav.vue:60`, a static top-level nav entry to a
+default AAPL symbol) is not a contextual link — explicitly unchanged, it
+keeps the fallback.
+
+Rules: one step = one commit; a step is marked `[x]` only after its tests
+pass (unit + docker-compose level per AGENTS.md).
+
+---
+
+### 60.1 — Core: `from` query param + back-target resolution (`research.ts`, `ResearchView.vue`)
+
+- [ ] `src/utils/research.ts`:
+  - `researchRoute(symbol: string, from?: string | null): RouteLocationRaw`
+    → `{ name: "research-overview", params: { symbol:
+      researchSymbol(symbol) }, query: from ? { from } : undefined }`
+    (single source for every entry point; keeps the existing symbol
+    normalization rule).
+  - `researchBackTarget(query: Record<string, unknown>): string` — pure:
+    `typeof query.from === "string" && query.from.startsWith("/en/")` →
+    return that path; anything else (missing, external URL, relative, junk)
+    → `"/en/investments"`.
+- [ ] `src/modules/instruments/ResearchView.vue`:
+  - `const backTarget = computed(() => researchBackTarget(route.query))`;
+    replace `to="/en/investments"` (:89) with `:to="backTarget"`.
+  - Preserve `from` on in-research navigation so the origin survives
+    tab/symbol switches: add
+    `const preservedQuery = computed(() =>
+    route.query.from ? { from: String(route.query.from) } : undefined)`;
+    the tab-nav router-links (:112–121) get `:to="{ name: tab.name, params:
+    { symbol: routeSymbol }, query: preservedQuery }"` and `goToSymbol`
+    (:33–35) pushes the same query.
+- [ ] Unit tests: new `tests/unit/utils/research.test.ts` —
+  `researchRoute`: with `from` (query present, symbol normalized), without
+  (`query` absent, not an empty object); `researchBackTarget`: a valid
+  `/en/portfolios/1/holdings` passed through; `http://…`, `//evil`,
+  `investments` (relative), non-string, and empty query →
+  `/en/investments`.
+- [ ] Tests: `npm run test`, `npm run build`, `npm run test:mock` green.
+- [ ] Commit.
+
+### 60.2 — Wire `from` (current `route.fullPath`) at all contextual entry points
+
+Every navigation into research below switches to
+`researchRoute(symbol, route.fullPath)` (add `useRoute()` where the
+component does not already use it):
+
+- [ ] `src/components/TransactionsTable.vue:373` — shared by the global
+  `/en/investments/transactions` view and the per-portfolio transactions
+  tab (the reported bug site).
+- [ ] `src/modules/portfolios/PortfolioHoldingsTab.vue` — `goResearch()`
+  (:328, kebab "Research") and the symbol router-link (:426).
+- [ ] `src/modules/portfolios/PortfolioCalendarTab.vue:221` (event chips).
+- [ ] `src/modules/portfolios/PortfolioCompareTab.vue:60` (rows).
+- [ ] `src/modules/portfolios/EditTransactionModal.vue:173` (`goResearch` —
+  `from` = the page the modal was opened over, since the route is
+  unchanged while a modal is open).
+- [ ] `src/modules/portfolios/AddPositionDialog.vue:470` (`goResearch` —
+  keep the existing `.US` suffix handling, then call the helper).
+- [ ] `src/modules/instruments/InstrumentSearchModal.vue:47`
+  (`openResult`, default mode only — the `mode="add"` mounts in
+  ChartingView / AddPositionDialog / PortfolioPerformanceTab emit instead
+  of navigating and are untouched; when mounted on the research page itself,
+  `from` = the current research path, so switching symbols keeps the
+  previous symbol reachable via back).
+- [ ] `src/modules/watchlists/WatchlistsView.vue:124` (watchlist items →
+  back returns to the watchlist).
+- [ ] Explicitly unchanged: `src/layout/SidebarNav.vue:60` (top-level nav
+  entry, no context — falls back to `/en/investments`).
+- [ ] Tests: `npm run build`, `npm run test`, `npm run test:mock` green.
+  This step is behaviour-neutral on its own (no entry point passed `from`
+  before 60.1, and the back target only changes when the param is present);
+  the user-visible fix is proven by the e2e in 60.3.
+- [ ] Commit.
+
+### 60.3 — E2E: back returns to the origin (extend `tests/e2e/research.spec.ts`)
+
+Reuse the existing spec's login helper and seeded portfolio/transaction
+fixtures (the seeded portfolio with transactions that
+`tests/e2e/labels.spec.ts` already uses on the per-portfolio tab).
+
+- [ ] Portfolio origin: main page → open the seeded portfolio → Holdings
+  tab → click a position's symbol link → research overview for that symbol;
+  assert the "Go back" link's `href` equals `/en/portfolios/<id>/holdings`;
+  click it → URL is that portfolio's holdings tab and the holdings table is
+  visible.
+- [ ] Global transactions origin: `/en/investments/transactions` → click a
+  row's symbol → research; back link `href` =
+  `/en/investments/transactions`; click → the transactions table is
+  visible.
+- [ ] Per-portfolio transactions origin: open the seeded portfolio's
+  Transactions tab → click a row's symbol → research; back link `href` =
+  `/en/portfolios/<id>/transactions`; click → that tab is shown.
+- [ ] Origin survives tab switch: arriving at research from Holdings, click
+  the "Dividends" research tab → the back link `href` still equals the
+  holdings path.
+- [ ] Deep-link fallback: navigate directly to
+  `/en/research/<seeded symbol>/overview` (no `from`) → back link `href` =
+  `/en/investments`.
+- [ ] Tests: `npm run test:e2e` (docker compose) green.
+- [ ] Commit.
+
+### 60.4 — Release + PROD verify
+
+- [ ] Push `portfoliost` → GHA patch-bump → pin the **real** tag from
+  `gh release list` in the homelab portfoliost helmrelease
+  (`KUBECONFIG=$HOME/.kube/homylab`, ns `pfire`); Flux + kubectl verify
+  the rollout.
+- [ ] Playwright PROD (user's passkey session):
+  - Open a portfolio → Holdings → click a holding's symbol → research;
+    "Go back" → back on that portfolio's holdings tab.
+  - Global transactions list → click a row's symbol → research; "Go back"
+    → back on the transactions list (filters intact if any were set).
+  - On research, switch a tab → "Go back" still targets the origin.
+- [ ] Commit (plan closeout) + archive §60 to `plan-archive.md`.
