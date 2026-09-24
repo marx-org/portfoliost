@@ -77,7 +77,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ### 54.1 — contracts: per-holding calendar in `CalendarData`
 
-- [ ] `contracts/openapi.yaml` — `CalendarData` gains `holdings` (additive;
+- [x] `contracts/openapi.yaml` — `CalendarData` gains `holdings` (additive;
   `upcoming`/`past` stay for the mock and any flat consumers):
   ```yaml
   holdings:
@@ -97,11 +97,11 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
   objects verbatim — factor into named sub-schemas if the spec tooling
   requires it; wallets/SPA types are contract-typed per AGENTS.md, no local
   redefinitions.)
-- [ ] Push → CI patch-bumps → `NODE_AUTH_TOKEN=$(gh auth token) npm install
+- [x] Push → CI patch-bumps → `NODE_AUTH_TOKEN=$(gh auth token) npm install
   @marx2/contracts@<new>` in `portfoliost` + `portfoliost-wallets` →
   `npm run gen:types` (SPA) / regenerate (wallets) → contracts suite green.
-- [ ] Tests: contracts suite (`npm test` in `portfoliost-contracts/contracts/`).
-- [ ] Commit (contracts) + consumer bumps (one commit per repo).
+- [x] Tests: contracts suite (`npm test` in `portfoliost-contracts/contracts/`).
+- [x] Commit (contracts) + consumer bumps (one commit per repo).
 
 ### 54.2 — wallets: real `GET /:id/calendar` via instruments fan-out
 
