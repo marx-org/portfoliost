@@ -120,7 +120,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ### 55.1 — contracts: label bootstrap + labels on ImportPortfolioTx
 
-- [ ] `contracts/openapi.yaml`:
+- [x] `contracts/openapi.yaml`:
   - New `ImportLabelBootstrapRequest { externalSource, labels: string[]
     (min 1, max 200) }` and `ImportLabelBootstrapResponse { labels: { name,
     id }[] }` — idempotent ensure-by-name per user (201/200).
@@ -129,11 +129,11 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
     `transactionLabels` (names, applied to the row's portfolio
     transaction). Names, not UUIDs — the importer only sees sheet text;
     resolution is server-side, per user.
-- [ ] Push → CI patch-bump → `NODE_AUTH_TOKEN=$(gh auth token) npm install
+- [x] Push → CI patch-bump → `NODE_AUTH_TOKEN=$(gh auth token) npm install
   @marx2/contracts@<new>` in `portfoliost-wallets` → regenerate
   `generated/api-types` → contracts suite green.
-- [ ] Tests: contracts suite (`npm test` in `portfoliost-contracts/contracts/`).
-- [ ] Commit (contracts) + wallets consumer bump (one commit per repo).
+- [x] Tests: contracts suite (`npm test` in `portfoliost-contracts/contracts/`).
+- [x] Commit (contracts) + wallets consumer bump (one commit per repo).
 
 ### 55.2 — wallets: label bootstrap endpoint + labels/tax convention in import
 
