@@ -174,7 +174,7 @@ function chipText(c: Chip): string {
         <h2 class="text-base font-semibold">Calendar</h2>
         <div class="flex items-center gap-1">
           <button type="button" class="btn-ghost px-2" data-testid="pf-cal-prev-month" aria-label="Previous month" @click="shiftMonth(-1)">‹</button>
-          <span class="min-w-32 text-center text-sm font-medium text-slate-700 dark:text-slate-200">{{ monthLabel }}</span>
+          <span class="min-w-32 text-center text-sm font-medium text-slate-700 dark:text-slate-200" data-testid="pf-cal-month">{{ monthLabel }}</span>
           <button type="button" class="btn-ghost px-2" data-testid="pf-cal-next-month" aria-label="Next month" @click="shiftMonth(1)">›</button>
         </div>
         <div class="ml-auto flex items-center gap-2">

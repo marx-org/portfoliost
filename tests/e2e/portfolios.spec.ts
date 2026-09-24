@@ -419,3 +419,43 @@ test("deleting a transaction asks for confirmation and removes it on confirm", a
   await expect(page.getByText("Transaction deleted")).toBeVisible()
   await expect(dialog).toBeHidden()
 })
+
+test("portfolio calendar tab renders the month grid over holdings events", async ({ page }) => {
+  await login(page)
+  await page.getByRole("link", { name: /Top10/ }).click()
+  await page.getByRole("navigation", { name: "Portfolio tabs" }).getByRole("link", { name: "Calendar" }).click()
+  await expect(page).toHaveURL(/\/calendar/)
+
+  // the holdings fan-out hits the live provider stack — allow a longer settle
+  await expect(page.getByTestId("pf-cal-grid")).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByTestId("pf-cal-day")).toHaveCount(42)
+  await expect(page.getByTestId("pf-cal-filter")).toHaveValue("all")
+
+  const month = page.getByTestId("pf-cal-month")
+  await expect(month).toHaveText(/[A-Z][a-z]+ 20\d\d/)
+  const initial = (await month.textContent())!.trim()
+  await page.getByTestId("pf-cal-next-month").click()
+  await expect(month).not.toHaveText(initial)
+  await page.getByTestId("pf-cal-prev-month").click()
+  await expect(month).toHaveText(initial)
+
+  // The provider stack may yield no rows for the seeded holdings (fmp-only,
+  // §49.9 fragility) — scan the instruments window (~4 months) and tolerate
+  // it the same way research.spec.ts does for chart data.
+  const chips = page.locator('[data-testid="pf-cal-day"] a')
+  let hasChip = (await chips.count()) > 0
+  for (let i = 0; i < 5 && !hasChip; i++) {
+    await page.getByTestId("pf-cal-next-month").click()
+    hasChip = (await chips.count()) > 0
+  }
+  if (hasChip) {
+    const chip = chips.first()
+    await expect(chip).toHaveText(/^[A-Z0-9.]+ (Earnings|Ex-Div|Div)(: .+)?$/)
+    await expect(chip).toHaveAttribute("href", /\/en\/research\/[^/]+\/overview/)
+  } else {
+    for (let i = 0; i < 5; i++) {
+      await page.getByTestId("pf-cal-prev-month").click()
+    }
+    await expect(page.getByText("No events in this month.")).toBeVisible()
+  }
+})
