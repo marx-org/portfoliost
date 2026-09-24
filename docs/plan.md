@@ -129,10 +129,10 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ### 56.2 — release + PROD verify
 
-- [ ] Push → GHA patch-bump (pin the **real** tag from `gh release list`) →
+- [x] Push → GHA patch-bump (pin the **real** tag from `gh release list`) →
   bump the pin in the homelab instruments helmrelease — **all 4 occurrences**
   (app + tickersync + corpbondsync + fxsyync cronjobs).
-- [ ] Flux + kubectl verify (`KUBECONFIG=$HOME/.kube/homylab`); if the RWO
+- [x] Flux + kubectl verify (`KUBECONFIG=$HOME/.kube/homylab`); if the RWO
   logos PVC multi-attach stalls the rollout (known gotcha), scale the
   deployment to 0, wait, scale back to 1.
 - [ ] Playwright PROD: a portfolio holding un-suffixed AMD →
@@ -140,7 +140,15 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
   holding (and the Calendar tab renders accordingly); the AMD research chart
   still renders (default load = no conversion); an explicit display-currency
   selection on AMD shows the §48.2 400 error state, not a silently converted
-  series.
+  series. **Verified 2026-09-24 — first two clauses pass; third clause
+  exposed a gap:** the `price-bars` leg does return the §48.2 400, but
+  `PriceChart.vue` runs a second `/history` leg which has NO base-currency
+  guard — for ambiguous AMD it returns 200 with `currency: null` and
+  unconverted USD closes, and the UI keeps showing that series while the
+  title selector still reads the chosen display currency (PLN) — i.e. a
+  silently wrong-denomination series, exactly what the guard was meant to
+  prevent. Follow-up needed (instruments guard on `/history`, or PriceChart
+  error state on 400).
 - [ ] Commit (plan closeout) + archive §56.
 
  **Open question (decide before 56.2):** is silence → the §49.6 USD fallback
