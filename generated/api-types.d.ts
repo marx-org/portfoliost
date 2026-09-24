@@ -2656,24 +2656,10 @@ export interface components {
         };
         CalendarData: {
             currency?: string;
-            earnings?: {
-                date: string;
-                title?: string;
-                year?: number;
-                quarter?: number;
-            }[];
-            exDividend?: {
-                date: string;
-                title?: string;
-                year?: number;
-                amount?: number;
-            }[];
-            dividend?: {
-                date: string;
-                title?: string;
-                year?: number;
-                amount?: number;
-            }[];
+            earnings?: components["schemas"]["CalendarEarningsItem"][];
+            exDividend?: components["schemas"]["CalendarExDividendItem"][];
+            dividend?: components["schemas"]["CalendarDividendItem"][];
+            holdings?: components["schemas"]["CalendarHolding"][];
             upcoming?: {
                 symbol?: string;
                 companyName?: string;
@@ -2692,6 +2678,32 @@ export interface components {
                 amount?: number | null;
                 quarter?: number | null;
             }[];
+        };
+        CalendarEarningsItem: {
+            date: string;
+            title?: string;
+            year?: number;
+            quarter?: number;
+        };
+        CalendarExDividendItem: {
+            date: string;
+            title?: string;
+            year?: number;
+            amount?: number;
+        };
+        CalendarDividendItem: {
+            date: string;
+            title?: string;
+            year?: number;
+            amount?: number;
+        };
+        CalendarHolding: {
+            symbol: string;
+            companyName?: string;
+            currency?: string;
+            earnings?: components["schemas"]["CalendarEarningsItem"][];
+            exDividend?: components["schemas"]["CalendarExDividendItem"][];
+            dividend?: components["schemas"]["CalendarDividendItem"][];
         };
         SeasonalityData: {
             symbol?: string;
