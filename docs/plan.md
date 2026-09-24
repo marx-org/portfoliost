@@ -176,31 +176,31 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ### 55.3 — sheets-sync: parse AK/AL/AJ + catalog flags, map labels & tax
 
-- [ ] `transakcje-parser.ts`: `RawTransakcjeRow` gains `program: string`
+- [x] `transakcje-parser.ts`: `RawTransakcjeRow` gains `program: string`
   (col 35, trimmed, `"-"` → empty), `dividendTaxable: number | null` (col 36,
   `parsePlDecimal`), `dividendTax: number | null` (col 37, same parser).
   Update the file-header column list. **Do not** change `externalIdOf`
   (stable dedup keys must survive — no re-keying on a re-import).
-- [ ] `podsumowanie-parser.ts`: `PodsumowanieCatalogEntry` gains
+- [x] `podsumowanie-parser.ts`: `PodsumowanieCatalogEntry` gains
   `inspiracja: string | null` (col 34) and flag booleans for cols 38
   (Crypto), 39 (Obligacje), 40 (Funds), 41 (Stock), 42 (Growth), 43
   (Dividend) — true ⇔ trimmed cell === `"1"`. Expose as
   `catalogLabels: string[]` on the entry (label names: the Inspiracja value
   itself plus the flag names). Update the file-header column map + note that
   live AN–AR headers are stale formula totals (verified 2026-09-27).
-- [ ] `sync.ts`: `CATALOG_RANGE` → `Podsumowanie!A1:AR233`. Before the import
+- [x] `sync.ts`: `CATALOG_RANGE` → `Podsumowanie!A1:AR233`. Before the import
   loop, collect the full label name set (all non-empty `program` values,
   skipping any `^\d,\d+\s*zł$` shapes with a logged warning, + all
   `catalogLabels` across matched entries), call the new
   `client.bootstrapLabels(...)`; assert every requested name came back with
   an id (fail fast). Extend the typed client in `wallets-api-client.ts`
   (`ImportLabelBootstrapRequest/Response`, `bootstrapLabels` method).
-- [ ] `instrument-resolver.ts`: carry the catalog entry's
+- [x] `instrument-resolver.ts`: carry the catalog entry's
   `inspiracja`/flags through into `ResolvedInstrument` (e.g.
   `catalogLabels: string[]`) so the mapper can label the position — only
   when the join actually matched a catalog entry, never on the
   name-as-symbol fallback.
-- [ ] `transakcje-mapper.ts`: for rows with a portfolio leg —
+- [x] `transakcje-mapper.ts`: for rows with a portfolio leg —
     - `portfolioTx.positionLabels = instrument?.catalogLabels ?? []`
       (omitted when empty);
     - `portfolioTx.transactionLabels = row.program ? [row.program] : []`
@@ -218,7 +218,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
   - Dividend rows that are wallet-only (zero quantity) still ship
     `walletTx.taxes = null` (unchanged — the sheet's cash is the truth
     there) — taxes only apply on the ptx leg.
-- [ ] Unit tests (`transakcje-parser.test.ts`, `podsumowanie-parser.test.ts`,
+- [x] Unit tests (`transakcje-parser.test.ts`, `podsumowanie-parser.test.ts`,
   `transakcje-mapper.test.ts`): parser — AK/AL/AJ parse incl. `"0,00"` →
   0 and empty → null; catalog — `"1"` flags (all six incl. AP→Stock) +
   Inspiracja → `catalogLabels`, missing cols → no labels; mapper — Div with
@@ -227,7 +227,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
   taxes = AL; Div without AK/AL → byte-identical to today's output; Kupno
   with AJ → `transactionLabels` on the BUY ptx; non-Div with AK/AL present
   → ignored; AJ with a `\d,\d+ zł` value → not a label, run logs a warning.
-- [ ] Full sheets-sync suite green (`npm run test`); commit.
+- [x] Full sheets-sync suite green (`npm run test`); commit.
 
 ### 55.4 — PROD verification (wipe & re-import)
 
