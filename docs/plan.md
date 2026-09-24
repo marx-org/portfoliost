@@ -87,16 +87,19 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ### 53.2 — wallets: widen cumulative columns + reimport PROD
 
-- [ ] Belt-and-braces: change `cumulative_twr/mwr/simple` from `numeric(20,8)` to
+- [x] Belt-and-braces: change `cumulative_twr/mwr/simple` from `numeric(20,8)` to
   `numeric(28,8)` in `src/db/schema.ts`; `npm run db:generate` → migration SQL
-  committed alongside.
-- [ ] Migration applies in dev docker-compose without error; wallets suite green.
+  committed alongside. (portfoliost-wallets 315c936, `drizzle/0006_strong_phantom_reporter.sql`)
+- [x] Migration applies in dev docker-compose without error; wallets suite green.
+  (Verified: `information_schema` shows `numeric(28,8)` on all three columns; 323 passed.)
 - [ ] PROD: **user-approved wipe & reimport** of the wallets DB (Admin → Jobs →
   "Wipe & Reimport", `portfoliost-sheets-sync`), then verify
   `portfolio_backfill_metadata` shows `complete` for **all** portfolios (incl.
   Crypto) and no `numeric field overflow` in the error column. (Requires explicit
-  user approval at execution time — homelab mutation.)
-- [ ] Commit (schema + migration).
+  user approval at execution time — homelab mutation. Deferred until after
+  53.5/53.6 are deployed so the reimported history runs through the new
+  current_value/FX pipeline.)
+- [x] Commit (schema + migration).
 
 ### 53.3 — SPA: card chart remount + failed-backfill state
 
