@@ -103,20 +103,28 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ### 53.3 — SPA: card chart remount + failed-backfill state
 
-- [ ] `src/modules/portfolios/PortfolioCard.vue`: add the `chartKey` remount
-  fingerprint (copy the pattern + comment from
-  `src/components/PortfolioPerformanceChart.vue`) to the `<apexchart>` so timeframe
-  switches and poll updates repaint the running instance.
-- [ ] Handle `analytics.backfillStatus === "failed"`: render "Chart unavailable"
-  + a small **Recompute** button (existing `recomputePortfolio` API) instead of the
-  eternal "Loading chart…"; stop the pending-only poll assumption.
-- [ ] Vitest: the chart key changes when the series fingerprint changes (same
-  assertions as the shared component's tests).
-- [ ] Playwright e2e (docker-compose stack): on the investments page, click 6M→1Y
-  on a card and assert the remount (canvas key/replacement or series count
-  change); `npm run test:e2e` green.
-- [ ] `npm run build`, `npm run test`, `npm run test:mock`, `npm run test:e2e`
-  green; commit.
+- [x] `src/modules/portfolios/PortfolioCard.vue`: add the `chartKey` remount
+  fingerprint (timeframe + series length/first/last, copied pattern + comment
+  from `src/components/PortfolioPerformanceChart.vue`) to the `<apexchart>` so
+  timeframe switches and poll updates repaint the running instance.
+  - Exposed via `defineExpose({ chartKey })` for the unit test.
+- [x] Handle `analytics.backfillStatus === "failed"`: render "Chart unavailable"
+  + a **Recompute** button (`recomputePortfolio`) instead of the eternal
+  "Loading chart…"; `applyBackfillStatus()` now drives pending/failed/complete
+  from both the initial load and the poll (stops the pending-only assumption).
+- [x] Vitest (`tests/unit/modules/portfolios/PortfolioCard.test.ts`, 3 tests):
+  the chart key changes when the series fingerprint changes (timeframe swap),
+  the failed state renders the unavailable notice + recompute button (not
+  "Loading chart…"), and Recompute calls `recomputePortfolio` then repaints.
+- [x] Playwright e2e (`parity-portfolios.spec.ts`): on the investments page,
+  click 1Y on the Top10 card and assert the old chart node detaches
+  (`.vue-apexcharts` elementHandle `isConnected === false`) + a fresh chart
+  renders. `npm run test:e2e` green (102 passed, 1 skipped).
+- [x] `npm run build`, `npm run test` (369), `npm run test:mock` (227),
+  `npm run test:e2e` green; commit (portfoliost ae8ab4b).
+  - Note: the dev-stack gateway caches upstream IPs at boot; after
+    `docker compose up -d --build` recreated example-service-mock the gateway 502'd on
+    /api/auth until recreated (`up -d --force-recreate gateway`).
 
 ### 53.4 — Decision recorded: card sparkline stays shape-only, no FX conversion
 
