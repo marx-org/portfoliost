@@ -182,12 +182,13 @@ The instrument calendar (research page, §49.9) is live; the portfolio
 (`c.json({ events: [] })`), and the SPA's `PortfolioCalendarTab.vue` renders
 `upcoming`/`past` shapes the real endpoint never returns. Example service's
 portfolio calendar (inspected live 2026-09-24, `/pl/portfolios/<id>/calendar`) is
-a **month grid**: toolbar `Calendar ‹ May 2026 › | Impact | All events ▾ | Today`,
+a **month grid**: toolbar `Calendar ‹ May 2026 › | (Impact) | All events ▾ | Today`,
 SUN–SAT columns, day cells with small event chips (e.g. `AAPL Ex-Div: $0.26`),
 and a premium gate. Parity target: the month grid over the portfolio's
 holdings' events, **not gated** (AGENTS.md: premium features ship as working
-content). Event source = fan-out to the per-instrument calendar that §49.9
-shipped (openst/cachest/instruments unchanged — no provider-tier work).
+content), **no Impact toggle** (abandoned — see Design decisions). Event
+source = fan-out to the per-instrument calendar that §49.9 shipped
+(openst/cachest/instruments unchanged — no provider-tier work).
 
 Repos touched: `portfoliost-contracts` (54.1), `portfoliost-wallets` (54.2),
 `portfoliost` SPA + mock (54.3–54.5). The mock endpoint
@@ -197,8 +198,8 @@ upcoming/past shapes and is kept unchanged (54.1's shape stays additive).
 Example service observations to keep honest (2026-09-24 capture in
 `/tmp/example-service_pf_calendar.png`): the "All events" dropdown also mixes in
 macro-economic events (ISM, CPI, FOMC…) and holidays (Memorial Day) — those
-are NOT holdings events; we render holdings events only (decision, see
-Open question 3). Chip format is `SYMBOL <Type>: <amount in instrument ccy>`.
+are NOT holdings events and are out of scope here (Design decisions). Chip
+format is `SYMBOL <Type>: <amount in instrument ccy>`.
 
 Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 (unit + docker-compose level).
@@ -262,11 +263,14 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
   "Calendar" label, ‹/› month buttons, "May 2026"-style month label, an
   event-type filter ("All events" / "Earnings" / "Ex-Dividend" / "Dividend
   payment" — plain `<select class="input">`, `testid="pf-cal-filter"`), and a
-  **Today** button (`btn-secondary`). Grid: `grid-cols-7` header SUN–SAT +
+  **Today** button (`btn-secondary`). **No "Impact" control** (example-service has one;
+  abandoned — no behavior defined, no decoration). Grid: `grid-cols-7` header
+  SUN–SAT +
   42 day cells (6 weeks; prev/next-month days muted); today outlined; event
   chips per day (max ~3 visible + "+N more"; chip = `SYMBOL <Type>: <amount>`
   with `tabular-nums`, amounts formatted via `formatAmount(amount,
-  holding.currency)` — instrument ccy, never converted). Chip colors per type
+  holding.currency)` — the **instrument's base currency, never converted** to
+  the portfolio ccy, per the resolved decision). Chip colors per type
   (earnings = blue, ex-dividend = amber, dividend payment = green — same
   mapping as today's `badgeClass`, with `dark:` variants). Clicking a symbol
   chip links to `research-overview` (existing pattern). Empty state: grid
@@ -274,6 +278,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
   `pf-cal-next-month`, `pf-cal-today`, `pf-cal-grid`, `pf-cal-filter`; the
   old table testids are dropped with the table — update
   `tests/e2e/portfolios.spec.ts` calendar expectations in the same commit.
+  No macro-economic events or holidays are rendered (holdings events only).
 - [ ] Flat-shape compat: if `holdings` is absent (mock returns
   `upcoming`/`past`) the component derives holdings-shaped data from the flat
   arrays (group by symbol; no `currency` → omit amount) so the mock-backend
@@ -282,7 +287,8 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 - [ ] Vitest (`tests/unit/modules/portfolios/PortfolioCalendarTab.test.ts`):
   month navigation (prev/next changes the month label + rendered day set),
   Today resets, filter hides other types, chip count cap + "+N more",
-  flat-shape derivation path.
+  flat-shape derivation path; toolbar renders no "Impact" control.
+  No macro events in any rendered output (fixture-driven).
 - [ ] `npm run build` + `npm run test` + `npm run test:mock` green; commit.
 
 ### 54.4 — E2E: calendar grid on a seeded portfolio (compose stack)
@@ -304,18 +310,15 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
   ex-date chips on `exDividend` rows, not payment dates).
 - [ ] PROD (with user approval if a SPA pin bump is needed): Playwright
   against `https://portfoliost.k.homylab.com` — Calendar tab shows the month
-  grid (not the table), navigation works, no paywall.
+  grid (not the table), navigation works, no paywall, no Impact control.
 - [ ] Archive §54 to `plan-archive.md`.
 
-**Open questions (answer before steps run — they block 54.1/54.3):**
+**Design decisions (resolved 2026-09-24 by the user):**
 
-1. **"Impact" toggle** — example-service shows it but gates it behind premium with no
-   visible meaning. Ship it as a disabled decoration (plan default), drop it,
-   or define behavior now (e.g. chip shows the event's impact on portfolio
-   value — needs position quantity × amount)?
-2. **Amount currency** — chips show the amount in the *instrument's*
-   currency (example-service does; e.g. `$0.26` for a EUR portfolio). Confirmed OK,
-   or convert to the portfolio base ccy (D27, quantity × amount)?
-3. **Macro events + holidays** — example-service mixes in economic data (ISM, CPI,
-   FOMC) and holidays. Plan default: **no** (holdings events only — no
-   provider tier exists for macro). Confirm.
+- **"Impact" toggle abandoned** — example-service shows it (premium-gated, no visible
+  behavior); we ship no Impact control at all, not even as decoration.
+- **Chip amounts stay in the instrument's base currency** — never converted
+  to the portfolio base ccy (example-service does the same; e.g. `$0.26` in a PLN
+  portfolio). No D27 FX leg on this surface.
+- **No macro-economic events or holidays** — holdings events only (example-service
+  mixes in ISM/CPI/FOMC + holidays; no provider tier exists for macro).
