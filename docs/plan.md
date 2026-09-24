@@ -1234,7 +1234,7 @@ and before any wipe.
 
 ### 62.2 — wallets backend: schema + cash replay service
 
-- [ ] `portfoliost-wallets src/db/schema.ts` + new drizzle migration:
+- [x] `portfoliost-wallets src/db/schema.ts` + new drizzle migration:
   - New `portfolios.portfolio_cash_transactions`: mirrors
     `wallet_transactions` minus wallet fields — `userId`, `portfolioId` (FK
     `portfolios.id` on-delete cascade), `type` in
@@ -1252,7 +1252,7 @@ and before any wipe.
     `wallets.wallets`, `wallets.wallet_transactions`,
     `wallets.wallet_transaction_labels` (data intentionally discarded — PROD
     rebuilds via wipe & reimport; migration ships with the 62.9 image).
-- [ ] New `src/services/cashLedger.ts`:
+- [x] New `src/services/cashLedger.ts`:
   - `tradeCashEffects(tx: portfolioTransactions row): Map<string, number>` —
     principal leg in `tx.currency`: BUY −totalAmount, SELL +totalAmount,
     DIVIDEND +totalAmount (net, the §49 convention — `totalAmount` is already
@@ -1271,13 +1271,13 @@ and before any wipe.
     (DEPOSIT +, WITHDRAWAL −, TRANSFER ± its own leg) at that day's rate —
     **the D50 replacement** for `dailyNetCashFlows` (rename the old function,
     delete the BUY/SELL series).
-- [ ] Unit tests (`src/services/cashLedger.test.ts`): seeded multi-currency
+- [x] Unit tests (`src/services/cashLedger.test.ts`): seeded multi-currency
   portfolio (USD trades, EUR dividend, fee in a third currency, DEPOSIT/WITHDRAW/
   cross-ccy TRANSFER) → `cashBalances` per currency hand-computed;
   `cashBalanceSeries` across an FX-moving window; `dailyExternalFlows` signs
   (deposit inflow, withdrawal outflow, transfer leg).
-- [ ] Full wallets suite green (`npm run test`) + `npm run build`.
-- [ ] Commit (portfoliost-wallets).
+- [x] Full wallets suite green (`npm run test`) + `npm run build`.
+- [x] Commit (portfoliost-wallets).
 
 ### 62.3 — wallets backend: portfolio cash routes; delete wallet routes
 
