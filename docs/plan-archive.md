@@ -7178,3 +7178,189 @@ nasdaq-first (from §49.9) stays the default for US history.
 - [x] Archived §52.
 
 ---
+
+## 53. Main-page portfolio cards: stale charts, MWR overflow, current_value, snapshot FX (closed 2026-09-24)
+
+Proposal: — (investigation, no proposal doc — see "Findings" below).
+
+The investments-page portfolio cards (`PortfolioCard.vue`) render sparklines from the
+same `/api/portfolios/:id/analytics` data as the performance tab, but four distinct
+defects make them look wrong/stale in PROD:
+
+**Findings (verified against the homelab cluster, 2026-09-23):**
+
+1. **Card sparkline never re-renders after mount.** `PortfolioCard.vue` binds the
+   vue3-apexcharts `options` from a stable cached computed and lacks the `:key`
+   remount fingerprint that `PortfolioPerformanceChart.vue` already carries
+   (§48.6e B3 — prop updates are not pushed into the running instance in this
+   stack). Timeframe clicks and 5 s backfill-poll updates may leave the initial
+   series on screen.
+2. **MWR overflow kills backfill → `Crypto` permanently stuck on "Loading chart…".** `portfolio_backfill_metadata` for Crypto: status `failed`, error
+   `numeric field overflow` — `buildMwr`'s XIRR Newton solver diverges for
+   near-zero-capital / one-sided-flow histories and "converges" to a garbage rate;
+   `Math.pow(1+r, t)` then produced `cumulative_mwr ≈ 1.01e12` into a
+   `numeric(20,8)` column (`returnColumns.ts`). The card polls only on
+   `backfillStatus === "pending"`, so `failed` shows "Loading chart…" forever with
+   no diagnostics.
+3. **`portfolios.current_value` is never maintained** — all 10 portfolios are 0, so
+   every card shows "Value $0.00 · Return 0.00%" while the chart ends at real
+   values.
+4. **Two pipelines write `value_snapshots` with different FX rules.** Backfill
+   (`backfill.ts`) fetches closes server-side converted into the portfolio base
+   currency (plan §48.3); snapshot-on-read (`quotes.ts` `snapshotPortfolioValue`)
+   sums `positions.market_value × fx(instrument_currency→base)`, but the live-quote
+   path stores `current_price`/`market_value` in the **quote's native price
+   currency, unconverted** (§39). PROD proof (IBKR): TSM lot `current_price 452.00`
+   (USD close, matches `price_bars_all`) with `instrument_currency=USD` and MV 4 068 —
+   while the backfill valued the same day at 199 983 PLN, snapshot-on-read wrote
+   251 782 PLN (+26%, pure FX inconsistency between the two pipelines' price/rate
+   resolution). That 2026-09-23 row is what both charts now end on.
+
+Repos touched: `portfoliost-wallets` (53.1–53.2, 53.5–53.7), `portfoliost` SPA
+(53.3–53.4). No provider-tier (openst/cachest/instruments) work.
+
+Rules: one step = one commit; a step is marked `[x]` only after its tests pass
+(unit + docker-compose level).
+
+### 53.1 — wallets: guard MWR (and XIRR) against divergence
+
+- [x] `src/services/returnColumns.ts`: `xirr()` returns `null` when the result is
+  non-finite or outside a sane band (|r| > 10); `buildMwr` then takes its existing
+  `buildSimple` fallback (it already does — the guard makes it reachable).
+  - Regression fixture (verified pre-fix in node): 1 PLN capital + 10 000 PLN
+    deposit growing 2 000 000x in 6 months → unguarded solver "converges" to
+    r ≈ 1.7e10 → `buildMwr` end value ≈ 1.85e12 (the PROD overflow).
+- [x] Unit tests in `returnColumns.test.ts` (created): (a) the Crypto-shaped case —
+  every `buildMwr` output finite, |v| < 1e12, and equal to the `buildSimple`
+  fallback (column-bound regression); (b) a healthy mixed-flow case still yields a
+  real MWR (end index ≈ 110.06, mid ≈ 104.88 — not the simple 205/215).
+- [x] Full wallets suite green (`npm run test`: 323 passed); `npm run build` clean.
+- [x] Commit (portfoliost-wallets 2f745f7).
+
+### 53.2 — wallets: widen cumulative columns + reimport PROD
+
+- [x] Belt-and-braces: change `cumulative_twr/mwr/simple` from `numeric(20,8)` to
+  `numeric(28,8)` in `src/db/schema.ts`; `npm run db:generate` → migration SQL
+  committed alongside. (portfoliost-wallets 315c936, `drizzle/0006_strong_phantom_reporter.sql`)
+- [x] Migration applies in dev docker-compose without error; wallets suite green.
+  (Verified: `information_schema` shows `numeric(28,8)` on all three columns; 323 passed.)
+- [x] PROD (user-approved 2026-09-24): **wipe & reimport** ran clean (2016 txs
+  imported, 0 errors; 10 wallets / 10 portfolios bootstrapped); then all 10
+  `portfolio_backfill_metadata` rows `complete`, no `numeric field overflow`
+  anywhere — Crypto `cumulative_mwr` max 45 982 (simple-fallback for the
+  divergent history; pre-fix ≈1.01e12 overflowed numeric(20,8)), and
+  `current_value` == newest snapshot for all 10 portfolios. Shipped as wallets
+  v1.1.51 + SPA v1.0.211 (homelab Flux pin).
+- [x] Commit (schema + migration).
+
+### 53.3 — SPA: card chart remount + failed-backfill state
+
+- [x] `src/modules/portfolios/PortfolioCard.vue`: add the `chartKey` remount
+  fingerprint (timeframe + series length/first/last, copied pattern + comment
+  from `src/components/PortfolioPerformanceChart.vue`) to the `<apexchart>` so
+  timeframe switches and poll updates repaint the running instance.
+  - Exposed via `defineExpose({ chartKey })` for the unit test.
+- [x] Handle `analytics.backfillStatus === "failed"`: render "Chart unavailable"
+  + a **Recompute** button (`recomputePortfolio`) instead of the eternal
+  "Loading chart…"; `applyBackfillStatus()` now drives pending/failed/complete
+  from both the initial load and the poll (stops the pending-only assumption).
+- [x] Vitest (`tests/unit/modules/portfolios/PortfolioCard.test.ts`, 3 tests):
+  the chart key changes when the series fingerprint changes (timeframe swap),
+  the failed state renders the unavailable notice + recompute button (not
+  "Loading chart…"), and Recompute calls `recomputePortfolio` then repaints.
+- [x] Playwright e2e (`parity-portfolios.spec.ts`): on the investments page,
+  click 1Y on the Top10 card and assert the old chart node detaches
+  (`.vue-apexcharts` elementHandle `isConnected === false`) + a fresh chart
+  renders. `npm run test:e2e` green (102 passed, 1 skipped).
+- [x] `npm run build`, `npm run test` (369), `npm run test:mock` (227),
+  `npm run test:e2e` green; commit (portfoliost ae8ab4b).
+  - Note: the dev-stack gateway caches upstream IPs at boot; after
+    `docker compose up -d --build` recreated example-service-mock the gateway 502'd on
+    /api/auth until recreated (`up -d --force-recreate gateway`).
+
+### 53.4 — Decision recorded: card sparkline stays shape-only, no FX conversion
+
+- [x] No code change (user decision 2026-09-23): the card sparkline renders the
+  series shape only — no value labels, no tooltip (already the case: `dataLabels`
+  off, `tooltip.enabled=false`). It is therefore not converted to the display
+  currency; no numbers on the card are mislabeled by it. The numeric Value/
+  Invested/Return row is fixed by 53.5 instead.
+- [x] Assert in 53.3's vitest that the sparkline renders no text/tooltip:
+  `PortfolioCard.test.ts` (capturing apexchart stub) pins `dataLabels.enabled ===
+  false`, `tooltip.enabled === false`, `xaxis.labels.show === false` (guards
+  against a later "nice to have" re-introducing unconverted numbers).
+- [x] Commit (test-only, portfoliost c3410ea).
+
+### 53.5 — wallets: maintain `portfolios.current_value` from the latest snapshot
+
+- [x] In the history-write paths (`backfill.ts` `runBackfill`/`recalcPortfolioHistory`
+  after the batch is committed, and `quotes.ts` `snapshotPortfolioValue` after its
+  upsert), set `portfolios.current_value` = the newest `value_snapshots.value` for
+  that portfolio (1-day-old is acceptable — user decision 2026-09-23). Factored into
+  one small exported helper (`syncCurrentValueFromSnapshots(db, portfolioId)` in
+  `returnColumns.ts`, the "after every value_snapshots write" module) and called
+  from both sites.
+- [x] Unit tests: after a recalc the column equals the last snapshot value (10 ×
+  160 = 1600); after a snapshot-on-read upsert it equals the new row (2300, then
+  1100 after the idempotent second call); a portfolio whose history is cleared
+  (all txs removed) → `current_value` 0.
+- [x] Existing detail/summary surfaces that read `currentValue` keep behaving
+  (no contract change — column already exists in the schema/contract; only the
+  write side changed).
+- [x] Full wallets suite green (324 passed); commit (portfoliost-wallets 2624331).
+
+### 53.6 — wallets: unify snapshot-on-read FX with the backfill rule
+
+- [x] In `quotes.ts`: `refreshQuotes` now carries `quote.currency` (already
+  fetched, §39-validated ISO code) into each `liveValues` row. In
+  `snapshotPortfolioValue`, the value leg converts as
+  `mv × fx(quoteCurrency → base)`; the fallback branch (no live quote) uses the
+  stored `market_value` with `fx(instrument_currency → base)` (stored MVs on
+  fallback are the legacy native-mixed values — residual documented in the
+  function doc). Cost basis/invested stays `fx(instrumentCurrency → base)`.
+- [x] Unit test (the regression that motivated this): `backfill.test.ts`
+  pipeline-agreement test — a PLN-base portfolio with one USD lot (quote
+  currency USD, stored instrumentCurrency a legacy "EUR" both pipelines must
+  ignore) + one PLN lot → `snapshotPortfolioValue` output equals
+  `computeSnapshotBatch` for the same day (old code diverged: 5755 vs 5404.63
+  in the fixture).
+- [x] Full wallets suite green (325 passed); commit (portfoliost-wallets 1bf9375).
+
+### 53.7 — Closeout
+
+- [x] Dev docker-compose smoke: seeded a multi-currency portfolio (base PLN;
+  10 AAPL @ 330 USD + 5 PKN.WA @ 150 PLN), triggered backfill (9 rows,
+  complete) + a quote refresh. Same-day snapshot-on-read value 14 132.71 PLN
+  equals the direct FX computation from the same live quotes (fx USD→PLN
+  3.9815, dev 0.00% — 53.6), and `portfolios.current_value` 14 132.71 equals
+  the newest snapshot (53.5). No non-complete/overflow rows in
+  `portfolio_backfill_metadata`.
+- [x] PROD release (user-approved 2026-09-24): pushed wallets + SPA, GHA
+  tags wallets v1.1.51 / SPA v1.0.211, homelab Flux pin, rollout verified,
+  migration 0006 applied. **Wipe & Reimport** ran clean (2016 txs, 0 errors);
+  all 10 backfills `complete`, no overflow — Crypto `cumulative_mwr` max is
+  now 45 982 (simple-fallback for the divergent history; pre-fix ≈1.01e12
+  overflowed numeric(20,8)), and `current_value` == newest snapshot for all
+  10 portfolios.
+- [x] PROD finding: **empty window = eternal "Loading chart…"**. XTB (last
+  tx 2023-02) and Equate+ (snapshots end 2022-07, no SAP.DE prices since)
+  have complete backfills with zero points in the default 6M window — the
+  card's final fallback rendered "Loading chart…" forever. Fix: the fallback
+  now shows "Loading chart…" only while `chartLoading || backfillPending`,
+  else "No data" (`data-testid="card-chart-empty"`); +unit test. All 4 SPA
+  gates green (build, 371 unit, 227 mock, 102 e2e).
+- [x] Crypto card re-armed (user-approved): added BTC-USD 0.004 @ 84 000 USD
+  (2026-09-24) to the PROD Crypto portfolio — backfill complete, position
+  open; (first attempt used the stale `BTC` symbol — superseded by
+  `BTC-USD`, whose bars are fresh through 09-24.)
+- [x] PROD Playwright verify (SPA v1.0.212 deployed, fresh session, 2026-09-24):
+  0 cards stuck on "Loading chart…" — XTB + Equate+ render "No data" (empty 6M
+  window: liquidated 2023-02 / no SAP.DE prices since 2022-07). Timeframe
+  remount confirmed: clicking 1Y on the IBKR card detached the old
+  `.apexcharts-svg` DOM probe and mounted a fresh chart. Card Value tracks
+  `portfolios.current_value` on all 10 cards; the Crypto card shows $1 288.98
+  (BTC-USD 0.004, MV 336.08 USD → 1 288.98 PLN via the quote-currency FX rule —
+  53.6) with 1 open position. Screenshot `prod-537-verified.png`.
+- [x] Archived §53.
+
+---
