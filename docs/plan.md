@@ -1179,7 +1179,7 @@ and before any wipe.
 
 ### 62.1 — contracts: drop the wallet entity, add portfolio cash schemas + endpoints
 
-- [ ] `portfoliost-contracts/contracts/openapi.yaml`:
+- [x] `portfoliost-contracts/contracts/openapi.yaml`:
   - `Portfolio`: remove `currency` (properties + `required`) and `walletId`
     (properties + `required`); `CreatePortfolioRequest` unchanged (it never had a
     walletId in the contract — the SPA passed one ad hoc; 62.7 removes it).
@@ -1226,11 +1226,11 @@ and before any wipe.
     `RecentCashTransactionsPage`), `PATCH|DELETE
     /api/portfolios/cash/transactions/{txId}`, `POST
     /api/portfolios/cash/transactions/{txId}/labels`.
-- [ ] Push contracts main → GHA patch bump; `NODE_AUTH_TOKEN=$(gh auth token)
+- [x] Push contracts main → GHA patch bump; `NODE_AUTH_TOKEN=$(gh auth token)
   npm install @marx2/contracts@<new>` + `npm run gen:types` in `portfoliost`,
   `portfoliost-wallets`, `portfoliost-sheets-sync`.
-- [ ] Tests: contracts `npm test` (spec validity) green.
-- [ ] Commit (portfoliost-contracts) + consumer install commits.
+- [x] Tests: contracts `npm test` (spec validity) green.
+- [x] Commit (portfoliost-contracts) + consumer install commits.
 
 ### 62.2 — wallets backend: schema + cash replay service
 
