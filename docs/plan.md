@@ -111,21 +111,21 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ### 56.1 — instruments: ambiguity → resolver silence in `resolveInstrumentCurrency`
 
-- [ ] `src/services/instrument-currency.ts` — in the un-suffixed branch (no
+- [x] `src/services/instrument-currency.ts` — in the un-suffixed branch (no
   exchange hint), fetch up to 10 `searchTickerReference` rows and, among rows
   whose `ticker` exactly equals the route symbol, count distinct `exchange`
   values: **>1 → return null** (silence); exactly 1 → resolve as today.
   Venue-qualified path (suffix → exchange → exact listing) and the
   bond/fund short-circuit are untouched.
-- [ ] Unit tests (`instrument-currency.test.ts`): (a) AMD-shaped collision —
+- [x] Unit tests (`instrument-currency.test.ts`): (a) AMD-shaped collision —
   exact `AMD` rows on ASX + NASDAQ + NEO + TASE, no suffix → `null`; and
   `resolveCurrency` with provider-declared USD → `{ USD, "provider" }`, not
   `{ AUD, "estimated" }`; (b) a single-listing ticker still resolves via
   country code; (c) venue-qualified `SNT.WA` with a cross-exchange `SNT`
   collision still resolves to the WSE row (regression guard, §49.9
   follow-up); (d) bond/savings short-circuit unchanged.
-- [ ] Full instruments suite green (`npm run test`) + `npm run build`.
-- [ ] Commit.
+- [x] Full instruments suite green (`npm run test`) + `npm run build`.
+- [x] Commit.
 
 ### 56.2 — release + PROD verify
 
