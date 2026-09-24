@@ -162,14 +162,14 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ### 54.4 — E2E: calendar grid on a seeded portfolio (compose stack)
 
-- [ ] Playwright (docker compose, real wallets + live instruments): open a
+- [x] Playwright (docker compose, real wallets + live instruments): open a
   seeded portfolio → Calendar tab → expect `pf-cal-grid` with 42 day cells
   and the "All events" select; ‹/› navigation changes the month label; if
   the provider stack yields no rows for the seeded holdings (fmp-only,
   §49.9 fragility) the month still renders + empty state (no hard failure —
   same provider-skip convention as `research.spec.ts` chart tests); when
   rows exist, at least one chip is visible and links to research.
-- [ ] `npm run test:e2e` green; commit.
+- [x] `npm run test:e2e` green; commit.
 
 ### 54.5 — Closeout
 
