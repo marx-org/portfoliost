@@ -176,9 +176,13 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ### 53.7 — Closeout
 
-- [ ] Dev docker-compose smoke: seed a multi-currency portfolio, trigger backfill
-  + a quote refresh, assert same-day snapshot value is stable (53.6) and
-  `current_value` tracks the latest snapshot (53.5).
+- [x] Dev docker-compose smoke: seeded a multi-currency portfolio (base PLN;
+  10 AAPL @ 330 USD + 5 PKN.WA @ 150 PLN), triggered backfill (9 rows,
+  complete) + a quote refresh. Same-day snapshot-on-read value 14 132.71 PLN
+  equals the direct FX computation from the same live quotes (fx USD→PLN
+  3.9815, dev 0.00% — 53.6), and `portfolios.current_value` 14 132.71 equals
+  the newest snapshot (53.5). No non-complete/overflow rows in
+  `portfolio_backfill_metadata`.
 - [ ] PROD (after 53.2's reimport, with user approval): Playwright against
   `https://portfoliost.k.homylab.com` — card sparklines repaint on timeframe
   click, no "Loading chart…" stuck cards, card Value matches the chart end value
