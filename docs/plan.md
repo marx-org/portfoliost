@@ -160,6 +160,53 @@ ticker imported bare from IBKR) that the USD fallback would get wrong; it
 touches wallets + instruments (new API param), so it would land as a separate
 step if wanted.
 
+ **Open question — DECIDED 2026-09-24 by the user:** implement the guard (a);
+no `?company=` hint. Silence → the §49.6 USD fallback stands as the resolution
+policy; the `?company=` disambiguation variant is NOT wanted.
+
+### 56.3 — instruments: base-currency guard on `/:symbol/history` + PriceChart refusal notice (user request 2026-09-24)
+
+The §56.2 PROD verify exposed a gap: `PriceChart.vue` fires a **two-stage**
+load (price-bars leg → full `/history` leg). The §48.2 base-currency guard
+lived only on the `price-bars` route. The `/history` leg had none: for an
+ambiguous un-suffixed ticker (AMD on 4 exchanges, resolver silent per
+§56.1) it returned `200` with `currency: null` and **unconverted native
+(USD) closes**, while the title currency selector still read the user's
+chosen display currency (PLN) — a silently wrong-denomination series, exactly
+what the guard exists to prevent. Decided 2026-09-24 (user): add the guard.
+
+- [x] `portfoliost-instruments src/routes/instruments.ts` — mirror the
+  `price-bars` §48.2 guard on `/:symbol/history`: when a `?currency=` target
+  is present and `resolveInstrumentCurrency` is silent (null), return
+  `400 { error:"BadRequest", message:"base currency unknown; cannot convert" }`
+  before touching the provider. No `?currency=` (default chart load) is
+  unaffected. Response shapes unchanged → **no contracts change**.
+- [x] instruments unit test (`instruments.test.ts`, the existing `GET
+  /:symbol/history — ?currency=` describe): an AMD-shaped 4-exchange
+collision → `?currency=PLN` returns 400 `base currency unknown` and never
+  calls the provider; the same symbol without `?currency=` still returns
+  the native series (`currency: null`).
+- [x] instruments suite green (`npm run test`) + `npm run build`.
+- [x] SPA `PriceChart.vue` — on a failed **currency-conversion** load
+  (both legs rejected because the target currency was requested), keep the
+  already-rendered native series and surface a distinct notice
+  ("Display currency unavailable for this instrument — chart stays in its
+  base currency.") instead of the misleading "Full history unavailable".
+  The native-load failure path (no `?currency=`) is unchanged.
+- [x] SPA unit test (`ResearchPriceChart.test.ts`): (a) while the base
+  currency is unknown the title currency selector is hidden (a conversion can
+  never be offered); (b) selecting a display currency that the server 400s
+  keeps the native series and shows the refusal notice, not
+  "Full history unavailable".
+- [x] SPA green: `npm run test` (unit) + `npm run test:mock` + `npm run build`.
+- [x] Commit (instruments); commit (SPA).
+
+**PROD verify (§56.3, user-approved pin bump):** re-release instruments, bump
+the 4 homelab pins, re-release SPA; then in PROD — AMD research chart with an
+explicit display-currency selection shows the refusal notice over the native
+series (not a silently converted/wrong-denomination series); default AMD load
+still renders.
+
 ---
 
 ## 57. Transactions UI: clipped labels picker, missing label chips, hidden action column (user request 2026-09-24)
@@ -635,3 +682,122 @@ reimport depends on the new wallets surface).
     & reimport again. Repeat until the report is clean within tolerances.
 - [ ] Commit (plan closeout) + archive §58 to `plan-archive.md` once the
     report is accepted clean.
+
+---
+
+## 59. ApexCharts 5.16 → 7.5.1 (user request 2026-09-24)
+
+Proposal: — (direct user request: "upgrade charts apex to latest"; no proposal doc).
+
+SPA-only dependency bump: `apexcharts ^5.10.0` (5.16.0 installed) →
+`^7.5.1` (latest, 2026-09-20), keeping `vue3-apexcharts 1.11.1` (already the
+latest release; peer range `apexcharts >=5.10.0`). No other repo is touched —
+no contracts, no backend, no provider tier.
+
+Verified 2026-09-24 (upstream release notes + a temporary local bump that was
+fully reverted afterwards):
+
+- **Usage surface is small.** All ~14 chart mounts go through the local
+  `src/components/ApexChart.vue` wrapper (globally registered as
+  `apexchart`), which wraps `vue3-apexcharts`. Chart types in use: area
+  (card sparklines, wallet balance, price area), line (portfolio performance),
+  bar (seasonality, EPS surprises, fundamentals, charting comparison), donut
+  (allocation, projections). **None** of the v7 opt-in features
+  (trellis/storyboard/perspectives/ink/renderer-canvas/link/measure/history/
+  context-menu) and **no** `plotOptions.bar.borderRadiusWhenStacked` (removed
+  in v7) are used — both v7 breaking changes are no-ops here. `dataLabels`
+  are enabled only on the static research bar charts; v7's new
+  `dataLabels.animate.enabled` default (true) affects only data-change
+  updates, not initial render.
+- **v6.0.0 is config-compatible** ("existing configs keep working unchanged");
+  its default-on behaviour changes (coherent variable-length transitions,
+  mobile pinch/pan) are no-ops: our charts remount on data swap via the
+  §48.6e `key` pattern rather than in-place `updateOptions`, and the app is
+  desktop-first. v6's idempotent `render()` additionally guards the
+  wrapper's mount path.
+- **Wrapper works on v7 — proven, not assumed.** `vue3-apexcharts 1.11.1`
+  predates v6/v7 (published 2026-03-03) and was never tested against them, but
+  a live smoke (temporary `apexcharts@7.5.1` install, vite dev + mock backend,
+  Playwright) rendered every surface correctly: sparklines, performance line,
+  research PriceChart incl. the custom `tooltip.custom` HTML on hover
+  (`.apexcharts-tooltip`/`-title`/`-series-group` structure intact), bars with
+  data labels, grouped bars, donut. **Zero** console warnings — in particular
+  no v7 "feature configured but not loaded" warnings — and no watermark.
+  Every e2e selector the suite depends on (`.apexcharts-canvas`,
+  `svg.apexcharts-svg`, `g.apexcharts-grid`, `.apexcharts-yaxis text`,
+  `.apexcharts-xaxis`, `.apexcharts-tooltip`, `.apexcharts-legend`) is
+  unchanged in v7. One v7 DOM difference found: donut slices are now
+  `apexcharts-donut-slice-N` (indexed) instead of bare
+  `apexcharts-donut-slice` — nothing in `src/` or `tests/` references the
+  bare class, so no action.
+- **Licensing improves.** The v6.x default bundle shipped 24%
+  licence-gated Premium code (watermarked without a licence); v7 moved all
+  premium features to opt-in add-ons, so the default bundle is 0% gated and
+  our usage (all free-tier features) renders watermark-free — verified in the
+  smoke.
+- **Node engines:** apexcharts 7.5.1 declares `^20.19.0 || ^22.12.0 ||
+  >=24.0.0`; the Dockerfile's floating `node:22-alpine` currently resolves to
+  22.23 (satisfied) and the local toolchain is 22.23. No Dockerfile change
+  needed; noted so a future node-20 pin doesn't break the build.
+
+Design decisions (resolved 2026-09-24): keep `vue3-apexcharts` (the smoke
+above is the evidence for the keep-vs-drop question); if 59.2 nevertheless
+exposes wrapper/v7 incompatibility in the dockerized stack, the fallback is to
+replace `vue3-apexcharts` with a ~60-line direct wrapper inside the existing
+`ApexChart.vue` (`new ApexCharts(el, options).render()` on mount, destroy on
+unmount, keep the remount-key pattern the callers already use) — and re-run
+59.2.
+
+Rules: one step = one commit; a step is marked `[x]` only after its tests pass
+(unit + docker-compose level per AGENTS.md).
+
+---
+
+### 59.1 — Bump `apexcharts` to `^7.5.1`
+
+- [ ] `package.json`: `"apexcharts": "^7.5.1"`; `npm install` → commit the
+  `package-lock.json` change; assert the tree resolves `apexcharts@7.5.1` and
+  `vue3-apexcharts@1.11.1` (unchanged) — `npm ls apexcharts vue3-apexcharts`.
+- [ ] No source changes expected (config compatibility verified in the
+  section intro). If `vue-tsc` surfaces type fallout from the types v6+ ships
+  in-package (e.g. `chart.type` literal narrowing in the `as const` options
+  objects), fix it in the affected chart components only — minimal diff, no
+  behaviour change.
+- [ ] Tests: `npm run build` (includes `vue-tsc --noEmit`), `npm run test`,
+  `npm run test:mock`, `docker compose up -d --build` +
+  `npm run test:e2e` (the chart specs — `chart-currency`,
+  `chart-title-stability`, `chart-recompute`, `charting`, `combined-chart`,
+  `parity-portfolios`, `research`, `performance-display-currency` — assert on
+  the `.apexcharts-*` DOM and double as the v7 DOM-compatibility gate) green.
+- [ ] Commit.
+
+### 59.2 — Visual + console sweep across all chart surfaces (docker compose)
+
+- [ ] Against the rebuilt compose stack (`:8080`), Playwright pass at 1280px
+  over every chart surface: main page (portfolio-card sparklines +
+  "Portfolio Value" line), research overview (PriceChart: render, custom
+  tooltip on hover shows title + series row + transactions block when
+  transactions are enabled, buy/sell markers), seasonality + EPS bar charts
+  (data labels legible), allocation + projections donuts, charting grouped
+  bars (preset-loaded), wallet balance area.
+- [ ] Per surface assert: chart visible (`.apexcharts-canvas`), console has
+  **zero** errors/warnings mentioning apexcharts — in particular no v7
+  "feature … configured but … not loaded" warning and no watermark overlay or
+  "Premium" text in the rendered page.
+- [ ] If a surface drifted (label animation unwanted on the static bar
+  charts, tooltip placement, sizing): adjust that component's options (e.g.
+  `dataLabels: { animate: { enabled: false } }`) — re-run the sweep and the
+  chart e2e specs.
+- [ ] Commit (the fixes, if any; a verification-only step otherwise — note
+  that in the commit of 59.3's plan closeout).
+
+### 59.3 — Release + PROD verify
+
+- [ ] Push `portfoliost` → GHA patch-bump → pin the **real** tag from
+  `gh release list` in the homelab portfoliost helmrelease
+  (`KUBECONFIG=$HOME/.kube/homylab`, ns `pfire`); Flux + kubectl verify the
+  rollout.
+- [ ] Playwright PROD (user's passkey session): main page cards + one
+  research PriceChart render, custom tooltip works on hover, console clean,
+  no watermark, no v7 feature warnings.
+- [ ] Commit (plan closeout) + archive §59 to `plan-archive.md`.
