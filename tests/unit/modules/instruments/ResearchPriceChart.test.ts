@@ -2,7 +2,7 @@ import { flushPromises, mount } from "@vue/test-utils"
 import { describe, expect, it, vi } from "vitest"
 import { createPinia } from "pinia"
 import PriceChart from "@/components/PriceChart.vue"
-import { getHistory } from "@/api/instruments"
+import { getHistory, getPriceBars } from "@/api/instruments"
 import { getAllTransactions, getPortfolioTransactions } from "@/api/portfolios"
 
 vi.mock("@/api/instruments", () => ({
@@ -26,13 +26,24 @@ vi.mock("@/api/portfolios", () => ({
 
 // §48.5 — the title selector reads the shared currency registry; keep the
 // unit test off the network (the e2e stack exercises the real registry).
-vi.mock("@/stores/currencies", () => ({
-  useCurrenciesStore: () => ({ options: [], loaded: false, load: vi.fn().mockResolvedValue(undefined) }),
-}))
+// §56.3 — the mock is reactive + configurable (via __currenciesState) so
+// currency-refusal tests can show the selector.
+vi.mock("@/stores/currencies", async () => {
+  const { reactive } = await import("vue")
+  const state = reactive({ options: [] as unknown[], loaded: false, load: vi.fn().mockResolvedValue(undefined) })
+  return {
+    useCurrenciesStore: () => state,
+    __currenciesState: state,
+  }
+})
 
 const mockedGetHistory = vi.mocked(getHistory)
 const mockedGetAllTransactions = vi.mocked(getAllTransactions)
 const mockedGetPortfolioTransactions = vi.mocked(getPortfolioTransactions)
+const mockedGetPriceBars = vi.mocked(getPriceBars)
+const { __currenciesState: currenciesMock } = (await import("@/stores/currencies")) as unknown as {
+  __currenciesState: { options: unknown[]; loaded: boolean }
+}
 
 function makeHistory() {
   return {
@@ -116,6 +127,18 @@ describe("PriceChart", () => {
     mockedGetHistory.mockResolvedValue(makeHistory())
     mockedGetAllTransactions.mockResolvedValue(makeTxPage([]))
     mockedGetPortfolioTransactions.mockResolvedValue(makeTxPage([]))
+    mockedGetPriceBars.mockResolvedValue({
+      symbol: "AAPL",
+      timeframe: "daily",
+      stale: false,
+      currency: "USD",
+      baseCurrency: "USD",
+      fxFrom: null,
+      dates: ["2026-08-18", "2026-08-19"],
+      closes: [180, 182],
+    })
+    currenciesMock.options = [{ code: "USD", name: "US Dollar", symbol: "$", minorUnits: 2, popular: true }]
+    currenciesMock.loaded = false
   })
 
   it("fetches daily history for the symbol", async () => {
@@ -409,5 +432,48 @@ describe("PriceChart", () => {
     // Sell 4 -> drains 4@100 -> remaining 4@100. totalCost = 4*100 = 400, qty 4, avg = 100.
     expect(avg).toBeDefined()
     expect(avg!.y).toBe(100)
+  })
+
+  it("omits the currency selector while the base currency is unknown (plan §56.3)", async () => {
+    // Ambiguous ticker: both legs return a native series with currency:null
+    // — the resolver stayed silent, so a conversion can never be offered.
+    mockedGetPriceBars.mockResolvedValue({
+      symbol: "AMD", timeframe: "daily", stale: false,
+      // Contract PriceBarSeries.currency is a non-nullable string; the real
+      // 400-refusal path never returns a converted series, so the native leg
+      // shape here only needs a falsy base (baseCurrency null → no selector).
+      currency: "", baseCurrency: null, fxFrom: null,
+      dates: ["2026-08-18", "2026-08-19"], closes: [180, 182],
+    })
+    mockedGetHistory.mockResolvedValue({ ...makeHistory(), currency: null })
+    currenciesMock.loaded = true
+    const wrapper = mountChart({ symbol: "AMD" })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="chart-currency-select"]').exists()).toBe(false)
+    expect(mockedGetHistory).toHaveBeenCalledWith("AMD", "daily", undefined, null)
+  })
+
+  it("keeps the native series + a refusal notice when the server 400s a conversion (plan §56.3)", async () => {
+    currenciesMock.loaded = true
+    currenciesMock.options = [
+      { code: "USD", name: "US Dollar", symbol: "$", minorUnits: 2, popular: true },
+      { code: "PLN", name: "Polish Zloty", symbol: "zł", minorUnits: 2, popular: true },
+    ]
+    const wrapper = mountChart({ symbol: "AMD" })
+    await flushPromises()
+    const select = wrapper.find('[data-testid="chart-currency-select"]')
+    expect(select.exists()).toBe(true)
+    // Switch the display currency; the server refuses (base currency unknown).
+    mockedGetPriceBars.mockRejectedValue(new Error("400 base currency unknown; cannot convert"))
+    mockedGetHistory.mockRejectedValue(new Error("400 base currency unknown; cannot convert"))
+    await select.setValue("PLN")
+    await flushPromises()
+    expect(mockedGetPriceBars).toHaveBeenCalledWith("AMD", expect.any(String), expect.any(String), "PLN")
+    // The native series from the initial load is kept, explicitly caveated —
+    // not a silently wrong-denomination series under a PLN title.
+    const vm = wrapper.vm as unknown as { prices: number[]; error: string | null }
+    expect(vm.prices.length).toBeGreaterThan(0)
+    expect(vm.error).toMatch(/Display currency unavailable/)
+    expect(vm.error).not.toMatch(/Full history unavailable/)
   })
 })

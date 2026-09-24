@@ -241,10 +241,19 @@ async function load(compareKey: CompareKey) {
     }
   } catch {
     if (seq !== loadSeq.value) return
-    // Keep the price-bars chart; surface a dismissible notice + retry instead
-    // of a blank canvas / blocking spinner.
+    if (currencyParam) {
+      // §48.2 / plan §56.3 — both legs 400 "base currency unknown": the
+      // server refused to convert (ambiguous ticker, silent resolver). The
+      // stale series below is the native base currency — say so explicitly
+      // instead of the misleading "full history unavailable".
+      error.value =
+        "Display currency unavailable for this instrument — chart stays in its base currency."
+    } else {
+      // Keep the price-bars chart; surface a dismissible notice + retry instead
+      // of a blank canvas / blocking spinner.
+      error.value = "Full history unavailable — showing recent prices."
+    }
     historyFailed.value = true
-    error.value = "Full history unavailable — showing recent prices."
   } finally {
     if (seq === loadSeq.value) historyLoading.value = false
   }
