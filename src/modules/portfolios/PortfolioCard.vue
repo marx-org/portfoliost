@@ -326,8 +326,13 @@ async function exportPositions(format: "csv" | "xml" | "json") {
           </button>
         </div>
         <p v-else-if="chartError" class="py-6 text-center text-xs text-slate-400 dark:text-slate-500">Chart unavailable</p>
-        <div v-else class="flex h-[90px] items-center justify-center">
+        <div v-else-if="chartLoading || backfillPending" class="flex h-[90px] items-center justify-center">
           <p class="text-xs text-slate-400 dark:text-slate-500">Loading chart...</p>
+        </div>
+        <!-- §53.7 — backfill complete but the window is empty (e.g. fully
+             liquidated portfolio): must not sit on "Loading chart…" forever. -->
+        <div v-else class="flex h-[90px] items-center justify-center" data-testid="card-chart-empty">
+          <p class="text-xs text-slate-400 dark:text-slate-500">No data</p>
         </div>
         <div v-if="chartLoading && series.length" class="absolute inset-0 flex items-center justify-center rounded bg-white/70 dark:bg-slate-900/70">
           <span class="text-xs font-medium text-slate-500 dark:text-slate-400">Refreshing...</span>

@@ -90,6 +90,19 @@ describe("PortfolioCard sparkline (§53.3)", () => {
     expect(w.find('[data-testid="card-chart-recompute"]').exists()).toBe(true)
   })
 
+  it("shows 'No data' (not eternal 'Loading chart…') when the backfill completed but the window is empty (§53.7)", async () => {
+    // PROD 2026-09-24: fully-liquidated portfolios (XTB, Equate+) had a
+    // complete backfill with zero points in the default 6M window — the card
+    // sat on "Loading chart…" forever.
+    mockedPortfolios.getPortfolioAnalytics.mockResolvedValue(analytics([], "complete"))
+    const w = await mountCard()
+
+    expect(w.text()).toContain("No data")
+    expect(w.text()).not.toContain("Loading chart...")
+    expect(w.find('[data-testid="card-chart-empty"]').exists()).toBe(true)
+    expect(w.find('[data-testid="card-chart-recompute"]').exists()).toBe(false)
+  })
+
   it("Recompute calls recomputePortfolio and repaints once the backfill succeeds", async () => {
     mockedPortfolios.getPortfolioAnalytics
       .mockResolvedValueOnce(analytics([], "failed"))
