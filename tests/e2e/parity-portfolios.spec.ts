@@ -52,6 +52,24 @@ test("portfolio card shows chart, quick links and manage menu", async ({ page })
   await expect(page.getByRole("button", { name: "Delete", exact: true })).toBeVisible()
 })
 
+test("card sparkline remounts on timeframe switch (§53.3)", async ({ page }) => {
+  await login(page)
+
+  const card = page.locator(".card", { hasText: "Top10" }).first()
+  const oldChart = await card.locator(".vue-apexcharts").first().elementHandle()
+  expect(oldChart).not.toBeNull()
+
+  await card.getByRole("button", { name: "1Y", exact: true }).click()
+
+  // §48.6e B3: vue3-apexcharts never pushes a prop update into the mounted
+  // chart, so the chartKey fingerprint (timeframe + series shape) must replace
+  // the running instance — the old chart node detaches from the DOM.
+  await expect
+    .poll(async () => (oldChart ? await oldChart.evaluate((el) => el.isConnected) : false))
+    .toBe(false)
+  await expect(card.locator(".vue-apexcharts").first()).toBeVisible()
+})
+
 test("create, rename and delete a portfolio from the card manage menu", async ({ page }) => {
   const name = `E2E Manage ${Date.now()}`
   const renamed = `${name} renamed`

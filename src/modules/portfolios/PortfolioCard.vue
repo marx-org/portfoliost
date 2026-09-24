@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from "vue"
 import { useRouter } from "vue-router"
 import { usePortfolioStore } from "@/stores/portfolios"
-import { deletePortfolio, getPortfolioAnalytics, getPortfolioPositions, updatePortfolio } from "@/api/portfolios"
+import { deletePortfolio, getPortfolioAnalytics, getPortfolioPositions, recomputePortfolio, updatePortfolio } from "@/api/portfolios"
 import { formatCurrency, formatNumber, formatPercent } from "@/utils/format"
 import type { PortfolioAnalyticsTimeframe } from "@/api/portfolios"
 import type { PortfoliosSummaries } from "@/api/types"
@@ -30,6 +30,8 @@ const chartLoading = ref(false)
 const openMenu = ref(false)
 const notice = ref<string | null>(null)
 const backfillPending = ref(false)
+const backfillFailed = ref(false)
+const recomputeBusy = ref(false)
 
 const showRename = ref(false)
 const renameName = ref(props.portfolio.name)
@@ -50,6 +52,24 @@ function stopPolling() {
   }
 }
 
+function applyBackfillStatus(status: string | null | undefined) {
+  if (status === "pending") {
+    backfillPending.value = true
+    backfillFailed.value = false
+    startPolling()
+  } else if (status === "failed") {
+    // §53.3 — a failed backfill must not leave the card on the eternal
+    // "Loading chart…": surface the failure + a Recompute escape hatch.
+    backfillPending.value = false
+    backfillFailed.value = true
+    stopPolling()
+  } else {
+    backfillPending.value = false
+    backfillFailed.value = false
+    stopPolling()
+  }
+}
+
 function startPolling() {
   stopPolling()
   pollDeadline = Date.now() + 5 * 60 * 1000 // 5-minute guard
@@ -58,10 +78,7 @@ function startPolling() {
     try {
       const analytics = await getPortfolioAnalytics(props.portfolio.id, timeframe.value)
       series.value = (analytics.performance?.timeSeries ?? []).map((p) => p.value ?? 0)
-      if (analytics.backfillStatus !== "pending") {
-        backfillPending.value = false
-        stopPolling()
-      }
+      applyBackfillStatus(analytics.backfillStatus)
     } catch { stopPolling() }
   }, 5000)
 }
@@ -75,17 +92,25 @@ async function loadChart() {
   try {
     const analytics = await getPortfolioAnalytics(props.portfolio.id, timeframe.value)
     series.value = (analytics.performance?.timeSeries ?? []).map((p) => p.value ?? 0)
-    if (analytics.backfillStatus === "pending") {
-      backfillPending.value = true
-      startPolling()
-    } else {
-      backfillPending.value = false
-      stopPolling()
-    }
+    applyBackfillStatus(analytics.backfillStatus)
   } catch {
     chartError.value = true
   } finally {
     chartLoading.value = false
+  }
+}
+
+async function handleRecompute() {
+  if (recomputeBusy.value) return
+  recomputeBusy.value = true
+  backfillFailed.value = false
+  try {
+    await recomputePortfolio(props.portfolio.id)
+    await loadChart()
+  } catch {
+    // network error — stay failed; the user can retry
+  } finally {
+    recomputeBusy.value = false
   }
 }
 
@@ -119,6 +144,18 @@ const sparkOptions = computed(() => ({
   xaxis: { categories: series.value.map((_, i) => i), labels: { show: false } },
   tooltip: { enabled: false },
 }))
+
+// §48.6e B3 / §53.3 — remount key (PortfolioPerformanceChart.vue precedent):
+// vue3-apexcharts' prop-update path is unreliable in this stack — a data swap
+// after mount (timeframe switch, 5 s backfill-poll update) is never pushed
+// into the running instance, leaving the initial series on screen. A fresh
+// mount is the only reliable way to repaint; the fingerprint (timeframe +
+// length + first/last point) changes on every real data swap.
+const chartKey = computed(
+  () => [timeframe.value, series.value.length, series.value[0] ?? "", series.value.at(-1) ?? ""].join("~"),
+)
+
+defineExpose({ chartKey })
 
 function returnClass(p: PortfoliosSummaries[number]): string {
   return (p.metrics?.totalReturn ?? 0) >= 0 ? "text-green-600" : "text-red-600"
@@ -272,9 +309,22 @@ async function exportPositions(format: "csv" | "xml" | "json") {
         <component
           :is="'apexchart'"
           v-if="series.length"
+          :key="chartKey"
           :options="sparkOptions"
           :series="sparkOptions.series"
         />
+        <div v-else-if="backfillFailed" class="flex h-[90px] flex-col items-center justify-center gap-1.5" @click.stop>
+          <p class="text-xs text-slate-400 dark:text-slate-500">Chart unavailable</p>
+          <button
+            type="button"
+            class="btn-secondary text-xs"
+            data-testid="card-chart-recompute"
+            :disabled="recomputeBusy"
+            @click="handleRecompute"
+          >
+            {{ recomputeBusy ? "Recomputing..." : "Recompute" }}
+          </button>
+        </div>
         <p v-else-if="chartError" class="py-6 text-center text-xs text-slate-400 dark:text-slate-500">Chart unavailable</p>
         <div v-else class="flex h-[90px] items-center justify-center">
           <p class="text-xs text-slate-400 dark:text-slate-500">Loading chart...</p>
