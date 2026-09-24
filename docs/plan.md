@@ -72,16 +72,18 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ### 53.1 — wallets: guard MWR (and XIRR) against divergence
 
-- [ ] `src/services/returnColumns.ts`: `xirr()` returns `null` when the result is
+- [x] `src/services/returnColumns.ts`: `xirr()` returns `null` when the result is
   non-finite or outside a sane band (|r| > 10); `buildMwr` then takes its existing
   `buildSimple` fallback (it already does — the guard makes it reachable).
-- [ ] Unit tests in `returnColumns.test.ts` (create if absent, else extend):
-  (a) the Crypto-shaped case — small capital + one large deposit whose XIRR would
-  exceed the band → every `buildMwr` output is finite and |v| < 1e12 (column-bound
-  regression); (b) a healthy mixed-flow case still yields a real MWR (no
-  regression to the fallback).
-- [ ] Full wallets suite green (`npm run test`); `npm run build` clean.
-- [ ] Commit.
+  - Regression fixture (verified pre-fix in node): 1 PLN capital + 10 000 PLN
+    deposit growing 2 000 000x in 6 months → unguarded solver "converges" to
+    r ≈ 1.7e10 → `buildMwr` end value ≈ 1.85e12 (the PROD overflow).
+- [x] Unit tests in `returnColumns.test.ts` (created): (a) the Crypto-shaped case —
+  every `buildMwr` output finite, |v| < 1e12, and equal to the `buildSimple`
+  fallback (column-bound regression); (b) a healthy mixed-flow case still yields a
+  real MWR (end index ≈ 110.06, mid ≈ 104.88 — not the simple 205/215).
+- [x] Full wallets suite green (`npm run test`: 323 passed); `npm run build` clean.
+- [x] Commit (portfoliost-wallets 2f745f7).
 
 ### 53.2 — wallets: widen cumulative columns + reimport PROD
 
