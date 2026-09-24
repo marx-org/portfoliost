@@ -183,10 +183,28 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
   3.9815, dev 0.00% — 53.6), and `portfolios.current_value` 14 132.71 equals
   the newest snapshot (53.5). No non-complete/overflow rows in
   `portfolio_backfill_metadata`.
-- [ ] PROD (after 53.2's reimport, with user approval): Playwright against
-  `https://portfoliost.k.homylab.com` — card sparklines repaint on timeframe
-  click, no "Loading chart…" stuck cards, card Value matches the chart end value
-  (±1 day), Crypto card shows a chart.
+- [x] PROD release (user-approved 2026-09-24): pushed wallets + SPA, GHA
+  tags wallets v1.1.51 / SPA v1.0.211, homelab Flux pin, rollout verified,
+  migration 0006 applied. **Wipe & Reimport** ran clean (2016 txs, 0 errors);
+  all 10 backfills `complete`, no overflow — Crypto `cumulative_mwr` max is
+  now 45 982 (simple-fallback for the divergent history; pre-fix ≈1.01e12
+  overflowed numeric(20,8)), and `current_value` == newest snapshot for all
+  10 portfolios.
+- [x] PROD finding: **empty window = eternal "Loading chart…"**. XTB (last
+  tx 2023-02) and Equate+ (snapshots end 2022-07, no SAP.DE prices since)
+  have complete backfills with zero points in the default 6M window — the
+  card's final fallback rendered "Loading chart…" forever. Fix: the fallback
+  now shows "Loading chart…" only while `chartLoading || backfillPending`,
+  else "No data" (`data-testid="card-chart-empty"`); +unit test. All 4 SPA
+  gates green (build, 371 unit, 227 mock, 102 e2e).
+- [x] Crypto card re-armed (user-approved): added BTC-USD 0.004 @ 84 000 USD
+  (2026-09-24) to the PROD Crypto portfolio — backfill complete, position
+  open; (first attempt used the stale `BTC` symbol — superseded by
+  `BTC-USD`, whose bars are fresh through 09-24.)
+- [ ] PROD Playwright verify (needs the fixed SPA deployed + a fresh
+  session): card sparklines repaint on timeframe click, no "Loading chart…"
+  stuck cards (XTB/Equate+ show "No data"), card Value tracks
+  `current_value`, Crypto card has a live position value.
 - [ ] Archive §53 to `plan-archive.md`.
 
 ---
