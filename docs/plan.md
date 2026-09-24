@@ -809,3 +809,746 @@ fixtures (the seeded portfolio with transactions that
     → back on the transactions list (filters intact if any were set).
   - On research, switch a tab → "Go back" still targets the origin.
 - [ ] Commit (plan closeout) + archive §60 to `plan-archive.md`.
+
+---
+
+## 61. Shared TickerBadge: logo + ticker + name + details at every ticker surface (user request 2026-09-24)
+
+Proposal: — (direct user request: "make a ticker component which consist of: logo, ticker, name, details (like (PL) Stock) and then use this component everywhere we show a ticker, for example: top/bottom performers, dividends tab, news, Compare with peers"; no proposal doc).
+
+One presentational component — `src/components/TickerBadge.vue` — replaces the ~10 ad-hoc
+ticker renderings across the SPA: holdings symbol cell, top/bottom performers, transactions
+symbol cell, portfolio dividends rows, portfolio news cards, research header, research
+overview header, compare-with-peers column headers, instrument search results, watchlist
+items, and form symbol previews. It renders the instrument logo, the ticker, an optional
+details line `(<CC>) <Type>` (e.g. `(PL) Stock`), and the company name.
+
+Example service parity source (verified live 2026-09-24): the holdings-table
+`instrument-identity` block — logo (24/28px rounded square, `object-contain`) + `MSFT` +
+` (US) ` exchange hint + `Akcja` (Stock) pill + `Microsoft Corp` — and the research header
+`ih-identity` — logo (32px rounded square) + name + `US · MSFT` chip. The example-service research
+header and holdings cell use the *same* identity block at different scales; that is the
+`size` prop of the component.
+
+Data availability per surface (audited 2026-09-24 against the SPA types + backend routes):
+
+| Surface | File | symbol | name | country | assetType |
+|---|---|---|---|---|---|
+| Holdings cell | `PortfolioHoldingsTab.vue:420` | `pos.symbol` | `pos.companyName` | `pos.country` | `pos.assetType` |
+| Top/Bottom performers | `PortfolioPerformanceTab.vue:350/370` | `p.symbol` | `p.companyName` | `p.country` | `p.assetType` |
+| Transactions cell | `TransactionsTable.vue:370` | `tx.instrumentSymbol` | `tx.instrumentName` | `tx.country` | `tx.assetType` |
+| Dividends rows | `PortfolioDividendsTab.vue:95` | `d.symbol` | `d.instrumentName` | **new (61.3)** | **new (61.3)** |
+| News cards | `PortfolioNewsTab.vue:43` | `a.ticker` | position lookup | position lookup | position lookup |
+| Research header | `ResearchView.vue:88` | `routeSymbol` | `profile.name` | `profile.countryCode` | `profile.type` |
+| Overview header | `ResearchOverview.vue:229` | `symbol` | `profile.name` | `profile.countryCode` | `profile.type` |
+| Compare columns | `ResearchCompare.vue:46` | `r.symbol` | `r.name` | **new (61.4)** | **new (61.4)** |
+| Search results | `InstrumentSearchModal.vue` | `result.symbol` | `result.name` | `result.countryCode` | `result.type` |
+| Watchlist items | `WatchlistsView.vue:122` | `item.symbol` | `item.name` | — | — |
+| Form previews | `AddPositionDialog` / `EditTransactionModal` / `RecordDividendDialog` / `TransactionFormFields` | typed/selected symbol | selected name | — | — |
+
+Design decisions (resolved 2026-09-24):
+
+- **Logo shape standardized to example-service's rounded square** (`rounded-[9px] object-contain`
+  on a `bg-slate-100 dark:bg-slate-800` plate) at every surface — replaces the current
+  circle style; the `docs/COMPONENTS.md` logo line is updated in 61.10.
+- **Backends are enriched** so the dividends tab and compare tab show full details:
+  wallets adds `assetType`/`country` to `GET /:id/dividends` items (both columns already
+  on the DIVIDEND tx row, `portfolios.ts:1105`), instruments adds `countryCode`/
+  `assetType` to the `/:symbol/peers` rows (local `ticker_reference` lookup, same
+  `ref.ticker === baseTicker` guard as the profile route), both via nullable contracts
+  fields — never guessed, null when unknown.
+- **Presentational only** — the component fetches nothing; each call site passes the
+  data it already has (or a local lookup, for news). Surfaces without country/type
+  (watchlist, forms, symbol-only rows) degrade to logo + ticker (+ name when known);
+  the details line is simply omitted.
+- **Not a link** — parents that need a research link wrap the badge in their existing
+  `router-link`; note/label-chip rows (transactions) keep their extra lines below the
+  badge.
+- **Out of scope (stay as-is):** `RecentSearchesBar` symbol chips (dense bar, symbol
+  only), `PortfolioCalendarTab` month-grid text chips (`SAP dividend: 10,00 PLN` — a
+  badge would break the grid), the sentence titles in `ResearchDividends.vue` /
+  `ResearchNews.vue` ("Dividends per share - MSFT", "N of M articles for MSFT"),
+  `PortfolioCompareTab` (compares portfolios, not instruments).
+
+Repos touched: `portfoliost-contracts` (61.2), `portfoliost-wallets` (61.3),
+`portfoliost-instruments` (61.4), `portfoliost` SPA + mocks (61.1, 61.4–61.10).
+
+Rules: one step = one commit; a step is marked `[x]` only after its tests pass
+(unit + docker-compose level per AGENTS.md).
+
+---
+
+### 61.1 — SPA: `TickerBadge.vue` component + unit tests
+
+- [ ] New `src/components/TickerBadge.vue`:
+  - Props (`<script setup lang="ts">`, typed `defineProps`):
+    `symbol: string` (required); `name?: string | null`; `countryCode?: string | null`
+    (2-letter code, uppercased on render); `assetType?: string | null` (accepts the
+    enum form `STOCK`/`ETF`/… or an already-displayable word); `size?: "sm" | "md" |
+    "lg"` (default `"md"`; logo `h-5` / `h-6` / `h-8`); `align?: "left" | "right"`
+    (default `"left"`; right = `flex-row-reverse text-right`, for compare-table column
+    headers); `titleAs?: "div" | "h1" | "h2"` (default `"div"`; element of the ticker
+    line — research header uses `"h1"`); `testid?: string` (default `"ticker-badge"`).
+  - Layout: `<div :data-testid="tid" class="flex min-w-0 items-center gap-2.5">` →
+    `<img :src="`/api/logos/${symbol}`" :alt="symbol" loading="lazy"
+    class="shrink-0 rounded-[9px] object-contain bg-slate-100 dark:bg-slate-800 …size">`
+    → text block (`min-w-0`): line 1 = ticker (`<Component :is="titleAs"
+    class="truncate font-medium text-slate-900 dark:text-slate-100">`) + details
+    `<span :data-testid="`${tid}-details`" class="text-[11px] text-slate-400
+    dark:text-slate-500">` (only when non-empty); line 2 = name (`text-xs
+    text-slate-500 dark:text-slate-400 truncate`, only when provided).
+  - Plain `<script>` block (house style for shared logic) exporting:
+    `formatAssetType(t: string | null | undefined): string` — `STOCK→"Stock"`,
+    `ETF→"ETF"`, `BOND→"Bond"`, `CORP_BOND→"Bond"`, `CRYPTO→"Crypto"`, `FUND→"Fund"`,
+    empty/null→`""`, other → title-case as-is; and
+    `tickerDetails(countryCode?: string | null, assetType?: string | null):
+    string | null` — `(${CC}) ${Type}` over the non-empty parts, `null` when both are
+    missing. Both pure and unit-tested; no other call site re-derives the format.
+- [ ] Unit tests, new `tests/unit/components/TickerBadge.test.ts`:
+  - full props → logo `img[src*="/api/logos/SAP"]`, ticker `SAP`, name line,
+    details `(PL) Stock` (and `${tid}-details` testid);
+  - no `name` → no name line; no details → no details span; countryCode only →
+    `(PL)`; assetType only → `Stock`;
+  - `formatAssetType` map incl. `ETF` (not `Etf`), `CORP_BOND`, unknown passthrough;
+    `tickerDetails(null, null) === null`;
+  - `size` sm/lg swap the logo class; `align="right"` adds the row-reverse class;
+    `titleAs="h1"` renders an `<h1>`; custom `testid` prefixes the root + details.
+- [ ] Tests: `npm run test`, `npm run build` green.
+- [ ] Commit.
+
+### 61.2 — contracts: dividends items + compare rows carry identity fields
+
+- [ ] `portfoliost-contracts/contracts/openapi.yaml`:
+  - `DividendsData.items` item: add `assetType: { type: string, nullable: true }` and
+    `country: { type: string, nullable: true }` (nullable — the research-backed
+    `history` shape has neither).
+  - `ResearchCompare`: add `countryCode: { type: string, nullable: true }` and
+    `assetType: { type: string, nullable: true }` (nullable — never guessed, 61.4).
+- [ ] Push contracts main → GHA patch bump; `NODE_AUTH_TOKEN=$(gh auth token)
+  npm install @marx2/contracts@<new>` + `npm run gen:types` in `portfoliost`,
+  `portfoliost-wallets`, `portfoliost-instruments` (all three have generated types).
+- [ ] Tests: contracts `npm test` (spec validity) green.
+- [ ] Commit (portfoliost-contracts) + consumer install commits.
+
+### 61.3 — wallets: `assetType` + `country` on `GET /:id/dividends` items
+
+- [ ] `portfoliost-wallets src/routes/portfolios.ts` `/:id/dividends` (:1105): the
+  item map adds `assetType: r.assetType ?? null` and `country: r.country ?? null` —
+  both columns are already selected (`select()` over `portfolioTransactions`); no
+  schema/DB change.
+- [ ] Unit test (`portfolios.test.ts` dividends describe): a DIVIDEND tx seeded with
+  `assetType: "ETF"`, `country: "PL"` → response `items[0].assetType === "ETF"`,
+  `items[0].country === "PL"`; a tx without them → `null`.
+- [ ] Full wallets suite green (`npm run test`) + `npm run build`.
+- [ ] Commit (portfoliost-wallets).
+
+### 61.4 — instruments: `countryCode` + `assetType` on `/:symbol/peers` rows (+ SPA mock)
+
+- [ ] `portfoliost-instruments src/routes/instruments.ts` `/:symbol/peers` (:1346):
+  after each `toCompare(...)` item is built, enrich from the local reference table —
+  same pattern as the profile route (:1602): `searchTickerReference(getDb(),
+  sym.split(".")[0], 1)`, only when `ref.ticker === baseTicker` set
+  `item.countryCode = ref.countryCode ?? null` and
+  `item.assetType = toInstrumentType(ref.assetType)`; no ref row → both stay null
+  (never guessed). `toCompare` (translate.ts) stays pure.
+- [ ] Unit test (`instruments.test.ts` peers describe): a ref row for the primary
+  symbol (e.g. AAPL → `US` / `STOCK`) → `items[0].countryCode === "US"`,
+  `items[0].assetType === "STOCK"`; a symbol with no ref row → both null.
+- [ ] Full instruments suite green (`npm run test`) + `npm run build`.
+- [ ] Commit (portfoliost-instruments).
+- [ ] SPA mock (e2e runs against the compose mock backend): `mocks/instruments/
+  index.js` — the `/compare` and `/peers` mappers add `countryCode`/`assetType` to
+  each compare row, derived from the seeded research data where it carries a country
+  (else `null`).
+- [ ] Tests: `npm run test:mock` green (portfoliost).
+- [ ] Commit (portfoliost).
+
+### 61.5 — SPA: adopt in holdings table + top/bottom performers
+
+- [ ] `PortfolioHoldingsTab.vue` symbol cell (:420–433): replace the logo `img` +
+  symbol `router-link` + `assetLabel(pos)` line with the existing `router-link`
+  wrapping `<TickerBadge :symbol="pos.symbol" :name="pos.companyName"
+  :country-code="pos.country" :asset-type="pos.assetType" />`; delete the now-unused
+  `assetLabel` function (:235) — its format lives in the component's
+  `tickerDetails`.
+- [ ] `PortfolioPerformanceTab.vue` Top/Bottom performers lists (:350, :370):
+  replace the `symbol` + `companyName` div with
+  `<TickerBadge size="sm" :symbol="p.symbol" :name="p.companyName"
+  :country-code="p.country" :asset-type="p.assetType" />`; the P/L right column is
+  untouched.
+- [ ] Update the affected unit tests (holdings/performance specs that assert the old
+  markup) to select on `ticker-badge` / `ticker-badge-details`.
+- [ ] Tests: `npm run build`, `npm run test`, `npm run test:mock` green;
+  `docker compose up -d --build` + `npm run test:e2e` (holdings +
+  `top-performers-currency.spec.ts`) green.
+- [ ] Commit.
+
+### 61.6 — SPA: adopt in transactions table + portfolio dividends tab (+ SPA mock)
+
+- [ ] `TransactionsTable.vue` symbol cell (:370–392): replace the global-mode logo
+  `img` + `symbol` + `assetLabel(tx)` + `instrumentName` lines with
+  `<TickerBadge :symbol="tx.instrumentSymbol" :name="tx.instrumentName"
+  :country-code="tx.country" :asset-type="tx.assetType" />` inside the existing
+  `router-link`; the note line and `LabelChips` stay below the badge (transaction-
+  level, not identity).
+- [ ] `PortfolioDividendsTab.vue` symbol cell (:96): replace the plain
+  `{{ d.symbol }}` with
+  `<TickerBadge size="sm" :symbol="d.symbol" :name="d.instrumentName"
+  :country-code="d.country" :asset-type="d.assetType" />` — the 61.2/61.3 fields are
+  nullable, so a research-backed legacy row degrades to ticker-only.
+- [ ] SPA mock: `mocks/portfolios/index.js` dividends mapper (:731) adds
+  `assetType: t.assetType ?? null, country: t.country ?? null` (tx rows already carry
+  both via `enrichTx`).
+- [ ] Update affected unit tests; e2e: `dividends.spec.ts` + the transactions specs.
+- [ ] Tests: `npm run build`, `npm run test`, `npm run test:mock`,
+  `docker compose up -d --build` + `npm run test:e2e` green.
+- [ ] Commit.
+
+### 61.7 — SPA: adopt in portfolio news cards
+
+- [ ] `PortfolioNewsTab.vue` (:43): replace the uppercase `a.ticker` chip with
+  `<TickerBadge size="sm" :symbol="a.ticker" :name="..." :country-code="..."
+  :asset-type="...">` enriched from a `symbol → position` map over
+  `usePortfolioStore().positions` (`companyName` / `country` / `assetType`); call
+  `store.fetchPositions(id)` on mount when `store.positions` is empty (the tab is
+  directly reachable via its route). A ticker absent from open positions degrades to
+  logo + ticker (news is fetched for held stocks, so this is the rare case). The
+  sentiment chip stays on the right.
+- [ ] E2E: portfolio News tab — a card for a held ticker shows the badge with the
+  position's name and details; the sentiment chip is still present.
+- [ ] Tests: `npm run build`, `npm run test`, `npm run test:mock`,
+  `docker compose up -d --build` + `npm run test:e2e` green.
+- [ ] Commit.
+
+### 61.8 — SPA: adopt in research header, overview header, compare columns
+
+- [ ] `ResearchView.vue` header (:88–105): replace the logo `img` + `h1` ticker +
+  name line + the duplicate ticker pill with
+  `<TickerBadge size="lg" title-as="h1" :symbol="routeSymbol" :name="profile?.name"
+  :country-code="profile?.countryCode" :asset-type="profile?.type" />` (details and
+  name appear when the profile resolves; the `Add to Watchlist` / search buttons and
+  the `from`-aware back link are untouched).
+- [ ] `ResearchOverview.vue` header block (:229–232): replace the logo `img` + `h2`
+  symbol + name with `<TickerBadge title-as="h2" :symbol="symbol"
+  :name="profile?.name" :country-code="profile?.countryCode"
+  :asset-type="profile?.type" />`.
+- [ ] `ResearchCompare.vue` column headers (:46–49): replace the symbol + name
+  divs with `<TickerBadge size="sm" align="right" :symbol="r.symbol" :name="r.name"
+  :country-code="r.countryCode" :asset-type="r.assetType" />` (61.4 fields, nullable);
+  the primary column keeps its `font-bold text-blue-700 dark:text-blue-400` highlight
+  via a wrapper class.
+- [ ] Tests: `npm run build`, `npm run test`, `npm run test:mock` green;
+  `docker compose up -d --build` + `npm run test:e2e` (`research.spec.ts`,
+  `logos.spec.ts`) green.
+- [ ] Playwright visual pass (1280px, compose stack): research header shows logo +
+  ticker + `(US) Stock` + name at 32px; compare table column headers show the badge
+  with details, right-aligned.
+- [ ] Commit.
+
+### 61.9 — SPA: adopt in search modal, watchlists, form previews
+
+- [ ] `InstrumentSearchModal.vue` result row: replace the logo `img` + symbol/name/
+  exchange block + type pill with
+  `<TickerBadge :symbol="result.symbol" :name="result.name"
+  :country-code="result.countryCode" :asset-type="result.type" />` (search results
+  already carry all four fields).
+- [ ] `WatchlistsView.vue` items (:122–131): replace the plain symbol `router-link`
+  + name span with the link wrapping
+  `<TickerBadge :symbol="item.symbol" :name="item.name" />` (no country/type stored —
+  details omitted).
+- [ ] Form symbol previews — `AddPositionDialog.vue`, `EditTransactionModal.vue`,
+  `RecordDividendDialog.vue`, `TransactionFormFields.vue`: replace each
+  logo-`img`+symbol pair with `<TickerBadge :symbol="..." :name="..." />` (name from
+  the selected search result where the dialog keeps it; typed-only symbols degrade to
+  ticker-only).
+- [ ] `RecentSearchesBar.vue` unchanged (decision — dense symbol-only chips).
+- [ ] Tests: `npm run build`, `npm run test`, `npm run test:mock`,
+  `docker compose up -d --build` + `npm run test:e2e` (watchlists + add-position
+  specs) green.
+- [ ] Commit.
+
+### 61.10 — Sweep, docs, parity check
+
+- [ ] Sweep: `grep -rn "/api/logos/" src` returns hits **only** in
+  `src/components/TickerBadge.vue` — fix any leftover ad-hoc logo renders surfaced by
+  the grep (the form previews of 61.9 are the expected tail).
+- [ ] `docs/COMPONENTS.md`: update the instrument-logo line (the rounded-square
+  `object-contain` plate, not the circle) and add `TickerBadge` to the reference
+  table (presentational identity block; `ticker-badge` testid prefix;
+  `tickerDetails`/`formatAssetType` shared exports).
+- [ ] Playwright parity pass (AGENTS.md): side-by-side a11y snapshots + screenshots
+  at 1280px vs `app.example-service.ai` for the holdings table, the performance tab, the
+  research header, and the compare tab; fix visual drift (spacing/truncation) in the
+  component, not per call site.
+- [ ] Tests: full suite green — `npm run build`, `npm run test`,
+  `npm run test:mock`, `npm run test:e2e`.
+- [ ] Commit.
+
+### 61.11 — Release + PROD verify
+
+- [ ] Push `portfoliost-wallets`, `portfoliost-instruments`, `portfoliost` → GHA
+  patch bumps → pin the **real** tags from `gh release list` in the homelab
+  helmreleases (`KUBECONFIG=$HOME/.kube/homylab`, ns `pfire`); for instruments bump
+  **all 4 occurrences** (app + tickersync + corpbondsync + fxsyync cronjobs, §56.2).
+  Contracts ship inside the npm installs — no deploy.
+- [ ] Flux + kubectl verify all three rollouts (if the RWO logos PVC multi-attach
+  stalls the instruments rollout, scale to 0, wait, scale back to 1 — known gotcha).
+- [ ] Playwright PROD (user's passkey session):
+  - Holdings table row: rounded-square logo + ticker + `(US) Stock`-style details +
+    company name.
+  - Top/Bottom performers: badge with details on each row.
+  - Portfolio Dividends tab: rows show name + details for held instruments
+    (the 61.3 fields from the re-imported tx rows).
+  - Portfolio News tab: cards show the badge (position-enriched) + sentiment chip.
+  - Research: header badge (32px logo, `h1` ticker, details from the profile),
+    Compare-with-peers column headers show details.
+- [ ] Commit (plan closeout) + archive §61 to `plan-archive.md`.
+
+---
+
+## 62. Remove wallets: portfolio-native multi-currency cash position (user request 2026-09-24)
+
+Proposal: — (direct user request: remove the wallet concept — a portfolio owns a cash
+position in its own currencies, trades/deposits/withdrawals/adjust it, and cash counts
+toward portfolio value and performance; no data migration — the sheets import is
+re-targeted and PROD is wiped & re-imported; no proposal doc).
+
+**Scope.** The `CashWallet` entity goes away. Each portfolio owns its cash as a
+per-currency ledger (IBKR model — a portfolio may hold cash in several currencies;
+the portfolio's `baseCurrency` stays the single display/valuation currency).
+BUY/SELL/DIVIDEND adjust the portfolio's cash in the transaction's settlement
+currency; DEPOSIT/WITHDRAWAL/TRANSFER become portfolio-scoped transactions
+(transfer = portfolio → portfolio). Cash is **included** in portfolio value and in
+all performance math (TWR/MWR/vol/drawdown/benchmarks) — idle cash drags, and
+dividends finally count as return via the cash leg. `/api/wallets/*` is removed;
+cash endpoints move under `/api/portfolios`. **No migration**: the sheets-sync
+importer is re-targeted to the new schema, PROD is wiped & re-imported
+(user-authorized), orphan wallets are simply dropped.
+
+Design decisions (resolved 2026-09-24):
+
+- **`Portfolio.currency` is dropped** — it is vestigial: set at creation (defaulted
+  from the linked wallet's currency) and used nowhere in computation; valuation,
+  snapshots and analytics all use `baseCurrency` (verified: only `portfolios.ts:74`
+  serialization + `:1265` shared-portfolio display). `baseCurrency` remains the
+  single portfolio-level currency. Also dropped: `portfolios.wallet_id`,
+  `positions.wallet_id`, `transactions.wallet_id` (D57 pairing columns).
+- **Cash balances are derived by replay, never stored** (the D17 ledger principle,
+  now portfolio-scoped). Per-currency balance = Σ signed effects of (a) trade rows —
+  BUY −(notional+fees), SELL +(notional−fees), DIVIDEND +net, principal leg in
+  `tx.currency`, fee leg in `tx.feeCurrency` when different (the existing D28/D29
+  two-leg / `settledFeeOf` math, made currency-aware) — and (b) external rows
+  (DEPOSIT +, WITHDRAWAL −, TRANSFER legs). The paired-row machinery and its
+  immutability rules (D23#6, D57) disappear: cash is a pure function of the
+  portfolio's transactions + its cash transactions, so editing a trade
+  automatically corrects the cash history.
+- **Negative cash is allowed** (replay fidelity — real ledgers dip negative before
+  a deposit lands). `isMarginEnabled` stays per portfolio (IBKR = true) and is
+  **informational in v1**: a warning badge when any currency balance < 0 and the
+  flag is off; no hard validation.
+- **Performance semantics:** snapshot `value(D) = positions(D) +
+  Σ_c balance_c(D) × fx(c→base, D)`. TWR/MWR external flows = DEPOSIT/WITHDRAWAL/
+  TRANSFER converted at that day's rate; DIVIDEND is **not** a flow (it stays in
+  the value). This redefines `dailyNetCashFlows` (D50, today BUY/SELL): BUY/SELL
+  are *internal* (cash ↔ positions), so the benchmark cash-flow mirror and the
+  `value_snapshots.netFlow` column switch to the external-flow series.
+- **Example service (verified live 2026-09-24):** their nav no longer has a separate Cash
+  section — wallets are embedded per portfolio card (balance + Deposit/Withdraw/
+  Transfer), plus a dashboard cash summary. We go one step further (no wallet
+  entity, no orphan state), so this is example-service's direction, not a fork; AGENTS.md's
+  "keep the API similar to example-service" is satisfied for the UI, the endpoint paths move
+  because the entity is gone.
+- **Orphan wallets: dropped** (PROD is rebuilt from the sheet).
+
+**Ordering note (read first):** pending §57.3/§57.4 and most of §58 target wallet
+code this section deletes. §58's AU reconstruction / sign clamp / Equate+→IBKR
+transfer / Gotówka-recon design **carries over into 62.4–62.6, re-targeted at
+portfolios**, so §58 is largely *absorbed*; §57.3/§57.4 re-target to the portfolio
+cash-tx UI/route. Do §62 first; the superseded pending steps are rewritten at
+closeout (62.10).
+
+Repos touched: `portfoliost-contracts` (62.1), `portfoliost-wallets` (62.2–62.5),
+`portfoliost-sheets-sync` (62.6), `portfoliost` SPA + mocks (62.7–62.9),
+release/PROD (62.9b).
+
+Rules: one step = one commit; a step is marked `[x]` only after its tests pass
+(unit + docker-compose level per AGENTS.md). 62.2–62.5 land before any SPA work
+and before any wipe.
+
+---
+
+### 62.1 — contracts: drop the wallet entity, add portfolio cash schemas + endpoints
+
+- [ ] `portfoliost-contracts/contracts/openapi.yaml`:
+  - `Portfolio`: remove `currency` (properties + `required`) and `walletId`
+    (properties + `required`); `CreatePortfolioRequest` unchanged (it never had a
+    walletId in the contract — the SPA passed one ad hoc; 62.7 removes it).
+  - The portfolio summary item schema (backing `GET /api/portfolios`) and
+    `PortfolioDetail` (:1378): add `cash: { $ref: PortfolioCash }`.
+  - `PortfolioPosition` (the holdings/transactions position shape carrying
+    `walletId` at :1484/:1588): remove `walletId` (properties + `required`).
+  - New `PortfolioCash`: `required: [baseCurrency, balances, total]` —
+    `baseCurrency: string`, `balances: array of { currency: string, balance:
+    number }` (per-currency, in that currency), `total: number` (base currency,
+    server-computed).
+  - New `PortfolioCashHistory` (same `data`/`meta` shape as the old
+    `BalanceHistory`, but `data[].balance` = the **base-currency total** of all
+    currency balances at that date).
+  - `CashTransaction`: `walletId` → `portfolioId`; `walletName` →
+    `portfolioName`; `to_wallet_id` → `to_portfolio_id`; add `balanceAfter:
+    { type: number, nullable: true }` (the row's own-currency balance after this
+    tx — ledger-derived, window sum, no storage; absorbs §58.4).
+  - `RecentCashTransaction`: `walletId` → `portfolioId`, `walletName` →
+    `portfolioName`.
+  - `PortfolioTotalMetrics`: add `totalCash: { type: number }` (base) +
+    `cashBreakdown: array of { currency, balance }` (dashboard cash summary).
+  - New request schemas (all `allOf FeeFxFields` where FX applies):
+    `DepositCashRequest` (`amount, currency?, description?, transaction_date?`),
+    `WithdrawCashRequest` (`+ payment_method?`), `TransferCashRequest`
+    (`amount, currency, to_portfolio_id, targetAmount?, targetFxRate?` + FX
+    fields — the D22 elastic target leg, portfolio-scoped).
+  - `ImportWalletTx` → `ImportPortfolioCashTx`: `walletName` → `portfolioName`,
+    `targetWalletName` → `toPortfolioName`, keep `amount, currency, type
+    (DEPOSIT|WITHDRAWAL|TRANSFER), description, date, fees/fees_type/feeCurrency,
+    exchangeRate, targetAmount, labels?`; the import row leg field `walletTx`
+    → `cashTx`.
+  - Endpoints: delete every `/wallets/*` path (list/create/rename/delete,
+    total-balance, `:id/balance-history`, `:id/transactions`,
+    `recent-transactions`, `transactions/:txId` PATCH/DELETE,
+    `:id/transactions/:txId/labels`, deposits/withdrawals/transfers). Add under
+    portfolios: `GET /api/portfolios/{id}/cash` (→ `PortfolioCash`),
+    `GET /api/portfolios/{id}/cash/balance-history` (→
+    `PortfolioCashHistory`), `GET /api/portfolios/{id}/cash/transactions`
+    (paginated + `labels` filter → `CashTransaction[]`),
+    `POST /api/portfolios/{id}/cash/deposits|withdrawals|transfers` (→
+    `CashTransaction`), `GET /api/portfolios/cash/recent-transactions`
+    (cross-portfolio feed, paginated + `labels` filter →
+    `RecentCashTransactionsPage`), `PATCH|DELETE
+    /api/portfolios/cash/transactions/{txId}`, `POST
+    /api/portfolios/cash/transactions/{txId}/labels`.
+- [ ] Push contracts main → GHA patch bump; `NODE_AUTH_TOKEN=$(gh auth token)
+  npm install @marx2/contracts@<new>` + `npm run gen:types` in `portfoliost`,
+  `portfoliost-wallets`, `portfoliost-sheets-sync`.
+- [ ] Tests: contracts `npm test` (spec validity) green.
+- [ ] Commit (portfoliost-contracts) + consumer install commits.
+
+### 62.2 — wallets backend: schema + cash replay service
+
+- [ ] `portfoliost-wallets src/db/schema.ts` + new drizzle migration:
+  - New `portfolios.portfolio_cash_transactions`: mirrors
+    `wallet_transactions` minus wallet fields — `userId`, `portfolioId` (FK
+    `portfolios.id` on-delete cascade), `type` in
+    (DEPOSIT, WITHDRAWAL, TRANSFER), `amount numeric(28,8)`, `currency`,
+    `feeCurrency`, `fees`, `fees_type`, `rateSource`, `exchangeRate`,
+    `feeRateSource`, `feeExchangeRate`, `toPortfolioId` (FK, nullable),
+    `targetAmount`, `transferFxRate`, `linkedTxId` (counterpart pair),
+    `description`, `transactionDate`, `paymentMethod`, `externalSource`,
+    `externalId` (unique per externalSource), `createdAt`; index on
+    `portfolioId` (+ `transactionDate`).
+  - New `portfolios.portfolio_cash_transaction_labels` (mirrors
+    `wallet_transaction_labels`).
+  - Drop columns `portfolios.currency`, `portfolios.wallet_id`,
+    `positions.wallet_id`, `transactions.wallet_id`; drop tables
+    `wallets.wallets`, `wallets.wallet_transactions`,
+    `wallets.wallet_transaction_labels` (data intentionally discarded — PROD
+    rebuilds via wipe & reimport; migration ships with the 62.9 image).
+- [ ] New `src/services/cashLedger.ts`:
+  - `tradeCashEffects(tx: portfolioTransactions row): Map<string, number>` —
+    principal leg in `tx.currency`: BUY −totalAmount, SELL +totalAmount,
+    DIVIDEND +totalAmount (net, the §49 convention — `totalAmount` is already
+    net of tax); fee leg in `tx.feeCurrency ?? tx.currency`: BUY +fee,
+    SELL/DIVIDEND −fee (fee magnitude via the existing `settledFeeOf` math:
+    `pct` resolved against |notional|). Splits/ADJUSTMENT → empty map.
+  - `cashBalances(db, authToken, portfolioId, asOf?): Promise<Map<string,
+    number>>` — replay trade rows (`executedAt ≤ asOf`) + external rows,
+    summed per currency.
+  - `cashBalanceSeries(db, authToken, portfolioId, from, to):
+    Promise<Map<string, number>>` — daily **base-currency** totals: running
+    per-currency balances at each day's close, each × `fxTo(base)` (same
+    memoized instruments-FX machinery as `dailyNetCashFlows`).
+  - `dailyExternalFlows(db, authToken, portfolioId, from, to):
+    Promise<Map<string, number>>` — daily net external flow in base currency
+    (DEPOSIT +, WITHDRAWAL −, TRANSFER ± its own leg) at that day's rate —
+    **the D50 replacement** for `dailyNetCashFlows` (rename the old function,
+    delete the BUY/SELL series).
+- [ ] Unit tests (`src/services/cashLedger.test.ts`): seeded multi-currency
+  portfolio (USD trades, EUR dividend, fee in a third currency, DEPOSIT/WITHDRAW/
+  cross-ccy TRANSFER) → `cashBalances` per currency hand-computed;
+  `cashBalanceSeries` across an FX-moving window; `dailyExternalFlows` signs
+  (deposit inflow, withdrawal outflow, transfer leg).
+- [ ] Full wallets suite green (`npm run test`) + `npm run build`.
+- [ ] Commit (portfoliost-wallets).
+
+### 62.3 — wallets backend: portfolio cash routes; delete wallet routes
+
+- [ ] New `src/routes/portfolio-cash.ts` (mounted by `index.ts`):
+  - `GET /:id/cash` → `PortfolioCash` (balances from `cashBalances`, `total` via
+    `fxTo(base)`); ownership guard as the other portfolio routes.
+  - `GET /:id/cash/balance-history` → `PortfolioCashHistory` from
+    `cashBalanceSeries` (same period/resolution/meta shape as the old wallet
+    history route).
+  - `GET /:id/cash/transactions` → paginated, `labels` filter, `balanceAfter`
+    per row = running window sum of the row-currency balance (trade effects +
+    external effects ordered by `transactionDate, createdAt`), labels joined
+    (absorbs §58.4).
+  - `POST /:id/cash/deposits|withdrawals|transfers` — zod schemas mirroring
+    62.1; sign clamp (DEPOSIT → +|a|, WITHDRAWAL → −|a|, TRANSFER as sent — the
+    §58.3 decision); deposit/withdrawal `currency` defaults to the portfolio
+    `baseCurrency`, any registry currency allowed (FX leg via the D28/D29
+    fields); transfer: `to_portfolio_id` must exist, belong to the user, differ
+    from the source; cross-ccy `targetAmount` server-computed when
+    `rateSource: "manual"` (same-ccy = −amount, cross = amount ×
+    `targetFxRate`), the paired counterpart leg inserted with `linkedTxId`
+    both ways + `reference` suffixed `(→ <target portfolio>)`; both legs'
+    `externalSource`/`externalId` as sent (manual = null).
+  - `GET /cash/recent-transactions` (cross-portfolio, paginated, `labels`
+    filter) — the D19 read-model feed, now over `portfolio_cash_transactions`
+    only (trade rows no longer appear here — they are portfolio transactions).
+  - `PATCH|DELETE /cash/transactions/:txId` + `POST
+    /cash/transactions/:txId/labels` — manual cash rows editable (the D23#6
+    "trade-derived rows are immutable" rule no longer exists); PATCH returns
+    real `labels` (absorbs §57.4).
+- [ ] `routes/portfolios.ts`: `POST /` drops `walletId` from the create schema
+  (it was accepted ad hoc); `GET /` (summaries) and `GET /:id` (detail) add
+  `cash` (62.1 shape); `GET /total-metrics` adds `totalCash` + `cashBreakdown`
+  (Σ `cashBalances` over the user's portfolios, base-converted).
+- [ ] Delete: `routes/wallets.ts`, `routes/wallet-transaction-labels.ts`, the
+  wallet-cash list/update/delete routes in `routes/transactions.ts` (keep
+  `rowEffect` only if still referenced — it is replaced by
+  `cashLedger.tradeCashEffects`, so delete it), the wallet-cash read models in
+  `routes/history.ts` (keep the portfolio-side D19 parts), the wallet branches
+  in `routes/labels.ts`.
+- [ ] Unit tests (`routes/portfolio-cash.test.ts`): deposit (own + foreign
+  ccy, fee leg), withdrawal, same-ccy + cross-ccy transfer (paired legs,
+  `linkedTxId`, both balances move, `balanceAfter` on the list), recent feed
+  ordering + label filter, PATCH/DELETE/labels on a manual row, 404/403
+  ownership, transfer to own portfolio → 400.
+- [ ] Full wallets suite green + `npm run build`.
+- [ ] Commit (portfoliost-wallets).
+
+### 62.4 — wallets backend: snapshots, currentValue and analytics include cash
+
+- [ ] `src/services/backfill.ts`:
+  - `value(D) = positionValue(D) + cashBalanceSeries(D)` (62.2) — the
+    `value_snapshots` `value` column now includes cash; `netFlow(D) =
+    dailyExternalFlows(D)` (replaces the BUY/SELL series; D50's
+    benchmark-overlay seed/mirror switches to the same series —
+    `portfolios.ts:1021–1029` consumer updated).
+  - `src/services/cashFlows.ts`: delete `dailyNetCashFlows` (consumers now
+    `dailyExternalFlows`): update `routes/portfolios.ts` analytics mirror,
+    `services/quotes.ts:362` (today's flows for the day-change), `backfill.ts`.
+  - `services/quotes.ts` / `routes/portfolios.ts`: `currentValue`
+    maintenance (position market value, §53) **plus the current cash total** —
+    `portfolios.current_value` and every summary `currentValue`/`totalValue`
+    henceforth include cash; `PortfolioTotalMetrics.totalValue` inherits via
+    the breakdown.
+- [ ] Analytics endpoints (TWR/MWR, vol, drawdown, benchmarks) consume the
+  snapshots — no formula change; **fixtures updated**: every
+  analytics/backfill/quotes test with a cash-bearing portfolio gains the
+  expected cash leg (a portfolio that deposits 1k and never invests must now
+  show value 1k and 0% return, previously 0/0).
+- [ ] Unit tests: backfill over a seeded portfolio with a USD position + EUR
+  cash + a mid-window deposit → snapshot values hand-computed incl. FX;
+  netFlow = external flows only (a BUY/SELL day with no deposit/withdraw has
+  netFlow 0); `quotes` day-change includes a same-day deposit.
+- [ ] Full wallets suite green + `npm run build`.
+- [ ] Commit (portfoliost-wallets).
+
+### 62.5 — wallets backend: import API on the new cash schema
+
+- [ ] `src/routes/import.ts`:
+  - `ImportWalletTxSchema` → `ImportPortfolioCashTxSchema` (62.1 shape); the
+    per-row leg field `walletTx` → `cashTx` (`portfolioTx` unchanged — trade
+    legs no longer carry a walletId; `insertImportPortfolioTx` drops the
+    `walletId` argument and the D57 pairing write).
+  - `insertImportWalletTx` → `insertImportPortfolioCashTx`: portfolio resolved
+    by name via `uq_portfolios_user_name` (bootstrap as today); transfer
+    `toPortfolioName` validated (exists, ≠ source) with the server-computed
+    `targetAmount` + paired counterpart leg (62.3 rules,
+    `externalSource = google-sheets:transakcje`, `externalId + "#t"`);
+    sign clamp per the §58.3 decision; `labels` bootstrapped + attached to
+    `portfolio_cash_transaction_labels` (§58.3 rule, unknown name → row error).
+  - Wipe (`DELETE /import/source/:externalSource`): add
+    `portfolio_cash_transactions` (+ labels) to the delete cascade (the old
+    wallet tables are already dropped by the 62.2 migration — the wipe no
+    longer touches them).
+- [ ] Unit tests (`import.test.ts`): DEPOSIT/WITHDRAWAL rows land with clamped
+  signs + labels; cross-ccy TRANSFER pair (amounts, `linkedTxId`, both
+  portfolios' balances); unknown portfolio name → row error; `#t` dedupe on a
+  second run; wipe removes both transfer legs and re-import recreates
+  idempotently.
+- [ ] Full wallets suite green + `npm run build`.
+- [ ] Commit (portfoliost-wallets).
+
+### 62.6 — sheets-sync: mapper + recon re-targeted at portfolio cash
+
+- [ ] `src/transakcje-parser.ts`: `RANGE = "Transakcje!A1:AU"`; `au` flag
+    parsing + abort-on-garbage + Wpłata/Wypłata-with-AU=0 abort (absorbs §58.5).
+- [ ] `src/transakcje-mapper.ts`:
+  - **Drop the INVEST/SELL wallet legs entirely** — the trade's cash effect is
+    derived server-side by replay; the row emits only `portfolioTx` (BUY/SELL/
+    DIVIDEND unchanged) + optional `cashTx`.
+  - `Konto` → **portfolio** name mapping reuses the existing wallet-name map
+    (Equate+ / NN PPK / NN PPO / Rach. rejestrowy PKO BP / Crypto / IBKR
+    portfolios are bootstrapped by name as the wallets were).
+  - **Kupno AU=1**: `cashTx DEPOSIT +|cash|` (row's portfolio/ccy/rate,
+    `#d`) — paired with the derived BUY −X, net zero (the §58.6 decision).
+    `Konto = Equate+`: the DEPOSIT is paired as a TRANSFER —
+    `toPortfolioName: "IBKR"` (server creates the IBKR credit leg).
+  - **Sprzedaż AU=1**: `cashTx WITHDRAWAL −|cash|` (`#w`), **except Equate+**
+    → `cashTx TRANSFER −|cash| (EUR)` with `toPortfolioName: "IBKR"` +
+    `exchangeRate` (proceeds land in the IBKR portfolio, USD).
+  - **Wpłata/Wypłata**: sign-normalized DEPOSIT/WITHDRAWAL on the row's
+    portfolio, AJ `program` note → labels; no transfer target.
+  - **AU=0**: trade legs only (no `cashTx`).
+  - `externalId` suffixes (`#d`/`#w`/`#t`) unchanged (dedupe keys).
+- [ ] API client: the wallet cash methods re-target to the 62.1
+    `/api/portfolios…cash` endpoints (import batch payload field `walletTx` →
+    `cashTx`); bootstrap-labels set includes the Wpłata/Wypłata AJ notes.
+- [ ] `src/gotowka-recon.ts` (new; absorbs §58.7): fetch `Gotówka!A1:L`;
+  tracked columns `IB` → IBKR, `IKE Marek` → IKE Marek, `IKE Beata` → IKE Beata
+  (now **portfolios**; other columns ignored); per tracked portfolio interleave
+  the in-memory ledger effects (the mapped rows' `cashLedger`-equivalent math,
+  cross-ccy × their rate) with the snapshots; warn-only lines over tolerance
+  (IBKR ±50 USD at the latest row rate, IKE ±10 PLN; below-zero IKE → loud
+  warning); never changes the exit code.
+- [ ] Unit tests (`transakcje-mapper.test.ts`): Kupno AU=1 (portfolioTx +
+  DEPOSIT `#d`, no INVEST leg), Kupno AU=1 Equate+ (TRANSFER to IBKR),
+  Sprzedaż AU=1 (WITHDRAWAL `#w`), Sprzedaż AU=1 Equate+ (TRANSFER EUR→USD),
+  Wpłata sign flip (sheet −6 336,29 → +6336.29), AU=0 Kupno (portfolioTx
+  only), Wpłata AU=0 → abort; recon fixtures (exact match / 60 USD gap / 5 PLN
+  in-tol / below-zero / unknown header abort).
+- [ ] Full sheets-sync suite green (`npm run test`).
+- [ ] Commit (portfoliost-sheets-sync).
+
+### 62.7 — SPA: delete the wallet module, re-point the API layer
+
+- [ ] Delete: `src/stores/wallets.ts`, `src/api/wallets.ts`,
+  `src/modules/wallets/` (WalletsView, WalletDetailView),
+  `src/modules/portfolios/CashWalletCard.vue`; router entries `wallets`,
+  `wallet-detail` (the `transactions-cash` route + `CashTransactionsView.vue`
+  stay — re-fetched in 62.9).
+- [ ] New cash API in `src/api/portfolios.ts` (62.1 endpoints, explicit return
+  types from the regenerated contracts): `getPortfolioCash(id)`,
+  `getPortfolioCashHistory(id)`, `getPortfolioCashTransactions(id, …)`,
+  `depositCash/withdrawCash/transferCash(id, …)`,
+  `getRecentCashTransactions(page, limit, …)`, `updateCashTransaction/delete
+  CashTransaction/setCashTransactionLabels`.
+- [ ] Form cleanup — remove `walletId` everywhere (the field simply stops
+  being sent): `AddPositionDialog.vue`, `EditPositionDialog.vue` (drop the
+  `tx.walletId` read at :169), `EditTransactionModal.vue` (drop both wallet
+  selects + defaulting), `RecordDividendDialog.vue` (drop the wallet default
+  from `portfolio.walletId` — the dividend now needs no wallet at all),
+  `TransactionFormFields.vue` (drop the `walletId` prop + select),
+  `LabelPickerPopover.vue` (the `walletId` entity param → cash-tx entity),
+  `InvestmentsView.vue` (drop the new-portfolio wallet select at :435 and the
+  "create wallet" dialog + flow at :233–245 — new portfolio: name/description/
+  strategy/currency only).
+- [ ] Dashboard: `InvestmentsView.vue` drops the wallet-cards row
+  (:386–398) + the `getWalletTotalBalance`/`cashBreakdown`-from-wallets fetch
+  (:152–161) — the cash summary card switches to
+  `totalMetrics.totalCash` + `totalMetrics.cashBreakdown` (62.4) — same
+  visual (total + per-currency pct chips).
+- [ ] Update every unit test touching the deleted store/API; e2e specs that
+  navigate `wallets`/`wallet-detail` or assert wallet picks are fixed in 62.9.
+- [ ] Tests: `npm run build`, `npm run test`, `npm run test:mock` green.
+- [ ] Commit.
+
+### 62.8 — SPA: per-portfolio cash UI (example-service parity)
+
+- [ ] `PortfolioCard.vue` (main page): example-service-parity "Cash" group under the
+  card (verified layout: name-less, balance line + per-currency hint +
+  Deposit/Withdraw/Transfer buttons) — data from the summary's `cash`;
+  clicking the balance opens the portfolio's cash tab.
+- [ ] New `src/modules/portfolios/PortfolioCashTab.vue` (tab next to
+  Holdings/Transactions/Dividends/Performance in `PortfolioDetailView.vue`;
+  route `/en/portfolios/:id/cash` directly reachable):
+  - Balance block: one row per currency (`DualCurrencyCell`-style, in its own
+    currency) + the base-currency total; `WalletBalanceChart.vue` re-scoped to
+    the base-currency `PortfolioCashHistory` series (component file renamed
+    `CashBalanceChart.vue`, props unchanged otherwise).
+  - Deposit / Withdraw / Transfer buttons → new
+    `PortfolioCashModals.vue` (re-scope of the deleted `WalletCashModals.vue`:
+    currency select from the `/api/currencies` registry — never hardcoded,
+    D28/D29 `FxRateFields` on both legs; transfer adds a target-portfolio
+    select (other user portfolios) + the D22 elastic target leg).
+  - Cash transactions table (reuse the `TransactionsTable` patterns): Type /
+    Amount (+ dual-currency where FX) / Balance (`balanceAfter`) / Description
+    / Labels (`LabelChips`) / actions (edit/delete via
+    `EditTransactionModal` re-scoped to cash rows, or a small cash edit form).
+  - **Negative-cash warning**: if `isMarginEnabled === false` and any currency
+    balance < 0 → an amber badge line (currency + amount), informational only
+    (62 design decision).
+- [ ] `CashTransactionsView.vue` (global Cash tab): re-fetch
+  `getRecentCashTransactions` (cross-portfolio feed) — rows gain the
+  portfolio name in place of the wallet name; edit/delete/labels via the 62.7
+  cash-tx API.
+- [ ] Shared portfolios: cash rows appear under the existing
+  `showTransactionHistory` privacy setting (verify in the e2e — no new gating).
+- [ ] Unit tests: tab renders per-currency rows + total + chart + warning
+  badge case; modals submit the 62.1 shapes (transfer carries
+  `to_portfolio_id` + elastic leg); the card's cash group renders from
+  summary `cash`.
+- [ ] E2E: portfolio cash tab — deposit flow (form → row appears, balance
+  moves), transfer between two seeded portfolios (both balances move),
+  negative-cash badge after an over-withdrawal on a non-margin portfolio;
+  global cash feed shows rows from both portfolios.
+- [ ] Tests: `npm run build`, `npm run test`, `npm run test:mock`,
+  `docker compose up -d --build` + `npm run test:e2e` green.
+- [ ] Commit.
+
+### 62.9 — Mocks + full e2e sweep
+
+- [ ] `mocks/wallets/` deleted; `mocks/portfolios/index.js` gains the 62.1
+  cash routes (replay over the seeded txs + cash rows — the mock keeps its
+  simple ledger math); raw data: delete `wallets.json`,
+  `wallet_balance_history.json`, `wallets_total_balance.json`; add
+  `portfolio_cash.json` / `portfolio_cash_transactions.json` /
+  `portfolio_cash_history.json` (a second currency on one seeded portfolio —
+  the multi-currency path); the portfolio summary/detail raw files gain
+  `cash`; `portfolios_total_metrics.json` gains `totalCash`/`cashBreakdown`.
+- [ ] E2E sweep: fix every spec that touched wallet surfaces (labels spec's
+  wallet-detail assertions → cash tab; add-position spec's wallet pick → gone;
+  the transactions-cash spec → the cross-portfolio feed); cash appears in the
+  portfolio card + dashboard summary assertions.
+- [ ] Tests: full suite green — `npm run build`, `npm run test`,
+  `npm run test:mock`, `docker compose up -d --build` + `npm run test:e2e`.
+- [ ] Commit.
+
+### 62.9b — Release + PROD wipe & reimport (user-authorized)
+
+- [ ] Push `portfoliost-wallets`, `portfoliost`, `portfoliost-sheets-sync` →
+  GHA patch bumps → pin the **real** tags from `gh release list` in the
+  homelab helmreleases / job (`KUBECONFIG=$HOME/.kube/homylab`, ns `pfire`);
+  Flux + kubectl verify all three rollouts — the wallets rollout runs the
+  62.2 migration (drops the old tables + columns); verify it applied
+  (`\d portfolios.portfolio_cash_transactions` present, `wallets` schema
+  empty) and that the service boots clean.
+- [ ] Admin → Jobs → **Wipe & Reimport** (`POST /api/admin/jobs/sheets-sync/run
+  {wipe:true}`, authenticated Pocket-ID session) — the first wipe on the new
+  schema; assert: 0 row errors; DEPOSIT rows positive / WITHDRAWAL negative;
+  the ~166 AU=1 rows produced their cash legs (Equate+ portfolio cash ≈ 0,
+  IBKR portfolio gained the SAP-sale proceeds as transfer legs); `#d`/`#w`/
+  `#t` dedupe on a second run.
+- [ ] Read the Gotówka recon report (62.6): for each warning line decide with
+  the user — sheet mistake (fix sheet) vs import gap (adjust 62.6) — then wipe
+  & reimport again. Repeat until clean within tolerances.
+- [ ] Playwright PROD (user's passkey session): main page — no wallet cards,
+  the cash summary card from total metrics, portfolio cards show their cash
+  group; portfolio cash tab — per-currency balances + history chart + a real
+  deposit (then delete it) round-trips; global cash feed lists cross-portfolio
+  rows; Top10's total value and return now include its cash (the number moves
+  vs the pre-§62 UI — expected, user-accepted); shared portfolio still
+  respects its privacy settings.
+- [ ] Commit (plan note).
+
+### 62.10 — Closeout: rewrite the superseded pending sections
+
+- [ ] `docs/plan.md`: rewrite §57.3/§57.4 to the portfolio cash-tx surface
+  (§57.3 → chips in the portfolio cash tab — delivered by 62.8, mark
+  superseded with a pointer; §57.4 → delivered by 62.3's PATCH-returns-labels,
+  mark superseded), and §58 → a short "superseded by §62" stub mapping
+  58.1→62.1, 58.2/58.3→62.5, 58.4→62.3, 58.5/58.6/58.7→62.6, 58.8→62.8,
+  58.9/58.10→62.9b (keep the sheet-fact background paragraph for reference).
+- [ ] Archive §62 to `plan-archive.md` once the PROD report is accepted clean.
+- [ ] Commit.
