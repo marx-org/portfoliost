@@ -127,7 +127,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ### 54.3 — SPA: month-grid `PortfolioCalendarTab` (example-service layout)
 
-- [ ] Rewrite `src/modules/portfolios/PortfolioCalendarTab.vue` as the example-service
+- [x] Rewrite `src/modules/portfolios/PortfolioCalendarTab.vue` as the example-service
   month grid (per `docs/COMPONENTS.md`): toolbar row inside a `card` —
   "Calendar" label, ‹/› month buttons, "May 2026"-style month label, an
   event-type filter ("All events" / "Earnings" / "Ex-Dividend" / "Dividend
@@ -148,17 +148,17 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
   old table testids are dropped with the table — update
   `tests/e2e/portfolios.spec.ts` calendar expectations in the same commit.
   No macro-economic events or holidays are rendered (holdings events only).
-- [ ] Flat-shape compat: if `holdings` is absent (mock returns
+- [x] Flat-shape compat: if `holdings` is absent (mock returns
   `upcoming`/`past`) the component derives holdings-shaped data from the flat
   arrays (group by symbol; no `currency` → omit amount) so the mock-backend
   dev path and 54.3's unit tests work without the real endpoint. The mock
   itself is untouched.
-- [ ] Vitest (`tests/unit/modules/portfolios/PortfolioCalendarTab.test.ts`):
+- [x] Vitest (`tests/unit/modules/portfolios/PortfolioCalendarTab.test.ts`):
   month navigation (prev/next changes the month label + rendered day set),
   Today resets, filter hides other types, chip count cap + "+N more",
   flat-shape derivation path; toolbar renders no "Impact" control.
   No macro events in any rendered output (fixture-driven).
-- [ ] `npm run build` + `npm run test` + `npm run test:mock` green; commit.
+- [x] `npm run build` + `npm run test` + `npm run test:mock` green; commit.
 
 ### 54.4 — E2E: calendar grid on a seeded portfolio (compose stack)
 
