@@ -159,18 +159,20 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ### 53.6 — wallets: unify snapshot-on-read FX with the backfill rule
 
-- [ ] In `quotes.ts`: when accumulating `liveValues` for `snapshotPortfolioValue`,
-  carry the quote's own currency (`quote.currency`, already fetched, §39-validated
-  ISO code). In `snapshotPortfolioValue`, convert each leg as
-  `mv × fx(quoteCurrency → base)`; when no live quote exists (fallback branch) use
-  the position's stored `market_value` with `fx(instrument_currency → base)` as
-  today (stored MVs on fallback are the legacy native-mixed values — document the
-  residual).
-- [ ] Unit test (the regression that motivated this): a portfolio with one USD
-  lot (quote currency USD) + one PLN-denominated base lot, base currency PLN →
-  `snapshotPortfolioValue` output equals what `computeSnapshotBatch` produces for
-  the same fixtures (pipeline-agreement test).
-- [ ] Full wallets suite green; commit.
+- [x] In `quotes.ts`: `refreshQuotes` now carries `quote.currency` (already
+  fetched, §39-validated ISO code) into each `liveValues` row. In
+  `snapshotPortfolioValue`, the value leg converts as
+  `mv × fx(quoteCurrency → base)`; the fallback branch (no live quote) uses the
+  stored `market_value` with `fx(instrument_currency → base)` (stored MVs on
+  fallback are the legacy native-mixed values — residual documented in the
+  function doc). Cost basis/invested stays `fx(instrumentCurrency → base)`.
+- [x] Unit test (the regression that motivated this): `backfill.test.ts`
+  pipeline-agreement test — a PLN-base portfolio with one USD lot (quote
+  currency USD, stored instrumentCurrency a legacy "EUR" both pipelines must
+  ignore) + one PLN lot → `snapshotPortfolioValue` output equals
+  `computeSnapshotBatch` for the same day (old code diverged: 5755 vs 5404.63
+  in the fixture).
+- [x] Full wallets suite green (325 passed); commit (portfoliost-wallets 1bf9375).
 
 ### 53.7 — Closeout
 
