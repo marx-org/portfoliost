@@ -454,6 +454,8 @@ describe("PriceChart", () => {
   })
 
   it("keeps the native series + a refusal notice when the server 400s a conversion (plan §56.3)", async () => {
+    // (beforeEach's getPriceBars mock supplies a resolved baseCurrency=USD so
+    // the title selector is offered; the conversion itself is refused below.)
     currenciesMock.loaded = true
     currenciesMock.options = [
       { code: "USD", name: "US Dollar", symbol: "$", minorUnits: 2, popular: true },
@@ -469,11 +471,13 @@ describe("PriceChart", () => {
     await select.setValue("PLN")
     await flushPromises()
     expect(mockedGetPriceBars).toHaveBeenCalledWith("AMD", expect.any(String), expect.any(String), "PLN")
-    // The native series from the initial load is kept, explicitly caveated —
-    // not a silently wrong-denomination series under a PLN title.
+    // The native series from the initial load is kept, explicitly caveated in
+    // the rendered banner — not a silently wrong-denomination series under a
+    // PLN title, and not the misleading "full history unavailable" text.
     const vm = wrapper.vm as unknown as { prices: number[]; error: string | null }
     expect(vm.prices.length).toBeGreaterThan(0)
     expect(vm.error).toMatch(/Display currency unavailable/)
-    expect(vm.error).not.toMatch(/Full history unavailable/)
+    expect(wrapper.text()).toMatch(/Display currency unavailable/)
+    expect(wrapper.text()).not.toMatch(/Full history unavailable/)
   })
 })

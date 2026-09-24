@@ -244,14 +244,10 @@ async function load(compareKey: CompareKey) {
     if (currencyParam) {
       // §48.2 / plan §56.3 — both legs 400 "base currency unknown": the
       // server refused to convert (ambiguous ticker, silent resolver). The
-      // stale series below is the native base currency — say so explicitly
-      // instead of the misleading "full history unavailable".
+      // kept series is the native base currency — say so explicitly; the
+      // historyFailed banner renders this message.
       error.value =
         "Display currency unavailable for this instrument — chart stays in its base currency."
-    } else {
-      // Keep the price-bars chart; surface a dismissible notice + retry instead
-      // of a blank canvas / blocking spinner.
-      error.value = "Full history unavailable — showing recent prices."
     }
     historyFailed.value = true
   } finally {
@@ -878,7 +874,7 @@ function downloadCsv(): void {
          "loading…" hint (while the wide /history runs) over the price-bars
          chart. The chart itself renders from price-bars immediately. -->
     <div v-if="historyFailed" class="mb-3 flex items-center justify-between gap-3 rounded-lg bg-amber-50 dark:bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
-      <span>Full history unavailable — showing recent prices. <button type="button" class="font-semibold underline underline-offset-2 hover:opacity-80" @click="load(compare)">Retry</button></span>
+      <span>{{ error || "Full history unavailable — showing recent prices." }} <button type="button" class="font-semibold underline underline-offset-2 hover:opacity-80" @click="load(compare)">Retry</button></span>
       <button type="button" class="text-amber-500 hover:opacity-70" aria-label="Dismiss" @click="historyFailed = false">&times;</button>
     </div>
     <p v-else-if="showingPartial" class="mb-3 text-sm text-slate-500 dark:text-slate-400">Showing recent prices — full history loading&hellip;</p>
