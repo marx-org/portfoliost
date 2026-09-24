@@ -141,18 +141,21 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ### 53.5 — wallets: maintain `portfolios.current_value` from the latest snapshot
 
-- [ ] In the history-write paths (`backfill.ts` `runBackfill`/`recalcPortfolioHistory`
+- [x] In the history-write paths (`backfill.ts` `runBackfill`/`recalcPortfolioHistory`
   after the batch is committed, and `quotes.ts` `snapshotPortfolioValue` after its
   upsert), set `portfolios.current_value` = the newest `value_snapshots.value` for
-  that portfolio (1-day-old is acceptable — user decision 2026-09-23). Factor into
-  one small exported helper (`syncCurrentValueFromSnapshots(db, portfolioId)`) and
-  call from both sites.
-- [ ] Unit tests: after a backfill/recalc the column equals the last snapshot
-  value; after a snapshot-on-read upsert it equals the new row; a portfolio whose
-  history is cleared (all txs removed) → `current_value` 0.
-- [ ] Existing detail/summary surfaces that read `currentValue` keep behaving
-  (no contract change — column already exists in the schema/contract).
-- [ ] Full wallets suite green; commit.
+  that portfolio (1-day-old is acceptable — user decision 2026-09-23). Factored into
+  one small exported helper (`syncCurrentValueFromSnapshots(db, portfolioId)` in
+  `returnColumns.ts`, the "after every value_snapshots write" module) and called
+  from both sites.
+- [x] Unit tests: after a recalc the column equals the last snapshot value (10 ×
+  160 = 1600); after a snapshot-on-read upsert it equals the new row (2300, then
+  1100 after the idempotent second call); a portfolio whose history is cleared
+  (all txs removed) → `current_value` 0.
+- [x] Existing detail/summary surfaces that read `currentValue` keep behaving
+  (no contract change — column already exists in the schema/contract; only the
+  write side changed).
+- [x] Full wallets suite green (324 passed); commit (portfoliost-wallets 2624331).
 
 ### 53.6 — wallets: unify snapshot-on-read FX with the backfill rule
 
