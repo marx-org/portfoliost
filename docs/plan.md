@@ -105,25 +105,25 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ### 54.2 — wallets: real `GET /:id/calendar` via instruments fan-out
 
-- [ ] New `src/services/portfolioCalendar.ts` — clone the `portfolioNews.ts`
+- [x] New `src/services/portfolioCalendar.ts` — clone the `portfolioNews.ts`
   pattern: `getPortfolioSymbols` (distinct open positions) + per-symbol
   `fetch(`${INSTRUMENTS_URL}/api/instruments/${symbol}/calendar`)` (bounded
   fan-out, `Promise.allSettled`, per-symbol failure → skip symbol, never 500;
   pass through `Authorization`).
-- [ ] `src/routes/portfolios.ts` `/:id/calendar`: return `holdings` shape from
+- [x] `src/routes/portfolios.ts` `/:id/calendar`: return `holdings` shape from
   the service (each entry: `symbol`, `companyName` (from `positions`),
   `currency` (from the instruments calendar response — the §47.5 resolved
   instrument currency, no fallback), and the three arrays within the
   instruments window; symbols whose fetch failed are omitted). Keep the
   endpoint `200` with `holdings: []` when the portfolio has no open
   positions or instruments is unreachable.
-- [ ] Unit tests (`portfolioCalendar.test.ts`, mocked `fetch`): (a) two symbols
+- [x] Unit tests (`portfolioCalendar.test.ts`, mocked `fetch`): (a) two symbols
   → two holdings with their arrays + currencies; (b) one fetch 502 → that
   symbol omitted, others intact; (c) no open positions → `holdings: []` and
   zero fetches; (d) `INSTRUMENTS_URL` unset → `holdings: []` (1:1 degrade,
   same rule as `instruments-fx.ts`).
-- [ ] Full wallets suite green (`npm run test`) + `npm run build`.
-- [ ] Commit.
+- [x] Full wallets suite green (`npm run test`) + `npm run build`.
+- [x] Commit.
 
 ### 54.3 — SPA: month-grid `PortfolioCalendarTab` (example-service layout)
 
