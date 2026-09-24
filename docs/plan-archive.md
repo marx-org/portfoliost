@@ -7364,3 +7364,140 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 - [x] Archived §53.
 
 ---
+
+## 54. Portfolio calendar: month grid over holdings' event calendars (example-service parity) (closed 2026-09-24)
+
+Proposal: — (user request 2026-09-24; no proposal doc — example-service parity per AGENTS.md).
+
+The instrument calendar (research page, §49.9) was live; the portfolio **Calendar**
+tab was a flat Upcoming/Recent events *table* fed by `GET /api/portfolios/:id/calendar`
+— the wallets route was a stub (`c.json({ events: [] })`) and the SPA rendered
+`upcoming`/`past` shapes the real endpoint never returned. Example service's portfolio
+calendar (inspected live 2026-09-24, `/pl/portfolios/<id>/calendar`) is a **month
+grid**: toolbar `Calendar ‹ May 2026 › | (Impact) | All events ▾ | Today`, SUN–SAT
+columns, day cells with small event chips (e.g. `AAPL Ex-Div: $0.26`), and a
+premium gate. Parity target: the month grid over the portfolio's holdings' events,
+**not gated** (AGENTS.md: premium features ship as working content), **no Impact
+toggle** (abandoned), **no macro-economic events or holidays** (holdings events
+only). Event source = fan-out to the per-instrument calendar that §49.9 shipped
+(openst/cachest/instruments unchanged — no provider-tier work). Chip amounts stay
+in the instrument's base currency — never converted to the portfolio ccy.
+
+Repos touched: `portfoliost-contracts` (54.1), `portfoliost-wallets` (54.2),
+`portfoliost` SPA + mock + e2e (54.3–54.5). The mock endpoint
+(`mocks/portfolios/index.js`) already serves the flat upcoming/past shapes and is
+kept unchanged (the SPA derives holdings-shaped data from them — flat-shape compat).
+
+### 54.1 — contracts: per-holding calendar in `CalendarData`
+
+- [x] `contracts/openapi.yaml` — `CalendarData` gains `holdings` (additive;
+  `upcoming`/`past` stay for the mock and any flat consumers). The
+  `earnings`/`exDividend`/`dividend` item shapes were factored into named
+  sub-schemas (`CalendarEarningsItem`, `CalendarExDividendItem`,
+  `CalendarDividendItem`) and reused by `CalendarHolding` (symbol required,
+  companyName/currency optional, the three arrays via `$ref`).
+- [x] Push → GHA patch-bump **v1.6.37** → `npm install @marx2/contracts@1.6.37`
+  + `npm run gen:types` in `portfoliost` + `portfoliost-wallets`; contracts suite
+  green (16 tests).
+- [x] Commits: portfoliost-contracts a567437; consumer bumps portfoliost 7f70add,
+  portfoliost-wallets 3c0738f.
+
+### 54.2 — wallets: real `GET /:id/calendar` via instruments fan-out
+
+- [x] `src/services/portfolioCalendar.ts` — `portfolioNews.ts` pattern:
+  `getPortfolioSymbols` (distinct open positions + company names, own schema) +
+  per-symbol `GET ${INSTRUMENTS_URL}/api/instruments/:symbol/calendar`
+  (`Promise.allSettled`, per-symbol failure → omit symbol, never 500;
+  `Authorization` passed through; items kept only if they carry a `date`).
+  `INSTRUMENTS_URL` unset → `holdings: []` before any DB/fetch work (1:1 degrade,
+  same rule as `instruments-fx.ts`).
+- [x] `src/routes/portfolios.ts` `/:id/calendar` returns `{ holdings }`
+  (`CalendarData`-typed): `symbol` + `companyName` from `positions`, `currency`
+  from the instruments response (§47.5 resolved instrument currency, no
+  fallback), the three arrays within the instruments window. `200` with
+  `holdings: []` for no open positions / unreachable instruments.
+- [x] Unit tests (`portfolioCalendar.test.ts`, mocked `fetch`): two symbols →
+  two holdings with arrays + currencies + Authorization pass-through; one 502 →
+  that symbol omitted, others intact; no open positions → `[]` + zero fetches;
+  no URL → `[]` + zero fetches.
+- [x] Full wallets suite green (331 tests, 28 files) + `npm run build` clean.
+  Commit: portfoliost-wallets 67958a7.
+
+### 54.3 — SPA: month-grid `PortfolioCalendarTab` (example-service layout)
+
+- [x] Rewrote `src/modules/portfolios/PortfolioCalendarTab.vue` as the example-service
+  month grid: toolbar inside a `card` (Calendar label, ‹/› month buttons,
+  "May 2026"-style label `pf-cal-month`, event-type `<select class="input">`
+  `pf-cal-filter` with All events / Earnings / Ex-Dividend / Dividend payment,
+  Today `btn-secondary`). **No Impact control.** Grid `pf-cal-grid`: SUN–SAT
+  header + 42 day cells `pf-cal-day` (prev/next-month days muted, today
+  outlined); chips only on in-month days, max 3 + "+N more"; chip
+  `SYMBOL <Type>: <amount>` (`tabular-nums`, `formatAmount(amount,
+  holding.currency)` — instrument base ccy, never converted; earnings have no
+  amount; colors per type with `dark:` variants); chip links to
+  `research-overview`. Empty state below the grid: "No events in this month."
+  testids: `pf-cal-prev-month`, `pf-cal-next-month`, `pf-cal-today`,
+  `pf-cal-grid`, `pf-cal-filter`, `pf-cal-day`, `pf-cal-month`. The old table
+  testids went with the table (no e2e referenced them — the tab-list entry in
+  `portfolios.spec.ts` stays).
+- [x] Flat-shape compat: when `holdings` is absent (mock `upcoming`/`past`) the
+  component derives holdings from the flat arrays (group by symbol; no currency
+  → amount omitted on chips). The mock itself is untouched.
+- [x] Vitest (`PortfolioCalendarTab.test.ts`, 8 tests, fake timers @ 2026-09-15):
+  42-day grid + SUN–SAT + no Impact control; prev/next changes month label +
+  first-cell day set (Oct 2026 starts Sun Sep 27); Today resets; chips on the
+  right days with instrument-ccy amounts + research link (`to` prop); cap 3 +
+  "+2 more"; filter hides other types; flat-shape derivation (amount omitted,
+  past events render); no macro events/holidays rendered.
+- [x] All SPA gates green: `npm run build` (vue-tsc), 379 unit, 227 mock.
+  Commits: portfoliost b5620b2 (+ pf-cal-month testid with 54.4, eee0bfd).
+
+### 54.4 — E2E: calendar grid on a seeded portfolio (compose stack)
+
+- [x] Playwright (docker compose, real wallets + live instruments): Top10 →
+  Calendar tab → `pf-cal-grid` with 42 `pf-cal-day` cells + "All events" select;
+  ‹/› navigation changes `pf-cal-month`; provider-tolerant chip branch — scan up
+  5 months of the instruments window; when rows exist assert chip text
+  `SYM (Earnings|Ex-Div|Div)(: amount)` + research href, else the empty state
+  (same convention as `research.spec.ts` chart tests).
+- [x] `npm run test:e2e` green (103 passed, 1 skipped). Commit: portfoliost eee0bfd.
+  - Ops note: the first e2e run failed on login (502s from the gateway) — nginx
+    had cached the pre-rebuild upstream IPs; `docker compose up -d
+    --force-recreate gateway` after any `--build` restores routing.
+
+### 54.5 — Closeout
+
+- [x] Dev docker-compose smoke: Top10 → real endpoint returns `holdings` for all
+  3 open positions with the instruments-resolved currency (KLAC USD, CART USD,
+  SNT.WA PLN). No event rows for the seeded holdings (fmp-only §49.9 fragility)
+  → the chip-on-right-day behavior is verified at unit level instead; the
+  endpoint's holdings + currency shape is the §54.5 contract.
+- [x] PROD (user-approved pin bump): homelab b4997f87f pinned SPA **v1.0.220** +
+  wallets **v1.1.53** (real tags from `gh release list`); Flux + kubectl verify
+  (both HelmReleases succeeded, pods 1/1, `KUBECONFIG=$HOME/.kube/homylab`).
+  Playwright against `https://portfoliost.k.homylab.com` (Pocket-ID re-auth after
+  the short-lived JWT expired), IBKR portfolio (35 open positions): month grid
+  renders (SUN–SAT, 42 cells), ‹/› navigation + Today + event-type filter work,
+  "No events in this month." for Sep–Nov 2026 (no provider rows), no paywall, no
+  Impact control; `GET /api/portfolios/:id/calendar` → 200 with `holdings`
+  (O, AMD, LRCX).
+  - **Data finding (user to fix manually):** PROD §47.5 resolver returned
+    `currency: "AUD"` for **AMD** (Advanced Micro Devices, Inc.) in the calendar
+    response — expected USD. Verified in `instruments.ticker_reference`: the
+    un-suffixed `AMD` matches 4 listings, and `searchTickerReference` returns
+    the ASX row (**Arrow Minerals Ltd**, country_code AU) first — the calendar
+    route has no exchange suffix on the position symbol and no provider
+    declaration to disambiguate (quotes/overview use provider-declared
+    currency, so only the calendar exposes the raw ambiguity).
+
+**Design decisions (resolved 2026-09-24 by the user):**
+
+- **"Impact" toggle abandoned** — example-service shows it (premium-gated, no visible
+  behavior); we ship no Impact control at all, not even as decoration.
+- **Chip amounts stay in the instrument's base currency** — never converted to
+  the portfolio base ccy (example-service does the same; e.g. `$0.26` in a PLN
+  portfolio). No D27 FX leg on this surface.
+- **No macro-economic events or holidays** — holdings events only (example-service mixes
+  in ISM/CPI/FOMC + holidays; no provider tier exists for macro).
+
+---
