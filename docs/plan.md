@@ -1536,13 +1536,22 @@ and before any wipe.
 
 ### 62.9b — Release + PROD wipe & reimport (user-authorized)
 
-- [ ] Push `portfoliost-wallets`, `portfoliost`, `portfoliost-sheets-sync` →
+- [x] Push `portfoliost-wallets`, `portfoliost`, `portfoliost-sheets-sync` →
   GHA patch bumps → pin the **real** tags from `gh release list` in the
   homelab helmreleases / job (`KUBECONFIG=$HOME/.kube/homylab`, ns `pfire`);
   Flux + kubectl verify all three rollouts — the wallets rollout runs the
   62.2 migration (drops the old tables + columns); verify it applied
   (`\d portfolios.portfolio_cash_transactions` present, `wallets` schema
   empty) and that the service boots clean.
+  - **Done 2026-09-25**: wallets `v1.1.55→v1.1.56`, portfoliost `v1.0.224→v1.0.226`,
+    sheets-sync `v1.0.11→v1.0.12` (pinned in `portfoliost-admin`'s
+    `SHEETS_SYNC_IMAGE`); homelab commit `f9a9015b5`. All three rollouts clean.
+    Migration verified in PROD DB: `portfolios.portfolio_cash_transactions`
+    present (0 rows), `portfolios.base_currency` present, old
+    `portfolios.currency` + wallet tables gone, 10 portfolios intact.
+    Note: the `wallets` schema retains exactly one table — `wallets.sync_runs`
+    (0 rows) — by design (schema.ts: "the wallets schema is kept for
+    sync_runs only").
 - [ ] Admin → Jobs → **Wipe & Reimport** (`POST /api/admin/jobs/sheets-sync/run
   {wipe:true}`, authenticated Pocket-ID session) — the first wipe on the new
   schema; assert: 0 row errors; DEPOSIT rows positive / WITHDRAWAL negative;
