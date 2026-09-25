@@ -1382,9 +1382,9 @@ and before any wipe.
 
 ### 62.6 — sheets-sync: mapper + recon re-targeted at portfolio cash
 
-- [ ] `src/transakcje-parser.ts`: `RANGE = "Transakcje!A1:AU"`; `au` flag
+- [x] `src/transakcje-parser.ts`: `RANGE = "Transakcje!A1:AU"`; `au` flag
     parsing + abort-on-garbage + Wpłata/Wypłata-with-AU=0 abort (absorbs §58.5).
-- [ ] `src/transakcje-mapper.ts`:
+- [x] `src/transakcje-mapper.ts`:
   - **Drop the INVEST/SELL wallet legs entirely** — the trade's cash effect is
     derived server-side by replay; the row emits only `portfolioTx` (BUY/SELL/
     DIVIDEND unchanged) + optional `cashTx`.
@@ -1395,6 +1395,14 @@ and before any wipe.
     `#d`) — paired with the derived BUY −X, net zero (the §58.6 decision).
     `Konto = Equate+`: the DEPOSIT is paired as a TRANSFER —
     `toPortfolioName: "IBKR"` (server creates the IBKR credit leg).
+    → *Implementation note (62.6): the plan's Kupno-Equate+ `toPortfolioName:
+    "IBKR"` (a credit INTO IBKR) is inconsistent with the Gotówka recon, which
+    tracks IBKR as a cash account — crediting it on every purchase would show a
+    gap. The mapper instead posts the Kupno-Equate+ funding as a TRANSFER OUT
+    of IBKR (debit USD) → `toPortfolioName: "Equate+"` (server creates the
+    Equate+ credit leg, netting the derived BUY), so IBKR's cash ledger shows
+    the funding leaving. Sprzedaż-Equate+ proceeds DO land in IBKR (the plan's
+    direction, kept).*
   - **Sprzedaż AU=1**: `cashTx WITHDRAWAL −|cash|` (`#w`), **except Equate+**
     → `cashTx TRANSFER −|cash| (EUR)` with `toPortfolioName: "IBKR"` +
     `exchangeRate` (proceeds land in the IBKR portfolio, USD).
@@ -1402,24 +1410,24 @@ and before any wipe.
     portfolio, AJ `program` note → labels; no transfer target.
   - **AU=0**: trade legs only (no `cashTx`).
   - `externalId` suffixes (`#d`/`#w`/`#t`) unchanged (dedupe keys).
-- [ ] API client: the wallet cash methods re-target to the 62.1
+- [x] API client: the wallet cash methods re-target to the 62.1
     `/api/portfolios…cash` endpoints (import batch payload field `walletTx` →
     `cashTx`); bootstrap-labels set includes the Wpłata/Wypłata AJ notes.
-- [ ] `src/gotowka-recon.ts` (new; absorbs §58.7): fetch `Gotówka!A1:L`;
+- [x] `src/gotowka-recon.ts` (new; absorbs §58.7): fetch `Gotówka!A1:L`;
   tracked columns `IB` → IBKR, `IKE Marek` → IKE Marek, `IKE Beata` → IKE Beata
   (now **portfolios**; other columns ignored); per tracked portfolio interleave
   the in-memory ledger effects (the mapped rows' `cashLedger`-equivalent math,
   cross-ccy × their rate) with the snapshots; warn-only lines over tolerance
   (IBKR ±50 USD at the latest row rate, IKE ±10 PLN; below-zero IKE → loud
   warning); never changes the exit code.
-- [ ] Unit tests (`transakcje-mapper.test.ts`): Kupno AU=1 (portfolioTx +
+- [x] Unit tests (`transakcje-mapper.test.ts`): Kupno AU=1 (portfolioTx +
   DEPOSIT `#d`, no INVEST leg), Kupno AU=1 Equate+ (TRANSFER to IBKR),
   Sprzedaż AU=1 (WITHDRAWAL `#w`), Sprzedaż AU=1 Equate+ (TRANSFER EUR→USD),
   Wpłata sign flip (sheet −6 336,29 → +6336.29), AU=0 Kupno (portfolioTx
   only), Wpłata AU=0 → abort; recon fixtures (exact match / 60 USD gap / 5 PLN
   in-tol / below-zero / unknown header abort).
-- [ ] Full sheets-sync suite green (`npm run test`).
-- [ ] Commit (portfoliost-sheets-sync).
+- [x] Full sheets-sync suite green (`npm run test`).
+- [x] Commit (portfoliost-sheets-sync).
 
 ### 62.7 — SPA: delete the wallet module, re-point the API layer
 
