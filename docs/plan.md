@@ -1580,3 +1580,108 @@ and before any wipe.
   58.9/58.10→62.9b (keep the sheet-fact background paragraph for reference).
 - [ ] Archive §62 to `plan-archive.md` once the PROD report is accepted clean.
 - [ ] Commit.
+
+## 63. Portfolio value correctness: unified live valuation, recompute reliability, cash-included charts (user request 2026-09-25)
+
+Post-§62 PROD verification exposed that portfolio **value** is computed by
+two divergent, both-wrong paths, and that the recompute button silently no-ops:
+
+- **Chart / analytics** = `value_snapshots.value` = Σ qty × `price_bars.close`
+  (+ cash). Openst history quotes are 10–70× off for several held symbols
+  (CSN.L £363 vs £5 cost, RIO.L £7 199, BYG.L £820, SAP.DE cost basis €1.16 vs
+  quote €184) → IKE Marek snapshot 2 300 732 vs true ~100k.
+- **Headline "Total Value"** = Σ `positions.market_value`, which is **stale/0**
+  (no live quote at last import) → falls back to `qty × avgCostBasis` → reads
+  ~755k (cheap).
+- **Recompute** `POST /api/portfolios/:id/recompute` is fire-and-forget with
+  `.catch(() => undefined)` — it fails silently (no logs, no value change).
+
+User spec (2026-09-25): cash = uninvested (free) cash per the **Gotówka sheet**
+(traces free cash on brokerage accounts), multi-currency; Gotówka is a
+*reference*, the same values must also be **derivable from inflows/outflows
++ transactions**; a funded buy (AU=1) is one inflow + immediate buy; the
+performance/consolidated charts must show **positions + cash** over time.
+
+Rules: one step = one commit; step `[x]` only after its tests pass (unit +
+docker-compose level). Provider tier first (openst/cachest) for the bad
+quotes — §63.5 is gated on reproducing the bad symbol's provider response.
+
+---
+
+### 63.1 — Wallets: make recompute reliable + observable (no silent no-op)
+
+- [ ] `portfoliost-wallets`: `POST /:id/recompute` and the recalc-queue/backfill
+  runner stop swallowing errors — log the error (service, portfolioId, error)
+  and expose status. `backfillStatus` reflects the real outcome; a failed pass
+  is visible (log line + `GET /:id/analytics` `backfillStatus` not stuck
+  `pending` with no effect).
+- [ ] Recompute actually rewrites `value_snapshots` + `portfolios.current_value`
+  for a portfolio (verify against a known-bad portfolio: value changes, log
+  line emitted, no `.catch(() => undefined)`).
+- [ ] Tests: recompute success rewrites snapshots; recompute failure is logged
+  (not swallowed) and leaves state consistent.
+- [ ] Tests: `npm run build`, full `vitest` green.
+- [ ] Commit.
+
+### 63.2 — Wallets: one live valuation path for headline + charts (single source of truth)
+
+- [ ] `portfoliost-wallets`: headline total-metrics `totalValue` and
+  `value_snapshots` both derive position value from the **same** live price
+  source (quote service / cached live price), not `price_bars` for one and
+  `positions.market_value`-fallback for the other. When no live price, use the
+  latest `price_bars` close (not `avgCostBasis`) and mark `priceSource`.
+- [ ] `portfolios.current_value` is refreshed from the live value (positions +
+  cash) on the quotes pass and on recompute — so headline = chart last point
+  (± cash timing) after a recompute.
+- [ ] Tests: a portfolio's headline totalValue equals the latest snapshot value
+  (positions + cash) when quotes are fresh; fallback-to-close (not cost) is
+  asserted when no quote.
+- [ ] Tests: `npm run build`, full `vitest` green.
+- [ ] Commit.
+
+### 63.3 — Wallets: cash included in consolidated + per-portfolio performance series
+
+- [ ] Verify/fix the consolidated (all-portfolio) performance chart and each
+  portfolio chart show **Σ positions + cash** per day (cash per §62 base-
+  currency balance already added in backfill — confirm it is in the consolidated
+  merge path `getMergedAnalytics` too, and that negative cash doesn't hide).
+- [ ] Tests: consolidated series = Σ per-portfolio (positions + cash); a
+  deposit moves the consolidated line up on that day.
+- [ ] Tests: `npm run build`, full `vitest` green.
+- [ ] Commit.
+
+### 63.4 — Sheets-sync: derive free-cash from flows+trades; Gotówka as reconciliation reference (multi-currency)
+
+- [ ] Model "uninvested/free cash" per account as the §62 per-currency cash
+  ledger (external flows + derived trade effects) — this already nets a funded
+  buy (inflow + immediate buy) to ~0 net cash and is multi-currency. Keep
+  Gotówka as a **reconciliation reference** (warn-only), not the source of the
+  cash value. Re-scope the §62.6 Gotówka recon to compare the *derived* free-
+  cash total against the Gotówka snapshot on the right basis/currency (resolve
+  the IB=USD vs column=PLN basis) so the 3 tracked accounts give a meaningful
+  Δ instead of the current full-history mismatch.
+- [ ] Tests: derived free-cash for a funded-buy round-trip (inflow + buy) ≈ 0
+  net; Gotówka recon warn-line compares derived vs snapshot within tolerance.
+- [ ] Tests: `npm run build`, full `vitest` green.
+- [ ] Commit.
+
+### 63.5 — Provider tier: root-cause the mispriced symbols (openst/cachest) — GATED
+
+- [ ] Reproduce the bad quotes from the provider: fetch live quote + history for
+  the mispriced set (CSN.L, RIO.L, BYG.L, SAP.DE, AMD, TSM, ASML) from
+  openst/cachest; determine whether each is a wrong **quote** (unit/pence-vs-
+  GBP, symbol collision, split) or a wrong **cost basis** at import.
+- [ ] Fix at the owning tier (openst fetcher / cachest config / instruments
+  adapter) per provider-tier-first; add a staleness/sanity guard so an extreme
+  quote-vs-cost jump flags instead of silently valuing 70×.
+- [ ] Tests: openst/cachest suites green; the fixed symbols' quotes match the
+  exchange (spot-checked).
+- [ ] GATE: this step blocks "chart == true value"; §63.1–63.4 ship independently
+  (correctness of the *pipeline*), §63.5 fixes the *data*.
+- [ ] Commit.
+
+Open question (transient — answer before §63.5 work): are the mispriced symbols
+bad because of a **quote** unit issue (e.g. openst returning pence for GBX
+symbols) or because the **import cost basis** was mis-parsed? Decide by
+comparing openst's live quote for CSN.L/RIO.L/BYG.L/SAP.DE against the exchange
+before choosing the fix tier.
