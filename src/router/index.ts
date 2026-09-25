@@ -90,6 +90,11 @@ const router = createRouter({
               component: () => import("@/modules/portfolios/PortfolioHoldingsTab.vue"),
             },
             {
+              path: "cash",
+              name: "portfolio-cash",
+              component: () => import("@/modules/portfolios/PortfolioCashTab.vue"),
+            },
+            {
               path: "transactions",
               name: "portfolio-transactions",
               component: () => import("@/modules/portfolios/PortfolioTransactionsTab.vue"),

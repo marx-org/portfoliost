@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * Reusable wallet balance area chart (plan §27.4) with a Recompute button.
+ * Reusable cash balance area chart (§62) with a Recompute button.
  * Point shaping (e.g. `balance > 0` filters) stays in the parent — the
  * component renders exactly the points it gets.
  */
@@ -38,7 +38,7 @@ defineExpose({ chartOptions })
       <button
         type="button"
         class="btn-secondary text-xs"
-        data-testid="wallet-chart-recompute"
+        data-testid="cash-chart-recompute"
         :disabled="busy"
         @click="emit('recompute')"
       >

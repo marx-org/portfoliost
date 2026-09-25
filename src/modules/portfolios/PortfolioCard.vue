@@ -122,6 +122,7 @@ async function changeTimeframe(tf: PortfolioAnalyticsTimeframe) {
 function tabPath(name: string) {
   const map: Record<string, string> = {
     holdings: "holdings",
+    cash: "cash",
     performance: "performance",
     news: "news",
     calendar: "calendar",
@@ -360,6 +361,25 @@ async function exportPositions(format: "csv" | "xml" | "json") {
     <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
       {{ portfolio.metrics?.openPositions ?? 0 }} open positions &middot; {{ formatNumber(portfolio.metrics?.unrealizedGainLoss) }} unrealized
     </p>
+
+    <!-- §62.8 — Cash group (example-service parity): balance line + per-currency hint. -->
+    <div v-if="portfolio.cash" class="mt-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 p-4" @click.stop data-testid="card-cash-group">
+      <div class="flex items-center justify-between">
+        <span class="text-xs text-slate-500 dark:text-slate-400">Cash</span>
+        <router-link
+          :to="tabPath('cash')"
+          class="text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400"
+          data-testid="card-cash-balance"
+        >
+          {{ formatCurrency(portfolio.cash.total, portfolio.cash.baseCurrency) }}
+        </router-link>
+      </div>
+      <div class="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+        <span v-for="b in portfolio.cash.balances" :key="b.currency" class="text-xs text-slate-500 dark:text-slate-400" :data-testid="`card-cash-${b.currency}`">
+          {{ b.currency }} {{ formatCurrency(b.balance, b.currency) }}
+        </span>
+      </div>
+    </div>
 
     <div class="mt-4 flex items-center justify-between gap-2 border-t border-slate-100 dark:border-slate-800 pt-3" @click.stop>
       <button type="button" class="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline" data-testid="card-add-position" @click="emit('add-position')">Add Position</button>

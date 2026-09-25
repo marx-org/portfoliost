@@ -27,6 +27,7 @@ const showCurrencyMenu = ref(false)
 
 const tabs = [
   { name: "portfolio-holdings", label: "Holdings" },
+  { name: "portfolio-cash", label: "Cash" },
   { name: "portfolio-transactions", label: "Transactions" },
   { name: "portfolio-performance", label: "Performance" },
   { name: "portfolio-allocation", label: "Allocation" },

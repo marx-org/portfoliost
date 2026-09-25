@@ -18,7 +18,6 @@ const props = defineProps<{
   entityKind: EntityKind
   currentLabels: Label[]
   portfolioId?: string
-  walletId?: string
 }>()
 const emit = defineEmits<{ close: []; saved: [labels: Label[]] }>()
 
