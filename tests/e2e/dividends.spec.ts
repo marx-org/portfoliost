@@ -37,17 +37,25 @@ test("record dividend nets the wallet and populates Dividends + Transactions Tax
     return res.json() as Promise<Record<string, unknown>>
   }
 
-  const walletName = `E2E DIV USD ${run}`
-  const wallet = await mk("/api/wallets", { name: walletName, currency: "USD" })
-  const walletId = String(wallet.id)
-  await mk(`/api/wallets/${walletId}/deposits`, { amount: 1000 })
-  const portfolio = await mk("/api/portfolios", { name: `E2E DIV ${run}`, currency: "USD", walletId })
+  const portfolio = await mk("/api/portfolios", { name: `E2E DIV ${run}`, baseCurrency: "USD" })
   const pid = String(portfolio.id)
-  // 10 × $50 buy = 500, leaving 500 cash; the dividend credits +80 net.
-  await mk(`/api/portfolios/${pid}/positions`, { symbol: "AAPL", quantity: 10, price: 50, currency: "USD", walletId })
+  // 10 × $50 buy = 500, leaving the buy-funded cash to be credited +80 net by
+  // the dividend (the portfolio's own cash, not a wallet — §62).
+  await mk(`/api/portfolios/${pid}/positions`, { symbol: "AAPL", quantity: 10, price: 50, currency: "USD" })
 
   await login(page)
   await page.goto(`/en/portfolios/${pid}/holdings`)
+
+  const cashUsd = async (): Promise<number | undefined> => {
+    const res = await request.get(`${GATEWAY}/api/portfolios/${pid}/cash`, { headers: auth })
+    if (res.status() !== 200) return undefined
+    const body = (await res.json()) as { balances: Array<{ currency: string; balance: number }> }
+    return body.balances.find((b) => b.currency === "USD")?.balance
+  }
+  // The buy already debited the portfolio's own cash; capture the pre-dividend
+  // baseline and assert the dividend credits the NET amount on top of it (§62).
+  const before = await cashUsd()
+  expect(before, "pre-dividend cash baseline").not.toBeUndefined()
 
   const row = page.locator("tbody tr").filter({ hasText: "AAPL" }).first()
   await expect(row).toBeVisible({ timeout: 20000 })
@@ -70,11 +78,8 @@ test("record dividend nets the wallet and populates Dividends + Transactions Tax
   await expect(dialog.getByTestId("dividend-shares")).toHaveValue("10")
   await dialog.getByTestId("dividend-mode-total").click()
 
-  // pick the funded wallet explicitly (the dialog prefers the portfolio-linked
-  // wallet; it loads asynchronously, so select it deterministically)
-  const walletSelect = dialog.getByTestId("dividend-wallet")
-  await expect(walletSelect.locator("option", { hasText: walletName })).toHaveCount(1, { timeout: 10000 })
-  await walletSelect.selectOption(walletId)
+  // §62 — the dividend is paid into the portfolio (no wallet select); the FX
+  // leg converts into the portfolio's base currency automatically.
 
   // tax can never exceed gross → inline error + disabled submit
   await dialog.getByTestId("dividend-gross").fill("10")
@@ -94,21 +99,16 @@ test("record dividend nets the wallet and populates Dividends + Transactions Tax
   await dialog.getByTestId("dividend-submit").click()
   await expect(dialog).not.toBeVisible({ timeout: 10000 })
 
-  // wallet credited the NET amount (1000 deposited − 500 buy + 80 net dividend)
+  // The portfolio's cash was credited the NET amount (dividend-derived by
+  // replay, not a stored wallet ledger — §62).
+  // The portfolio's cash was credited the NET dividend amount (dividend-derived
+  // by replay, not a stored wallet ledger — §62): before + net(80).
   await expect
     .poll(async () => {
-      const res = await request.get(`${GATEWAY}/api/wallets`, { headers: auth })
-      if (res.status() !== 200) return undefined
-      const rows = (await res.json()) as Array<{ id?: string; balance?: number }>
-      return rows.find((w) => w.id === walletId)?.balance
+      const after = await cashUsd()
+      return after != null && before != null ? after - before : undefined
     }, { timeout: 15000 })
-    .toBe(580)
-
-  const wtx = await request.get(`${GATEWAY}/api/wallets/${walletId}/transactions`, { headers: auth })
-  expect(wtx.status()).toBe(200)
-  const wtxBody = (await wtx.json()) as { items?: Array<{ type?: string; amount?: number }> }
-  const dividendCash = wtxBody.items?.find((t) => t.type === "INVEST" && t.amount === 80)
-  expect(dividendCash, "wallet ledger row for the dividend").toBeTruthy()
+    .toBe(80)
 
   // Dividends tab aggregates the real transaction row (gross / tax / net)
   await page.goto(`/en/portfolios/${pid}/dividends`)
@@ -126,9 +126,6 @@ test("record dividend nets the wallet and populates Dividends + Transactions Tax
   await expect(trow).toBeVisible()
   await expect(trow).toContainText("80")
 
-  // best-effort cleanup: the portfolio still holds a live position, so drop the
-  // wallet ledger + transactions first is overkill — entities are inert leftovers
-  for (const del of [`${GATEWAY}/api/portfolios/${pid}`, `${GATEWAY}/api/wallets/${walletId}`]) {
-    try { await request.delete(del, { headers: auth }) } catch { /* ignore */ }
-  }
+  // best-effort cleanup (leftover "E2E DIV*" entities are inert for other specs)
+  try { await request.delete(`${GATEWAY}/api/portfolios/${pid}`, { headers: auth }) } catch { /* ignore */ }
 })

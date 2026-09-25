@@ -421,12 +421,11 @@ async function main() {
   const addPosFull = await request(`/portfolios/${cid}/positions`, {
     method: "POST",
     token,
-    body: { symbol: "INTC", quantity: 10, price: 120, fees: 12, feesType: "pct", walletId: "wallet-1", executedAt: "2026-08-01T00:00:00.000Z" },
+    body: { symbol: "INTC", quantity: 10, price: 120, fees: 12, feesType: "pct", executedAt: "2026-08-01T00:00:00.000Z" },
   })
   check(
-    "portfolios.positions.create persists walletId/fees/feesType/executedAt",
+    "portfolios.positions.create persists fees/feesType/executedAt",
     addPosFull.status === 201 &&
-      addPosFull.json.walletId === "wallet-1" &&
       addPosFull.json.fees === 12 &&
       addPosFull.json.feesType === "pct" &&
       addPosFull.json.openedAt === "2026-08-01T00:00:00.000Z" &&
@@ -437,86 +436,71 @@ async function main() {
   check("portfolios.positions.delete", delPos.status === 200 && delPos.json.isOpen === false, `got ${delPos.status}`)
   const upd = await request(`/portfolios/${cid}`, { method: "PATCH", token, body: { name: "TEST_TMP_RENAMED" } })
   check("portfolios.update", upd.status === 200 && upd.json.name === "TEST_TMP_RENAMED", `got ${upd.status}`)
+
+  // ── §62.9 — portfolio-native cash (replaces the wallet entity) ──────────
+  // Top10 is seeded with a 2nd currency (EUR) → the multi-currency path.
+  const TOP10 = "3cb589d8-f92d-428f-aeab-9ee5d4b9cef2"
+  const cash0 = await request(`/portfolios/${TOP10}/cash`, { token })
+  check(
+    "cash.get seeded multi-currency",
+    cash0.status === 200 &&
+      cash0.json.baseCurrency === "USD" &&
+      cash0.json.balances.some((b) => b.currency === "USD" && b.balance === 700) &&
+      cash0.json.balances.some((b) => b.currency === "EUR" && b.balance === 500) &&
+      cash0.json.total === 1240,
+    `got ${JSON.stringify(cash0.json).slice(0, 160)}`,
+  )
+  const cashHist = await request(`/portfolios/${TOP10}/cash/balance-history?period=90d&resolution=day`, { token })
+  check("cash.balance-history", cashHist.status === 200 && Array.isArray(cashHist.json.data) && cashHist.json.data.length > 50 && cashHist.json.meta.high === 1240, `got ${cashHist.status} len ${cashHist.json.data?.length}`)
+  const cashTx0 = await request(`/portfolios/${TOP10}/cash/transactions`, { token })
+  check("cash.transactions seeded", cashTx0.status === 200 && Array.isArray(cashTx0.json.items) && cashTx0.json.items.length === 3, `got ${cashTx0.status} ${JSON.stringify(cashTx0.json).slice(0, 120)}`)
+  const deposit = await request(`/portfolios/${TOP10}/cash/deposits`, { method: "POST", token, body: { amount: 100, description: "Test deposit", transactionDate: "2026-08-12", currency: "USD" } })
+  check("cash.deposit new fields", deposit.status === 201 && deposit.json.type === "DEPOSIT" && deposit.json.amount === 100 && deposit.json.new_balance === 800 && deposit.json.remaining_balance === 800, `got ${deposit.status} ${JSON.stringify(deposit.json).slice(0, 120)}`)
+  const withdraw = await request(`/portfolios/${TOP10}/cash/withdrawals`, { method: "POST", token, body: { amount: 50, paymentMethod: "bank_transfer", currency: "USD" } })
+  check("cash.withdraw payment method", withdraw.status === 201 && withdraw.json.type === "WITHDRAWAL" && withdraw.json.amount === -50 && withdraw.json.paymentMethod === "bank_transfer" && withdraw.json.remaining_balance === 750, `got ${withdraw.status} ${JSON.stringify(withdraw.json).slice(0, 120)}`)
+  const destPf = await request("/portfolios", { method: "POST", token, body: { name: "Cash transfer dest", baseCurrency: "USD" } })
+  check("cash.create transfer-dest portfolio", destPf.status === 201, `got ${destPf.status}`)
+  const transfer = await request(`/portfolios/${TOP10}/cash/transfers`, { method: "POST", token, body: { amount: 100, toPortfolioId: destPf.json.id, fees: 2, feesType: "fixed", currency: "USD" } })
+  check("cash.transfer fees + dest", transfer.status === 201 && transfer.json.toPortfolioId === destPf.json.id && transfer.json.fees === 2, `got ${transfer.status} ${JSON.stringify(transfer.json).slice(0, 120)}`)
+  const destCash = await request(`/portfolios/${destPf.json.id}/cash`, { token })
+  check("cash.transfer credits destination", destCash.json.balances.some((b) => b.currency === "USD" && b.balance === 100), `got ${JSON.stringify(destCash.json).slice(0, 120)}`)
+  const srcCash = await request(`/portfolios/${TOP10}/cash`, { token })
+  check("cash.transfer debits source (750-102=648)", srcCash.json.balances.some((b) => b.currency === "USD" && b.balance === 648), `got ${JSON.stringify(srcCash.json.balances).slice(0, 120)}`)
+  const recent = await request("/portfolios/cash/recent-transactions?page=1&limit=10&sortBy=date&sortOrder=desc", { token })
+  check("cash.recent-transactions", recent.status === 200 && isObj(recent.json) && Array.isArray(recent.json.data) && isObj(recent.json.meta), `got ${recent.status}`)
+  check("cash.recent-transactions fields", recent.status === 200 && hasKeys(recent.json.data[0], ["id", "portfolioId", "portfolioName", "type", "displayLabel", "amount", "date"]), JSON.stringify(recent.json.data && recent.json.data[0]).slice(0, 120))
+  check("cash.recent-transactions total", recent.status === 200 && recent.json.meta.total >= 6, `total ${recent.json.meta && recent.json.meta.total}`)
+  const recentPg = await request("/portfolios/cash/recent-transactions?page=1&limit=3&sortBy=date&sortOrder=desc", { token })
+  check("cash.recent-transactions paginated", recentPg.status === 200 && recentPg.json.meta.page === 1 && recentPg.json.data.length === 3, `len ${recentPg.json.data.length}`)
+  const recentSorted = await request("/portfolios/cash/recent-transactions?page=1&limit=50&sortBy=amount&sortOrder=asc", { token })
+  const amounts = recentSorted.json.data.map((t) => Number(t.amount))
+  check("cash.recent-transactions sorted asc", recentSorted.status === 200 && amounts.every((v, i) => i === 0 || amounts[i - 1] <= v), `amounts ${amounts.join(",")}`)
+  const investTx = (await request("/portfolios/cash/recent-transactions?page=1&limit=50", { token })).json.data.find((t) => t.type === "INVEST")
+  const patched = await request(`/portfolios/cash/transactions/${investTx.id}`, { method: "PATCH", token, body: { type: "WITHDRAWAL", amount: 100 } })
+  check("cash.recent PATCH recomputes label", patched.status === 200 && patched.json.displayLabel === "Withdrawal" && patched.json.amount.startsWith("-"), `got ${patched.status} ${patched.json.displayLabel} ${patched.json.amount}`)
+  const delTx = await request(`/portfolios/cash/transactions/${investTx.id}`, { method: "DELETE", token })
+  check("cash.recent DELETE", delTx.status === 204, `got ${delTx.status}`)
+  const afterDelete = await request("/portfolios/cash/recent-transactions?page=1&limit=50&sortBy=date&sortOrder=desc", { token })
+  check("cash.recent DELETE tombstones", afterDelete.status === 200 && !afterDelete.json.data.some((t) => t.id === investTx.id), `total ${afterDelete.json.meta.total}`)
+  const seedTx = (await request(`/portfolios/${TOP10}/cash/transactions`, { token })).json.items.find((t) => t.id.startsWith("seed-"))
+  const patchedSeed = await request(`/portfolios/cash/transactions/${seedTx.id}`, { method: "PATCH", token, body: { type: "WITHDRAWAL", amount: 50, description: "Edited" } })
+  check("cash.detail PATCH returns signed recent shape", patchedSeed.status === 200 && patchedSeed.json.displayLabel === "Withdrawal", `got ${patchedSeed.status} ${patchedSeed.json.displayLabel}`)
+  const detailPatched = (await request(`/portfolios/${TOP10}/cash/transactions`, { token })).json.items.find((t) => t.id === seedTx.id)
+  check(
+    "cash.detail reflects recent PATCH (amount abs + type)",
+    detailPatched && detailPatched.type === "WITHDRAWAL" && Math.abs(Number(detailPatched.amount)) === 50 && detailPatched.description === "Edited",
+    `found ${detailPatched && JSON.stringify({ type: detailPatched.type, amount: detailPatched.amount, description: detailPatched.description })}`,
+  )
+  await request(`/portfolios/cash/transactions/${seedTx.id}`, { method: "DELETE", token })
+  const detailDeleted = (await request(`/portfolios/${TOP10}/cash/transactions`, { token })).json.items.some((t) => t.id === seedTx.id)
+  check("cash.detail reflects recent DELETE", !detailDeleted, `deleted tx still present`)
+  const transferValidation = await request(`/portfolios/${TOP10}/cash/transfers`, { method: "POST", token, body: { amount: 10, toPortfolioId: "no-such" } })
+  check("cash.transfer unknown dest → 404", transferValidation.status === 404, `got ${transferValidation.status}`)
+
   const del = await request(`/portfolios/${cid}`, { method: "DELETE", token })
   check("portfolios.delete → 204", del.status === 204, `got ${del.status}`)
   const gone = await request(`/portfolios/${cid}`, { token })
   check("portfolios deleted portfolio", gone.status === 200, `got ${gone.status}`)
-
-  // ── Wallets ─────────────────────────────────────────────────
-  const wallets = await request("/wallets", { token })
-  check("wallets.list", wallets.status === 200 && Array.isArray(wallets.json) && wallets.json.length >= 1, `got ${wallets.status}`)
-  const walletId = wallets.json[0].id
-  const totalBalance = await request("/wallets/total-balance", { token })
-  check("wallets.total-balance", totalBalance.status === 200 && "totalBalance" in totalBalance.json, `got ${totalBalance.status}`)
-  const balanceHistory = await request(`/wallets/${walletId}/balance-history?period=90d&resolution=day`, { token })
-  check("wallets.balance-history", balanceHistory.status === 200 && Array.isArray(balanceHistory.json.data) && balanceHistory.json.data.length > 50, `got ${balanceHistory.status} len ${balanceHistory.json.data.length}`)
-  const walletTx = await request(`/wallets/${walletId}/transactions`, { token })
-  check("wallets.transactions", walletTx.status === 200, `got ${walletTx.status}`)
-  const deposit = await request(`/wallets/${walletId}/deposits`, { method: "POST", token, body: { amount: 100, description: "Test deposit", transaction_date: "2026-08-12", currency: "USD" } })
-  check("wallets.deposit new fields", deposit.status === 201 && deposit.json.transaction_date === "2026-08-12" && deposit.json.new_balance === 2016.6 && deposit.json.remaining_balance === 2016.6, `got ${deposit.status} ${JSON.stringify(deposit.json).slice(0, 120)}`)
-  const withdraw = await request(`/wallets/${walletId}/withdrawals`, { method: "POST", token, body: { amount: 50, payment_method: "bank_transfer", transaction_date: "2026-08-12" } })
-  check("wallets.withdraw payment method", withdraw.status === 201 && withdraw.json.payment_method === "bank_transfer" && withdraw.json.remaining_balance === 1966.6, `got ${withdraw.status} ${JSON.stringify(withdraw.json).slice(0, 120)}`)
-  const otherWalletId = wallets.json[1] ? wallets.json[1].id : null
-  const srcBalanceBefore = withdraw.json.remaining_balance ?? wallets.json.find((w) => w.id === walletId).balance
-  if (otherWalletId) {
-    const transfer = await request(`/wallets/${walletId}/transfers`, { method: "POST", token, body: { amount: 100, to_wallet_id: otherWalletId, fees: 2, fees_type: "fixed", transaction_date: "2026-08-12" } })
-    check("wallets.transfer fees + dest", transfer.status === 201 && transfer.json.to_wallet_id === otherWalletId && transfer.json.fees === 2, `got ${transfer.status} ${JSON.stringify(transfer.json).slice(0, 120)}`)
-    const destWallet = await request("/wallets", { token })
-    const destUpdated = destWallet.json.find((w) => w.id === otherWalletId)
-    check("wallets.transfer credits destination", destUpdated && destUpdated.balance > wallets.json.find((w) => w.id === otherWalletId).balance, `got ${JSON.stringify(destUpdated).slice(0, 120)}`)
-    const srcUpdated = destWallet.json.find((w) => w.id === walletId)
-    check("wallets.transfer debits source", srcUpdated && srcUpdated.balance === Math.round((srcBalanceBefore - 102) * 100) / 100, `got ${JSON.stringify(srcUpdated).slice(0, 120)}`)
-  } else {
-    const newWallet = await request("/wallets", { method: "POST", token, body: { name: "Transfer dest", currency: "USD" } })
-    const destId = newWallet.json.id
-    const transfer = await request(`/wallets/${walletId}/transfers`, { method: "POST", token, body: { amount: 100, to_wallet_id: destId, fees: 2, fees_type: "fixed", transaction_date: "2026-08-12" } })
-    check("wallets.transfer fees + dest", transfer.status === 201 && transfer.json.to_wallet_id === destId && transfer.json.fees === 2, `got ${transfer.status} ${JSON.stringify(transfer.json).slice(0, 120)}`)
-    const destWallet = await request("/wallets", { token })
-    const destUpdated = destWallet.json.find((w) => w.id === destId)
-    check("wallets.transfer credits destination", destUpdated && destUpdated.balance === 100, `got ${JSON.stringify(destUpdated).slice(0, 120)}`)
-    const srcUpdated = destWallet.json.find((w) => w.id === walletId)
-    check("wallets.transfer debits source", srcUpdated && srcUpdated.balance === Math.round((srcBalanceBefore - 102) * 100) / 100, `got ${JSON.stringify(srcUpdated).slice(0, 120)}`)
-    const delWallet = await request(`/wallets/${destId}`, { method: "DELETE", token })
-    check(
-      "wallets.transfer dest wallet delete → 409 (has transactions)",
-      delWallet.status === 409 && /cannot be deleted/.test(delWallet.json.message),
-      `got ${delWallet.status} ${JSON.stringify(delWallet.json).slice(0, 80)}`,
-    )
-  }
-  const emptyWall = await request("/wallets", { method: "POST", token, body: { name: "Empty deletable", currency: "USD" } })
-  const emptyWallId = emptyWall.json.id
-  const delEmpty = await request(`/wallets/${emptyWallId}`, { method: "DELETE", token })
-  check("wallets.empty wallet delete → 204", delEmpty.status === 204, `got ${delEmpty.status}`)
-  const delSeed = await request(`/wallets/${walletId}`, { method: "DELETE", token })
-  check("wallets.seeded wallet delete → 409", delSeed.status === 409, `got ${delSeed.status}`)
-  const recent = await request("/wallets/recent-transactions?page=1&limit=10&sortBy=date&sortOrder=desc", { token })
-  check("wallets.recent-transactions", recent.status === 200 && isObj(recent.json) && Array.isArray(recent.json.data) && isObj(recent.json.meta), `got ${recent.status}`)
-  check("wallets.recent-transactions fields", recent.status === 200 && hasKeys(recent.json.data[0], ["id", "walletId", "walletName", "type", "displayLabel", "amount", "date"]), JSON.stringify(recent.json.data && recent.json.data[0]).slice(0, 120))
-  check("wallets.recent-transactions total", recent.status === 200 && recent.json.meta.total === 19, `total ${recent.json.meta && recent.json.meta.total}`)
-  const recentPg = await request("/wallets/recent-transactions?page=2&limit=5&sortBy=date&sortOrder=desc", { token })
-  check("wallets.recent-transactions paginated", recentPg.status === 200 && recentPg.json.meta.page === 2 && recentPg.json.data.length === 5, `len ${recentPg.json.data.length} page ${recentPg.json.meta.page}`)
-  const recentSorted = await request("/wallets/recent-transactions?page=1&limit=11&sortBy=amount&sortOrder=asc", { token })
-  const amounts = recentSorted.json.data.map((t) => Number(t.amount))
-  check("wallets.recent-transactions sorted asc", recentSorted.status === 200 && amounts.every((v, i) => i === 0 || amounts[i - 1] <= v), `amounts ${amounts.join(",")}`)
-  const investTx = recent.json.data.find((t) => t.type === "INVEST")
-  const patched = await request(`/wallets/transactions/${investTx.id}`, { method: "PATCH", token, body: { type: "WITHDRAWAL", amount: 100 } })
-  check("wallets.recent PATCH recomputes label", patched.status === 200 && patched.json.displayLabel === "Withdrawal" && patched.json.amount.startsWith("-"), `got ${patched.status} ${patched.json.displayLabel} ${patched.json.amount}`)
-  const delTx = await request(`/wallets/transactions/${investTx.id}`, { method: "DELETE", token })
-  check("wallets.recent DELETE", delTx.status === 204, `got ${delTx.status}`)
-  const afterDelete = await request("/wallets/recent-transactions?page=1&limit=11&sortBy=date&sortOrder=desc", { token })
-  check("wallets.recent DELETE tombstones", afterDelete.status === 200 && afterDelete.json.meta.total === 18 && !afterDelete.json.data.some((t) => t.id === investTx.id), `total ${afterDelete.json.meta.total}`)
-  const seedTx = (await request(`/wallets/${walletId}/transactions`, { token })).json.items.find((t) => t.id.startsWith("seed-"))
-  const patchedSeed = await request(`/wallets/transactions/${seedTx.id}`, { method: "PATCH", token, body: { type: "WITHDRAWAL", amount: 50, description: "Edited" } })
-  check("wallets.detail PATCH returns signed recent shape", patchedSeed.status === 200 && patchedSeed.json.displayLabel === "Withdrawal", `got ${patchedSeed.status} ${patchedSeed.json.displayLabel}`)
-  const detailPatched = (await request(`/wallets/${walletId}/transactions`, { token })).json.items.find((t) => t.id === seedTx.id)
-  check(
-    "wallets.detail reflects recent PATCH (amount abs + type)",
-    detailPatched && detailPatched.type === "WITHDRAWAL" && Number(detailPatched.amount) === 50 && detailPatched.description === "Edited",
-    `found ${detailPatched && JSON.stringify({ type: detailPatched.type, amount: detailPatched.amount, description: detailPatched.description })}`,
-  )
-  await request(`/wallets/transactions/${seedTx.id}`, { method: "DELETE", token })
-  const detailDeleted = (await request(`/wallets/${walletId}/transactions`, { token })).json.items.some((t) => t.id === seedTx.id)
-  check("wallets.detail reflects recent DELETE", !detailDeleted, `deleted tx still present`)
 
   // ── Watchlists ──────────────────────────────────────────────
   const wl = await request("/watchlists", { token })
@@ -629,17 +613,16 @@ async function main() {
       `got ${adminFxUsd.status} ${JSON.stringify(adminFxUsd.json || {}).slice(0, 120)}`,
     )
 
-    const usdWalletsBefore = await request("/wallets", { token })
-    const createW = await request("/wallets", {
+    const createW = await request("/portfolios", {
       method: "POST",
       token,
-      body: { name: "FX test wallet", currency: "EUR" },
+      body: { name: "FX test portfolio", baseCurrency: "EUR" },
     })
-    check("feesfx.create EUR wallet", createW.status === 201 && createW.json.currency === "EUR", `got ${createW.status}`)
+    check("feesfx.create EUR portfolio", createW.status === 201 && createW.json.baseCurrency === "EUR", `got ${createW.status}`)
     const eurId = createW.json.id
 
     // deposit without fees echoes resolved defaults (feeCurrency = tx ccy)
-    const dep = await request(`/wallets/${eurId}/deposits`, {
+    const dep = await request(`/portfolios/${eurId}/cash/deposits`, {
       method: "POST",
       token,
       body: { amount: 1000, description: "fx seed" },
@@ -654,32 +637,32 @@ async function main() {
     )
 
     // withdrawal with pct fee materialized on the fly (2% of 100)
-    const wd = await request(`/wallets/${eurId}/withdrawals`, {
+    const wd = await request(`/portfolios/${eurId}/cash/withdrawals`, {
       method: "POST",
       token,
-      body: { amount: 100, fees: 2, fees_type: "pct", description: "pct fee" },
+      body: { amount: 100, fees: 2, feesType: "pct", description: "pct fee" },
     })
     check(
       "feesfx.withdrawal pct fee settled",
-      wd.status === 201 && Number(wd.json.fees_settled) === 2 && wd.json.new_balance === 898,
+      wd.status === 201 && Number(wd.json.feesSettled) === 2 && wd.json.new_balance === 898,
       JSON.stringify(wd.json || {}).slice(0, 200),
     )
 
-    // foreign-currency fee settles via demo rates (10 USD fee into EUR wallet)
-    const wdf = await request(`/wallets/${eurId}/withdrawals`, {
+    // foreign-currency fee settles via demo rates (10 USD fee into EUR portfolio)
+    const wdf = await request(`/portfolios/${eurId}/cash/withdrawals`, {
       method: "POST",
       token,
-      body: { amount: 10, fees: 10, fees_type: "fixed", feeCurrency: "USD", description: "usd fee" },
+      body: { amount: 10, fees: 10, feesType: "fixed", feeCurrency: "USD", description: "usd fee" },
     })
     // 10 USD = 10/1.08 EUR ≈ 9.2593; balance math uses the settled amount
     check(
       "feesfx.foreign fee converted",
-      wdf.status === 201 && Math.abs(Number(wdf.json.fees_settled) - 10 / 1.08) < 1e-6,
-      JSON.stringify({ settled: wdf.json?.fees_settled }).slice(0, 120),
+      wdf.status === 201 && Math.abs(Number(wdf.json.feesSettled) - 10 / 1.08) < 1e-6,
+      JSON.stringify({ settled: wdf.json?.feesSettled }).slice(0, 120),
     )
 
     // manual exchange rate is echoed verbatim
-    const manual = await request(`/wallets/${eurId}/deposits`, {
+    const manual = await request(`/portfolios/${eurId}/cash/deposits`, {
       method: "POST",
       token,
       body: { amount: 1, rateSource: "manual", exchangeRate: 4.5 },
@@ -691,13 +674,13 @@ async function main() {
     )
 
     // invalid manual rates → 422
-    const bad = await request(`/wallets/${eurId}/deposits`, {
+    const bad = await request(`/portfolios/${eurId}/cash/deposits`, {
       method: "POST",
       token,
       body: { amount: 1, rateSource: "manual", exchangeRate: -3 },
     })
     check("feesfx.negative manual rate → 422", bad.status === 422, `got ${bad.status}`)
-    const badFee = await request(`/wallets/${eurId}/withdrawals`, {
+    const badFee = await request(`/portfolios/${eurId}/cash/withdrawals`, {
       method: "POST",
       token,
       body: { amount: 1, fees: 1, feeRateSource: "manual", feeExchangeRate: 0 },
@@ -705,35 +688,29 @@ async function main() {
     check("feesfx.zero manual fee rate → 422", badFee.status === 422, `got ${badFee.status}`)
 
     // cross-currency transfer credits target at demo cross rate
-    const usdCreate = await request("/wallets", {
+    const usdCreate = await request("/portfolios", {
       method: "POST",
       token,
-      body: { name: "FX target USD", currency: "USD" },
+      body: { name: "FX target USD", baseCurrency: "USD" },
     })
     const usdId = usdCreate.json.id
-    const xfer = await request(`/wallets/${eurId}/transfers`, {
+    const xfer = await request(`/portfolios/${eurId}/cash/transfers`, {
       method: "POST",
       token,
-      body: { amount: 43, to_wallet_id: usdId, description: "cross" },
+      body: { amount: 43, toPortfolioId: usdId, description: "cross" },
     })
     // 43 EUR -> USD at 1.08 = 46.44
     check(
       "feesfx.cross transfer credited at rate",
-      xfer.status === 201 && Math.abs(Number(xfer.json.target_amount) - 46.44) < 1e-6,
-      JSON.stringify({ target: xfer.json?.target_amount, fxr: xfer.json?.transfer_fx_rate }).slice(0, 140),
+      xfer.status === 201 && Math.abs(Number(xfer.json.targetAmount) - 46.44) < 1e-6,
+      JSON.stringify({ target: xfer.json?.targetAmount }).slice(0, 140),
     )
-    const usdTxs = await request(`/wallets/${usdId}/transactions`, { token })
+    const usdTxs = await request(`/portfolios/${usdId}/cash/transactions`, { token })
     check(
       "feesfx.transfer dest leg recorded",
-      usdTxs.status === 200 && usdTxs.json.items.some((t) => t.amount === 46.44 || t.amount === 46.440000000000005),
-      `items ${(usdTxs.json?.items || []).length}`,
+      usdTxs.status === 200 && usdTxs.json.items.some((t) => t.type === "TRANSFER" && Math.abs(t.amount - 46.44) < 1e-6),
+      `items ${(usdTxs.json?.items || []).map((t) => t.type).join(",")}`,
     )
-
-    // cleanup: created wallets hold transactions, so delete is blocked (mirrors real module)
-    for (const id of [eurId, usdId]) {
-      const del = await request(`/wallets/${id}`, { method: "DELETE", token })
-      check("feesfx.created wallet delete → 409 (has transactions)", del.status === 409, `got ${del.status}`)
-    }
 
     // portfolio transaction with manual rate drives converted outputs
     const portfolios = await request("/portfolios", { token })
@@ -769,8 +746,8 @@ async function main() {
   {
     const allPortfolios = await request("/portfolios", { token })
     const divPid = allPortfolios.json[0].id
-    const allWalletsList = await request("/wallets", { token })
-    const divWalletId = allWalletsList.json[0].id
+    const divCcy = "USD"
+    const cashBefore = Number((await request(`/portfolios/${divPid}/cash`, { token })).json.balances.find((b) => b.currency === divCcy).balance)
 
     const divTx = await request(`/portfolios/${divPid}/transactions`, {
       method: "POST",
@@ -782,7 +759,6 @@ async function main() {
         price: 100,
         taxes: 20,
         notes: "Q2 payout",
-        walletId: divWalletId,
         executedAt: "2026-09-01T00:00:00.000Z",
       },
     })
@@ -797,6 +773,8 @@ async function main() {
       JSON.stringify(divTx.json || {}).slice(0, 220),
     )
     const divId = divTx.json.id
+    const cashAfterCreate = Number((await request(`/portfolios/${divPid}/cash`, { token })).json.balances.find((b) => b.currency === divCcy).balance)
+    check("dividends.cash credited net (derived on the portfolio)", cashAfterCreate - cashBefore === 80, `before ${cashBefore} after ${cashAfterCreate}`)
 
     const divFilter = await request(`/portfolios/${divPid}/transactions?type=dividend`, { token })
     check(
@@ -820,14 +798,6 @@ async function main() {
       JSON.stringify(divRows.json || {}).slice(0, 220),
     )
 
-    const divCashList = await request(`/wallets/${divWalletId}/transactions`, { token })
-    const divCash = divCashList.json.items.find((t) => t.id === `pf-${divId}`)
-    check(
-      "dividends.wallet credited net with PORTFOLIO reference",
-      divCash && divCash.amount === 80 && divCash.reference === `PORTFOLIO_DIVIDEND_MSFT_${divId.slice(0, 8)}`,
-      JSON.stringify(divCash || {}).slice(0, 180),
-    )
-
     const divPatched = await request(`/portfolios/${divPid}/transactions/${divId}`, {
       method: "PATCH",
       token,
@@ -838,9 +808,8 @@ async function main() {
       divPatched.status === 200 && divPatched.json.totalAmount === 70 && divPatched.json.taxes === 30,
       JSON.stringify(divPatched.json || {}).slice(0, 220),
     )
-    const divCashList2 = await request(`/wallets/${divWalletId}/transactions`, { token })
-    const divCash2 = divCashList2.json.items.find((t) => t.id === `pf-${divId}`)
-    check("dividends.patch wallet entry adjusted (net delta −10)", divCash2 && divCash2.amount === 70, JSON.stringify(divCash2 || {}).slice(0, 180))
+    const cashAfterPatch = Number((await request(`/portfolios/${divPid}/cash`, { token })).json.balances.find((b) => b.currency === divCcy).balance)
+    check("dividends.patch cash adjusted (net delta −10)", cashAfterPatch - cashBefore === 70, `before ${cashBefore} after ${cashAfterPatch}`)
 
     const divBad = await request(`/portfolios/${divPid}/transactions`, {
       method: "POST",
@@ -852,61 +821,38 @@ async function main() {
     await request(`/portfolios/${divPid}/transactions/${divId}`, { method: "DELETE", token })
     const divRowsAfter = await request(`/portfolios/${divPid}/dividends`, { token })
     check("dividends.delete → rows removed", divRowsAfter.status === 200 && divRowsAfter.json.count === 0, `count ${divRowsAfter.json.count}`)
+    const divCashAfterDelete = Number((await request(`/portfolios/${divPid}/cash`, { token })).json.balances.find((b) => b.currency === divCcy).balance)
+    check("dividends.delete → cash reverted to before", divCashAfterDelete === cashBefore, `before ${cashBefore} after ${divCashAfterDelete}`)
   }
 
-  // ── Import (§23) ────────────────────────────────────────────
+  // ── Import (§62.5) ─────────────────────────────────────────
   const importSource = "mock:tests"
-  const wb = await request("/import/wallets/bootstrap", {
-    method: "POST",
-    token,
-    body: { externalSource: importSource, wallets: [{ name: "MockImport", currency: "usd" }] },
-  })
-  check(
-    "import.wallets.bootstrap creates tagged wallet",
-    wb.status === 200 && wb.json.wallets?.[0]?.created === true && wb.json.wallets[0].currency === "USD",
-    JSON.stringify(wb.json || {}).slice(0, 160),
-  )
-  const wb2 = await request("/import/wallets/bootstrap", {
-    method: "POST",
-    token,
-    body: { externalSource: importSource, wallets: [{ name: "MockImport", currency: "usd" }] },
-  })
-  check(
-    "import.wallets.bootstrap is idempotent",
-    wb2.status === 200 &&
-      wb2.json.wallets?.[0]?.created === false &&
-      wb2.json.wallets[0].id === wb.json.wallets[0].id,
-    JSON.stringify(wb2.json || {}).slice(0, 160),
-  )
-
   const pb = await request("/import/portfolios/bootstrap", {
     method: "POST",
     token,
-    body: { externalSource: importSource, name: "MockImportP", currency: "USD" },
+    body: { externalSource: importSource, name: "MockImportP", baseCurrency: "USD" },
   })
   check("import.portfolios.bootstrap creates", pb.status === 200 && pb.json.created === true && pb.json.id, JSON.stringify(pb.json || {}).slice(0, 160))
+  const pb2 = await request("/import/portfolios/bootstrap", { method: "POST", token, body: { externalSource: importSource, name: "MockImportP", baseCurrency: "usd" } })
+  check("import.portfolios.bootstrap is idempotent", pb2.status === 200 && pb2.json.created === false && pb2.json.id === pb.json.id, JSON.stringify(pb2.json || {}).slice(0, 160))
 
   const importTxBody = {
     source: { externalSource: importSource, spreadsheetId: "spr-mock", sheet: "tx" },
     transactions: [
-      {
-        externalId: "mock-1",
-        walletName: "MockImport",
-        executedAt: new Date().toISOString(),
-        walletTx: { type: "DEPOSIT", amount: 100, currency: "USD" },
-      },
+      { externalId: "mock-1", portfolioName: "MockImportP", executedAt: new Date().toISOString(), cashTx: { type: "DEPOSIT", amount: 100, currency: "USD" } },
+      { externalId: "mock-2", portfolioName: "MockImportP", executedAt: new Date().toISOString(), portfolioTx: { type: "BUY", symbol: "AAPL", quantity: 1, price: 10, fees: 0 } },
     ],
   }
   const itx = await request("/import/transactions", { method: "POST", token, body: importTxBody })
   check(
-    "import.transactions inserts + syncRun",
-    itx.status === 200 && itx.json.inserted === 1 && itx.json.skipped === 0 && itx.json.syncRun?.status === "done",
+    "import.transactions inserts ptx + cash legs + syncRun",
+    itx.status === 200 && itx.json.inserted === 2 && itx.json.skipped === 0 && itx.json.syncRun?.insertedPtx === 1 && itx.json.syncRun?.insertedCashTx === 1 && itx.json.syncRun?.status === "done",
     JSON.stringify(itx.json || {}).slice(0, 160),
   )
   const itx2 = await request("/import/transactions", { method: "POST", token, body: importTxBody })
   check(
     "import.transactions is idempotent by externalId",
-    itx2.status === 200 && itx2.json.inserted === 0 && itx2.json.skipped === 1,
+    itx2.status === 200 && itx2.json.inserted === 0 && itx2.json.skipped === 2,
     JSON.stringify(itx2.json || {}).slice(0, 160),
   )
 
@@ -926,20 +872,15 @@ async function main() {
   check(
     "import.source wipe removes tagged data",
     wipe.status === 200 &&
-      wipe.json.deleted?.wallets === 1 &&
-      wipe.json.deleted.portfolios === 1 &&
-      wipe.json.deleted.walletTransactions === 1 &&
+      wipe.json.deleted?.portfolios === 1 &&
+      wipe.json.deleted.cashTransactions === 2 &&
       wipe.json.deleted.syncRuns === 0,
     JSON.stringify(wipe.json || {}).slice(0, 160),
   )
   const runsAfter = await request("/import/sync-runs", { token })
   check("import.sync-runs empty after run delete", runsAfter.json.total === 0, JSON.stringify(runsAfter.json || {}).slice(0, 120))
-  const wb3 = await request("/import/wallets/bootstrap", {
-    method: "POST",
-    token,
-    body: { externalSource: importSource, wallets: [{ name: "MockImport", currency: "usd" }] },
-  })
-  check("import.wallets.bootstrap re-creates after wipe", wb3.json.wallets?.[0]?.created === true, JSON.stringify(wb3.json || {}).slice(0, 120))
+  const pb3 = await request("/import/portfolios/bootstrap", { method: "POST", token, body: { externalSource: importSource, name: "MockImportP", baseCurrency: "USD" } })
+  check("import.portfolios.bootstrap re-creates after wipe", pb3.json.created === true, JSON.stringify(pb3.json || {}).slice(0, 120))
 
   const split = await fetch(`http://localhost:${PORT}/internal/apply-split`, {
     method: "POST",

@@ -8,19 +8,6 @@ async function login(page: import("@playwright/test").Page) {
   await expect(page).toHaveURL(/\/en\/investments/)
 }
 
-// the mock backend keeps state across runs and buy-specs share the USD wallet,
-// so top it up before spending from it (prevents "Insufficient wallet funds")
-async function refillUsdWallet(page: import("@playwright/test").Page) {
-  await page.goto("/en/wallets")
-  const card = page.locator(".card").filter({ hasText: "Portfel USD 1" })
-  await card.getByRole("button", { name: "Deposit", exact: true }).click()
-  const cash = page.getByRole("dialog", { name: "Cash movement" })
-  await cash.locator("#wc-amount").fill("10000")
-  await cash.getByRole("button", { name: "Deposit", exact: true }).click()
-  await expect(cash).not.toBeVisible()
-  await page.goto("/en/investments")
-}
-
 test("investments dashboard shows totals and the portfolio", async ({ page }) => {
   await login(page)
 
@@ -103,19 +90,17 @@ test("transactions page lists transactions with sortable columns and pagination"
   await expect(page.getByText(/^\d+[-–]\d+ of \d+$/)).toBeVisible()
 })
 
-test("wallet transactions sub-tab lists cash transactions", async ({ page }) => {
+test("cash transactions sub-tab lists cross-portfolio cash rows", async ({ page }) => {
   await login(page)
   await page.goto("/en/investments/transactions/cash")
 
   await expect(page.getByRole("heading", { name: "Transactions", exact: true })).toBeVisible()
-  await expect(page.getByRole("link", { name: "Wallet Transactions" })).toHaveClass(/border-blue-600/)
+  await expect(page.getByRole("link", { name: "Cash Transactions" })).toHaveClass(/border-blue-600/)
   await expect(page.locator("tbody tr").first()).toBeVisible()
-  await expect(page.getByTestId("table-th-walletName")).toBeVisible()
+  await expect(page.getByTestId("table-th-portfolioName")).toBeVisible()
   await expect(page.getByTestId("table-th-amount")).toBeVisible()
   await expect(page.getByTestId("table-th-date")).toContainText("↓")
   await expect(page.getByRole("columnheader", { name: "Description" })).toBeVisible()
-  await expect(page.locator("thead th").nth(3)).toHaveText("Description")
-  await expect(page.locator("thead th").nth(4)).toContainText("Amount")
   await expect(page.getByRole("button", { name: "Edit transaction" }).first()).toBeVisible()
 })
 
@@ -131,7 +116,6 @@ test("editing an investing transaction opens example-service-style modal and sav
   await expect(dialog).toBeVisible()
   await expect(dialog.getByRole("heading", { name: /Edit .* Transaction/ })).toBeVisible()
   await expect(dialog.getByText("Purchase Date")).toBeVisible()
-  await expect(dialog.getByText("Cash portfolio")).toBeVisible()
   await expect(dialog.getByText("Transaction Fees")).toBeVisible()
   await expect(dialog.getByText("Total Cost")).toBeVisible()
   await expect(dialog.getByText("Historical Price", { exact: false })).toBeVisible()
@@ -162,7 +146,6 @@ test("creating a new portfolio adds it to the list", async ({ page }) => {
 
 test("position actions menu: buy updates quantity, research navigates, remove is blocked for a position with transactions", async ({ page }) => {
   await login(page)
-  await refillUsdWallet(page)
   await page.getByRole("link", { name: /Top10/ }).click()
   await expect(page).toHaveURL(/\/en\/portfolios\/.*\/holdings/)
 
@@ -174,7 +157,6 @@ test("position actions menu: buy updates quantity, research navigates, remove is
 
   await page.getByRole("button", { name: "Buy", exact: true }).click()
   await expect(page.getByRole("dialog", { name: /Buy META/ })).toBeVisible()
-  await page.getByTestId("add-position-wallet").selectOption("1a1f2d68-686c-4f8b-ba34-a67846163275")
   await page.getByTestId("add-position-quantity").fill("5")
   await page.getByTestId("add-position-price").fill("600")
   await page.getByRole("button", { name: /Buy for \S+/ }).click()
@@ -225,7 +207,6 @@ test("edit position opens a transaction list editor with rows and add row", asyn
 
 test("add position from the header opens a chooser with instrument/option/cfd and adds a stock row", async ({ page }) => {
   await login(page)
-  await refillUsdWallet(page)
   await page.getByRole("link", { name: /Top10/ }).click()
   await expect(page).toHaveURL(/\/en\/portfolios\/.*\/holdings/)
 
@@ -245,7 +226,6 @@ test("add position from the header opens a chooser with instrument/option/cfd an
   await page.getByRole("dialog", { name: "Search for Instruments" }).getByRole("button", { name: /AMD/ }).first().click()
 
   await expect(page.getByRole("dialog", { name: "Buy Position" })).toBeVisible()
-  await page.getByRole("dialog", { name: "Buy Position" }).getByTestId("add-position-wallet").selectOption("1a1f2d68-686c-4f8b-ba34-a67846163275")
   await page.getByTestId("add-position-quantity").fill("10")
   await page.getByTestId("add-position-price").fill("120")
   await page.getByRole("dialog", { name: "Buy Position" }).getByRole("button", { name: /Buy for/ }).click()
@@ -259,7 +239,6 @@ test("add position from the header opens a chooser with instrument/option/cfd an
 
 test("buy position stock step has purchase date, cash portfolio, fee % toggle and total", async ({ page }) => {
   await login(page)
-  await refillUsdWallet(page)
   await page.getByRole("link", { name: /Top10/ }).click()
   await expect(page).toHaveURL(/\/en\/portfolios\/.*\/holdings/)
 
@@ -280,12 +259,6 @@ test("buy position stock step has purchase date, cash portfolio, fee % toggle an
   const date = dialog.getByTestId("add-position-date")
   await expect(date).toBeVisible()
   await expect(date).toHaveValue(new Date().toISOString().slice(0, 10))
-
-  const wallet = dialog.getByTestId("add-position-wallet")
-  await expect(wallet).toBeVisible()
-  const usdOption = wallet.locator("option", { hasText: "Portfel USD 1" })
-  await expect(usdOption).toContainText("$")
-  await wallet.selectOption("1a1f2d68-686c-4f8b-ba34-a67846163275")
 
   await dialog.getByTestId("add-position-quantity").fill("10")
   await dialog.getByTestId("add-position-price").fill("120")

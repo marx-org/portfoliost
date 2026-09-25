@@ -141,6 +141,10 @@ watch(
       feeSuggestion.value = null
       transferSuggestion.value = null
       if (!currenciesStore.loaded) void currenciesStore.load()
+      // The transfer target list is store.portfolios; refresh it so a freshly
+      // created portfolio is available even when opened straight to the cash tab
+      // (DetailView doesn't fetchAll on mount).
+      void store.fetchAll().catch(() => {})
       busy.value = false
       error.value = null
     }

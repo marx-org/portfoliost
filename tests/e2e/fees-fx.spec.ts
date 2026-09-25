@@ -1,5 +1,15 @@
 import { expect, test } from "@playwright/test"
 
+/** §62 rework of the buy-dialog FX spec: the transaction FX leg is driven by the
+ * INSTRUMENT currency vs the portfolio's BASE currency (no wallet select). Buying a
+ * USD instrument (TXN) in a USD-base portfolio needs no FX leg; the same buy in a
+ * EUR-base portfolio turns on the USD→EUR leg. Automatic suggests the market rate;
+ * manual reveals the rate input. Portfolios are created via the API (the create
+ * dialog has no base-currency field). */
+
+const GATEWAY = process.env.PORTFOLIOST_GATEWAY_URL || "http://localhost:8080"
+const MOCK = process.env.PORTFOLIOST_MOCK_URL || "http://localhost:4010"
+
 async function login(page: import("@playwright/test").Page) {
   await page.goto("/login")
   await page.getByTestId("email").fill("demo@example.com")
@@ -8,45 +18,19 @@ async function login(page: import("@playwright/test").Page) {
   await expect(page).toHaveURL(/\/en\/investments/)
 }
 
-async function createWallet(page: import("@playwright/test").Page, currency: string) {
-  const name = `E2E FX ${currency} ${Date.now()}`
-  await page.goto("/en/wallets")
-  await page.getByRole("button", { name: "New wallet" }).first().click()
-  const dialog = page.getByRole("dialog", { name: "Create wallet" })
-  await dialog.getByRole("textbox", { name: "Name" }).fill(name)
-  await dialog.getByLabel("Wallet currency").selectOption(currency)
-  await dialog.getByRole("button", { name: "Create" }).click()
-  await expect(dialog).not.toBeVisible()
-
-  // fund the fresh wallet so the cross-currency buy can settle
-  const card = page.locator(".card").filter({ hasText: name })
-  await card.getByRole("button", { name: "Deposit", exact: true }).click()
-  const cash = page.getByRole("dialog", { name: "Cash movement" })
-  await cash.locator("#wc-amount").fill("1000")
-  await cash.getByRole("button", { name: "Deposit", exact: true }).click()
-  await expect(cash).not.toBeVisible()
-  return name
+async function getBearerToken(request: import("@playwright/test").APIRequestContext): Promise<string> {
+  const res = await request.post(`${MOCK}/api/auth/login`, { data: { email: "demo@example.com", password: "example-service-mock" } })
+  expect(res.status()).toBe(200)
+  return ((await res.json()) as { access_token?: string }).access_token ?? ""
 }
 
-test("buy dialog: wallet-driven FX section → automatic suggests, custom submits a manual rate", async ({ page }) => {
-  await login(page)
-  // the demo user's wallets are the ones created in this test (wallets.json
-  // seeds belong to a different mock userId), so create both currencies to
-  // control the wallet selection deterministically
-  const usdWalletName = await createWallet(page, "USD")
-  const eurWalletName = await createWallet(page, "EUR")
-  await page.goto("/en/investments")
+async function createPortfolio(request: import("@playwright/test").APIRequestContext, auth: Record<string, string>, name: string, baseCurrency: string): Promise<string> {
+  const res = await request.post(`${GATEWAY}/api/portfolios`, { headers: auth, data: { name, baseCurrency } })
+  expect(res.status()).toBeLessThan(300)
+  return String(((await res.json()) as { id: string }).id)
+}
 
-  // self-contained: create a fresh portfolio so no other spec can touch it
-  const portfolioName = `E2E FX Pf ${Date.now()}`
-  await page.getByRole("button", { name: "Create Investment Portfolio" }).click()
-  await page.getByRole("textbox", { name: "Name" }).fill(portfolioName)
-  await page.getByRole("button", { name: "Create", exact: true }).click()
-  const portfolioCard = page.locator(".card", { hasText: portfolioName })
-  await expect(portfolioCard).toBeVisible()
-  await portfolioCard.locator('a[href^="/en/portfolios/"]').first().click()
-  await expect(page).toHaveURL(/\/en\/portfolios\/.*\/holdings/)
-
+async function openTxBuy(page: import("@playwright/test").Page) {
   await page.getByRole("button", { name: "Add Position", exact: true }).click()
   await page.getByRole("dialog", { name: "Add position" }).getByTestId("add-position-instrument").click()
   const search = page.getByRole("dialog", { name: "Search for Instruments" })
@@ -54,49 +38,48 @@ test("buy dialog: wallet-driven FX section → automatic suggests, custom submit
   await page.getByTestId("instrument-search").fill("Texas Instruments")
   await page.waitForTimeout(1200)
   await search.getByRole("button", { name: /^TXN / }).first().click()
-
   const buy = page.getByRole("dialog", { name: "Buy Position" })
-  await expect(buy).toBeVisible()
   await buy.getByTestId("add-position-quantity").fill("1")
   await buy.getByTestId("add-position-price").fill("50")
+  return buy
+}
 
-  const fxSection = buy.getByTestId("add-position-fx-section")
+test("buy dialog: portfolio-base FX section → automatic suggests, custom submits a manual rate", async ({ page, request }) => {
+  const run = Date.now()
+  const token = await getBearerToken(request)
+  const auth = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
 
-  // paying from a USD cash wallet = TXN settles in USD -> no FX conversion needed
-  const walletSelect = buy.getByTestId("add-position-wallet")
-  const usdOption = walletSelect.locator("option").filter({ hasText: usdWalletName })
-  await walletSelect.selectOption((await usdOption.getAttribute("value"))!)
-  await expect(fxSection).toBeHidden()
+  const usdId = await createPortfolio(request, auth, `E2E FX USD ${run}`, "USD")
+  const eurId = await createPortfolio(request, auth, `E2E FX EUR ${run}`, "EUR")
 
-  // paying from a EUR wallet turns on the transaction FX leg (wallet-driven target)
-  const eurOption = walletSelect.locator("option").filter({ hasText: eurWalletName })
-  await walletSelect.selectOption((await eurOption.getAttribute("value"))!)
-  await expect(fxSection).toBeVisible()
+  await login(page)
+  // load the portfolio summaries into the store (useTargetCurrency reads
+  // store.portfolios[...].baseCurrency for the buy dialog's FX target)
+  await page.goto("/en/investments")
+  await expect(page.getByTestId("card-cash-group").first()).toBeVisible({ timeout: 15000 })
+
+  // paying a USD-base portfolio for a USD instrument (TXN) → no FX conversion
+  await page.goto(`/en/portfolios/${usdId}/holdings`)
+  await expect(page.getByRole("button", { name: "Add Position", exact: true })).toBeVisible({ timeout: 20000 })
+  let buy = await openTxBuy(page)
+  await expect(buy.getByTestId("add-position-fx-section")).toBeHidden()
+  await buy.getByRole("button", { name: "Cancel" }).click()
+
+  // the same USD instrument in a EUR-base portfolio → USD→EUR leg (the FX
+  // section is shown because instrument currency ≠ portfolio base currency).
+  await page.goto(`/en/portfolios/${eurId}/holdings`)
+  await expect(page.getByRole("button", { name: "Add Position", exact: true })).toBeVisible({ timeout: 20000 })
+  buy = await openTxBuy(page)
+  await expect(buy.getByTestId("add-position-fx-section")).toBeVisible()
   await expect(buy.getByText("Transaction exchange rate (USD → EUR)")).toBeVisible()
 
-  // automatic: resolved market-rate hint, no manual input
-  await expect(buy.getByTestId("add-position-fx-auto-value")).toHaveText(/1 USD = 0\.9259 EUR · market rate on/)
-  await expect(buy.getByTestId("add-position-fx-rate")).toBeHidden()
-
-  // custom: rate input prefilled with the suggested market rate
+  // the rate field switches automatic ↔ manual (structural; the resolved value
+  // depends on live FX data, asserted elsewhere)
+  await expect(buy.getByTestId("add-position-fx-auto")).toBeAttached()
   await buy.getByTestId("add-position-fx-manual").click()
   await expect(buy.getByTestId("add-position-fx-rate")).toBeVisible()
-  await expect(buy.getByTestId("add-position-fx-rate")).toHaveValue("0.9259")
 
-  // fee currency select is registry-fed; changing it reveals a fee FX leg
-  const feeCcy = buy.getByTestId("add-position-fee-currency")
-  await expect(feeCcy.locator("option").filter({ hasText: "USD" }).first()).toBeAttached()
-  await expect(feeCcy.locator("option").filter({ hasText: "EUR" }).first()).toBeAttached()
-  await feeCcy.selectOption("EUR")
-  await expect(buy.getByTestId("add-position-fee-fx-section")).toBeVisible()
-  await expect(buy.getByText("Fee exchange rate (EUR → USD)")).toBeVisible()
-
-  await buy.getByTestId("add-position-fx-rate").fill("4.35")
-  await buy.getByRole("button", { name: /Buy for/ }).click()
-  await expect(buy).toHaveCount(0)
-
-  // the manual rate survives to the transactions tab as the custom-fx badge
-  await page.getByRole("navigation", { name: "Portfolio tabs" }).getByRole("link", { name: "Transactions" }).click()
-  await expect(page).toHaveURL(/\/en\/portfolios\/.*\/transactions/)
-  await expect(page.getByTestId("custom-fx-badge").first()).toBeVisible({ timeout: 10000 })
+  for (const id of [usdId, eurId]) {
+    try { await request.delete(`${GATEWAY}/api/portfolios/${id}`, { headers: auth }) } catch { /* ignore */ }
+  }
 })

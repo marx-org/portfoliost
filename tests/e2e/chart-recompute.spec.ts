@@ -33,18 +33,16 @@ test("portfolio recompute: pending line appears, then the chart repopulates (§2
   await expect(chart).toBeVisible()
 })
 
-test("wallet recompute: balance history re-fetches without error (§27.5)", async ({ page }) => {
+test("cash-tab recompute: balance history re-fetches without error (§27.5)", async ({ page }) => {
   await login(page)
-  await page.goto("/en/wallets")
+  // Seeded Top10 portfolio cash tab (multi-currency; Top10 is never mutated).
+  await page.goto("/en/portfolios/3cb589d8-f92d-428f-aeab-9ee5d4b9cef2/cash")
 
-  const historyBtn = page.getByRole("button", { name: "History", exact: true }).first()
-  await historyBtn.click()
-
-  const recomputeBtn = page.getByTestId("wallet-chart-recompute")
-  await expect(recomputeBtn).toBeVisible()
+  const recomputeBtn = page.getByTestId("cash-chart-recompute")
+  await expect(recomputeBtn).toBeVisible({ timeout: 30_000 })
   await recomputeBtn.click()
 
-  // No error surfaced and the chart (or empty state) is still rendered.
+  // No error surfaced and the chart recompute button is still usable.
   await expect(page.getByText("Failed to load balance history")).toHaveCount(0)
   await expect(recomputeBtn).toBeEnabled()
 })

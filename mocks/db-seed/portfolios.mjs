@@ -4,7 +4,7 @@
  * Idempotent: skips if any portfolio already exists.
  */
 import {
-  SEED_USER_ID, SEED_WALLET_ID, SEED_PORTFOLIO_ID, SEED_SHARE_ID,
+  SEED_USER_ID, SEED_PORTFOLIO_ID, SEED_SHARE_ID,
   SEED_POSITIONS, SEED_TRANSACTIONS, SEED_SHARE_PRIVACY,
 } from "./constants.mjs"
 
@@ -51,16 +51,16 @@ export async function seedPortfolios(sql) {
   const posOpenedAt = "2026-08-02T00:00:00.000Z"
 
   await sql.begin(async tx => {
-    // Portfolio
+    // Portfolio (wallet entity dropped in §62.2 — no wallet_id / currency column)
     await tx`
       INSERT INTO portfolios.portfolios
-        (id, user_id, name, description, strategy, type, currency, base_currency,
-         wallet_id, total_invested, current_value, is_public, is_margin_enabled,
+        (id, user_id, name, description, strategy, type, base_currency,
+         total_invested, current_value, is_public, is_margin_enabled,
          margin_rate, maintenance_margin_rate, created_at, updated_at)
       VALUES
         (${SEED_PORTFOLIO_ID}, ${SEED_USER_ID}, ${"Top10"},
          ${"Top10 big US stocks with best ghrowth potential, rebalanced monthly"},
-         ${"GROWTH"}, ${"regular"}, ${"USD"}, ${"USD"}, ${SEED_WALLET_ID},
+         ${"GROWTH"}, ${"regular"}, ${"USD"},
          ${totalInvested.toFixed(8)}, ${totalInvested.toFixed(8)},
          false, false, ${"0.5000"}, ${"0.2500"}, ${createdAt}, ${updatedAt})
     `
@@ -91,24 +91,37 @@ export async function seedPortfolios(sql) {
       `
     }
 
-    // Transactions (all BUYs)
+    // Transactions (all BUYs) — no wallet_id column (§62.2)
     for (const t of SEED_TRANSACTIONS) {
       await tx`
         INSERT INTO portfolios.transactions
-          (id, user_id, portfolio_id, position_id, wallet_id, type,
+          (id, user_id, portfolio_id, position_id, type,
            instrument_symbol, instrument_name, sector, country,
            quantity, price, currency, instrument_currency, asset_type,
            fees, total_amount, exchange_rate, rate_source, fee_rate_source,
            is_gift, synthesized_opening_lot, executed_at, created_at, updated_at)
         VALUES
           (${t.id}, ${SEED_USER_ID}, ${SEED_PORTFOLIO_ID}, ${t.positionId},
-           ${SEED_WALLET_ID}, ${"BUY"}, ${t.instrumentSymbol}, ${t.instrumentName},
+           ${"BUY"}, ${t.instrumentSymbol}, ${t.instrumentName},
            ${t.sector}, ${t.country},
            ${t.quantity.toFixed(8)}, ${t.price.toFixed(8)}, ${t.instrumentCurrency ?? "USD"}, ${t.instrumentCurrency ?? "USD"}, ${"STOCK"},
            ${"0"}, ${t.totalAmount.toFixed(8)}, ${"1"}, ${"automatic"}, ${"automatic"},
            false, false, ${txExecutedAt}, ${createdAt}, ${updatedAt})
       `
     }
+
+    // Opening cash deposit: the seeded BUYs spend the portfolio's cash, so seed
+    // a funding DEPOSIT covering the buy total (minus a positive remainder). The
+    // cash ledger is derived by replay — a DEPOSIT row makes Top10 cash positive
+    // (otherwise it is -totalInvested, which is meaningless for a funded book).
+    await tx`
+      INSERT INTO portfolios.portfolio_cash_transactions
+        (user_id, portfolio_id, type, amount, currency, status, description, transaction_date, rate_source)
+      VALUES
+        (${SEED_USER_ID}, ${SEED_PORTFOLIO_ID}, ${"DEPOSIT"},
+         ${(totalInvested + 5000).toFixed(8)}, ${"USD"}, ${"completed"},
+         ${"Opening funding"}, ${"2026-08-01"}, ${"automatic"})
+    `
 
     // Value snapshots — the wallets analytics routes need ≥2 rows per portfolio
     // to resolve "complete" instead of firing a backfill (§46.4).

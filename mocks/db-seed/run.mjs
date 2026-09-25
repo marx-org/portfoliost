@@ -1,10 +1,11 @@
 /**
  * mock-db-seed entry point (D76).
  * Runs after all module containers report healthy (schema guaranteed).
- * Order: FX + wallet → portfolio (FK on wallet) → user prefs → ticker reference.
+ * Order: demo FX → portfolios → user prefs → ticker reference. (The wallet seed
+ * was dropped in §62; demo FX is seeded independently.)
  */
 import postgres from "postgres"
-import { seedWallets } from "./wallets.mjs"
+import { seedFx } from "./fx.mjs"
 import { seedPortfolios } from "./portfolios.mjs"
 import { seedUserPreferences } from "./user-preferences.mjs"
 import { seedTickerReference } from "./ticker-reference.mjs"
@@ -21,7 +22,7 @@ const sql = postgres(DATABASE_URL, { max: 3 })
 try {
   console.log("[db-seed] starting")
 
-  await seedWallets(sql)
+  await seedFx(sql)
 
   if (SEED_PORTFOLIOS) {
     await seedPortfolios(sql)

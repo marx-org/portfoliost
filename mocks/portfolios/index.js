@@ -2,7 +2,7 @@ import { requireAuth } from "../lib/auth.js"
 import { resolveFeeFx } from "../lib/demo-fx.js"
 import { loadJson, loadRaw, loadResearch, normalize } from "../lib/data.js"
 import { paginatePage, uuid, nowIso } from "../lib/http.js"
-import { createPortfolioWalletEntry, adjustPortfolioWalletEntry } from "../wallets/index.js"
+import { applyTradeCash, tradeSigned, ensurePortfolio } from "./cash.js"
 import { benchmarkSeries, benchmarkSymbols } from "./benchmarks.js"
 
 const created = new Map()
@@ -341,12 +341,11 @@ export function register(app) {
 
   app.post("/api/portfolios", (ctx) => {
     if (!requireAuth(ctx)) return
-    const { name, description, strategy = "GROWTH", currency = "USD", baseCurrency = "USD", isPublic = false, walletId } = ctx.body || {}
+    const { name, description, strategy = "GROWTH", currency = "USD", baseCurrency = "USD", isPublic = false, isMarginEnabled = false } = ctx.body || {}
     if (!name) {
       return ctx.res.status(422).json({ error: "ValidationError", message: "name is required", statusCode: 422 })
     }
     const id = uuid()
-    const wallet = loadRaw("wallets.json").find((w) => w.id === walletId) || loadRaw("wallets.json")[0]
     const now = nowIso()
     const portfolio = {
       id,
@@ -357,11 +356,10 @@ export function register(app) {
       type: "regular",
       currency,
       baseCurrency,
-      walletId: wallet ? wallet.id : null,
       totalInvested: 0,
       currentValue: 0,
       isPublic,
-      isMarginEnabled: false,
+      isMarginEnabled,
       marginRate: null,
       maintenanceMarginRate: null,
       createdAt: now,
@@ -369,6 +367,7 @@ export function register(app) {
     }
     created.set(id, portfolio)
     newPortfolioIds.add(id)
+    ensurePortfolio(id, { baseCurrency, isMarginEnabled })
     ctx.res.status(201).json(portfolio)
   })
 
@@ -614,18 +613,8 @@ export function register(app) {
       convertedRealizedGainLoss: null,
     }
     allTxs.set(tx.id, tx)
-    createPortfolioWalletEntry({
-      walletId: tx.walletId,
-      type: tx.type,
-      symbol: tx.instrumentSymbol,
-      totalAmount: tx.totalAmount,
-      fees: tx.fees,
-      currency,
-      executedAt: tx.executedAt,
-      portfolioId: tx.portfolioId,
-      txId: tx.id,
-      taxes: tx.taxes,
-    })
+    ensurePortfolio(tx.portfolioId)
+    applyTradeCash(tx.portfolioId, currency, tradeSigned(tx.type, tx.totalAmount, tx.fees))
     ctx.res.status(201).json(tx)
   })
 
@@ -676,23 +665,7 @@ export function register(app) {
       updatedAt: nowIso(),
     }
     allTxs.set(ctx.params.txId, updated)
-    // §49.7 — mirror the real wallets PATCH: apply the wallet delta for the
-    // changed signed value (BUY −(total+fees), SELL total−fees, DIVIDEND net).
-    if (existing.walletId) {
-      const oldType = String(existing.type || "BUY").toUpperCase()
-      const oldGross = round2((existing.quantity ?? 1) * (existing.price ?? 0))
-      const oldTaxes = existing.taxes != null ? Number(existing.taxes) : null
-      const oldNet = oldType === "DIVIDEND" ? round2(oldGross - (oldTaxes ?? 0)) : oldGross
-      const oldFees = Number(existing.fees) || 0
-      const oldSigned = oldType === "BUY" ? -(oldNet + oldFees) : oldType === "SELL" ? oldNet - oldFees : oldNet
-      const newSigned = txType === "BUY" ? -(net + Number(fees)) : txType === "SELL" ? net - Number(fees) : net
-      adjustPortfolioWalletEntry({
-        walletId: existing.walletId,
-        txId: existing.id,
-        delta: newSigned - oldSigned,
-        currency,
-      })
-    }
+    applyTradeCash(existing.portfolioId, currency, tradeSigned(txType, net, fees) - tradeSigned(existing.type, existing.totalAmount, existing.fees))
     ctx.res.json(updated)
   })
 
@@ -703,6 +676,7 @@ export function register(app) {
     if (!existing || existing.portfolioId !== ctx.params.id) {
       return ctx.res.status(404).json({ error: "NotFound", message: "Transaction not found" })
     }
+    applyTradeCash(existing.portfolioId, existing.currency, -tradeSigned(existing.type, existing.totalAmount, existing.fees))
     allTxs.delete(ctx.params.txId)
     ctx.res.status(204).end()
   })

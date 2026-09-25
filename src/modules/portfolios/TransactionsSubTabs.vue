@@ -12,7 +12,7 @@ const tabs = [
     match: (path: string) => path === "/en/investments/transactions",
   },
   {
-    label: "Wallet Transactions",
+    label: "Cash Transactions",
     to: "/en/investments/transactions/cash",
     match: (path: string) => path.startsWith("/en/investments/transactions/cash"),
   },

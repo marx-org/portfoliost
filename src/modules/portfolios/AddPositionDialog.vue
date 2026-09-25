@@ -166,7 +166,16 @@ function onPriceInput() {
 }
 
 const targetCurrency = useTargetCurrency(
-  computed(() => store.portfolios.find((p) => p.id === props.portfolioId)?.baseCurrency ?? null),
+  computed(() => {
+    // The detail view loads store.detail (not the full list) when deep-linked to
+    // a tab, so prefer the loaded detail's base currency, then the summary list.
+    const id = props.portfolioId
+    return (
+      (id && store.detail?.id === id ? store.detail.baseCurrency : null) ??
+      store.portfolios.find((p) => p.id === id)?.baseCurrency ??
+      null
+    )
+  }),
 )
 
 function chooseStock() {

@@ -163,21 +163,28 @@ export function createApp() {
         }
 
         const handlers = routes.get(method) || []
+        // Prefer the most specific match (fewest :params) so a literal segment
+        // (e.g. /api/portfolios/cash/transactions) wins over a :id param route.
+        let chosen = null
         for (const r of handlers) {
           const params = matchRoute(r.tokens, tokens)
           if (!params) continue
-          ctx.params = params
-          ctx.route = r.pattern
-          try {
-            await r.handler(ctx)
-          } catch (e) {
-            console.error(`[mock] ${method} ${path} ->`, e)
-            if (!res.writableEnded) send(500, { error: "Internal Server Error", message: String((e && e.message) || e) })
-          }
+          const score = r.tokens.filter((t) => String(t).startsWith(":")).length
+          if (!chosen || score < chosen.score) chosen = { r, params, score }
+        }
+        if (!chosen) {
+          send(404, { error: "Not Found", message: `No route for ${method} ${path}` })
           return
         }
-
-        send(404, { error: "Not Found", message: `No route for ${method} ${path}` })
+        ctx.params = chosen.params
+        ctx.route = chosen.r.pattern
+        try {
+          await chosen.r.handler(ctx)
+        } catch (e) {
+          console.error(`[mock] ${method} ${path} ->`, e)
+          if (!res.writableEnded) send(500, { error: "Internal Server Error", message: String((e && e.message) || e) })
+        }
+        return
       })
       server.listen(port, host, cb)
       return server

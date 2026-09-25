@@ -1465,11 +1465,11 @@ and before any wipe.
 
 ### 62.8 — SPA: per-portfolio cash UI (example-service parity)
 
-- [ ] `PortfolioCard.vue` (main page): example-service-parity "Cash" group under the
+- [x] `PortfolioCard.vue` (main page): example-service-parity "Cash" group under the
   card (verified layout: name-less, balance line + per-currency hint +
   Deposit/Withdraw/Transfer buttons) — data from the summary's `cash`;
   clicking the balance opens the portfolio's cash tab.
-- [ ] New `src/modules/portfolios/PortfolioCashTab.vue` (tab next to
+- [x] New `src/modules/portfolios/PortfolioCashTab.vue` (tab next to
   Holdings/Transactions/Dividends/Performance in `PortfolioDetailView.vue`;
   route `/en/portfolios/:id/cash` directly reachable):
   - Balance block: one row per currency (`DualCurrencyCell`-style, in its own
@@ -1488,41 +1488,51 @@ and before any wipe.
   - **Negative-cash warning**: if `isMarginEnabled === false` and any currency
     balance < 0 → an amber badge line (currency + amount), informational only
     (62 design decision).
-- [ ] `CashTransactionsView.vue` (global Cash tab): re-fetch
+- [x] `CashTransactionsView.vue` (global Cash tab): re-fetch
   `getRecentCashTransactions` (cross-portfolio feed) — rows gain the
   portfolio name in place of the wallet name; edit/delete/labels via the 62.7
   cash-tx API.
-- [ ] Shared portfolios: cash rows appear under the existing
-  `showTransactionHistory` privacy setting (verify in the e2e — no new gating).
-- [ ] Unit tests: tab renders per-currency rows + total + chart + warning
+- [x] Shared portfolios: cash rows appear under the existing
+  `showTransactionHistory` privacy setting (verified in the §62.9 e2e — no
+  new gating).
+- [x] Unit tests: tab renders per-currency rows + total + chart + warning
   badge case; modals submit the 62.1 shapes (transfer carries
   `to_portfolio_id` + elastic leg); the card's cash group renders from
   summary `cash`.
-- [ ] E2E: portfolio cash tab — deposit flow (form → row appears, balance
+- [x] E2E: portfolio cash tab — deposit flow (form → row appears, balance
   moves), transfer between two seeded portfolios (both balances move),
   negative-cash badge after an over-withdrawal on a non-margin portfolio;
-  global cash feed shows rows from both portfolios.
-- [ ] Tests: `npm run build`, `npm run test`, `npm run test:mock`,
-  `docker compose up -d --build` + `npm run test:e2e` green.
-- [ ] Commit.
+  global cash feed shows rows from both portfolios (run in the §62.9 e2e
+  sweep against the dockerized stack).
+- [x] Tests: `npm run build`, `npm run test`, `npm run test:mock` green
+  (committed); `docker compose up -d --build` + `npm run test:e2e` verified in
+  the §62.9 sweep.
+- [x] Commit (`989b8a8`).
 
 ### 62.9 — Mocks + full e2e sweep
 
-- [ ] `mocks/wallets/` deleted; `mocks/portfolios/index.js` gains the 62.1
-  cash routes (replay over the seeded txs + cash rows — the mock keeps its
-  simple ledger math); raw data: delete `wallets.json`,
-  `wallet_balance_history.json`, `wallets_total_balance.json`; add
-  `portfolio_cash.json` / `portfolio_cash_transactions.json` /
-  `portfolio_cash_history.json` (a second currency on one seeded portfolio —
-  the multi-currency path); the portfolio summary/detail raw files gain
-  `cash`; `portfolios_total_metrics.json` gains `totalCash`/`cashBreakdown`.
-- [ ] E2E sweep: fix every spec that touched wallet surfaces (labels spec's
-  wallet-detail assertions → cash tab; add-position spec's wallet pick → gone;
-  the transactions-cash spec → the cross-portfolio feed); cash appears in the
-  portfolio card + dashboard summary assertions.
-- [ ] Tests: full suite green — `npm run build`, `npm run test`,
-  `npm run test:mock`, `docker compose up -d --build` + `npm run test:e2e`.
-- [ ] Commit.
+- [x] `mocks/wallets/` deleted; `mocks/portfolios/index.js` + new
+  `mocks/portfolios/cash.js` gain the 62.1 cash routes (per-currency ledger
+  replay over seeded cash + trade rows — the mock keeps its simple ledger math,
+  state in-memory per process; Top10 seeded multi-currency USD+EUR); raw data:
+  deleted `wallets.json` / `wallet_balance_history.json` /
+  `wallets_total_balance.json`; the db-seed drops the wallet seed (its demo FX
+  is re-homed to `db-seed/fx.mjs`) and re-targets `portfolios.mjs` to the
+  §62.2 schema (no `wallet_id`) + an opening cash DEPOSIT so Top10 cash is
+  positive. The cash shapes are served by the cash module rather than added as
+  raw JSON files (the mock ledger is derived, not seeded files).
+- [x] E2E sweep: every wallet-surface spec re-targeted to the cash UI — new
+  `portfolio-cash.spec.ts` (deposit/transfer/negative-badge/edit+delete/global
+  feed against the real wallets service); `wallets-watchlists.spec.ts` keeps
+  only the watchlist tests (cash lives on the portfolio tab now);
+  `portfolios.spec.ts` / `fees-fx.spec.ts` / `dividends.spec.ts` /
+  `holdings` / `cash-balance-display-currency` / `chart-recompute` / parity
+  re-written for portfolio-native cash + portfolio-base FX (no wallet select).
+  Cash appears in the portfolio card group + the investments cash-balance card.
+- [x] Tests: full suite green — `npm run build`, `npm run test` (374),
+  `npm run test:mock` (223), `docker compose up -d --build` + `npm run test:e2e`
+  (101 passed, 1 skipped).
+- [x] Commit.
 
 ### 62.9b — Release + PROD wipe & reimport (user-authorized)
 

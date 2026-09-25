@@ -61,25 +61,18 @@ test("holdings converts portfolio-base values to the display currency", async ({
   const token = await getBearerToken(request)
   const auth = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
 
-  // Fresh PLN + USD wallets (funded) and a portfolio (base defaults to USD).
+  // A fresh portfolio (base defaults to USD) holding SNT.WA (PLN instrument)
+  // + AAPL (USD instrument) — cross-currency buys, converted* in the USD base.
   const mk = async (path: string, data: unknown) => {
     const res = await request.post(`${GATEWAY}${path}`, { headers: auth, data })
     expect(res.status(), `POST ${path}: ${await res.text()}`).toBeLessThan(300)
     return res.json() as Promise<Record<string, unknown>>
   }
-  const plnWallet = await mk("/api/wallets", { name: `E2E B2 PLN ${run}`, currency: "PLN" })
-  const usdWallet = await mk("/api/wallets", { name: `E2E B2 USD ${run}`, currency: "USD" })
-  await mk(`/api/wallets/${plnWallet.id}/deposits`, { amount: 1_000_000 })
-  await mk(`/api/wallets/${usdWallet.id}/deposits`, { amount: 1_000_000 })
-  const portfolio = await mk("/api/portfolios", { name: `E2E B2 ${run}`, currency: "PLN", walletId: plnWallet.id })
+  const portfolio = await mk("/api/portfolios", { name: `E2E B2 ${run}`, baseCurrency: "USD" })
 
   const pid = String(portfolio.id)
-  const plnWalletId = String(plnWallet.id)
-  const usdWalletId = String(usdWallet.id)
-  // SNT.WA (PLN instrument) in the PLN wallet, AAPL (USD instrument) in the
-  // USD wallet — cross-currency buys, converted* in the USD base.
-  await mk(`/api/portfolios/${pid}/positions`, { symbol: "SNT.WA", quantity: 100, price: 100, currency: "PLN", walletId: plnWalletId })
-  await mk(`/api/portfolios/${pid}/positions`, { symbol: "AAPL", quantity: 10, price: 200, currency: "USD", walletId: usdWalletId })
+  await mk(`/api/portfolios/${pid}/positions`, { symbol: "SNT.WA", quantity: 100, price: 100, currency: "PLN" })
+  await mk(`/api/portfolios/${pid}/positions`, { symbol: "AAPL", quantity: 10, price: 200, currency: "USD" })
 
   await login(page)
   await page.goto(`/en/portfolios/${pid}/holdings`)
@@ -120,7 +113,5 @@ test("holdings converts portfolio-base values to the display currency", async ({
   await expect(tfoot).not.toContainText("$")
 
   // Best-effort cleanup (leftover "E2E B2*" entities are inert for other specs).
-  for (const del of [`${GATEWAY}/api/portfolios/${pid}`, `${GATEWAY}/api/wallets/${plnWalletId}`, `${GATEWAY}/api/wallets/${usdWalletId}`]) {
-    try { await request.delete(del, { headers: auth }) } catch { /* ignore */ }
-  }
+  try { await request.delete(`${GATEWAY}/api/portfolios/${pid}`, { headers: auth }) } catch { /* ignore */ }
 })

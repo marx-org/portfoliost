@@ -8,7 +8,7 @@ async function login(page: import("@playwright/test").Page) {
   await expect(page).toHaveURL(/\/en\/investments/)
 }
 
-test("sidebar matches example-service: no Wallets/News, Report bug, cash portfolios on main page", async ({ page }) => {
+test("sidebar matches example-service: no Wallets/News, Report bug; cash as a card + per-portfolio groups", async ({ page }) => {
   await login(page)
 
   const nav = page.getByRole("navigation", { name: "Main navigation" })
@@ -17,12 +17,10 @@ test("sidebar matches example-service: no Wallets/News, Report bug, cash portfol
   await expect(page.getByRole("link", { name: "Report bug" })).toHaveCount(0)
 
   await expect(page.getByRole("heading", { name: "Investment Portfolios", exact: true })).toBeVisible()
-  await expect(page.getByRole("heading", { name: "Cash Portfolios", exact: true })).toBeVisible()
-  await expect(page.getByText("Portfel USD 1")).toBeVisible()
-  await expect(page.getByRole("button", { name: "Deposit", exact: true }).first()).toBeVisible()
-  await expect(page.getByRole("button", { name: "Withdraw", exact: true }).first()).toBeVisible()
-  await expect(page.getByRole("button", { name: "Transfer", exact: true }).first()).toBeVisible()
-  await expect(page.getByRole("button", { name: "History", exact: true }).first()).toBeVisible()
+  // the portfolio-native cash summary card (no wallet section anymore)
+  await expect(page.getByTestId("cash-balance")).toBeVisible({ timeout: 10000 })
+  // a portfolio card carries its own cash group with Deposit/Withdraw/Transfer
+  await expect(page.getByTestId("card-cash-group").first()).toBeVisible({ timeout: 10000 })
 })
 
 test("portfolio card shows chart, quick links and manage menu", async ({ page }) => {

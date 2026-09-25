@@ -8,7 +8,7 @@ import * as newsModule from "../news/index.js"
 import * as instrumentsModule from "../instruments/index.js"
 import * as chartingModule from "../charting/index.js"
 import * as portfoliosModule from "../portfolios/index.js"
-import * as walletsModule from "../wallets/index.js"
+import * as cashModule from "../portfolios/cash.js"
 import * as watchlistsModule from "../watchlists/index.js"
 import * as copilotModule from "../copilot/index.js"
 import * as fxModule from "../fx/index.js"
@@ -44,7 +44,7 @@ const modules = [
   instrumentsModule,
   chartingModule,
   portfoliosModule,
-  walletsModule,
+  cashModule,
   watchlistsModule,
   copilotModule,
   fxModule,
