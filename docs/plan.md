@@ -1328,7 +1328,7 @@ and before any wipe.
 
 ### 62.4 — wallets backend: snapshots, currentValue and analytics include cash
 
-- [ ] `src/services/backfill.ts`:
+- [x] `src/services/backfill.ts`:
   - `value(D) = positionValue(D) + cashBalanceSeries(D)` (62.2) — the
     `value_snapshots` `value` column now includes cash; `netFlow(D) =
     dailyExternalFlows(D)` (replaces the BUY/SELL series; D50's
@@ -1342,21 +1342,21 @@ and before any wipe.
     `portfolios.current_value` and every summary `currentValue`/`totalValue`
     henceforth include cash; `PortfolioTotalMetrics.totalValue` inherits via
     the breakdown.
-- [ ] Analytics endpoints (TWR/MWR, vol, drawdown, benchmarks) consume the
+- [x] Analytics endpoints (TWR/MWR, vol, drawdown, benchmarks) consume the
   snapshots — no formula change; **fixtures updated**: every
   analytics/backfill/quotes test with a cash-bearing portfolio gains the
   expected cash leg (a portfolio that deposits 1k and never invests must now
   show value 1k and 0% return, previously 0/0).
-- [ ] Unit tests: backfill over a seeded portfolio with a USD position + EUR
+- [x] Unit tests: backfill over a seeded portfolio with a USD position + EUR
   cash + a mid-window deposit → snapshot values hand-computed incl. FX;
   netFlow = external flows only (a BUY/SELL day with no deposit/withdraw has
   netFlow 0); `quotes` day-change includes a same-day deposit.
-- [ ] Full wallets suite green + `npm run build`.
-- [ ] Commit (portfoliost-wallets).
+- [x] Full wallets suite green + `npm run build`.
+- [x] Commit (portfoliost-wallets).
 
 ### 62.5 — wallets backend: import API on the new cash schema
 
-- [ ] `src/routes/import.ts`:
+- [x] `src/routes/import.ts`:
   - `ImportWalletTxSchema` → `ImportPortfolioCashTxSchema` (62.1 shape); the
     per-row leg field `walletTx` → `cashTx` (`portfolioTx` unchanged — trade
     legs no longer carry a walletId; `insertImportPortfolioTx` drops the
@@ -1372,13 +1372,13 @@ and before any wipe.
     `portfolio_cash_transactions` (+ labels) to the delete cascade (the old
     wallet tables are already dropped by the 62.2 migration — the wipe no
     longer touches them).
-- [ ] Unit tests (`import.test.ts`): DEPOSIT/WITHDRAWAL rows land with clamped
+- [x] Unit tests (`import.test.ts`): DEPOSIT/WITHDRAWAL rows land with clamped
   signs + labels; cross-ccy TRANSFER pair (amounts, `linkedTxId`, both
   portfolios' balances); unknown portfolio name → row error; `#t` dedupe on a
   second run; wipe removes both transfer legs and re-import recreates
   idempotently.
-- [ ] Full wallets suite green + `npm run build`.
-- [ ] Commit (portfoliost-wallets).
+- [x] Full wallets suite green + `npm run build`.
+- [x] Commit (portfoliost-wallets).
 
 ### 62.6 — sheets-sync: mapper + recon re-targeted at portfolio cash
 
