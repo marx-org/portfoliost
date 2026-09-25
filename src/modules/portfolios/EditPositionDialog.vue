@@ -7,7 +7,6 @@ import {
   updatePortfolioPosition,
 } from "@/api/portfolios"
 import { usePortfolioStore } from "@/stores/portfolios"
-import { useWalletsStore } from "@/stores/wallets"
 import { formatCurrency } from "@/utils/format"
 import type { PortfolioPositions, PortfolioTransactionsPage } from "@/api/types"
 import EditTransactionModal, { type EditTransaction } from "@/modules/portfolios/EditTransactionModal.vue"
@@ -23,7 +22,6 @@ const props = defineProps<{ open: boolean; portfolioId: string; position: Positi
 const emit = defineEmits<{ (e: "close"): void; (e: "saved"): void }>()
 
 const store = usePortfolioStore()
-const walletsStore = useWalletsStore()
 const currenciesStore = useCurrenciesStore()
 
 const transactions = ref<Tx[]>([])
@@ -43,13 +41,12 @@ const newTx = ref({
   feeExchangeRate: "",
   rateSource: "automatic" as "automatic" | "manual",
   exchangeRate: "",
-  walletId: "",
 })
 
 const portfolioStore = usePortfolioStore()
 const targetCurrency = useTargetCurrency(
   computed(() =>
-    portfolioStore.portfolios.find((p) => p.id === props.portfolioId)?.currency ?? null,
+    portfolioStore.portfolios.find((p) => p.id === props.portfolioId)?.baseCurrency ?? null,
   ),
 )
 
@@ -67,9 +64,6 @@ watch(
     if (!open || !props.position) return
     transactions.value = []
     error.value = null
-    if (!walletsStore.wallets.length) {
-      await walletsStore.fetchAll()
-    }
     newTx.value = {
       date: new Date().toISOString().slice(0, 10),
       type: "BUY",
@@ -82,7 +76,6 @@ watch(
       feeExchangeRate: "",
       rateSource: "automatic",
       exchangeRate: "",
-      walletId: walletsStore.wallets[0]?.id ?? "",
     }
     if (!currenciesStore.loaded) void currenciesStore.load()
     await load()
@@ -166,7 +159,6 @@ function openEditModal(tx: Tx) {
     price: tx.price,
     fees: tx.fees ?? 0,
     currency: tx.currency || "USD",
-    walletId: tx.walletId,
     executedAt: tx.executedAt,
     feeCurrency: tx.feeCurrency,
     rateSource: tx.rateSource,
@@ -219,7 +211,6 @@ async function addRow(): Promise<void> {
       input.rateSource = "manual"
       input.exchangeRate = Number(newTx.value.exchangeRate)
     }
-    input.walletId = newTx.value.walletId || undefined
     const iso = new Date(newTx.value.date).toISOString()
     input.executedAt = iso
 
@@ -288,17 +279,6 @@ async function close() {
         <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="close">✕</button>
       </div>
 
-      <div class="mb-4 flex items-center justify-between rounded-xl bg-slate-50 px-4 py-2.5 dark:bg-slate-800/50">
-        <div>
-          <p class="text-sm text-slate-600 dark:text-slate-300">Cash in {{ walletsStore.wallets[0]?.name ?? "cash portfolio" }}:</p>
-          <p class="text-sm font-medium tabular-nums text-slate-900 dark:text-slate-100">{{ formatCurrency(walletsStore.wallets[0]?.balance ?? 0, walletsStore.wallets[0]?.currency ?? "USD") }}</p>
-        </div>
-        <div class="flex items-center gap-2">
-          <input type="number" class="input !w-32 !py-1.5 text-sm" placeholder="Amount" aria-label="Amount" />
-          <button type="button" class="btn-secondary text-sm">Deposit</button>
-        </div>
-      </div>
-
       <p v-if="error" class="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-400">{{ error }}</p>
 
       <div class="overflow-x-auto">
@@ -345,7 +325,6 @@ async function close() {
           :country="'US'"
           :market-price="position.currentPrice"
           :price-as-of-label="'current price'"
-          :wallets="walletsStore.wallets"
           :target-currency="targetCurrency"
           :tx-currency="position.instrumentCurrency || 'USD'"
           :testid="'edit-position'"

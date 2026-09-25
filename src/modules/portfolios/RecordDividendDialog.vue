@@ -2,9 +2,7 @@
 import { computed, ref, watch } from "vue"
 import { createPortfolioTransaction } from "@/api/portfolios"
 import { usePortfolioStore } from "@/stores/portfolios"
-import { useWalletsStore } from "@/stores/wallets"
 import { useCurrenciesStore } from "@/stores/currencies"
-import { formatCurrency } from "@/utils/format"
 import FxRateFields from "@/components/FxRateFields.vue"
 import DividendFields, { dividendTotals } from "@/components/DividendFields.vue"
 import type { PortfolioPositions } from "@/api/types"
@@ -17,7 +15,6 @@ const props = defineProps<{
 const emit = defineEmits<{ (e: "close"): void; (e: "saved"): void }>()
 
 const store = usePortfolioStore()
-const walletsStore = useWalletsStore()
 const currenciesStore = useCurrenciesStore()
 
 const perShare = ref(false)
@@ -27,7 +24,6 @@ const quantity = ref("")
 const taxes = ref("")
 const date = ref(new Date().toISOString().slice(0, 10))
 const notes = ref("")
-const walletId = ref("")
 const rateSource = ref<"automatic" | "manual">("automatic")
 const exchangeRate = ref("")
 const suggestion = ref<{ rate: number } | null>(null)
@@ -51,9 +47,6 @@ watch(
     suggestion.value = null
     quantity.value = String(props.position.quantity ?? 1)
     if (!currenciesStore.loaded) void currenciesStore.load()
-    if (!walletsStore.wallets.length) void walletsStore.fetchAll()
-    const linked = store.portfolios.find((p) => p.id === props.portfolioId)?.walletId
-    walletId.value = linked ?? walletsStore.wallets[0]?.id ?? ""
   },
 )
 
@@ -65,9 +58,10 @@ const assetLabel = computed(() => {
 })
 const totals = computed(() => dividendTotals(perShare.value, grossTotal.value, perShareGross.value, quantity.value, taxes.value))
 
-const wallet = computed(() => walletsStore.wallets.find((w) => w.id === walletId.value))
-const walletCcy = computed(() => wallet.value?.currency.toUpperCase() ?? "")
-const needsFx = computed(() => Boolean(walletCcy.value) && walletCcy.value !== txCcy.value)
+// The dividend is paid into the portfolio; the FX leg converts the tx currency
+// into the portfolio's base currency (§62 — dividends need no wallet).
+const portfolioCcy = computed(() => (store.portfolios.find((p) => p.id === props.portfolioId)?.baseCurrency ?? "USD").toUpperCase())
+const needsFx = computed(() => portfolioCcy.value !== txCcy.value)
 
 const rate = computed(() => {
   if (!needsFx.value) return 1
@@ -76,7 +70,7 @@ const rate = computed(() => {
 })
 const convertedNet = computed(() => (needsFx.value && rate.value ? totals.value.net * rate.value : null))
 
-const canSubmit = computed(() => totals.value.gross > 0 && !totals.value.taxExceedsGross && !!walletId.value)
+const canSubmit = computed(() => totals.value.gross > 0 && !totals.value.taxExceedsGross)
 
 function onSuggestion(r: { rate: number } | null): void {
   suggestion.value = r
@@ -94,7 +88,6 @@ async function submit(): Promise<void> {
       price: totals.value.price,
       positionId: props.position.id,
       currency: txCcy.value,
-      walletId: walletId.value || undefined,
       executedAt: date.value ? new Date(`${date.value}T00:00:00Z`).toISOString() : new Date().toISOString(),
       taxes: totals.value.tax > 0 ? totals.value.tax : undefined,
       notes: notes.value.trim() || undefined,
@@ -153,7 +146,7 @@ async function submit(): Promise<void> {
           :tx-ccy="txCcy"
           :ccy-symbol="ccySymbol"
           :converted-net="needsFx ? convertedNet : null"
-          :converted-ccy="needsFx ? walletCcy : ''"
+          :converted-ccy="needsFx ? portfolioCcy : ''"
           v-model:per-share="perShare"
           v-model:gross-total="grossTotal"
           v-model:per-share-gross="perShareGross"
@@ -162,25 +155,11 @@ async function submit(): Promise<void> {
           v-model:date="date"
           v-model:notes="notes"
         >
-          <template #after-toggle>
-            <label class="mb-1.5 mt-4 block text-sm font-medium" for="dividend-wallet">Cash portfolio</label>
-            <select
-              id="dividend-wallet"
-              v-model="walletId"
-              class="input mb-4"
-              :data-testid="`dividend-wallet`"
-            >
-              <option value="" disabled>Select cash portfolio</option>
-              <option v-for="w in walletsStore.wallets" :key="w.id" :value="w.id">
-                {{ w.name }} ({{ formatCurrency(w.balance, w.currency) }})
-              </option>
-            </select>
-          </template>
           <template #before-summary>
             <FxRateFields
               leg="Transaction"
               :from="txCcy"
-              :to="walletCcy"
+              :to="portfolioCcy"
               :hidden="!needsFx"
               :date="date"
               v-model:rate-source="rateSource"

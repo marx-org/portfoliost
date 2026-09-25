@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import RecordDividendDialog from "@/modules/portfolios/RecordDividendDialog.vue"
 import { usePortfolioStore } from "@/stores/portfolios"
 import * as portfoliosApi from "@/api/portfolios"
-import * as walletsApi from "@/api/wallets"
 import { useCurrenciesStore } from "@/stores/currencies"
 
 vi.mock("vue-router", () => ({
@@ -20,21 +19,11 @@ vi.mock("@/api/portfolios", async (importOriginal) => {
   }
 })
 
-vi.mock("@/api/wallets", async (importOriginal) => {
-  const actual = await importOriginal<typeof walletsApi>()
-  return {
-    ...actual,
-    getWallets: vi.fn(),
-    getWalletTotalBalance: vi.fn(),
-  }
-})
-
 vi.mock("@/api/fx", () => ({
   getLatestRate: vi.fn().mockResolvedValue({ rate: 4.35, asOf: "2026-08-25" }),
 }))
 
 const mocked = vi.mocked(portfoliosApi)
-const mockedWallets = vi.mocked(walletsApi)
 
 const registry = [
   { code: "EUR", name: "Euro", symbol: "€", minorUnits: 2, popular: true },
@@ -53,24 +42,14 @@ const POSITION = {
   quantity: 10,
 } as never
 
-function makeEnv(linkedWallet = "w1") {
+function makeEnv(baseCurrency = "USD") {
   const pinia = createPinia()
   setActivePinia(pinia)
   const store = useCurrenciesStore()
   store.currencies = registry
   store.loaded = true
   const portfolios = usePortfolioStore()
-  portfolios.portfolios = [{ id: "p1", currency: "PLN", walletId: linkedWallet }] as never
-  mockedWallets.getWallets.mockResolvedValue([
-    { id: "w1", userId: "u", name: "Cash USD", currency: "USD", balance: 1000, availableBalance: 1000, isDefault: true, createdAt: "", updatedAt: "" },
-    { id: "w2", userId: "u", name: "Cash PLN", currency: "PLN", balance: 4300, availableBalance: 4300, isDefault: false, createdAt: "", updatedAt: "" },
-  ] as never)
-  mockedWallets.getWalletTotalBalance.mockResolvedValue({
-    totalBalance: 5300,
-    totalAvailableBalance: 5300,
-    baseCurrency: "PLN",
-    walletBreakdown: [],
-  } as never)
+  portfolios.portfolios = [{ id: "p1", baseCurrency }] as never
   return { pinia }
 }
 
@@ -92,9 +71,9 @@ describe("RecordDividendDialog (§49.4)", () => {
     mocked.createPortfolioTransaction.mockResolvedValue({} as never)
   })
 
-  it("preselects the portfolio's linked wallet and defaults the receive date to today", async () => {
-    const wrapper = await openDialog(makeEnv("w2"))
-    expect((wrapper.find('[data-testid="dividend-wallet"]').element as HTMLSelectElement).value).toBe("w2")
+  it("defaults the receive date to today and shows no wallet picker (§62)", async () => {
+    const wrapper = await openDialog()
+    expect(wrapper.find('[data-testid="dividend-wallet"]').exists()).toBe(false)
   })
 
   it("title + header card parity: title, logo, country, asset pill, shares held (§50.2)", async () => {
@@ -110,7 +89,6 @@ describe("RecordDividendDialog (§49.4)", () => {
 
   it("total mode — net = gross − tax; submit posts DIVIDEND with taxes+notes (§49.4)", async () => {
     const wrapper = await openDialog()
-    expect((wrapper.find('[data-testid="dividend-wallet"]').element as HTMLSelectElement).value).toBe("w1")
 
     await wrapper.find('[data-testid="dividend-gross"]').setValue("200")
     await wrapper.find('[data-testid="dividend-tax"]').setValue("30")
@@ -127,7 +105,6 @@ describe("RecordDividendDialog (§49.4)", () => {
       price: 20, // gross per share (200/10)
       positionId: "pos-1",
       currency: "USD",
-      walletId: "w1",
       taxes: 30,
       notes: "Q4 div",
     })
@@ -203,8 +180,8 @@ describe("RecordDividendDialog (§49.4)", () => {
     expect((btn.element as HTMLButtonElement).disabled).toBe(true)
   })
 
-  it("cross-currency — converts net into wallet currency via manual rate (§49.4)", async () => {
-    const wrapper = await openDialog(makeEnv("w2"))
+  it("cross-currency — converts net into the portfolio base currency via manual rate (§49.4)", async () => {
+    const wrapper = await openDialog(makeEnv("PLN"))
     await wrapper.find('[data-testid="dividend-gross"]').setValue("200")
     await wrapper.find('[data-testid="dividend-tax"]').setValue("20")
     await wrapper.find('[data-testid="dividend-fx-manual"]').trigger("click")
@@ -217,7 +194,6 @@ describe("RecordDividendDialog (§49.4)", () => {
 
     const payload = mocked.createPortfolioTransaction.mock.calls[0][1]
     expect(payload).toMatchObject({
-      walletId: "w2",
       rateSource: "manual",
       exchangeRate: 4.5,
     })

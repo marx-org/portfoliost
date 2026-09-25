@@ -52,16 +52,6 @@ const router = createRouter({
           component: () => import("@/modules/watchlists/WatchlistsView.vue"),
         },
         {
-          path: "wallets",
-          name: "wallets",
-          component: () => import("@/modules/wallets/WalletsView.vue"),
-        },
-        {
-          path: "portfolios/wallets/:id",
-          name: "wallet-detail",
-          component: () => import("@/modules/wallets/WalletDetailView.vue"),
-        },
-        {
           path: "charting",
           name: "charting",
           component: () => import("@/modules/charting/ChartingView.vue"),

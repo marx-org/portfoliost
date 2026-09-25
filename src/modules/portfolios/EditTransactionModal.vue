@@ -2,7 +2,6 @@
 import { computed, ref, watch } from "vue"
 import { useRouter } from "vue-router"
 import { updatePortfolioTransaction } from "@/api/portfolios"
-import { useWalletsStore } from "@/stores/wallets"
 import { formatCurrency, formatDate } from "@/utils/format"
 import { researchSymbol } from "@/utils/research"
 import FeeFields from "@/components/FeeFields.vue"
@@ -23,7 +22,6 @@ export interface EditTransaction {
   price: number
   fees: number | null
   currency: string
-  walletId?: string
   executedAt: string
   feeCurrency?: string | null
   rateSource?: "automatic" | "manual" | null
@@ -42,11 +40,9 @@ const props = defineProps<{
 const emit = defineEmits<{ (e: "close"): void; (e: "saved"): void }>()
 
 const router = useRouter()
-const walletsStore = useWalletsStore()
 const currenciesStore = useCurrenciesStore()
 
 const executedAt = ref("")
-const walletId = ref("")
 const quantity = ref(0)
 const price = ref(0)
 const fees = ref(0)
@@ -66,7 +62,7 @@ const quantityStr = ref("")
 const portfolioStore = usePortfolioStore()
 const targetCurrency = useTargetCurrency(
   computed(() =>
-    portfolioStore.portfolios.find((p) => p.id === props.transaction?.portfolioId)?.currency ?? null,
+    portfolioStore.portfolios.find((p) => p.id === props.transaction?.portfolioId)?.baseCurrency ?? null,
   ),
 )
 const busy = ref(false)
@@ -77,7 +73,6 @@ watch(
   (open) => {
     if (open && props.transaction) {
       executedAt.value = (props.transaction.executedAt || new Date().toISOString()).slice(0, 10)
-      walletId.value = props.transaction.walletId || walletsStore.wallets[0]?.id || ""
       quantity.value = props.transaction.quantity
       price.value = props.transaction.price
       fees.value = props.transaction.fees ?? 0
@@ -96,11 +91,6 @@ watch(
       if (!currenciesStore.loaded) void currenciesStore.load()
       busy.value = false
       error.value = null
-      if (!walletsStore.wallets.length) {
-        walletsStore.fetchAll().then(() => {
-          if (!walletId.value) walletId.value = walletsStore.wallets[0]?.id || ""
-        })
-      }
     }
   },
   { immediate: true },
@@ -140,7 +130,6 @@ async function submit() {
       price: isDividend.value ? dTotals.value.price : price.value,
       fees: feeValue.value,
       executedAt: new Date(executedAt.value).toISOString(),
-      walletId: walletId.value || undefined,
       feesType: feesType.value,
       feeCurrency: feesType.value === "fixed" ? feeCurrency.value : undefined,
       rateSource: rateSource.value,
@@ -229,14 +218,8 @@ function goResearch() {
             v-model:notes="notes"
           >
             <template #after-toggle>
-              <label for="etx-wallet" class="mb-1 mt-4 block text-sm text-slate-600 dark:text-slate-300">Cash portfolio</label>
-              <select id="etx-wallet" v-model="walletId" class="input mb-4">
-                <option v-for="w in walletsStore.wallets" :key="w.id" :value="w.id">
-                  {{ w.name }} ({{ formatCurrency(w.balance, w.currency) }})
-                </option>
-              </select>
-            </template>
-            <template #before-summary>
+          </template>
+          <template #before-summary>
               <FxRateFields
                 leg="Transaction"
                 :from="transaction.currency"
@@ -253,13 +236,6 @@ function goResearch() {
         <template v-else>
           <label for="etx-date" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Purchase Date</label>
           <input id="etx-date" v-model="executedAt" type="date" required class="input mb-4" />
-
-          <label for="etx-wallet" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Cash portfolio</label>
-          <select id="etx-wallet" v-model="walletId" class="input mb-4">
-            <option v-for="w in walletsStore.wallets" :key="w.id" :value="w.id">
-              {{ w.name }} ({{ formatCurrency(w.balance, w.currency) }})
-            </option>
-          </select>
 
           <div class="mb-4 grid grid-cols-2 gap-4">
             <div>

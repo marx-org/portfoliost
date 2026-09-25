@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import EditTransactionModal, { type EditTransaction } from "@/modules/portfolios/EditTransactionModal.vue"
 import { usePortfolioStore } from "@/stores/portfolios"
 import * as portfoliosApi from "@/api/portfolios"
-import * as walletsApi from "@/api/wallets"
 import { useCurrenciesStore } from "@/stores/currencies"
 
 vi.mock("vue-router", () => ({
@@ -20,21 +19,11 @@ vi.mock("@/api/portfolios", async (importOriginal) => {
   }
 })
 
-vi.mock("@/api/wallets", async (importOriginal) => {
-  const actual = await importOriginal<typeof walletsApi>()
-  return {
-    ...actual,
-    getWallets: vi.fn(),
-    getWalletTotalBalance: vi.fn(),
-  }
-})
-
 vi.mock("@/api/fx", () => ({
   getLatestRate: vi.fn().mockResolvedValue({ rate: 4.35, asOf: "2026-08-25" }),
 }))
 
 const mocked = vi.mocked(portfoliosApi)
-const mockedWallets = vi.mocked(walletsApi)
 
 const registry = [
   { code: "EUR", name: "Euro", symbol: "€", minorUnits: 2, popular: true },
@@ -53,7 +42,6 @@ const divTx = (): EditTransaction => ({
   price: 3,
   fees: null,
   currency: "USD",
-  walletId: "w1",
   executedAt: "2026-09-20T00:00:00Z",
   taxes: 3,
   notes: "Q3",
@@ -66,17 +54,7 @@ function makeEnv() {
   store.currencies = registry
   store.loaded = true
   const portfolios = usePortfolioStore()
-  portfolios.portfolios = [{ id: "p1", currency: "PLN" }] as never
-  mockedWallets.getWallets.mockResolvedValue([
-    { id: "w1", userId: "u", name: "Cash USD", currency: "USD", balance: 1000, availableBalance: 1000, isDefault: true, createdAt: "", updatedAt: "" },
-    { id: "w2", userId: "u", name: "Cash PLN", currency: "PLN", balance: 4300, availableBalance: 4300, isDefault: false, createdAt: "", updatedAt: "" },
-  ] as never)
-  mockedWallets.getWalletTotalBalance.mockResolvedValue({
-    totalBalance: 5300,
-    totalAvailableBalance: 5300,
-    baseCurrency: "PLN",
-    walletBreakdown: [],
-  } as never)
+  portfolios.portfolios = [{ id: "p1", baseCurrency: "PLN" }] as never
   return { pinia }
 }
 

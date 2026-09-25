@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watchEffect } from "vue"
 import { usePortfolioStore } from "@/stores/portfolios"
-import { useWalletsStore } from "@/stores/wallets"
 import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
 import { useCurrenciesStore } from "@/stores/currencies"
 import { storeToRefs } from "pinia"
@@ -9,15 +8,12 @@ import { formatCurrency, formatPercent, formatSignedCurrency } from "@/utils/for
 import { getMergedAnalytics, recomputePortfolio, type PortfolioAnalyticsTimeframe } from "@/api/portfolios"
 import type { PortfolioAnalytics } from "@/api/types"
 import { getLatestRate } from "@/api/fx"
-import { getWalletTotalBalance } from "@/api/wallets"
 import InvestmentsTabs from "@/modules/portfolios/InvestmentsTabs.vue"
 import PortfolioCard from "@/modules/portfolios/PortfolioCard.vue"
-import CashWalletCard from "@/modules/portfolios/CashWalletCard.vue"
 import AddPositionDialog from "@/modules/portfolios/AddPositionDialog.vue"
 import PortfolioPerformanceChart from "@/components/PortfolioPerformanceChart.vue"
 
 const store = usePortfolioStore()
-const walletsStore = useWalletsStore()
 const loading = ref(true)
 const error = ref<string | null>(null)
 
@@ -135,43 +131,39 @@ const strategies = [
   { value: "BALANCED", label: "Balanced" },
 ]
 
-// §48.6e B4 — "Cash balance" must be the CONVERTED total: the endpoint values
-// every wallet in the requested base currency (per-wallet rate via
-// instruments' fx). Fetch it for the display currency and re-fetch on display
-// or wallet-list changes; never sum native balances under a foreign symbol.
-// `null` while resolving — the template renders "—" (a mislabelled amount is
-// never shown). Per-currency shares come from the breakdown `weight` (each
-// wallet's converted share of the total).
+// §62 — the "Cash balance" card is the portfolio-native cash position:
+// `totalMetrics.totalCash` (already converted to the totalMetrics base currency)
+// re-expressed into the display currency, with per-currency shares from
+// `totalMetrics.cashBreakdown` `weight`.
 const cashTotal = ref<number | null>(null)
 const cashBreakdown = ref<Array<{ currency: string; pct: number }>>([])
-let cashTotalSeq = 0
 
 watchEffect(() => {
-  const seq = ++cashTotalSeq
-  const ccy = displayCurrency.value.toUpperCase()
-  void walletsStore.wallets // dep: re-fetch after wallet mutations on this page
-  cashTotal.value = null
-  cashBreakdown.value = []
-  void getWalletTotalBalance(ccy)
-    .then((res) => {
-      if (seq !== cashTotalSeq) return
-      cashTotal.value = res.totalBalance ?? null
-      const byCurrency = new Map<string, number>()
-      for (const w of res.walletBreakdown ?? []) {
-        const ccy = (w.currency ?? "").toUpperCase()
-        if (!ccy) continue
-        byCurrency.set(ccy, (byCurrency.get(ccy) ?? 0) + (w.weight ?? 0))
-      }
-      cashBreakdown.value = [...byCurrency.entries()]
-        .map(([currency, pct]) => ({ currency, pct }))
-        .sort((a, b) => b.pct - a.pct)
-    })
-    .catch(() => {
-      if (seq === cashTotalSeq) cashTotal.value = null
-    })
+  const tm = store.totalMetrics
+  const rate = mergedChartRate.value
+  const dst = displayCurrency.value.toUpperCase()
+  const base = (tm?.baseCurrency ?? "USD").toUpperCase()
+  // totalCash is in totalMetrics.baseCurrency; re-express into the display
+  // currency via the merged-chart rate (base→display). "—" while the rate
+  // resolves (a mislabelled amount is never shown).
+  cashTotal.value =
+    tm?.totalCash != null && rate != null && base === dst
+      ? tm.totalCash
+      : tm?.totalCash != null && rate != null
+        ? tm.totalCash * rate
+        : null
+  const byCurrency = new Map<string, number>()
+  for (const c of tm?.cashBreakdown ?? []) {
+    const ccy = (c.currency ?? "").toUpperCase()
+    if (!ccy) continue
+    byCurrency.set(ccy, (byCurrency.get(ccy) ?? 0) + (c.weight ?? 0))
+  }
+  cashBreakdown.value = [...byCurrency.entries()]
+    .map(([currency, pct]) => ({ currency, pct }))
+    .sort((a, b) => b.pct - a.pct)
 })
 const showCreate = ref(false)
-const newPortfolio = ref({ name: "", description: "", strategy: "GROWTH", currency: "USD", walletId: "" })
+const newPortfolio = ref({ name: "", description: "", strategy: "GROWTH", currency: "USD" })
 const creating = ref(false)
 const createError = ref<string | null>(null)
 
@@ -187,14 +179,9 @@ function closeAddPosition() {
   showAddPosition.value = false
 }
 
-const showCreateWallet = ref(false)
-const newWallet = ref({ name: "", currency: "USD" })
-const creatingWallet = ref(false)
-const createWalletError = ref<string | null>(null)
-
 onMounted(async () => {
   try {
-    await Promise.all([store.fetchAll(), walletsStore.fetchAll()])
+    await store.fetchAll()
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Failed to load portfolios"
   } finally {
@@ -218,37 +205,13 @@ async function submitCreate() {
       description: newPortfolio.value.description.trim() || undefined,
       strategy: newPortfolio.value.strategy,
       currency: newPortfolio.value.currency,
-      walletId: newPortfolio.value.walletId || undefined,
     })
-    newPortfolio.value = { name: "", description: "", strategy: "GROWTH", currency: "USD", walletId: "" }
+    newPortfolio.value = { name: "", description: "", strategy: "GROWTH", currency: "USD" }
     showCreate.value = false
   } catch (err) {
     createError.value = err instanceof Error ? err.message : "Failed to create portfolio"
   } finally {
     creating.value = false
-  }
-}
-
-function openCreateWalletFromPortfolio() {
-  newWallet.value = { name: "", currency: newPortfolio.value.currency }
-  createWalletError.value = null
-  showCreateWallet.value = true
-}
-
-async function submitCreateWallet() {
-  if (!newWallet.value.name.trim()) return
-  creatingWallet.value = true
-  createWalletError.value = null
-  try {
-    const created = await walletsStore.create({ name: newWallet.value.name.trim(), currency: newWallet.value.currency })
-    newPortfolio.value.walletId = created.id
-    newPortfolio.value.currency = created.currency
-    newWallet.value = { name: "", currency: "USD" }
-    showCreateWallet.value = false
-  } catch (err) {
-    createWalletError.value = err instanceof Error ? err.message : "Failed to create wallet"
-  } finally {
-    creatingWallet.value = false
   }
 }
 </script>
@@ -382,8 +345,8 @@ async function submitCreateWallet() {
     <section v-if="!loading" class="mb-10">
       <div class="mb-4 flex items-center justify-between">
         <div>
-          <h2 class="text-lg font-semibold">Cash Portfolios</h2>
-          <div v-if="walletsStore.wallets.length" class="mt-0.5 flex items-center gap-3 text-sm">
+          <h2 class="text-lg font-semibold">Cash</h2>
+          <div class="mt-0.5 flex items-center gap-3 text-sm">
             <span class="text-slate-500 dark:text-slate-400">Total Balance</span>
             <span class="font-semibold tabular-nums" data-testid="cash-total-balance">{{ formatCurrency(cashTotal, displayCurrency) }}</span>
             <span v-for="c in cashBreakdown" :key="c.currency" class="text-xs text-slate-500 dark:text-slate-400">
@@ -391,16 +354,6 @@ async function submitCreateWallet() {
             </span>
           </div>
         </div>
-        <span v-if="walletsStore.wallets.length" class="text-sm text-slate-500 dark:text-slate-400">{{ walletsStore.wallets.length }}</span>
-      </div>
-
-      <div v-if="walletsStore.wallets.length" class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <CashWalletCard v-for="w in walletsStore.wallets" :key="w.id" :wallet="w" />
-      </div>
-      <p v-else-if="!error" class="text-sm text-slate-500 dark:text-slate-400">No cash portfolios yet.</p>
-
-      <div class="mt-4">
-        <button type="button" class="btn-secondary text-sm" @click="showCreateWallet = true">Create Cash Wallet</button>
       </div>
     </section>
 
@@ -430,46 +383,11 @@ async function submitCreateWallet() {
               </select>
             </div>
           </div>
-          <label for="portfolio-wallet" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Linked wallet</label>
-          <div class="mb-4 flex gap-2">
-            <select id="portfolio-wallet" v-model="newPortfolio.walletId" class="input flex-1">
-              <option value="" disabled>Select a wallet…</option>
-              <option v-for="w in walletsStore.wallets" :key="w.id" :value="w.id">
-                {{ w.name }} ({{ w.currency }})
-              </option>
-            </select>
-            <button type="button" class="btn-secondary shrink-0 text-sm" @click="openCreateWalletFromPortfolio">Create wallet</button>
-          </div>
           <p v-if="createError" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ createError }}</p>
           <div class="flex justify-end gap-2">
             <button type="button" class="btn-ghost" @click="showCreate = false">Cancel</button>
             <button type="submit" class="btn-primary" :disabled="creating || !newPortfolio.name.trim()">
               {{ creating ? "Creating..." : "Create" }}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <div
-      v-if="showCreateWallet"
-      class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
-      @click.self="showCreateWallet = false"
-    >
-      <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Create wallet">
-        <h3 class="mb-4 text-base font-semibold">Create a cash wallet</h3>
-        <form @submit.prevent="submitCreateWallet">
-          <label for="wallet-name" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Name</label>
-          <input id="wallet-name" v-model="newWallet.name" type="text" required class="input mb-4" placeholder="e.g. USD savings" />
-          <label for="wallet-currency" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Currency</label>
-          <select id="wallet-currency" v-model="newWallet.currency" class="input mb-4">
-            <option v-for="c in currencies" :key="c" :value="c">{{ c }}</option>
-          </select>
-          <p v-if="createWalletError" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ createWalletError }}</p>
-          <div class="flex justify-end gap-2">
-            <button type="button" class="btn-ghost" @click="showCreateWallet = false">Cancel</button>
-            <button type="submit" class="btn-primary" :disabled="creatingWallet || !newWallet.name.trim()">
-              {{ creatingWallet ? "Creating..." : "Create" }}
             </button>
           </div>
         </form>

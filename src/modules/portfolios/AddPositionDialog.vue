@@ -3,7 +3,6 @@ import { computed, ref, watch } from "vue"
 import { useRouter } from "vue-router"
 import { createPortfolioPosition, createPortfolioTransaction, updatePortfolioPosition, removePortfolioPosition } from "@/api/portfolios"
 import { usePortfolioStore } from "@/stores/portfolios"
-import { useWalletsStore } from "@/stores/wallets"
 import { formatCurrency } from "@/utils/format"
 import InstrumentSearchModal from "@/modules/instruments/InstrumentSearchModal.vue"
 import { getQuote, getHistoricalClose, getInstrumentDetail } from "@/api/instruments"
@@ -25,7 +24,6 @@ const props = defineProps<{ open: boolean; portfolioId: string; positionAction?:
 const emit = defineEmits<{ (e: "close"): void; (e: "added"): void; (e: "saved"): void }>()
 
 const store = usePortfolioStore()
-const walletsStore = useWalletsStore()
 const currenciesStore = useCurrenciesStore()
 const router = useRouter()
 
@@ -49,7 +47,6 @@ const stockForm = ref({
   rateSource: "automatic" as "automatic" | "manual",
   exchangeRate: "",
   date: new Date().toISOString().slice(0, 10),
-  walletId: "",
 })
 const busy = ref(false)
 const error = ref<string | null>(null)
@@ -82,13 +79,6 @@ watch(
       showSearch.value = false
       error.value = null
       if (!currenciesStore.loaded) void currenciesStore.load()
-      const loadWallets = () => {
-        if (!walletsStore.wallets.length) {
-          walletsStore.fetchAll().then(() => {
-            if (!stockForm.value.walletId) stockForm.value.walletId = walletsStore.wallets[0]?.id || ""
-          })
-        }
-      }
       if (props.positionAction) {
         const { kind, position } = props.positionAction
         priceTouched.value = false
@@ -105,15 +95,12 @@ watch(
           rateSource: "automatic",
           exchangeRate: "",
           date: new Date().toISOString().slice(0, 10),
-          walletId: walletsStore.wallets[0]?.id ?? "",
         }
         TX_CCY.value = position.instrumentCurrency ?? "USD"
         step.value = "stock"
-        loadWallets()
         void triggerLoadMarketPrice()
       } else {
         step.value = "chooser"
-        loadWallets()
       }
     }
   },
@@ -179,7 +166,7 @@ function onPriceInput() {
 }
 
 const targetCurrency = useTargetCurrency(
-  computed(() => store.portfolios.find((p) => p.id === props.portfolioId)?.currency ?? null),
+  computed(() => store.portfolios.find((p) => p.id === props.portfolioId)?.baseCurrency ?? null),
 )
 
 function chooseStock() {
@@ -230,7 +217,6 @@ function onSearchAdd(symbol: string, name: string) {
       rateSource: "automatic",
       exchangeRate: "",
       date: new Date().toISOString().slice(0, 10),
-      walletId: walletsStore.wallets[0]?.id ?? "",
     }
     step.value = "stock"
     error.value = null
@@ -290,10 +276,6 @@ async function submitStock() {
   const symbol = stockForm.value.symbol.toUpperCase()
   const quantity = Number(stockForm.value.quantity)
   if (!symbol || !quantity) return
-  if (!stockForm.value.walletId) {
-    error.value = "Select a cash portfolio"
-    return
-  }
   busy.value = true
   error.value = null
   try {
@@ -307,7 +289,6 @@ async function submitStock() {
         price: Number(stockForm.value.price) || 0,
         positionId: position.id,
         currency: position.instrumentCurrency || "USD",
-        walletId: stockForm.value.walletId || undefined,
         executedAt: stockForm.value.date ? new Date(stockForm.value.date).toISOString() : undefined,
       }
       if (stockForm.value.feesType === "fixed" && Number(stockForm.value.fees) > 0) {
@@ -372,7 +353,6 @@ async function submitStock() {
           stockForm.value.feeExchangeRate
             ? Number(stockForm.value.feeExchangeRate)
             : undefined,
-        walletId: stockForm.value.walletId || undefined,
         executedAt: stockForm.value.date ? new Date(stockForm.value.date).toISOString() : undefined,
       })
       emit("added")
@@ -521,7 +501,6 @@ defineExpose({ pendingMarketPrice })
           :market-price="marketPrice"
           :price-loading="priceLoading"
           :price-as-of-label="priceLoading ? 'fetching price…' : stockForm.date >= today() ? 'current price' : `close on ${stockForm.date}`"
-          :wallets="walletsStore.wallets"
           :target-currency="targetCurrency"
           :tx-currency="TX_CCY"
           :testid="'add-position'"

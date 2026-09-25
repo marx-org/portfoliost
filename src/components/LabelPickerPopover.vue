@@ -6,7 +6,7 @@ import { labelColors, labelPaletteHexes } from "@/utils/labelColors"
 import {
   setPositionLabels,
   setTransactionLabels,
-  setWalletTransactionLabels,
+  setCashTransactionLabels,
 } from "@/api/labels"
 import type { Label } from "@/api/labels"
 
@@ -77,8 +77,8 @@ async function save() {
         saved = await setTransactionLabels(props.portfolioId, props.entityId, ids)
         break
       case "cash-transaction":
-        if (!props.walletId) throw new Error("Missing walletId")
-        saved = await setWalletTransactionLabels(props.walletId, props.entityId, ids)
+        await setCashTransactionLabels(props.entityId, { labelIds: ids })
+        saved = store.labels.filter((l) => ids.includes(l.id))
         break
     }
     emit("saved", saved)

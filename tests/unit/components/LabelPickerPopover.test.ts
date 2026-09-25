@@ -13,7 +13,7 @@ vi.mock("@/api/labels", async (importOriginal) => {
     createLabel: vi.fn(),
     setPositionLabels: vi.fn(),
     setTransactionLabels: vi.fn(),
-    setWalletTransactionLabels: vi.fn(),
+    setCashTransactionLabels: vi.fn(),
   }
 })
 
@@ -42,7 +42,7 @@ describe("LabelPickerPopover (3.11)", () => {
     mocked.getLabels.mockResolvedValue([label("a", "Dividend"), label("b", "Fund")])
     mocked.setPositionLabels.mockResolvedValue([label("b", "Fund")])
     mocked.setTransactionLabels.mockResolvedValue([])
-    mocked.setWalletTransactionLabels.mockResolvedValue([])
+    mocked.setCashTransactionLabels.mockResolvedValue([])
   })
 
   it("syncs the current labels as checked on open", async () => {
@@ -74,12 +74,12 @@ describe("LabelPickerPopover (3.11)", () => {
     expect(mocked.setTransactionLabels).toHaveBeenCalledWith("pf1", "pos1", [])
   })
 
-  it("routes cash-transaction kind to setWalletTransactionLabels", async () => {
-    const w = mountPopover({ entityKind: "cash-transaction", walletId: "w1" })
+  it("routes cash-transaction kind to setCashTransactionLabels", async () => {
+    const w = mountPopover({ entityKind: "cash-transaction" })
     await flushPromises()
     await w.findAll("button").find((b) => b.text() === "Save")!.trigger("click")
     await flushPromises()
-    expect(mocked.setWalletTransactionLabels).toHaveBeenCalledWith("w1", "pos1", [])
+    expect(mocked.setCashTransactionLabels).toHaveBeenCalledWith("pos1", { labelIds: [] })
   })
 
   it("creates a new label inline and auto-checks it", async () => {

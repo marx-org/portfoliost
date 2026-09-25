@@ -6,7 +6,6 @@ import EditPositionDialog from "@/modules/portfolios/EditPositionDialog.vue"
 import EditTransactionModal, { type EditTransaction } from "@/modules/portfolios/EditTransactionModal.vue"
 import { usePortfolioStore } from "@/stores/portfolios"
 import * as portfoliosApi from "@/api/portfolios"
-import * as walletsApi from "@/api/wallets"
 import { useCurrenciesStore } from "@/stores/currencies"
 
 vi.mock("vue-router", () => ({
@@ -45,41 +44,20 @@ vi.mock("@/api/instruments", () => ({
   getEpsSurprises: vi.fn().mockResolvedValue({}),
 }))
 
-vi.mock("@/api/wallets", async (importOriginal) => {
-  const actual = await importOriginal<typeof walletsApi>()
-  return {
-    ...actual,
-    getWallets: vi.fn(),
-    getWalletTotalBalance: vi.fn(),
-  }
-})
-
 vi.mock("@/api/fx", () => ({
   getLatestRate: vi.fn().mockResolvedValue({ rate: 4.35, asOf: "2026-08-25" }),
 }))
 const mocked = vi.mocked(portfoliosApi)
-const mockedWallets = vi.mocked(walletsApi)
 
-function makeEnv() {
+function makeEnv(baseCurrency = "USD") {
   const pinia = createPinia()
   setActivePinia(pinia)
   const store = useCurrenciesStore()
   store.currencies = registry
   store.loaded = true
-  // D40: the transaction leg settles into the *wallet's* currency (payment currency);
-  // the portfolio currency is only the fallback when no wallet is selected
+  // §62 — the FX payment leg targets the portfolio's base currency (no wallet).
   const portfolios = usePortfolioStore()
-  portfolios.portfolios = [{ id: "p1", currency: "PLN" }] as never
-  mockedWallets.getWallets.mockResolvedValue([
-    { id: "w1", userId: "u", name: "Cash USD", currency: "USD", balance: 1000, availableBalance: 1000, isDefault: false, createdAt: "", updatedAt: "" },
-    { id: "w2", userId: "u", name: "Cash PLN", currency: "PLN", balance: 4300, availableBalance: 4300, isDefault: false, createdAt: "", updatedAt: "" },
-  ] as never)
-  mockedWallets.getWalletTotalBalance.mockResolvedValue({
-    totalBalance: 5300,
-    totalAvailableBalance: 5300,
-    baseCurrency: "PLN",
-    walletBreakdown: [],
-  } as never)
+  portfolios.portfolios = [{ id: "p1", baseCurrency }] as never
   return { pinia }
 }
 
@@ -88,13 +66,6 @@ const registry = [
   { code: "USD", name: "US Dollar", symbol: "$", minorUnits: 2, popular: true },
   { code: "PLN", name: "Polish Zloty", symbol: "zł", minorUnits: 2, popular: true },
 ]
-
-async function waitForOption(wrapper: { find: (sel: string) => { exists(): boolean } }, value: string): Promise<void> {
-  for (let i = 0; i < 25; i++) {
-    if (wrapper.find(`option[value="${value}"]`).exists()) return
-    await flushPromises()
-  }
-}
 
 async function openStockStep(env = makeEnv()) {
   const wrapper = mount(AddPositionDialog, {
@@ -132,21 +103,17 @@ describe("AddPositionDialog — fee currency & fx disclosure (§10.3)", () => {
     wrapper.unmount()
   })
 
-  it("hides the fx section when the wallet currency equals the transaction currency", async () => {
-    const wrapper = await openStockStep()
-    await waitForOption(wrapper, "w1")
-    await wrapper.find('[data-testid="add-position-wallet"]').setValue("w1") // USD === TX_CCY
+  it("hides the fx section when the portfolio base currency equals the transaction currency", async () => {
+    const wrapper = await openStockStep(makeEnv("USD")) // base USD === TX_CCY
     await flushPromises()
     expect(wrapper.find('[data-testid="add-position-fx-section"]').exists()).toBe(false)
     wrapper.unmount()
   })
 
-  it("shows the fx section targeted at the wallet currency; defaults to automatic, hides the rate input", async () => {
-    const wrapper = await openStockStep()
-    await waitForOption(wrapper, "w2")
-    await wrapper.find('[data-testid="add-position-wallet"]').setValue("w2")
+  it("shows the fx section targeted at the portfolio base currency; defaults to automatic, hides the rate input", async () => {
+    const wrapper = await openStockStep(makeEnv("PLN"))
     await flushPromises()
-    expect(wrapper.find('[data-testid="add-position-fx-section"]').exists()).toBe(true) // USD → PLN (wallet ccy)
+    expect(wrapper.find('[data-testid="add-position-fx-section"]').exists()).toBe(true) // USD → PLN (base ccy)
     expect(wrapper.text()).toContain("USD → PLN")
     expect(wrapper.find('[data-testid="add-position-fx-rate"]').exists()).toBe(false)
     wrapper.unmount()
@@ -156,9 +123,7 @@ describe("AddPositionDialog — fee currency & fx disclosure (§10.3)", () => {
     mocked.createPortfolioPosition.mockImplementation(async () => {
       throw new Error("exit-early")
     })
-    const wrapper = await openStockStep()
-    await waitForOption(wrapper, "w2")
-    await wrapper.find('[data-testid="add-position-wallet"]').setValue("w2")
+    const wrapper = await openStockStep(makeEnv("PLN"))
     await flushPromises()
     await wrapper.find('[data-testid="add-position-fx-manual"]').trigger("click")
     expect(wrapper.find('[data-testid="add-position-fx-rate"]').exists()).toBe(true)
@@ -177,9 +142,7 @@ describe("AddPositionDialog — fee currency & fx disclosure (§10.3)", () => {
   })
 
   it("automatic mode omits exchangeRate from the payload", async () => {
-    const wrapper = await openStockStep()
-    await waitForOption(wrapper, "w2")
-    await wrapper.find('[data-testid="add-position-wallet"]').setValue("w2")
+    const wrapper = await openStockStep(makeEnv("PLN"))
     await flushPromises()
     await wrapper.find('[data-testid="add-position-quantity"]').setValue("1")
     await wrapper.find('[data-testid="add-position-price"]').setValue("10")
@@ -204,7 +167,6 @@ describe("EditTransactionModal — fee currency & fx disclosure (§10.3)", () =>
     price: 100,
     fees: 1,
     currency: "USD",
-    walletId: "w1",
     executedAt: new Date().toISOString(),
     feeCurrency: null,
     rateSource: null,
@@ -212,7 +174,7 @@ describe("EditTransactionModal — fee currency & fx disclosure (§10.3)", () =>
   })
 
   function mountModal(transaction: EditTransaction) {
-    const env = makeEnv()
+    const env = makeEnv("PLN") // base PLN ≠ tx USD → cross-currency FX leg
     return mount(EditTransactionModal, {
       props: { open: false, transaction },
       global: { plugins: [env.pinia] },
@@ -322,17 +284,15 @@ describe("AddPositionDialog — multicurrency summary (plan §13 follow-up 4/6)"
     vi.mocked(fxMod.getLatestRate).mockResolvedValue({ rate: 4.35, asOf: "2026-08-25" } as never)
   })
 
-  it("shows converted amounts when the wallet currency differs from TX_CCY", async () => {
-    const wrapper = await openStockStep()
-    await waitForOption(wrapper, "w2")
-    await wrapper.find('[data-testid="add-position-wallet"]').setValue("w2")
+  it("shows converted amounts when the portfolio base currency differs from TX_CCY", async () => {
+    const wrapper = await openStockStep(makeEnv("PLN"))
     await flushPromises()
     await wrapper.find('[data-testid="add-position-price"]').setValue("100")
     await flushPromises()
     await flushPromises()
     await flushPromises()
     const summaryText = wrapper.find("dl").text()
-    // 1 × $100 = $100, converted at 4.35 → PLN 435.00 (wallet ccy)
+    // 1 × $100 = $100, converted at 4.35 → PLN 435.00 (base ccy)
     expect(summaryText).toContain("$100.00")
     // Intl.NumberFormat uses U+00A0 between currency code and amount
     expect(summaryText).toContain("PLN\u00A0435.00")
@@ -352,15 +312,14 @@ describe("AddPositionDialog — multicurrency summary (plan §13 follow-up 4/6)"
     wrapper.unmount()
   })
 
-  it("shows no ≈ conversion when the wallet currency equals TX_CCY", async () => {
+  it("shows no ≈ conversion when the portfolio base currency equals TX_CCY", async () => {
     const pinia = createPinia()
     setActivePinia(pinia)
     const cs = useCurrenciesStore()
     cs.currencies = registry
     cs.loaded = true
     const ps = usePortfolioStore()
-    ps.portfolios = [{ id: "p1", currency: "USD" }] as never
-    mockedWallets.getWallets.mockResolvedValue([{ id: "w1", name: "Cash", balance: 1000, currency: "USD" }] as never)
+    ps.portfolios = [{ id: "p1", baseCurrency: "USD" }] as never
 
     const wrapper = mount(AddPositionDialog, {
       props: { open: false, portfolioId: "p1" },
@@ -398,11 +357,11 @@ describe("EditPositionDialog — fee/FX fields + multicurrency summary (plan §1
     openedAt: "2026-08-20T00:00:00Z",
   })
 
-  function mountDialog() {
-    const env = makeEnv()
+  function mountDialog(env?: ReturnType<typeof makeEnv>) {
+    const envArg = env ?? makeEnv()
     return mount(EditPositionDialog, {
       props: { open: false, portfolioId: "p1", position: position() as never },
-      global: { plugins: [env.pinia] },
+      global: { plugins: [envArg.pinia] },
       attachTo: document.body,
     })
   }
@@ -412,15 +371,13 @@ describe("EditPositionDialog — fee/FX fields + multicurrency summary (plan §1
     vi.mocked(fxMod.getLatestRate).mockResolvedValue({ rate: 4.35, asOf: "2026-08-25" } as never)
   })
 
-  it("renders FeeFields and FxRateFields in the add-tx form when a cross-currency wallet is selected", async () => {
-    const wrapper = mountDialog()
+  it("renders FeeFields and FxRateFields in the add-tx form when the portfolio base currency is cross-currency", async () => {
+    const wrapper = mountDialog(makeEnv("PLN"))
     await wrapper.setProps({ open: true })
     await flushPromises()
     // FeeFields renders fee currency select
     expect(wrapper.find('[data-testid="edit-position-fee-currency"]').exists()).toBe(true)
-    // FxRateFields renders transaction disclosure once the payment wallet differs from tx ccy
-    await waitForOption(wrapper, "w2")
-    await wrapper.find('[data-testid="edit-position-wallet"]').setValue("w2")
+    // FxRateFields renders transaction disclosure when the base currency differs from tx ccy
     await flushPromises()
     expect(wrapper.find('[data-testid="edit-position-fx-section"]').exists()).toBe(true)
     // Multicurrency summary exists
@@ -428,12 +385,10 @@ describe("EditPositionDialog — fee/FX fields + multicurrency summary (plan §1
     wrapper.unmount()
   })
 
-  it("shows multicurrency summary when the wallet currency differs from instrument currency", async () => {
-    const wrapper = mountDialog()
+  it("shows multicurrency summary when the portfolio base currency differs from instrument currency", async () => {
+    const wrapper = mountDialog(makeEnv("PLN"))
     await wrapper.setProps({ open: true })
     await flushPromises()
-    await waitForOption(wrapper, "w2")
-    await wrapper.find('[data-testid="edit-position-wallet"]').setValue("w2")
     await flushPromises()
     await wrapper.find('[data-testid="edit-position-quantity"]').setValue("2")
     await wrapper.find('[data-testid="edit-position-price"]').setValue("100")
@@ -442,7 +397,7 @@ describe("EditPositionDialog — fee/FX fields + multicurrency summary (plan §1
     await flushPromises()
     const dl = wrapper.find("dl")
     const text = dl.text()
-    // 2 × $100 = $200 → converted at 4.35 → PLN 870.00 (wallet ccy)
+    // 2 × $100 = $200 → converted at 4.35 → PLN 870.00 (base ccy)
     expect(text).toContain("$200.00")
     expect(text).toContain("PLN\u00A0870.00")
     wrapper.unmount()

@@ -63,7 +63,6 @@ export interface CreatePortfolioPositionInput {
   expirationDate?: string
   openedAt?: string
   executedAt?: string
-  walletId?: string
   fees?: number
   feesType?: "fixed" | "pct"
   /** ISO 4217; defaults to transaction currency when omitted (fees-and-custom-fx D28) */
@@ -108,7 +107,6 @@ export async function createPortfolioTransaction(
     exchangeRate?: number
     feeRateSource?: "automatic" | "manual"
     feeExchangeRate?: number
-    walletId?: string
     positionId?: string
     executedAt?: string
     /** DIVIDEND withholding tax (gross − taxes = net totalAmount; must be ≤ quantity × price) */
@@ -198,6 +196,85 @@ export async function getPortfolioRiskMetrics(id: string): Promise<unknown> {
   return http.get<unknown>(`/api/portfolios/${id}/risk-metrics`)
 }
 
+// ─── §62 — portfolio-native cash (replaces the deleted wallet module) ──────
+type PortfolioCash = components["schemas"]["PortfolioCash"]
+type PortfolioCashHistory = components["schemas"]["PortfolioCashHistory"]
+type CashTransaction = components["schemas"]["CashTransaction"]
+type RecentCashTransaction = components["schemas"]["RecentCashTransaction"]
+type RecentCashTransactionsPage = components["schemas"]["RecentCashTransactionsPage"]
+type DepositCashRequest = components["schemas"]["DepositCashRequest"]
+type WithdrawCashRequest = components["schemas"]["WithdrawCashRequest"]
+type TransferCashRequest = components["schemas"]["TransferCashRequest"]
+type GetPortfolioCashHistoryQuery = NonNullable<operations["getPortfolioCashHistory"]["parameters"]["query"]>
+type GetRecentCashTransactionsQuery = NonNullable<operations["getRecentCashTransactions"]["parameters"]["query"]>
+export interface UpdateCashTransactionInput {
+  type?: string
+  amount?: number
+  description?: string
+  date?: string
+}
+
+export async function getPortfolioCash(id: string): Promise<PortfolioCash> {
+  return http.get<PortfolioCash>(`/api/portfolios/${id}/cash`)
+}
+
+export async function getPortfolioCashHistory(
+  id: string,
+  period?: GetPortfolioCashHistoryQuery["period"],
+  resolution?: GetPortfolioCashHistoryQuery["resolution"],
+): Promise<PortfolioCashHistory> {
+  const q = new URLSearchParams()
+  if (period) q.set("period", period)
+  if (resolution) q.set("resolution", resolution)
+  const s = q.toString() ? `?${q.toString()}` : ""
+  return http.get<PortfolioCashHistory>(`/api/portfolios/${id}/cash/balance-history${s}`)
+}
+
+export async function getPortfolioCashTransactions(
+  id: string,
+  page = 1,
+  limit = 20,
+  labelIds?: string[],
+): Promise<PaginatedResponse<CashTransaction>> {
+  const labels = labelIds?.length ? `&labels=${encodeURIComponent(labelIds.join(","))}` : ""
+  return http.get<PaginatedResponse<CashTransaction>>(
+    `/api/portfolios/${id}/cash/transactions?page=${page}&limit=${limit}${labels}` as string,
+  )
+}
+
+export async function depositCash(id: string, input: DepositCashRequest): Promise<CashTransaction> {
+  return http.post<CashTransaction>(`/api/portfolios/${id}/cash/deposits`, input)
+}
+
+export async function withdrawCash(id: string, input: WithdrawCashRequest): Promise<CashTransaction> {
+  return http.post<CashTransaction>(`/api/portfolios/${id}/cash/withdrawals`, input)
+}
+
+export async function transferCash(id: string, input: TransferCashRequest): Promise<CashTransaction> {
+  return http.post<CashTransaction>(`/api/portfolios/${id}/cash/transfers`, input)
+}
+
+export async function getRecentCashTransactions(
+  page = 1,
+  limit = 10,
+  sortBy?: GetRecentCashTransactionsQuery["sortBy"],
+  sortOrder?: GetRecentCashTransactionsQuery["sortOrder"],
+  labelIds?: string[],
+): Promise<RecentCashTransactionsPage> {
+  const labels = labelIds?.length ? `&labels=${encodeURIComponent(labelIds.join(","))}` : ""
+  return http.get<RecentCashTransactionsPage>(
+    `/api/portfolios/cash/recent-transactions?page=${page}&limit=${limit}&sortBy=${sortBy ?? "date"}&sortOrder=${sortOrder ?? "desc"}${labels}` as string,
+  )
+}
+
+export async function updateCashTransaction(txId: string, input: UpdateCashTransactionInput): Promise<RecentCashTransaction> {
+  return http.patch<RecentCashTransaction>(`/api/portfolios/cash/transactions/${txId}`, input)
+}
+
+export async function deleteCashTransaction(txId: string): Promise<void> {
+  return http.delete<void>(`/api/portfolios/cash/transactions/${txId}`)
+}
+
 export async function getAllTransactions(
   page = 1,
   limit = 10,
@@ -219,7 +296,6 @@ export async function createPortfolio(input: {
   strategy?: string
   currency?: string
   isPublic?: boolean
-  walletId?: string
 }): Promise<PortfolioDetail> {
   return http.post<PortfolioDetail>("/api/portfolios", input)
 }

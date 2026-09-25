@@ -96,11 +96,11 @@ describe("PortfolioPerformanceTab — §48.6e B3 display-currency conversion", (
     expect(benchmark.data).toContainEqual([TS, 5000 * 0.26])
   })
 
-  it("falls back to currency when baseCurrency is absent (older API)", async () => {
-    const wrapper = await mountTab({ currency: "PLN" })
+  it("defaults to USD when baseCurrency is absent (no FX fetch)", async () => {
+    const wrapper = await mountTab({ baseCurrency: "USD" })
 
-    expect(mockedFx.getLatestRate).toHaveBeenCalledWith("PLN", "USD")
-    expect(lastValue(plottedSeries(wrapper))).toBeCloseTo(119190 * 0.26, 6)
+    expect(mockedFx.getLatestRate).not.toHaveBeenCalled()
+    expect(lastValue(plottedSeries(wrapper))).toBeCloseTo(119190, 6)
   })
 
   it("same-currency base: no FX fetch, values plotted as-is", async () => {

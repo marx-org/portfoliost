@@ -5,7 +5,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import InvestmentsView from "@/modules/portfolios/InvestmentsView.vue"
 import PortfolioPerformanceChart from "@/components/PortfolioPerformanceChart.vue"
 import * as portfoliosApi from "@/api/portfolios"
-import * as walletsApi from "@/api/wallets"
 import * as fxApi from "@/api/fx"
 
 vi.mock("@/api/portfolios", async (importOriginal) => {
@@ -22,17 +21,11 @@ vi.mock("@/api/portfolios", async (importOriginal) => {
   }
 })
 
-vi.mock("@/api/wallets", () => ({
-  getWallets: vi.fn(),
-  getWalletTotalBalance: vi.fn(),
-}))
-
 vi.mock("@/api/fx", () => ({
   getLatestRate: vi.fn(),
 }))
 
 const mocked = vi.mocked(portfoliosApi)
-const mockedWallets = vi.mocked(walletsApi)
 const mockedFx = vi.mocked(fxApi)
 
 let pinia: Pinia
@@ -46,8 +39,7 @@ function summary() {
       description: "Big US growth stocks",
       strategy: "GROWTH",
       type: "regular",
-      currency: "USD",
-      walletId: "w1",
+      baseCurrency: "USD",
       totalInvested: 1000,
       currentValue: 1200,
       isPublic: false,
@@ -122,6 +114,8 @@ describe("InvestmentsView", () => {
       returnPercentage: 20,
       baseCurrency: "USD",
       portfolioBreakdown: [],
+      totalCash: 0,
+      cashBreakdown: [],
     } as never)
     mocked.getPortfolioAnalytics.mockResolvedValue({
       performance: { timeSeries: [{ date: "2026-01-01", value: 100 }], monthlyReturns: [] },
@@ -129,8 +123,6 @@ describe("InvestmentsView", () => {
     mocked.getMergedAnalytics.mockResolvedValue({
       performance: { timeSeries: [{ date: "2026-01-01", value: 1000 }], monthlyReturns: [] },
     } as never)
-    mockedWallets.getWallets.mockResolvedValue([])
-    mockedWallets.getWalletTotalBalance.mockResolvedValue({ totalBalance: 0, totalAvailableBalance: 0 } as never)
     mockedFx.getLatestRate.mockResolvedValue({ rate: 0.9, asOf: "2026-09-21" })
   })
 
@@ -145,35 +137,30 @@ describe("InvestmentsView", () => {
     expect(wrapper.text()).toContain("20.00%")
   })
 
-  it("renders investment and cash portfolio sections with cards (converted cash total, §48.6e B4)", async () => {
-    mockedWallets.getWallets.mockResolvedValue([
-      { id: "w1", userId: "u1", name: "Portfel USD 1", currency: "USD", balance: 500, availableBalance: 500, isDefault: true, createdAt: "", updatedAt: "" },
-      { id: "w2", userId: "u1", name: "Portfel EUR 1", currency: "EUR", balance: 200, availableBalance: 200, isDefault: false, createdAt: "", updatedAt: "" },
-    ] as never)
-    // The endpoint values every wallet in the REQUESTED base currency (display
-    // USD here; EUR→USD @ 1.1): 500 + 200×1.1 = 720, weights from converted.
-    mockedWallets.getWalletTotalBalance.mockResolvedValue({
-      totalBalance: 720,
-      totalAvailableBalance: 720,
+  it("renders the investment and cash sections with the portfolio-native cash total (§62)", async () => {
+    mocked.getPortfolioTotalMetrics.mockResolvedValue({
+      totalValue: 1200,
+      totalInvested: 1000,
+      totalGainLoss: 200,
+      returnPercentage: 20,
       baseCurrency: "USD",
-      walletBreakdown: [
-        { id: "w1", name: "Portfel USD 1", currency: "USD", balance: 500, availableBalance: 500, weight: 69.44 },
-        { id: "w2", name: "Portfel EUR 1", currency: "EUR", balance: 200, availableBalance: 200, weight: 30.56 },
+      portfolioBreakdown: [],
+      totalCash: 720,
+      cashBreakdown: [
+        { currency: "USD", balance: 500, weight: 69.44 },
+        { currency: "EUR", balance: 200, weight: 30.56 },
       ],
     } as never)
     const wrapper = mountView()
     await flushPromises()
 
-    expect(mockedWallets.getWalletTotalBalance).toHaveBeenCalledWith("USD")
     expect(wrapper.text()).toContain("Investment Portfolios")
-    expect(wrapper.text()).toContain("Cash Portfolios")
+    expect(wrapper.text()).toContain("Cash")
     expect(wrapper.text()).toContain("Top10")
     expect(wrapper.text()).toContain("GROWTH")
     expect(wrapper.text()).toContain("10 open positions")
-    expect(wrapper.text()).toContain("Portfel USD 1")
     expect(wrapper.text()).toContain("Total Balance")
     expect(wrapper.text()).toContain("$720.00")
-    // Converted weights — NOT the raw 500/200 (71/29) native split.
     expect(wrapper.text()).toContain("USD 69%")
     expect(wrapper.text()).toContain("EUR 31%")
   })
@@ -195,7 +182,6 @@ describe("InvestmentsView", () => {
       description: undefined,
       strategy: "GROWTH",
       currency: "USD",
-      walletId: undefined,
     })
   })
 

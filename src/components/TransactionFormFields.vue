@@ -5,11 +5,9 @@ import FxRateFields from "@/components/FxRateFields.vue"
 import { formatCurrency } from "@/utils/format"
 import { useCurrenciesStore } from "@/stores/currencies"
 import { useTransactionForm, type TransactionFormFields } from "@/composables/useTransactionForm"
-import type { Wallets } from "@/api/types"
 
 export interface TransactionFormModel extends TransactionFormFields {
   date: string
-  walletId: string
   type?: "BUY" | "SELL"
 }
 
@@ -21,7 +19,6 @@ const props = withDefaults(defineProps<{
   marketPrice: number | null
   priceAsOfLabel: string
   priceLoading?: boolean
-  wallets: Wallets
   targetCurrency: string | null
   txCurrency: string
   testid: string
@@ -43,10 +40,7 @@ const emit = defineEmits<{
 const currenciesStore = useCurrenciesStore()
 if (!currenciesStore.loaded) void currenciesStore.load()
 
-const paymentCurrency = computed<string | null>(() => {
-  const wallet = props.wallets.find((w) => w.id === model.value.walletId)
-  return wallet?.currency ?? props.targetCurrency
-})
+const paymentCurrency = computed<string | null>(() => props.targetCurrency)
 
 const tf = useTransactionForm(
   computed(() => model.value),
@@ -108,14 +102,6 @@ const tf = useTransactionForm(
           :data-testid="`${testid}-date`"
         />
       </template>
-
-      <label :for="`${testid}-wallet`" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Cash portfolio</label>
-      <select :id="`${testid}-wallet`" v-model="model.walletId" class="input mb-4" :data-testid="`${testid}-wallet`">
-        <option v-if="!wallets.length" value="" disabled>Loading wallets…</option>
-        <option v-for="w in wallets" :key="w.id" :value="w.id">
-          {{ w.name }} ({{ formatCurrency(w.balance, w.currency) }})
-        </option>
-      </select>
 
       <div class="mb-4 grid grid-cols-2 gap-4">
         <div>

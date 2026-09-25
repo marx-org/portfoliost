@@ -31,11 +31,15 @@ export type PortfolioCompare = components["schemas"]["PortfolioSnapshot"]
 export type PortfolioTransactionsPage = { items: components["schemas"]["Transaction"][] }
 export type PortfoliosTransactions = { items: components["schemas"]["Transaction"][]; total: number; page: number; limit: number; totalPages: number; hasNext: boolean; hasPrevious: boolean }
 
-export type CashWallet = components["schemas"]["CashWallet"]
-export type Wallets = components["schemas"]["CashWallet"][]
-export type WalletsTotalBalance = components["schemas"]["WalletsTotalBalance"]
-export type BalanceHistory = components["schemas"]["BalanceHistory"]
+export type PortfolioCash = components["schemas"]["PortfolioCash"]
+export type PortfolioCashHistory = components["schemas"]["PortfolioCashHistory"]
+export type PortfolioCashTransactionsPage = components["schemas"]["PageResponse"]
 export type CashTransaction = components["schemas"]["CashTransaction"]
+export type RecentCashTransaction = components["schemas"]["RecentCashTransaction"]
+export type RecentCashTransactionsPage = components["schemas"]["RecentCashTransactionsPage"]
+export type DepositCashRequest = components["schemas"]["DepositCashRequest"]
+export type WithdrawCashRequest = components["schemas"]["WithdrawCashRequest"]
+export type TransferCashRequest = components["schemas"]["TransferCashRequest"]
 
 export type InstrumentDetail = components["schemas"]["InstrumentDetail"]
 export type InstrumentMetrics = components["schemas"]["InstrumentMetrics"]

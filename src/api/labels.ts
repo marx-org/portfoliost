@@ -34,12 +34,9 @@ export function setTransactionLabels(
   })
 }
 
-export function setWalletTransactionLabels(
-  walletId: string,
+export function setCashTransactionLabels(
   transactionId: string,
-  labelIds: string[],
+  req: { labelIds: string[] },
 ): Promise<Label[]> {
-  return http.post<Label[]>(`/api/wallets/${walletId}/transactions/${transactionId}/labels`, {
-    labelIds,
-  })
+  return http.post<Label[]>(`/api/portfolios/cash/transactions/${transactionId}/labels`, req)
 }

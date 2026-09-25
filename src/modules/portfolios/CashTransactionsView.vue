@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from "vue"
-import { getAllWalletTransactions, updateWalletTransaction, deleteWalletTransaction } from "@/api/wallets"
+import { getRecentCashTransactions, updateCashTransaction, deleteCashTransaction } from "@/api/portfolios"
 import { formatCurrency, formatDateTime } from "@/utils/format"
-import type { RecentCashTransaction } from "@/api/wallets"
+import type { RecentCashTransaction } from "@/api/types"
 import InvestmentsTabs from "@/modules/portfolios/InvestmentsTabs.vue"
 import TransactionsSubTabs from "@/modules/portfolios/TransactionsSubTabs.vue"
 import ConfirmDeleteModal from "@/modules/portfolios/ConfirmDeleteModal.vue"
@@ -44,13 +44,13 @@ async function load(targetPage = page.value) {
   loading.value = true
   error.value = null
   try {
-    const res = await getAllWalletTransactions(targetPage, pageSize.value, sortBy.value, sortOrder.value, labelFilter.value.length ? labelFilter.value : undefined)
+    const res = await getRecentCashTransactions(targetPage, pageSize.value, sortBy.value, sortOrder.value, labelFilter.value.length ? labelFilter.value : undefined)
     transactions.value = res.data ?? []
     total.value = res.meta?.total ?? 0
     page.value = res.meta?.page ?? 1
     totalPages.value = res.meta?.totalPages ?? 1
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Failed to load wallet transactions"
+    error.value = err instanceof Error ? err.message : "Failed to load cash transactions"
   } finally {
     loading.value = false
   }
@@ -122,7 +122,7 @@ async function submitEdit() {
   editBusy.value = true
   editError.value = null
   try {
-    await updateWalletTransaction(editing.value.id, {
+    await updateCashTransaction(editing.value.id, {
       type: editForm.value.type,
       amount: editForm.value.amount,
       description: editForm.value.description,
@@ -149,7 +149,7 @@ async function submitDelete() {
   deleteError.value = null
   const target = deleteTarget.value
   try {
-    await deleteWalletTransaction(target.id)
+    await deleteCashTransaction(target.id)
     deleteTarget.value = null
     notice.value = "Transaction deleted"
     await load()
@@ -202,10 +202,10 @@ function onPickerSaved() {
                   <span v-if="sortBy === 'date'">{{ sortOrder === "asc" ? "↑" : "↓" }}</span>
                 </button>
               </th>
-              <th data-testid="table-th-walletName" class="px-5 py-2.5 font-medium">
-                <button type="button" class="inline-flex items-center gap-1 hover:text-slate-900" @click="toggleSort('walletName')">
-                  Wallet
-                  <span v-if="sortBy === 'walletName'">{{ sortOrder === "asc" ? "↑" : "↓" }}</span>
+              <th data-testid="table-th-portfolioName" class="px-5 py-2.5 font-medium">
+                <button type="button" class="inline-flex items-center gap-1 hover:text-slate-900" @click="toggleSort('portfolioName')">
+                  Portfolio
+                  <span v-if="sortBy === 'portfolioName'">{{ sortOrder === "asc" ? "↑" : "↓" }}</span>
                 </button>
               </th>
               <th data-testid="table-th-type" class="px-5 py-2.5 font-medium">
@@ -227,7 +227,7 @@ function onPickerSaved() {
           <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
             <tr v-for="tx in transactions" :key="tx.id" class="hover:bg-slate-50">
               <td class="px-5 py-3 whitespace-nowrap text-slate-600 dark:text-slate-300">{{ formatDateTime(tx.date) }}</td>
-              <td class="px-5 py-3 text-slate-900 dark:text-slate-100">{{ tx.walletName || "—" }}</td>
+              <td class="px-5 py-3 text-slate-900 dark:text-slate-100">{{ tx.portfolioName || "—" }}</td>
               <td class="px-5 py-3 text-slate-600 dark:text-slate-300">{{ tx.displayLabel }}</td>
               <td class="px-5 py-3 text-slate-600 dark:text-slate-300">
                 <div>{{ tx.description || "—" }}</div>
@@ -382,7 +382,7 @@ function onPickerSaved() {
         :open="pickerOpen"
         :entity-id="pickerTx.id"
         entity-kind="cash-transaction"
-        :wallet-id="pickerTx.walletId"
+        :portfolio-id="pickerTx.portfolioId"
         :current-labels="pickerTx.labels ?? []"
         @close="pickerOpen = false"
         @saved="onPickerSaved"
