@@ -1431,18 +1431,19 @@ and before any wipe.
 
 ### 62.7 — SPA: delete the wallet module, re-point the API layer
 
-- [ ] Delete: `src/stores/wallets.ts`, `src/api/wallets.ts`,
+- [x] Delete: `src/stores/wallets.ts`, `src/api/wallets.ts`,
   `src/modules/wallets/` (WalletsView, WalletDetailView),
   `src/modules/portfolios/CashWalletCard.vue`; router entries `wallets`,
   `wallet-detail` (the `transactions-cash` route + `CashTransactionsView.vue`
-  stay — re-fetched in 62.9).
-- [ ] New cash API in `src/api/portfolios.ts` (62.1 endpoints, explicit return
+  stay — re-fetched in 62.9). *(Also dropped `WalletCashModals.vue`, consumed
+  only by the deleted views/cards — re-scoped to PortfolioCashModals in 62.8.)*
+- [x] New cash API in `src/api/portfolios.ts` (62.1 endpoints, explicit return
   types from the regenerated contracts): `getPortfolioCash(id)`,
   `getPortfolioCashHistory(id)`, `getPortfolioCashTransactions(id, …)`,
   `depositCash/withdrawCash/transferCash(id, …)`,
   `getRecentCashTransactions(page, limit, …)`, `updateCashTransaction/delete
   CashTransaction/setCashTransactionLabels`.
-- [ ] Form cleanup — remove `walletId` everywhere (the field simply stops
+- [x] Form cleanup — remove `walletId` everywhere (the field simply stops
   being sent): `AddPositionDialog.vue`, `EditPositionDialog.vue` (drop the
   `tx.walletId` read at :169), `EditTransactionModal.vue` (drop both wallet
   selects + defaulting), `RecordDividendDialog.vue` (drop the wallet default
@@ -1452,15 +1453,15 @@ and before any wipe.
   `InvestmentsView.vue` (drop the new-portfolio wallet select at :435 and the
   "create wallet" dialog + flow at :233–245 — new portfolio: name/description/
   strategy/currency only).
-- [ ] Dashboard: `InvestmentsView.vue` drops the wallet-cards row
+- [x] Dashboard: `InvestmentsView.vue` drops the wallet-cards row
   (:386–398) + the `getWalletTotalBalance`/`cashBreakdown`-from-wallets fetch
   (:152–161) — the cash summary card switches to
   `totalMetrics.totalCash` + `totalMetrics.cashBreakdown` (62.4) — same
   visual (total + per-currency pct chips).
-- [ ] Update every unit test touching the deleted store/API; e2e specs that
+- [x] Update every unit test touching the deleted store/API; e2e specs that
   navigate `wallets`/`wallet-detail` or assert wallet picks are fixed in 62.9.
-- [ ] Tests: `npm run build`, `npm run test`, `npm run test:mock` green.
-- [ ] Commit.
+- [x] Tests: `npm run build`, `npm run test`, `npm run test:mock` green.
+- [x] Commit.
 
 ### 62.8 — SPA: per-portfolio cash UI (example-service parity)
 
