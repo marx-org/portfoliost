@@ -1281,7 +1281,7 @@ and before any wipe.
 
 ### 62.3 — wallets backend: portfolio cash routes; delete wallet routes
 
-- [ ] New `src/routes/portfolio-cash.ts` (mounted by `index.ts`):
+- [x] New `src/routes/portfolio-cash.ts` (mounted by `index.ts`):
   - `GET /:id/cash` → `PortfolioCash` (balances from `cashBalances`, `total` via
     `fxTo(base)`); ownership guard as the other portfolio routes.
   - `GET /:id/cash/balance-history` → `PortfolioCashHistory` from
@@ -1308,23 +1308,23 @@ and before any wipe.
     /cash/transactions/:txId/labels` — manual cash rows editable (the D23#6
     "trade-derived rows are immutable" rule no longer exists); PATCH returns
     real `labels` (absorbs §57.4).
-- [ ] `routes/portfolios.ts`: `POST /` drops `walletId` from the create schema
+- [x] `routes/portfolios.ts`: `POST /` drops `walletId` from the create schema
   (it was accepted ad hoc); `GET /` (summaries) and `GET /:id` (detail) add
   `cash` (62.1 shape); `GET /total-metrics` adds `totalCash` + `cashBreakdown`
   (Σ `cashBalances` over the user's portfolios, base-converted).
-- [ ] Delete: `routes/wallets.ts`, `routes/wallet-transaction-labels.ts`, the
+- [x] Delete: `routes/wallets.ts`, `routes/wallet-transaction-labels.ts`, the
   wallet-cash list/update/delete routes in `routes/transactions.ts` (keep
   `rowEffect` only if still referenced — it is replaced by
   `cashLedger.tradeCashEffects`, so delete it), the wallet-cash read models in
   `routes/history.ts` (keep the portfolio-side D19 parts), the wallet branches
   in `routes/labels.ts`.
-- [ ] Unit tests (`routes/portfolio-cash.test.ts`): deposit (own + foreign
+- [x] Unit tests (`routes/portfolio-cash.test.ts`): deposit (own + foreign
   ccy, fee leg), withdrawal, same-ccy + cross-ccy transfer (paired legs,
   `linkedTxId`, both balances move, `balanceAfter` on the list), recent feed
   ordering + label filter, PATCH/DELETE/labels on a manual row, 404/403
   ownership, transfer to own portfolio → 400.
-- [ ] Full wallets suite green + `npm run build`.
-- [ ] Commit (portfoliost-wallets).
+- [x] Full wallets suite green + `npm run build`.
+- [x] Commit (portfoliost-wallets).
 
 ### 62.4 — wallets backend: snapshots, currentValue and analytics include cash
 
