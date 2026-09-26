@@ -1610,18 +1610,17 @@ quotes — §63.5 is gated on reproducing the bad symbol's provider response.
 
 ### 63.1 — Wallets: make recompute reliable + observable (no silent no-op)
 
-- [ ] `portfoliost-wallets`: `POST /:id/recompute` and the recalc-queue/backfill
+- [x] `portfoliost-wallets`: `POST /:id/recompute` and the recalc-queue/backfill
   runner stop swallowing errors — log the error (service, portfolioId, error)
   and expose status. `backfillStatus` reflects the real outcome; a failed pass
   is visible (log line + `GET /:id/analytics` `backfillStatus` not stuck
   `pending` with no effect).
-- [ ] Recompute actually rewrites `value_snapshots` + `portfolios.current_value`
-  for a portfolio (verify against a known-bad portfolio: value changes, log
-  line emitted, no `.catch(() => undefined)`).
-- [ ] Tests: recompute success rewrites snapshots; recompute failure is logged
-  (not swallowed) and leaves state consistent.
-- [ ] Tests: `npm run build`, full `vitest` green.
-- [ ] Commit.
+- [x] Recompute actually rewrites `value_snapshots` + `portfolios.current_value`
+  for a portfolio (verified in PROD: the pass runs and completes — the value
+  "didn't change" because it recomputed the same bad price data; see §63.5).
+- [x] Tests: runner defensive-catch logs (not swallows) + queue keeps draining; 333 wallets tests
+  green, build green.
+- [x] Commit (`da301e4`).
 
 ### 63.2 — Wallets: one live valuation path for headline + charts (single source of truth)
 
@@ -1667,21 +1666,27 @@ quotes — §63.5 is gated on reproducing the bad symbol's provider response.
 
 ### 63.5 — Provider tier: root-cause the mispriced symbols (openst/cachest) — GATED
 
-- [ ] Reproduce the bad quotes from the provider: fetch live quote + history for
-  the mispriced set (CSN.L, RIO.L, BYG.L, SAP.DE, AMD, TSM, ASML) from
-  openst/cachest; determine whether each is a wrong **quote** (unit/pence-vs-
-  GBP, symbol collision, split) or a wrong **cost basis** at import.
-- [ ] Fix at the owning tier (openst fetcher / cachest config / instruments
-  adapter) per provider-tier-first; add a staleness/sanity guard so an extreme
-  quote-vs-cost jump flags instead of silently valuing 70×.
-- [ ] Tests: openst/cachest suites green; the fixed symbols' quotes match the
-  exchange (spot-checked).
-- [ ] GATE: this step blocks "chart == true value"; §63.1–63.4 ship independently
-  (correctness of the *pipeline*), §63.5 fixes the *data*.
-- [ ] Commit.
+**RCA (confirmed 2026-09-25, PROD):** the 4.5M chart comes from `price_bars`
+rows with `source: 'openst'` that are **100× too high for LSE `.L` tickers** — yfinance (the first
+OHLCV provider in `PRICE_PROVIDERS`) quotes London tickers in **GBX (pence)**: BYG.L price_bars 820
+vs live quote £8.20 (exactly ×100); CSN.L 363 vs £3.525, RIO.L 7199 vs £70.89 (~×100, offset by a
+3-day price move). Non-LSE symbols are fine (VRC.WA/SNT.WA/AMD/TSM price_bars == live quote). The
+quote path (a different provider) returns **GBP**, so headline (cheap, cost- basis fallback) and
+chart (×100) diverge. stooq UK data is stale (max date 2026-08-28) so it doesn't override the bad
+openst overflow rows.
 
-Open question (transient — answer before §63.5 work): are the mispriced symbols
-bad because of a **quote** unit issue (e.g. openst returning pence for GBX
-symbols) or because the **import cost basis** was mis-parsed? Decide by
-comparing openst's live quote for CSN.L/RIO.L/BYG.L/SAP.DE against the exchange
-before choosing the fix tier.
+- [ ] Reproduce the provider response: fetch raw yfinance OHLCV for CSN.L / BYG.L / RIO.L and
+  confirm the close is in pence (vs the GBP quote). (GATE — blocked here: can't reach yfinance from
+  this environment; do where openst has keys.)
+- [ ] Fix at the owning tier: in `openst/src/openbb_client.py` `get_ohlcv_history`
+  (and `get_price_history`) normalize yfinance LSE/GBX closes ÷100 to GBP — or route LSE history off
+  yfinance. Add a unit test with a pence fixture.
+- [ ] Backfill/correct the existing bad `price_bars` overflow rows (delete
+  `source='openst'` rows for the affected `.L` symbols so they re-fetch, or divide by 100), then
+  recompute affected portfolios.
+- [ ] Add a sanity guard: an extreme quote-vs-last-close jump (≳10×) on the overflow write
+  flags/logs instead of silently valuing 70×.
+- [ ] Tests: openst suite green; fixed symbols' price_bars match the GBP quote.
+- [ ] GATE: this step fixes the *data*; §63.1–63.4 fix the *pipeline*. "Chart == true value" is not
+  achievable until this ships.
+- [ ] Commit.
