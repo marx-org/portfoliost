@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from "vue"
-import { getRecentCashTransactions, updateCashTransaction, deleteCashTransaction } from "@/api/portfolios"
+import { getRecentCashTransactions, deleteCashTransaction } from "@/api/portfolios"
 import { formatCurrency, formatDateTime } from "@/utils/format"
 import type { RecentCashTransaction } from "@/api/types"
 import InvestmentsTabs from "@/modules/portfolios/InvestmentsTabs.vue"
 import TransactionsSubTabs from "@/modules/portfolios/TransactionsSubTabs.vue"
 import ConfirmDeleteModal from "@/modules/portfolios/ConfirmDeleteModal.vue"
+import PortfolioCashModals from "@/modules/portfolios/PortfolioCashModals.vue"
 import LabelFilterBar from "@/components/LabelFilterBar.vue"
 import LabelChips from "@/components/LabelChips.vue"
 import LabelManagerDialog from "@/components/LabelManagerDialog.vue"
@@ -27,9 +28,8 @@ const sortBy = ref("date")
 const sortOrder = ref<"asc" | "desc">("desc")
 
 const editing = ref<Tx | null>(null)
-const editForm = ref({ type: "DEPOSIT", amount: 0, description: "", date: "" })
-const editBusy = ref(false)
-const editError = ref<string | null>(null)
+const modalOpen = ref(false)
+const modalAction = ref<"deposit" | "withdraw" | "transfer">("deposit")
 
 const deleteTarget = ref<Tx | null>(null)
 const deleteBusy = ref(false)
@@ -108,34 +108,15 @@ function amountValue(tx: Tx): number {
 
 function openEdit(tx: Tx) {
   editing.value = tx
-  editForm.value = {
-    type: tx.type,
-    amount: Math.abs(amountValue(tx)),
-    description: tx.description ?? "",
-    date: tx.date.slice(0, 10),
-  }
-  editError.value = null
+  modalAction.value = tx.type === "WITHDRAWAL" ? "withdraw" : tx.type === "TRANSFER" ? "transfer" : "deposit"
+  modalOpen.value = true
 }
 
-async function submitEdit() {
-  if (!editing.value) return
-  editBusy.value = true
-  editError.value = null
-  try {
-    await updateCashTransaction(editing.value.id, {
-      type: editForm.value.type,
-      amount: editForm.value.amount,
-      description: editForm.value.description,
-      date: editForm.value.date ? new Date(editForm.value.date).toISOString() : editing.value.date,
-    })
-    editing.value = null
-    notice.value = "Transaction updated"
-    await load()
-  } catch (err) {
-    editError.value = err instanceof Error ? err.message : "Failed to update transaction"
-  } finally {
-    editBusy.value = false
-  }
+function onEditDone() {
+  modalOpen.value = false
+  editing.value = null
+  notice.value = "Transaction updated"
+  void load()
 }
 
 function openDelete(tx: Tx) {
@@ -335,37 +316,15 @@ function onPickerSaved() {
       </div>
     </div>
 
-    <div
-      v-if="editing"
-      class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
-      @click.self="editing = null"
-    >
-      <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Edit transaction">
-        <h3 class="mb-4 text-base font-semibold">Edit Transaction</h3>
-        <form @submit.prevent="submitEdit">
-          <label for="wt-type" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Transaction Type</label>
-          <select id="wt-type" v-model="editForm.type" class="input mb-4">
-            <option value="DEPOSIT">Deposit</option>
-            <option value="WITHDRAWAL">Withdrawal</option>
-            <option value="TRANSFER">Transfer</option>
-            <option value="INVEST">Investment</option>
-          </select>
-          <label for="wt-amount" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Amount</label>
-          <input id="wt-amount" v-model.number="editForm.amount" type="number" min="0" step="0.01" required class="input mb-4" />
-          <label for="wt-date" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Date</label>
-          <input id="wt-date" v-model="editForm.date" type="date" required class="input mb-4" />
-          <label for="wt-description" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Description</label>
-          <input id="wt-description" v-model="editForm.description" type="text" class="input mb-4" placeholder="Transaction description" />
-          <p v-if="editError" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ editError }}</p>
-          <div class="flex justify-end gap-2">
-            <button type="button" class="btn-ghost" @click="editing = null">Cancel</button>
-            <button type="submit" class="btn-primary" :disabled="editBusy">
-              {{ editBusy ? "Saving..." : "Update Transaction" }}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <PortfolioCashModals
+      :open="modalOpen"
+      :action="modalAction"
+      :portfolio-id="editing?.portfolioId ?? ''"
+      :cash="{ baseCurrency: editing?.currency ?? 'USD', balances: [], total: 0 }"
+      :edit-tx="editing"
+      @close="modalOpen = false; editing = null"
+      @done="onEditDone"
+    />
     <ConfirmDeleteModal
       :open="!!deleteTarget"
       message="Are you sure you want to delete this transaction?"

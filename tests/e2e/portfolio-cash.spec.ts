@@ -162,13 +162,15 @@ test("cash tab: edit + delete a cash row", async ({ page, request }) => {
   await page.goto(`/en/portfolios/${pid}/cash`)
   await expect(page.locator("tbody tr", { hasText: `sal ${ts}` })).toBeVisible({ timeout: 15000 })
 
-  // edit description
+  // edit — the full Deposit/Withdraw/Transfer modal in edit mode
   await page.locator("tbody tr", { hasText: `sal ${ts}` }).getByRole("button", { name: "Edit" }).click()
-  const edit = page.getByRole("dialog", { name: "Edit cash transaction" })
+  const edit = page.getByTestId("pc-form")
   await expect(edit).toBeVisible()
-  await edit.getByTestId("cash-edit-desc").fill(`sal ${ts} edited`)
-  await edit.getByTestId("cash-edit-save").click()
+  await edit.getByTestId("pc-description").fill(`sal ${ts} edited`)
+  await edit.getByTestId("pc-amount").fill("250")
+  await edit.getByTestId("pc-submit").click()
   await expect(page.locator("tbody tr", { hasText: `sal ${ts} edited` })).toBeVisible({ timeout: 10000 })
+  await expect(page.locator("tbody tr", { hasText: `sal ${ts} edited` })).toContainText("$250.00")
 
   // delete the bond row
   await page.locator("tbody tr", { hasText: `bon ${ts}` }).getByRole("button", { name: "Delete" }).click()

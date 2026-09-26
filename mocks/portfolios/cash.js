@@ -9,7 +9,7 @@ import { paginatePage, uuid, nowIso } from "../lib/http.js"
 import { currenciesPayload, resolveFeeFx, DEMO_RATES } from "../lib/demo-fx.js"
 import { convert } from "@marx2/contracts/fx"
 
-const CASH_LABELS = { DEPOSIT: "Deposit", WITHDRAWAL: "Withdrawal", TRANSFER: "Transfer", INVEST: "Investment" }
+const CASH_LABELS = { DEPOSIT: "Deposit", WITHDRAWAL: "Withdrawal", TRANSFER: "Transfer" }
 
 const round2 = (x) => Math.round(x * 100) / 100
 
@@ -54,7 +54,7 @@ function seed() {
   const T = "2026-08-05T00:00:00.000Z"
   applyRow(TOP10_ID, { id: "seed-top-dep", type: "DEPOSIT", amount: 1000, currency: "USD", createdAt: T, date: T, description: "Seed deposit" })
   applyRow(TOP10_ID, { id: "seed-top-dep-eur", type: "DEPOSIT", amount: 500, currency: "EUR", createdAt: T, date: T, description: "Seed deposit EUR" })
-  applyRow(TOP10_ID, { id: "seed-top-inv", type: "INVEST", amount: -300, currency: "USD", createdAt: T, date: T, description: "Seed investment" })
+  applyRow(TOP10_ID, { id: "seed-top-inv", type: "WITHDRAWAL", amount: -300, currency: "USD", createdAt: T, date: T, description: "Opening position (buy)" })
 }
 
 function applyRow(portfolioId, row) {
@@ -297,14 +297,13 @@ export function register(app) {
     if (!found) return ctx.res.status(404).json({ error: "NotFound", message: "Transaction not found" })
     const body = { ...(ctx.body || {}) }
     if (body.transaction_date && !body.transactionDate) body.transactionDate = body.transaction_date
-    if (body.type) {
-      body.type = String(body.type).toUpperCase()
-      body.displayLabel = body.type === "INVEST" ? "Investment" : CASH_LABELS[body.type] ?? body.type
-    }
+    delete body.type // the SPA no longer sends a type — the row type is fixed
     if (typeof body.amount === "number") {
-      const t = String(body.type ?? found.type).toUpperCase()
+      // sign is re-clamped from the existing row's type (like the real PATCH):
+      // WITHDRAWAL → −, DEPOSIT → +
+      const t = String(found.type).toUpperCase()
       const abs = Math.abs(body.amount)
-      body.amount = t === "WITHDRAWAL" || t === "INVEST" ? -abs : abs
+      body.amount = t === "WITHDRAWAL" ? -abs : abs
     }
     overrides.set(txId, { ...overrides.get(txId), ...body })
     ctx.res.json(allRecent().find((t) => t.id === txId))

@@ -475,20 +475,20 @@ async function main() {
   const recentSorted = await request("/portfolios/cash/recent-transactions?page=1&limit=50&sortBy=amount&sortOrder=asc", { token })
   const amounts = recentSorted.json.data.map((t) => Number(t.amount))
   check("cash.recent-transactions sorted asc", recentSorted.status === 200 && amounts.every((v, i) => i === 0 || amounts[i - 1] <= v), `amounts ${amounts.join(",")}`)
-  const investTx = (await request("/portfolios/cash/recent-transactions?page=1&limit=50", { token })).json.data.find((t) => t.type === "INVEST")
-  const patched = await request(`/portfolios/cash/transactions/${investTx.id}`, { method: "PATCH", token, body: { type: "WITHDRAWAL", amount: 100 } })
-  check("cash.recent PATCH recomputes label", patched.status === 200 && patched.json.displayLabel === "Withdrawal" && patched.json.amount.startsWith("-"), `got ${patched.status} ${patched.json.displayLabel} ${patched.json.amount}`)
+  const investTx = (await request("/portfolios/cash/recent-transactions?page=1&limit=50", { token })).json.data.find((t) => t.type === "DEPOSIT")
+  const patched = await request(`/portfolios/cash/transactions/${investTx.id}`, { method: "PATCH", token, body: { amount: 100 } })
+  check("cash.recent PATCH keeps the row type, clamps magnitude positive", patched.status === 200 && patched.json.type === "DEPOSIT" && Number(patched.json.amount) === 100, `got ${patched.status} ${patched.json.type} ${patched.json.amount}`)
   const delTx = await request(`/portfolios/cash/transactions/${investTx.id}`, { method: "DELETE", token })
   check("cash.recent DELETE", delTx.status === 204, `got ${delTx.status}`)
   const afterDelete = await request("/portfolios/cash/recent-transactions?page=1&limit=50&sortBy=date&sortOrder=desc", { token })
   check("cash.recent DELETE tombstones", afterDelete.status === 200 && !afterDelete.json.data.some((t) => t.id === investTx.id), `total ${afterDelete.json.meta.total}`)
-  const seedTx = (await request(`/portfolios/${TOP10}/cash/transactions`, { token })).json.items.find((t) => t.id.startsWith("seed-"))
-  const patchedSeed = await request(`/portfolios/cash/transactions/${seedTx.id}`, { method: "PATCH", token, body: { type: "WITHDRAWAL", amount: 50, description: "Edited" } })
-  check("cash.detail PATCH returns signed recent shape", patchedSeed.status === 200 && patchedSeed.json.displayLabel === "Withdrawal", `got ${patchedSeed.status} ${patchedSeed.json.displayLabel}`)
+  const seedTx = (await request(`/portfolios/${TOP10}/cash/transactions`, { token })).json.items.find((t) => t.id === "seed-top-dep")
+  const patchedSeed = await request(`/portfolios/cash/transactions/${seedTx.id}`, { method: "PATCH", token, body: { amount: 50, description: "Edited" } })
+  check("cash.detail PATCH returns the row (type kept, magnitude set)", patchedSeed.status === 200 && patchedSeed.json.type === seedTx.type, `got ${patchedSeed.status} ${patchedSeed.json.type}`)
   const detailPatched = (await request(`/portfolios/${TOP10}/cash/transactions`, { token })).json.items.find((t) => t.id === seedTx.id)
   check(
-    "cash.detail reflects recent PATCH (amount abs + type)",
-    detailPatched && detailPatched.type === "WITHDRAWAL" && Math.abs(Number(detailPatched.amount)) === 50 && detailPatched.description === "Edited",
+    "cash.detail reflects recent PATCH (amount abs + description)",
+    detailPatched && detailPatched.type === seedTx.type && Math.abs(Number(detailPatched.amount)) === 50 && detailPatched.description === "Edited",
     `found ${detailPatched && JSON.stringify({ type: detailPatched.type, amount: detailPatched.amount, description: detailPatched.description })}`,
   )
   await request(`/portfolios/cash/transactions/${seedTx.id}`, { method: "DELETE", token })

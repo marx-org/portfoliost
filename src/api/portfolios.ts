@@ -208,10 +208,15 @@ type TransferCashRequest = components["schemas"]["TransferCashRequest"]
 type GetPortfolioCashHistoryQuery = NonNullable<operations["getPortfolioCashHistory"]["parameters"]["query"]>
 type GetRecentCashTransactionsQuery = NonNullable<operations["getRecentCashTransactions"]["parameters"]["query"]>
 export interface UpdateCashTransactionInput {
-  type?: string
   amount?: number
+  currency?: string
   description?: string
   date?: string
+  fees?: number
+  feesType?: "fixed" | "pct"
+  feeCurrency?: string
+  feeRateSource?: "automatic" | "manual"
+  feeExchangeRate?: number
 }
 
 export async function getPortfolioCash(id: string): Promise<PortfolioCash> {

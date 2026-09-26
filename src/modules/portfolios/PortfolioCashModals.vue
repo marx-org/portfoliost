@@ -9,7 +9,7 @@
 import { computed, ref, watch } from "vue"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { useCurrenciesStore } from "@/stores/currencies"
-import { depositCash, withdrawCash, transferCash } from "@/api/portfolios"
+import { depositCash, withdrawCash, transferCash, updateCashTransaction } from "@/api/portfolios"
 import { formatCurrency } from "@/utils/format"
 import FeeFields from "@/components/FeeFields.vue"
 import FxRateFields from "@/components/FxRateFields.vue"
@@ -24,6 +24,8 @@ const props = defineProps<{
   portfolioId: string
   /** the portfolio's current cash (for the balance hint + currency default). */
   cash: PortfolioCash
+  /** §62 follow-up — when set the modal edits this cash row (PATCH) instead of creating one. */
+  editTx?: { id: string; type: string; amount: number | string; currency: string; date?: string; createdAt: string; description?: string | null; toPortfolioId?: string | null; fees?: number | null; feeCurrency?: string | null; feeRateSource?: "automatic" | "manual" | null; feeExchangeRate?: number | null } | null
 }>()
 
 const emit = defineEmits<{ (e: "close"): void; (e: "done"): void }>()
@@ -53,6 +55,7 @@ const error = ref<string | null>(null)
 
 const allCurrencies = computed(() => currenciesStore.currencies.map((c) => c.code))
 const baseCurrency = computed(() => props.cash.baseCurrency)
+const isEdit = computed(() => props.editTx != null)
 
 // Other user portfolios (transfer targets).
 const targetPortfolios = computed(() =>
@@ -123,19 +126,34 @@ watch(
   () => props.open,
   (open) => {
     if (open) {
-      amount.value = 0
-      currency.value = baseCurrency.value
-      description.value = ""
-      transactionDate.value = new Date().toISOString().slice(0, 10)
-      paymentMethod.value = "bank_transfer"
-      toPortfolioId.value = ""
-      fees.value = 0
-      feesType.value = "fixed"
-      feeCurrency.value = baseCurrency.value || "USD"
+      if (props.editTx) {
+        // Edit mode — prefill from the existing row (the server re-clamps the
+        // sign per type, so the amount ships as a magnitude).
+        const tx = props.editTx
+        amount.value = Math.abs(Number(tx.amount)) || 0
+        currency.value = tx.currency
+        description.value = tx.description ?? ""
+        transactionDate.value = tx.date ?? tx.createdAt.slice(0, 10)
+        toPortfolioId.value = tx.toPortfolioId ?? ""
+        fees.value = tx.fees != null ? Number(tx.fees) : 0
+        // The CashTransaction schema exposes no feesType; fees ship fixed.
+        feesType.value = "fixed"
+        feeCurrency.value = tx.feeCurrency ?? (baseCurrency.value || "USD")
+        feeRateSource.value = tx.feeRateSource ?? "automatic"
+        feeExchangeRate.value = tx.feeExchangeRate != null ? String(tx.feeExchangeRate) : ""
+      } else {
+        amount.value = 0
+        currency.value = baseCurrency.value
+        description.value = ""
+        transactionDate.value = new Date().toISOString().slice(0, 10)
+        paymentMethod.value = "bank_transfer"
+        toPortfolioId.value = ""
+        fees.value = 0
+        feesType.value = "fixed"
+        feeCurrency.value = baseCurrency.value || "USD"
+      }
       rateSource.value = "automatic"
       exchangeRate.value = ""
-      feeRateSource.value = "automatic"
-      feeExchangeRate.value = ""
       targetRateSource.value = "automatic"
       manualTargetAmount.value = null
       feeSuggestion.value = null
@@ -160,6 +178,31 @@ async function submit() {
   busy.value = true
   error.value = null
   try {
+    if (props.editTx) {
+      // Edit mode — PATCH the row (the server re-clamps the sign per type and
+      // ignores currency changes on transfers).
+      await updateCashTransaction(props.editTx.id, {
+        amount: amount.value,
+        currency: props.editTx.type !== "TRANSFER" ? currency.value : undefined,
+        description: description.value || undefined,
+        date: transactionDate.value || undefined,
+        fees: fees.value || undefined,
+        feesType: feesType.value,
+        feeCurrency:
+          props.editTx.type !== "TRANSFER" && feesType.value === "fixed" ? feeCurrency.value : undefined,
+        feeRateSource:
+          feesType.value === "fixed" && feeCurrency.value !== currency.value ? feeRateSource.value : undefined,
+        feeExchangeRate:
+          feesType.value === "fixed" &&
+          feeCurrency.value !== currency.value &&
+          feeRateSource.value === "manual" &&
+          feeExchangeRate.value
+            ? Number(feeExchangeRate.value)
+            : undefined,
+      })
+      emit("done")
+      return
+    }
     const feeFx = {
       fees: fees.value || undefined,
       feesType: feesType.value,
@@ -222,6 +265,7 @@ async function submit() {
 }
 
 const title = computed(() => {
+  if (isEdit.value) return `Edit ${submitLabel.value}`
   if (props.action === "deposit") return "Deposit Funds"
   if (props.action === "withdraw") return "Withdraw Funds"
   return "Transfer Funds"
@@ -248,7 +292,7 @@ const submitLabel = computed(() => (props.action === "deposit" ? "Deposit" : pro
           </p>
         </template>
 
-        <template v-if="action === 'transfer'">
+        <template v-if="action === 'transfer' && !isEdit">
           <div>
             <label for="pc-to-portfolio" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">To Portfolio *</label>
             <select id="pc-to-portfolio" v-model="toPortfolioId" class="input" required data-testid="pc-to-portfolio">
@@ -272,7 +316,7 @@ const submitLabel = computed(() => (props.action === "deposit" ? "Deposit" : pro
               <span class="pl-3 text-sm text-slate-500 dark:text-slate-400">{{ currency }}</span>
               <input id="pc-amount" v-model.number="amount" type="number" min="0" step="0.01" required class="input !rounded-l-none !border-0 !ring-0 focus:ring-0" placeholder="Enter amount" data-testid="pc-amount" />
             </div>
-            <button v-if="action === 'transfer'" type="button" class="btn-secondary shrink-0 text-sm" @click="transferAll">Transfer All</button>
+            <button v-if="action === 'transfer' && !isEdit" type="button" class="btn-secondary shrink-0 text-sm" @click="transferAll">Transfer All</button>
           </div>
           <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Available: {{ formatCurrency(availableBalance, currency) }}</p>
         </div>
@@ -282,7 +326,7 @@ const submitLabel = computed(() => (props.action === "deposit" ? "Deposit" : pro
           <input id="pc-date" v-model="transactionDate" type="date" class="input" data-testid="pc-date" />
         </div>
 
-        <template v-if="isCrossCcy || action === 'transfer'">
+        <template v-if="!isEdit && (isCrossCcy || action === 'transfer')">
           <FxRateFields
             :leg="action === 'transfer' ? 'Transfer' : 'Deposit'"
             :from="currency"

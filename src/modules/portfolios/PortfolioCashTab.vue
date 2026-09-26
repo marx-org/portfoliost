@@ -12,7 +12,6 @@ import {
   getPortfolioCash,
   getPortfolioCashHistory,
   getPortfolioCashTransactions,
-  updateCashTransaction,
   deleteCashTransaction,
 } from "@/api/portfolios"
 import { usePortfolioStore } from "@/stores/portfolios"
@@ -42,11 +41,10 @@ const error = ref<string | null>(null)
 const modalOpen = ref(false)
 const modalAction = ref<"deposit" | "withdraw" | "transfer">("deposit")
 
-// Edit / delete / labels
+// Edit / delete / labels — edit reuses the Deposit/Withdraw/Transfer modal in
+// edit mode (§62 follow-up) so every field (amount, currency, fees, date, …)
+// is editable, not just the description.
 const editing = ref<CashTransaction | null>(null)
-const editForm = ref({ description: "" })
-const editBusy = ref(false)
-const editError = ref<string | null>(null)
 const deleteTarget = ref<CashTransaction | null>(null)
 const pickerTx = ref<CashTransaction | null>(null)
 
@@ -96,30 +94,15 @@ function openModal(action: "deposit" | "withdraw" | "transfer") {
 
 function onModalDone() {
   modalOpen.value = false
+  editing.value = null
   void load()
 }
 
 function openEdit(tx: CashTransaction) {
   editing.value = tx
-  editForm.value = { description: tx.description ?? "" }
-  editError.value = null
-}
-
-async function submitEdit() {
-  if (!editing.value) return
-  editBusy.value = true
-  editError.value = null
-  try {
-    await updateCashTransaction(editing.value.id, {
-      description: editForm.value.description,
-    })
-    editing.value = null
-    await load()
-  } catch (err) {
-    editError.value = err instanceof Error ? err.message : "Failed to update transaction"
-  } finally {
-    editBusy.value = false
-  }
+  modalAction.value =
+    tx.type === "WITHDRAWAL" ? "withdraw" : tx.type === "TRANSFER" ? "transfer" : "deposit"
+  modalOpen.value = true
 }
 
 async function confirmDelete() {
@@ -261,29 +244,10 @@ function typeLabel(t: string): string {
       :action="modalAction"
       :portfolio-id="id"
       :cash="cash ?? { baseCurrency: 'USD', balances: [], total: 0 }"
-      @close="modalOpen = false"
+      :edit-tx="editing"
+      @close="modalOpen = false; editing = null"
       @done="onModalDone"
     />
-
-    <!-- Small cash edit form (re-scope of the wallet edit) -->
-    <div
-      v-if="editing"
-      class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
-      @click.self="editing = null"
-    >
-      <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Edit cash transaction">
-        <h3 class="mb-4 text-base font-semibold">Edit cash transaction</h3>
-        <form @submit.prevent="submitEdit">
-          <label for="cash-edit-desc" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Description</label>
-          <input id="cash-edit-desc" v-model="editForm.description" type="text" class="input mb-4" data-testid="cash-edit-desc" />
-          <p v-if="editError" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ editError }}</p>
-          <div class="flex justify-end gap-2">
-            <button type="button" class="btn-ghost" @click="editing = null">Cancel</button>
-            <button type="submit" class="btn-primary" :disabled="editBusy" data-testid="cash-edit-save">{{ editBusy ? "Saving..." : "Save" }}</button>
-          </div>
-        </form>
-      </div>
-    </div>
 
     <ConfirmDeleteModal
       :open="deleteTarget != null"
