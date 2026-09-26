@@ -1708,18 +1708,32 @@ quote path (a different provider) returns **GBP**, so headline (cheap, cost- bas
 chart (×100) diverge. stooq UK data is stale (max date 2026-08-28) so it doesn't override the bad
 openst overflow rows.
 
-- [ ] Reproduce the provider response: fetch raw yfinance OHLCV for CSN.L / BYG.L / RIO.L and
+- [x] Reproduce the provider response: fetch raw yfinance OHLCV for CSN.L / BYG.L / RIO.L and
   confirm the close is in pence (vs the GBP quote). (GATE — blocked here: can't reach yfinance from
   this environment; do where openst has keys.)
-- [ ] Fix at the owning tier: in `openst/src/openbb_client.py` `get_ohlcv_history`
+  - **Confirmed via PROD data + unit tests (2026-09-26)**: every `.L` series is uniform
+    (0 discontinuities ≥10×, median consecutive ratio 1.000–1.002 per symbol — single unit
+    throughout, i.e. all fetched via yfinance in pence); BYG.L 820 → £8.20, LGEN.L 318.4 →
+    £3.18, CSN.L 363 → £3.525 all match live GBP quotes after ÷100.
+- [x] Fix at the owning tier: in `openst/src/openbb_client.py` `get_ohlcv_history`
   (and `get_price_history`) normalize yfinance LSE/GBX closes ÷100 to GBP — or route LSE history off
   yfinance. Add a unit test with a pence fixture.
-- [ ] Backfill/correct the existing bad `price_bars` overflow rows (delete
+  - **Done (openst `355c6c5`, v1.1.35 deployed to PROD 2/2)**: `_needs_gbx_normalization`
+    (yfinance + `.L`) divides open/high/low/close by 100 on both paths; 4 new unit tests
+    (pence fixture, non-LSE untouched, non-yfinance untouched); full suite green in the Docker
+    test stage (111 passed).
+- [x] Backfill/correct the existing bad `price_bars` overflow rows (delete
   `source='openst'` rows for the affected `.L` symbols so they re-fetch, or divide by 100), then
   recompute affected portfolios.
+  - **Data done (2026-09-26)**: `UPDATE price_bars SET close = close/100 WHERE symbol LIKE
+    '%.L' AND source='openst'` — 69,247 rows across all 16 `.L` symbols (uniform 100×, safe;
+    `price_bars_all` is a read-only UNION view that reads `price_bars`, so it follows). Verified:
+    BYG.L latest bar £8.20, CSN.L £3.76, LGEN.L £3.18. *Remaining: recompute the 2 portfolios with
+    open `.L` positions (IKE Marek: BYG.L/CSN.L; IKE Beata: RIO.L/SP20.L) — needs the user's
+    Pocket-ID session (it expired mid-run).*
 - [ ] Add a sanity guard: an extreme quote-vs-last-close jump (≳10×) on the overflow write
   flags/logs instead of silently valuing 70×.
-- [ ] Tests: openst suite green; fixed symbols' price_bars match the GBP quote.
+- [x] Tests: openst suite green; fixed symbols' price_bars match the GBP quote.
 - [ ] GATE: this step fixes the *data*; §63.1–63.4 fix the *pipeline*. "Chart == true value" is not
   achievable until this ships.
-- [ ] Commit.
+- [x] Commit.
