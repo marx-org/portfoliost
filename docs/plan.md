@@ -1725,15 +1725,18 @@ openst overflow rows.
 - [x] Backfill/correct the existing bad `price_bars` overflow rows (delete
   `source='openst'` rows for the affected `.L` symbols so they re-fetch, or divide by 100), then
   recompute affected portfolios.
-  - **Data done (2026-09-26)**: `UPDATE price_bars SET close = close/100 WHERE symbol LIKE
+  - **Done (2026-09-26)**: `UPDATE price_bars SET close = close/100 WHERE symbol LIKE
     '%.L' AND source='openst'` — 69,247 rows across all 16 `.L` symbols (uniform 100×, safe;
     `price_bars_all` is a read-only UNION view that reads `price_bars`, so it follows). Verified:
-    BYG.L latest bar £8.20, CSN.L £3.76, LGEN.L £3.18. *Remaining: recompute the 2 portfolios with
-    open `.L` positions (IKE Marek: BYG.L/CSN.L; IKE Beata: RIO.L/SP20.L) — needs the user's
-    Pocket-ID session (it expired mid-run).*
+    BYG.L latest bar £8.20, CSN.L £3.76, LGEN.L £3.18. **Recomputes done too** (user session):
+    POST /recompute on IKE Marek + IKE Beata → `backfillStatus: complete`; snapshot series now sane
+    (IKE Marek max £75,521 / latest 69,220 vs the pre-fix ~2.3M artifact; IKE Beata max £157,254 /
+    latest 155,635; 1,796–1,800 daily snapshots each through 2026-09-25).
 - [ ] Add a sanity guard: an extreme quote-vs-last-close jump (≳10×) on the overflow write
   flags/logs instead of silently valuing 70×.
 - [x] Tests: openst suite green; fixed symbols' price_bars match the GBP quote.
-- [ ] GATE: this step fixes the *data*; §63.1–63.4 fix the *pipeline*. "Chart == true value" is not
+- [x] GATE: this step fixes the *data*; §63.1–63.4 fix the *pipeline*. "Chart == true value" is not
   achievable until this ships.
+  - **Lifted 2026-09-26** (openst v1.1.35 + data backfill + recomputes; only the ≳10× sanity
+    guard remains as hardening).
 - [x] Commit.
