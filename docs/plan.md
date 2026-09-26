@@ -1566,6 +1566,24 @@ and before any wipe.
 - [ ] Read the Gotówka recon report (62.6): for each warning line decide with
   the user — sheet mistake (fix sheet) vs import gap (adjust 62.6) — then wipe
   & reimport again. Repeat until clean within tolerances.
+  - **RCA done 2026-09-26**: the recon's premise was wrong — the Gotówka
+    columns do NOT equal the running sum of Transakcje cash flows (matched
+    dates: IBKR 2/161, IKE Marek 2/71); user confirmed the sheet **missed
+    inflow/outflow rows** (the Gotówka column is the source of truth). Report
+    generated with every gap (Δ per day, suggested Wpłata/Wypłata row per
+    Konto, PLN): 586 rows, Σ +293 242,29 PLN (IB 311 / IKE Marek 126 /
+    IKE Beata 139) — user is adding them to the sheet step by step; re-run the
+    comparison as they land, then wipe & reimport when ~empty.
+  - **While there (2026-09-26, user request, shipped v1.1.58/v1.0.230/v1.0.19)**:
+    (1) Sell Call Option = expired unexecuted calls → new **EXPIRATION** tx
+    type (contracts enum; wallets closes the SHORT option lot at 0, zero cash,
+    migration 0008; mapper emits `#e` leg — the phantom −500 SAP position on
+    Equate+ is gone); (2) cash-tx descriptions show the kind of transaction
+    ("Buy: SAP SE" / "Sell: …" / "Dividend: …" / "Option premium: …" /
+    "Deposit/Withdrawal: …"); (3) transfers show direction on both legs
+    (debit "… (→ Target)", server credit "… (from Source)"); (4) cash-tx Edit
+    reuses the Deposit/Withdraw/Transfer modal (full-field PATCH: amount
+    re-clamped per type, currency locked for transfers, fees/feeFx, date).
 - [x] Playwright PROD (user's passkey session, 2026-09-26): main page — no
   wallet cards; cash summary card from total metrics (PLN 59,927.74 +
   PLN/EUR/GBP/USD pct chips); every portfolio card shows its Cash group with
