@@ -1561,14 +1561,24 @@ and before any wipe.
 - [ ] Read the Gotówka recon report (62.6): for each warning line decide with
   the user — sheet mistake (fix sheet) vs import gap (adjust 62.6) — then wipe
   & reimport again. Repeat until clean within tolerances.
-- [ ] Playwright PROD (user's passkey session): main page — no wallet cards,
-  the cash summary card from total metrics, portfolio cards show their cash
-  group; portfolio cash tab — per-currency balances + history chart + a real
-  deposit (then delete it) round-trips; global cash feed lists cross-portfolio
-  rows; Top10's total value and return now include its cash (the number moves
-  vs the pre-§62 UI — expected, user-accepted); shared portfolio still
-  respects its privacy settings.
-- [ ] Commit (plan note).
+- [x] Playwright PROD (user's passkey session, 2026-09-26): main page — no
+  wallet cards; cash summary card from total metrics (PLN 59,927.74 +
+  PLN/EUR/GBP/USD pct chips); every portfolio card shows its Cash group with
+  per-currency balances (e.g. IKE Beata: EUR −€250.03, GBP −£661.67,
+  PLN 8,170.62, USD −$260.64). IBKR cash tab — per-currency rows + base total
+  + balance history chart + negative-cash warning badge (CAD/PLN/SEK/SGD/USD
+  negative) + cash transactions table with Balance/Labels/Actions. Deposit
+  round-trip: €100 "pi 62.9b test" deposit → row appeared at top with
+  balanceAfter, EUR +€100, total +PLN 437.18 (FX at day rate); deleted →
+  balance restored exactly, row gone. Global cash feed
+  (/en/investments/transactions/cash): 454 rows across IBKR/Equate+/NN TFI
+  PPO/NN TFI PPK, paired transfer legs visible (Equate+ −€1,462.09 + IBKR
+  +€1,462.09 for one SAP SE sale). Headline totals include cash (totalValue
+  USD 210,287.86 vs invested 205,893.78 → return 2.13%). *Top10 check
+  skipped on instruction: no Top10 portfolio exists in this user's PROD.*
+  *Shared-portfolio privacy not verifiable: no shared (is_public) portfolios
+  in PROD; all 10 are private.*
+- [x] Commit (plan note).
 
 ### 62.10 — Closeout: rewrite the superseded pending sections
 
