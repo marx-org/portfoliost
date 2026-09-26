@@ -497,6 +497,37 @@ async function main() {
   const transferValidation = await request(`/portfolios/${TOP10}/cash/transfers`, { method: "POST", token, body: { amount: 10, toPortfolioId: "no-such" } })
   check("cash.transfer unknown dest → 404", transferValidation.status === 404, `got ${transferValidation.status}`)
 
+  // Per-portfolio cash tab sorting (sortBy/sortOrder on
+  // /portfolios/{id}/cash/transactions — the same shape the investing
+  // /portfolios/{id}/transactions endpoint has always taken).
+  const pfTxsAsc = await request(`/portfolios/${TOP10}/cash/transactions?page=1&limit=50&sortBy=amount&sortOrder=asc`, { token })
+  const pfAmounts = (pfTxsAsc.json.items || []).map((t) => Number(t.amount))
+  check(
+    "cash.detail sorted by amount asc",
+    pfTxsAsc.status === 200 && pfAmounts.length > 2 && pfAmounts.every((v, i) => i === 0 || pfAmounts[i - 1] <= v),
+    `amounts ${pfAmounts.join(",")}`,
+  )
+  const pfTxsDesc = await request(`/portfolios/${TOP10}/cash/transactions?page=1&limit=50&sortBy=amount&sortOrder=desc`, { token })
+  const pfAmountsDesc = (pfTxsDesc.json.items || []).map((t) => Number(t.amount))
+  check(
+    "cash.detail sorted by amount desc",
+    pfTxsDesc.status === 200 && pfAmountsDesc.every((v, i) => i === 0 || pfAmountsDesc[i - 1] >= v),
+    `amounts ${pfAmountsDesc.join(",")}`,
+  )
+  const pfDates = await request(`/portfolios/${TOP10}/cash/transactions?page=1&limit=50&sortBy=date&sortOrder=asc`, { token })
+  const pfDateKeys = (pfDates.json.items || []).map((t) => t.transactionDate || t.createdAt)
+  check(
+    "cash.detail sorted by date asc (transactionDate ?? createdAt)",
+    pfDates.status === 200 && pfDateKeys.length > 2 && pfDateKeys.every((v, i) => i === 0 || pfDateKeys[i - 1] <= v),
+    `dates ${pfDateKeys.join(",")}`,
+  )
+  const pfUnsorted = await request(`/portfolios/${TOP10}/cash/transactions?page=1&limit=50`, { token })
+  check(
+    "cash.detail unsorted keeps every row (unknown sortBy is a no-op)",
+    pfUnsorted.status === 200 && pfUnsorted.json.items.length === pfTxsAsc.json.items.length,
+    `${pfUnsorted.json.items.length} vs ${pfTxsAsc.json.items.length}`,
+  )
+
   const del = await request(`/portfolios/${cid}`, { method: "DELETE", token })
   check("portfolios.delete → 204", del.status === 204, `got ${del.status}`)
   const gone = await request(`/portfolios/${cid}`, { token })

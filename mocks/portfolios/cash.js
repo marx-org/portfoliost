@@ -268,13 +268,36 @@ function mutateTransfer(portfolioId, body) {
 }
 
 const RECENT_SORT_FIELDS = { date: "createdAt", portfolioName: "portfolioName", type: "type", amount: "amount" }
+// Per-portfolio tab: `date` falls back to createdAt when the row has no explicit
+// transactionDate, matching the SPA's dateOf() so the arrow order matches what
+// the user sees.
+const CASH_TX_SORT_FIELDS = {
+  date: "transactionDate",
+  type: "type",
+  amount: "amount",
+  balance: "balanceAfter",
+  description: "description",
+}
+const NUMERIC_SORT_FIELDS = new Set(["amount", "balanceAfter"])
+
+function sortValue(row, field) {
+  return field === "transactionDate" ? row.transactionDate ?? row.createdAt : row[field]
+}
+
+function sortCashRows(items, fields, sortBy, sortOrder) {
+  const field = fields[sortBy]
+  if (!field) return items
+  const dir = String(sortOrder).toLowerCase() === "asc" ? 1 : -1
+  return [...items].sort((a, b) => {
+    const av = sortValue(a, field)
+    const bv = sortValue(b, field)
+    if (NUMERIC_SORT_FIELDS.has(field)) return ((Number(av) || 0) - (Number(bv) || 0)) * dir
+    return String(av ?? "").localeCompare(String(bv ?? ""), undefined, { numeric: true }) * dir
+  })
+}
+
 function recentPage(ctx) {
-  const items = allRecent()
-  const field = RECENT_SORT_FIELDS[ctx.query.sortBy]
-  if (field) {
-    const dir = String(ctx.query.sortOrder).toLowerCase() === "asc" ? 1 : -1
-    items.sort((a, b) => (field === "amount" ? (Number(a.amount) - Number(b.amount)) * dir : String(a[field] ?? "").localeCompare(String(b[field] ?? ""), undefined, { numeric: true }) * dir))
-  }
+  const items = sortCashRows(allRecent(), RECENT_SORT_FIELDS, ctx.query.sortBy, ctx.query.sortOrder)
   const limit = Number(ctx.query.limit) || 10
   const page = Number(ctx.query.page) || 1
   const total = items.length
@@ -330,7 +353,8 @@ export function register(app) {
   app.get("/api/portfolios/:id/cash/transactions", (ctx) => {
     if (!requireAuth(ctx)) return
     const rows = liveRows(ctx.params.id).map((t) => toRow(ctx.params.id, t))
-    ctx.res.json(paginatePage(ctx.query.page, ctx.query.limit, rows, rows.length))
+    const sorted = sortCashRows(rows, CASH_TX_SORT_FIELDS, ctx.query.sortBy, ctx.query.sortOrder)
+    ctx.res.json(paginatePage(ctx.query.page, ctx.query.limit, sorted, sorted.length))
   })
 
   app.post("/api/portfolios/:id/cash/deposits", (ctx) => {

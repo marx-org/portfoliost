@@ -198,3 +198,48 @@ test("global cash feed lists cross-portfolio rows with the portfolio name", asyn
 
   await request.delete(`${GATEWAY}/api/portfolios/${String(a.id)}`, { headers: auth }).catch(() => {})
 })
+
+test("cash tab: the transactions table has a Date column and sorts on every column", async ({ page, request }) => {
+  const run = Date.now()
+  const token = await getBearerToken(request)
+  const auth = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
+  const post = mk(auth, request)
+
+  const portfolio = await post("/api/portfolios", { name: `E2E Sort ${run}`, baseCurrency: "USD" })
+  const pid = String(portfolio.id)
+  // explicit transactionDates so both the date and the amount orders are
+  // deterministic
+  await post(`/api/portfolios/${pid}/cash/deposits`, { amount: 300, currency: "USD", description: `big ${run}`, transactionDate: "2026-05-01" })
+  await post(`/api/portfolios/${pid}/cash/deposits`, { amount: 100, currency: "USD", description: `small ${run}`, transactionDate: "2026-06-01" })
+  await post(`/api/portfolios/${pid}/cash/deposits`, { amount: 200, currency: "USD", description: `mid ${run}`, transactionDate: "2026-07-01" })
+
+  await login(page)
+  await page.goto(`/en/portfolios/${pid}/cash`)
+  await expect(page.getByTestId("cash-tab-total")).toBeVisible({ timeout: 15000 })
+
+  // the date column the tab used to be missing
+  await expect(page.getByTestId("table-th-date")).toBeVisible()
+  await expect(page.getByTestId("table-th-date")).toContainText("↓")
+  await expect(page.getByTestId("table-th-balance")).toBeVisible()
+  // no Portfolio column in a single-portfolio tab
+  await expect(page.getByTestId("table-th-portfolioName")).toHaveCount(0)
+  // the date cell is populated on a real row
+  await expect(page.locator("tbody tr", { hasText: `small ${run}` })).toContainText("Jun 1, 2026")
+
+  // default order is date desc → mid (2026-07-01) first
+  await expect(page.locator("tbody tr").nth(0)).toContainText(`mid ${run}`)
+
+  // sorting actually reorders the rows
+  await page.getByTestId("table-th-amount").locator("button").click()
+  await expect(page.getByTestId("table-th-amount")).toContainText("↑")
+  await expect(page.locator("tbody tr").nth(0)).toContainText(`small ${run}`)
+  await expect(page.locator("tbody tr").nth(2)).toContainText(`big ${run}`)
+
+  // every other data column is sortable too
+  for (const key of ["date", "type", "balance"]) {
+    await page.getByTestId(`table-th-${key}`).locator("button").click()
+    await expect(page.getByTestId(`table-th-${key}`)).toContainText("↑")
+  }
+
+  await request.delete(`${GATEWAY}/api/portfolios/${pid}`, { headers: auth }).catch(() => {})
+})

@@ -3,27 +3,23 @@
  * §62.8 — per-portfolio cash tab (example-service parity). Balance block (one row per
  * currency + base-currency total), the CashBalanceChart over the base-currency
  * PortfolioCashHistory series, Deposit/Withdraw/Transfer via
- * PortfolioCashModals, and a cash-transactions table. An amber negative-cash
- * badge shows on a non-margin portfolio when any currency balance < 0.
+ * PortfolioCashModals, and the shared CashTransactionsTable. An amber
+ * negative-cash badge shows on a non-margin portfolio when any currency
+ * balance < 0.
  */
 import { computed, onMounted, ref, watch } from "vue"
 import { useRoute } from "vue-router"
 import {
   getPortfolioCash,
   getPortfolioCashHistory,
-  getPortfolioCashTransactions,
-  deleteCashTransaction,
 } from "@/api/portfolios"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { formatCurrency, formatSignedCurrency } from "@/utils/format"
 import CashBalanceChart from "@/components/CashBalanceChart.vue"
-import LabelChips from "@/components/LabelChips.vue"
-import LabelPickerPopover from "@/components/LabelPickerPopover.vue"
+import CashTransactionsTable from "@/components/CashTransactionsTable.vue"
 import PortfolioCashModals from "@/modules/portfolios/PortfolioCashModals.vue"
-import ConfirmDeleteModal from "@/modules/portfolios/ConfirmDeleteModal.vue"
 import type { components } from "@/api/types"
 
-type CashTransaction = components["schemas"]["CashTransaction"]
 type PortfolioCash = components["schemas"]["PortfolioCash"]
 
 const route = useRoute()
@@ -32,7 +28,6 @@ const store = usePortfolioStore()
 
 const cash = ref<PortfolioCash | null>(null)
 const historyPoints = ref<Array<{ date: string; balance: number }>>([])
-const transactions = ref<CashTransaction[]>([])
 const loading = ref(true)
 const chartBusy = ref(false)
 const error = ref<string | null>(null)
@@ -40,13 +35,8 @@ const error = ref<string | null>(null)
 // Modal state
 const modalOpen = ref(false)
 const modalAction = ref<"deposit" | "withdraw" | "transfer">("deposit")
-
-// Edit / delete / labels — edit reuses the Deposit/Withdraw/Transfer modal in
-// edit mode (§62 follow-up) so every field (amount, currency, fees, date, …)
-// is editable, not just the description.
-const editing = ref<CashTransaction | null>(null)
-const deleteTarget = ref<CashTransaction | null>(null)
-const pickerTx = ref<CashTransaction | null>(null)
+/** bumped after a movement so the shared table reloads its page */
+const tableRefreshKey = ref(0)
 
 const isMarginEnabled = computed(() => store.detail?.isMarginEnabled ?? false)
 const baseCurrency = computed(() => cash.value?.baseCurrency ?? store.detail?.baseCurrency ?? "USD")
@@ -61,14 +51,12 @@ async function load() {
   loading.value = true
   error.value = null
   try {
-    const [c, h, txs] = await Promise.all([
+    const [c, h] = await Promise.all([
       getPortfolioCash(id),
       getPortfolioCashHistory(id, "1Y"),
-      getPortfolioCashTransactions(id, 1, 20),
     ])
     cash.value = c
     historyPoints.value = (h.data ?? []).map((p) => ({ date: p.date, balance: p.balance }))
-    transactions.value = txs.items ?? []
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Failed to load cash"
   } finally {
@@ -94,35 +82,8 @@ function openModal(action: "deposit" | "withdraw" | "transfer") {
 
 function onModalDone() {
   modalOpen.value = false
-  editing.value = null
   void load()
-}
-
-function openEdit(tx: CashTransaction) {
-  editing.value = tx
-  modalAction.value =
-    tx.type === "WITHDRAWAL" ? "withdraw" : tx.type === "TRANSFER" ? "transfer" : "deposit"
-  modalOpen.value = true
-}
-
-async function confirmDelete() {
-  if (!deleteTarget.value) return
-  try {
-    await deleteCashTransaction(deleteTarget.value.id)
-    deleteTarget.value = null
-    await load()
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : "Failed to delete transaction"
-  }
-}
-
-function typeLabel(t: string): string {
-  switch (t) {
-    case "DEPOSIT": return "Deposit"
-    case "WITHDRAWAL": return "Withdrawal"
-    case "TRANSFER": return "Transfer"
-    default: return t
-  }
+  tableRefreshKey.value++
 }
 </script>
 
@@ -187,56 +148,12 @@ function typeLabel(t: string): string {
       </section>
 
       <!-- Cash transactions -->
-      <section class="card overflow-hidden">
-        <h2 class="mb-4 px-5 pt-5 text-lg font-semibold">Cash Transactions</h2>
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700/60">
-            <thead>
-              <tr>
-                <th class="px-5 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Type</th>
-                <th class="px-5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Amount</th>
-                <th class="px-5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Balance</th>
-                <th class="px-5 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Description</th>
-                <th class="px-5 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Labels</th>
-                <th class="px-5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Actions</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-              <tr v-for="tx in transactions" :key="tx.id" :data-testid="`cash-tx-${tx.id}`">
-                <td class="px-5 py-3 text-sm text-slate-900 dark:text-slate-100">{{ typeLabel(tx.type) }}</td>
-                <td class="px-5 py-3 text-right text-sm tabular-nums text-slate-900 dark:text-slate-100">
-                  {{ formatSignedCurrency(tx.amount, tx.currency) }}
-                </td>
-                <td class="px-5 py-3 text-right text-sm tabular-nums text-slate-500 dark:text-slate-400">
-                  {{ tx.balanceAfter != null ? formatCurrency(tx.balanceAfter, tx.currency) : "—" }}
-                </td>
-                <td class="px-5 py-3 text-sm text-slate-600 dark:text-slate-300">{{ tx.description || "—" }}</td>
-                <td class="px-5 py-3">
-                  <div class="relative">
-                    <LabelChips v-if="tx.labels?.length" :labels="tx.labels" :max="3" @badge-click="pickerTx = tx" />
-                    <button
-                      v-else
-                      type="button"
-                      class="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-                      data-testid="cash-add-label"
-                      @click="pickerTx = tx"
-                    >+ label</button>
-                  </div>
-                </td>
-                <td class="px-5 py-3 text-right">
-                  <div class="flex justify-end gap-3">
-                    <button type="button" class="text-sm text-slate-500 hover:text-slate-800 dark:hover:text-slate-200" @click="openEdit(tx)">Edit</button>
-                    <button type="button" class="text-sm text-red-600 dark:text-red-400 hover:underline" @click="deleteTarget = tx">Delete</button>
-                  </div>
-                </td>
-              </tr>
-              <tr v-if="!transactions.length">
-                <td colspan="6" class="px-5 py-6 text-center text-sm text-slate-500 dark:text-slate-400">No cash transactions yet.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <CashTransactionsTable
+        mode="portfolio"
+        :portfolio-id="id"
+        :cash="cash"
+        :refresh-key="tableRefreshKey"
+      />
     </template>
 
     <PortfolioCashModals
@@ -244,26 +161,8 @@ function typeLabel(t: string): string {
       :action="modalAction"
       :portfolio-id="id"
       :cash="cash ?? { baseCurrency: 'USD', balances: [], total: 0 }"
-      :edit-tx="editing"
-      @close="modalOpen = false; editing = null"
+      @close="modalOpen = false"
       @done="onModalDone"
-    />
-
-    <ConfirmDeleteModal
-      :open="deleteTarget != null"
-      :busy="false"
-      :message="`Delete this ${deleteTarget ? typeLabel(deleteTarget.type).toLowerCase() : 'cash transaction'}? This cannot be undone.`"
-      @close="deleteTarget = null"
-      @confirm="confirmDelete"
-    />
-
-    <LabelPickerPopover
-      :open="pickerTx != null"
-      :entity-id="pickerTx?.id ?? ''"
-      entity-kind="cash-transaction"
-      :current-labels="pickerTx?.labels ?? []"
-      @close="pickerTx = null"
-      @saved="pickerTx = null; void load()"
     />
   </div>
 </template>

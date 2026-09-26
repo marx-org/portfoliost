@@ -240,10 +240,12 @@ export async function getPortfolioCashTransactions(
   page = 1,
   limit = 20,
   labelIds?: string[],
+  sortBy = "date",
+  sortOrder: "asc" | "desc" = "desc",
 ): Promise<PaginatedResponse<CashTransaction>> {
   const labels = labelIds?.length ? `&labels=${encodeURIComponent(labelIds.join(","))}` : ""
   return http.get<PaginatedResponse<CashTransaction>>(
-    `/api/portfolios/${id}/cash/transactions?page=${page}&limit=${limit}${labels}` as string,
+    `/api/portfolios/${id}/cash/transactions?page=${page}&limit=${limit}&sortBy=${sortBy}&sortOrder=${sortOrder}${labels}` as string,
   )
 }
 

@@ -102,6 +102,15 @@ test("cash transactions sub-tab lists cross-portfolio cash rows", async ({ page 
   await expect(page.getByTestId("table-th-date")).toContainText("↓")
   await expect(page.getByRole("columnheader", { name: "Description" })).toBeVisible()
   await expect(page.getByRole("button", { name: "Edit transaction" }).first()).toBeVisible()
+  // the shared table paginates like the investing one
+  await expect(page.getByLabel("Rows per page")).toContainText("10 per page")
+  await expect(page.getByText(/^\d+[-–]\d+ of \d+$/)).toBeVisible()
+  // every data column is sortable
+  await page.getByTestId("table-th-amount").locator("button").click()
+  await expect(page.getByTestId("table-th-amount")).toContainText("↑")
+  await page.getByTestId("table-th-type").locator("button").click()
+  await expect(page.getByTestId("table-th-type")).toContainText("↑")
+  await expect(page.getByTestId("table-th-date")).not.toContainText("↓")
 })
 
 test("editing an investing transaction opens example-service-style modal and saves", async ({ page }) => {
