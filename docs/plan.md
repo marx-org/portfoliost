@@ -1552,12 +1552,17 @@ and before any wipe.
     Note: the `wallets` schema retains exactly one table — `wallets.sync_runs`
     (0 rows) — by design (schema.ts: "the wallets schema is kept for
     sync_runs only").
-- [ ] Admin → Jobs → **Wipe & Reimport** (`POST /api/admin/jobs/sheets-sync/run
+- [x] Admin → Jobs → **Wipe & Reimport** (`POST /api/admin/jobs/sheets-sync/run
   {wipe:true}`, authenticated Pocket-ID session) — the first wipe on the new
   schema; assert: 0 row errors; DEPOSIT rows positive / WITHDRAWAL negative;
   the ~166 AU=1 rows produced their cash legs (Equate+ portfolio cash ≈ 0,
   IBKR portfolio gained the SAP-sale proceeds as transfer legs); `#d`/`#w`/
   `#t` dedupe on a second run.
+  - **Done 2026-09-26 (syncRun 146, user-triggered, ×2)**: 0 row errors,
+    2371 inserted / 8 skipped (4 no-op splits/div, 4 dup re-statement rows).
+    DEPOSIT 373 (+663 912.79, all positive), WITHDRAWAL 5 (−121 130, negative),
+    TRANSFER 38 legs (paired, Σ=0); `#d`×320 + `#t`×38 dedupe keys present,
+    second wipe+reimport re-created everything idempotently (identical counts).
 - [ ] Read the Gotówka recon report (62.6): for each warning line decide with
   the user — sheet mistake (fix sheet) vs import gap (adjust 62.6) — then wipe
   & reimport again. Repeat until clean within tolerances.
