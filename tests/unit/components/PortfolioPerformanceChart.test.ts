@@ -146,4 +146,40 @@ describe("PortfolioPerformanceChart (§41.1)", () => {
     await btn.trigger("click")
     expect(w.emitted("recompute")).toHaveLength(1)
   })
+
+  it("§63.8 — grays out + blocks the chart while a recompute is in flight", async () => {
+    const w = mount(PortfolioPerformanceChart, {
+      props: { timeSeries: [ts("2026-07-01", 500)], recomputing: false },
+      global: { stubs: { apexchart: true } },
+    })
+    // idle: no overlay, chart wrapper is not dimmed, button active
+    expect(w.find('[data-testid="portfolio-chart-recomputing-overlay"]').exists()).toBe(false)
+    expect(w.find('[data-testid="portfolio-chart-recompute"]').attributes("disabled")).toBeUndefined()
+
+    await w.setProps({ recomputing: true })
+    // overlay shown, wrapper dimmed + pointer-events disabled, button blocked
+    expect(w.find('[data-testid="portfolio-chart-recomputing-overlay"]').exists()).toBe(true)
+    expect(w.find('[data-testid="portfolio-chart-recomputing-overlay"]').text()).toMatch(/Recomputing/i)
+    // the pointer-events/opacity class is on the .relative wrapper
+    expect(w.html()).toMatch(/pointer-events-none[^>]*opacity-50|opacity-50[^>]*pointer-events-none/)
+    const btn = w.find('[data-testid="portfolio-chart-recompute"]')
+    expect(btn.attributes("disabled")).toBeDefined()
+    // clicking while blocked must NOT re-trigger recompute
+    await btn.trigger("click")
+    expect(w.emitted("recompute")).toBeUndefined()
+  })
+
+  it("§63.8 — shows a partial-sum warning when gapSymbols is non-empty", async () => {
+    const w = mount(PortfolioPerformanceChart, {
+      props: { timeSeries: [ts("2026-07-01", 500)], gapSymbols: null },
+      global: { stubs: { apexchart: true } },
+    })
+    expect(w.find('[data-testid="portfolio-chart-gap-warning"]').exists()).toBe(false)
+
+    await w.setProps({ gapSymbols: ["XTB.WA", "AMZN"] })
+    const warn = w.find('[data-testid="portfolio-chart-gap-warning"]')
+    expect(warn.exists()).toBe(true)
+    expect(warn.text()).toMatch(/2 positions?/)
+    expect(warn.text()).toMatch(/no price history/i)
+  })
 })

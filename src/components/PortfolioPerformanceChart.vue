@@ -35,8 +35,14 @@ const props = withDefaults(
     backfillPending?: boolean
     loading?: boolean
     height?: number
+    /** §63.8 — a recompute/backfill pass is in flight. The chart is grayed
+     * out and non-interactable (no tooltip / no re-trigger) until it finishes. */
+    recomputing?: boolean
+    /** §63.8 — held symbols the last backfill had no price bar for. Non-empty →
+     * the value series is a partial sum; a warning chip is shown. */
+    gapSymbols?: string[] | null
   }>(),
-  { benchmarks: () => [], currency: "USD", color: "#16a34a", backfillPending: false, loading: false, height: 300 },
+  { benchmarks: () => [], currency: "USD", color: "#16a34a", backfillPending: false, loading: false, height: 300, recomputing: false, gapSymbols: null },
 )
 
 const emit = defineEmits<{ recompute: [] }>()
@@ -48,6 +54,14 @@ const toPoint = (p: PerformancePoint): [number, number] => [new Date(p.date ?? "
 //portfolio performance chart AND the combined chart. Same currency as value.
 const hasInvested = computed(() => props.timeSeries.some((p) => p.invested != null))
 const INVESTED_COLOR = "#0ea5e9"
+
+// §63.8 — value is a partial sum when some held symbols had no price bar.
+const gapCount = computed(() => (props.gapSymbols?.length ?? 0))
+const gapMessage = computed(() =>
+  gapCount.value > 0
+    ? `Value excludes ${gapCount.value} position${gapCount.value === 1 ? "" : "s"} with no price history yet — total is a partial sum.`
+    : "",
+)
 
 // Config-only options (no `series`). The object is memoised by
 // (currency, colour, benchmark names) so a data swap that keeps the same
@@ -138,26 +152,39 @@ defineExpose({ options, chartOptions, seriesData })
 </script>
 
 <template>
-  <div>
+  <div data-testid="portfolio-performance-chart">
     <div class="mb-2 flex items-center justify-between">
       <span />
       <button
         type="button"
         class="btn-secondary text-xs"
         data-testid="portfolio-chart-recompute"
-        :disabled="loading"
+        :disabled="loading || recomputing"
         @click="emit('recompute')"
       >
-        Recompute
+        {{ recomputing ? "Recomputing..." : "Recompute" }}
       </button>
     </div>
-    <div class="relative">
+    <div
+      class="relative transition-opacity duration-300"
+      :class="{ 'pointer-events-none select-none opacity-50': recomputing }"
+    >
       <component :is="'apexchart'" :key="chartKey" v-if="timeSeries.length" :options="chartOptions" :series="seriesData" :height="height" />
       <p v-else class="text-sm text-slate-500 dark:text-slate-400">No analytics available.</p>
       <div v-if="loading" class="absolute inset-0 flex items-center justify-center rounded-lg bg-white/70 dark:bg-slate-900/70">
         <span class="text-sm font-medium text-slate-500 dark:text-slate-400">Refreshing...</span>
       </div>
+      <!-- §63.8 — gray-out overlay while a recompute/backfill is in flight -->
+      <div v-if="recomputing" class="absolute inset-0 flex items-center justify-center rounded-lg bg-white/40 dark:bg-slate-900/40">
+        <span class="text-sm font-medium text-slate-500 dark:text-slate-400" data-testid="portfolio-chart-recomputing-overlay">
+          Recomputing — please wait…
+        </span>
+      </div>
     </div>
+    <!-- §63.8 — value is a partial sum when some held symbols lack price history -->
+    <p v-if="gapMessage" class="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400" data-testid="portfolio-chart-gap-warning">
+      {{ gapMessage }}
+    </p>
     <p v-if="backfillPending" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
       Historical data is loading, chart will update in a moment.
     </p>

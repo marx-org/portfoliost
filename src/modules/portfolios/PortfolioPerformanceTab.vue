@@ -312,6 +312,8 @@ const chartBenchmarks = computed(() => {
         :benchmarks="chartBenchmarks"
         :currency="displayCurrency"
         :backfill-pending="backfillPending || recomputeBusy"
+        :recomputing="recomputeBusy || backfillPending"
+        :gap-symbols="store.analytics?.gapSymbols ?? null"
         :loading="store.analyticsLoading"
         :height="300"
         @recompute="handleRecompute"
