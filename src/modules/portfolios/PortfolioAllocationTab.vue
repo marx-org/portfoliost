@@ -8,6 +8,9 @@ import type { components } from "@/api/types"
 const route = useRoute()
 const id = String(route.params.id)
 const allocation = ref<components["schemas"]["PortfolioSnapshot"]["allocation"] | null>(null)
+/** §66.3 — the allocation reports the currency it is denominated in. byCurrency
+ * rows are the exception: each is in its own currency, carried as `name`. */
+const allocationCcy = computed(() => allocation.value?.currency ?? null)
 const loading = ref(true)
 const error = ref<string | null>(null)
 
@@ -29,7 +32,7 @@ const sectorOptions = computed(() => {
     colors: ["#2563eb", "#0ea5e9", "#8b5cf6", "#f59e0b", "#10b981", "#ef4444", "#64748b", "#ec4899"],
     legend: { position: "bottom" as const },
     dataLabels: { enabled: false },
-    tooltip: { y: { formatter: (value: number) => formatCurrency(value, undefined) } },
+    tooltip: { y: { formatter: (value: number) => formatCurrency(value, allocationCcy.value) } },
     series: slices.map((s) => s.value),
   }
 })
@@ -69,7 +72,7 @@ function weight(name: string, slices: { name?: string; value?: number }[] | unde
             <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
               <tr v-for="s in allocation?.bySector" :key="s.name" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                 <td class="px-5 py-3 font-medium text-slate-900 dark:text-slate-100">{{ s.name }}</td>
-                <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(s.value ?? 0, undefined) }}</td>
+                <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(s.value ?? 0, allocationCcy) }}</td>
                 <td class="px-5 py-3 text-right tabular-nums">{{ formatPercent(weight(s.name ?? "", allocation?.bySector)) }}</td>
               </tr>
             </tbody>
@@ -86,7 +89,7 @@ function weight(name: string, slices: { name?: string; value?: number }[] | unde
             <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
               <tr v-for="s in allocation?.byAssetType" :key="s.name" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                 <td class="px-5 py-3 font-medium text-slate-900 dark:text-slate-100">{{ s.name }}</td>
-                <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(s.value ?? 0, undefined) }}</td>
+                <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(s.value ?? 0, allocationCcy) }}</td>
                 <td class="px-5 py-3 text-right tabular-nums">{{ formatPercent(weight(s.name ?? "", allocation?.byAssetType)) }}</td>
               </tr>
             </tbody>

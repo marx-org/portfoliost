@@ -4,6 +4,7 @@ import { useRouter } from "vue-router"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { deletePortfolio, getPortfolioAnalytics, getPortfolioPositions, recomputePortfolio, updatePortfolio } from "@/api/portfolios"
 import { formatCurrency, formatNumber, formatPercent } from "@/utils/format"
+import { useDisplayConversion } from "@/composables/useDisplayConversion"
 import type { PortfolioAnalyticsTimeframe } from "@/api/portfolios"
 import type { PortfoliosSummaries } from "@/api/types"
 
@@ -12,6 +13,13 @@ const emit = defineEmits<{ (e: "add-position"): void }>()
 
 const store = usePortfolioStore()
 const router = useRouter()
+
+// §66.3 — `currentValue` / `totalInvested` are denominated in the portfolio's own
+// baseCurrency (the contract has always carried it — the SPA simply was not
+// reading it, so it rendered PLN amounts with a `$`). Convert into the user's
+// display currency exactly like the headline does, so the cards and the headline
+// are computed the same way and their sum can reconcile (§63.3).
+const { convert, displayCurrencyOr } = useDisplayConversion(() => props.portfolio.baseCurrency)
 
 const timeframes: Array<{ value: PortfolioAnalyticsTimeframe; label: string }> = [
   { value: "1W", label: "1W" },
@@ -355,11 +363,11 @@ async function exportPositions(format: "csv" | "xml" | "json") {
     <div class="mt-4 grid grid-cols-3 gap-2 text-sm">
       <div>
         <p class="text-xs text-slate-500 dark:text-slate-400">Value</p>
-        <p class="font-medium tabular-nums">{{ formatCurrency(portfolio.currentValue, undefined) }}</p>
+        <p class="font-medium tabular-nums">{{ formatCurrency(convert(portfolio.currentValue), displayCurrencyOr()) }}</p>
       </div>
       <div>
         <p class="text-xs text-slate-500 dark:text-slate-400">Invested</p>
-        <p class="font-medium tabular-nums">{{ formatCurrency(portfolio.totalInvested, undefined) }}</p>
+        <p class="font-medium tabular-nums">{{ formatCurrency(convert(portfolio.totalInvested), displayCurrencyOr()) }}</p>
       </div>
       <div>
         <p class="text-xs text-slate-500 dark:text-slate-400">Return</p>
