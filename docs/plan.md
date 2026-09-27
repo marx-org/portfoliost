@@ -1728,9 +1728,13 @@ So the residual gap is cash, not FX: the cards include cash and the headline
 does not. That is §63.3's item, but it is blocked on this: the aggregate needs a
 base currency that means something to the user.
 
-- [ ] Decide the aggregate base: set a `baseCurrency` UI preference for the user
-      so `preferredBaseCurrency` returns something real, OR change the endpoint to
-      report each portfolio in its own base and let the SPA convert.
+- [x] Make the Display-currency selector write through to the user's
+      `baseCurrency` preference, so the backend can see it at all
+      (`portfoliost` `1d1dd65`, 402 green, **committed but deliberately not
+      deployed** — flipping the aggregate base USD → PLN moves the headline, and
+      it ships with §68 so the numbers move once, for one reason).
+- [ ] On deploy (with §68): confirm the aggregate base is now the user's chosen
+      currency rather than the USD default.
 - [ ] Then close §63.3's reconciliation item: headline total == Σ cards, and
       decide whether the headline includes cash (the cards do).
 - [ ] Also still open there: `Crypto` reports `totalValue: 0,
@@ -1765,3 +1769,164 @@ change to working display code rather than a mechanical dedup.
 - [ ] Commit.
 
 ---
+
+## 68. Cash as a first-class citizen in the headline: Cash / Instruments / Total / Invested (2026-09-27)
+
+Follows §66 (never guess a currency) and unblocks §63.3, whose reconciliation item
+has been open since the fact-check. The four headline figures the user asked for:
+
+- **Cash value** — the cash balance
+- **Instruments Value** — positions only
+- **Total Value** — cash + instruments (**confirmed by the user**: cash is a
+  first-class citizen, so Total includes it)
+- **Total Invested** — the value of cash inflow / outflow / **transfer**
+  (confirmed by the user: transfers are part of the definition, not excluded)
+
+### 68.1 — What the numbers are today, measured (not inferred)
+
+PROD, 2026-09-27, all 10 portfolios PLN:
+
+| figure | PLN | where it comes from |
+|---|---|---|
+| Σ `portfolio.currentValue` | **1,380,487** | **includes cash** — Crypto's 887.74 value *is* its 887.74 cash; Rach. rej. 47,956 positions + 8,500 cash = 56,456 |
+| Σ cash | **345,228** | `totalCash` = 90,046.10 in the aggregate base (USD) |
+| headline "Total Value" | **1,035,259** | 1,380,487 − 345,228 → **today's headline is really Instruments Value** |
+| Σ `totalInvested` | 1,040,416 | net external flow |
+
+So the ambiguity is precise: **`total-metrics.totalValue` excludes cash while
+`portfolio.currentValue` includes it.** The cards and the headline are summing
+different things, which is the whole of §63.3's 345,228.04 discrepancy — the
+figure is exactly the Cash card (PLN 345,228.05).
+
+`totalCash` and `cashBreakdown` already exist on the response (`openapi.yaml`
+`PortfolioTotalMetrics`) and are correct. `instrumentsValue` does not exist
+anywhere, and there is no per-portfolio cash/instruments split on the card either.
+
+### 68.2 — contracts: define the four, and change what `totalValue` means
+
+**This is a breaking semantic change** and the only one in this section:
+`totalValue` goes from 1,035,259 → 1,380,487 PLN for this user. Anything reading
+it as "the invested capital" or comparing it to a per-portfolio `currentValue`
+will shift. The SPA is the only consumer in the monorepo; grep before assuming.
+
+- [ ] `PortfolioTotalMetrics`:
+      - `instrumentsValue: { type: number }` — positions only, aggregate base.
+      - rename `totalCash` → **`cashValue`** (`cashBreakdown` already spells the
+        card out; `cashValue` is what the tile shows). Update the description to
+        say it is the **balance**, not a flow.
+      - **`totalValue`** keeps its name and changes meaning: `instrumentsValue +
+        cashValue`. Say so in the description, because the old meaning was
+        positions-only and that is the bug being removed.
+      - `totalInvested` description: cash inflow / outflow / transfer, i.e. the
+        §62 `externalCashInvested` basis (`externalCapitalBasisSource:
+        "externalFlows"` already reports it). **Verified 2026-09-27:**
+        `externalCashInvested` (`services/cashLedger.ts:284`) sums every cash row
+        with no type filter, so transfers are already included — which is the
+        requested definition, so this is documentation only.
+        Consequence to state in the description rather than hide: a transfer
+        between two of the user's own portfolios *raises one portfolio's invested
+        and lowers the other's*. The aggregate is unaffected (the legs net to
+        zero) but the per-portfolio number is not "capital you put in". Say so.
+      - While there: `cashLedger.ts:306` still has
+        `(await resolvedFxRate(...))?.rate ?? 1` — the same 1:1 degrade §66.4
+        removed from `fxTo`, on the invested path, and it ignores the `opts.strict`
+        it is handed. Tighten it to match, so a missing rate on a multi-currency
+        portfolio cannot silently understate invested.
+      - `totalGainLoss` / `returnPercentage` are then derived from the new
+        `totalValue`; document that they move with it.
+      - `portfolioBreakdown[]`: add per-portfolio `instrumentsValue` and
+        `cashValue` so Σ breakdown == the headline, and the cards can render
+        their own split without a second request.
+- [ ] `PortfolioSummaryMetrics` (per portfolio): same three — `instrumentsValue`,
+      `cashValue`, and `currency` is already there from §66.3.
+- [ ] Tests: contracts `npm test` green; the spec is valid and `gen:types`
+      regenerates in all three consumers.
+- [ ] Commit (contracts) → GHA bumps + publishes.
+
+### 68.3 — wallets: compute the split from one place
+
+- [ ] Per portfolio, derive the two components explicitly rather than by
+      subtraction where possible:
+      - `instrumentsValue` = Σ open positions' market value, **each converted
+        from its own `instrument_currency` into the portfolio base** (the same
+        strict `fxTo` and the same conversion the §66.3 allocation route now
+        does — do not re-introduce a raw cross-currency sum).
+      - `cashValue` = the existing `portfolio_cash_transactions` replay total
+        (already exposed as `PortfolioCash.total`).
+      - `currentValue` must then be exactly `instrumentsValue + cashValue`, so
+        the card and the headline cannot disagree by construction. Make the card's
+        `currentValue` **derived** rather than a separately-written column, or
+        assert the identity in a test — today they are two independent code
+        paths and that is the bug.
+- [ ] `total-metrics`: sum the per-portfolio `instrumentsValue` and `cashValue`
+      into the aggregate base (using the §67.1 preference, which the SPA now
+      writes through), and derive `totalValue` as their sum. Keep the existing
+      "preference unreadable → derive from the user's own portfolios → else report
+      null" ladder from §66.4.
+- [ ] Negative-cash handling: XTB and IKE Beata hold negative balances (margin
+      accounts, §62). A negative `cashValue` must reduce `totalValue`, not be
+      clamped, and must not make the tile render as `—`.
+- [ ] Decide and record whether `total-metrics` keeps `totalCash` as a deprecated
+      alias for one release, or breaks outright. Prefer breaking outright: it has
+      no consumer outside the SPA.
+- [ ] Tests:
+      - a portfolio with positions and cash: `currentValue == instrumentsValue +
+        cashValue` to the cent, and `totalValue` on `/total-metrics` equals Σ
+        per-portfolio `totalValue`;
+      - cash-only portfolio (XTB): `instrumentsValue == 0`, `cashValue < 0`,
+        `totalValue` negative and rendered, not clamped;
+      - multi-currency portfolio: `instrumentsValue` equals the converted sum,
+        and a missing FX rate throws rather than 1:1 (§66.4);
+      - `totalInvested` is unchanged by an internal transfer between two of the
+        user's portfolios.
+- [ ] Full wallets suite green + `npm run build`.
+- [ ] Commit (portfoliost-wallets).
+
+### 68.4 — SPA: four tiles, each labelled with what it is
+
+- [ ] `InvestmentsView.vue` header: four tiles in this order — **Cash value**,
+      **Instruments Value**, **Total Value**, **Total Invested**. All four
+      formatted through `useDisplayConversion` so they are converted and labelled
+      identically (the headline already does; the cards now do too since §66.3).
+- [ ] Derive **Total Gain / Loss** = `totalValue − totalInvested` and **Total
+      Return** from the same pair, so the four tiles and the two derived figures
+      can never disagree. The current tiles are computed independently.
+- [ ] While a rate is unresolved, render `—` (never a bare number with a foreign
+      symbol — §66.2) and do not flash a converted value first.
+- [ ] Portfolio cards: show the cash/instruments split inside the existing Cash
+      group rather than adding a fifth number to the top row.
+- [ ] Tests: a tile shows the right currency symbol; `Total Value` equals
+      `Cash + Instruments` in the rendered output; a null rate renders `—`.
+- [ ] `npm run build`, `npm run test`, `npm run test:mock`, `npm run test:e2e`
+      green (e2e snapshots of the header will need re-baselining — the tile count
+      changes 4 → 4 but the labels and values do).
+- [ ] Commit (portfoliost).
+
+### 68.5 — Release, PROD verify, close §63.3
+
+- [ ] Pin the real tags: contracts, wallets, portfoliost. The §67.1
+      preference write-through (`1d1dd65`, committed and green but **not yet
+      deployed**) ships with this, so the aggregate base flips USD → PLN in the
+      same release as the split and the displayed numbers move once, for one
+      reason. Do not deploy `1d1dd65` on its own — it shifts the headline by
+      itself with nothing to explain it.
+- [ ] Playwright PROD `/en/investments`:
+      - the four tiles read **Cash 345,228 · Instruments 1,035,259 · Total
+        1,380,487 · Invested 1,040,416** (PLN) — `Cash + Instruments == Total`
+        exactly;
+      - Σ the 10 cards' `currentValue` equals the Total tile (this is the §63.3
+        reconciliation, finally assertable);
+      - the negative-cash portfolios render a negative Cash tile, not `—`;
+      - no tile shows a `$` (§66.2 guard still holds).
+- [ ] Then tick §63.3's reconciliation and its "Crypto reports 0 / −100%"
+      findings, and archive §63 if nothing else in it is open.
+- [ ] Commit (plan closeout).
+
+### Open question
+
+1. **Should the chart's value line include cash too?** The tiles will (confirmed),
+   but `/portfolios/merged` plots positions and cash as separate series (§63.3's
+   "consolidated series = Σ positions + cash"). Exposing cash in the header while
+   the chart's value line disagrees would move the inconsistency rather than fix
+   it. Needs an answer before §68.5, since the PROD check compares the Total tile
+   against the chart.
