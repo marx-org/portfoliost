@@ -1948,3 +1948,174 @@ both, migration 0009 (`gap_symbols`) applied in PROD.
       Recompute and re-renders fresh when done.
 - [ ] **Turn RECALC_DEBUG off** in the wallets helmrelease now that the §63.6
       RCA is closed (it is still `value: "1"` in PROD).
+
+---
+
+## 64. Kubernetes probes for the pfire fleet (found 2026-09-27 while deploying openst v1.1.36)
+
+No marx2-owned service in `pfire` had a working HTTP health probe until
+openst v1.1.36. Auditing all nine against the live cluster found three
+distinct states, and — worse — that the pattern already in the repo is a
+**false friend**: it reads like an HTTP health check but deploys as a TCP
+socket check. Nothing in the namespace can currently express "degraded", and
+nothing restarts a hung process.
+
+Scope: the 9 `ghcr.io/marx2/*` services in `cluster/apps/pfire/`. Third-party
+images (`ghostfolio`, `pgadmin`, `pgweb`, `postgrest`, `swagger-ui`,
+`investbrain`) are **out of scope** — their probe semantics belong to their
+upstreams.
+
+### Audited state (live, 2026-09-27 — not inferred)
+
+| Service | chart | probes in yaml | renders as | health endpoint |
+|---|---|---|---|---|
+| `openst` | 5.1.0 | liveness+readiness+startup | `httpGet` ✅ | `/health` 200, `/ready` 200 |
+| `cachest` | 5.1.0 | **none** | — | `/health` 200, `/ready` **404** |
+| `portfoliost-wallets` | **5.0.1** | liveness+readiness | `tcpSocket` ⚠️ | `/health` 200 |
+| `portfoliost-instruments` | 5.1.0 | liveness+readiness | `tcpSocket` ⚠️ | `/health` 200 |
+| `portfoliost-admin` | **5.0.1** | liveness+readiness | `tcpSocket` ⚠️ | `/health` 200 |
+| `portfoliost-users-auth` | 5.1.0 | liveness+readiness | `tcpSocket` ⚠️ | `/health` 200 |
+| `portfoliost` (SPA) | 5.1.0 | **none** | — | `/` 200 (nginx SPA fallback) |
+| `jobshot` | 5.1.0 | **none** | — | every path → `index.html` 200 |
+| `mastra-ticker` | 5.1.0 | liveness (`custom: true`) | n/a — **no Deployment or Service in cluster** | unreachable |
+
+### The chart contract (read from the chart, not guessed)
+
+`app-template` 5.x nests probes at
+`controllers.<c>.containers.<name>.probes.<probeName>`:
+
+- `enabled: true` is **required** — a probe without it is silently skipped.
+- `type` defaults to **`TCP`**, not HTTP. `type: HTTP` is needed for `httpGet`.
+- `path` / `port` are read from the **probe** level; `initialDelaySeconds`,
+  `failureThreshold`, `timeoutSeconds`, `periodSeconds` are read from `spec`.
+- `port` defaults to the controller's primary service port.
+- `custom: true` + a raw `spec` is the escape hatch that renders verbatim.
+
+**Why the four existing probes are wrong:** they put `path: /health` inside
+`spec:` and omit `type`. The template only lifts the four timing keys out of
+`spec` and never reads `path` from there, so the path is dropped and the
+default `TCP` applies. Verified live — all four render as
+`tcpSocket: {port: 3000}`. A process that accepts connections but no longer
+answers (deadlocked, event loop wedged, exhausted pool) passes both probes.
+
+Rules: one step = one commit; step `[x]` only after its tests pass. Probe
+changes are cluster-visible, so **every step ends with a Flux + `kubectl`
+verification**, and each helmrelease change must be validated against
+`app-template`'s `values.schema.json` **before** pushing — see §64.1.
+
+---
+
+### 64.1 — Fix the four false-friend probes (wallets, instruments, admin, users-auth)
+
+- [ ] Convert each to the shape that actually renders `httpGet` — add
+      `type: HTTP`, move `path: /health` from `spec` to the probe level, keep
+      the timing keys in `spec`. Use the openst v1.1.36 block as the reference
+      implementation, not the current wallets one.
+- [ ] Bump `portfoliost-admin` and `portfoliost-wallets` from chart 5.0.1 to
+      5.1.0 in the same commit, so all four pfire TS services share one chart
+      version and one probe dialect.
+- [ ] Add a **startupProbe** to each. These four have no schema migration on
+      boot, but a slow first provider/db connect currently counts against
+      `liveness` and can restart-loop a cold pod.
+- [ ] Validate locally before pushing (this is the step that would have
+      prevented the openst rollout failure — the first v1.1.36 push put
+      `livenessProbe:` directly on the container, the Helm upgrade failed schema
+      validation, and **openst silently stayed on v1.1.35**):
+      ```sh
+      helm pull bjw-s/app-template --version 5.1.0 && tar xzf app-template-5.1.0.tgz
+      python -c "import json,yaml,jsonschema; jsonschema.validate(
+        yaml.safe_load(open('cluster/apps/pfire/<app>/app/helmrelease.yaml'))['spec']['values'],
+        json.load(open('app-template/values.schema.json')))"
+      ```
+- [ ] Tests: schema validation passes for all four; after Flux applies,
+      `kubectl get deploy -n pfire <app> -o json` shows `httpGet` with
+      `path: /health` (not `tcpSocket`) for both probes, and pods reach 1/1 with
+      `restarts: 0`.
+- [ ] Commit.
+
+### 64.2 — cachest: add `/ready`, then probes
+
+- [ ] `cachest`: add `GET /ready` mirroring openst's — `503` +
+      `{"status":"degraded","redis":"unreachable"}` when the cache is down,
+      `200` otherwise; keep `/health` as pure liveness that never touches Redis
+      (a dependency-aware liveness probe restart-loops the pod during a cache
+      blip, which cannot fix the cache). Since cachest's `RedisCache.get/set`
+      already degrade to misses, readiness is the only honest place to drop the
+      pod from rotation.
+- [ ] Add liveness (`/health`), readiness (`/ready`) and startup probes to
+      `cluster/apps/pfire/cachest/app/helmrelease.yaml`.
+- [ ] `cachest`: add `test_ready_reports_503_when_redis_is_unreachable` and
+      `test_health_stays_ok_while_redis_is_down`; full suite green
+      (`docker build --target test -t cachest-test . && docker run --rm cachest-test`).
+- [ ] Tests: pod 1/1 with 0 restarts; probes render `httpGet`; `/ready` returns
+      200 in-cluster; and a deliberate Redis outage (scale the cache down) takes
+      the pod out of rotation **without** `/health` flapping.
+- [ ] Commit: `cachest` code + tests, then the homelab tag bump + probes.
+
+### 64.3 — portfoliost SPA: probe nginx, and say so
+
+- [ ] Add liveness + readiness on `GET /` (the SPA's own `/health` returns
+      `index.html` via the nginx catch-all, so it is not a health check). This
+      proves nginx is serving, which is the only failure mode an SPA has —
+      the API is a separate deployment with its own probes after §64.1.
+- [ ] Add a comment in the helmrelease recording that this probe covers nginx
+      only, so a future reader does not assume it validates the app.
+- [ ] Tests: pod 1/1; probe renders `httpGet` on `/`; rolling the deployment
+      does not flap.
+- [ ] Commit.
+
+### 64.4 — jobshot: needs a real health route (crosses a 3rd repo)
+
+- [ ] **Blocked on open question 1.** `jobshot` returns `index.html` for
+      `/health`, `/healthz` and `/ready` alike (SPA fallback), so any HTTP probe
+      on it is a no-op that always passes. Either add a real `/health` in the
+      `jobshot` repo, or accept a `/` probe that only proves nginx is up.
+- [ ] Tests: the chosen endpoint returns something other than the SPA shell
+      (assert on content, not just status), pod 1/1.
+- [ ] Commit.
+
+### 64.5 — mastra-ticker: decide, or remove the dead helmrelease
+
+- [ ] `mastra-ticker` has a helmrelease with a `custom: true` probe but **no
+      Deployment and no Service** in `pfire` — it is not deployed. Either deploy
+      it or drop the manifest so the next audit is not misled by a probe that
+      protects nothing. `custom: true` is the correct escape hatch and is the
+      shape to prefer when the built-in dialect does not fit.
+- [ ] Tests: if deployed, pod 1/1 and probe reaching a 200; if removed,
+      `kubectl get deploy -n pfire mastra-ticker` 404s and the Flux
+      kustomization reconciles clean.
+- [ ] Commit.
+
+### 64.6 — Make the schema check routine, not a one-off
+
+- [ ] Add a `hack/validate-helmrelease.py` (or equivalent) to the homelab repo
+      that validates **every** `cluster/apps/pfire/*/app/helmrelease.yaml`
+      against the pinned chart's `values.schema.json`, and call it from a
+      pre-commit hook. §64.1's openst failure was a schema error that only
+      surfaced as `Ready=False / UpgradeFailed` in the cluster, ~90 s after
+      Flux applied it, with the service silently left on the old image.
+- [ ] Also assert, in the same check, that a service declaring `probes:` has
+      `type` set on each probe — the tcpSocket false friend is schema-**valid**,
+      so only an explicit lint catches it.
+- [ ] Tests: the script exits non-zero on (a) a schema violation and (b) a
+      probe missing `type`; exits 0 on the current tree after §64.1–64.3.
+- [ ] Commit.
+
+### Open questions
+
+1. **jobshot health route** — add a real `/health` in the `jobshot` repo
+   (3rd repo for this plan), or accept a `/` probe that only proves nginx is
+   up? The plan currently assumes a real route is preferred; §64.4 is blocked
+   until this is answered.
+2. **cachest `/ready`** — is a second endpoint worth it, given cachest already
+   degrades gracefully to cache misses? The argument for it is that without it
+   readiness would duplicate liveness and the pod would keep taking traffic it
+   cannot serve quickly. Confirm before §64.2.
+3. **Separate liveness vs readiness paths for the four TS services** — all four
+   expose only `/health` (200); `/ready` is 404 on every one. So readiness
+   would be a duplicate of liveness unless each service grows a `/ready` that
+   checks its own dependencies (db, redis). Is a duplicated probe acceptable, or
+   should `/ready` be added to each service?
+4. **Third-party images** — deliberately excluded here. Should the audit cover
+   `postgrest` / `swagger-ui` / `pgadmin` / `pgweb` too, or stay scoped to
+   images this monorepo builds?
