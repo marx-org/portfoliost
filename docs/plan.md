@@ -2059,24 +2059,31 @@ recorded as such, distinct from a 404.
 
 ### 63.9.2 — instruments: a transient 503 is not a 1-hour `failed`
 
-- [ ] `portfoliost-instruments` migration `0003_price_bar_metadata_last_error.sql`
-      (+ `drizzle/`): add `last_error text` to `instruments.price_bar_metadata`.
-      Schema in `src/db/schema.ts`.
-- [ ] `fetchJson` (`src/adapters/cachest.ts:13-17`) — carry the upstream status on
-      `UpstreamError` and stop collapsing 404 into the same undifferentiated throw.
-- [ ] `getPriceBarSeries` (`src/services/price-bars.ts:395-404`) — record
-      `fetch_status` + `last_error` (status code + message, truncated). A
-      **retryable** status (429/502/503/504, or a fetch timeout) must NOT arm the
-      1-hour breaker for the full hour: keep a short retry backoff (minutes) for
-      those and reserve the 1-hour `COOLDOWN_MS` for a genuine 404 "no such
-      symbol", so one lost race cannot park a symbol for the rest of the day.
-      `recentlyFailed` becomes status-aware.
-- [ ] Tests: `src/services/price-bars.test.ts` — 503 from cachest → `last_error`
-      recorded, retried after minutes (not an hour), `fetch_status` not left as a
-      dead `failed` for 60 min; a 404 → the full-hour breaker still applies; a
-      success clears `last_error`.
-- [ ] Tests: `npm run build && npm run test` in `portfoliost-instruments/` green.
-- [ ] Commit.
+- [x] **Migration + status-aware breaker** (instruments `cc75111`, 356 green).
+      `drizzle/0003_price_bar_metadata_last_error.sql` adds
+      `price_bar_metadata.last_error` (status + message, bounded to 300 chars);
+      schema in `src/db/schema.ts`. `UpstreamError` already carried `status`, so
+      no adapter change was needed — what was missing was anywhere to *put* it.
+      New `isTransientFailure` / `cooldownFor` / `describeFailure` in
+      `src/services/price-bars.ts`: an upstream **404** keeps the hour-long
+      breaker (there is genuinely nothing to fetch), while 429/502/503/504, a
+      thrown fetch and an unparseable body all retry after
+      `TRANSIENT_COOLDOWN_MS` (5 min). A success clears `last_error`. The
+      breaker is now read with `cooldownFor(meta.lastError)`.
+      Also fixed a latent test/clock bug: the metadata upserts wrote
+      ``sql`now()` `` (the DB clock) while the breaker compared against the
+      *injected* `now`, so the pre-existing "fails within the hour" case passed on
+      a negative delta rather than on the cooldown it claimed to cover. Both now
+      use the injected clock (identical in prod, where the route passes
+      `new Date()`), and that case is now a real 404.
+      +5 tests: `last_error` records the status, a 503 is retried at +6 min and
+      succeeds (**fails against the old single hourly cooldown**), a 404 stays
+      parked at +30 min, the transient/404 classification, `last_error` bounding.
+- [ ] Deploy (push → GHA → pin the tag) + apply migration 0003 in PROD, then read
+      `select symbol, last_error, count(*) from instruments.price_bar_metadata
+      where fetch_status='failed' group by 1,2` to separate genuine 404s from
+      retryable failures. Expect the `.WA`/`.L` cluster to clear on the next
+      sweep.
 
 ### 63.9.3 — heal PROD and prove the spike is gone
 
