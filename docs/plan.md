@@ -2524,6 +2524,24 @@ Six overrides total across §63.12–§63.13: `7974.T`→`NTO.F`, `CSKR.L`→`IK
 `EXS1`→`EXS1.DE`, `LTAM`→`LTAM.MI`, `EX10.VI`→`DEAM.DE`, `CNYAN.MX`→`CNYA.L`,
 `FRO`→`FRO.WA`, `XDEW.SW`→`XDEW.MI` — seven in all.
 
+#### Healed in PROD (2026-09-27)
+
+Wipe & reimport (`sheets-sync` v1.0.24) + full recompute of all 10 portfolios:
+
+| check | before | after |
+|---|---|---|
+| bad symbols in `transactions` | 8 kinds | **none** — all 7 overridden |
+| `NTO.F` / `IKOR.L` / `EXS1.DE` / `LTAM.MI` / `DEAM.DE` / `CNYA.L` / `FRO.WA` / `XDEW.MI` | — | present, 31 rows |
+| IKE Beata 2025-01-22 → 01-23 (`CNYA.L`) | 115,606 → 143,275 (**+27,669**) | 115,606 → **115,208 (−398)** |
+| IKE Beata around 2022-08-26 (`FRO.WA`) | Frontline's USD line | smooth, ~22,000, no step |
+| merged series 2025-09-24 | −52.1% | **+0.1%** |
+| worst single day, whole 2019–2026 series | −52.1% (phantom) | **−24.1%** (2022-05-26, a real drawdown) |
+| days worse than −25% | 1 (the phantom) | **0** |
+| backfill status (10/10) | complete | **complete**, `gap_symbols` empty |
+
+The 2025-01-23 step is the clearest single confirmation: +27,669 PLN became −398,
+and the position that caused it is worth ~1,485 PLN.
+
 ---
 
 
