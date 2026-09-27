@@ -1923,3 +1923,28 @@ silently-wrong value.
       already gates its timeframe buttons during recompute. A `gapSymbols` prop
       shows the amber partial-sum warning (Performance tab + card). +2 chart
       unit tests (gray-out blocks re-trigger; gap warning renders).
+
+**Deployed 2026-09-27** — wallets **v1.1.65** + SPA **v1.0.239** pinned in
+`cluster/apps/pfire/*/app/helmrelease.yaml` (homelab commit `f2be27648`), 1/1
+both, migration 0009 (`gap_symbols`) applied in PROD.
+
+**What's still missing (continue here next session):**
+- [ ] **Item #2 — the actual price history** (GATED, provider tier / §63.5).
+      Until the `.WA`/`.AS` symbols get bars, the value is *flagged* partial,
+      not *corrected*. The 5 missing IKE Beata symbols (≈ 50k): **XTB.WA,
+      EMIM.AS, RBOE.AS** (`fetch_status='failed'`, 0 bars) and **AMZN, SP20.L**
+      (bars exist but a gap on the snapshot date). Concretely: (a) figure out
+      why cachest/OpenBB `/ohlcv/XTB.WA` returns nothing (symbol mapping for
+      WSE/ASX venues, or no provider coverage — check what openst/stooq could
+      supply), (b) once sourceable, seed the history (instruments fill / stooq
+      import) and re-run a backfill so `gap_symbols` clears to null and the
+      value matches the live path. Also still open on the instruments side:
+      log the provider error into `fetch_status`/`last_error` (diagnosability)
+      and add a scheduled "fill gaps for held symbols" pass.
+- [ ] **Confirm in UI** (needs a fresh PROD login — Playwright session closed
+      mid-verification): on IKE Beata → Performance, verify (a) the amber
+      "Value excludes 5 positions without price history" banner shows after one
+      recompute, and (b) the chart grays out + Recompute is disabled during a
+      Recompute and re-renders fresh when done.
+- [ ] **Turn RECALC_DEBUG off** in the wallets helmrelease now that the §63.6
+      RCA is closed (it is still `value: "1"` in PROD).
