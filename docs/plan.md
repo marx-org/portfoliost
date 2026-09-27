@@ -2353,17 +2353,32 @@ a stale `TYO` row (it is name-keyed, so the venue column cannot filter it out);
 `podsumowanie-parser.test.ts` keeps asserting `7974.T`/`JP` to pin the fact that the
 parser reads the sheet verbatim and the correction lives in the resolver. 138 green.
 
+#### Healed in PROD (2026-09-27)
+
+Wipe & reimport + full recompute of all 10 portfolios, verified:
+
+| check | before | after |
+|---|---|---|
+| stored Nintendo symbol | `7974.T` (9 rows) | **`NTO.F`** (9 rows) |
+| IBKR value 2025-09-23 | 1,528,346 | **453,217** |
+| IBKR value 2025-09-24 | 454,644 (−52.1%) | **454,644 (+0.3%)** |
+| merged series 2025-09-24 | −52.1% | **+0.1%** |
+| `NTO.F` price bars | none | 6,830 |
+| backfill status (10/10) | complete | **complete**, `gap_symbols` empty |
+
+Phantom removed: **1,075,129 PLN** from IBKR's 2023-04-12..2025-09-23 window —
+which reconciles with the predicted 1.07M from the table above. Headline values are
+**unchanged** (IBKR 585,319.22, IKE Beata 196,827.12, IKE Marek 90,962.72) because
+the position was sold in Sept 2025 and contributes nothing to today's figures; only
+the historical window moved. The merged chart's worst remaining single-day move is
+−24.1% on 2022-05-26, a real drawdown.
+
 #### Left open
 
-- **A wipe & reimport is required.** The stored transactions still carry `7974.T`,
-  so IBKR's `2023-04-12 .. 2025-09-23` value stays overstated by ~1.07M PLN until
-  the reimport rewrites the label and a force-recompute rebuilds the series. This
-  is the one case in §63 where a reimport *is* needed — §63.9/§63.10 did not
-  require one.
 - **The DIVIDEND rows will still be `JPY`** after the reimport: `currency` comes
   from the sheet, and the override only changes the symbol. Financially
   immaterial (~10 PLN total across four rows) but it is a residual label
-  inconsistency.
+  inconsistency, now confirmed to have survived the reimport as predicted.
 - **The fleet-wide stale-symbol audit is unresolved.** The obvious check —
   compare each row's Yahoo column against `symbol + exchange_reference.yahoo_suffix`
   — does not work, because the sheet uses **Polish venue codes** (`ETR`, `LON`,
@@ -2372,8 +2387,10 @@ parser reads the sheet verbatim and the correction lives in the resolver. 138 gr
   venue" and the naive comparison also flags legitimate local-ticker ≠ Yahoo-ticker
   cases (`V` → `HUBS`). Nintendo is the one case proven wrong by the data.
   Two real reference gaps surfaced while attempting it: `TSE` has an **empty**
-  `yahoo_suffix` (which is why step 3 was silent), and there is **no TSX row**,
-  so `CSU` (Constellation Software, `CSU.TO`) has no venue to resolve against.
+  `yahoo_suffix` (which is why the currency resolver was silent), and there is
+  **no TSX row**, so `CSU` (Constellation Software, `CSU.TO`) has no venue to
+  resolve against. Adding the sheet's venue-code vocabulary to
+  `exchange_reference` is the prerequisite for making that audit real.
 
 ---
 
