@@ -1697,9 +1697,12 @@ that appeared and re-appeared over the day.
 3. **Two genuine 09-26 moves remain unexplained** (recompute rebuilt them,
    still high): Equate+ 3,947→8,633 (+119%) and IKE Marek 68,455→105,452
    (+54%). Equate+ = the short-SAP-option book (expiry effect?); IKE Marek
-   = the LSE `.L` names. **OPEN: root-cause with `RECALC_DEBUG=1` per-symbol
-   logs (env already added to the two snapshot writers; currently ON in the
-   PROD helmrelease — turn off when done).**
+   = the LSE `.L` names. ~~**OPEN: root-cause with `RECALC_DEBUG=1`**~~
+   — **RESOLVED, and it was not a valuation problem: see §63.10.** Both "moves"
+   were the same artifact as the spike: a snapshot written by a pass that had
+   priced *nothing*, so the stored value was cash only. Equate+ and IKE Marek now
+   price 1/1 and 13/13 with no gaps. `RECALC_DEBUG` is **off** in the PROD
+   helmrelease (turned off in §63.10.5).**
 
    **Diagnostic aid (2026-09-27, §63.7): the new value-vs-`Invested` chart
    isolates these from real deposits.** The **Invested** line (cumulative net
@@ -1874,8 +1877,7 @@ both, migration 0009 (`gap_symbols`) applied in PROD.
       "Value excludes 5 positions without price history" banner shows after one
       recompute, and (b) the chart grays out + Recompute is disabled during a
       Recompute and re-renders fresh when done.
-- [ ] **Turn RECALC_DEBUG off** in the wallets helmrelease now that the §63.6
-      RCA is closed (it is still `value: "1"` in PROD).
+- [x] ~~**Turn RECALC_DEBUG off**~~ — done in §63.10.5 (now `RECALC_DEBUG: "0"`).
 
 ### 63.9 — cachest's rate limiter caps upstream concurrency at 3 (RCA of the IKE Beata spike, 2026-09-27)
 
