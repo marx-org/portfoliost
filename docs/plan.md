@@ -1704,156 +1704,64 @@ row per Konto, in PLN). It never fails the run.
 
 ---
 
-## 66. Never guess a currency: 71 silent `"USD"` defaults across four repos (2026-09-27)
+## 67. Follow-ups from the currency work — the aggregate base and a duplicated helper (2026-09-27)
 
-Found while fixing §63.14. The card bug was one instance of a class: **a missing
-currency is silently filled in with `"USD"`**, so an amount is labelled with a
-symbol that was never true. 71 sites:
+Two things §66 deliberately did not do, both left over from the rollout.
 
-| repo | sites | what a wrong value costs there |
-|---|---|---|
-| `portfoliost` (SPA) | 46 | a **wrong symbol on screen** |
-| `portfoliost-wallets` | 17 | 12 of them pick the **FX conversion base** |
-| `portfoliost-instruments` | 8 | the **quote currency** on price/quote responses |
-| `portfoliost-sheets-sync` | 0 | — |
+### 67.1 — the aggregate still denominates in USD, so §63.3 cannot reconcile
 
-`PriceChart.vue` already threads `baseCurrency` and uses `""` for unknown — the
-correct pattern exists in the codebase, it just is not used consistently.
+`total-metrics` no longer *hardcodes* USD (§66.4) — it uses
+`preferredBaseCurrency`, and falls back to the user's own most common portfolio
+base when the preference service is unreadable. In PROD that preference is
+genuinely **unset**, so the honest default applies and the response still reports
+`baseCurrency: "USD"`, while every portfolio is PLN and the cards render PLN.
 
-### 66.1 — Root cause: the API does not send the currency, so the SPA guesses
+Measured after the §66 rollout:
 
-The SPA's `|| "USD"` is not carelessness; it is papering over a **contract gap**.
+| surface | value |
+|---|---|
+| Σ the 10 cards (Value) | PLN **1,380,487.34** |
+| "Total Value" headline | PLN **1,035,259.30** |
+| difference | PLN **345,228.04** ≈ the Cash card (PLN 345,228.05) |
 
-- `PortfolioSummaryMetrics` (`openapi.yaml:1515`) has `totalValue`,
-  `totalInvested`, `dayChangeAmount`, … and **no currency field at all**. That is
-  why `PortfolioCard.vue:358,362` had nothing to pass.
-- `PortfolioSnapshot.allocation` (`:1380`) is rows of `{ name, value }` — again no
-  currency, so `PortfolioAllocationTab` cannot label its donut or sector/asset/
-  geography tables at all.
-- By contrast the headline in `InvestmentsView.vue:277` renders correctly ("PLN")
-  because it uses the **user's display currency** from `useDisplayCurrencyStore`
-  plus `toDisplay()`. The cards do neither.
+So the residual gap is cash, not FX: the cards include cash and the headline
+does not. That is §63.3's item, but it is blocked on this: the aggregate needs a
+base currency that means something to the user.
 
-So there are two independent defects on the card, and fixing only the symbol
-leaves them inconsistent: **no currency** *and* **no `toDisplay()` conversion**,
-which is part of why §63.3's card sum (PLN 1,380,487) and headline
-(PLN 1,035,259) disagree.
-
-The 6 call sites that omit the currency argument entirely:
-
-| site | renders | real currency |
-|---|---|---|
-| `PortfolioCard.vue:358` | Value | unknown — not in the payload |
-| `PortfolioCard.vue:362` | Invested | unknown — not in the payload |
-| `PortfolioAllocationTab.vue:32` | donut tooltip | unknown — not in the payload |
-| `PortfolioAllocationTab.vue:72` | bySector value | unknown — not in the payload |
-| `PortfolioAllocationTab.vue:89` | byAssetType value | unknown — not in the payload |
-| `PortfolioAllocationTab.vue:103` | byCurrency value | **`s.name` already is the currency** |
-
-The last one is the cheapest real fix in the whole class: the row's `name` *is*
-the ISO code, and the table is not passing it.
-
-### 66.2 — SPA: make the formatters refuse to guess, then fix all 46 sites
-
-The three formatters are the root. `format.ts:1,34,45` each default
-`currency = "USD"` **and** re-guess internally:
-
-```ts
-const ccy = currency && /^[A-Za-z]{3}$/.test(currency) ? currency : "USD"
-```
-
-so an **explicitly passed** `""`, `null`, `"PL"` or `"zł"` also became USD. The
-inner re-guess is the worse half — it defeats the caller's own care. `formatAmount`
-(`:9`, §47.5) already documents the right rule ("never a silent USD label") and
-must become the single implementation.
-
-- [ ] `src/utils/format.ts`: drop the `= "USD"` default **and** the internal
-      `: "USD"` re-guess from `formatCurrency`, `formatSignedCurrency` and
-      `formatCompactCurrency`; make `currency` a required
-      `string | null | undefined` so `vue-tsc` fails every call site that does
-      not know it; when the currency is absent or malformed render a bare number
-      (visibly incomplete) instead of a confidently wrong symbol. Collapse
-      `formatAmount` / `formatSignedAmount` into delegations so there is one
-      implementation of the rule.
-- [ ] Fix the 6 argument-less call sites: pass the real currency where one
-      exists (`PortfolioAllocationTab.vue:103` → `s.name`), and render symbol-less
-      where the payload genuinely lacks one until §66.3 lands.
-- [ ] Then work the remaining 40 SPA sites by file, largest first:
-      `EditPositionDialog.vue` (12), `AddPositionDialog.vue` (6),
-      `RecordDividendDialog.vue` (2), `PortfolioCashModals.vue` (2),
-      `InvestmentsView.vue` (2), `EditTransactionModal.vue` (2),
-      `useTransactionForm.ts` (2), `PriceChart.vue` (2), `FeeCell.vue` (2),
-      `DualCurrencyPnlCell.vue` (2), `DualCurrencyCell.vue` (2), plus
-      `compareSeries.ts`, `displayCurrency.ts`, `PortfolioPerformanceTab.vue`,
-      `PortfolioCashTab.vue`, `useTargetCurrency.ts`, `TransactionsTable.vue`,
-      `CashTransactionsTable.vue`. In every case: use the currency the payload
-      actually carries, or none.
-- [ ] `stores/displayCurrency.ts:5` defaults a user *preference* to USD. That is
-      a different question from labelling an amount — decide it explicitly
-      (recommend: keep USD as the preference default but never let it stand in
-      for an amount's real currency) and record the decision here.
-- [ ] Tests: `formatCurrency(1234.5, null)` and `(1234.5, "PL")` and
-      `(1234.5, "")` render `"1,234.50"` with **no** symbol; `(1234.5, "pln")`
-      renders `"PLN 1,234.50"` (case-insensitive input, normalised output); a
-      null value still renders `"—"`. Add a source-level guard test that fails if
-      any `format*Currency(` call site passes fewer than 2 arguments, so the
-      compiler contract cannot be bypassed.
-- [ ] Tests: `npm run build`, `npm run test`, `npm run test:mock` green.
-- [ ] Playwright: `/en/investments` — the IBKR card's Value line shows no `$`
-      until §66.3 supplies the currency, then shows the right symbol; the
-      allocation tab's byCurrency table shows its own row currency.
+- [ ] Decide the aggregate base: set a `baseCurrency` UI preference for the user
+      so `preferredBaseCurrency` returns something real, OR change the endpoint to
+      report each portfolio in its own base and let the SPA convert.
+- [ ] Then close §63.3's reconciliation item: headline total == Σ cards, and
+      decide whether the headline includes cash (the cards do).
+- [ ] Also still open there: `Crypto` reports `totalValue: 0,
+      returnPercentage: -100` in the breakdown while holding 887.74 PLN and its
+      card reads +1.65%. A portfolio with cash and a position must not floor at
+      zero.
+- [ ] Tests: `total-metrics.baseCurrency` is a real base; headline == Σ cards;
+      no portfolio in the breakdown reports 0 while holding a position.
 - [ ] Commit.
 
-### 66.3 — contracts: send the currency the SPA is missing
+### 67.2 — three copies of the same display conversion
 
-- [ ] `portfoliost-contracts` `openapi.yaml`:
-      - `PortfolioSummaryMetrics`: add `currency` (the portfolio's base
-        currency — every amount on that object is denominated in it). Required,
-        not nullable: a summary with no currency is not renderable.
-      - `PortfolioSnapshot.allocation`: give the allocation object a `currency`
-        for the `bySector` / `byAssetType` / `byAsset` / `byGeography` /
-        `byIndustry` / `byPosition` rows, and document that `byCurrency[].name`
-        **is** an ISO code (the SPA may use the row name as its currency).
-- [ ] `portfoliost-wallets`: populate both from `portfolio.baseCurrency`; fail
-      the request rather than defaulting when it is null (see §66.4 — a portfolio
-      with no base currency should be a loud error, not a USD assumption).
-- [ ] `portfoliost`: consume the new fields; `PortfolioCard` renders
-      `formatCurrency(toDisplay(portfolio.currentValue), displayCurrency)` so the
-      cards and the headline are computed the same way and their sum reconciles
-      (this is the §63.3 half, not a separate cosmetic change).
-- [ ] Tests: contracts `npm test`; wallets suite asserts the currency is
-      returned and that a null `baseCurrency` is rejected, not defaulted.
-- [ ] Commit (contracts) + consumer commits + release/PROD verify.
+§66.3 added `useDisplayConversion` (one implementation, two explicit rules) and
+used it on the card. Two older, working copies remain:
 
-### 66.4 — wallets + instruments: stop defaulting the FX base and quote currency
+- `src/modules/portfolios/InvestmentsView.vue` — local `toDisplay()` +
+  `mergedChartRate`, source = `totalMetrics.baseCurrency`
+- `src/modules/portfolios/PortfolioHoldingsTab.vue` — local `toDisplay()` +
+  `toDisplayRate`, source = a position's `displayCurrency`
 
-These are **not** label bugs. 12 `baseCurrency ?? "USD"` sites in wallets pick the
-conversion base for a real number, and 5 in instruments fill the currency on a
-price/quote response — a wrong value here moves money on the chart, which is
-exactly the §63.12/§63.13 class of damage.
+They differ subtly (the holdings tab rounds, falls back to the portfolio currency
+for the label, and has a `totalsCcy`), so consolidating them is a behaviour
+change to working display code rather than a mechanical dedup.
 
-Sites: `portfolio-cash.ts:128,324,449`; `portfolio-transactions.ts:93,1073,1074`;
-`portfolios.ts:274,293,400,863,1047`; `internal.ts:227`; `import.ts:341`;
-`quotes.ts:353,356`; `backfill.ts:633`; and in instruments
-`adapters/translate.ts:593,663,692,786,794`, `routes/instruments.ts:1073`,
-`services/quote-dispatch.ts:62`.
-
-- [ ] Decide per site which of three behaviours is right, and apply it
-      consistently — this is the whole point of the step:
-      1. **the currency is genuinely known** → thread it through, no fallback;
-      2. **it is genuinely optional** (e.g. a crypto pair quoted in USD) → keep an
-         explicit, documented default *at the boundary where the provider states
-         it*, not a silent `??` deep in a route;
-      3. **it is required and missing** → reject the request / mark the row
-         errored. A portfolio with no base currency and a position must not be
-         valued against an invented one.
-- [ ] Audit against §63.10.5, which already added a base-currency guard on
-      `/history`: confirm whether that guard makes any of these 12 unreachable,
-      and delete the dead fallbacks rather than leaving them as false friends.
-- [ ] Tests: a portfolio with `baseCurrency: null` and a held position is
-      rejected (or explicitly flagged), never valued in USD; a cross-currency
-      row with a manual rate is unchanged; the whole wallets + instruments suites
-      stay green.
-- [ ] Commit (per repo).
+- [ ] Move both onto `useDisplayConversion`, keeping each one's current fallback
+      behaviour, and delete the local implementations.
+- [ ] Tests: the two views render exactly as they do today (snapshot the Value /
+      Invested / totals lines before and after); `npm run test`, `test:mock`,
+      `test:e2e` green.
+- [ ] Playwright: compare `/en/investments` and a portfolio's holdings tab before
+      and after.
+- [ ] Commit.
 
 ---
