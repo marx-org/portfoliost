@@ -267,7 +267,11 @@ watchEffect(() => {
 
 const chartSeries = computed(() => {
   const rate = chartRate.value ?? 1
-  return (store.analytics?.performance?.timeSeries ?? []).map((p) => ({ ...p, value: (p.value ?? 0) * rate }))
+  return (store.analytics?.performance?.timeSeries ?? []).map((p) => ({
+    ...p,
+    value: (p.value ?? 0) * rate,
+    invested: p.invested != null ? p.invested * rate : null,
+  }))
 })
 
 // Benchmark overlays share the portfolio base currency — same rate.

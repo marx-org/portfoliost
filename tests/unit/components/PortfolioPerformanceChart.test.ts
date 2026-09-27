@@ -54,6 +54,37 @@ describe("PortfolioPerformanceChart (§41.1)", () => {
     expect(opts.tooltip.y.formatter(94508.33)).toBe("$94,508.33")
   })
 
+  it("draws the 'Invested' line (same axis) when timeSeries carries invested", () => {
+    const w = mount(PortfolioPerformanceChart, {
+      props: {
+        // value (portfolio) + invested (cumulative net money-in)
+        timeSeries: [
+          { date: "2026-07-01", value: 500, invested: 400 },
+          { date: "2026-07-02", value: 94000, invested: 90000 },
+        ],
+      },
+      global: { stubs: { apexchart: true } },
+    })
+    const opts = chartOptions(w)
+    expect(opts.series).toHaveLength(2)
+    expect(opts.series[0].name).toBe("Portfolio")
+    expect(opts.series[1].name).toBe("Invested")
+    expect(opts.series[1].data.map(([, v]) => v)).toEqual([400, 90000])
+    // invested is a solid (non-dashed) line, second slot
+    expect(opts.stroke.dashArray[0]).toBe(0)
+    expect(opts.stroke.dashArray[1]).toBe(0)
+  })
+
+  it("omits the 'Invested' line when timeSeries has no invested field", () => {
+    const w = mount(PortfolioPerformanceChart, {
+      props: { timeSeries: [ts("2026-07-01", 500)] },
+      global: { stubs: { apexchart: true } },
+    })
+    const opts = chartOptions(w)
+    expect(opts.series).toHaveLength(1)
+    expect(opts.series[0].name).toBe("Portfolio")
+  })
+
   it("overlays the benchmark on the same axis, grey dashed", () => {
     const w = mount(PortfolioPerformanceChart, {
       props: {

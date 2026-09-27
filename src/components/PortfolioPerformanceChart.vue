@@ -11,6 +11,9 @@ import { formatCompactCurrency, formatCurrency } from "@/utils/format"
 interface PerformancePoint {
   date?: string
   value?: number
+  /** Cumulative net money-in (same currency as `value`). When present, drawn
+   * as a second "Invested" line so value − invested = profit at a glance. */
+  invested?: number | null
   cumulativeTwr?: number | null
   cumulativeMwr?: number | null
   cumulativeSimple?: number | null
@@ -40,6 +43,12 @@ const emit = defineEmits<{ recompute: [] }>()
 
 const toPoint = (p: PerformancePoint): [number, number] => [new Date(p.date ?? "").getTime(), p.value ?? 0]
 
+// §cash-invested overlay — the "Invested" line (cumulative net money-in) is
+// only drawn when the caller passes it through, so it shows on the per-
+//portfolio performance chart AND the combined chart. Same currency as value.
+const hasInvested = computed(() => props.timeSeries.some((p) => p.invested != null))
+const INVESTED_COLOR = "#0ea5e9"
+
 // Config-only options (no `series`). The object is memoised by
 // (currency, colour, benchmark names) so a data swap that keeps the same
 // configuration reuses the identical `options` reference (vue3-apexcharts
@@ -52,9 +61,10 @@ type ChartOptions = ReturnType<typeof buildChartOptions>
 
 function buildChartOptions() {
   const benchmarks = props.benchmarks ?? []
+  const hasInv = hasInvested.value
   return {
     chart: { type: "line" as const, toolbar: { show: false }, zoom: { enabled: false } },
-    colors: [props.color, ...benchmarks.map(() => "#94a3b8")],
+    colors: [props.color, ...(hasInv ? [INVESTED_COLOR] : []), ...benchmarks.map(() => "#94a3b8")],
     xaxis: { type: "datetime" as const, labels: { datetimeUTC: false } },
     yaxis: {
       labels: { formatter: (v: number) => formatCompactCurrency(v, props.currency) },
@@ -63,7 +73,11 @@ function buildChartOptions() {
       shared: true,
       y: { formatter: (v: number) => formatCurrency(v, props.currency) },
     },
-    stroke: { width: [2, ...benchmarks.map(() => 1)], dashArray: [0, ...benchmarks.map(() => 4)] },
+    // Portfolio line solid+bold; Invested solid+thinner; benchmarks dashed+thin.
+    stroke: {
+      width: [2, ...(hasInv ? [1.5] : []), ...benchmarks.map(() => 1)],
+      dashArray: [0, ...(hasInv ? [0] : []), ...benchmarks.map(() => 4)],
+    },
     dataLabels: { enabled: false },
   }
 }
@@ -85,6 +99,9 @@ const seriesData = computed(() => {
   const benchmarks = props.benchmarks ?? []
   return [
     { name: "Portfolio", data: props.timeSeries.map(toPoint) },
+    ...(hasInvested.value
+      ? [{ name: "Invested", data: props.timeSeries.map((p) => [new Date(p.date ?? "").getTime(), p.invested ?? 0]) }]
+      : []),
     ...benchmarks.map((b) => ({
       name: b.name || b.symbol || "Benchmark",
       data: (b.timeSeries ?? []).map((p) => [new Date(p.date ?? "").getTime(), p.value ?? 0]),
@@ -107,8 +124,9 @@ const chartKey = computed(() => {
     props.currency,
     props.color,
     props.height,
+    hasInvested.value ? "inv" : "",
     benchmarks.map((b) => b.name || b.symbol || "Benchmark").join(","),
-    `${props.timeSeries.length}|${(props.timeSeries[0]?.value ?? "").toString()}|${tail(props.timeSeries)}`,
+    `${props.timeSeries.length}|${(props.timeSeries[0]?.value ?? "").toString()}|${tail(props.timeSeries)}|${(props.timeSeries.at(-1)?.invested ?? "").toString()}`,
     ...benchmarks.map((b) => `${(b.timeSeries ?? []).length}|${tail(b.timeSeries)}`),
   ].join("~")
 })

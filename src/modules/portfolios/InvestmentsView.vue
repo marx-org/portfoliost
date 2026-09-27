@@ -103,7 +103,11 @@ watchEffect(() => {
 
 const mergedChartSeries = computed(() => {
   const rate = mergedChartRate.value ?? 1
-  return (merged.value?.performance?.timeSeries ?? []).map((p) => ({ ...p, value: (p.value ?? 0) * rate }))
+  return (merged.value?.performance?.timeSeries ?? []).map((p) => ({
+    ...p,
+    value: (p.value ?? 0) * rate,
+    invested: p.invested != null ? p.invested * rate : null,
+  }))
 })
 
 // §48.6e B5 — the total-metrics values are denominated in `baseCurrency`

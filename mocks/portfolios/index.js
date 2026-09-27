@@ -59,6 +59,21 @@ function timelineFor(timeframe) {
   return ANALYTICS_BY_TIMEFRAME[t] ? t : "1Y"
 }
 
+// The performance chart's "Invested" overlay line (value − invested = profit)
+// wants a per-point `invested` (cumulative net money-in, same currency as
+// `value`). The fixtures carry it as `investedCapital`; surface it so the
+// line renders in mock/docker mode exactly as it does against the live API.
+function withInvestedSeries(perf) {
+  if (!perf || !Array.isArray(perf.timeSeries)) return perf
+  return {
+    ...perf,
+    timeSeries: perf.timeSeries.map((p) => ({
+      ...p,
+      invested: typeof p.invested === "number" ? p.invested : p.investedCapital ?? null,
+    })),
+  }
+}
+
 function findPortfolio(id) {
   if (created.has(id)) return created.get(id)
   if (id === noPricePortfolio().id) return noPricePortfolio()
@@ -240,7 +255,7 @@ export function register(app) {
     const available = benchmarkSymbols()
     const symbols = wanted.filter((s) => available.includes(s))
     const benchmarks = symbols.map((s) => benchmarkSeries(s, timeframe))
-    ctx.res.json({ ...base, benchmarks })
+    ctx.res.json({ ...base, performance: withInvestedSeries(base.performance), benchmarks })
   })
 
   app.get("/api/portfolios/merged/light", (ctx) => {
@@ -423,7 +438,7 @@ export function register(app) {
     // reports `pending` (mirroring the real backend's n<2 auto-trigger) until
     // a recompute fills the series.
     const backfillStatus = !recomputed && newPortfolioIds.has(ctx.params.id) ? "pending" : undefined
-    ctx.res.json({ ...base, ...(backfillStatus ? { backfillStatus } : {}), benchmarks })
+    ctx.res.json({ ...base, performance: withInvestedSeries(base.performance), ...(backfillStatus ? { backfillStatus } : {}), benchmarks })
   })
 
   app.post("/api/portfolios/:id/recompute", (ctx) => {
