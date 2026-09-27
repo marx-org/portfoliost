@@ -138,7 +138,7 @@ watch(
         fees.value = tx.fees != null ? Number(tx.fees) : 0
         // The CashTransaction schema exposes no feesType; fees ship fixed.
         feesType.value = "fixed"
-        feeCurrency.value = tx.feeCurrency ?? (baseCurrency.value || "USD")
+        feeCurrency.value = tx.feeCurrency ?? (baseCurrency.value || "")
         feeRateSource.value = tx.feeRateSource ?? "automatic"
         feeExchangeRate.value = tx.feeExchangeRate != null ? String(tx.feeExchangeRate) : ""
       } else {
@@ -150,7 +150,7 @@ watch(
         toPortfolioId.value = ""
         fees.value = 0
         feesType.value = "fixed"
-        feeCurrency.value = baseCurrency.value || "USD"
+        feeCurrency.value = baseCurrency.value || ""
       }
       rateSource.value = "automatic"
       exchangeRate.value = ""

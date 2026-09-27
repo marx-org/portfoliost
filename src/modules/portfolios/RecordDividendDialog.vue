@@ -50,7 +50,7 @@ watch(
   },
 )
 
-const txCcy = computed(() => (props.position?.instrumentCurrency ?? props.position?.purchaseCurrency ?? "USD").toUpperCase())
+const txCcy = computed(() => (props.position?.instrumentCurrency ?? props.position?.purchaseCurrency ?? "").toUpperCase())
 const ccySymbol = computed(() => currenciesStore.info(txCcy.value)?.symbol ?? txCcy.value)
 const assetLabel = computed(() => {
   const t = props.position?.assetType
@@ -60,7 +60,7 @@ const totals = computed(() => dividendTotals(perShare.value, grossTotal.value, p
 
 // The dividend is paid into the portfolio; the FX leg converts the tx currency
 // into the portfolio's base currency (§62 — dividends need no wallet).
-const portfolioCcy = computed(() => (store.portfolios.find((p) => p.id === props.portfolioId)?.baseCurrency ?? "USD").toUpperCase())
+const portfolioCcy = computed(() => (store.portfolios.find((p) => p.id === props.portfolioId)?.baseCurrency ?? "").toUpperCase())
 const needsFx = computed(() => portfolioCcy.value !== txCcy.value)
 
 const rate = computed(() => {

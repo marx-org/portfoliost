@@ -248,7 +248,7 @@ function convertedPnl(p: PortfolioPositions[number]): number | null {
 // chart component.
 const portfolioCcy = computed(() => {
   const d = store.detail
-  return ((d?.baseCurrency ?? "").toUpperCase() || "USD")
+  return (d?.baseCurrency ?? "").toUpperCase()
 })
 const chartRate = ref<number | null>(null)
 

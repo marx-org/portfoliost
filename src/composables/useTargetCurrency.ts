@@ -19,6 +19,6 @@ export function useTargetCurrency(contextCurrency?: TargetCurrencyContext["conte
         ? contextCurrency.value
         : contextCurrency
       : null
-    return explicit || display.currency || "USD"
+    return explicit || display.currency || ""
   })
 }

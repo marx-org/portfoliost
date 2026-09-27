@@ -355,11 +355,11 @@ async function exportPositions(format: "csv" | "xml" | "json") {
     <div class="mt-4 grid grid-cols-3 gap-2 text-sm">
       <div>
         <p class="text-xs text-slate-500 dark:text-slate-400">Value</p>
-        <p class="font-medium tabular-nums">{{ formatCurrency(portfolio.currentValue) }}</p>
+        <p class="font-medium tabular-nums">{{ formatCurrency(portfolio.currentValue, undefined) }}</p>
       </div>
       <div>
         <p class="text-xs text-slate-500 dark:text-slate-400">Invested</p>
-        <p class="font-medium tabular-nums">{{ formatCurrency(portfolio.totalInvested) }}</p>
+        <p class="font-medium tabular-nums">{{ formatCurrency(portfolio.totalInvested, undefined) }}</p>
       </div>
       <div>
         <p class="text-xs text-slate-500 dark:text-slate-400">Return</p>

@@ -65,7 +65,7 @@ function num(value: unknown, format: (v: number) => string): string {
                 <p class="text-xs text-slate-500 dark:text-slate-400">{{ r.name }}</p>
               </td>
               <td class="px-5 py-3 text-right tabular-nums">{{ formatPercent(r.weight) }}</td>
-              <td class="px-5 py-3 text-right tabular-nums">{{ num(r.price, formatCurrency) }}</td>
+              <td class="px-5 py-3 text-right tabular-nums">{{ num(r.price, (v) => formatCurrency(v, r.currency)) }}</td>
               <td class="px-5 py-3 text-right tabular-nums">{{ num(r.marketCap, (v) => `$${(v / 1e9).toFixed(1)}B`) }}</td>
               <td class="px-5 py-3 text-right tabular-nums">{{ num(r.peRatio, formatNumber) }}</td>
               <td class="px-5 py-3 text-right tabular-nums">{{ num(r.forwardPe, formatNumber) }}</td>

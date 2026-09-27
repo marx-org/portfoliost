@@ -488,7 +488,7 @@ function onPickerSaved() {
       :open="modalOpen"
       :action="modalAction"
       :portfolio-id="editing?.portfolioId ?? ''"
-      :cash="cash ?? { baseCurrency: editing?.currency ?? 'USD', balances: [], total: 0 }"
+      :cash="cash ?? { baseCurrency: editing?.currency ?? '', balances: [], total: 0 }"
       :edit-tx="editing ? editPayload(editing) : null"
       @close="modalOpen = false; editing = null"
       @done="onEditDone"

@@ -25,8 +25,8 @@ const props = defineProps<{
   percent?: number | null
 }>()
 
-const primaryCcy  = computed(() => (props.primaryCurrency || "USD").toUpperCase())
-const displayCcy  = computed(() => (props.displayCurrency  || "USD").toUpperCase())
+const primaryCcy  = computed(() => (props.primaryCurrency || "").toUpperCase())
+const displayCcy  = computed(() => (props.displayCurrency || "").toUpperCase())
 const dual        = computed(() => primaryCcy.value !== displayCcy.value && props.converted != null && !Number.isNaN(props.converted))
 const isPositive  = computed(() => (props.primary ?? 0) >= 0)
 const colorClass  = computed(() => isPositive.value ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400")

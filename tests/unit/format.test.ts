@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   formatAmount,
   formatCompact,
+  formatCompactCurrency,
   formatCurrency,
   formatDate,
   formatPercent,
@@ -10,24 +11,38 @@ import {
 
 describe("format", () => {
   it("formats currency with thousands separators", () => {
-    expect(formatCurrency(109916.76)).toBe("$109,916.76")
-    expect(formatCurrency(1916.6)).toBe("$1,916.60")
+    expect(formatCurrency(109916.76, "USD")).toBe("$109,916.76")
+    expect(formatCurrency(1916.6, "USD")).toBe("$1,916.60")
     expect(formatCurrency(1000, "EUR")).toBe("€1,000.00")
   })
 
-  it("handles null/undefined currency", () => {
-    expect(formatCurrency(null)).toBe("—")
-    expect(formatCurrency(undefined)).toBe("—")
-    expect(formatCurrency(NaN)).toBe("—")
+  it("handles null/undefined value", () => {
+    expect(formatCurrency(null, "USD")).toBe("—")
+    expect(formatCurrency(undefined, "USD")).toBe("—")
+    expect(formatCurrency(NaN, "USD")).toBe("—")
+  })
+
+  // §66.2 — the whole point of the change: a currency is never guessed.
+  it("§66.2: never guesses a currency — bare number, not a $", () => {
+    for (const unknown of [null, undefined, "", "PL", "zł", "US", "EURO", "1234"]) {
+      expect(formatCurrency(1234.5, unknown)).toBe("1,234.50")
+    }
+    expect(formatSignedCurrency(1234.5, null)).toBe("+1,234.50")
+    expect(formatCompactCurrency(1234.5, "")).toBe("1.2K")
+  })
+
+  it("§66.2: a real ISO code is upper-cased, not passed through as typed", () => {
+    expect(formatCurrency(1000, "pln")).toBe("PLN\u00A01,000.00")
+    expect(formatCurrency(1000, "usd")).toBe("$1,000.00")
   })
 
   it("formatAmount: no guessed currency — plain number when currency is null (§47.5)", () => {
     expect(formatAmount(109916.76, null)).toBe("109,916.76")
     expect(formatAmount(109916.76, undefined)).toBe("109,916.76")
-    expect(formatAmount(1916.6, null)).toBe("1,916.6")
+    expect(formatAmount(1916.6, null)).toBe("1,916.60") // §66.2: same 2dp as the symbolised form
     expect(formatAmount(1000, "EUR")).toBe("€1,000.00")
     expect(formatAmount(1000, "pln")).toBe("PLN\u00A01,000.00") // valid code is normalized, not guessed
-    expect(formatAmount(1000, "US")).toBe("1,000") // not a 3-letter code → plain number
+    expect(formatAmount(1000, "US")).toBe("1,000.00") // not a 3-letter code → plain number
     expect(formatAmount(null, "USD")).toBe("—")
     expect(formatAmount(NaN, "USD")).toBe("—")
   })
@@ -39,8 +54,8 @@ describe("format", () => {
   })
 
   it("formats signed currency", () => {
-    expect(formatSignedCurrency(11900.94)).toBe("+$11,900.94")
-    expect(formatSignedCurrency(-5)).toBe("-$5.00")
+    expect(formatSignedCurrency(11900.94, "USD")).toBe("+$11,900.94")
+    expect(formatSignedCurrency(-5, "USD")).toBe("-$5.00")
   })
 
   it("formats compact numbers", () => {

@@ -25,8 +25,8 @@ const props = defineProps<{
   displayCurrency?: string | null
 }>()
 
-const primaryCcy = computed(() => (props.primaryCurrency || "USD").toUpperCase())
-const displayCcy = computed(() => (props.displayCurrency || "USD").toUpperCase())
+const primaryCcy = computed(() => (props.primaryCurrency || "").toUpperCase())
+const displayCcy = computed(() => (props.displayCurrency || "").toUpperCase())
 
 /** Show the secondary row only when currencies genuinely differ */
 const showConverted = computed(

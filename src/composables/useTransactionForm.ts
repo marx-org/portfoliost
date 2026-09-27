@@ -22,7 +22,7 @@ export interface TransactionFormFields {
 export function useTransactionForm(
   form: Ref<TransactionFormFields>,
   targetCurrency: ComputedRef<string | null>,
-  txCurrency: MaybeRef<string> = "USD",
+  txCurrency: MaybeRef<string | null> = null,
 ) {
   const txSuggestion = ref<LatestRate | null>(null)
   const feeSuggestion = ref<LatestRate | null>(null)
@@ -31,7 +31,7 @@ export function useTransactionForm(
   function onFeeSuggestion(r: LatestRate | null) { feeSuggestion.value = r }
 
   /** Resolved instrument currency (e.g. "PLN") */
-  const instrCcy = computed(() => (toValue(txCurrency) || "USD").toUpperCase())
+  const instrCcy = computed(() => (toValue(txCurrency) || "").toUpperCase())
 
   /** Cost in instrument currency: qty × price */
   const positionCostUSD = computed(() => {

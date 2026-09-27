@@ -24,7 +24,8 @@ vi.mock("@/api/portfolios", async (importOriginal) => {
 
 vi.mock("@/api/instruments", () => ({
   searchInstruments: vi.fn().mockResolvedValue({ instruments: [], total: 0 }),
-  getInstrumentDetail: vi.fn().mockResolvedValue({}),
+  // §66.2 — the transaction currency comes from the instrument, not from a default.
+  getInstrumentDetail: vi.fn().mockResolvedValue({ currency: "USD" }),
   getInstrumentProfile: vi.fn().mockResolvedValue({}),
   getInstrumentMetrics: vi.fn().mockResolvedValue({}),
   getInstrumentOverviewMetrics: vi.fn().mockResolvedValue({}),

@@ -474,7 +474,7 @@ const colCount = computed(() =>
                 class="px-5 py-3 text-right font-medium tabular-nums"
                 :class="groupSubtotal(g.items) < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-700 dark:text-green-400'"
               >
-                {{ formatCurrency(groupSubtotal(g.items), g.items[0]?.displayCurrency ?? 'USD') }}
+                {{ formatCurrency(groupSubtotal(g.items), g.items[0]?.displayCurrency) }}
               </td>
               <td :colspan="mode === 'global' ? 2 : 1" class="px-5 py-3"></td>
             </tr>

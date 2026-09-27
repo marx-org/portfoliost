@@ -12,9 +12,13 @@ describe("compareSeries (§36 cross-currency overlay)", () => {
       expect(needsPercentComparison("PLN", "USD")).toBe(true)
       expect(needsPercentComparison("USD", "EUR")).toBe(true)
     })
-    it("treats missing currencies as USD", () => {
-      expect(needsPercentComparison("", "USD")).toBe(false)
+    it("§66.2: an unknown currency is never assumed to match a known one", () => {
+      // previously "" was treated as USD, so a missing currency silently agreed
+      // with a USD series; now an unknown side always reports a difference
+      expect(needsPercentComparison("", "USD")).toBe(true)
       expect(needsPercentComparison("PLN", "")).toBe(true)
+      expect(needsPercentComparison(null, null)).toBe(true)
+      expect(needsPercentComparison("usd", "USD")).toBe(false)
     })
   })
 

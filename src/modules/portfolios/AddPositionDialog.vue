@@ -89,14 +89,14 @@ watch(
           price: String(position.currentPrice ?? ""),
           fees: "0",
           feesType: "fixed",
-          feeCurrency: position.instrumentCurrency ?? "USD",
+          feeCurrency: position.instrumentCurrency ?? "",
           feeRateSource: "automatic",
           feeExchangeRate: "",
           rateSource: "automatic",
           exchangeRate: "",
           date: new Date().toISOString().slice(0, 10),
         }
-        TX_CCY.value = position.instrumentCurrency ?? "USD"
+        TX_CCY.value = position.instrumentCurrency ?? ""
         step.value = "stock"
         void triggerLoadMarketPrice()
       } else {
@@ -118,11 +118,13 @@ const today = () => new Date().toISOString().slice(0, 10)
 async function applyInstrumentCurrency(symbol: string): Promise<void> {
   try {
     const detail = await getInstrumentDetail(symbol)
-    const ccy = detail.currency?.toUpperCase() || "USD"
+    const ccy = detail.currency?.toUpperCase() || ""
     TX_CCY.value = ccy
     stockForm.value.feeCurrency = ccy
   } catch {
-    // fallback: keep USD
+    // §66.2 — no fallback currency. If the instrument's currency cannot be read,
+    // the select stays empty and the user picks one; guessing USD here is what
+    // put a wrong symbol on every amount in this dialog.
   }
 }
 
@@ -297,13 +299,13 @@ async function submitStock() {
         quantity,
         price: Number(stockForm.value.price) || 0,
         positionId: position.id,
-        currency: position.instrumentCurrency || "USD",
+        currency: position.instrumentCurrency || "",
         executedAt: stockForm.value.date ? new Date(stockForm.value.date).toISOString() : undefined,
       }
       if (stockForm.value.feesType === "fixed" && Number(stockForm.value.fees) > 0) {
         txPayload.fees = Number(stockForm.value.fees)
         txPayload.feesType = "fixed"
-        const instCcy = position.instrumentCurrency ?? "USD"
+        const instCcy = position.instrumentCurrency ?? ""
         if (stockForm.value.feeCurrency !== instCcy) {
           txPayload.feeCurrency = stockForm.value.feeCurrency
           txPayload.feeRateSource = stockForm.value.feeRateSource
@@ -626,7 +628,7 @@ defineExpose({ pendingMarketPrice })
               <p class="text-sm text-slate-600 dark:text-slate-300">Total Cost</p>
               <p class="text-xs text-slate-400 dark:text-slate-500">Option Symbol (OCC): {{ optionSymbol() }}</p>
             </div>
-            <span class="text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ formatCurrency(optionTotal, optionForm.feeCurrency || 'USD') }}</span>
+            <span class="text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ formatCurrency(optionTotal, optionForm.feeCurrency) }}</span>
           </div>
           <p v-if="error" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ error }}</p>
           <div class="flex justify-end gap-2">

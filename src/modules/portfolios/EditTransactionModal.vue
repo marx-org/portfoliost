@@ -77,7 +77,7 @@ watch(
       price.value = props.transaction.price
       fees.value = props.transaction.fees ?? 0
       feesType.value = "fixed"
-      feeCurrency.value = props.transaction.feeCurrency || props.transaction.currency || "USD"
+      feeCurrency.value = props.transaction.feeCurrency || props.transaction.currency || ""
       rateSource.value = props.transaction.rateSource === "manual" ? "manual" : "automatic"
       exchangeRate.value = props.transaction.exchangeRate != null ? String(props.transaction.exchangeRate) : ""
       feeRateSource.value = props.transaction.feeRateSource === "manual" ? "manual" : "automatic"
@@ -107,7 +107,7 @@ const isDividend = computed(() => props.transaction?.type === "DIVIDEND")
 const dTotals = computed(() => dividendTotals(perShare.value, grossInput.value, perShareInput.value, quantityStr.value, taxes.value))
 const taxExceedsGross = computed(() => (isDividend.value ? dTotals.value.taxExceedsGross : false))
 const ccySymbol = computed(() => {
-  const ccy = (props.transaction?.currency ?? "USD").toUpperCase()
+  const ccy = (props.transaction?.currency ?? "").toUpperCase()
   return currenciesStore.info(ccy)?.symbol ?? ccy
 })
 

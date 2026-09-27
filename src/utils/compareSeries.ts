@@ -9,8 +9,16 @@
  */
 
 /** True when the overlay must be percent-normalized because currencies differ. */
-export function needsPercentComparison(instrumentCcy: string, benchmarkCcy: string): boolean {
-  return (instrumentCcy || "USD").toUpperCase() !== (benchmarkCcy || "USD").toUpperCase()
+export function needsPercentComparison(instrumentCcy: string | null | undefined, benchmarkCcy: string | null | undefined): boolean {
+  // §66.2 — the two series are comparable only when BOTH currencies are known
+  // and equal. An unknown side (including both unknown, which would otherwise
+  // compare "" === "" and silently agree) is reported as a difference, so the
+  // chart falls back to percent-normalized rather than overlaying two series
+  // that may not share a unit.
+  const a = (instrumentCcy || "").trim().toUpperCase()
+  const b = (benchmarkCcy || "").trim().toUpperCase()
+  if (!a || !b) return true
+  return a !== b
 }
 
 /**
@@ -24,6 +32,8 @@ export function percentNormalize(prices: number[]): number[] {
 }
 
 /** Caption shown when the benchmark is percent-normalized due to a currency gap. */
-export function crossCurrencyCaption(instrumentCcy: string, benchmarkCcy: string): string {
-  return `Percent — currencies differ (${instrumentCcy.toUpperCase()} vs ${benchmarkCcy.toUpperCase()})`
+export function crossCurrencyCaption(instrumentCcy: string | null | undefined, benchmarkCcy: string | null | undefined): string {
+  const a = (instrumentCcy || "").toUpperCase() || "unknown"
+  const b = (benchmarkCcy || "").toUpperCase() || "unknown"
+  return `Percent — currencies differ (${a} vs ${b})`
 }

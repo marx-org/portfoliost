@@ -39,7 +39,7 @@ const modalAction = ref<"deposit" | "withdraw" | "transfer">("deposit")
 const tableRefreshKey = ref(0)
 
 const isMarginEnabled = computed(() => store.detail?.isMarginEnabled ?? false)
-const baseCurrency = computed(() => cash.value?.baseCurrency ?? store.detail?.baseCurrency ?? "USD")
+const baseCurrency = computed(() => cash.value?.baseCurrency ?? store.detail?.baseCurrency ?? "")
 
 // Any currency balance below zero on a non-margin portfolio → amber badge.
 const negativeBalances = computed(() => {

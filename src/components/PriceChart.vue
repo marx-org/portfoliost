@@ -399,7 +399,7 @@ const forcedPct = computed(
     !!bench.value &&
     compare.value !== "none" &&
     mode.value === "Price" &&
-    needsPercentComparison(chartCurrency.value, bench.value?.currency || "USD"),
+    needsPercentComparison(chartCurrency.value, bench.value?.currency),
 )
 
 // §36 — y-axis unit for the current window. "pct" when a cross-currency overlay
@@ -408,7 +408,7 @@ const axisUnit = computed<"price" | "pct">(() => (forcedPct.value ? "pct" : "pri
 
 /** §36 — non-null when the benchmark overlay is percent-normalized due to a currency gap. */
 const crossCurrencyNote = computed(() =>
-  axisUnit.value === "pct" ? crossCurrencyCaption(chartCurrency.value, bench.value?.currency || "USD") : null,
+  axisUnit.value === "pct" ? crossCurrencyCaption(chartCurrency.value, bench.value?.currency) : null,
 )
 
 /** Plan §48.5a — ISO date of the first VISIBLE bar (the sliced window's

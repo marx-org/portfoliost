@@ -53,7 +53,7 @@ const targetCurrency = useTargetCurrency(
 const tf = useTransactionForm(
   newTx,
   targetCurrency,
-  computed(() => props.position?.instrumentCurrency ?? "USD"),
+  computed(() => props.position?.instrumentCurrency ?? ""),
 )
 
 const editingTx = ref<EditTransaction | null>(null)
@@ -71,7 +71,7 @@ watch(
       price: "",
       fees: "0",
       feesType: "fixed",
-      feeCurrency: props.position.instrumentCurrency ?? "USD",
+      feeCurrency: props.position.instrumentCurrency ?? "",
       feeRateSource: "automatic",
       feeExchangeRate: "",
       rateSource: "automatic",
@@ -102,15 +102,15 @@ async function load() {
           price: props.position.averageCostBasis ?? 0,
           fees: 0,
           totalAmount: (props.position.quantity ?? 0) * (props.position.averageCostBasis ?? 0),
-          currency: props.position.instrumentCurrency ?? "USD",
-          instrumentCurrency: props.position.instrumentCurrency ?? "USD",
+          currency: props.position.instrumentCurrency ?? "",
+          instrumentCurrency: props.position.instrumentCurrency ?? "",
           assetType: props.position.assetType ?? "STOCK",
           exchangeRate: 1,
           isGift: false,
           synthesizedOpeningLot: false,
           executedAt: props.position.openedAt ?? new Date().toISOString(),
           createdAt: props.position.openedAt ?? new Date().toISOString(),
-          displayCurrency: props.position.instrumentCurrency ?? "USD",
+          displayCurrency: props.position.instrumentCurrency ?? "",
           convertedTotalAmount: (props.position.quantity ?? 0) * (props.position.averageCostBasis ?? 0),
           convertedPrice: props.position.averageCostBasis ?? 0,
           convertedFees: 0,
@@ -135,7 +135,7 @@ function totalFor(tx: Tx): string {
   const fees = tx.fees ?? 0
   const rate = tx.exchangeRate ?? 1
   const total = qty * price * rate + fees
-  return formatCurrency(total, tx.currency || "USD")
+  return formatCurrency(total, tx.currency || "")
 }
 
 function typeLabel(type: string): string {
@@ -158,7 +158,7 @@ function openEditModal(tx: Tx) {
     quantity: tx.quantity,
     price: tx.price,
     fees: tx.fees ?? 0,
-    currency: tx.currency || "USD",
+    currency: tx.currency || "",
     executedAt: tx.executedAt,
     feeCurrency: tx.feeCurrency,
     rateSource: tx.rateSource,
@@ -196,11 +196,11 @@ async function addRow(): Promise<void> {
       symbol: props.position.symbol,
       quantity: Number(newTx.value.quantity),
       price: Number(newTx.value.price),
-      currency: props.position.instrumentCurrency ?? "USD",
+      currency: props.position.instrumentCurrency ?? "",
       fees: newTx.value.feesType === "pct" ? tf.feeValue.value : Number(newTx.value.fees) || 0,
       feesType: newTx.value.feesType,
     }
-    if (newTx.value.feesType === "fixed" && newTx.value.feeCurrency !== (props.position.instrumentCurrency ?? "USD")) {
+    if (newTx.value.feesType === "fixed" && newTx.value.feeCurrency !== (props.position.instrumentCurrency ?? "")) {
       input.feeCurrency = newTx.value.feeCurrency
       input.feeRateSource = newTx.value.feeRateSource
       if (newTx.value.feeRateSource === "manual" && newTx.value.feeExchangeRate) {
@@ -302,8 +302,8 @@ async function close() {
               </td>
               <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ typeLabel(tx.type) }}</td>
               <td class="px-3 py-2 tabular-nums text-slate-900 dark:text-slate-100">{{ tx.quantity }}</td>
-              <td class="px-3 py-2 tabular-nums text-slate-900 dark:text-slate-100">{{ formatCurrency(tx.price, tx.currency || "USD") }}</td>
-              <td class="px-3 py-2 tabular-nums text-slate-900 dark:text-slate-100">{{ formatCurrency(tx.fees ?? 0, tx.feeCurrency || tx.currency || "USD") }}</td>
+              <td class="px-3 py-2 tabular-nums text-slate-900 dark:text-slate-100">{{ formatCurrency(tx.price, tx.currency || "") }}</td>
+              <td class="px-3 py-2 tabular-nums text-slate-900 dark:text-slate-100">{{ formatCurrency(tx.fees ?? 0, tx.feeCurrency || tx.currency || "") }}</td>
               <td class="px-3 py-2 text-right font-medium tabular-nums text-slate-900 dark:text-slate-100">{{ totalFor(tx) }}</td>
               <td class="px-3 py-2 text-right">
                 <button v-if="!isSynthetic(tx)" type="button" class="text-xs text-blue-600 hover:underline" @click="openEditModal(tx)">Edit</button>
@@ -326,7 +326,7 @@ async function close() {
           :market-price="position.currentPrice"
           :price-as-of-label="'current price'"
           :target-currency="targetCurrency"
-          :tx-currency="position.instrumentCurrency || 'USD'"
+          :tx-currency="position.instrumentCurrency || ''"
           :testid="'edit-position'"
           :show-type="true"
           :show-view-chart="false"

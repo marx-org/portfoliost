@@ -87,7 +87,7 @@ const showCurrencyMenu = ref(false)
 
 // Merged series is denominated in the base currency (store.totalMetrics) —
 // convert to the display currency before plotting (getLatestRate once).
-const mergedSourceCcy = computed(() => (store.totalMetrics?.baseCurrency ?? "USD").toUpperCase())
+const mergedSourceCcy = computed(() => (store.totalMetrics?.baseCurrency ?? "").toUpperCase())
 const mergedChartRate = ref<number | null>(null)
 
 watchEffect(() => {
@@ -146,7 +146,7 @@ watchEffect(() => {
   const tm = store.totalMetrics
   const rate = mergedChartRate.value
   const dst = displayCurrency.value.toUpperCase()
-  const base = (tm?.baseCurrency ?? "USD").toUpperCase()
+  const base = (tm?.baseCurrency ?? "").toUpperCase()
   // totalCash is in totalMetrics.baseCurrency; re-express into the display
   // currency via the merged-chart rate (base→display). "—" while the rate
   // resolves (a mislabelled amount is never shown).

@@ -13,8 +13,8 @@ const props = defineProps<{
   displayCurrency?: string | null
 }>()
 
-const currency = computed(() => (props.feeCurrency || props.fallbackCurrency || "USD").toUpperCase())
-const displayCcy = computed(() => (props.displayCurrency || "USD").toUpperCase())
+const currency = computed(() => (props.feeCurrency || props.fallbackCurrency || "").toUpperCase())
+const displayCcy = computed(() => (props.displayCurrency || "").toUpperCase())
 const isCustom = computed(() => props.rateSource === "manual")
 
 const showConverted = computed(
