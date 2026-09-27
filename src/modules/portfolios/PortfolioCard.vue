@@ -32,6 +32,8 @@ const notice = ref<string | null>(null)
 const backfillPending = ref(false)
 const backfillFailed = ref(false)
 const recomputeBusy = ref(false)
+// §63.8 — held symbols the last backfill had no price bar for → value is partial
+const chartGap = ref<string[] | null>(null)
 
 const showRename = ref(false)
 const renameName = ref(props.portfolio.name)
@@ -78,6 +80,7 @@ function startPolling() {
     try {
       const analytics = await getPortfolioAnalytics(props.portfolio.id, timeframe.value)
       series.value = (analytics.performance?.timeSeries ?? []).map((p) => p.value ?? 0)
+      chartGap.value = analytics.gapSymbols ?? null
       applyBackfillStatus(analytics.backfillStatus)
     } catch { stopPolling() }
   }, 5000)
@@ -92,6 +95,7 @@ async function loadChart() {
   try {
     const analytics = await getPortfolioAnalytics(props.portfolio.id, timeframe.value)
     series.value = (analytics.performance?.timeSeries ?? []).map((p) => p.value ?? 0)
+    chartGap.value = analytics.gapSymbols ?? null
     applyBackfillStatus(analytics.backfillStatus)
   } catch {
     chartError.value = true
@@ -341,6 +345,10 @@ async function exportPositions(format: "csv" | "xml" | "json") {
       </div>
       <p v-if="backfillPending" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
         Historical data is loading, chart will update in a moment.
+      </p>
+      <!-- §63.8 — value is a partial sum when some held positions lack price history -->
+      <p v-if="chartGap && chartGap.length" class="mt-1 text-xs font-medium text-amber-600 dark:text-amber-400" data-testid="card-chart-gap-warning">
+        Value excludes {{ chartGap.length }} position{{ chartGap.length === 1 ? "" : "s" }} without price history.
       </p>
     </div>
 

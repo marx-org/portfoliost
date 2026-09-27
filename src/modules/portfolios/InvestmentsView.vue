@@ -325,6 +325,7 @@ async function submitCreate() {
         color="#2563eb"
         :loading="mergedLoading"
         :backfill-pending="mergedBackfillPending"
+        :recomputing="mergedBusy || mergedBackfillPending"
         :height="300"
         @recompute="handleMergedRecompute"
       />
