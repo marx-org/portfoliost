@@ -7,78 +7,6 @@ Legend: `[ ]` pending · `[x]` done
 
 ---
 
-## 51. Document the SPA component conventions (docs/COMPONENTS.md)
-
-Closed 2026-09-23 — `docs/COMPONENTS.md` + the `AGENTS.md` pointer are in
-place (commit `367270e`, doc accuracy pass this closeout); full record in
-`plan-archive.md` §51.
-
----
-
-## 52. Additional dividend providers: biznesradar calendar + dividendmax plugin
-
-Closed 2026-09-24 — biznesradar `CalendarDividend` (GPW coupon/payment
-calendar, union-merged in openst `get_calendar`) + dividendmax
-`HistoricalDividends` (key-free public-page scrape, fallback). Decisions:
-dividendmax stays a fallback (nasdaq remains preferred for US); biznesradar
-is the GPW coupon/payment calendar. Commits: openst 03b1ca5 / 6ce9ec0 /
-8d898e9 / 4f0e40d / c53979b, cachest 9799638. Full record in
-`plan-archive.md` §52.
-
----
-
-## 53. Main-page portfolio cards: stale charts, MWR overflow, current_value, snapshot FX
-
-Closed 2026-09-24 — XIRR divergence guard + numeric(28,8) cumulative columns
-(wallets), `current_value` maintained from the latest snapshot, snapshot-on-read
-FX unified with the backfill rule (quote-currency conversion), and the SPA card:
-sparkline remount key, failed-backfill state and the empty-window "No data"
-state. PROD wipe & reimport clean (2016 txs, 0 errors), all 10 backfills
-complete with no overflow (Crypto MWR max 45 982 vs pre-fix ≈1.01e12), Crypto
-re-armed with a BTC-USD position. Commits: portfoliost-wallets 2f745f7 /
-315c936 / 2624331 / 1bf9375 (→ v1.1.51), portfoliost ae8ab4b / c3410ea /
-dfe84ca (→ v1.0.212). Full record in `plan-archive.md` §53.
-
----
-
-## 54. Portfolio calendar: month grid over holdings' event calendars (example-service parity)
-
-Closed 2026-09-24 — the portfolio Calendar tab is now the example-service **month
-grid** over holdings' events (not gated, **no Impact control**, no macro
-events, chip amounts in the instrument's base currency). Shipped on
-contracts `CalendarData.holdings` (v1.6.37) + a real wallets
-`GET /:id/calendar` (instruments fan-out, per-symbol failure-tolerant).
-Compose e2e + PROD verified (SPA v1.0.220 / wallets v1.1.53, homelab
-b4997f87f); one data finding — PROD `ticker_reference` resolves un-suffixed
-AMD to the ASX Arrow Minerals row (currency AUD), user to fix manually.
-Commits: portfoliost-contracts a567437, portfoliost-wallets 67958a7,
-portfoliost b5620b2 / eee0bfd. Full record in `plan-archive.md` §54.
-
----
-
-## 55. Sheets-sync import: dividend taxes + sheet-derived labels
-
-Closed 2026-09-27 — Dividend taxes (Transakcje AK/AL) imported with the §49
-net convention (ptx gross = AK, taxes = AL, totalAmount = net); sheet-derived
-labels attached: Transakcje AJ "program" → transaction label, Podsumowanie
-Inspiracja (AI) + six flags (AM Crypto / AN Obligacje / AO Funds / AP Stock /
-AQ Growth / AR Dividend) → position labels. New `POST /api/import/labels/
-bootstrap` + `positionLabels`/`transactionLabels` on `ImportPortfolioTx`.
-PROD wipe & re-import clean (2016 inserted, 0 errors). Full record in
-`plan-archive.md` §55.
-
----
-
-Closed 2026-09-24 — un-suffixed multi-exchange ticker collisions now leave
-`resolveInstrumentCurrency` silent (§56.1, instruments v1.0.68); the
-§56.2 PROD verify confirmed the calendar USD fix and exposed a missing
-base-currency guard on `/history` + a hardcoded banner in `PriceChart.vue`,
-both fixed in §56.3 (instruments v1.0.69, SPA v1.0.224; refusal state verified
-in PROD). Open question resolved: no `?company=` hint. Full record in
-`plan-archive.md` §56.
-
----
-
 ## 57. Transactions UI: clipped labels picker, missing label chips, hidden action column (user request 2026-09-24)
 
 Proposal: — (direct user request; no proposal doc).
@@ -2087,25 +2015,238 @@ recorded as such, distinct from a 404.
 
 ### 63.9.3 — heal PROD and prove the spike is gone
 
-- [ ] Deploy both (GHA → pin in the homelab HelmReleases → Flux), migration applied.
-- [ ] **No new `portfoliost-sheets-sync` image needed** — the import payload is
-      untouched by this change (D24 version coupling unaffected).
-- [ ] Trigger `portfoliost-wallets-snapshotssync` (or one
-      `POST /api/portfolios/:id/recompute` on IKE Beata — production, needs the
-      user's go-ahead per §28) and verify:
-      - `select count(*) from instruments.price_bar_metadata where fetch_status='failed'`
-        drops sharply (from 175) and the 175-row set is re-read for genuine 404s
-        (`EMIM`, `EMIM.AS`, `ASML HOLDING NV`, `ISHARES …` — several are company
-        *names*, not symbols, which is a separate finding worth a §63.10);
-      - `XTB.WA` / `EMIM.AS` / `RBOE.AS` have bars in `price_bars_all`;
-      - `portfolio_backfill_metadata.gap_symbols` for IKE Beata is `null` (today it
-        lists the 3) so the amber partial-sum banner clears;
-      - the backfill's last value ≈ the live-quote path's (155k vs 205k today).
-- [ ] Also re-check the `logo` route's 21 rejections — the SPA logo storm hits the
-      same depth-3 wall and is a one-line config fix in §63.9.1.
-- [ ] Commit the plan closeout.
+- [x] **Deployed 2026-09-27** (cachest v1.0.44 + instruments v1.0.70 pinned in
+      `cluster/apps/pfire/{cachest,portfoliost-instruments}/app/helmrelease.yaml`,
+      homelab `b9c2a9eff`; migration 0003 applied). The cachest ConfigMap landed
+      first and Flux's reloader restarted the pod on it, so the limiter fix was
+      live before the images.
+      Verified in PROD: 16 concurrent `forceRefresh` `/ohlcv/SNT.WA` → **16 × 200,
+      0 × 503** in 3.08 s (the same burst gave 3 × 200 / 13 × 503 before). Cachest
+      now logs `queue_depth` per route at boot. Drove the instruments gap-fill
+      directly from the pod for the starved symbols: `XTB.WA` 2637 bars,
+      `EMIM.AS` 1258, `RBOE.AS` 1230, and `SNT.WA`/`ETFSP500.WA` off 09-18 onto
+      09-25. `fetch_status='failed'` symbols: **175 → 166**.
+- [x] All 23 IKE Beata positions now have a price bar; the amber partial-sum
+      signal is no longer needed for the missing-history case. The next sweep
+      pass then exposed a **much larger, unrelated** problem — see §63.10.
+- [ ] `logo` route: the 21 rejections came from the same depth-3 wall and are fixed
+      by §63.9.1's config (depth 600), but the SPA still fans out ~80 logos per
+      page, so re-check its rejection count after the next full page load.
+
+### 63.10 — The scheduled sweep prices nothing: instruments demands a *user* JWT from a job that has no user (2026-09-27)
+
+Found 2026-09-27 while verifying §63.9.3 in PROD. **This is the actual "sudden
+spike"**, and it invalidates the §63.6 / §63.8 attribution.
+
+**The bug.** `portfoliost-wallets/src/scripts/snapshots-sync.ts:35` calls
+`runBackfillRecent(db, p.id, "")` — an **empty** auth token — justified by its own
+header comment (line 13): *"No user token is needed: the instruments
+/internal/fx-rates endpoint is unauthenticated."* That is false.
+`GET /api/instruments/:symbol/price-bars` sits behind
+`instruments.use("*", userIdentityMiddleware)`
+(`portfoliost-instruments/src/routes/instruments.ts:255`) and `/internal/fx-rates`
+behind the same middleware (`src/routes/fx.ts:163`). `POCKETID_ISSUER_URL` is set
+in the cluster, so `validateJwt` runs and an empty header is a hard 401. Measured
+in the running pod:
+
+```
+no auth        401 {"error":"Unauthorized","message":"Missing or invalid Authorization header"}
+bogus bearer   401 {"error":"Unauthorized","message":"Invalid or expired token"}
+```
+
+The failure is then swallowed three times over: `fetchPriceBars` →
+`if (!res.ok) return null` (`backfill.ts:61`); `fetchPriceSeries` → the symbol is
+dropped (`backfill.ts:109`); `computeSnapshotBatch` → `if (price == null) continue`
+(`backfill.ts:687`). `totalValue` collapses to **cash only**, and because
+`_runBackfillCore` writes with `onConflictDoUpdate` (`backfill.ts:742-748`) the pass
+**overwrites correct stored values with cash-only ones**. The FX leg degrades the
+same way: `resolvedFxRate` sends no header for a falsy token and falls back to
+`rate = 1` (`instruments-fx.ts:31-32`).
+
+Measured fleet-wide after running the sweep — `gap_symbols` equals the position
+count *exactly*, for every portfolio:
+
+| portfolio | stored value | invested | positions | `gap_symbols` |
+| --- | --- | --- | --- | --- |
+| IBKR | **−24,602** | 20,130 | 35 | **35** |
+| IKE Beata | 37,428 | 116,322 | 23 | **23** |
+| IKE Marek | 33,695 | 38,771 | 13 | **13** |
+| Rach. rejestrowy PKO BP | 8,500 | 45,000 | 23 | **23** |
+
+Ground truth for IKE Beata: `Σ qty × last close` = **≈152,900** (matches §63.6's
+"154,860"), against 37,428 stored — the cash remainder. An *interactive* recompute
+carries a real browser JWT, prices 18–23 symbols and writes ~155k. The chart
+therefore alternates between the two, and that is the user's "sudden drop" and
+"sudden rise". The two V-dips §63.6 spotted in Jan/May 2026 are the same
+cash-only collapse, and IBKR currently has a **negative** portfolio value. Both
+CronJobs (`snapshotssync` 13:00 UTC, `snapshotssync-postfx` 17:20 UTC) have been
+doing this twice a day.
+
+**Why the design is wrong, not just the token.** A user JWT is the wrong credential
+for this caller by construction: the sweep iterates *every* portfolio of *every*
+user, so it has no single user context to present. Forcing it through a user token
+guarantees it can only ever refresh one user's data. And the guard it is failing
+against buys nothing where it is applied:
+
+| | tables with `user_id` | handlers reading `userIdentity` | real authorization |
+| --- | --- | --- | --- |
+| `portfoliost-wallets` | **7** (`portfolios`, `positions`, `portfolio_transactions`, `portfolio_cash_transactions`, `labels`, `shares`, `sync_runs`) | many, e.g. `routes/portfolios.ts:186-191`, `:944-948` | yes — per-user scoping is load-bearing |
+| `portfoliost-instruments` | **0** (10 tables, no user column anywhere) | **1**, and only inside `requireGroup` (`auth.ts:131`) | one route: `requireGroup("portfoliost_admin")` at `fx.ts:187` |
+
+24 of instruments' 34 endpoints are behind `userIdentityMiddleware` and **not one
+of their handlers reads the identity**. Every response is a pure function of the
+URL. Prices, FX, ticker metadata, news and logos are the same for everybody — the
+schema says so outright (`schema.ts:167-171`: *"NOT user-scoped — shared reference
+data"*). So instruments authenticates 24 endpoints and authorizes none of them.
+
+**Design decision (resolved).** Keep a gate on instruments, but make it a gate on
+**the caller**, not on a user: accept *either* a user JWT *or* a service token.
+Concretely:
+
+- **Why not simply drop instruments' auth** (the "let services work without auth"
+  option): the exposure chain is public → instruments → cachest → openst → provider
+  keys, and **cachest and openst have no auth at all**. `GET /:symbol/history` and
+  `GET /:symbol/price` are also write-through (`backgroundUpsertBars`), so dropping
+  the gate would hand the internet an unauthenticated mutation of `price_bars` plus
+  a metered-provider proxy. The pfire namespace has no edge auth to fall back on
+  (`global-auth-url` is commented out at
+  `cluster/apps/networking/ingress-nginx/helm-release.yaml:51`), so instruments'
+  JWT check is currently the only thing in that chain.
+- **Service token, not a forged identity.** The `POCKETID_ISSUER_URL`-unset
+  fallback (`auth.ts:73-116`) trusts `X-User-*` headers and even an *unsigned*
+  three-part bearer, minting `groups: ["portfoliost_admin"]` — so "just send a
+  header" would work in compose and must never be how the cluster path
+  authenticates. A shared secret compared with a timing-safe equality, sourced
+  from the cluster secret, is the credential.
+- **A service token must not grant user authority.** `GET /api/admin/fx-rates`
+  keeps `requireGroup("portfoliost_admin")` and stays user-only; the sweep has no
+  business reading the admin listing.
+- **Edge auth stays out of scope for now.** Turning on nginx `auth_request` is
+  worthwhile defence in depth for *browser* traffic, but it cannot fix a
+  service-to-service caller and is a separate change — recorded as §63.11.
+- **The safety net is the real lesson.** Even with the credential fixed, a pass
+  that cannot price its positions must **never write**. `gap_symbols` already
+  computes exactly that condition; the write path just has to honour it. That
+  guard is what stops the next credential mistake from silently rewriting the
+  fleet, and it is why the bug survived a full day of RCA.
+
+### 63.10.1 — wallets: a transport failure must abort the pass, never write
+
+- [ ] `src/services/backfill.ts` — `fetchPriceBars` stops collapsing every
+      non-2xx into `null`. A **401/403 is an error**, not "no data": throw (or
+      return a discriminated `{ error }`) so `fetchPriceSeries` propagates it and
+      `runBackfillRecent`/`_runBackfillCore` abort before any write. A genuine
+      empty series stays a valid result. Keep the symbol-level `catch` for network
+      errors, but surface the count.
+- [ ] `src/services/backfill.ts` — `_runBackfillCore` refuses to write when the
+      pass could not price **every** held symbol it was asked about: if
+      `gapSymbols.length` equals the held-position count, mark
+      `portfolio_backfill_metadata.status = 'failed'` with an explanatory
+      `error_message` and **return without touching `value_snapshots`**. (The
+      cash-only portfolio is still written — a genuine all-cash portfolio has
+      `gap_symbols = []` and `positions = 0`, so the two are distinguishable.)
+- [ ] `src/services/instruments-fx.ts` — `resolvedFxRate` must not silently return
+      `rate = 1` on a 401/5xx. Distinguish "no rate for this pair" (a legitimate
+      1:1 degrade, still allowed) from "the FX service rejected us" (throw).
+- [ ] Tests: `src/services/backfill.test.ts` — a 401 from instruments aborts the
+      pass and leaves the previous `value_snapshots` rows byte-identical (assert
+      the pre-existing row survives); a 200-with-empty-series for one symbol still
+      writes the partial value and records it in `gap_symbols`; `resolvedFxRate`
+      throws on 401 and returns 1:1 on a genuine no-rate. **These are the tests
+      that would have caught today's corruption.**
+- [ ] Tests: `npm run build && npm run test` in `portfoliost-wallets/` green
+      (current: 344 + the §63.8 additions).
+- [ ] Commit.
+
+### 63.10.2 — instruments: accept a service token alongside a user JWT
+
+- [ ] `src/auth.ts` — new `serviceOrUserMiddleware`: if `X-Service-Token` matches
+      `INSTRUMENTS_SERVICE_TOKEN` (timing-safe compare; **fail closed** when the
+      env var is unset — an unset secret must reject service calls, never accept
+      them), set a marker (`serviceCaller`) and continue. Otherwise fall through to
+      the existing `userIdentityMiddleware`. No `userIdentity` is fabricated for a
+      service caller.
+- [ ] `src/routes/instruments.ts:255` and `:899` — install the combined
+      middleware. Leave `src/routes/fx.ts:150-165` (`/api/internal/fx-rates`,
+      `/api/fx/latest`) on `serviceOrUserMiddleware` and leave
+      `src/routes/fx.ts:168-187` (`/api/admin/fx-rates`) on
+      `userIdentityMiddleware` + `requireGroup("portfoliost_admin")` unchanged, so
+      a service token cannot read the admin listing.
+- [ ] Tests: `src/routes/*.test.ts` — no header → 401; wrong service token → 401;
+      correct service token → 200 on `/price-bars` and `/api/internal/fx-rates` and
+      on `/api/instruments/:symbol/quote`; correct service token → **403/401** on
+      `/api/admin/fx-rates`; a valid user JWT still works everywhere it does today;
+      and with `INSTRUMENTS_SERVICE_TOKEN` unset a service token is rejected.
+- [ ] Tests: `npm run build && npm run test` in `portfoliost-instruments/` green
+      (current: 356).
+- [ ] Commit.
+
+### 63.10.3 — wallets: send the service token from the sweep
+
+- [ ] `portfoliost-wallets/src/scripts/snapshots-sync.ts` — read
+      `INSTRUMENTS_SERVICE_TOKEN` and pass it as the `authToken` argument;
+      correct the header comment, which currently asserts a falsehood. Fail fast
+      with a clear message when the env var is missing, rather than running a pass
+      that cannot price anything.
+- [ ] `src/services/instruments-fx.ts` / `backfill.ts` — the instruments client
+      helper sends `X-Service-Token` when it holds a service token and
+      `Authorization` when it holds a user JWT, so one code path serves both the
+      sweep and the interactive recompute. Keep the browser path on
+      `Authorization` only.
+- [ ] Tests: `snapshots-sync` — missing env var exits non-zero with the message and
+      runs no pass; a present token is sent as `X-Service-Token`.
+- [ ] Tests: `npm run build && npm run test` in `portfoliost-wallets/` green.
+- [ ] Commit.
+
+### 63.10.4 — cluster: the shared secret
+
+- [ ] Generate the secret into the existing SOPS-backed cluster secret
+      (`cluster-secrets`) as `INSTRUMENTS_SERVICE_TOKEN`; reference it from
+      `portfoliost-instruments/app/helmrelease.yaml` (`envFrom`) and from
+      `portfoliost-wallets/app/helmrelease.yaml` (app **and** both snapshotsync
+      CronJob templates). Follow the `tmpl/cluster-secrets.yaml` →
+      `cluster/config/cluster-secrets.sops.yaml` → Flux `postBuild` substitution
+      path per the homelab skill.
+- [ ] **Compose parity**: `portfoliost/docker-compose.yml` must set the same env
+      var for `instruments` and `wallets`, or local dev and the e2e stack diverge
+      from the cluster exactly the way this bug did. Pick a committed dev value.
+- [ ] Verify with `kubectl -n pfire exec` that the CronJob pod has it and that a
+      sweep pass prices positions (`gap_symbols` no longer equals the position
+      count).
+- [ ] Commit.
+
+### 63.10.5 — heal the stored snapshots and close out
+
+- [ ] With §63.10.1 live, run the sweep and confirm it prices: IKE Beata's stored
+      value must move from 37,428 to ≈155k and `gap_symbols` must become `NULL`;
+      IBKR's must stop being negative.
+- [ ] Then run a **force** recompute (`POST /api/portfolios/:id/recompute`, default
+      mode) for the portfolios whose history is cash-only — the additive pass only
+      rewrites the last two days, so Jan/May 2026 and everything before the
+      corruption started still needs rebuilding. ⚠ touches production, per §28 get
+      the user's go-ahead first. Expect the two V-dips §63.6 described to
+      disappear rather than to be re-investigated.
+- [ ] Then drop the open `§63.2` (unify the two valuation paths): with the sweep
+      pricing correctly, the remaining live-quote-vs-backfill divergence is a much
+      smaller question and may be answerable by deleting the divergence rather
+      than by reconciling two paths.
+- [ ] Update `docs/plan.md` §63.6 and §63.8 to point at §63.10 as the root cause,
+      and close the `RECALC_DEBUG` item.
+
+### 63.11 — Edge auth for browser traffic (follow-on, not a fix for §63.10)
+
+Recorded, deliberately not part of §63.10: the cluster has a working global nginx
+auth subrequest that is switched off
+(`cluster/apps/networking/ingress-nginx/helm-release.yaml:51`,
+`# global-auth-url: "https://auth.${SECRET_DOMAIN}/api/verify"`), and nothing in
+`apps/pfire/*` uses oauth2-proxy or `auth-url`. So every access control in pfire is
+per-service application-level JWT validation, and the instruments → cachest →
+openst → provider-keys chain has exactly one check at its front. Worth turning on
+as defence in depth once §63.10 settles — it hardens *browser* traffic and changes
+nothing for the scheduled job, which is why it is not the fix.
 
 ---
+
 
 ## 64. Kubernetes probes for the pfire fleet (found 2026-09-27 while deploying openst v1.1.36)
 
