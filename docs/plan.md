@@ -2282,6 +2282,101 @@ nothing for the scheduled job, which is why it is not the fix.
 
 ---
 
+### 63.12 — The −52% "crash" on 2025-09-24 is one mislabelled ticker (2026-09-27)
+
+Found while diffing the combined performance series against a PLN-normalised SQL
+comparison. The chart showed a single-day cliff that no §63.6–§63.11 work touched,
+because **it was never a cashflow or a data gap** — it was one position priced off
+the wrong exchange.
+
+| Combined series | value |
+|---|---|
+| 2025-09-23 | 537,767 |
+| 2025-09-24 | 257,700 |
+| delta | **−52.1%** |
+
+IBKR alone: `1,528,346` → `454,644`, and its Nintendo position went `20 → 0` on
+2025-09-24. The sale is real; the *size* of the drop is not.
+
+#### The chain
+
+1. **The sheet contradicts itself.** The live Podsumowanie row for
+   `Nintendo Co Ltd` (fixture row `[106]`) carries `Symbol giełdowy`=`NTO`,
+   `Giełda`=`FRA`, currency=`EUR` — i.e. the Frankfurt line — but its
+   `Symbol Yahoo` column says **`7974.T`**, the Tokyo line. The DIVIDEND rows on
+   the same holding say `JPY` while the BUY/SELL rows say `EUR`.
+2. **The resolver faithfully follows the stale column.** `resolveInstrument`'s
+   order is `byNameOverride` → catalog-by-name → catalog-by-(symbol, venue) →
+   `ticker_reference`, and the catalog entry's `yahooSymbol` *is* that Yahoo
+   column. A name override was already supposed to shield this, and for `EMIM`
+   (`§38.3`) and `RBOE` (`§43.1`) it does — but the `nintendo co ltd` entry itself
+   pointed at `7974.T` with `country: "JP"`, so the override *enshrined* the wrong
+   listing. It carried no provenance comment, unlike its `allianz se` neighbour.
+3. **The currency resolver could not object.** `ticker_reference` has no `7974`
+   row at all, and `exchange_reference`'s `TSE` row has an **empty
+   `yahoo_suffix`**, so `resolveInstrumentCurrency` is silent and falls back to
+   the caller-declared base — which is the trade row's `EUR`.
+4. **Valuation then priced the wrong series.** The stored `instrument_currency` is
+   `EUR`, so the ¥12,695 Tokyo close of 2025-09-23 became
+   `20 × 12,695 × 4.25 ≈ 1,080,421 PLN`.
+
+#### The evidence that the intended series is `NTO.F`
+
+The stored transaction prices were *already* the Frankfurt ones — the import only
+mislabelled the symbol. `NTO.F` closes reproduce them to within a day's spread,
+while `7974.T` is a different series entirely (probed 2026-09-27 via openst):
+
+| date | stored transaction price | `NTO.F` close | `7974.T` close |
+|---|---|---|---|
+| 2023-04-12 (BUY 5) | 37.50 EUR | **37.02** | 5,466 JPY |
+| 2024-08-05 (BUY 5) | 42.72 EUR | **43.89** | 6,607 JPY |
+| 2025-09-23 | — | **73.22** | 12,695 JPY |
+| 2025-09-24 (SELL 20) | 74.70 EUR | — | — |
+
+`NTO.DE`, `NTOG.UK` and `7974.TO` all 404; `NTO.F` is the only live line. It also
+has the deeper history of the two (2,983 bars from 2015-01-02 vs 2,886 from
+2015-01-05), so the reimport heals the whole holding rather than opening a gap.
+Correct value of the 20 shares on 2025-09-23 is `20 × 73.22 ≈ 1,464 EUR ≈ 6,200 PLN`,
+not 1,080,421 PLN — the cliff is **entirely** the phantom, and the recomputed
+series should be flat across 2025-09-24.
+
+#### Fix
+
+`NAME_VENUE_OVERRIDES["nintendo co ltd"]` → `ticker: "NTO"`, `yahooSymbol: "NTO.F"`,
+`country: "DE"` (`portfoliost-sheets-sync` `db04359`, shipped `v1.0.22`, pinned in
+`portfoliost-admin`'s `SHEETS_SYNC_IMAGE`). EUR now matches the row's own currency
+column, so the position needs **no conversion at all** — which also answers "why JPY
+if we only use EUR": we do not; JPY was only ever the stale Tokyo line bleeding in.
+
+Tests: `instrument-resolver.test.ts` asserts the override holds for `FRA` *and* for
+a stale `TYO` row (it is name-keyed, so the venue column cannot filter it out);
+`podsumowanie-parser.test.ts` keeps asserting `7974.T`/`JP` to pin the fact that the
+parser reads the sheet verbatim and the correction lives in the resolver. 138 green.
+
+#### Left open
+
+- **A wipe & reimport is required.** The stored transactions still carry `7974.T`,
+  so IBKR's `2023-04-12 .. 2025-09-23` value stays overstated by ~1.07M PLN until
+  the reimport rewrites the label and a force-recompute rebuilds the series. This
+  is the one case in §63 where a reimport *is* needed — §63.9/§63.10 did not
+  require one.
+- **The DIVIDEND rows will still be `JPY`** after the reimport: `currency` comes
+  from the sheet, and the override only changes the symbol. Financially
+  immaterial (~10 PLN total across four rows) but it is a residual label
+  inconsistency.
+- **The fleet-wide stale-symbol audit is unresolved.** The obvious check —
+  compare each row's Yahoo column against `symbol + exchange_reference.yahoo_suffix`
+  — does not work, because the sheet uses **Polish venue codes** (`ETR`, `LON`,
+  `FRA`, `AMS`, `BIT`, `SWX`) while `exchange_reference` carries MIC-style ones
+  (`XETRA`, `XLON`, `XFRA`, `XAMS`, `FSX`). 35 of 226 rows come back "unknown
+  venue" and the naive comparison also flags legitimate local-ticker ≠ Yahoo-ticker
+  cases (`V` → `HUBS`). Nintendo is the one case proven wrong by the data.
+  Two real reference gaps surfaced while attempting it: `TSE` has an **empty**
+  `yahoo_suffix` (which is why step 3 was silent), and there is **no TSX row**,
+  so `CSU` (Constellation Software, `CSU.TO`) has no venue to resolve against.
+
+---
+
 
 ## 64. Kubernetes probes for the pfire fleet (found 2026-09-27 while deploying openst v1.1.36)
 
