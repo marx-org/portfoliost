@@ -1889,30 +1889,37 @@ bar for (18/23 → 155k) while the live-quote snapshot values all 23 (→ 205k).
 Three coupled changes so the two valuation paths agree and the UI never shows a
 silently-wrong value.
 
-- [ ] **Backfill must not silently drop a held symbol with no price bar.**
-      `computeSnapshotBatch` currently `continue`s when `price == null`, so a
-      portfolio is valued on a subset of its positions and the number is quietly
-      low. Collect the dropped symbols per pass and mark the resulting snapshots
-      **incomplete** (e.g. `value_snapshots.gap_symbols text[]` or a
-      `portfolio_backfill_metadata.gap_symbols`), so the SPA can flag "N
-      positions lack price history" instead of presenting a wrong total. Decide
-      the display contract with the §63.7 chart (warning chip / value line drawn
-      dashed while incomplete).
-- [ ] **Instruments: fill/repair missing history.** `getPriceBarSeries` already
-      attempts an on-demand `fetchOhlcv` gap-fill, but XTB.WA / EMIM.AS / RBOE.AS
-      end up `price_bar_metadata.fetch_status='failed'` with 0 bars (not in any
-      stooq table — likely a symbol-mapping or provider gap). Log the provider
-      error and expose it (`fetch_status` / `last_error`) so the missing symbols
-      are diagnosable, and add a scheduled "fill gaps for held symbols" pass (or
-      have `snapshots-sync` trigger the instruments fill for the portfolio's
-      symbols before the backfill runs).
-- [ ] **UI: gray out + block every recomputing chart until done** (user request).
-      Any chart whose data source is a recompute/backfill (per-portfolio
-      Performance tab, the combined/composed chart, and any view with a Recompute
-      button) renders **dimmed/disabled with an in-progress indicator** for the
-      duration of the recompute and is not interactable (no timeframe switching /
-      tooltip / recompute re-trigger) until the pass completes, then re-renders
-      from the fresh series. Wire the existing pending state (SPA already tracks
-      `backfillPending` / a recompute promise) to a `disabled` + opacity style on
-      `PortfolioPerformanceChart`. Add a testid + a unit case asserting the chart
-      is disabled while a recompute is in flight.
+- [x] **Backfill must not silently drop a held symbol with no price bar.**
+      (wallets `09f48c2` + `bcdf8e3`, 348 green; contracts v1.6.44.)
+      `computeSnapshotBatch` now returns `{ rows, gapSymbols }` — the held
+      (qty>0 on the window's last day) symbols with NO price bar. Both backfill
+      paths persist it to `portfolio_backfill_metadata.gap_symbols` (migration
+      0009; the force path writes it atomically inside the delete+rebuild tx;
+      `persistGapSymbols` coerces []→null). `GET /:id/analytics` returns a
+      top-level `gapSymbols` via `getGapSymbols`. +4 tests (gap detected / gap
+      cleared / API present / API absent). The SPA renders an amber
+      partial-sum warning (see item 3).
+- [ ] **Instruments: fill/repair missing history — GATED on the provider tier
+      (§63.5).** `getPriceBarSeries` already attempts an on-demand `fetchOhlcv`
+      gap-fill, but XTB.WA / EMIM.AS / RBOE.AS end up
+      `price_bar_metadata.fetch_status='failed'` with 0 bars. Root cause (PROD,
+      2026-09-27): `providerSymbol()` only strips `.US`, so the fill sends the
+      venue-qualified symbol (e.g. `XTB.WA`, `RBOE.AS`, `EMIM.AS`) to
+      cachest/OpenBB `/ohlcv/XTB.WA`, which returns no bars → the catch marks it
+      `failed`; the stooq daily tables have no row for these tickers either.
+      The real fix is why OpenBB/cachest can't source these `.WA`/`.AS`
+      (Warsaw / ASX) symbols — a symbol-mapping or provider-coverage gap, NOT a
+      wallets bug. Until then the gap is surfaced (item 1) so the value is
+      flagged partial rather than silently wrong. Follow-ups: log the provider
+      error into `fetch_status`/`last_error` (diagnosability), and a scheduled
+      "fill gaps for held symbols" pass.
+- [x] **UI: gray out + block every recomputing chart until done** (user
+      request). (SPA `296343e` + `fe4c0e5`, 397 green.) `PortfolioPerformanceChart`
+      gained a `recomputing` prop: the chart is dimmed (opacity-50) +
+      pointer-events disabled with an in-progress overlay, and the Recompute
+      button is disabled (no re-trigger) while a pass is in flight. Wired on the
+      per-portfolio Performance tab (`recomputeBusy || backfillPending`) and the
+      combined chart (`mergedBusy || mergedBackfillPending`); PortfolioCard
+      already gates its timeframe buttons during recompute. A `gapSymbols` prop
+      shows the amber partial-sum warning (Performance tab + card). +2 chart
+      unit tests (gray-out blocks re-trigger; gap warning renders).
