@@ -2,12 +2,12 @@
 import { computed, onMounted, ref, watchEffect } from "vue"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
+import { useDisplayConversion } from "@/composables/useDisplayConversion"
 import { useCurrenciesStore } from "@/stores/currencies"
 import { storeToRefs } from "pinia"
 import { formatCurrency, formatPercent, formatSignedCurrency } from "@/utils/format"
 import { getMergedAnalytics, recomputePortfolio, type PortfolioAnalyticsTimeframe } from "@/api/portfolios"
 import type { PortfolioAnalytics } from "@/api/types"
-import { getLatestRate } from "@/api/fx"
 import InvestmentsTabs from "@/modules/portfolios/InvestmentsTabs.vue"
 import PortfolioCard from "@/modules/portfolios/PortfolioCard.vue"
 import AddPositionDialog from "@/modules/portfolios/AddPositionDialog.vue"
@@ -85,21 +85,13 @@ const displayCurrencyStore = useDisplayCurrencyStore()
 const { currency: displayCurrency } = storeToRefs(displayCurrencyStore)
 const showCurrencyMenu = ref(false)
 
-// Merged series is denominated in the base currency (store.totalMetrics) —
-// convert to the display currency before plotting (getLatestRate once).
-const mergedSourceCcy = computed(() => (store.totalMetrics?.baseCurrency ?? "").toUpperCase())
-const mergedChartRate = ref<number | null>(null)
-
-watchEffect(() => {
-  const src = mergedSourceCcy.value
-  const dst = displayCurrency.value.toUpperCase()
-  if (!src) { mergedChartRate.value = null; return }
-  if (src === dst) { mergedChartRate.value = 1; return }
-  mergedChartRate.value = null
-  void getLatestRate(src, dst).then((r) => {
-    if (r && typeof r.rate === "number" && r.rate > 0) mergedChartRate.value = r.rate
-  })
-})
+// §67.2 — the base→display conversion now comes from the ONE implementation
+// (useDisplayConversion, §66.3) instead of a second copy of the same
+// getLatestRate watchEffect. Source is the aggregate's own baseCurrency, exactly
+// as before, so this is a dedup and not a behaviour change.
+const { rate: mergedChartRate, convert: toDisplay } = useDisplayConversion(
+  () => store.totalMetrics?.baseCurrency,
+)
 
 const mergedChartSeries = computed(() => {
   const rate = mergedChartRate.value ?? 1
@@ -110,14 +102,6 @@ const mergedChartSeries = computed(() => {
   }))
 })
 
-// §48.6e B5 — the total-metrics values are denominated in `baseCurrency`
-// (USD, post wallets conversion); the summary cards render them in the
-// display currency via the same base→display rate as the merged chart
-// (null while the rate resolves — "—", never a mislabelled amount).
-function toDisplay(v: number | undefined | null): number | null {
-  if (v == null || mergedChartRate.value == null) return null
-  return v * mergedChartRate.value
-}
 
 const strategies = [
   { value: "GROWTH", label: "Growth" },
@@ -144,18 +128,11 @@ const cashBreakdown = ref<Array<{ currency: string; pct: number }>>([])
 
 watchEffect(() => {
   const tm = store.totalMetrics
-  const rate = mergedChartRate.value
-  const dst = displayCurrency.value.toUpperCase()
-  const base = (tm?.baseCurrency ?? "").toUpperCase()
   // totalCash is in totalMetrics.baseCurrency; re-express into the display
-  // currency via the merged-chart rate (base→display). "—" while the rate
-  // resolves (a mislabelled amount is never shown).
-  cashTotal.value =
-    tm?.totalCash != null && rate != null && base === dst
-      ? tm.totalCash
-      : tm?.totalCash != null && rate != null
-        ? tm.totalCash * rate
-        : null
+  // currency via the one shared base→display conversion. "—" while the rate
+  // resolves (a mislabelled amount is never shown). §68 renames the field to
+  // `cashValue` — same meaning, the cash-ledger BALANCE rather than a flow.
+  cashTotal.value = toDisplay(tm?.totalCash)
   const byCurrency = new Map<string, number>()
   for (const c of tm?.cashBreakdown ?? []) {
     const ccy = (c.currency ?? "").toUpperCase()

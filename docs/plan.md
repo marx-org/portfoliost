@@ -1745,28 +1745,58 @@ base currency that means something to the user.
       no portfolio in the breakdown reports 0 while holding a position.
 - [ ] Commit.
 
-### 67.2 — three copies of the same display conversion
+### 67.2 — one display conversion, not five (§67.2 closed 2026-09-27)
 
 §66.3 added `useDisplayConversion` (one implementation, two explicit rules) and
-used it on the card. Two older, working copies remain:
+used it on the card. Grepping for the pattern instead of trusting the count
+found **four** remaining copies, not the two this section originally listed:
 
-- `src/modules/portfolios/InvestmentsView.vue` — local `toDisplay()` +
-  `mergedChartRate`, source = `totalMetrics.baseCurrency`
-- `src/modules/portfolios/PortfolioHoldingsTab.vue` — local `toDisplay()` +
-  `toDisplayRate`, source = a position's `displayCurrency`
+- `InvestmentsView.vue` — local `toDisplay()` + `mergedChartRate`
+- `PortfolioHoldingsTab.vue` — local `toDisplay()` + `toDisplayRate` + `totalsCcy`
+- `PortfolioDetailView.vue` — `summaryRate` **(degraded an unresolvable pair to
+  1:1)**
+- `PortfolioPerformanceTab.vue` — `chartRate` **(degraded to 1:1)**
 
-They differ subtly (the holdings tab rounds, falls back to the portfolio currency
-for the label, and has a `totalsCcy`), so consolidating them is a behaviour
-change to working display code rather than a mechanical dedup.
+The two marked ones are a §66 violation, not a dedup. `PortfolioDetailView`'s
+`summaryRate` was set to `1` when the rate lookup failed, which defeated the
+`summaryPending` gate right below it: a failed rate made `summaryPending` false,
+so the template rendered **native portfolio-currency values under the display
+currency's symbol** — exactly the mislabelled amount §66.2 forbids.
+`PortfolioPerformanceTab` was worse in the same way: the chart is labelled
+`:currency="displayCurrency"`, so an unresolvable pair plotted native values
+under the display currency. Same class as the wallets `?? 1` degrade fixed in
+`bd28ba1`, on the SPA side, and missed by the same reasoning — nobody greps for
+the bug they did not know to look for.
 
-- [ ] Move both onto `useDisplayConversion`, keeping each one's current fallback
-      behaviour, and delete the local implementations.
-- [ ] Tests: the two views render exactly as they do today (snapshot the Value /
-      Invested / totals lines before and after); `npm run test`, `test:mock`,
-      `test:e2e` green.
-- [ ] Playwright: compare `/en/investments` and a portfolio's holdings tab before
-      and after.
-- [ ] Commit.
+- [x] Move all four onto `useDisplayConversion` and delete the local
+      implementations. The holdings tab's `totalsCcy` is now
+      `computed(() => displayCurrencyOr())` and the totals rows still read
+      `rate` **directly** rather than `convert()`, because they must keep
+      falling back to the portfolio-currency sum instead of going null.
+- [x] Fix the two mislabelling degrades: the rate is left `null` (so the
+      existing `—` path works) and the chart label falls back to the portfolio's
+      own currency via `displayCurrencyOr()`.
+- [x] Tests: 402 unit + 227 mock green, `vue-tsc` clean.
+- [x] Playwright: `/en/investments` and the portfolio holdings/performance/detail
+      tabs compared; no new failures (see the pre-existing note below).
+- [x] Commit (`portfoliost` §67.2).
+
+`PortfolioPerformanceTab` keeps one `getLatestRate` call for the per-position
+`rateByCcy` map — that is N currencies → display, not a single base→display rate,
+so the single-source composable cannot serve it. Deliberately left.
+
+#### Pre-existing e2e failures found while verifying (not caused by §67.2)
+
+Baseline-checked by stashing the change and re-running: **5 e2e tests already
+fail on unmodified `main`** — all of them "chart element not found"
+(`chart-recompute.spec.ts:13`, `combined-chart.spec.ts:11` and `:19`,
+`performance-display-currency.spec.ts:39`, `parity-portfolios.spec.ts:53`). The
+mock backend appears not to serve the charting series these specs wait on.
+`portfolios.spec.ts` is separately **flaky** (a different test in it failed on
+each of three consecutive runs; 17/17 green on the fourth). Recorded here rather
+than fixed, since both predate §67.2 and neither is caused by it — but the
+mock's charting data needs a look, and until then "e2e green" cannot be used as
+a release gate for chart work.
 
 ---
 

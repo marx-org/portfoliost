@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch, watchEffect } from "vue"
+import { computed, onMounted, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
+import { useDisplayConversion } from "@/composables/useDisplayConversion"
 import { useCurrenciesStore } from "@/stores/currencies"
 import { storeToRefs } from "pinia"
 import { deletePortfolio, updatePortfolio } from "@/api/portfolios"
-import { getLatestRate } from "@/api/fx"
 import { formatCurrency, formatPercent, formatSignedCurrency } from "@/utils/format"
 import AddPositionDialog from "@/modules/portfolios/AddPositionDialog.vue"
 
@@ -77,23 +77,15 @@ const description = computed(() => store.detail?.description ?? store.portfolios
 // convert to the display currency once via getLatestRate (never a
 // mislabelled amount). Pending cross-currency rate renders "—"; an
 // unresolvable pair degrades to 1:1 (§48.3).
-const summaryRate = ref<number | null>(null)
-watchEffect(() => {
-  const src = (store.detail?.baseCurrency ?? "").toUpperCase()
-  const dst = displayCurrency.value.toUpperCase()
-  if (!src) {
-    summaryRate.value = null
-    return
-  }
-  if (src === dst) {
-    summaryRate.value = 1
-    return
-  }
-  summaryRate.value = null
-  void getLatestRate(src, dst).then((r) => {
-    summaryRate.value = r && typeof r.rate === "number" && r.rate > 0 ? r.rate : 1
-  })
-})
+//
+// §67.2 — this was a FOURTH copy of the same base→display conversion, and the
+// only one that DEGRADED an unresolvable pair to 1:1 (`: 1` in the old
+// watchEffect). That defeated the `summaryPending` gate right below it: a failed
+// rate made `summaryRate` 1, so `summaryPending` went false and the template
+// rendered native portfolio-currency values under the DISPLAY currency's symbol
+// — precisely the mislabelled amount §66.2 forbids. useDisplayConversion leaves
+// the rate null instead, so the existing `—` path does its job.
+const { rate: summaryRate } = useDisplayConversion(() => store.detail?.baseCurrency)
 const summaryPending = computed(() => {
   const src = (store.detail?.baseCurrency ?? "").toUpperCase()
   return !!src && src !== displayCurrency.value.toUpperCase() && summaryRate.value === null

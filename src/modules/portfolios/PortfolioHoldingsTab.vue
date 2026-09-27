@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch, watchEffect } from "vue"
+import { computed, onMounted, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
+import { useDisplayConversion } from "@/composables/useDisplayConversion"
 import { storeToRefs } from "pinia"
 import { removePortfolioPosition, getPortfolioTransactions } from "@/api/portfolios"
-import { getLatestRate } from "@/api/fx"
 import { formatAmount, formatNumber, formatPercent, formatSignedAmount } from "@/utils/format"
 import { researchSymbol } from "@/utils/research"
 import type { PortfolioPositions } from "@/api/types"
@@ -201,30 +201,19 @@ const portfolioCcy = computed(() => {
   const pos = store.positions.find((p) => p.isOpen)
   return (pos?.displayCurrency ?? "").toUpperCase() || null
 })
-const toDisplayRate = ref<number | null>(null)
+// §67.2 — third copy of the same conversion removed; the source is still this
+// portfolio's own `displayCurrency`, so the totals rows keep their existing
+// fallback (native currency when the rate is unknown, never a foreign symbol).
+const { rate: toDisplayRate, convert: toDisplay, displayCurrencyOr } = useDisplayConversion(
+  () => portfolioCcy.value,
+)
+// the display currency once a rate is known, else the portfolio's own
+const totalsCcy = computed(() => displayCurrencyOr())
 
-watchEffect(() => {
-  const src = portfolioCcy.value
-  const dst = displayCurrency.value.toUpperCase()
-  if (!src) { toDisplayRate.value = null; return }
-  if (src === dst) { toDisplayRate.value = 1; return }
-  toDisplayRate.value = null
-  void getLatestRate(src, dst).then((r) => {
-    if (r && typeof r.rate === "number" && r.rate > 0) toDisplayRate.value = r.rate
-  })
-})
-
-/** Portfolio-currency value → display currency (null while the rate is unknown). */
-function toDisplay(v: number | null | undefined): number | null {
-  if (v == null) return null
-  const rate = toDisplayRate.value
-  return rate == null ? null : Math.round(v * rate * 100) / 100
-}
-
-// Subtotal/total rows: converted when the rate is known; otherwise rendered
-// in the portfolio currency, or as a plain number when it is still unknown
-// (never a foreign symbol over a native sum).
-const totalsCcy = computed(() => (toDisplayRate.value != null ? displayCurrency.value : portfolioCcy.value))
+// The totals rows are intentionally NOT null-returning: when the rate is
+// unknown they fall back to the portfolio-currency sum and `totalsCcy` labels it
+// as the portfolio currency. That is why they use `rate` directly rather than
+// `convert()` — a behaviour the dedup must preserve.
 const totalValueDisplay = computed(() => (toDisplayRate.value == null ? totalValue.value : totalValue.value * toDisplayRate.value))
 const totalUnrealizedDisplay = computed(() => (toDisplayRate.value == null ? totalUnrealized.value : totalUnrealized.value * toDisplayRate.value))
 

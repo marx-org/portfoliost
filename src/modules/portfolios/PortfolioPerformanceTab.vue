@@ -7,6 +7,7 @@ import type { PortfolioAnalyticsTimeframe } from "@/api/portfolios"
 import type { PortfolioPositions } from "@/api/types"
 import { formatPercent, formatSignedCurrency } from "@/utils/format"
 import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
+import { useDisplayConversion } from "@/composables/useDisplayConversion"
 import { storeToRefs } from "pinia"
 import { getLatestRate } from "@/api/fx"
 import InstrumentSearchModal from "@/modules/instruments/InstrumentSearchModal.vue"
@@ -250,20 +251,16 @@ const portfolioCcy = computed(() => {
   const d = store.detail
   return (d?.baseCurrency ?? "").toUpperCase()
 })
-const chartRate = ref<number | null>(null)
-
-watchEffect(() => {
-  const src = portfolioCcy.value
-  const dst = displayCurrency.value.toUpperCase()
-  if (!src) { chartRate.value = null; return }
-  if (src === dst) { chartRate.value = 1; return }
-  chartRate.value = null
-  void getLatestRate(src, dst).then((r) => {
-    // Unresolvable pair degrades to 1:1 (§48.3) — the chart still renders
-    // (native values) instead of hanging on a pending state forever.
-    chartRate.value = r && typeof r.rate === "number" && r.rate > 0 ? r.rate : 1
-  })
-})
+//
+// §67.2 — a FIFTH copy of the same conversion, also degrading an unresolvable
+// pair to 1:1. Here that was worse than a rounding issue: the chart is labelled
+// `:currency="displayCurrency"`, so an unresolvable pair plotted NATIVE
+// portfolio-currency values under the display currency's symbol. The series
+// still renders (values are left unscaled) but the LABEL now falls back to the
+// portfolio's own currency via displayCurrencyOr() — §66.3's rule 2, which is
+// what the composable exists to enforce.
+const { rate: chartRate, displayCurrencyOr } = useDisplayConversion(() => portfolioCcy.value)
+const chartCcy = computed(() => displayCurrencyOr() ?? undefined)
 
 const chartSeries = computed(() => {
   const rate = chartRate.value ?? 1
@@ -288,7 +285,7 @@ const chartBenchmarks = computed(() => {
   <div class="space-y-6">
     <div class="card p-6">
       <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 class="text-base font-semibold">Performance Chart: {{ displayCurrency }}</h2>
+        <h2 class="text-base font-semibold">Performance Chart: {{ chartCcy }}</h2>
         <div class="flex flex-wrap items-center gap-1">
           <button
             v-for="tf in timeframes"
@@ -310,7 +307,7 @@ const chartBenchmarks = computed(() => {
       <PortfolioPerformanceChart
         :time-series="chartSeries"
         :benchmarks="chartBenchmarks"
-        :currency="displayCurrency"
+        :currency="chartCcy"
         :backfill-pending="backfillPending || recomputeBusy"
         :recomputing="recomputeBusy || backfillPending"
         :gap-symbols="store.analytics?.gapSymbols ?? null"
