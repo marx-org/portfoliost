@@ -1817,11 +1817,29 @@ that appeared and re-appeared over the day.
       pinned in helmrelease as `snapshotsync` 13:00 UTC +
       `snapshotsync-postfx` 17:20 UTC, after instruments fxsync). 2/2 cronjobs
       live.
-- [ ] Root-cause the genuine 09-26 Equate+ / IKE Marek moves (RECALC_DEBUG
-      logs; then turn RECALC_DEBUG off in the helmrelease).
+- [x] Root-cause the "sudden growth" / fake-inflow spike (RECALC_DEBUG +
+      PROD DB, 2026-09-27, IKE Beata `ab64f782…`). **It is NOT the price/FX
+      valuation path and NOT a race** — it is **missing price-bar history**.
+      The backfill (price-bars path) values only the symbols that have a bar
+      in the window (`if (price == null) continue`); the live-quote
+      `snapshotPortfolioValue` (fired on detail-page read) values **all** open
+      positions from a single live quote. IKE Beata today: backfill 09-26 =
+      154,860 (18 of 23 symbols) vs live today = 205,470 (all 23). The 5
+      missing ≈ 50k: **XTB.WA, EMIM.AS, RBOE.AS** (`price_bars_all`=0,
+      `price_bar_metadata.fetch_status='failed'`), **AMZN** (7,377 bars but
+      gap on 09-26), **SP20.L** (465 bars, from Nov 2024, gap on 09-26).
+      None exist in the stooq daily tables; the on-demand upstream fill
+      (cachest `fetchOhlcv`) **failed** for them. So the two paths disagree
+      purely because the backfill's symbols lack history — recomputing cannot
+      fix it (the bars are still absent), and a page refresh re-writes today
+      via the live path → the spike re-appears. **Fix = §63.8 (two prongs):
+      (a) make instruments fill/repair missing history, (b) make the backfill
+      *not silently drop* a held symbol with no bar — signal a data-gap so
+      the value is flagged incomplete rather than quietly under-reported.**
+      (Turn RECALC_DEBUG off in the helmrelease once §63.8 ships.)
 - [ ] §63.2 — unify the two valuation paths (live-quote snapshot vs
-      price-bars backfill) so they agree; until then the scheduled job is
-      the safety net.
+      price-bars backfill) so they agree; **root cause pinned in §63.8** —
+      the disagreement is upstream missing price history, not FX.
 
 ### 63.7 — Performance chart: "Invested" overlay line (cash in/out, value − invested = profit) — DONE 2026-09-27
 
@@ -1862,3 +1880,39 @@ Implemented end-to-end (contracts → wallets → SPA → mock):
 - [x] Contracts v1.6.43, wallets v1.1.64, SPA v1.0.236 deployed.
 - [ ] Confirm in UI: combined + per-portfolio charts show the "Invested" line
       under the value line (gap = profit), same currency, both timeframes.
+
+### 63.8 — Data-gap handling: fill/repair price history + surface incomplete backfills + gray-out during recompute (2026-09-27)
+
+Follow-on from the §63.6 RCA: the "sudden growth"/fake-inflow spike on IKE Beata
+is **missing price-bar history** — the backfill values only the symbols it has a
+bar for (18/23 → 155k) while the live-quote snapshot values all 23 (→ 205k).
+Three coupled changes so the two valuation paths agree and the UI never shows a
+silently-wrong value.
+
+- [ ] **Backfill must not silently drop a held symbol with no price bar.**
+      `computeSnapshotBatch` currently `continue`s when `price == null`, so a
+      portfolio is valued on a subset of its positions and the number is quietly
+      low. Collect the dropped symbols per pass and mark the resulting snapshots
+      **incomplete** (e.g. `value_snapshots.gap_symbols text[]` or a
+      `portfolio_backfill_metadata.gap_symbols`), so the SPA can flag "N
+      positions lack price history" instead of presenting a wrong total. Decide
+      the display contract with the §63.7 chart (warning chip / value line drawn
+      dashed while incomplete).
+- [ ] **Instruments: fill/repair missing history.** `getPriceBarSeries` already
+      attempts an on-demand `fetchOhlcv` gap-fill, but XTB.WA / EMIM.AS / RBOE.AS
+      end up `price_bar_metadata.fetch_status='failed'` with 0 bars (not in any
+      stooq table — likely a symbol-mapping or provider gap). Log the provider
+      error and expose it (`fetch_status` / `last_error`) so the missing symbols
+      are diagnosable, and add a scheduled "fill gaps for held symbols" pass (or
+      have `snapshots-sync` trigger the instruments fill for the portfolio's
+      symbols before the backfill runs).
+- [ ] **UI: gray out + block every recomputing chart until done** (user request).
+      Any chart whose data source is a recompute/backfill (per-portfolio
+      Performance tab, the combined/composed chart, and any view with a Recompute
+      button) renders **dimmed/disabled with an in-progress indicator** for the
+      duration of the recompute and is not interactable (no timeframe switching /
+      tooltip / recompute re-trigger) until the pass completes, then re-renders
+      from the fresh series. Wire the existing pending state (SPA already tracks
+      `backfillPending` / a recompute promise) to a `disabled` + opacity style on
+      `PortfolioPerformanceChart`. Add a testid + a unit case asserting the chart
+      is disabled while a recompute is in flight.
