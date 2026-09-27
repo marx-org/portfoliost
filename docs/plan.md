@@ -1773,7 +1773,19 @@ that appeared and re-appeared over the day.
    logs (env already added to the two snapshot writers; currently ON in the
    PROD helmrelease — turn off when done).**
 
-**Implementation (WIP — local, tested 344 green, not yet deployed):**
+   **Diagnostic aid (2026-09-27, §63.7): the new value-vs-`Invested` chart
+   isolates these from real deposits.** The **Invested** line (cumulative net
+   money-in) is flat through them, while the **value** line dips/steeps — so
+   a sharp value move with a *flat* Invested line is a valuation anomaly,
+   not a deposit. On the combined 1Y chart the value line shows **two sharp
+   V-shaped dips (late Jan 2026 and late May 2026)** that the flat Invested
+   line does not follow — these are the "sudden move" anomalies the user
+   reported, now visually separable and worth the same per-symbol
+   `RECALC_DEBUG` root-cause as the 09-26 Equate+/IKE Marek moves. (IBKR also
+   shows value 457,493 < invested 503,574 = a *negative* gap, i.e. behind
+   money-in — the chart surfaces per-portfolio ahead/behind-at-a-glance too.)
+
+**Implementation (DEPLOYED — wallets v1.1.63/v1.1.64, tested green):**
 - `POST /api/portfolios/:id/recompute` now has TWO modes over ONE shared core
   (`computeSnapshotBatch`):
   - **default = force** (`forcePortfolioRecalc`): DELETE all rows + rebuild —
@@ -1801,9 +1813,10 @@ that appeared and re-appeared over the day.
   trade effects) and what the AV:BE headers are. Documented as a diagnostic
   in `docs/proposals/portfolio-cash-tracing.md`.
 
-- [ ] Deploy the two-modes recompute + snapshotsync cron (needs a wallets
-      version bump via GHA; pin in helmrelease, two cronjob entries or one
-      cron with a wrapper — decide: one job at 17:20 UTC + one at 13:00 UTC).
+- [x] Deploy the two-modes recompute + snapshotsync cron (wallets v1.1.63,
+      pinned in helmrelease as `snapshotsync` 13:00 UTC +
+      `snapshotsync-postfx` 17:20 UTC, after instruments fxsync). 2/2 cronjobs
+      live.
 - [ ] Root-cause the genuine 09-26 Equate+ / IKE Marek moves (RECALC_DEBUG
       logs; then turn RECALC_DEBUG off in the helmrelease).
 - [ ] §63.2 — unify the two valuation paths (live-quote snapshot vs
