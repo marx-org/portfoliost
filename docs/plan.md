@@ -1827,11 +1827,12 @@ will shift. The SPA is the only consumer in the monorepo; grep before assuming.
         between two of the user's own portfolios *raises one portfolio's invested
         and lowers the other's*. The aggregate is unaffected (the legs net to
         zero) but the per-portfolio number is not "capital you put in". Say so.
-      - While there: `cashLedger.ts:306` still has
-        `(await resolvedFxRate(...))?.rate ?? 1` — the same 1:1 degrade §66.4
-        removed from `fxTo`, on the invested path, and it ignores the `opts.strict`
-        it is handed. Tighten it to match, so a missing rate on a multi-currency
-        portfolio cannot silently understate invested.
+      - ~~`cashLedger.ts:306` `?.rate ?? 1`~~ — **done 2026-09-27**, not left for
+        here: `bd28ba1`. Both cash-ledger conversions now go through one
+        `rateToBase` helper that honours `opts.strict`. It was a third instance of
+        the §66.4 pattern, found by grepping `?? 1` rather than `?? "USD"` — a
+        guessed *rate* is as much a guess as a guessed currency, one layer down,
+        and the original sweep would never have looked for it.
       - `totalGainLoss` / `returnPercentage` are then derived from the new
         `totalValue`; document that they move with it.
       - `portfolioBreakdown[]`: add per-portfolio `instrumentsValue` and
@@ -1891,7 +1892,14 @@ will shift. The SPA is the only consumer in the monorepo; grep before assuming.
 - [ ] Derive **Total Gain / Loss** = `totalValue − totalInvested` and **Total
       Return** from the same pair, so the four tiles and the two derived figures
       can never disagree. The current tiles are computed independently.
-- [ ] While a rate is unresolved, render `—` (never a bare number with a foreign
+- [ ] **The chart's value line must include cash too** (confirmed by the user:
+      "Total is always total: stocks+cash on this account. Also on chart").
+      `/portfolios/merged` currently plots positions and cash as separate series,
+      so its value line is a *different* number from the Total tile. Make the
+      merged series' value line `instruments + cash` per day, and keep a separate
+      cash series for the breakdown rather than summing it into the headline only.
+      This is the step that stops the inconsistency moving rather than going away.
+  - [ ] While a rate is unresolved, render `—` (never a bare number with a foreign
       symbol — §66.2) and do not flash a converted value first.
 - [ ] Portfolio cards: show the cash/instruments split inside the existing Cash
       group rather than adding a fifth number to the top row.
@@ -1917,16 +1925,20 @@ will shift. The SPA is the only consumer in the monorepo; grep before assuming.
       - Σ the 10 cards' `currentValue` equals the Total tile (this is the §63.3
         reconciliation, finally assertable);
       - the negative-cash portfolios render a negative Cash tile, not `—`;
+      - the chart's value line ends at the same figure as the Total tile (cash
+        included, per the decision above);
       - no tile shows a `$` (§66.2 guard still holds).
 - [ ] Then tick §63.3's reconciliation and its "Crypto reports 0 / −100%"
       findings, and archive §63 if nothing else in it is open.
 - [ ] Commit (plan closeout).
 
-### Open question
+### Design decisions (resolved 2026-09-27)
 
-1. **Should the chart's value line include cash too?** The tiles will (confirmed),
-   but `/portfolios/merged` plots positions and cash as separate series (§63.3's
-   "consolidated series = Σ positions + cash"). Exposing cash in the header while
-   the chart's value line disagrees would move the inconsistency rather than fix
-   it. Needs an answer before §68.5, since the PROD check compares the Total tile
-   against the chart.
+- **Total includes cash, everywhere** — tiles *and* the chart value line. There is
+  no longer a question of whether the headline includes cash; the only remaining
+  freedom is how prominently the cash *component* is shown (its own tile and its
+  own series), which is a display choice, not a definitional one.
+- **Total Invested includes transfers** — verified that
+  `externalCashInvested` already sums every cash row with no type filter, so no
+  code change is needed; only the description and the per-portfolio caveat in
+  §68.2.
