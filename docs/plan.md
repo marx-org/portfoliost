@@ -2102,7 +2102,6 @@ data"*). So instruments authenticates 24 endpoints and authorizes none of them.
 **Design decision (resolved).** Keep a gate on instruments, but make it a gate on
 **the caller**, not on a user: accept *either* a user JWT *or* a service token.
 Concretely:
-
 - **Why not simply drop instruments' auth** (the "let services work without auth"
   option): the exposure chain is public → instruments → cachest → openst → provider
   keys, and **cachest and openst have no auth at all**. `GET /:symbol/history` and
@@ -2132,106 +2131,133 @@ Concretely:
 
 ### 63.10.1 — wallets: a transport failure must abort the pass, never write
 
-- [ ] `src/services/backfill.ts` — `fetchPriceBars` stops collapsing every
-      non-2xx into `null`. A **401/403 is an error**, not "no data": throw (or
-      return a discriminated `{ error }`) so `fetchPriceSeries` propagates it and
-      `runBackfillRecent`/`_runBackfillCore` abort before any write. A genuine
-      empty series stays a valid result. Keep the symbol-level `catch` for network
-      errors, but surface the count.
-- [ ] `src/services/backfill.ts` — `_runBackfillCore` refuses to write when the
-      pass could not price **every** held symbol it was asked about: if
-      `gapSymbols.length` equals the held-position count, mark
-      `portfolio_backfill_metadata.status = 'failed'` with an explanatory
-      `error_message` and **return without touching `value_snapshots`**. (The
-      cash-only portfolio is still written — a genuine all-cash portfolio has
-      `gap_symbols = []` and `positions = 0`, so the two are distinguishable.)
-- [ ] `src/services/instruments-fx.ts` — `resolvedFxRate` must not silently return
-      `rate = 1` on a 401/5xx. Distinguish "no rate for this pair" (a legitimate
-      1:1 degrade, still allowed) from "the FX service rejected us" (throw).
-- [ ] Tests: `src/services/backfill.test.ts` — a 401 from instruments aborts the
-      pass and leaves the previous `value_snapshots` rows byte-identical (assert
-      the pre-existing row survives); a 200-with-empty-series for one symbol still
-      writes the partial value and records it in `gap_symbols`; `resolvedFxRate`
-      throws on 401 and returns 1:1 on a genuine no-rate. **These are the tests
-      that would have caught today's corruption.**
-- [ ] Tests: `npm run build && npm run test` in `portfoliost-wallets/` green
-      (current: 344 + the §63.8 additions).
-- [ ] Commit.
+- [x] **`InstrumentsUnavailableError` + abort semantics** (wallets `153bfb5`,
+      351 green). `fetchPriceBars` no longer collapses a non-2xx into `null`: a
+      **404 stays a gap** (cachest/instruments' documented "no data for this key",
+      so an unresolvable benchmark ticker is still dropped rather than failing the
+      request), while 401/403/400/5xx and an unreachable host throw.
+      `fetchPriceSeries` latches the first worker failure and rethrows once all
+      have settled, so a rejected fetch cannot leave a half-filled map.
+- [x] **FX**: `resolvedFxRate` gained `strict`. The backfill sets it, so an
+      unusable FX source aborts instead of degrading 1:1 across a whole valuation;
+      the interactive deposit/fee/ledger paths keep the 1:1 degrade and now log
+      it. Threaded through `fxTo`, `fxToOnDay`, `cashBalanceSeries`,
+      `dailyExternalFlows`, `externalCashInvested`.
+- [x] **`instrumentsAuthHeaders`** — one place deciding user-JWT vs service token
+      (Bearer-prefixed or not) for every instruments call.
+- [x] **The write guard**: `isUnpriceable` / `UnpriceablePortfolioError` — a pass
+      that priced **0 of N** held symbols is refused before any write, on *both*
+      paths (the force path deletes before it writes, so it would have erased the
+      history and rebuilt it cash-only). A partial pass (≥1 priced) is still
+      written and flagged; an all-cash portfolio (0 held) is unaffected.
+- [x] Also fixed a test asserting the wrong thing: *"marks status failed when
+      instruments unreachable"* asserted `complete`, documenting the
+      swallow-everything behaviour. It now asserts `failed`.
+- [x] Tests +5. Both new safety-net tests **fail against the pre-fix code**:
+      "leaves the previous snapshots untouched when the pass cannot price" and
+      "refuses a pass that priced 0 of N held symbols".
 
 ### 63.10.2 — instruments: accept a service token alongside a user JWT
 
-- [ ] `src/auth.ts` — new `serviceOrUserMiddleware`: if `X-Service-Token` matches
-      `INSTRUMENTS_SERVICE_TOKEN` (timing-safe compare; **fail closed** when the
-      env var is unset — an unset secret must reject service calls, never accept
-      them), set a marker (`serviceCaller`) and continue. Otherwise fall through to
-      the existing `userIdentityMiddleware`. No `userIdentity` is fabricated for a
-      service caller.
-- [ ] `src/routes/instruments.ts:255` and `:899` — install the combined
-      middleware. Leave `src/routes/fx.ts:150-165` (`/api/internal/fx-rates`,
-      `/api/fx/latest`) on `serviceOrUserMiddleware` and leave
-      `src/routes/fx.ts:168-187` (`/api/admin/fx-rates`) on
-      `userIdentityMiddleware` + `requireGroup("portfoliost_admin")` unchanged, so
-      a service token cannot read the admin listing.
-- [ ] Tests: `src/routes/*.test.ts` — no header → 401; wrong service token → 401;
-      correct service token → 200 on `/price-bars` and `/api/internal/fx-rates` and
-      on `/api/instruments/:symbol/quote`; correct service token → **403/401** on
-      `/api/admin/fx-rates`; a valid user JWT still works everywhere it does today;
-      and with `INSTRUMENTS_SERVICE_TOKEN` unset a service token is rejected.
-- [ ] Tests: `npm run build && npm run test` in `portfoliost-instruments/` green
-      (current: 356).
-- [ ] Commit.
+- [x] **`serviceOrUserMiddleware`** (instruments `cfbfda8`, 367 green).
+      `X-Service-Token` (opaque shared secret) **or** a user JWT; neither is
+      optional. `serviceTokenMatches` is timing-safe (both sides hashed to a fixed
+      width first, since `timingSafeEqual` throws on a length mismatch and would
+      itself leak length) and **fails closed** — with
+      `INSTRUMENTS_SERVICE_TOKEN` unset a service token is rejected, so a missing
+      secret can never open the door. A service token fabricates no
+      `userIdentity`, so `requireGroup` cannot be satisfied by one:
+      `/api/admin/fx-rates` keeps `userIdentityMiddleware` +
+      `requireGroup("portfoliost_admin")` and stays user-only. Applied to
+      `instruments.*`, `news.*`, `/api/fx/latest`, `/api/internal/fx-rates`.
+- [x] Tests +11, incl. the two that catch the wrong versions: deleting the
+      `!expected` guard fails both fail-closed cases, and a service token is
+      asserted to get 401 on the admin listing.
 
 ### 63.10.3 — wallets: send the service token from the sweep
 
-- [ ] `portfoliost-wallets/src/scripts/snapshots-sync.ts` — read
-      `INSTRUMENTS_SERVICE_TOKEN` and pass it as the `authToken` argument;
-      correct the header comment, which currently asserts a falsehood. Fail fast
-      with a clear message when the env var is missing, rather than running a pass
-      that cannot price anything.
-- [ ] `src/services/instruments-fx.ts` / `backfill.ts` — the instruments client
-      helper sends `X-Service-Token` when it holds a service token and
-      `Authorization` when it holds a user JWT, so one code path serves both the
-      sweep and the interactive recompute. Keep the browser path on
-      `Authorization` only.
-- [ ] Tests: `snapshots-sync` — missing env var exits non-zero with the message and
-      runs no pass; a present token is sent as `X-Service-Token`.
-- [ ] Tests: `npm run build && npm run test` in `portfoliost-wallets/` green.
-- [ ] Commit.
+- [x] **`resolveServiceToken`** (wallets `bec58a5`, 363 green) reads
+      `INSTRUMENTS_SERVICE_TOKEN` and throws a message naming the variable and
+      the consequence if missing. The script calls it **before `getDb()`**, so a
+      misconfigured sweep never starts rather than producing a plausible-looking
+      run. The header comment no longer asserts a falsehood.
+- [x] Tests +12: the credential split and the failure split in
+      `instruments-fx.test.ts`; `snapshots-sync.test.ts` asserts the message and
+      spawns the script to prove it exits 1 **without dialling the database**.
 
 ### 63.10.4 — cluster: the shared secret
 
-- [ ] Generate the secret into the existing SOPS-backed cluster secret
-      (`cluster-secrets`) as `INSTRUMENTS_SERVICE_TOKEN`; reference it from
-      `portfoliost-instruments/app/helmrelease.yaml` (`envFrom`) and from
-      `portfoliost-wallets/app/helmrelease.yaml` (app **and** both snapshotsync
-      CronJob templates). Follow the `tmpl/cluster-secrets.yaml` →
-      `cluster/config/cluster-secrets.sops.yaml` → Flux `postBuild` substitution
-      path per the homelab skill.
-- [ ] **Compose parity**: `portfoliost/docker-compose.yml` must set the same env
-      var for `instruments` and `wallets`, or local dev and the e2e stack diverge
-      from the cluster exactly the way this bug did. Pick a committed dev value.
-- [ ] Verify with `kubectl -n pfire exec` that the CronJob pod has it and that a
-      sweep pass prices positions (`gap_symbols` no longer equals the position
-      count).
-- [ ] Commit.
+- [x] `INSTRUMENTS_SERVICE_TOKEN` (generated 32-byte hex) added to the
+      SOPS-encrypted `cluster-secrets` — re-encrypted with the cluster's PGP
+      recipient; the key-set diff is **exactly one addition** and the round-trip
+      decrypt was verified against the intended plaintext (no plaintext in the
+      committed file). `tmpl/cluster-secrets.yaml` gets the matching placeholder
+      for the regeneration path. Referenced by the instruments app, the wallets
+      app, **and both `snapshotsync` CronJob templates** (without it on the
+      CronJob the sweep still cannot price anything).
+- [x] **Compose parity** (`portfoliost` `64c2928`): both services get a
+      committed dev default. Verified against the running stack — no credential
+      401, wrong token 401, service token 200 on `/price-bars` and
+      `/api/internal/fx-rates`, **401 on `/api/admin/fx-rates`**.
 
-### 63.10.5 — heal the stored snapshots and close out
+### 63.10.5 — the two further bugs the guard exposed, then the heal
 
-- [ ] With §63.10.1 live, run the sweep and confirm it prices: IKE Beata's stored
-      value must move from 37,428 to ≈155k and `gap_symbols` must become `NULL`;
-      IBKR's must stop being negative.
-- [ ] Then run a **force** recompute (`POST /api/portfolios/:id/recompute`, default
-      mode) for the portfolios whose history is cash-only — the additive pass only
-      rewrites the last two days, so Jan/May 2026 and everything before the
-      corruption started still needs rebuilding. ⚠ touches production, per §28 get
-      the user's go-ahead first. Expect the two V-dips §63.6 described to
-      disappear rather than to be re-investigated.
-- [ ] Then drop the open `§63.2` (unify the two valuation paths): with the sweep
-      pricing correctly, the remaining live-quote-vs-backfill divergence is a much
-      smaller question and may be answerable by deleting the divergence rather
-      than by reconciling two paths.
-- [ ] Update `docs/plan.md` §63.6 and §63.8 to point at §63.10 as the root cause,
-      and close the `RECALC_DEBUG` item.
+Deploying §63.10.1–.4 and running the sweep immediately proved the guard works
+(4 portfolios refused, **stored values left untouched** instead of corrupted) and
+produced two *new* root causes, each of which had been silently corrupting values
+long before this section:
+
+- [x] **`resolveInstrumentCurrency` silenced any multi-venue ticker**
+      (instruments `f6044f2`, 370 green). The `exchanges.size > 1 → null` rule is
+      right for the **venue** and wrong for the **currency**, which only needs the
+      candidates to agree. PROD: `MSFT` → NASDAQ + NEO, both US, resolved to
+      `null`, so `?currency=PLN` 400'd. Now resolves when every candidate maps to
+      one ISO code; genuine disagreement still returns null (§47), so
+      `AFL` (NYSE/ASX), `META` (NASDAQ/LSE/STO) and the existing `SNT`/`AMD`
+      ambiguity cases are unchanged.
+- [x] **The backfill priced long-closed symbols** (wallets `bf0d600`, 364 green).
+      The symbol list came from every BUY/SELL row ever imported, so a position
+      sold in 2024 was still fetched in a 2026 window. The day grid and qty maps
+      are now built before the price fetch and the fetch is restricted to symbols
+      with qty > 0 on some day in the window.
+- [x] **A ticker listed on several venues in different currencies could not be
+      converted at all** — and that is the case the plan had already decided.
+      §48.3b: *"fetches `/price-bars?currency=<portfolio base>` for positions
+      whose **instrument currency is known** and non-base (null stays native —
+      §45.3 never guess)"*. We did know it — `transactions.instrument_currency` —
+      but only sent the **target**, so instruments re-derived the base with a
+      weaker heuristic and §48.2's 400 vetoed the caller's own fact. One such
+      position took its whole portfolio unvaluable (5 of 10 in PROD).
+      Resolved in the direction the plan already points (contracts **v1.6.45**,
+      instruments `db4bed7`, wallets `920cb7f`): a new optional `?baseCurrency=`
+      carrying the base the caller already knows, **honoured only where the local
+      resolver is silent and never overriding a resolved one** — so §47's "never
+      guess" is intact and the response still reports which base was used.
+- [x] **Deployed and verified.** wallets v1.1.68 + instruments v1.0.73. The
+      sweep runs `ok=10 failed=0`, and every portfolio is `complete` with
+      `gap_symbols` empty:
+
+      | portfolio | before | after | invested | positions | gaps |
+      | --- | --- | --- | --- | --- | --- |
+      | **IKE Beata** | 37,428 | **196,827** | 116,322 | 23 | 0 |
+      | **IBKR** | **−24,602** | **585,319** | 503,574 | 35 | 0 |
+      | IKE Marek | 33,695 | 90,963 | 38,771 | 13 | 0 |
+      | Rach. rejestrowy PKO BP | 8,500 | 56,448 | 45,000 | 23 | 0 |
+      | Crypto | 208 | 888 | 873 | 0 | 0 |
+
+      The spike is gone: §63.6 measured the two valuation paths 130k apart for
+      IBKR (457,493 backfill vs 587,547 live) and IKE Beata at 18/23 symbols; the
+      backfill now returns 585,319 vs the live path's 587,547 (**0.4%**) and
+      prices 23/23. The two V-dips §63.6 flagged in late Jan and late May 2026 are
+      **gone** — they were the cash-only collapse, not market moves: the series now
+      runs 118k (Sep 2025) → 199k (Sep 2026) with no collapses.
+- [x] **No force recompute was needed** — the additive pass upserts the whole
+      `[first trade, today]` window, so the sweep already rebuilt the history. The
+      monthly series confirms it (Jan 2026 min 129,464, previously 27k). The 12
+      `snapshotsync` CronJobs' own schedule (13:00 / 17:20 UTC) is now healthy.
+- [x] `RECALC_DEBUG` turned off in the wallets HelmRelease (§63.6's open item).
+- [x] Plan closeout: §63.6 and §63.8 now point here; see §63.11 for the edge-auth
+      follow-on this deliberately did not bundle in.
 
 ### 63.11 — Edge auth for browser traffic (follow-on, not a fix for §63.10)
 
