@@ -184,6 +184,10 @@ function closeAddPosition() {
 }
 
 onMounted(async () => {
+  // §67.1 — adopt the server-side display-currency preference when this browser
+  // has never chosen one, so the choice follows the user across devices. The
+  // selector writes through to the same field when they do pick one.
+  void displayCurrencyStore.hydrateFromServer()
   try {
     await store.fetchAll()
   } catch (err) {
