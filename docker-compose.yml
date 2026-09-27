@@ -153,6 +153,8 @@ services:
       DATABASE_URL: postgres://portfoliost:portfoliost@postgres:5432/portfoliost
       USERS_AUTH_URL: http://users-auth:3000
       INSTRUMENTS_URL: http://instruments:3000
+      # §63.10 — required by the snapshot sweep; must match the instruments service.
+      INSTRUMENTS_SERVICE_TOKEN: ${INSTRUMENTS_SERVICE_TOKEN:-dev-instruments-service-token}
       # dev identity resolution for opaque mock tokens (never used in cluster)
       AUTH_ME_URL: http://example-service-mock:4010
     depends_on:
@@ -173,6 +175,10 @@ services:
       DATABASE_URL: postgres://portfoliost:portfoliost@postgres:5432/portfoliost
       CACHEST_URL: http://cachest:8080
       LOGOS_DIR: /app/data/logos
+      # §63.10 — second accepted credential (serviceOrUserMiddleware). Pinned to a
+      # committed dev value so local and cluster behave the same; the cluster reads
+      # the real one from the SOPS cluster-secrets. Must match the wallets side.
+      INSTRUMENTS_SERVICE_TOKEN: ${INSTRUMENTS_SERVICE_TOKEN:-dev-instruments-service-token}
     volumes:
       - ../portfoliost-instruments/data/logos:/app/data/logos
     depends_on:
