@@ -1812,10 +1812,17 @@ Implemented end-to-end (contracts → wallets → SPA → mock):
 ### 63.8 — Data-gap handling: fill/repair price history + surface incomplete backfills + gray-out during recompute (2026-09-27)
 
 Follow-on from the §63.6 RCA: the "sudden growth"/fake-inflow spike on IKE Beata
-is **missing price-bar history** — the backfill values only the symbols it has a
-bar for (18/23 → 155k) while the live-quote snapshot values all 23 (→ 205k).
-Three coupled changes so the two valuation paths agree and the UI never shows a
-silently-wrong value.
+looked like **missing price-bar history** — the backfill values only the symbols
+it has a bar for (18/23 → 155k) while the live-quote snapshot values all 23
+(→ 205k). Three coupled changes so the two valuation paths agree and the UI never
+shows a silently-wrong value.
+
+> **Superseded in part (2026-09-27).** The missing history was real and is fixed
+> (item 2 → §63.9), but it was *not* the spike: the spike was the sweep pricing
+> **nothing at all** (§63.10). The three changes here stand on their own merit —
+> the gap signal, the gray-out, the fill — they are simply not what fixed the
+> chart. The `18 of 23` figure was also an exact-date count; `buildPriceMap` carries
+> prices forward, so the real number of unpriced symbols was smaller.
 
 - [x] **Backfill must not silently drop a held symbol with no price bar.**
       (wallets `09f48c2` + `bcdf8e3`, 348 green; contracts v1.6.44.)
