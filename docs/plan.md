@@ -13,8 +13,6 @@ also still has `[ ]` work; fully finished steps are archived)
 
 ---
 
----
-
 ## 57. Transactions UI: clipped labels picker, hidden action column (user request 2026-09-24)
 
 Proposal: — (direct user request; no proposal doc).
