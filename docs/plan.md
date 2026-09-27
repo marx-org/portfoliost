@@ -1740,3 +1740,72 @@ openst overflow rows.
   - **Lifted 2026-09-26** (openst v1.1.35 + data backfill + recomputes; only the ≳10× sanity
     guard remains as hardening).
 - [x] Commit.
+
+### 63.6 — Wallets: recalculation reliability, two recompute modes, scheduled additive refresh (WIP 2026-09-27)
+
+**Symptoms (user-reported, PROD):** the composed (and per-portfolio) value
+charts showed an "instant drop" / "sudden rise" around noon on 2026-09-27
+that appeared and re-appeared over the day.
+
+**Diagnosis (done 2026-09-27):**
+1. **The drop** — the merged endpoint summed `value_snapshots` per exact
+   date; today's snapshot is written LAZILY (snapshot-on-read / manual
+   recompute), so early in the day only opened portfolios had a "today" row
+   → the combined total collapsed to just those (PROD: 1/10 portfolios had a
+   09-27 row → head point 31k vs 327k). **Fixed**: `sumSnapshotsByDateForwardFilled`
+   (mergedAnalytics) — each portfolio contributes its latest-known value on
+   dates it has no snapshot (step-function semantics; no-op on complete
+   dates). No cron needed.
+2. **The rise** — a STALE value from the second valuation path: the
+   live-quote snapshot (`snapshotPortfolioValue` in quotes.ts, fired on
+   detail-page read) disagreed with the backfill (price-bars
+   `computeSnapshotBatch`). IBKR: live path wrote 09-26 = 587,547; the
+   authoritative backfill = 457,493 (= 09-25, no real move). A manual
+   recompute overwrote it → jump gone. This is **§63.2** (unify the two
+   valuation paths) — the real fix; the recompute job below is the
+   operational guard. IBKR is ~70% idle cash (EUR 141k + USD 963 − PLN 121k
+   in a PLN-base portfolio), so FX differences between the two paths are the
+   whole discrepancy.
+3. **Two genuine 09-26 moves remain unexplained** (recompute rebuilt them,
+   still high): Equate+ 3,947→8,633 (+119%) and IKE Marek 68,455→105,452
+   (+54%). Equate+ = the short-SAP-option book (expiry effect?); IKE Marek
+   = the LSE `.L` names. **OPEN: root-cause with `RECALC_DEBUG=1` per-symbol
+   logs (env already added to the two snapshot writers; currently ON in the
+   PROD helmrelease — turn off when done).**
+
+**Implementation (WIP — local, tested 344 green, not yet deployed):**
+- `POST /api/portfolios/:id/recompute` now has TWO modes over ONE shared core
+  (`computeSnapshotBatch`):
+  - **default = force** (`forcePortfolioRecalc`): DELETE all rows + rebuild —
+    manual recompute after data fixes; no stale rows survive; transactional
+    (abort → nothing written).
+  - **`?mode=upsert`** (`runBackfillRecent`, new): ADDITIVE upsert, window
+    extends to **TODAY** (default window ends yesterday) — re-values the last
+    2 days (FX for a fresh date is unknown until the ECB publish ~16:00 CET /
+    fxsync 17:10 UTC and can still shift converted values). A failed pass
+    leaves prior values in place.
+- `src/scripts/snapshots-sync.ts` (new): standalone job — for EVERY
+  portfolio, `runBackfillRecent` (serialized by the shared backfill runner;
+  no user token needed — instruments `/internal/fx-rates` is unauthenticated).
+- Deploy plan: cronjob `snapshotsync` in `portfoliost-wallets/app/helmrelease.yaml`,
+  schedule **after fxsync** (instruments fxsync = 17:10 UTC) + a mid-day pass
+  (~13:00 UTC) per the user's "run it twice a day" note; command
+  `node dist/scripts/snapshots-sync.js`, env DATABASE_URL (+ INSTRUMENTS_URL).
+- Tests: `recompute.test.ts` — new `?mode=upsert extends to today AND does
+  not delete` case; `mergedAnalytics.test.ts` — 5 forward-fill cases; full
+  suite 344 green.
+- **Cash in/out series on the performance chart** (user request, pending):
+  an additional accumulating series in the same currency as the main one,
+  mirroring the Transakcje running columns AV:BE. BLOCKED on the user
+  clarifying which definition (net money-in vs running free cash incl.
+  trade effects) and what the AV:BE headers are. Documented as a diagnostic
+  in `docs/proposals/portfolio-cash-tracing.md`.
+
+- [ ] Deploy the two-modes recompute + snapshotsync cron (needs a wallets
+      version bump via GHA; pin in helmrelease, two cronjob entries or one
+      cron with a wrapper — decide: one job at 17:20 UTC + one at 13:00 UTC).
+- [ ] Root-cause the genuine 09-26 Equate+ / IKE Marek moves (RECALC_DEBUG
+      logs; then turn RECALC_DEBUG off in the helmrelease).
+- [ ] §63.2 — unify the two valuation paths (live-quote snapshot vs
+      price-bars backfill) so they agree; until then the scheduled job is
+      the safety net.
