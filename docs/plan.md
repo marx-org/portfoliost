@@ -1809,3 +1809,43 @@ that appeared and re-appeared over the day.
 - [ ] §63.2 — unify the two valuation paths (live-quote snapshot vs
       price-bars backfill) so they agree; until then the scheduled job is
       the safety net.
+
+### 63.7 — Performance chart: "Invested" overlay line (cash in/out, value − invested = profit) — DONE 2026-09-27
+
+User request (context switch from recompute): an additional accumulating
+series on the **shared** performance chart (`PortfolioPerformanceChart` — used
+by both the per-portfolio Performance tab AND the combined/composed chart),
+same currency as the main value line, so you can see over time how much you
+deposited vs the current value → the gap is your profit.
+
+**Series = A = cumulative net money-in** (deposits − withdrawals ± transfer
+legs) — verified the Transakcje column is **CH "Skumulowana wpłata własna"**
+(cumulative own deposit); CH/CI headers exist but are empty, so the live
+`invested` column (same definition) is the source. (Note: the per-portfolio
+*balance* columns are BV:CE, not AV:BE.)
+
+Implemented end-to-end (contracts → wallets → SPA → mock):
+- **contracts** `openapi.yaml`: `performance.timeSeries[].invested`
+  (`number, nullable`). **Also fixed a latent YAML break** — the EXPIRATION
+  `description` (added in the §62 EXPIRATION commit) had an unquoted colon
+  (`type: EXPIRATION`) that failed the whole spec-validate → no contracts
+  release had published in a while. Published **v1.6.43**.
+- **wallets** (`4463994`, **v1.1.64**): both `GET /:id/analytics` and
+  `GET /merged` now emit per-point `invested` (already in
+  `value_snapshots.invested`, summed/FX-converted in the merged forward-fill).
+- **SPA** (`e3e615f`, **v1.0.236**): `PortfolioPerformanceChart` draws a
+  second solid **"Invested"** line (cyan, thinner) when the series carries
+  `invested` (auto-derived legend, added to the remount-key fingerprint);
+  both callers (per-portfolio tab + `InvestmentsView` combined) convert
+  `invested` by the same base→display rate as `value`.
+- **mock** (`mocks/portfolios/index.js`): surfaces the fixture's
+  `investedCapital` (monotonic 0→98k, = cumulative money-in) as `invested`
+  so the line renders in docker/mock mode.
+- Tests: wallets 344 green (per-portfolio + merged `invested` assertions);
+  SPA 395 green (2 new chart cases: invested line drawn / omitted).
+- **Deployed 1/1 both**; API + chart verification pending a login (session
+  keeps expiring).
+
+- [x] Contracts v1.6.43, wallets v1.1.64, SPA v1.0.236 deployed.
+- [ ] Confirm in UI: combined + per-portfolio charts show the "Invested" line
+      under the value line (gap = profit), same currency, both timeframes.
