@@ -2022,32 +2022,40 @@ recorded as such, distinct from a 404.
 
 ### 63.9.1 — cachest: give the openst routes a queue that fits a sweep
 
-- [ ] `cachest/config.yaml` — for every route whose `url` targets
-      `http://openst.pfire.svc.cluster.local:8080/…` (`OPENST`, `OPENST_PROFILE`,
-      `OPENST_QUOTE`, `OPENST_METRICS`, `OPENST_PROJECTIONS`, `OPENST_OHLCV`,
-      `OPENST_OHLCV_FUNDS`, and the crypto/ownership/filings/mda equivalents):
-      `fetch_interval: 0.2`, `fetch_max_wait: 120`. For the remaining external
-      routes (`DIVIDENDHISTORY`, `ALPHAVANTAGE`, `FMP`, `logo`, `dividendmax`, …):
-      keep `fetch_interval`, raise `fetch_max_wait` to `120`. Read the live
-      `config.yaml` out of the running container first and change every value
-      verbatim — the deployed file uses fully-qualified in-cluster URLs, which the
-      repo copy does not.
-- [ ] Document the depth formula next to the settings in `cachest/config.yaml` and
-      `cachest/readme.md` §`fetch_interval`: **queue depth =
-      `floor(fetch_max_wait / fetch_interval) + 1`**, and it is a *concurrency* cap
-      in disguise — a route with a 120 s `fetch_timeout` and depth 3 rejects
-      everything past the third concurrent caller. A route's depth must exceed the
-      largest burst its callers produce (one full portfolio sweep, ≥175 symbols).
-- [ ] `cachest/tests/` — regression test that fires N=16 concurrent
-      `forceRefresh` requests at one `OPENST_OHLCV` key and asserts **all 16 return
-      200** with no `503` and no `[rate-limit]` log (pinned against the real
-      `config.yaml`, not a synthetic route). Plus a unit test on `RateLimiter`
-      pinning `depth = floor(max_wait/interval) + 1` so the arithmetic can't
-      silently drift again.
-- [ ] Tests: `python -m pytest` in `cachest/` green (incl. the existing
-      `test_real_config_has_*` suite, which must be updated for the new values).
-- [ ] `docker compose up -d` in `cachest/` + the 16-request burst `curl` smoke.
-- [ ] Commit.
+- [x] **`RouteConfig.queue_depth` + config values + regression tests**
+      (cachest, 198 green). `queue_depth` is a documented property
+      (`config.py`: `floor(fetch_max_wait / fetch_interval) + 1`, `UNBOUNDED_QUEUE`
+      for `fetch_interval: 0`) and is now logged per route at startup, so a
+      depth-3 route is visible in the boot log instead of only in a 503.
+      `config.yaml` (repo **and** the cluster copy at
+      `homelab/cluster/apps/pfire/cachest/app/config/config.yaml` — they are two
+      files, and the cluster one is what actually runs): every `openst.*` route
+      that a sweep fans out over → `fetch_interval: 0.2`, `fetch_max_wait: 120`
+      (depth 600). Politeness kept where openst's own leg scrapes an external
+      site: `OPENST_OHLCV_FUNDS` 0.5, `OPENST_BOND_PROFILE` /
+      `OPENST_CORP_BOND_PROFILE` 2 (depth 61/241), vendors keep 2 (61).
+      `OPENST_NEWS` (300) and `OPENST_CORP_BOND_CATALOGUE` (60) stay at depth 1
+      **on purpose** — per-company news on a 5-min cadence, and a param-less
+      singleton scraped once a day — and are now named in the test so the
+      exemption cannot quietly outlive its reason.
+      Tests: `queue_depth` arithmetic + unbounded-without-pacing; two depth bars
+      on the shipped config (`MIN_SWEEP_DEPTH = 128` for the four price-bar
+      routes the snapshots-sync sweep hits, `MIN_UI_DEPTH = 32` for the rest);
+      a `paced_external_scrapes` guard; and — the one that actually reproduces
+      the bug — `test_shipped_ohlcv_route_serves_a_full_portfolio_sweep`, which
+      runs the **real** `RateLimiter` (every other test in `test_main.py` stubs
+      it out, which is why this survived) with 16 concurrent `forceRefresh`
+      callers against the shipped `/ohlcv/{ticker}`, `/equity/quote/{ticker}` and
+      `/logo/{ticker}`. Against the pre-fix config it fails with
+      `13 of 16 callers were rate-limited with no upstream call
+      (queue_depth=3); upstream saw 3 request(s)` — the local twin of the PROD
+      8-request burst (3× 200, 5× 503).
+      Compose smoke: 16 concurrent `/ohlcv/SNT.WA` against the running stack →
+      **0 × 503**, 14.8 s wall clock, paced 0.2 s apart.
+- [x] Deploy: pin the new `cachest` tag in the cluster HelmRelease, and the
+      ConfigMap change in the same commit (Flux re-applies both; the pod picks
+      the config up on restart, the `configmap.reloader` annotation is already
+      on the deployment).
 
 ### 63.9.2 — instruments: a transient 503 is not a 1-hour `failed`
 
