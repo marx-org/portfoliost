@@ -1899,20 +1899,13 @@ silently-wrong value.
       top-level `gapSymbols` via `getGapSymbols`. +4 tests (gap detected / gap
       cleared / API present / API absent). The SPA renders an amber
       partial-sum warning (see item 3).
-- [ ] **Instruments: fill/repair missing history — GATED on the provider tier
-      (§63.5).** `getPriceBarSeries` already attempts an on-demand `fetchOhlcv`
-      gap-fill, but XTB.WA / EMIM.AS / RBOE.AS end up
-      `price_bar_metadata.fetch_status='failed'` with 0 bars. Root cause (PROD,
-      2026-09-27): `providerSymbol()` only strips `.US`, so the fill sends the
-      venue-qualified symbol (e.g. `XTB.WA`, `RBOE.AS`, `EMIM.AS`) to
-      cachest/OpenBB `/ohlcv/XTB.WA`, which returns no bars → the catch marks it
-      `failed`; the stooq daily tables have no row for these tickers either.
-      The real fix is why OpenBB/cachest can't source these `.WA`/`.AS`
-      (Warsaw / ASX) symbols — a symbol-mapping or provider-coverage gap, NOT a
-      wallets bug. Until then the gap is surfaced (item 1) so the value is
-      flagged partial rather than silently wrong. Follow-ups: log the provider
-      error into `fetch_status`/`last_error` (diagnosability), and a scheduled
-      "fill gaps for held symbols" pass.
+- [x] ~~**Instruments: fill/repair missing history — GATED on the provider tier
+      (§63.5).**~~ **RESOLVED (wrong premise — see §63.9).** The diagnosis recorded
+      here was wrong: `providerSymbol()` is not the problem, and this was never a
+      provider-coverage gap. Probed in PROD on 2026-09-27: openst serves
+      `/price/ohlcv/XTB.WA` (2637 bars), `EMIM.AS` (3152 bars) and `RBOE.AS` in
+      0.3–2.1 s, **including with `start=1900-01-01`**. The symbols were always
+      sourceable; nothing ever asked. Superseded by §63.9.
 - [x] **UI: gray out + block every recomputing chart until done** (user
       request). (SPA `296343e` + `fe4c0e5`, 397 green.) `PortfolioPerformanceChart`
       gained a `recomputing` prop: the chart is dimmed (opacity-50) +
@@ -1948,6 +1941,154 @@ both, migration 0009 (`gap_symbols`) applied in PROD.
       Recompute and re-renders fresh when done.
 - [ ] **Turn RECALC_DEBUG off** in the wallets helmrelease now that the §63.6
       RCA is closed (it is still `value: "1"` in PROD).
+
+### 63.9 — cachest's rate limiter caps upstream concurrency at 3 (RCA of the IKE Beata spike, 2026-09-27)
+
+Continues §63.8 item 2, whose premise was wrong. Everything below is measured
+against PROD (cluster reachable via `KUBECONFIG=$HOME/.kube/homylab`, ns `pfire`),
+not inferred.
+
+**The spike, end to end.** The 09-26 `IKE Beata` snapshot is written by two
+different valuation paths. The **live-quote** path (`snapshotPortfolioValue`, fired
+on a detail-page read) values *all 23* open positions from one live quote → 205,470.
+The **price-bars** backfill (`computeSnapshotBatch`) values only the symbols it has a
+bar for. Measured position-by-position in PROD, exactly **3 of 23** have zero bars:
+
+| symbol | qty | bars | `price_bars_all` last | `fetch_status` |
+| --- | --- | --- | --- | --- |
+| `EMIM.AS` | 80 | **0** | — | `failed` 2026-09-22 06:31 |
+| `RBOE.AS` | 53 | **0** | — | `failed` 2026-09-22 06:31 |
+| `XTB.WA` | 84 | **0** | — | `failed` 2026-09-27 14:24:59 |
+
+The other 20 have bars, so the earlier "18 of 23 / 5 missing" count was an
+**exact-date** check and wrong: `buildPriceMap` (`portfoliost-wallets/src/services/backfill.ts:256`)
+**carries prices forward**, so a symbol with a 09-25 bar *is* valued on 09-26/27
+(09-26 was a Saturday). `AMZN` (last 09-21) and `SP20.L` (last 09-24) are stale but
+never dropped. The ≈50k delta is the 3 zero-bar symbols' weight, full stop.
+
+**Root cause: `cachest`'s `RateLimiter`.** `cachest/rate_limiter.py:22` claims the
+slot with `self._last_fetch = time.monotonic() + sleep`, so with N waiters the
+requested sleep *grows* — 2s, 3.9s, 5.8s, 7.7s … With `fetch_interval: 2` /
+`fetch_max_wait: 4` on `OPENST_OHLCV` (`cachest/config.yaml:88-99`), the moment
+`sleep > max_wait` the waiter is **rejected**: instant `503`, *no upstream call*
+(`cachest/main.py:84-92`). Effective queue depth is `floor(max_wait/interval) + 1`
+= **3**. Reproduced in PROD with 8 concurrent `forceRefresh` calls:
+
+```
+req0 -> 200 X-Cache=MISS 0.45s     req4 -> 503 X-Cache=None 0.04s 'rate limit exceeded…'
+req1 -> 200 X-Cache=MISS 2.07s     req5 -> 503 X-Cache=None 0.04s
+req2 -> 200 X-Cache=MISS 4.06s     req6 -> 503 X-Cache=None 0.04s
+req3 -> 503 X-Cache=None 0.06s     req7 -> 503 X-Cache=None 0.03s
+```
+
+The same limiter serves `OPENST_QUOTE` (65 rejections in the last 5 h), `logo` (21)
+and `OPENST_OHLCV_FUNDS`. So this is **not** IKE-Beata-specific: 175 symbols carry
+`fetch_status='failed'` in PROD, and the `.WA` family is hit as a block — `SNT.WA`
+and `ETFSP500.WA` are stuck at **09-18**, `PLW.WA`/`ELT.WA`/`KRU.WA` at 09-21,
+`CBF.WA`/`DNP.WA` at 09-22 — because they lost the race, not because they delisted.
+
+**Why the loser stays a loser.** `portfoliost-instruments/src/services/price-bars.ts:395`
+catches the 503 in a **bare** `catch {}`, records `fetch_status='failed'`, and
+`recentlyFailed` (`price-bars.ts:181-187`) then suppresses upstream for
+`COOLDOWN_MS = 1 h`. The sweep runs 1–2×/day
+(`portfoliost-wallets-snapshotsync` 13:00 UTC + `…-postfx` 17:20 UTC), so a symbol
+that loses one race waits ≥1 h and typically loses the next one too. There is no
+`last_error` column (`src/db/schema.ts:85-89`), so a transient 503 is recorded
+identically to a genuine 404 "no such symbol" — which is why this took a day to pin.
+
+**What the provider is NOT.** Both earlier hypotheses are dead, and it is worth
+recording so they are not re-tried:
+- *"`start=1900-01-01` for a zero-history symbol is too wide"* (`price-bars.ts:374`
+  does send that) — **false**. openst answers `XTB.WA` with 2637 bars in 2.1 s and
+  `EMIM.AS` with 3152 bars in 0.9 s *with that exact 126-year window*; yfinance
+  clamps to the listing date. It is visible in the cache key
+  (`ohlcv:VOX0224:1900-01-01:2026-09-26`) and looks alarming, but it is not the
+  cause and needs no clamp.
+- *"`providerSymbol()` doesn't strip `.WA`/`.AS`"* — **false**. The suffix is the
+  correct Yahoo form; `.WA`/`.AS`/`.DE`/`.L` are handled identically, and
+  `EMIM.AS`/`RBOE.AS` are Euronext-Amsterdam iShares ETFs (plan-archive §43) whose
+  *quotes* already work — which is precisely why the live path values them and the
+  backfill cannot.
+
+**Design decision (resolved):** fix it in `cachest`, the owning tier. `fetch_interval`
+is a *politeness spacing* toward upstream; for the routes that point at **our own**
+`openst` service it is far too coarse, and openst already bounds real concurrency
+itself (`UPSTREAM_MAX_INFLIGHT = 8`). So: drop the interval to `0.2` and raise
+`fetch_max_wait` so the queue absorbs a whole portfolio sweep (≥175 symbols), for
+every `openst.*` route. Genuinely external routes keep their spacing and only get
+`fetch_max_wait` raised. Separately, `portfoliost-instruments` must stop converting
+a *transient* 503 into a 1-hour `failed` — a 503/504/429 is retryable and must be
+recorded as such, distinct from a 404.
+
+### 63.9.1 — cachest: give the openst routes a queue that fits a sweep
+
+- [ ] `cachest/config.yaml` — for every route whose `url` targets
+      `http://openst.pfire.svc.cluster.local:8080/…` (`OPENST`, `OPENST_PROFILE`,
+      `OPENST_QUOTE`, `OPENST_METRICS`, `OPENST_PROJECTIONS`, `OPENST_OHLCV`,
+      `OPENST_OHLCV_FUNDS`, and the crypto/ownership/filings/mda equivalents):
+      `fetch_interval: 0.2`, `fetch_max_wait: 120`. For the remaining external
+      routes (`DIVIDENDHISTORY`, `ALPHAVANTAGE`, `FMP`, `logo`, `dividendmax`, …):
+      keep `fetch_interval`, raise `fetch_max_wait` to `120`. Read the live
+      `config.yaml` out of the running container first and change every value
+      verbatim — the deployed file uses fully-qualified in-cluster URLs, which the
+      repo copy does not.
+- [ ] Document the depth formula next to the settings in `cachest/config.yaml` and
+      `cachest/readme.md` §`fetch_interval`: **queue depth =
+      `floor(fetch_max_wait / fetch_interval) + 1`**, and it is a *concurrency* cap
+      in disguise — a route with a 120 s `fetch_timeout` and depth 3 rejects
+      everything past the third concurrent caller. A route's depth must exceed the
+      largest burst its callers produce (one full portfolio sweep, ≥175 symbols).
+- [ ] `cachest/tests/` — regression test that fires N=16 concurrent
+      `forceRefresh` requests at one `OPENST_OHLCV` key and asserts **all 16 return
+      200** with no `503` and no `[rate-limit]` log (pinned against the real
+      `config.yaml`, not a synthetic route). Plus a unit test on `RateLimiter`
+      pinning `depth = floor(max_wait/interval) + 1` so the arithmetic can't
+      silently drift again.
+- [ ] Tests: `python -m pytest` in `cachest/` green (incl. the existing
+      `test_real_config_has_*` suite, which must be updated for the new values).
+- [ ] `docker compose up -d` in `cachest/` + the 16-request burst `curl` smoke.
+- [ ] Commit.
+
+### 63.9.2 — instruments: a transient 503 is not a 1-hour `failed`
+
+- [ ] `portfoliost-instruments` migration `0003_price_bar_metadata_last_error.sql`
+      (+ `drizzle/`): add `last_error text` to `instruments.price_bar_metadata`.
+      Schema in `src/db/schema.ts`.
+- [ ] `fetchJson` (`src/adapters/cachest.ts:13-17`) — carry the upstream status on
+      `UpstreamError` and stop collapsing 404 into the same undifferentiated throw.
+- [ ] `getPriceBarSeries` (`src/services/price-bars.ts:395-404`) — record
+      `fetch_status` + `last_error` (status code + message, truncated). A
+      **retryable** status (429/502/503/504, or a fetch timeout) must NOT arm the
+      1-hour breaker for the full hour: keep a short retry backoff (minutes) for
+      those and reserve the 1-hour `COOLDOWN_MS` for a genuine 404 "no such
+      symbol", so one lost race cannot park a symbol for the rest of the day.
+      `recentlyFailed` becomes status-aware.
+- [ ] Tests: `src/services/price-bars.test.ts` — 503 from cachest → `last_error`
+      recorded, retried after minutes (not an hour), `fetch_status` not left as a
+      dead `failed` for 60 min; a 404 → the full-hour breaker still applies; a
+      success clears `last_error`.
+- [ ] Tests: `npm run build && npm run test` in `portfoliost-instruments/` green.
+- [ ] Commit.
+
+### 63.9.3 — heal PROD and prove the spike is gone
+
+- [ ] Deploy both (GHA → pin in the homelab HelmReleases → Flux), migration applied.
+- [ ] **No new `portfoliost-sheets-sync` image needed** — the import payload is
+      untouched by this change (D24 version coupling unaffected).
+- [ ] Trigger `portfoliost-wallets-snapshotssync` (or one
+      `POST /api/portfolios/:id/recompute` on IKE Beata — production, needs the
+      user's go-ahead per §28) and verify:
+      - `select count(*) from instruments.price_bar_metadata where fetch_status='failed'`
+        drops sharply (from 175) and the 175-row set is re-read for genuine 404s
+        (`EMIM`, `EMIM.AS`, `ASML HOLDING NV`, `ISHARES …` — several are company
+        *names*, not symbols, which is a separate finding worth a §63.10);
+      - `XTB.WA` / `EMIM.AS` / `RBOE.AS` have bars in `price_bars_all`;
+      - `portfolio_backfill_metadata.gap_symbols` for IKE Beata is `null` (today it
+        lists the 3) so the amber partial-sum banner clears;
+      - the backfill's last value ≈ the live-quote path's (155k vs 205k today).
+- [ ] Also re-check the `logo` route's 21 rejections — the SPA logo storm hits the
+      same depth-3 wall and is a one-line config fix in §63.9.1.
+- [ ] Commit the plan closeout.
 
 ---
 
