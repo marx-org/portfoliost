@@ -2392,6 +2392,138 @@ the historical window moved. The merged chart's worst remaining single-day move 
   resolve against. Adding the sheet's venue-code vocabulary to
   `exchange_reference` is the prerequisite for making that audit real.
 
+### 63.13 — Fleet-wide ticker/currency audit: 6 more wrong listings, and a 100× bug in the pence fix
+
+§63.12 fixed one instrument. This audits the whole catalog, because the same
+defect was demonstrably systemic and the only responsible way to find the rest is
+to check everything.
+
+#### Two audits, and why the first one was wrong
+
+**Attempt 1 (discarded).** Probed the provider's `/equity/quote` for all 220
+distinct stored symbols at concurrency 6 and compared the result with each
+symbol's `instrument_currency`. It reported "80 currency mismatches / 92
+unpriceable", including `NTO.F` — which had just been backfilled with 6,830 bars
+and verified at 43.01 EUR. Two tell-tales gave it away: `NTO.F` came back `ERR`,
+and `0M6S.IL` and `CSN.L` reported an identical 1,701 bars. openst was throwing
+and rate-limiting, so the harness was measuring its own failures. **Discarded
+whole.** The trustworthy signal at the time was the independent one: all 10
+portfolios were `complete` with empty `gap_symbols`.
+
+**Attempt 2 (kept).** Two changes made it sound:
+
+1. *Structural check, no network.* Compare each live Podsumowanie row's Yahoo
+   column against its own `Symbol giełdowy` + `Giełda`. The sheet's venue codes
+   map to fixed Yahoo suffixes (`ETR`→`.DE`, `FRA`→`.F`, `LON`→`.L`, `AMS`→`.AS`,
+   `BIT`→`.MI`), so the expected symbol is derivable. This needs the *stored*
+   symbol joined by name to see what the resolver actually produced.
+2. *Currency check, gently.* Probe `/equity/quote` at concurrency 3 with
+   retries, comparing the provider's currency against the **catalog's**
+   `Oryginalna waluta` (col 37) — not the transaction's `instrument_currency`,
+   which is legitimately different (§ below).
+
+#### What the ETR/FRA/LON/AMS/BIT sweep found (40 rows)
+
+14 of 40 diverged, and the classes are very different:
+
+| class | n | detail |
+|---|---|---|
+| cosmetic | 8 | German `.F` vs `.DE` sibling lines. Measured: AHOG +0.19%, VNA +0.17%, BAS +0.08%, SRT +0.73%, FRE −0.29%, MUV2 +0.16%; plus `XDEW.SW`/`XMBR.DE` on a `BIT` row. Same company, same currency, tracks within 0.75%. Not worth touching. |
+| intentional | 1 | `Allianz SE` → `0M6S.IL`, the §34.7 override. |
+| **wrong** | 4 | `CSKR.L`, `EXS1`, `LTAM`, `EX10.VI` — shipped in `v1.0.23`. |
+
+`EX10.VI` was the notable one: the provider identifies it as **iShares MDAX
+UCITS ETF (DE)** — a different issuer (BlackRock, not Invesco) — whose history
+starts 2026-04-28, *after* the holding closed in Oct 2025, so it could never have
+priced it. The real fund is ISIN **IE00BHJYDV33**, Borsa Italiana ticker `MDAX`,
+and the Xetra/gettex line is `DEAM.DE` (1,938 bars from 2019-02-11 inception vs
+`MDAX.MI`'s 351 from 2025-05-08 — hence `DEAM.DE`).
+
+**`openst`'s search endpoint cannot help here**: `/equity/search` is US-only
+(SEC CIK index), so "MDAX" and "Invesco MDAX" both 404. The ISIN had to come
+from the open web, then be confirmed against the provider's profile name and the
+sheet's own trade prices.
+
+#### The pence bug (§63.5's fix was half-wrong)
+
+`_needs_gbx_normalization` fired on **any** yfinance `.L` ticker, so every
+USD-quoted LSE line had its history divided by 100 as if it were pence. Measured
+in PROD:
+
+| symbol | bars before | truth | bars after |
+|---|---|---|---|
+| `CNYA.L` | 0.0447 | ~4.46 | **4.468** |
+| `DEAM.L` | 0.583 | ~58.3 | **58.78** |
+| `IWDA.L` | 1.4691 | ~146.9 | — |
+| `EMQQ.L` | 0.0933 | ~9.33 | — |
+| `BYG.L` | 8.20 | £8.20 ✓ | 8.24 ✓ |
+| `CSN.L` | 3.525 | 352.5 GBp ✓ | ✓ |
+
+The quote path was never wrong — only the two history paths divided — and
+instruments already applies its own `PENCE_UNIT` rule to quotes, so this was the
+sole incorrect side. Fixed in `openst` `9348560` / **v1.1.37**: the decision now
+comes from the provider-declared currency via a memoised `get_quote` lookup.
+Successful lookups are cached, failures deliberately are **not** (so they retry),
+and when the currency can't be determined openst does **not** scale — missing a
+pence line is a bounded error instruments flags, while scaling a USD line is
+unbounded across a whole class of ETFs. No USD `.L` position is open, so nothing
+live changed; the stored bars are corrected by the next recompute.
+
+This is also why `CNYAN.MX` → `CNYA.L` was **held back** from v1.0.23: before the
+fix `CNYA.L` came back as 0.0447, so applying it then would have swapped a 20×
+error for a 100× one.
+
+#### Full 220-symbol sweep — 3 more real defects
+
+| stored | resolved to | was | evidence |
+|---|---|---|---|
+| `CNYAN.MX` | **`CNYA.L`** | the **Mexican** line, for a `LON`/USD row | `CNYAN.MX` closed **90.11 MXN** where the sheet records 4.46 USD; `CNYA.L` gives 4.468/4.436 vs sheet 4.46/4.395 |
+| `FRO` | **`FRO.WA`** | bare `FRO` is **Frontline plc**, a USD tanker company | 11.89 USD vs a real 25.10 PLN; `FRO.WA` = "FERRO S.A.", PLN, 25.60/23.60 vs 25.10/23.00 |
+| `XDEW.SW` | **`XDEW.MI`** | the CHF SIX line, for a `BIT`/EUR row | 4–8% off; `XDEW.MI` matches all four trades within 0.5% |
+
+`FRO` is the same shape as Nintendo: a Polish holding priced off an unrelated
+US-listed company that happens to share the ticker.
+
+`CNYAN.MX` had already done measurable damage — IKE Beata's value series steps
+**+27,669 PLN** on 2025-01-23 (82 units) for a position genuinely worth ~1,485 PLN.
+
+#### Currency labels that are NOT bugs
+
+A stored `instrument_currency` that differs from the quote currency is **normal**:
+the broker transacts in a local currency and converts to the instrument's original
+currency with its own rate, which the pipeline already stores. Confirmed on
+`ASML`, which is Nasdaq/USD but has EUR rows in IKE Marek — every row carries
+`rate_source='manual'` with correct historical rates (4.74 for 2022-08-26, 4.35
+for 2023-12-29). So these were deliberately **not** overridden, only checked that
+the *symbol* fits its venue: `SHOP` (sheet CAD, transacted USD at IBKR),
+`NVO` (sheet DKK, transacted USD), `BTEC.SW` / `EMQQ.L` / `IUCD.L` / `MLPD.L`
+(sheet says GBp/EUR, all transacted USD with manual rates, provider quotes USD),
+`CSN.L` / `RIO.L` (PLN transactions on GBP-quoted London lines). Their catalog
+currency labels are annotations, not valuation inputs.
+
+#### False alarms worth recording
+
+- **The 33 Polish bond codes** (`EDO*`, `ROD*`, `ARH*`, `KIN*`, `KRI*`, `INS*`,
+  `BST*`, `NVA*`, `VOX*`) 404 on `/equity/quote` **by design** — they're bonds.
+  They are served in PLN by the bond endpoints (`EDO1233` 115.57 PLN,
+  `ROD0935` 121.60 PLN; `ARH0722`/`VOX0224`/`KIN1025` return corp-bond profiles
+  with ISINs but no quote). Not defects. Note the 41 `venue='-'` rows are 35 of
+  these bonds plus 6 Goldman Sachs TFI funds already handled by §38.3.
+- **`CRWD` / `GOOGL`** returned no `currency` field — the provider simply omits it
+  on those two quotes. Both are NASDAQ/USD and priced normally.
+
+#### Method note
+
+Every override in this section was validated against **your stored transaction
+prices** before being accepted, not against the sheet's symbol column. That is
+what makes the difference between a real fix and a plausible one: `EX10.VI` looks
+like a reasonable ticker until you ask what fund it actually is, and `FRO` looks
+right until you notice the bare ticker belongs to a shipping company.
+
+Six overrides total across §63.12–§63.13: `7974.T`→`NTO.F`, `CSKR.L`→`IKOR.L`,
+`EXS1`→`EXS1.DE`, `LTAM`→`LTAM.MI`, `EX10.VI`→`DEAM.DE`, `CNYAN.MX`→`CNYA.L`,
+`FRO`→`FRO.WA`, `XDEW.SW`→`XDEW.MI` — seven in all.
+
 ---
 
 
