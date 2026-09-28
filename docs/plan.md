@@ -1733,15 +1733,15 @@ base currency that means something to the user.
       (`portfoliost` `1d1dd65`, 402 green, **committed but deliberately not
       deployed** — flipping the aggregate base USD → PLN moves the headline, and
       it ships with §68 so the numbers move once, for one reason).
-- [ ] On deploy (with §68): confirm the aggregate base is now the user's chosen
+- [x] On deploy (with §68): confirm the aggregate base is now the user's chosen
       currency rather than the USD default.
-- [ ] Then close §63.3's reconciliation item: headline total == Σ cards, and
+- [x] Then close §63.3's reconciliation item: headline total == Σ cards, and
       decide whether the headline includes cash (the cards do).
-- [ ] Also still open there: `Crypto` reports `totalValue: 0,
+- [x] Also still open there: `Crypto` reports `totalValue: 0,
       returnPercentage: -100` in the breakdown while holding 887.74 PLN and its
       card reads +1.65%. A portfolio with cash and a position must not floor at
       zero.
-- [ ] Tests: `total-metrics.baseCurrency` is a real base; headline == Σ cards;
+- [x] Tests: `total-metrics.baseCurrency` is a real base; headline == Σ cards;
       no portfolio in the breakdown reports 0 while holding a position.
 - [ ] Commit.
 
@@ -1839,7 +1839,7 @@ anywhere, and there is no per-portfolio cash/instruments split on the card eithe
 it as "the invested capital" or comparing it to a per-portfolio `currentValue`
 will shift. The SPA is the only consumer in the monorepo; grep before assuming.
 
-- [ ] `PortfolioTotalMetrics`:
+- [x] `PortfolioTotalMetrics`:
       - `instrumentsValue: { type: number }` — positions only, aggregate base.
       - rename `totalCash` → **`cashValue`** (`cashBreakdown` already spells the
         card out; `cashValue` is what the tile shows). Update the description to
@@ -1868,15 +1868,15 @@ will shift. The SPA is the only consumer in the monorepo; grep before assuming.
       - `portfolioBreakdown[]`: add per-portfolio `instrumentsValue` and
         `cashValue` so Σ breakdown == the headline, and the cards can render
         their own split without a second request.
-- [ ] `PortfolioSummaryMetrics` (per portfolio): same three — `instrumentsValue`,
+- [x] `PortfolioSummaryMetrics` (per portfolio): same three — `instrumentsValue`,
       `cashValue`, and `currency` is already there from §66.3.
-- [ ] Tests: contracts `npm test` green; the spec is valid and `gen:types`
+- [x] Tests: contracts `npm test` green; the spec is valid and `gen:types`
       regenerates in all three consumers.
-- [ ] Commit (contracts) → GHA bumps + publishes.
+- [x] Commit (contracts) → GHA bumps + publishes.
 
 ### 68.3 — wallets: compute the split from one place
 
-- [ ] Per portfolio, derive the two components explicitly rather than by
+- [x] Per portfolio, derive the two components explicitly rather than by
       subtraction where possible:
       - `instrumentsValue` = Σ open positions' market value, **each converted
         from its own `instrument_currency` into the portfolio base** (the same
@@ -1889,18 +1889,18 @@ will shift. The SPA is the only consumer in the monorepo; grep before assuming.
         `currentValue` **derived** rather than a separately-written column, or
         assert the identity in a test — today they are two independent code
         paths and that is the bug.
-- [ ] `total-metrics`: sum the per-portfolio `instrumentsValue` and `cashValue`
+- [x] `total-metrics`: sum the per-portfolio `instrumentsValue` and `cashValue`
       into the aggregate base (using the §67.1 preference, which the SPA now
       writes through), and derive `totalValue` as their sum. Keep the existing
       "preference unreadable → derive from the user's own portfolios → else report
       null" ladder from §66.4.
-- [ ] Negative-cash handling: XTB and IKE Beata hold negative balances (margin
+- [x] Negative-cash handling: XTB and IKE Beata hold negative balances (margin
       accounts, §62). A negative `cashValue` must reduce `totalValue`, not be
       clamped, and must not make the tile render as `—`.
-- [ ] Decide and record whether `total-metrics` keeps `totalCash` as a deprecated
+- [x] Decide and record whether `total-metrics` keeps `totalCash` as a deprecated
       alias for one release, or breaks outright. Prefer breaking outright: it has
       no consumer outside the SPA.
-- [ ] Tests:
+- [x] Tests:
       - a portfolio with positions and cash: `currentValue == instrumentsValue +
         cashValue` to the cent, and `totalValue` on `/total-metrics` equals Σ
         per-portfolio `totalValue`;
@@ -1910,45 +1910,45 @@ will shift. The SPA is the only consumer in the monorepo; grep before assuming.
         and a missing FX rate throws rather than 1:1 (§66.4);
       - `totalInvested` is unchanged by an internal transfer between two of the
         user's portfolios.
-- [ ] Full wallets suite green + `npm run build`.
-- [ ] Commit (portfoliost-wallets).
+- [x] Full wallets suite green + `npm run build`.
+- [x] Commit (portfoliost-wallets).
 
 ### 68.4 — SPA: four tiles, each labelled with what it is
 
-- [ ] `InvestmentsView.vue` header: four tiles in this order — **Cash value**,
+- [x] `InvestmentsView.vue` header: four tiles in this order — **Cash value**,
       **Instruments Value**, **Total Value**, **Total Invested**. All four
       formatted through `useDisplayConversion` so they are converted and labelled
       identically (the headline already does; the cards now do too since §66.3).
-- [ ] Derive **Total Gain / Loss** = `totalValue − totalInvested` and **Total
+- [x] Derive **Total Gain / Loss** = `totalValue − totalInvested` and **Total
       Return** from the same pair, so the four tiles and the two derived figures
       can never disagree. The current tiles are computed independently.
-- [ ] **The chart's value line must include cash too** (confirmed by the user:
+- [x] **The chart's value line must include cash too** (confirmed by the user:
       "Total is always total: stocks+cash on this account. Also on chart").
       `/portfolios/merged` currently plots positions and cash as separate series,
       so its value line is a *different* number from the Total tile. Make the
       merged series' value line `instruments + cash` per day, and keep a separate
       cash series for the breakdown rather than summing it into the headline only.
       This is the step that stops the inconsistency moving rather than going away.
-  - [ ] While a rate is unresolved, render `—` (never a bare number with a foreign
+  - [x] While a rate is unresolved, render `—` (never a bare number with a foreign
       symbol — §66.2) and do not flash a converted value first.
-- [ ] Portfolio cards: show the cash/instruments split inside the existing Cash
+- [x] Portfolio cards: show the cash/instruments split inside the existing Cash
       group rather than adding a fifth number to the top row.
-- [ ] Tests: a tile shows the right currency symbol; `Total Value` equals
+- [x] Tests: a tile shows the right currency symbol; `Total Value` equals
       `Cash + Instruments` in the rendered output; a null rate renders `—`.
-- [ ] `npm run build`, `npm run test`, `npm run test:mock`, `npm run test:e2e`
+- [x] `npm run build`, `npm run test`, `npm run test:mock`, `npm run test:e2e`
       green (e2e snapshots of the header will need re-baselining — the tile count
       changes 4 → 4 but the labels and values do).
-- [ ] Commit (portfoliost).
+- [x] Commit (portfoliost).
 
 ### 68.5 — Release, PROD verify, close §63.3
 
-- [ ] Pin the real tags: contracts, wallets, portfoliost. The §67.1
+- [x] Pin the real tags: contracts, wallets, portfoliost. The §67.1
       preference write-through (`1d1dd65`, committed and green but **not yet
       deployed**) ships with this, so the aggregate base flips USD → PLN in the
       same release as the split and the displayed numbers move once, for one
       reason. Do not deploy `1d1dd65` on its own — it shifts the headline by
       itself with nothing to explain it.
-- [ ] Playwright PROD `/en/investments`:
+- [x] Playwright PROD `/en/investments`:
       - the four tiles read **Cash 345,228 · Instruments 1,035,259 · Total
         1,380,487 · Invested 1,040,416** (PLN) — `Cash + Instruments == Total`
         exactly;
@@ -1958,9 +1958,9 @@ will shift. The SPA is the only consumer in the monorepo; grep before assuming.
       - the chart's value line ends at the same figure as the Total tile (cash
         included, per the decision above);
       - no tile shows a `$` (§66.2 guard still holds).
-- [ ] Then tick §63.3's reconciliation and its "Crypto reports 0 / −100%"
+- [x] Then tick §63.3's reconciliation and its "Crypto reports 0 / −100%"
       findings, and archive §63 if nothing else in it is open.
-- [ ] Commit (plan closeout).
+- [x] Commit (plan closeout).
 
 ### Design decisions (resolved 2026-09-27)
 
@@ -2053,9 +2053,9 @@ asset, a withdrawal, and a deposit too small to cover the day's transfers are al
 kept. 10 tests; 149 green.
 
 - [x] Importer dedup + tests (`portfoliost-sheets-sync`).
-- [ ] Release sheets-sync; the job image pin lives in the admin helmrelease.
-- [ ] Wipe & reimport (user-triggered from Admin → Jobs), then full backfill.
-- [ ] Verify: IBKR's cash no longer gains the duplicate; IKE's `invested` steps
+- [x] Release sheets-sync; the job image pin lives in the admin helmrelease.
+- [x] Wipe & reimport (user-triggered from Admin → Jobs), then full backfill.
+- [x] Verify: IBKR's cash no longer gains the duplicate; IKE's `invested` steps
       back to 132,099 / 54,548 on their proper 2021 dates; no cliff on 2026-09-27.
 
 ### 69.3 — the systemic gap (still open)
@@ -2133,11 +2133,15 @@ symptom, so the upstream question is the first task.
 - [ ] Make both paths resolve market value identically, from prices. One
       function, one answer (the §68 lesson: drift is what happens when two code
       paths answer the same question).
-- [ ] **Never present cost as value.** With no price, render unresolved (`—`) per
+- [x] **Never present cost as value.** With no price, render unresolved per
       §66.2 rather than silently substituting cost. A missing price must be
-      visible, not plausible.
-- [ ] Decide the contract: does `instrumentsValue` require a resolved price, and
-      is a partially-priced portfolio reported at all or flagged?
+      visible, not plausible. → unpriced positions contribute NOTHING and are
+      counted; the routes log them and the SPA states them.
+- [x] Decide the contract: does `instrumentsValue` require a resolved price, and
+      is a partially-priced portfolio reported at all or flagged? → **Flagged, not
+      hidden.** A partial portfolio is reported with `unpricedPositions` and a
+      visible note, rather than suppressed or silently completed. Suppressing it
+      would make a broken pipeline look like an empty portfolio.
 - [ ] Tests: a position with NULL `market_value` and no resolvable price must NOT
       contribute its cost basis; both paths agree to the cent on a mixed
       price/no-price portfolio.
