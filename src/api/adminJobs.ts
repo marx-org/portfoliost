@@ -129,3 +129,29 @@ export function getSheetsSyncStatus(): Promise<SheetsSyncStatusResponse> {
 export function getSheetsSyncLog(): Promise<SheetsSyncLogEntry> {
   return http.get<SheetsSyncLogEntry>("/api/admin/jobs/sheets-sync/log")
 }
+
+// ── Price audit (plan §72) ───────────────────────────────────────────────────
+
+// Like the sheets-sync endpoints, these are not in the generated contracts yet;
+// local mirrors of the admin backend responses (src/price-audit.ts).
+export interface PriceAuditRunResponse {
+  jobName: string
+  namespace: string
+  status: string
+}
+
+export interface PriceAuditStatusResponse {
+  jobName: string
+  status: "Running" | "Succeeded" | "Failed" | "NotFound" | "Unknown" | string
+  details: unknown
+  startedAt?: string | null
+}
+
+/** Trigger the price-audit Job. `tolerance` is a fraction (0.1 = 10%). */
+export function runPriceAudit(tolerance?: number): Promise<PriceAuditRunResponse> {
+  return http.post<PriceAuditRunResponse>("/api/admin/jobs/price-audit/run", { tolerance })
+}
+
+export function getPriceAuditStatus(): Promise<PriceAuditStatusResponse> {
+  return http.get<PriceAuditStatusResponse>("/api/admin/jobs/price-audit/status")
+}

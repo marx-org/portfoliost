@@ -13,6 +13,8 @@ import {
   getSheetsSyncStatus,
   getSheetsSyncLog,
   type SheetsSyncLogEntry,
+  runPriceAudit,
+  getPriceAuditStatus,
 } from "@/api/adminJobs"
 
 // ── Dataset metadata ──────────────────────────────────────────────────────────
@@ -243,6 +245,85 @@ async function runSheets(wipe: boolean) {
   }
 }
 
+// ── Price audit (§72) ────────────────────────────────────────────────────────
+//
+// A read-only reconciliation of every BUY/SELL against the instrument's own
+// close. It finds venue overrides that are still wrong and currencies that do
+// not match the bar. It changes nothing, so it is safe to run at any time — and
+// it exits 0 even when it finds problems, so a successful run with findings is
+// shown as Succeeded rather than a red failure.
+
+type AuditPhase = "idle" | "running" | "succeeded" | "failed"
+
+const audit = ref<{
+  phase: AuditPhase
+  errorMsg: string | null
+  startedAt: string | null
+}>({ phase: "idle", errorMsg: null, startedAt: null })
+
+const auditTolerance = ref(10)
+
+let auditPoller: ReturnType<typeof setInterval> | null = null
+
+function startAuditPolling() {
+  stopAuditPolling()
+  auditPoller = setInterval(() => pollAuditStatus(), 30_000)
+}
+
+function stopAuditPolling() {
+  if (auditPoller !== null) {
+    clearInterval(auditPoller)
+    auditPoller = null
+  }
+}
+
+async function pollAuditStatus() {
+  try {
+    applyAuditStatus(await getPriceAuditStatus())
+  } catch {
+    // transient — keep polling
+  }
+}
+
+function applyAuditStatus(status: { status: string; startedAt?: string | null }) {
+  const a = audit.value
+  if (status.startedAt) a.startedAt = status.startedAt
+  if (status.status === "Running") {
+    a.phase = "running"
+  } else if (status.status === "Failed") {
+    a.phase = "failed"
+    a.errorMsg = "Audit job failed. Check cluster logs."
+    stopAuditPolling()
+  } else if (a.phase === "running") {
+    // NotFound — jobshot deletes the Job on completion, so a vanished job that
+    // we were watching is a finished one, not a lost one.
+    a.phase = "succeeded"
+    stopAuditPolling()
+  }
+}
+
+async function runAudit() {
+  const a = audit.value
+  a.errorMsg = null
+  try {
+    await runPriceAudit(auditTolerance.value / 100)
+    a.phase = "running"
+    a.startedAt = new Date().toISOString()
+    startAuditPolling()
+  } catch (e) {
+    a.phase = "failed"
+    a.errorMsg = e instanceof Error ? e.message : "Failed to start price audit"
+  }
+}
+
+function auditBadge(): { label: string; cls: string } | null {
+  const a = audit.value
+  if (a.phase === "running")   return { label: "Running",   cls: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" }
+  if (a.phase === "succeeded") return { label: "Succeeded", cls: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" }
+  if (a.phase === "failed")    return { label: "Failed",    cls: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" }
+  return null
+}
+
 // ── File selection ────────────────────────────────────────────────────────────
 
 function onFileChange(dataset: StooqDataset, event: Event) {
@@ -333,6 +414,7 @@ onMounted(loadLog)
 onUnmounted(() => {
   for (const dataset of STOOQ_DATASETS) stopPolling(dataset)
   stopSheetsPolling()
+  stopAuditPolling()
 })
 </script>
 
@@ -402,6 +484,77 @@ onUnmounted(() => {
                 @click="runSheets(true)"
               >
                 Wipe &amp; re-import
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Price audit (§72) -->
+      <section>
+        <h2 class="mb-3 text-base font-semibold text-slate-700 dark:text-slate-300">Data quality</h2>
+
+        <div class="space-y-3">
+          <div
+            class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
+            data-testid="job-card-price-audit"
+          >
+            <div class="mb-3 flex items-start justify-between gap-4">
+              <div>
+                <div class="font-medium text-slate-900 dark:text-slate-100">Price audit</div>
+                <div class="mt-0.5 font-mono text-xs text-slate-400 dark:text-slate-500">
+                  every BUY/SELL vs its own close
+                </div>
+              </div>
+              <span
+                v-if="auditBadge()"
+                class="inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
+                :class="auditBadge()!.cls"
+              >
+                {{ auditBadge()!.label }}
+              </span>
+            </div>
+
+            <p class="mb-3 text-xs text-slate-500 dark:text-slate-400">
+              Reconciles each trade against the instrument's own price bar for that
+              day, without converting first. Symbols that do not line up are a wrong
+              venue (needs a sheets-sync override) or a wrong currency. Read-only —
+              it changes nothing.
+            </p>
+
+            <div class="mb-3 text-xs text-slate-500 dark:text-slate-400">
+              <span v-if="audit.startedAt">Last run: {{ formatDate(audit.startedAt) }}</span>
+              <span v-else>Never run</span>
+            </div>
+
+            <div
+              v-if="audit.errorMsg"
+              class="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-700/50 dark:bg-red-900/20 dark:text-red-400"
+            >
+              {{ audit.errorMsg }}
+            </div>
+
+            <div class="flex items-center gap-3">
+              <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                Tolerance
+                <input
+                  v-model.number="auditTolerance"
+                  type="number"
+                  min="1"
+                  max="50"
+                  step="1"
+                  class="input w-20 py-1 text-sm"
+                  data-testid="price-audit-tolerance"
+                />
+                %
+              </label>
+              <button
+                class="btn-primary shrink-0"
+                :disabled="audit.phase === 'running'"
+                data-testid="price-audit-run-btn"
+                @click="runAudit"
+              >
+                {{ audit.phase === "running" ? "Running…" : "Run audit" }}
               </button>
             </div>
           </div>

@@ -2210,3 +2210,269 @@ warns on large deltas while never reading the DB — per the user, IBKR's mixed
 currency signs are real (unregistered conversions in the sheet), so the
 `cashBreakdown` weight formula needs a denominator guard, not different data.
 
+
+---
+
+## 71. A currency is a label that multiplies a number (2026-09-28)
+
+Shipped. Recorded here because §71 is stamped in the code of three repos
+(`portfoliost-instruments`, `portfoliost-wallets`, `portfoliost-sheets-sync`)
+and the numbering must not be reused. Ready to archive to `plan-archive.md`.
+
+Started as a follow-on from §70: the user asked to carry old prices forward,
+recalculate when a close arrives, and *flag serious problems* rather than invent
+a value. The investigation of "why is the chart wrong" turned up four defects
+that all produced plausible numbers instead of errors.
+
+### 71.1 — the symptom, and the proof it was not cash
+
+IKE Marek's live total read **107,206.28** against a stored **91,072.72**. Cash
+was ruled out first and by measurement, not assumption: `cashBalances` (live) and
+`cashBalanceSeries` (backfill) agree **to the cent** (`DELTA = -0.00`), and cash
+is 918.01 PLN (day FX) vs 827.51 (latest FX) — a ~90 PLN timing difference. The
+entire gap is in the instruments leg, and 16,190 of the 16,260 is one row.
+
+| symbol | bar close | backfill | market value | ccy | live | delta |
+|---|---|---|---|---|---|---|
+| **CRI.WA** | 727.00 | 9,451.00 | 9,451.00 | **CAD** | **25,641.66** | **+16,190.66** |
+| CSN.L | 17.91 | 15,420.45 | 3,035.03 | GBP | 15,471.43 | +50.98 |
+| … 11 more | | | | | | all within ±12 |
+
+`CRI.WA` is Creotech Instruments on the Warsaw exchange. Its position carried
+`instrument_currency = 'CAD'` while **both of its BUY transactions said `PLN`** —
+the import was right, and something later overwrote it.
+
+- [x] Prove cash is not the cause (both replays agree to the cent).
+- [x] Bisect the instruments leg per symbol; isolate the single responsible row.
+- [x] The stored bars are correct PLN (188.00 / 367.50 against trades of 194.00 /
+      369.00), so no data has to be invented to fix it.
+
+### 71.2 — instruments: two guesses, both removed
+
+`resolveInstrumentCurrency("CRI.WA")` returned **CAD**, measured in the live pod:
+
+    CRI.WA  suffix=WA exchangeResolved=WSE assetType=Stock
+      searchTickerReference returned 9 rows:
+        [0] CRI/TSXV/CA   [1] CRI/NYSE/US   [2] CRI/ASX/AU
+      resolveInstrumentCurrency(CRI.WA) = CAD
+
+Two defects compounded:
+
+1. The venue-qualified lookup (`ticker='CRI' AND exchange='WSE'`) **missed** —
+   `ticker_reference` has 1499 WSE rows but no `CRI` — and the search fell
+   through to an **unfiltered** `ticker ILIKE 'CRI%'`, whose first exact match
+   was the Canadian listing. The venue that named the venue was dropped from its
+   own lookup.
+2. The candidates-must-agree guard ran **only when the exchange was UNKNOWN**. A
+   resolved venue therefore trusted a single arbitrary row — exactly inverted:
+   knowing the venue is when the answer is most constrained.
+
+What remains is a parse (crypto pair), a market-structure rule (bonds/funds →
+PLN), an unambiguous listing read, or **the venue's own country** (WSE → PL → PLN)
+when a known venue's listing is missing. A suffix naming an unknown exchange, and
+a symbol with no exact listing, are now `null` — which the SPA already renders as
+`unknown`, so refusing is visible rather than silent.
+
+- [x] `getExchangeCountry()` added; both guess branches removed.
+- [x] A listing that records its own venue in the ticker (`SNT.WA` on WSE) is
+      accepted when exchange data is incomplete — that row states its venue rather
+      than implying it. (Found by the full suite: a fixture stores the ticker
+      venue-qualified while production stores it bare.)
+- [x] Tests: the exact call that returned CAD; `CRI` still ambiguous → `null`; a
+      suffix naming an unknown exchange → `null`; no exact listing → `null`.
+- [x] Verified live: `CRI.WA → PLN`, `ETFSP500.WA → PLN`, `SRT.F → EUR`,
+      `ASML → EUR`, bare `CRI → null`.
+- [x] `instruments` v1.0.76 (`a1d69a6`).
+
+### 71.3 — wallets: an estimate must not overwrite a known value
+
+`refreshQuotes` persisted `profile.instrumentCurrency` **unconditionally**.
+`currencySource` was on the wire and discarded by `fetchProfile`, so an inference
+was indistinguishable from a declaration.
+
+- [x] Carry `currencySource` through; provider-confirmed values may overwrite
+      (`market_value` is in the **quote's** currency, so a confirmed
+      disagreement has to win), estimated/unknown may only fill an empty
+      position. A protected disagreement warns with portfolio, symbol, both codes.
+- [x] `instrument_currency` is `char(3)`, so "unset" is whitespace — a `=== ""`
+      check is dead code. Trim.
+- [x] Tests: the PROD shape (estimated CAD must not beat a stored PLN, while the
+      price still refreshes) and the empty-position case. The pre-existing §39
+      test now tags its mock `currencySource: "provider"`, which instruments has
+      always sent.
+- [x] `wallets` v1.1.80 (`b9eed8d`), v1.1.81 (`12140c6`).
+
+### 71.4 — the two sites that were flagged and NOT changed
+
+Both were measured before being touched, and both would have introduced a bug.
+
+**`getPriceBarSeries` resolves `baseCcy = resolvedBase ?? declared`** — the local
+resolver overrides the caller. Across PROD's 98 open symbols they disagree on
+exactly two, and in **both the resolver is right and the caller is corrupt**
+(`CRI.WA` CAD→PLN, `SRT.F` GBP→EUR). The veto is currently what keeps the stored
+bar series out of CAD and GBP. Inverting it would silently reintroduce the
+corruption, and nothing would fail. Recorded at the call site so the obvious
+"fix" is not attempted (`f01e639`, **not yet pinned to a release**).
+
+**`quotes.ts` sent the service token in `Authorization`** while instruments'
+`serviceOrUserMiddleware` reads `X-Service-Token`:
+
+    SRT.F    Authorization:401   X-Service-Token:200   price=208 ccy=EUR
+
+`refreshQuotes` never throws and treats an instruments error as "keep stored
+values, mark `fallback`", so `snapshots-sync` printed "priced" for every portfolio
+twice a day while writing **no prices at all** — 12 of IKE Marek's 13 positions
+sat on stale values. User-driven refreshes were unaffected (a user JWT is a
+Bearer token, and Bearer is what `Authorization` expects), which is exactly why
+no test failed and it took a PROD audit to surface.
+
+- [x] Both fetchers use `instrumentsAuthHeaders`, which already existed and
+      already picks the right header for either credential.
+- [x] Tests pin the routing in both directions.
+- [x] `wallets` v1.1.82 (`72fe969`).
+
+### 71.5 — `valuation-audit`: report, never rewrite
+
+`src/scripts/valuation-audit.ts` checks (1) a position's currency against the
+currency on its **own transactions**, and (2) live value against the stored
+snapshot for the same day. Read-only, run from the pod.
+
+The currency check is the one that found `CRI.WA`: the contradiction sat in two
+columns of the same table and nothing read both.
+
+- [x] First PROD run returned 11 findings, **8 of them noise** — `AVGO: USD vs
+      PLN/USD`, `0M6S.IL: EUR vs EUR/PLN`. These are PLN accounts buying foreign
+      listings and paying in PLN, which is normal. The rule had been widened from
+      "cites a currency none of its trades used" to "some trade differs", on the
+      strength of a test written to justify it. Reverted; the reason is recorded
+      in the code.
+- [x] Cut an FX-pair heuristic for naming the offending currency: a portfolio
+      total is a sum, so one bad position in thirteen moves it by a *fraction* of a
+      rate (0.847 against CAD→PLN's 2.7131). It would have looked authoritative
+      while being wrong.
+- [x] Exit 2 when the audit cannot run — an audit that could not check must never
+      be mistaken for one that found nothing.
+- [x] Findings: 11 → 4 → **2**.
+
+### 71.6 — the data patch, and what is still open
+
+- [x] `CRI.WA` CAD → **PLN**, `SRT.F` GBP → **EUR** (one transaction, 2 rows;
+      `MFC` deliberately untouched — CAD is correct, its trades are USD only
+      because the US variant was bought).
+- [x] `recalcPortfolioHistory` on IKE Marek. It rebuilds through *yesterday* and
+      deletes first, so it dropped the corrupt `09-28` row rather than rewriting
+      it with fallback prices. Series ends `91,072.72`, invested flat `54,548`,
+      and IKE Marek's reconciliation finding closed.
+- [x] `SRT.F` vs `SRT3.DE`: **two share classes ~25% apart**, not two lines of
+      one stock. The stored trades split 2–1, and FIFO leaves the surviving lot
+      as the one `SRT3.DE` reproduces within 0.8% while `SRT.F` misses by 16.4%.
+      Bare `SRT` in the reference is **SRT Marine Systems plc** (LSE), an
+      unrelated company. Override added to `NAME_VENUE_OVERRIDES`; `sheets-sync`
+      v1.0.28 (`7c0290d`).
+- [ ] **`Equate+` +118.7%** (stored 3,947.57 vs live 8,635.30). Not a currency
+      finding. It is a margin account, which is a plausible innocent explanation,
+      but that is a hypothesis and has not been tested.
+- [ ] `MFC` is a **known false positive** in `valuation-audit`: a dual-listed
+      ticker bought on the other line. The rule cannot distinguish it from
+      corruption, and leaving it as a permanent red line trains people to skim
+      past real findings.
+- [ ] Pin `instruments` to the `f01e639` comment commit's release (a code comment
+      that records a trap should not sit unpinned).
+
+---
+
+## 72. `price-audit`: reconcile every trade against its own bar, as an admin job (2026-09-28)
+
+Follow-on from §71: the audit is currently a script someone has to remember to
+run in a pod. The `SRT3.DE` finding came from checking stored trades against
+price bars **by hand**; across 13 symbols and 200+ trades that is not repeatable.
+This makes it a permanent, run-on-demand job, and it is the check that tells us
+when a venue override or a currency is still wrong.
+
+Design (confirmed with the user before writing):
+
+- Runs in the **wallets** image, beside `valuation-audit` — wallets already owns
+  the `portfolios` schema, the FX resolver and the audit pattern. A `WALLETS_IMAGE`
+  pin goes in the admin HelmRelease so the two images cannot drift.
+- Authenticates to instruments with the **caller's JWT**, exactly like the
+  wipe-&-reimport job (`sheets-sync`): admin already has it, the history endpoint
+  already accepts a user JWT, and no new Kubernetes Secret is needed.
+- **Exits 0 with findings in the log.** A successful audit that found problems is
+  a success with a report; a red failed Job per finding trains people to ignore
+  the badge. The script keeps exit 1 for CLI/CI and takes a flag for the job path.
+- The Job runs the same jobshot path as wipe-&-reimport, so the admin UI, the
+  duplicate-run 409, the `upsertJobRun` record and the status poller all work
+  unchanged.
+
+**The comparison must not be routed through a currency converter.** That would
+validate the converter against itself — exactly how `CRI.WA` passed. A trade and
+a bar are compared as **raw numbers**, and a wrong currency appears *as* the
+deviation, typically by a factor equal to that pair's rate. `/history` is called
+without `?currency=`, which returns native closes (`fxFrom: null` confirms no
+conversion).
+
+### 72.1 — wallets: make `price-audit` permanent and job-safe
+
+- [x] `src/scripts/price-audit.ts` — accept the instruments credential as
+      `INSTRUMENTS_SERVICE_TOKEN` **or** a user JWT, and send it through
+      `instrumentsAuthHeaders` (which already routes Bearer vs service token).
+      A job run must not need a service token the cluster has to mount.
+- [x] `--exit-zero` so a findings report is a successful Job.
+- [x] Report, per symbol: trades checked, unreconciled, worst deviation,
+      instruments' `baseCurrency` vs the position's `instrument_currency`, and
+      symbols with **no bars** listed separately as unverifiable rather than
+      silently omitted. A trade on a weekend borrows the prior close and prints
+      the gap, so a 7-day-old bar is visible instead of looking like a bad price.
+- [x] Tests over the pure rules: same-day bar picked; weekend carry-forward
+      bounded by `MAX_CARRY_DAYS` and no bar beyond it; `deviationPct`; `fxHint`
+      naming a pair only when the ratio matches one; `summarise` ranking.
+- [x] Tests: the PROD `SRT3.DE` shape (a trade 16% off `SRT.F`, 0.8% off
+      `SRT3.DE`) and the `CRI.WA` shape (a trade off by ≈ CAD→PLN).
+- Tests: `npm run build` (tsc) + full `npm run test` green.
+- Commit.
+
+### 72.2 — admin: the job route, mirroring wipe-&-reimport
+
+- [x] `src/price-audit.ts` — `PRICE_AUDIT_JOB_NAME`, `walletsImage()` reading
+      `WALLETS_IMAGE`, `buildPriceAuditSpec(callerToken)`, and
+      `registerPriceAuditRoutes(admin)` with `POST /jobs/price-audit/run` and
+      `GET /jobs/price-audit/status`, following `sheets-sync.ts` exactly:
+      duplicate-run 409, `upsertJobRun` with `kind: "price_audit"`, DB row first
+      on status.
+- [x] Register the routes in `src/index.ts` next to `registerSheetsSyncRoutes`.
+- [x] `DATABASE_URL` comes from the pguser Secret, whose key is `uri` — jobshot
+      wires the whole Secret through `envFrom`, so the entrypoint is
+      `["sh","-c"]` with `export DATABASE_URL="$uri"; exec node
+      dist/scripts/price-audit.js --exit-zero` (the pgloader Job already uses
+      this shape). Without the wrapper the Job has no connection string.
+- [x] Tests: the spec carries the wallets image, the caller's token, the pguser
+      secret and the `sh -c` wrapper; a second concurrent run is refused 409.
+- Tests: `npm run build` + full `npm run test` green.
+- Commit.
+
+### 72.3 — homelab: pin and deploy
+
+- [x] `WALLETS_IMAGE: ghcr.io/marx2/portfoliost-wallets:<tag>` in the admin
+      HelmRelease, matching the wallets pin in its own release, with a comment
+      saying the two must move together.
+- [x] Release both modules (GHA tags; verify the tag resolves to the intended
+      commit before pinning), push, confirm one replica each on the new tag.
+- [x] Confirm from inside the Job's image that the entrypoint exists and the
+      script is present, before calling the job wired.
+- Commit.
+
+### 72.4 — run it after the wipe-&-reimport, and triage what it finds
+
+- [ ] Run the job for real against PROD and record the findings in this section.
+- [ ] Every flagged symbol gets one of: a `NAME_VENUE_OVERRIDES` entry (validated
+      against its stored trades, as `SRT3.DE` was), a currency fix, or a recorded
+      false positive with the reason — never a silent threshold bump.
+- [ ] Decide whether the `MFC` false positive from §71.6 is fixed by narrowing
+      the rule or by recording the exception.
+- [ ] Re-run and assert the flagged count only goes down.
+- Commit.
+
+### 72.5 — close out §71.6
+
+- [ ] Resolve or record the **`Equate+` +118.7%** reconciliation gap.
+- [ ] Archive §71 and §72 to `plan-archive.md`.
