@@ -21,6 +21,22 @@ const router = useRouter()
 // are computed the same way and their sum can reconcile (§63.3).
 const { convert, displayCurrencyOr } = useDisplayConversion(() => props.portfolio.baseCurrency)
 
+/**
+ * §68.4 — the instruments component of this portfolio's value, in the portfolio's
+ * base currency. `currentValue` INCLUDES cash (§68) and `cash.total` is that cash,
+ * so instruments = currentValue − cash. Subtraction rather than a second figure
+ * from the API is deliberate: the two fields are denominated in the same base, so
+ * the difference is exact, and it cannot fall out of sync with the Cash line
+ * printed right above it. Null cash means no cash figure, so the whole of
+ * currentValue is instruments.
+ */
+const instrumentsValue = computed<number | null>(() => {
+  const current = props.portfolio.currentValue
+  if (current == null) return null
+  const cash = props.portfolio.cash?.total
+  return Number(current) - (cash == null ? 0 : Number(cash))
+})
+
 const timeframes: Array<{ value: PortfolioAnalyticsTimeframe; label: string }> = [
   { value: "1W", label: "1W" },
   { value: "1M", label: "1M" },
@@ -389,6 +405,17 @@ async function exportPositions(format: "csv" | "xml" | "json") {
         >
           {{ formatCurrency(portfolio.cash.total, portfolio.cash.baseCurrency) }}
         </router-link>
+      </div>
+      <!-- §68.4 — the cash/instruments split lives HERE, inside the existing Cash
+           group, rather than as a fifth number in the top row. `currentValue`
+           includes cash and `cash.total` is the cash balance, both in the
+           portfolio's base currency, so the instruments component is their
+           difference and needs no second request. -->
+      <div class="mt-1.5 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+        <span>Instruments</span>
+        <span class="tabular-nums" data-testid="card-instruments-value">
+          {{ formatCurrency(convert(instrumentsValue), displayCurrencyOr()) }}
+        </span>
       </div>
       <div class="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
         <span v-for="b in portfolio.cash.balances" :key="b.currency" class="text-xs text-slate-500 dark:text-slate-400" :data-testid="`card-cash-${b.currency}`">

@@ -103,6 +103,22 @@ const mergedChartSeries = computed(() => {
 })
 
 
+// §68.4 — Total Gain/Loss and Total Return are now DERIVED from the same
+// (totalValue, totalInvested) pair the tiles show, in the aggregate base currency
+// and only then converted — which is what the backend does, so converting first
+// and subtracting would drift by the rounding. Previously all six figures were
+// read independently off the response and could disagree.
+const derived = computed(() => {
+  const tm = store.totalMetrics
+  const totalValue = tm?.totalValue ?? 0
+  const totalInvested = tm?.totalInvested ?? 0
+  const gainLoss = totalValue - totalInvested
+  return {
+    gainLoss,
+    returnPercentage: totalInvested > 0 ? (gainLoss / totalInvested) * 100 : 0,
+  }
+})
+
 const strategies = [
   { value: "GROWTH", label: "Growth" },
   { value: "VALUE", label: "Value" },
@@ -120,7 +136,7 @@ const strategies = [
 ]
 
 // §62 — the "Cash balance" card is the portfolio-native cash position:
-// `totalMetrics.totalCash` (already converted to the totalMetrics base currency)
+// `totalMetrics.cashValue` (already converted to the totalMetrics base currency)
 // re-expressed into the display currency, with per-currency shares from
 // `totalMetrics.cashBreakdown` `weight`.
 const cashTotal = ref<number | null>(null)
@@ -128,11 +144,10 @@ const cashBreakdown = ref<Array<{ currency: string; pct: number }>>([])
 
 watchEffect(() => {
   const tm = store.totalMetrics
-  // totalCash is in totalMetrics.baseCurrency; re-express into the display
+  // cashValue is in totalMetrics.baseCurrency; re-express into the display
   // currency via the one shared base→display conversion. "—" while the rate
-  // resolves (a mislabelled amount is never shown). §68 renames the field to
-  // `cashValue` — same meaning, the cash-ledger BALANCE rather than a flow.
-  cashTotal.value = toDisplay(tm?.totalCash)
+  // resolves (a mislabelled amount is never shown).
+  cashTotal.value = toDisplay(tm?.cashValue)
   const byCurrency = new Map<string, number>()
   for (const c of tm?.cashBreakdown ?? []) {
     const ccy = (c.currency ?? "").toUpperCase()
@@ -252,31 +267,52 @@ async function submitCreate() {
     <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading portfolios...</p>
 
     <template v-if="store.totalMetrics">
-      <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div class="card p-5">
-          <p class="text-sm text-slate-500 dark:text-slate-400">Total Value</p>
-          <p class="mt-1 text-2xl font-semibold tabular-nums">{{ formatCurrency(toDisplay(store.totalMetrics.totalValue), displayCurrency) }}</p>
-        </div>
-        <div class="card p-5">
-          <p class="text-sm text-slate-500 dark:text-slate-400">Total Invested</p>
-          <p class="mt-1 text-2xl font-semibold tabular-nums">{{ formatCurrency(toDisplay(store.totalMetrics.totalInvested), displayCurrency) }}</p>
-        </div>
-        <div class="card p-5">
-          <p class="text-sm text-slate-500 dark:text-slate-400">Total Gain / Loss</p>
-          <p
-            class="mt-1 text-2xl font-semibold tabular-nums"
-            :class="(store.totalMetrics?.totalGainLoss ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'"
-          >
-            {{ formatSignedCurrency(toDisplay(store.totalMetrics?.totalGainLoss), displayCurrency) }}
+      <!-- §68 — cash is a first-class citizen. Four tiles, each labelled with what
+           it is, in the order the user asked for. Total = Cash + Instruments, and
+           the two derived figures come from the same pair. -->
+      <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3" data-testid="headline-tiles">
+        <div class="card p-5" data-testid="tile-cash">
+          <p class="text-sm text-slate-500 dark:text-slate-400">Cash value</p>
+          <p class="mt-1 text-2xl font-semibold tabular-nums" data-testid="tile-cash-value">
+            {{ formatCurrency(toDisplay(store.totalMetrics.cashValue), displayCurrency) }}
           </p>
         </div>
-        <div class="card p-5">
-          <p class="text-sm text-slate-500 dark:text-slate-400">Total Return</p>
+        <div class="card p-5" data-testid="tile-instruments">
+          <p class="text-sm text-slate-500 dark:text-slate-400">Instruments value</p>
+          <p class="mt-1 text-2xl font-semibold tabular-nums" data-testid="tile-instruments-value">
+            {{ formatCurrency(toDisplay(store.totalMetrics.instrumentsValue), displayCurrency) }}
+          </p>
+        </div>
+        <div class="card p-5" data-testid="tile-total">
+          <p class="text-sm text-slate-500 dark:text-slate-400">Total value</p>
+          <p class="mt-1 text-2xl font-semibold tabular-nums" data-testid="tile-total-value">
+            {{ formatCurrency(toDisplay(store.totalMetrics.totalValue), displayCurrency) }}
+          </p>
+        </div>
+        <div class="card p-5" data-testid="tile-invested">
+          <p class="text-sm text-slate-500 dark:text-slate-400">Total invested</p>
+          <p class="mt-1 text-2xl font-semibold tabular-nums" data-testid="tile-invested-value">
+            {{ formatCurrency(toDisplay(store.totalMetrics.totalInvested), displayCurrency) }}
+          </p>
+        </div>
+        <div class="card p-5" data-testid="tile-gainloss">
+          <p class="text-sm text-slate-500 dark:text-slate-400">Total gain / loss</p>
           <p
             class="mt-1 text-2xl font-semibold tabular-nums"
-            :class="(store.totalMetrics?.returnPercentage ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'"
+            :class="derived.gainLoss >= 0 ? 'text-green-600' : 'text-red-600'"
+            data-testid="tile-gainloss-value"
           >
-            {{ formatPercent(store.totalMetrics?.returnPercentage ?? 0) }}
+            {{ formatSignedCurrency(toDisplay(derived.gainLoss), displayCurrency) }}
+          </p>
+        </div>
+        <div class="card p-5" data-testid="tile-return">
+          <p class="text-sm text-slate-500 dark:text-slate-400">Total return</p>
+          <p
+            class="mt-1 text-2xl font-semibold tabular-nums"
+            :class="derived.returnPercentage >= 0 ? 'text-green-600' : 'text-red-600'"
+            data-testid="tile-return-value"
+          >
+            {{ formatPercent(derived.returnPercentage) }}
           </p>
         </div>
       </div>

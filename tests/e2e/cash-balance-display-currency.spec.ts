@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test"
 
 /** §62 — the investments "Cash balance" card renders the portfolio-native cash
- * total (totalMetrics.totalCash, already in the total-metrics base currency)
+ * total (totalMetrics.cashValue, already in the total-metrics base currency)
  * converted to the display currency — never a raw sum of native balances under a
  * foreign symbol. Self-contained: creates a funded multi-currency portfolio, then
- * verifies the rendered card total against the live totalMetrics.totalCash
+ * verifies the rendered card total against the live totalMetrics.cashValue
  * converted at the LIVE /api/fx/latest rate for the display currency. */
 
 const GATEWAY = process.env.PORTFOLIOST_GATEWAY_URL || "http://localhost:8080"
@@ -47,17 +47,17 @@ test("investments cash balance renders the converted total for the display curre
   await mk(`/api/portfolios/${pid}/cash/deposits`, { amount: 500, currency: "USD" })
 
   // The live total-cash figure (across every portfolio) in the base currency,
-  // plus the FX rate base→display — the card re-expresses totalCash with this.
+  // plus the FX rate base→display — the card re-expresses cashValue with this.
   const rate = async (from: string, to: string): Promise<number> => {
     if (from === to) return 1
     const res = await request.get(`${GATEWAY}/api/fx/latest?from=${from}&to=${to}`, { headers: auth })
     expect(res.status()).toBe(200)
     return (await res.json() as { rate: number }).rate
   }
-  const totalCashInfo = async () => {
+  const cashValueInfo = async () => {
     const res = await request.get(`${GATEWAY}/api/portfolios/total-metrics`, { headers: auth })
     expect(res.status()).toBe(200)
-    const m = (await res.json()) as { totalCash: number; baseCurrency: string }
+    const m = (await res.json()) as { cashValue: number; baseCurrency: string }
     return m
   }
 
@@ -66,9 +66,9 @@ test("investments cash balance renders the converted total for the display curre
     await expect(page.getByTestId("cash-balance")).toBeVisible({ timeout: 10000 })
 
     const expectTotal = async (display: string) => {
-      const { totalCash, baseCurrency } = await totalCashInfo()
+      const { cashValue, baseCurrency } = await cashValueInfo()
       const r = await rate(baseCurrency, display)
-      return { expected: totalCash * r, present: totalCash > 0 }
+      return { expected: cashValue * r, present: cashValue > 0 }
     }
 
     // Default display USD.

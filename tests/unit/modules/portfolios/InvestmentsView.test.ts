@@ -114,7 +114,8 @@ describe("InvestmentsView", () => {
       returnPercentage: 20,
       baseCurrency: "USD",
       portfolioBreakdown: [],
-      totalCash: 0,
+      cashValue: 0,
+      instrumentsValue: 1200,
       cashBreakdown: [],
     } as never)
     mocked.getPortfolioAnalytics.mockResolvedValue({
@@ -131,10 +132,87 @@ describe("InvestmentsView", () => {
     await flushPromises()
 
     expect(wrapper.get("h1").text()).toBe("Portfolios")
-    expect(wrapper.text()).toContain("Total Value")
+    expect(wrapper.text()).toContain("Total value")
     expect(wrapper.text()).toContain("1,200.00")
     expect(wrapper.text()).toContain("+$200.00")
     expect(wrapper.text()).toContain("20.00%")
+  })
+
+  /**
+   * §68.4 — the four headline tiles, and the identity that makes the section
+   * worth having: Total = Cash + Instruments, in the rendered output.
+   */
+  it("renders the four §68 tiles and Total == Cash + Instruments", async () => {
+    mocked.getPortfolioTotalMetrics.mockResolvedValue({
+      instrumentsValue: 800,
+      cashValue: 400,
+      totalValue: 1200,
+      totalInvested: 1000,
+      baseCurrency: "USD",
+      portfolioBreakdown: [],
+      cashBreakdown: [],
+    } as never)
+    const wrapper = mountView()
+    await flushPromises()
+
+    const tiles = wrapper.get('[data-testid="headline-tiles"]')
+    expect(tiles.text()).toContain("Cash value")
+    expect(tiles.text()).toContain("Instruments value")
+    expect(tiles.text()).toContain("Total value")
+    expect(tiles.text()).toContain("Total invested")
+
+    const num = (id: string) =>
+      Number(wrapper.get(`[data-testid="${id}"]`).text().replace(/[^0-9.-]/g, ""))
+    const cash = num("tile-cash-value")
+    const instruments = num("tile-instruments-value")
+    const total = num("tile-total-value")
+    expect(cash).toBe(400)
+    expect(instruments).toBe(800)
+    expect(total).toBe(1200)
+    // the identity, asserted on what was actually rendered
+    expect(cash + instruments).toBe(total)
+  })
+
+  it("derives gain/loss and return from the same pair as the tiles (§68.4)", async () => {
+    // deliberately inconsistent response fields: the tiles and the derived pair
+    // must come from (totalValue, totalInvested), not from totalGainLoss /
+    // returnPercentage, or they could disagree.
+    mocked.getPortfolioTotalMetrics.mockResolvedValue({
+      instrumentsValue: 800,
+      cashValue: 400,
+      totalValue: 1200,
+      totalInvested: 1000,
+      totalGainLoss: 999999,
+      returnPercentage: 55555,
+      baseCurrency: "USD",
+      portfolioBreakdown: [],
+      cashBreakdown: [],
+    } as never)
+    const wrapper = mountView()
+    await flushPromises()
+
+    const num = (id: string) =>
+      Number(wrapper.get(`[data-testid="${id}"]`).text().replace(/[^0-9.-]/g, ""))
+    // 1200 - 1000
+    expect(num("tile-gainloss-value")).toBe(200)
+    expect(wrapper.get('[data-testid="tile-return-value"]').text()).toContain("20.00%")
+  })
+
+  it("renders a NEGATIVE cash tile rather than an em dash (§68.3)", async () => {
+    mocked.getPortfolioTotalMetrics.mockResolvedValue({
+      instrumentsValue: 0,
+      cashValue: -1200,
+      totalValue: -1200,
+      totalInvested: 0,
+      baseCurrency: "USD",
+      portfolioBreakdown: [],
+      cashBreakdown: [],
+    } as never)
+    const wrapper = mountView()
+    await flushPromises()
+    const cash = wrapper.get('[data-testid="tile-cash-value"]').text()
+    expect(cash).not.toBe("\u2014")
+    expect(cash).toContain("1,200")
   })
 
   it("renders the investment and cash sections with the portfolio-native cash total (§62)", async () => {
@@ -145,7 +223,8 @@ describe("InvestmentsView", () => {
       returnPercentage: 20,
       baseCurrency: "USD",
       portfolioBreakdown: [],
-      totalCash: 720,
+      cashValue: 720,
+      instrumentsValue: 1200,
       cashBreakdown: [
         { currency: "USD", balance: 500, weight: 69.44 },
         { currency: "EUR", balance: 200, weight: 30.56 },
