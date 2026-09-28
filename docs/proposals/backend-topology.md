@@ -104,7 +104,7 @@ worker/job pod ─ pulls row, runs engine, writes progress+results back
 
 ## Migration sequence
 
-1. **Gateway swap** — replace KrakenD with nginx in docker compose (this repo). Fixes the query-string blocker; unblocks endpoint migration (testing-strategy Phase 2).
+1. **Gateway swap** — replace KrakenD with nginx in docker compose (this repo). Fixes the query-string blocker; unblocks endpoint migration ([testing-logging-strategy](testing-logging-strategy.md), migration flow).
 2. **Extract modules one by one** — start with `market-data` (most independent; proves the provider-tier adapter pattern), then `users-auth`, `portfolio-domain`, `watchlists`, `misc`.
 3. **Cluster rollout** — drop the KrakenD deployment; ingress + per-module deployments + `service-urls` ConfigMap; add D9 edge auth once `users-auth` is real.
 4. **Backtest module** — queue + worker in compose first; k8s Jobs in cluster.

@@ -1,8 +1,8 @@
 # Proposal: Database Schema Migrations — main DB vs mock DB split
 
 **Status**: accepted (2026-09-07)
-**Builds on**: [backend-topology.md](backend-topology.md) (D6 schema-per-module), [testing-strategy.md](testing-strategy.md) (environment tiers), [database-postgres-drizzle.md](../../../portfoliost-users-auth/docs/database-postgres-drizzle.md) (Drizzle as the framework)
-**Supersedes wiring assumptions**: `testing-strategy.md` "seed in container CMD" and `database-postgres-drizzle.md` "migrations + seeds run from the module image"
+**Builds on**: [backend-topology.md](backend-topology.md) (D6 schema-per-module), [testing-logging-strategy.md](testing-logging-strategy.md) (environment tiers), [database-postgres-drizzle.md](../../../portfoliost-users-auth/docs/database-postgres-drizzle.md) (Drizzle as the framework)
+**Supersedes wiring assumptions**: `testing-logging-strategy.md` "seed in container CMD" and `database-postgres-drizzle.md` "migrations + seeds run from the module image"
 
 ## Context / Problem
 
@@ -210,7 +210,7 @@ Demo/mock data is never a module migration. Only `mocks/db-seed/*.mjs`, idempote
 | 4 | `admin`: squash to baseline + `drizzle_admin` | build + unit |
 | 5 | `mocks/db-seed/` + `postgres` dep + `mock-db-seed` service (D76); port all fixtures incl. ticker reference | `docker compose up -d --build` on fresh tmpfs; `test:stack`, `test:stack:wallets`, `test:stack:portfolios` |
 | 6 | `reset-mock-state.sh` → re-run `mock-db-seed`; drop wallet restart-reseed | `npm run test:e2e` (fresh tmpfs DB) |
-| 7 | Docs sweep: `MODULARISATION.md` migration checklist, `testing-strategy.md` seed section, README "DB reset required" note | — |
+| 7 | Docs sweep: `MODULARISATION.md` migration checklist, `testing-logging-strategy.md` seed section, README "DB reset required" note | — |
 
 Each module squashes on its own schedule; the compose stack only exercises the union, so steps 1–4 can land in any order.
 

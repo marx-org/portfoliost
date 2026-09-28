@@ -65,7 +65,7 @@ Implementation findings worth keeping:
   instruments calendar route treats upstream 404 as empty lists.
 - openst dividend history must normalize non-datetime indexes to ISO dates.
 Canonical verification matrix incl. research pointers for the gaps:
-[openst-coverage.md](../docs/openst-coverage.md).
+[openst-coverage.md](../openst-coverage.md).
 
 ### D14 — no direct gateway routing to providers
 

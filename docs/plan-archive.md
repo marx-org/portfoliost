@@ -309,7 +309,7 @@ Gradual migration: local mock stays as-is for development, cluster uses PocketID
 
 ## Related Proposals
 
-- [Testing Strategy — Mock Phase-Out and Database Environment Tiers](proposals/testing-strategy.md)
+- [Testing & Logging Strategy — Tiers, Database Environments, and Debug Logs](proposals/testing-logging-strategy.md)
 
 ---
 
