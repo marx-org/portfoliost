@@ -2149,3 +2149,60 @@ symptom, so the upstream question is the first task.
       converts currency repeatedly without registering it in the sheet — so the fix
       is a guard on the denominator, not a change to the data.
 
+### 70.5 — RESOLVED 2026-09-28 (production verified)
+
+Measured after the release, all ten portfolios, PLN:
+
+| | before | after |
+|---|---|---|
+| Total | 797,190 (and before that 1,380,487) | **1,079,019.29** |
+| Unpriced positions | invisible | **0**, and surfaced whenever non-zero |
+| Provenance | none | `priceAsOf` = oldest contributing price, `priceSource: "quote"` |
+| Σ cards vs headline | off by ~261k | **0.01** (see below) |
+
+**§63.3's reconciliation is proven for the first time.** Every per-portfolio card
+matches its live total to the cent (drift 0.00 on all ten):
+
+    Obligacje 119,250.00 · Crypto 887.74 · XTB −23.85 · Rach. 56,456.40
+    NN TFI PPO 173,445.64 · NN TFI PPK 123,722.33 · IKE Beata 205,468.41
+    IKE Marek 107,206.28 · Equate+ 8,632.99 · IBKR 283,973.35
+
+The residual 0.01 is structural, not a bug: the cards read the denormalized
+`current_value`, synced from the newest `value_snapshots` row (§53.5), while the
+headline recomputes live from positions and the cash ledger. Two computations, two
+roundings. Making them bit-identical would mean one of them stops being a
+snapshot, which is worse than a cent.
+
+- [x] Find why `market_value` was NULL for 75/85 — the BUY insert never sets it,
+      `refreshQuotes` is the only writer, and **no scheduled job called it**;
+      `snapshots-sync` only ran `runBackfillRecent`.
+- [x] Both paths resolve value identically (`splitPortfolioValue`), and the
+      unpriced are excluded and counted rather than valued at cost.
+- [x] `snapshots-sync` prices before snapshotting, reusing the existing writer
+      rather than adding a second one.
+- [x] Contract + SPA surface `unpricedPositions` / `priceAsOf` / `priceSource`.
+- [x] Tests assert the ABSENCE of a value, so no future fallback can hide behind
+      a plausible number.
+- [x] Verified in PROD: unpriced 0, all ten cards reconcile, freshness note absent
+      because there is nothing to warn about.
+
+Two defects found while doing this, both worth remembering:
+
+- The **contract lint could not see the class of problem it existed for**.
+  `yaml.safe_load` accepts duplicate mapping keys and keeps the last silently, so
+  a block inserted twice with an uncounted replace passed lint, was published as
+  v1.6.47 AND v1.6.48, and only failed in a consumer as an opaque
+  `YamlParseError`. The lint is now a real guard (fails on duplicates; verified
+  exit 1 with one reintroduced).
+- The SPA's per-card freshness map was built from a **setup-time snapshot of a
+  Pinia ref** (`usePortfolioStore().totalMetrics` outside the computed), so it was
+  silently empty — the aggregate worked, the cards never warned. A warning that
+  fails by absence is the worst failure mode; there is now a test that fails if
+  that pattern returns.
+
+Still open, flagged not fixed: `notifyTransactionsChanged` triggers a FULL
+multi-year rebuild for a single buy (§63.2 territory), and the `gotowka` recon
+warns on large deltas while never reading the DB — per the user, IBKR's mixed
+currency signs are real (unregistered conversions in the sheet), so the
+`cashBreakdown` weight formula needs a denominator guard, not different data.
+
