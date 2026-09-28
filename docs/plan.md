@@ -2617,3 +2617,65 @@ symbol names. The decisive check is ING01's published NAV for 2023-04-07 — if 
 - [ ] Separately: `positions.company_name` inherited the stale sheet name, so the UI
       shows a fund's former brand. Cosmetic, but it is what made this look like a
       wrong-fund problem rather than a class problem.
+
+### 72.7 — §72.14 verified in PROD: the Equate+ spike is resolved
+
+Deployed `portfoliost-wallets v1.1.91`, then recomputed all ten portfolios from
+the UI. The seam is gone:
+
+| date | value (PLN) | before §72.14 |
+|---|---|---|
+| 2026-09-23 | 8,655.91 | cash-only |
+| 2026-09-24 | 8,609.67 | cash-only |
+| 2026-09-25 | 8,632.99 | cash-only |
+| 2026-09-26 | 8,632.99 | cash-only |
+| 2026-09-27 | 8,632.99 | 3,946.55 |
+| 2026-09-28 | **8,587.39** | **8,587.39** (the +118% spike) |
+
+A real curve now, and the last day joins it at −0.5% instead of +118%. That
+−0.5% is the residual day-FX vs latest-FX difference between the two snapshot
+writers (§72.12 serialised them; it did not make them agree). Equate+ holds
+2,700 snapshots, peaking at 66,135.80.
+
+Grand total across all portfolios: 868,765,449.05 PLN over 18,497 snapshots.
+
+- [x] Deploy §72.14 and recompute all ten portfolios
+- [x] Confirm the spike is gone and history is a curve
+- [ ] §72.15 (below): reconcile the residual −0.5% last-day FX seam
+
+### 72.8 — §72.15: Crypto is valued in the wrong currency, and two sells are mislabelled
+
+Found while checking what the recompute left behind. Not a §72.14 regression —
+independent, and the portfolio is small (2 positions), so it has been easy to miss.
+
+`Crypto` history jumps +410% / +391% / +379% on consecutive 2022 days, and the
+UI shows `Instruments PLN -0.58` against `Cash PLN 888.32`. Two defects:
+
+1. **`BTC-USD` carries `instrument_currency = PLN`.** It trades in USD. The 2022
+   buy was *paid* in PLN (0.004 @ 172,660 PLN = 690.64), and the import took the
+   payment currency as the instrument currency. The snapshot grid then requests
+   bars with `targetCcy = null` ("already in base") and takes the USD close as if
+   it were PLN: `0.004 × ~43,000 = 172` where it should be `0.004 × 43,000 × 4.0
+   ≈ 688`. That is the ~4x error, and it is the same payment-vs-listing
+   distinction as CSN.L (§72.10) — this time the listing currency was lost on
+   import instead of the payment currency.
+
+   `ETH-USD` is correct (`USD`), which is why the two legs disagree.
+
+2. **The two 2024-10-14 sells are labelled `EUR` but are USD amounts** — ETH at
+   2,209.20 and BTC at 56,366.00 are USD prices for those dates. `rate_source` is
+   `automatic`, so the cash ledger converted EUR→base for cash that was never
+   EUR.
+
+Both are data corrections in the sheet plus an import rule, not a code bug in the
+grid. Neither is a quick fix: the import rule "instrument currency comes from the
+payment currency" is load-bearing for rows where the sheet genuinely only knows
+one currency, so it needs a decision about when to defer to the provider.
+
+- [ ] Decide the rule: when the instrument's listing currency is known from the
+      provider, it must win over the payment currency (never the reverse). Record
+      it in `instrument-resolver` as the currency source, and have the import
+      read it rather than infer.
+- [ ] Data fix: `BTC-USD` → `USD`; the two 2024-10-14 sells → `USD`.
+- [ ] Re-run the audit afterwards and confirm Crypto's 2022 jumps resolve to the
+      real purchase steps (2 buys, 5 trades total).
