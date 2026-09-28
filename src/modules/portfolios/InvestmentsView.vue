@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watchEffect } from "vue"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
 import { useDisplayConversion } from "@/composables/useDisplayConversion"
+import { usePortfolioFreshness } from "@/stores/portfolios"
 import { useCurrenciesStore } from "@/stores/currencies"
 import { storeToRefs } from "pinia"
 import { formatCurrency, formatPercent, formatSignedCurrency } from "@/utils/format"
@@ -108,6 +109,32 @@ const mergedChartSeries = computed(() => {
 // and only then converted — which is what the backend does, so converting first
 // and subtracting would drift by the rounding. Previously all six figures were
 // read independently off the response and could disagree.
+/**
+ * §70.2 — the headline says how complete and how fresh it is.
+ *
+ * Two things can make the total wrong in ways a bare number cannot convey:
+ *
+ *  - UNPRICED positions. They are excluded from `instrumentsValue` (they are not
+ *    valued at cost — see plan §70), so the total is an UNDERSTATEMENT and the
+ *    gap has to be visible.
+ *  - STALE prices. `priceAsOf` is the OLDEST contributing price, so "as of" here
+ *    is the age of the least fresh input, not the freshest. Without this the
+ *    total silently reads as current.
+ */
+const priceNote = computed(() => {
+  const tm = store.totalMetrics
+  if (!tm) return null
+  const unpriced = tm.unpricedPositions ?? 0
+  const asOf = tm.priceAsOf ? new Date(tm.priceAsOf) : null
+  const stale = asOf ? Date.now() - asOf.getTime() > 6 * 60 * 60 * 1000 : false
+  return {
+    unpriced,
+    asOf,
+    stale,
+    fallback: tm.priceSource === "fallback",
+  }
+})
+
 const derived = computed(() => {
   const tm = store.totalMetrics
   const totalValue = tm?.totalValue ?? 0
@@ -118,6 +145,8 @@ const derived = computed(() => {
     returnPercentage: totalInvested > 0 ? (gainLoss / totalInvested) * 100 : 0,
   }
 })
+
+const freshnessById = usePortfolioFreshness()
 
 const strategies = [
   { value: "GROWTH", label: "Growth" },
@@ -261,6 +290,29 @@ async function submitCreate() {
       </div>
     </div>
 
+    <!-- §70.2 — completeness and freshness of the headline, stated rather than
+         implied. Rendered only when there is something to say, so a healthy
+         total stays clean. -->
+    <p
+      v-if="priceNote && (priceNote.unpriced > 0 || priceNote.stale || priceNote.fallback)"
+      class="mb-4 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-300"
+      data-testid="price-freshness-note"
+    >
+      <template v-if="priceNote.unpriced > 0">
+        <strong>{{ priceNote.unpriced }}</strong> position{{ priceNote.unpriced === 1 ? "" : "s" }}
+        could not be priced and {{ priceNote.unpriced === 1 ? "is" : "are" }} excluded from these
+        figures &mdash; they are <em>not</em> valued at what you paid for them.
+      </template>
+      <template v-if="priceNote.stale && priceNote.asOf">
+        <br />
+        Priced as of {{ priceNote.asOf.toLocaleString() }} (the oldest price behind these totals).
+      </template>
+      <template v-if="priceNote.fallback">
+        <br />
+        Some prices are carried over from a previous fetch, not live.
+      </template>
+    </p>
+
     <InvestmentsTabs />
 
     <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-400">{{ error }}</p>
@@ -355,7 +407,7 @@ async function submitCreate() {
       </div>
 
       <div v-if="store.portfolios.length" class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <PortfolioCard v-for="p in store.portfolios" :key="p.id" :portfolio="p" @add-position="openAddPosition(p.id)" />
+        <PortfolioCard v-for="p in store.portfolios" :key="p.id" :portfolio="p" :freshness="freshnessById.get(p.id)" @add-position="openAddPosition(p.id)" />
       </div>
       <p v-else-if="!error" class="text-sm text-slate-500 dark:text-slate-400">No investment portfolios yet.</p>
 

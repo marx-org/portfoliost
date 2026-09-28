@@ -8,7 +8,11 @@ import { useDisplayConversion } from "@/composables/useDisplayConversion"
 import type { PortfolioAnalyticsTimeframe } from "@/api/portfolios"
 import type { PortfoliosSummaries } from "@/api/types"
 
-const props = defineProps<{ portfolio: PortfoliosSummaries[number] }>()
+const props = defineProps<{
+  portfolio: PortfoliosSummaries[number]
+  /** §70.2 — completeness/freshness, joined from the aggregate breakdown. */
+  freshness?: { unpriced: number; priceAsOf: string | null; fallback: boolean }
+}>()
 const emit = defineEmits<{ (e: "add-position"): void }>()
 
 const store = usePortfolioStore()
@@ -395,6 +399,20 @@ async function exportPositions(format: "csv" | "xml" | "json") {
     </p>
 
     <!-- §62.8 — Cash group (example-service parity): balance line + per-currency hint. -->
+    <!-- §70.2 — this card's value excludes anything unpriced, so say so rather
+         than let a small number pass for a complete one. -->
+    <p
+      v-if="freshness && (freshness.unpriced > 0 || freshness.fallback)"
+      class="mt-3 text-xs text-amber-700 dark:text-amber-400"
+      data-testid="card-freshness-note"
+    >
+      <template v-if="freshness.unpriced > 0">
+        {{ freshness.unpriced }} position{{ freshness.unpriced === 1 ? "" : "s" }} unpriced &mdash;
+        excluded from this value.
+      </template>
+      <template v-if="freshness.fallback"> Some prices are not live.</template>
+    </p>
+
     <div v-if="portfolio.cash" class="mt-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 p-4" @click.stop data-testid="card-cash-group">
       <div class="flex items-center justify-between">
         <span class="text-xs text-slate-500 dark:text-slate-400">Cash</span>

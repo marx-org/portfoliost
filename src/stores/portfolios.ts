@@ -1,5 +1,5 @@
 import { defineStore } from "pinia"
-import { ref } from "vue"
+import { computed, ref } from "vue"
 import * as portfoliosApi from "@/api/portfolios"
 import type { PortfolioAnalytics, PortfolioDetail, PortfolioPositions, PortfolioSummaryMetrics, PortfoliosSummaries, PortfoliosTotalMetrics } from "@/api/types"
 
@@ -142,3 +142,27 @@ export const usePortfolioStore = defineStore("portfolios", () => {
     reset,
   }
 })
+
+/**
+ * §70.2 — per-portfolio price completeness/freshness, joined from the aggregate
+ * `/total-metrics` breakdown.
+ *
+ * The breakdown already carries `unpricedPositions` / `priceAsOf` / `priceSource`
+ * per portfolio (contracts v1.6.49), and it is fetched for the header anyway, so
+ * the cards get this for free rather than each card issuing its own request.
+ */
+export function usePortfolioFreshness() {
+  const totalMetrics = usePortfolioStore().totalMetrics
+  return computed(() => {
+    const map = new Map<string, { unpriced: number; priceAsOf: string | null; fallback: boolean }>()
+    for (const row of totalMetrics?.portfolioBreakdown ?? []) {
+      map.set(row.id, {
+        unpriced: row.unpricedPositions ?? 0,
+        priceAsOf: row.priceAsOf ?? null,
+        fallback: row.priceSource === "fallback",
+      })
+    }
+    return map
+  })
+}
+

@@ -333,3 +333,47 @@ describe("InvestmentsView", () => {
     expect(allBtn.attributes("aria-pressed")).toBe("false")
   })
 })
+
+/**
+ * §70.2 — the headline must SAY when it is incomplete or stale, not just be
+ * small. An understated total that looks complete is the failure mode.
+ */
+describe("§70.2: price completeness and freshness", () => {
+  const setMetrics = (over: Record<string, unknown> = {}) => {
+    mocked.getPortfolioTotalMetrics.mockResolvedValue({
+      instrumentsValue: 800, cashValue: 400, totalValue: 1200, totalInvested: 1000,
+      baseCurrency: "USD", portfolioBreakdown: [], cashBreakdown: [],
+      ...over,
+    } as never)
+  }
+
+  it("warns and counts unpriced positions, and says they are not valued at cost", async () => {
+    setMetrics({ unpricedPositions: 12 })
+    const w = mountView(); await flushPromises()
+    const note = w.get('[data-testid="price-freshness-note"]').text()
+    expect(note).toContain("12")
+    expect(note).toContain("could not be priced")
+    expect(note).toContain("not")
+  })
+
+  it("says nothing when the total is complete and fresh", async () => {
+    setMetrics({ unpricedPositions: 0, priceAsOf: new Date().toISOString(), priceSource: "quote" })
+    const w = mountView(); await flushPromises()
+    expect(w.find('[data-testid="price-freshness-note"]').exists()).toBe(false)
+  })
+
+  it("flags a price that is more than 6 hours old, reporting the OLDEST", async () => {
+    const old = new Date(Date.now() - 30 * 60 * 60 * 1000).toISOString() // 30 h
+    setMetrics({ priceAsOf: old, priceSource: "quote" })
+    const w = mountView(); await flushPromises()
+    expect(w.get('[data-testid="price-freshness-note"]').text()).toContain("oldest price")
+  })
+
+  it("flags a carried-over (fallback) price as not live", async () => {
+    setMetrics({ priceAsOf: new Date().toISOString(), priceSource: "fallback" })
+    const w = mountView(); await flushPromises()
+    const note = w.get('[data-testid="price-freshness-note"]').text()
+    expect(note).toContain("not live")
+  })
+})
+
