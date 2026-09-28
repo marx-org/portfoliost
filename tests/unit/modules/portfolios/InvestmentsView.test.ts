@@ -377,3 +377,28 @@ describe("§70.2: price completeness and freshness", () => {
   })
 })
 
+/**
+ * The per-card note depends on `/total-metrics` arriving AFTER the cards are
+ * rendered — which is the normal order, since the portfolio list resolves first.
+ * A freshness map built from a snapshot taken at setup is empty forever, and the
+ * symptom is a silent absence of warnings, not an error.
+ */
+it("badges a card whose portfolio has unpriced positions, once metrics arrive", async () => {
+  const pfs = await summary()
+  mocked.getPortfolios.mockResolvedValue(pfs)
+  mocked.getPortfolioTotalMetrics.mockResolvedValue({
+    instrumentsValue: 100, cashValue: 0, totalValue: 100, totalInvested: 100,
+    baseCurrency: "PLN", cashBreakdown: [],
+    unpricedPositions: 3,
+    portfolioBreakdown: [
+      { id: pfs[0].id, name: pfs[0].name, instrumentsValue: 100, cashValue: 0,
+        totalValue: 100, totalInvested: 100, unpricedPositions: 3, priceAsOf: null, priceSource: null },
+    ],
+  } as never)
+  const w = mountView()
+  await flushPromises()
+  const notes = w.findAll('[data-testid="card-freshness-note"]')
+  expect(notes.length).toBe(1)
+  expect(notes[0].text()).toContain("3 positions unpriced")
+})
+

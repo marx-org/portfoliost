@@ -152,10 +152,15 @@ export const usePortfolioStore = defineStore("portfolios", () => {
  * the cards get this for free rather than each card issuing its own request.
  */
 export function usePortfolioFreshness() {
-  const totalMetrics = usePortfolioStore().totalMetrics
+  const store = usePortfolioStore()
+  // Read `store.totalMetrics` INSIDE the computed. A Pinia setup store unwraps
+  // refs on the instance, so `usePortfolioStore().totalMetrics` captured here
+  // would be a one-time snapshot (null at setup) and the map would stay empty
+  // forever — reading through the reactive proxy inside the computed is what
+  // keeps it live.
   return computed(() => {
     const map = new Map<string, { unpriced: number; priceAsOf: string | null; fallback: boolean }>()
-    for (const row of totalMetrics?.portfolioBreakdown ?? []) {
+    for (const row of store.totalMetrics?.portfolioBreakdown ?? []) {
       map.set(row.id, {
         unpriced: row.unpricedPositions ?? 0,
         priceAsOf: row.priceAsOf ?? null,
