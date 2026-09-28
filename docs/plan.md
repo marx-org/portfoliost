@@ -2576,3 +2576,44 @@ scheduler packs openst beside other work, so it is the first thing killed.
 - [ ] Add an alert on `container_memory_working_set_bytes` growth rate, so the next
       leak is caught by a trend rather than by an OOMKill.
 - Commit.
+
+### 72.6 — openst: a provider for a SPECIFIC ING Akcji share class (§72.9 follow-on)
+
+Found by the §72.4 price audit, which flagged **29 of 79** `INGAKC.TFI` trades at a
+near-constant **1.126× above the bar** (1.1256 in 2023-04, 1.1269 in 2026-08).
+
+What is established, and what is not:
+
+- The symbol is **right**. Goldman Sachs Akcji was renamed **ING Akcji**; the sheet
+  was never updated, which is why the position still reads "Goldman Sachs Akcji"
+  while the provider reports "ING Akcji (ING Parasol FIO)" at `ING01` on analizy.pl.
+  A stale *name* is cosmetic — names are not in the valuation math.
+- The bars are **consistent with the live quote** (795.02 on 2026-08-19 against a
+  820.03 current price), so the bar series is the NAV the provider serves.
+- The provider serves **only** `INGAKC.TFI`. `INGAKA`/`INGAKB`/`INGAKD` do not
+  respond, so there is no alternative class to compare against. The fund has share
+  categories (analizy.pl lists `ING01`, unit category A) and the symbol encodes `C`.
+- The ratio is **constant over 3.4 years**. That is the diagnostic fact: it is not a
+  fee (those do not scale with NAV), not compounding dividends (the ratio would
+  grow), and not market noise. A fixed multiplicative offset between two series of
+  the same fund is the signature of **two different classes of it**.
+
+**Open question, deliberately not guessed:** whether the trades are in the class the
+symbol names. The decisive check is ING01's published NAV for 2023-04-07 — if it is
+~382 PLN the bar is the wrong series; if ~339 then we paid 12.6% above NAV on all
+79 trades, which would point at the purchase prices in the sheet instead.
+
+- [ ] Resolve the open question with ING01's published NAV for 2023-04-07 (and one
+      later date) before building anything.
+- [ ] If the class is wrong: add an openbb provider in `openst` for that specific
+      ING Akcji class, following the provider-tier order in the planner contract —
+      capture the provider's response into `tests/fixtures/` first, then the plugin
+      with mocked I/O, then openst standalone smoke, then `cachest` route, then the
+      `portfoliost-instruments` adapter, then the full compose stack.
+- [ ] Sweep the other TFI rows for the same defect. `ticker_reference` knows **zero**
+      `.TFI` symbols, so nothing cross-checks them, and the same family is named
+      "NN Emerytura 2025/2030" but "Goldman Sachs Emerytura 2060/2065" in the same
+      sheet — a rename that was applied inconsistently across rows.
+- [ ] Separately: `positions.company_name` inherited the stale sheet name, so the UI
+      shows a fund's former brand. Cosmetic, but it is what made this look like a
+      wrong-fund problem rather than a class problem.
