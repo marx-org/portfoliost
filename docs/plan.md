@@ -2070,3 +2070,82 @@ changed `transaction_date` and re-backfill from there.
 
 - [ ] Decide and implement.
 
+---
+
+## 70. "Total value" is wrong: cost is being reported as market value (2026-09-28)
+
+Found while closing §69, and it outranks everything still open. Reported by the
+user from the dashboard; the cause is measured, not inferred.
+
+### 70.1 — the symptom
+
+The ten cards sum to **PLN 1,057,924**; the headline says **PLN 797,190**. The
+aggregate is the smaller of the two, which is the opposite of a rounding or FX
+artefact.
+
+### 70.2 — the cause
+
+**75 of 85 open positions have `positions.market_value` NULL** (PROD, measured):
+
+| portfolio | null / open | stored `market_value` | Σ cost | card | live |
+|---|---|---|---|---|---|
+| IBKR | 35/35 | — | 55,665.33 | 283,973.35 | 235,433.41 |
+| Rach. rejestrowy PKO BP | 23/23 | — | 36,500.00 | 56,451.80 | 45,000.00 |
+| IKE Marek | 13/13 | — | 25,814.13 | 91,072.72 | 65,867.46 |
+| Obligacje PKO SA Beata | 2/2 | — | 115,000.00 | 119,240 | **115,000** |
+| NN TFI PPK | 1/1 | — | 76,337.99 | 123,722.33 | **76,337.99** |
+| Equate+ | 1/1 | — | 913.01 | 3,946.55 | 3,991.49 |
+| NN TFI PPO | 0/1 | 173,445.64 | 96,440.71 | 173,445.64 | 96,440.71 |
+| IKE Beata | 0/23 | 154,825.70 | 115,037.32 | 205,208.09 | 154,308.64 |
+
+`services/valuation.ts` `splitPortfolioValue`:
+
+```ts
+const mv = p.marketValue != null ? Number(p.marketValue) : Number(p.quantity ?? 0) * Number(p.averageCostBasis ?? 0)
+```
+
+The fallback is the position's COST, and it is then reported as market value.
+Obligacje's live instruments equal its cost to the złoty (115,000) and NN TFI
+PPK's equal theirs exactly (76,337.99) — PLN funds with no reason to sit on cost.
+For a fund that has grown from ~456 to ~820 per unit, reporting 96k instead of
+173k understates net worth by 77k on that holding alone, and every derived
+figure (return, gain/loss, the §68 headline, the card) inherits it.
+
+### 70.3 — and the mirror-image defect in the snapshot path
+
+Equate+ is the opposite: its card holds 3,946.55 = **cash only, zero instruments**,
+while the live path sees 3,991.49 of SAP SE. The backfill resolved no price at
+all there. So the card can omit a holding the headline counts, and neither
+number is trustworthy alone. This asymmetry is why §63.3's reconciliation has
+never closed.
+
+### 70.4 — what is proven, and what is not
+
+Proven: the fallback exists in code, and it is being taken (two portfolios equal
+their cost exactly). NOT yet proven: **why** `market_value` is NULL for 75
+positions. `refreshQuotes` is the only writer of that column and apparently does
+not reach these symbols; unverified. Fixing the aggregate first would treat the
+symptom, so the upstream question is the first task.
+
+- [ ] Find why `positions.market_value` is NULL for 75/85 — which writer should
+      populate it, and why it is not reaching IBKR / Rach / IKE Marek / Obligacje
+      / NN TFI PPK / Equate+.
+- [ ] Make both paths resolve market value identically, from prices. One
+      function, one answer (the §68 lesson: drift is what happens when two code
+      paths answer the same question).
+- [ ] **Never present cost as value.** With no price, render unresolved (`—`) per
+      §66.2 rather than silently substituting cost. A missing price must be
+      visible, not plausible.
+- [ ] Decide the contract: does `instrumentsValue` require a resolved price, and
+      is a partially-priced portfolio reported at all or flagged?
+- [ ] Tests: a position with NULL `market_value` and no resolvable price must NOT
+      contribute its cost basis; both paths agree to the cent on a mixed
+      price/no-price portfolio.
+- [ ] Then re-run the single backfill and assert Σ cards == Total tile — the §63.3
+      reconciliation, still unproven after all of §66–§69.
+- [ ] Separately: the §68 `cashBreakdown` weight formula divides by a net total
+      that can approach zero (EUR +64,898 against USD −45,434 in IBKR), producing
+      weights from −398% to +648%. The user confirms the sign split is real — IBKR
+      converts currency repeatedly without registering it in the sheet — so the fix
+      is a guard on the denominator, not a change to the data.
+
