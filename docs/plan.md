@@ -2459,6 +2459,14 @@ conversion).
       commit before pinning), push, confirm one replica each on the new tag.
 - [x] Confirm from inside the Job's image that the entrypoint exists and the
       script is present, before calling the job wired.
+- [x] **The Jobs panel is a hardcoded card list — the backend route alone is not
+      a usable job.** `JobsView.vue` gained a "Data quality" section with a Price
+      audit card, a tolerance input and a Run button. The badge starts ABSENT,
+      not green: a status that reads Succeeded before it has ever run is how a
+      badge stops being believed. The panel shows percent and the API takes a
+      fraction, so the conversion is asserted by a test (15 → 0.15); sending 10
+      for 0.1 would flag every trade in the book.
+- [x] SPA `v1.0.260`.
 - Commit.
 
 ### 72.4 — run it after the wipe-&-reimport, and triage what it finds
