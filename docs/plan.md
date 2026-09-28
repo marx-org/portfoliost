@@ -1972,3 +1972,101 @@ will shift. The SPA is the only consumer in the monorepo; grep before assuming.
   `externalCashInvested` already sums every cash row with no type filter, so no
   code change is needed; only the description and the per-portfolio caveat in
   §68.2.
+
+---
+
+## 69. The sudden raise in return: a backdated deposit, a duplicate cash row, and a backfill that only looks 2 days back (2026-09-28)
+
+Found by the §68.5 PROD verification, not by a test. Three separate defects, one
+visible symptom.
+
+### 69.1 — the symptom, and the proof
+
+Three portfolios showed a step on **2026-09-27** with `net_flow = 0.00`:
+
+| portfolio | 09-26 value | 09-27 value | Δ | Δ invested |
+|---|---|---|---|---|
+| IKE Marek | 90,962.72 | 107,059.39 | +16,096.67 (+17.7%) | **+15,777.00** |
+| IKE Beata | 196,827.12 | 205,628.21 | +8,801.09 (+4.5%) | **+15,777.00** |
+| Equate+ | 3,946.55 | 8,632.99 | +4,686.44 (+118.7%) | 0 |
+
+The identical `+15,777.00` in two unrelated accounts is the whole diagnosis: one
+omitted deposit, in both. `/api/portfolios/:id/cash/transactions` closes it exactly —
+
+- IKE Beata `DEPOSIT 15,777 PLN` dated **2021-10-25**
+- IKE Marek `DEPOSIT 15,777 PLN` dated **2021-10-18**
+
+| | Σ deposits | 09-26 invested | 09-27 invested |
+|---|---|---|---|
+| IKE Beata | **132,099** | 116,322 = 132,099 − 15,777 | **132,099** |
+| IKE Marek | **54,548** | 38,771 = 54,548 − 15,777 | **54,548** |
+
+The 2026-09-27 21:14 re-import inserted it (all 100 cash rows in the system carry
+that timestamp, and every one is backdated). `externalCashInvested` replays the
+whole ledger, so cumulative invested rose — but the `snapshotsync` cronjob only
+re-values **the last two days**, so the entire five-year correction was stamped
+onto the next snapshot written. The data is now *more* correct; the presentation
+is what is broken.
+
+Equate+ is the same mechanism: its value rose because SAP SE went from ~0 to
+4,684 PLN of instruments value once the ticker fix landed. `invested` unmoved.
+
+**The data was right; the history was never recomputed behind it.**
+
+- [x] Diagnose (§69.1).
+- [x] **§69.2 importer dedup** — see below.
+- [ ] Re-import (wipe & reimport) with the dedup, then ONE full backfill of all
+      10 portfolios so the 15,777 and the SAP SE value land on their proper
+      dates. **User-approved**, deliberately deferred until after §69.2 so the
+      backfill runs once over final data rather than twice.
+
+### 69.2 — the sheet records one incoming payment twice, and the importer imported both
+
+The user confirmed the model: *theoretically* the SAP position is sold in Equate+
+and cash moves to IBKR, but *in practice* the stock is transferred to IBKR and sold
+there. There is no stock-transfer primitive, so the sale's cash side is already
+**simulated** as a same-currency TRANSFER Equate+ → IBKR (`SALE_PROCEEDS_TO`).
+The IBKR account *also* carries a real `Wpłata` "Gotówka IB" row for the arrival —
+the broker's own record of the same money landing:
+
+```
+2026-09-02  Equate+  TRANSFER  -1462.09 EUR   ← the simulation
+            IBKR     TRANSFER  +1462.09 EUR   ← its credit leg
+            IBKR     DEPOSIT   +1463.35 EUR   ← the broker's arrival: DUPLICATE
+```
+
+Importing both credits IBKR's cash twice. Only one move should be registered.
+The transfer pair is the one to keep — it already nets Equate+ to ~0 by offsetting
+its derived SELL, and it exists precisely because stock transfers cannot be
+modelled. The `~1.25 EUR` gap on every event is the commission, so the guard is
+"deposit covers the transfer", never equality.
+
+Fixed in `portfoliost-sheets-sync` `mapRow` + a new `transferFundingByKey`
+pre-pass. The duplicate is only visible **across rows** (the arrival is a `Wpłata`
+on IBKR; the transfer it duplicates comes from a `Sprzedaż` on a different konto),
+which is exactly why a per-row mapper could not see it and why the pre-pass is
+computed once over the whole sheet in `sync.ts`.
+
+Suppression is guarded on konto, asset name, date, currency **and** amount, so a
+genuine standalone deposit, a same-day deposit in another currency, a non-cash
+asset, a withdrawal, and a deposit too small to cover the day's transfers are all
+kept. 10 tests; 149 green.
+
+- [x] Importer dedup + tests (`portfoliost-sheets-sync`).
+- [ ] Release sheets-sync; the job image pin lives in the admin helmrelease.
+- [ ] Wipe & reimport (user-triggered from Admin → Jobs), then full backfill.
+- [ ] Verify: IBKR's cash no longer gains the duplicate; IKE's `invested` steps
+      back to 132,099 / 54,548 on their proper 2021 dates; no cliff on 2026-09-27.
+
+### 69.3 — the systemic gap (still open)
+
+**An import that adds backdated rows must trigger a full re-backfill for the
+portfolios it touched.** Today the only automatic revaluation is the twice-daily
+`snapshotsync`, which re-values the last two days, so *any* historical correction
+lands as a visible cliff on the next snapshot written. This will recur on every
+future re-import. Options: have the import job call `forcePortfolioRecalc` /
+`runBackfill` for the portfolios whose rows changed, or record the earliest
+changed `transaction_date` and re-backfill from there.
+
+- [ ] Decide and implement.
+
