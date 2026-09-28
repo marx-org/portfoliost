@@ -2127,10 +2127,10 @@ positions. `refreshQuotes` is the only writer of that column and apparently does
 not reach these symbols; unverified. Fixing the aggregate first would treat the
 symptom, so the upstream question is the first task.
 
-- [ ] Find why `positions.market_value` is NULL for 75/85 — which writer should
+- [x] Find why `positions.market_value` is NULL for 75/85 — which writer should
       populate it, and why it is not reaching IBKR / Rach / IKE Marek / Obligacje
       / NN TFI PPK / Equate+.
-- [ ] Make both paths resolve market value identically, from prices. One
+- [x] Make both paths resolve market value identically, from prices. One
       function, one answer (the §68 lesson: drift is what happens when two code
       paths answer the same question).
 - [x] **Never present cost as value.** With no price, render unresolved per
@@ -2142,10 +2142,10 @@ symptom, so the upstream question is the first task.
       hidden.** A partial portfolio is reported with `unpricedPositions` and a
       visible note, rather than suppressed or silently completed. Suppressing it
       would make a broken pipeline look like an empty portfolio.
-- [ ] Tests: a position with NULL `market_value` and no resolvable price must NOT
+- [x] Tests: a position with NULL `market_value` and no resolvable price must NOT
       contribute its cost basis; both paths agree to the cent on a mixed
       price/no-price portfolio.
-- [ ] Then re-run the single backfill and assert Σ cards == Total tile — the §63.3
+- [x] Then re-run the single backfill and assert Σ cards == Total tile — the §63.3
       reconciliation, still unproven after all of §66–§69.
 - [ ] Separately: the §68 `cashBreakdown` weight formula divides by a net total
       that can approach zero (EUR +64,898 against USD −45,434 in IBKR), producing
