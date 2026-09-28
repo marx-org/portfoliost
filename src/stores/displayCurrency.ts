@@ -43,12 +43,39 @@ export const useDisplayCurrencyStore = defineStore("displayCurrency", () => {
   }
 
   /**
-   * Adopt the server's preference when this browser has never chosen one, so the
-   * display currency follows the user across devices. An explicit local choice
-   * always wins.
+   * Reconcile the stored display currency with the server preference.
+   *
+   * Two directions, because one is not enough:
+   *
+   *  - server has one, this browser does not → adopt it, so the choice follows
+   *    the user to another device.
+   *  - this browser has one, the server does not → WRITE IT THROUGH. This is the
+   *    direction the first version of §67.1 missed: it only wrote on a selection
+   *    event, so a currency the user had already chosen before the write-through
+   *    shipped was never sent. PROD was exactly that case — PLN in localStorage,
+   *    `uiPreferences: {}` on the server — and the backend therefore kept
+   *    denominating the aggregate in its USD default. A deploy that adds
+   *    write-through has to push the value that already exists, or the mechanism
+   *    sits idle waiting for a click that may never come.
+   *
+   * The local value wins when the two disagree: it is what the user is looking at
+   * right now, and silently changing the currency under them mid-session is worse
+   * than a stale server preference that the next pick overwrites.
    */
   async function hydrateFromServer(): Promise<void> {
-    if (localStorage.getItem(STORAGE_KEY)) return
+    const local = localStorage.getItem(STORAGE_KEY)
+    if (local) {
+      try {
+        const prefs = await getUserPreferences()
+        const server = prefs?.uiPreferences?.baseCurrency
+        if (typeof server !== "string" || !/^[A-Za-z]{3}$/.test(server)) {
+          await syncToServer(local)
+        }
+      } catch {
+        // server unreachable — the local value stands and the next pick retries
+      }
+      return
+    }
     try {
       const prefs = await getUserPreferences()
       const base = prefs?.uiPreferences?.baseCurrency
