@@ -2484,3 +2484,95 @@ conversion).
 
 - [ ] Resolve or record the **`Equate+` +118.7%** reconciliation gap.
 - [ ] Archive §71 and §72 to `plan-archive.md`.
+
+---
+
+## 73. openst leaks memory until it is OOMKilled (found 2026-09-28)
+
+Found while deploying §72: both openst replicas were killed mid-investigation and
+the ceiling turned out to be the visible symptom of an unbounded one. Deliberately
+**deferred** until after the reimport and the price audit, because the reimport is
+the burst that will otherwise kill it again.
+
+### 73.1 — what is proven
+
+Both replicas `exitCode: 137`, `reason: OOMKilled`, at 2026-09-28 16:02 UTC, against
+a 700Mi limit with a 128Mi request. Prometheus
+(`container_memory_working_set_bytes`, 24h) shows this is a **leak, not a high
+baseline** — working set climbs monotonically and never returns to the floor:
+
+    openst-…d67lw  543 → 570 → 583 → 602 → 649 → 679 → 692 Mi   (18h, 38 points)
+    openst-…dxb2p  613 → 658 → 662 → 666 → 686 → 691 → 698 Mi   (hit the ceiling)
+    after restart   423 → 425 → 442 → 684 → 693 Mi             (+240Mi in one step)
+
+A fresh container floors at ~320–423Mi and climbs to the ceiling in roughly 4h under
+load (~65 Mi/h). Both replicas died doing the same thing: a per-symbol sweep of
+`/equity/logo/…` interleaved with `/fixedincome/search/…`, walking alphabetically
+(`CREC.PS`, `CREO.L`, `CRES.BA`, `CREX`, `CRET.ST`), 300–1100ms per call.
+
+**Not a cache.** `src/cache.py` is Redis-backed (`REDIS_DB 2`); there is no
+`lru_cache`/`TTLCache` in `src/`. The memory is retained by something in the
+request path, and the +240Mi step during a logo sweep says the logo/search path
+rather than price bars.
+
+### 73.2 — what is NOT proven, and must not be assumed
+
+- **Which structure retains it.** The step is measured; the cause is not. It could
+  be a per-call object graph held by a module-level registry, a provider session
+  accumulating cookies/responses, OpenBB's own per-symbol cache, or a
+  `ThreadingPoolExecutor` from `src/main.py` holding futures.
+- **That the logo path is the cause.** It is what was *running* when both pods died,
+  which is correlation. A concurrent price-bar burst would look identical in the
+  logs.
+- **That 2Gi is enough.** It buys ~3× the time and changes nothing about the shape
+  of the curve.
+
+Deliberately **not** done, and why — all three look like fixes and are not:
+
+- **More replicas.** Every process leaks at the same rate. Three replicas raise the
+  idle floor to ~1.26Gi and only slow the climb by spreading load.
+- **An HPA on memory.** It would add replicas *because* memory is high and never
+  converge — the wrong response to a per-process leak, and it would eventually
+  exhaust the nodes.
+- **Raising the limit further.** It converts a loud OOMKill into a slow node-level
+  problem.
+
+### 73.3 — the delay already applied
+
+`limits.memory 700Mi → 2Gi` and `requests.memory 128Mi → 512Mi`, committed to the
+homelab repo with the Prometheus evidence in the comment so nobody "reverts" it as
+an unexplained bump. The request matters as much as the limit: at 128Mi the
+scheduler packs openst beside other work, so it is the first thing killed.
+
+- [x] Measure and record the curve; bump the limit; document why it is a delay.
+- [x] Verify the new pods start at ~320–358Mi against the 2Gi ceiling.
+
+### 73.4 — find what retains it
+
+- [ ] Reproduce deterministically: drive N sequential requests against ONE
+      `/equity/logo/<sym>` and M against `/equity/ohlcv/<sym>`, sampling
+      `working_set_bytes` between batches, so the two paths are separable instead
+      of inferred from whatever happened to be running. The measurement decides
+      whether the logo path is the cause or merely the last thing logged.
+- [ ] For the leaking path, bisect inside it: one call vs many, and with the
+      provider call stubbed. Stub-out is the decisive test — if memory flattens
+      with the provider stubbed, the retention is ours (registry, pool, session);
+      if not, it is in OpenBB or yfinance and belongs upstream.
+- [ ] Check the obvious holders in `src/main.py` and `src/openbb_client.py`:
+      module-level dicts/lists, a `ThreadingPoolExecutor` retaining futures, and
+      any `requests.Session` reused across calls.
+- Tests: a regression test that asserts working set does not grow without bound
+      across repeated calls — otherwise this returns and nobody notices for months.
+- Commit.
+
+### 73.5 — fix, and prove the curve flattens
+
+- [ ] Fix the retaining structure, or pin/upgrade the upstream dependency if the
+      retention is OpenBB's. Do not paper over it with a bigger limit.
+- [ ] Re-run 73.4's measurement and show working set flat across the same workload
+      that produced +240Mi/30min. A screenshot of the curve is the deliverable.
+- [ ] Then reconsider the limit downward once the curve is flat — 2Gi is headroom
+      for bursts, not a target to keep.
+- [ ] Add an alert on `container_memory_working_set_bytes` growth rate, so the next
+      leak is caught by a trend rather than by an OOMKill.
+- Commit.
