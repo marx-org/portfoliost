@@ -385,7 +385,12 @@ function onPickerSaved() {
                 </th>
               </template>
               <th class="px-5 py-2.5 font-medium">Description</th>
-              <th class="px-5 py-2.5"><span class="sr-only">Actions</span></th>
+              <!-- Sticky actions — example-service parity (§57.2); 6 columns do not
+                   overflow at 1280 today, but this keeps them reachable on a
+                   narrow viewport. -->
+              <th
+                class="sticky right-0 z-30 bg-white px-5 py-2.5 shadow-[-1px_0_0_0_#e2e8f0] dark:bg-slate-900 dark:shadow-[-1px_0_0_0_#334155]"
+              ><span class="sr-only">Actions</span></th>
             </tr>
           </thead>
 
@@ -393,7 +398,7 @@ function onPickerSaved() {
             <tr
               v-for="tx in transactions"
               :key="tx.id"
-              class="hover:bg-slate-50 dark:hover:bg-slate-800/50"
+              class="group hover:bg-slate-50 dark:hover:bg-slate-800/50"
               :data-testid="`cash-tx-${tx.id}`"
             >
               <!-- Date -->
@@ -424,8 +429,10 @@ function onPickerSaved() {
                 <LabelChips v-if="tx.labels?.length" :labels="tx.labels" :max="3" class="mt-1" />
               </td>
 
-              <!-- Actions -->
-              <td class="px-5 py-3">
+              <!-- Actions — sticky right, opaque so nothing shows through -->
+              <td
+                class="sticky right-0 z-10 bg-white px-5 py-3 shadow-[-1px_0_0_0_#e2e8f0] group-hover:bg-slate-50 dark:bg-slate-900 dark:shadow-[-1px_0_0_0_#334155] dark:group-hover:bg-slate-800"
+              >
                 <div class="flex justify-end gap-1">
                   <button
                     type="button"

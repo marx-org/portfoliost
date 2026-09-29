@@ -67,9 +67,10 @@ async function openPickerAdjacentToRow(page: Page) {
     `panel is not flush with the button (gapBelow=${gapBelow}, gapAbove=${gapAbove})`,
   ).toBe(true)
 
-  // Right edges aligned (POPOVER_GAP = 8). While the actions column still
-  // overflows the table (§57.2), the button sits off-screen and the panel is
-  // clamped to the viewport instead — after §57.2 the first branch applies.
+  // Right edges aligned (POPOVER_GAP = 8). The actions column is sticky since
+  // §57.2, so the button is always inside the viewport and the first branch is
+  // the normal path; the fallback keeps the assertion meaningful if a future
+  // column set pushes it off-screen again.
   const buttonRight = buttonBox.x + buttonBox.width
   if (buttonRight <= viewport.width) {
     expect(Math.abs(pickerBox.x + pickerBox.width - buttonRight)).toBeLessThanOrEqual(16)
@@ -78,6 +79,60 @@ async function openPickerAdjacentToRow(page: Page) {
   }
 
   return { row, picker }
+}
+
+/**
+ * The scrollable wrapper around the transactions table. The page has nested
+ * `.overflow-x-auto` elements (an outer flex-1 panel wraps the table's own
+ * scroller), and a `has:` filter alone matches the ancestor too — so require
+ * the table to be a DIRECT child, and the labels button to be inside.
+ */
+function transactionsWrap(page: Page) {
+  return page
+    .locator(".overflow-x-auto:has(> table)")
+    .filter({ has: page.getByRole("button", { name: "Set labels" }) })
+    .first()
+}
+
+/**
+ * §57.2 — the actions column is pinned to the right edge of the table wrap:
+ * visible with no horizontal scroll, and it stays put when the table is
+ * scrolled right. (Example service parity; measured on app.example-service.ai.)
+ */
+async function expectActionsPinned(page: Page) {
+  const wrap = transactionsWrap(page)
+  await expect(wrap).toBeVisible({ timeout: 20000 })
+
+  const row = firstLabellableRow(page)
+  const buttons = {
+    edit: row.getByRole("button", { name: "Edit transaction" }),
+    labels: row.getByRole("button", { name: "Set labels" }),
+    delete: row.getByRole("button", { name: "Delete transaction" }),
+  }
+
+  const wrapBox = (await wrap.boundingBox())!
+  const atRest: Record<string, number> = {}
+  for (const [name, button] of Object.entries(buttons)) {
+    const box = (await button.boundingBox())!
+    // Fully inside the visible area of the wrap, without scrolling.
+    expect(box.x, `${name} starts left of the wrap`).toBeGreaterThanOrEqual(wrapBox.x - 1)
+    expect(box.x + box.width, `${name} ends right of the wrap`).toBeLessThanOrEqual(wrapBox.x + wrapBox.width + 1)
+    atRest[name] = box.x
+  }
+
+  // Scroll the table fully right: sticky holds the same on-screen x.
+  await wrap.evaluate((el) => {
+    el.scrollLeft = el.scrollWidth
+  })
+  await page.waitForTimeout(300)
+  for (const [name, button] of Object.entries(buttons)) {
+    const box = (await button.boundingBox())!
+    expect(Math.abs(box.x - atRest[name]), `${name} moved when the table scrolled`).toBeLessThanOrEqual(1)
+    expect(box.x + box.width).toBeLessThanOrEqual(wrapBox.x + wrapBox.width + 1)
+  }
+  await wrap.evaluate((el) => {
+    el.scrollLeft = 0
+  })
 }
 
 test.describe.serial("transactions labels picker placement (57.1)", () => {
@@ -106,6 +161,17 @@ test.describe.serial("transactions labels picker placement (57.1)", () => {
     await expect(picker).not.toBeVisible({ timeout: 10000 })
 
     await expect(row.locator(`[title="${LABEL_NAME}"]`)).toBeVisible({ timeout: 20000 })
+
+    // Unassign again. `LabelChips` renders only the first 3 labels, so a spec
+    // re-run without a mock-state reset would push this row's new chip past
+    // `max` and fail on its own leftovers. Leaving the fixture as we found it
+    // also exercises the picker's removal path.
+    await row.getByRole("button", { name: "Set labels" }).click()
+    await expect(picker).toBeVisible({ timeout: 10000 })
+    await picker.locator("label").filter({ hasText: LABEL_NAME }).getByRole("checkbox").uncheck()
+    await picker.getByRole("button", { name: "Save" }).click()
+    await expect(picker).not.toBeVisible({ timeout: 10000 })
+    await expect(row.locator(`[title="${LABEL_NAME}"]`)).toHaveCount(0, { timeout: 20000 })
   })
 
   test("portfolio transactions tab: picker opens next to the row too", async ({ page }) => {
@@ -117,6 +183,30 @@ test.describe.serial("transactions labels picker placement (57.1)", () => {
 
     const { picker } = await openPickerAdjacentToRow(page)
     await expect(picker).toBeVisible()
+  })
+
+  test("global transactions: actions stay pinned at 1280px, before and after scrolling (57.2)", async ({ page }) => {
+    await login(page)
+    await page.goto("/en/investments/transactions")
+    await expect(firstLabellableRow(page)).toBeVisible({ timeout: 20000 })
+
+    // The bug: 10–11 columns, wrap 991 vs scroll 1143 at 1280px — Edit was
+    // 22/38px visible and Labels + Delete were entirely off-screen.
+    const metrics = await transactionsWrap(page).evaluate((el) => ({
+      client: el.clientWidth,
+      scroll: el.scrollWidth,
+    }))
+    expect(metrics.scroll).toBeGreaterThan(metrics.client)
+
+    await expectActionsPinned(page)
+  })
+
+  test("cash transactions: actions stay pinned at 1280px (57.2)", async ({ page }) => {
+    await login(page)
+    await page.goto("/en/investments/transactions/cash")
+    await expect(firstLabellableRow(page)).toBeVisible({ timeout: 20000 })
+
+    await expectActionsPinned(page)
   })
 
   test("Escape closes the picker and clears the trigger state", async ({ page }) => {

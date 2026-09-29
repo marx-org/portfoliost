@@ -348,7 +348,17 @@ const colCount = computed(() =>
               </template>
               <!-- global-only: instrument currency badge -->
               <th v-if="mode === 'global'" class="px-5 py-2.5 font-medium text-xs">Ccy</th>
-              <th class="px-5 py-2.5"><span class="sr-only">Actions</span></th>
+              <!--
+                Actions stay pinned to the right edge (example-service parity, §57.2):
+                the global table is 10–11 columns and used to push Edit/Labels/
+                Delete off-screen behind overflow-x-auto. Opaque background +
+                a 1px left separator, so the columns scrolling underneath never
+                bleed through. z-30 (measured on app.example-service.ai) keeps the header
+                above the body cells.
+              -->
+              <th
+                class="sticky right-0 z-30 bg-white px-5 py-2.5 shadow-[-1px_0_0_0_#e2e8f0] dark:bg-slate-900 dark:shadow-[-1px_0_0_0_#334155]"
+              ><span class="sr-only">Actions</span></th>
             </tr>
           </thead>
 
@@ -362,7 +372,7 @@ const colCount = computed(() =>
             </tr>
 
             <!-- Data rows -->
-            <tr v-for="tx in g.items" :key="tx.id" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+            <tr v-for="tx in g.items" :key="tx.id" class="group hover:bg-slate-50 dark:hover:bg-slate-800/50">
               <!-- Date -->
               <td class="px-5 py-3 whitespace-nowrap text-slate-600 dark:text-slate-300">
                 {{ mode === "global" ? formatDateTime(tx.executedAt) : formatDate(tx.executedAt) }}
@@ -460,8 +470,10 @@ const colCount = computed(() =>
                 {{ tx.instrumentCurrency }}
               </td>
 
-              <!-- Actions -->
-              <td class="px-5 py-3">
+              <!-- Actions — sticky right, opaque so nothing shows through -->
+              <td
+                class="sticky right-0 z-10 bg-white px-5 py-3 shadow-[-1px_0_0_0_#e2e8f0] group-hover:bg-slate-50 dark:bg-slate-900 dark:shadow-[-1px_0_0_0_#334155] dark:group-hover:bg-slate-800"
+              >
                 <div class="flex justify-end gap-1">
                   <button type="button" class="btn-ghost px-2 py-1 text-xs" aria-label="Edit transaction" @click="openEdit(tx)">Edit</button>
                   <button type="button" class="btn-ghost px-2 py-1 text-xs" aria-label="Set labels" @click="openLabelPicker(tx, $event)">Labels</button>
@@ -484,7 +496,10 @@ const colCount = computed(() =>
               >
                 {{ formatCurrency(groupSubtotal(g.items), g.items[0]?.displayCurrency) }}
               </td>
-              <td :colspan="mode === 'global' ? 2 : 1" class="px-5 py-3"></td>
+              <td v-if="mode === 'global'" class="px-5 py-3"></td>
+              <td
+                class="sticky right-0 z-10 bg-slate-50 px-5 py-3 shadow-[-1px_0_0_0_#e2e8f0] dark:bg-slate-800 dark:shadow-[-1px_0_0_0_#334155]"
+              ></td>
             </tr>
           </tbody>
         </table>

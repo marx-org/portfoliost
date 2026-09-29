@@ -139,31 +139,48 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ### 57.2 — Sticky actions column in the transactions tables (example-service parity; fixes hidden Edit/Labels/Delete)
 
-- [ ] `TransactionsTable.vue`:
-  - Actions `th` (:343) and actions `td` (:456): add
-    `sticky right-0 z-10 bg-white dark:bg-slate-900` plus the left separator
-    `shadow-[-1px_0_0_0_#e2e8f0] dark:shadow-[-1px_0_0_0_#334155]` (example-service
-    parity: `box-shadow: -1px 0 0`, solid background, z-10).
-  - Row `<tr>` (:357): add `group`; the sticky `td` gets
-    `group-hover:bg-slate-50 dark:group-hover:bg-slate-800` — opaque, so the
-    scrolled-under columns never bleed through (the existing
-    `hover:bg-slate-50 dark:hover:bg-slate-800/50` tr tint is translucent and
-    cannot be used on the sticky cell).
-  - Group-subtotal row (:479): split the trailing `td[colspan]` into a plain
-    Ccy spacer `td` (global mode) + the sticky actions `td`, so the sticky
-    cell is exactly one column wide.
-- [ ] `CashTransactionsView.vue`: same treatment on its actions `th`/`td`
-  (:239–266) — no overflow today at 1280 (6 columns), but parity +
-  narrow-viewport safety.
-- [ ] E2E (extend `transactions-labels.spec.ts`): at the default 1280×720
-  viewport on the global transactions page — assert each row's Edit/Labels/
-  Delete `boundingBox()` right edges are ≤ the table wrap's client rect right
-  edge at `scrollLeft = 0` (visible without scrolling); then set the wrap
-  `scrollLeft = scrollWidth` and assert the buttons keep the same on-screen x
-  (sticky holds).
-- [ ] Tests: `npm run build`, `npm run test`, `npm run test:mock`,
-  `npm run test:e2e` green.
-- [ ] Commit.
+- [x] `TransactionsTable.vue`:
+  - Actions `th` and actions `td`: add `sticky right-0` with a solid
+    `bg-white dark:bg-slate-900` (identical to `.card`, so the cell is invisible
+    until something slides under it) plus the left separator
+    `shadow-[-1px_0_0_0_#e2e8f0] dark:shadow-[-1px_0_0_0_#334155]`. The header is
+    `z-30`, the body cells `z-10` — measured live on `app.example-service.ai`, where the
+    pinned `th`/`td` are `sticky right-0 z-30` / `z-10` with
+    `box-shadow: -1px 0 0` on an opaque background. Example service's dark background is
+    `rgb(15,20,36)`; the app's own palette equivalent is used instead.
+  - Data row `<tr>`: add `group`; the sticky `td` gets an **opaque**
+    `group-hover:bg-slate-50 dark:group-hover:bg-slate-800`. The row's own
+    `hover:bg-slate-50 dark:hover:bg-slate-800/50` is translucent and would let
+    the scrolled-under columns bleed through the pinned cell.
+  - Group-subtotal row: the trailing `td[colspan]` is split into a plain Ccy
+    spacer `td` (global mode) + the sticky actions `td`, so the pinned cell is
+    exactly one column wide. Its background is the opaque form of the subtotal
+    row's tint (`bg-slate-50 dark:bg-slate-800`), not the card white.
+- [x] `CashTransactionsTable.vue`: same treatment on its actions `th`/`td` and
+  `group` on the rows. No overflow today at 1280 (6–7 columns), so this is
+  parity + narrow-viewport safety. *File note: this is the shared cash table
+  `CashTransactionsView` and `PortfolioCashTab` both render — §62 moved the
+  anchor here from `CashTransactionsView.vue`.*
+- [x] E2E (extend `transactions-labels.spec.ts`): two tests, at the default
+  1280×720. The global transactions page is asserted to still overflow
+  (`scrollWidth > clientWidth` — measured 991 vs 1395) so the test cannot pass
+  vacuously, then every row's Edit/Labels/Delete `boundingBox()` must sit inside
+  the wrap at `scrollLeft = 0` and keep the same on-screen x after
+  `scrollLeft = scrollWidth`. Repeated for the cash transactions page.
+  *Two things the first attempt got wrong, both caught by the run rather than by
+  reading: (1) the page has **nested** `.overflow-x-auto` elements — an outer
+  `flex-1` panel wraps the table's own scroller — so a plain `.first()` measured
+  the ancestor (1041/1041, no overflow) and the assertion passed for the wrong
+  element; the locator now requires the table to be a direct child
+  (`.overflow-x-auto:has(> table)`) *and* to contain the labels button.
+  (2) asserting the row still carries the chip after Save only survives one run
+  — `LabelChips` renders `max: 3`, so a second run without a mock-state reset
+  pushes the new chip past the cap and fails on its own leftovers. The test now
+  unassigns the label again at the end, which also exercises the removal path;
+  verified by two consecutive runs with no reset in between.*
+- [x] Tests: `npm run build`, `npm run test` (431), `npm run test:mock` (227),
+  `npm run test:e2e` — **108 passed, 0 failed, 1 skipped**.
+- [x] Commit.
 
 ### 57.5 — Release + PROD verify
 
