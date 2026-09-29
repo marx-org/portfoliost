@@ -2787,3 +2787,53 @@ option-leg set, both of which depend on ordering.
       capture the name rather than re-running until green.
 - [x] Deploy §72.18 with the next wallets release and re-run the audit, to
       confirm SAP.DE stops being reported.
+
+### 72.12 — §72.8 complete: the payment currency was being stored as the instrument's
+
+The root of the Crypto misvaluation, and the thing §72.15/§72.16 were defending
+against downstream. `import.ts` wrote `instrumentCurrency: txCcy` — the currency
+the trade **settled** in — and recorded it as the currency the instrument
+**trades** in.
+
+- [x] **contracts** — `listingCurrency` added to `ImportPortfolioTx` (openapi.yaml
+      documents the precedence and the never-guess rule). **Not yet released**, so
+      generated types don't have it.
+- [x] **wallets `c7993a5`** — the import row accepts `listingCurrency` and prefers
+      it for both the transaction's and the position's `instrumentCurrency`.
+      Works today because the route validates with local zod, not generated
+      types. 4 tests: USD listing paid in PLN; fallback when absent; a non-ISO
+      code is a 422 rather than something stored; and the CSN.L shape keeps both
+      (`tx.currency` PLN, `tx.instrumentCurrency` GBP).
+- [x] **sheets-sync `93fc866`** — `ResolvedInstrument.listingCurrency`, set on both
+      resolution paths, sent on every trade row. `cryptoListingCurrency` reads
+      the quote currency off a crypto `BASE-QUOTE` ticker, which also covers the
+      `ticker_reference` path the NAME_VENUE_OVERRIDES never see. Scoped to
+      crypto only: a dash in a stock ticker (`BRK-B`) is left null, because
+      reading one there would be a guess — unknown beats wrong, the rule that
+      made `CRI.WA` return null rather than CAD.
+- [ ] Release `@marx2/contracts`, regenerate types in wallets (`npm run gen:types`),
+      then drop the two local shims: the `ImportPortfolioTxWithListing` widening
+      in `transakcje-mapper.ts` and the note in the wallets commit.
+
+**Why the pair's quote currency is a parse, not a guess** — worth stating because
+it is the same code path that produced the bug in the other direction. "BTC-USD"
+is not a ticker that happens to be quoted in USD; the quote currency is what
+makes it a different instrument from the bare "BTC" the provider also serves at a
+price ~2,000x away (§72.9). Reading it off the pair finishes the argument that
+began there, whereas inferring a listing currency from what a trade was *paid*
+in is exactly what made 0.004 BTC-USD a PLN instrument valued at 168.79 instead
+of 675.16.
+
+### 72.13 — the intermittent test failure, resolved
+
+The one I could not reproduce earlier reproduced, and it is a timeout rather than
+a logic error. `creates a portfolio tagged with externalSource` is the first test
+in `import.test.ts`, so it pays for `boot()` — harness, migration, real Postgres —
+before asserting. Under a full-suite run, contending with the other 28 files, it
+exceeded vitest's **5s default** per-test timeout and failed at 5012ms. Standalone
+the file's 50 tests pass in 23s, which is what identified it as timing.
+
+- [x] 30s timeout on that test, with a comment saying the cost is the harness
+      (`eb79515`). Six consecutive full-suite runs green, 460 tests.
+- [x] Do not use `cmd | tail` to gate a commit — it was how the first red run got
+      committed in the first place. Check the test count explicitly.
