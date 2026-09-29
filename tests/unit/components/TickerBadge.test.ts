@@ -54,10 +54,16 @@ describe("TickerBadge (§61.1)", () => {
     expect(w.classes()).toContain("text-right")
   })
 
-  it("renders the ticker in the requested heading element", () => {
+  it("renders the ticker in the requested heading element, at that element's size", () => {
     expect(mountBadge({ symbol: "SAP" }).find("h1").exists()).toBe(false)
+    expect(mountBadge({ symbol: "SAP" }).find("div.truncate").classes()).toContain("text-sm")
+    // measured against example-service 2026-09-30: its research ticker is 20px (text-xl)
+    expect(mountBadge({ symbol: "SAP", titleAs: "h1" }).find("h1").classes()).toEqual(
+      expect.arrayContaining(["truncate", "text-xl", "font-semibold"]),
+    )
     expect(mountBadge({ symbol: "SAP", titleAs: "h1" }).find("h1").text()).toBe("SAP")
     expect(mountBadge({ symbol: "SAP", titleAs: "h2" }).find("h2").text()).toBe("SAP")
+    expect(mountBadge({ symbol: "SAP", titleAs: "h2" }).find("h2").classes()).toContain("text-lg")
   })
 
   it("prefixes the root and detail testids with a custom testid", () => {

@@ -79,8 +79,16 @@ const rowClass = computed(() =>
     ? "flex min-w-0 flex-row-reverse items-center gap-2.5 text-right"
     : "flex min-w-0 items-center gap-2.5",
 )
-const tickerClass = computed(() =>
-  props.titleAs === "div" ? "truncate font-medium" : "truncate font-semibold",
+// Sizes measured against app.example-service.ai on 2026-09-30: its research header
+// ticker is an `h1` at 20px/600 with an 11px/500 detail chip, and the logo is a
+// 32px 9px-radius `object-contain` plate. The `titleAs` prop is what a surface
+// asks for, so the type scale follows it rather than each call site.
+const TICKER_SIZES: Record<string, string> = { div: "text-sm", h1: "text-xl", h2: "text-lg" }
+const tickerClass = computed(
+  () =>
+    `truncate ${TICKER_SIZES[props.titleAs]} ${
+      props.titleAs === "div" ? "font-medium" : "font-semibold"
+    }`,
 )
 </script>
 
@@ -95,13 +103,11 @@ const tickerClass = computed(() =>
     />
     <div class="min-w-0">
       <div class="flex min-w-0 items-baseline gap-1.5 text-slate-900 dark:text-slate-100" :class="align === 'right' ? 'justify-end' : ''">
-        <component :is="titleAs" :class="[tickerClass, titleAs === 'div' ? 'text-sm' : '']">
-          {{ symbol }}
-        </component>
+        <component :is="titleAs" :class="tickerClass">{{ symbol }}</component>
         <span
           v-if="details"
           :data-testid="`${tid}-details`"
-          class="truncate text-[11px] text-slate-400 dark:text-slate-500"
+          class="truncate text-[11px] font-medium text-slate-400 dark:text-slate-500"
         >
           {{ details }}
         </span>

@@ -45,6 +45,9 @@ function onSelect(symbol: string) {
       @click="onSelect(symbol)"
     >
       <template v-if="variant === 'bar'">
+        <!-- Deliberate exception to the "/api/logos only in TickerBadge" rule
+             (docs/COMPONENTS.md): this bar is a dense symbol-only chip strip,
+             and an identity block per chip would triple its height. §61.9. -->
         <img :src="`/api/logos/${symbol}`" :alt="symbol" class="h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800" />
         <span class="text-[10px] font-medium text-slate-600 dark:text-slate-300">{{ symbol }}</span>
       </template>

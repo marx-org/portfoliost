@@ -8,6 +8,7 @@ the examples below are the existing components to imitate:
 | Field group with a `testid` prefix | `src/components/FeeFields.vue` (`"fee-fields"`), `src/components/FxRateFields.vue` (`"fx"`) |
 | Bigger form section with slots + shared math | `src/components/TransactionFormFields.vue`, `src/components/DividendFields.vue` |
 | Feature view / dialog | `src/modules/portfolios/RecordDividendDialog.vue`, `src/modules/portfolios/EditTransactionModal.vue` |
+| Instrument identity block (logo + ticker + `(CC) Type` + name) | `src/components/TickerBadge.vue` (`"ticker-badge"`) |
 
 ## Where things live
 
@@ -74,8 +75,33 @@ submit gating, and labels — never re-derive the formula inline.
   `/api/currencies` registry) — never a hardcoded list; the input-prefix
   pattern is `ccySymbol = store.info(ccy)?.symbol ?? ccy`.
 - FX conversion math only via `@marx2/contracts/fx` (D27).
-- Instrument logos: `<img :src="`/api/logos/${symbol}`">` with
-  `rounded-full bg-slate-100 dark:bg-slate-800`.
+- **Instrument logos go through `TickerBadge`**, never a bare `<img>`. It owns
+  the only `/api/logos/` reference in `src/`: a `rounded-[9px] object-contain`
+  plate on `bg-slate-100 dark:bg-slate-800` (example-service's rounded square — *not* a
+  circle). `grep -rn "/api/logos/" src` must return `TickerBadge.vue` and
+  `RecentSearchesBar.vue` only; the latter is the one deliberate exception (a
+  dense symbol-only chip bar, §61.9).
+
+## TickerBadge (the instrument identity block)
+
+`src/components/TickerBadge.vue` — one presentational component for every
+surface that shows a ticker. It fetches nothing; each call site passes the
+data it already has (or nothing, and the block degrades).
+
+- Testid prefix `"ticker-badge"`; `-details` and `-name` for the two optional
+  lines. Override with `testid="research-ticker"` etc.
+- Props: `symbol` (required), `name`, `countryCode` (uppercased on render),
+  `assetType` (contract enum `STOCK`/`ETF`/`CORP_BOND`/… or a displayable
+  word), `size` `sm|md|lg` (logo `h-5`/`h-6`/`h-8`), `align` `left|right`
+  (`flex-row-reverse text-right`, for compare-table column headers),
+  `titleAs` `div|h1|h2` (the research header uses `h1`).
+- Shared exports (plain `<script>` block, house style):
+  `formatAssetType(t)` and `tickerDetails(countryCode, assetType)`. No call
+  site re-derives the `(PL) Stock` format.
+- **A missing part is omitted, never guessed.** `tickerDetails(null, null)` is
+  `null` and the line does not render; a position with no `country` shows
+  `Stock`, not `(US) Stock` (§61.5 replaced two `assetLabel()` helpers that
+  did exactly that guess).
 
 ## Tests
 
