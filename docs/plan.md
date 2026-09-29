@@ -3244,3 +3244,61 @@ Two ways to close it, and the first is the right one:
       flagged and is now clean is exactly the signal §72.17b/§72.18 should produce.
 - [ ] Re-read this run's actual findings once a log route exists, and confirm
       SAP.DE no longer appears.
+
+### 72.23 — §72.16 CLOSED: there is no second series and no second class. It is the data.
+
+Three findings, each closing a route:
+
+**1. "Goldman Sachs Akcji" and "NN Akcji" are previous NAMES of ING Akcji, not a
+different fund.** analizy.pl's `ING01` page lists
+`Poprzednie nazwy funduszu: ING FIO Akcji; ING Akcji; NN Akcji; Goldman Sachs Akcji`,
+and carries **one unbroken series back to `Data pierwszej wyceny 09.03.1998`** —
+across both renames. The audited semi-annual report confirms the legal lineage
+("Goldman Sachs Subfundusz Akcji / Goldman Sachs Akcji / Goldman Sachs (PL) Akcji"
+is subfundusz #5 of Goldman Sachs Parasol FIO = today's ING Parasol FIO). A GS
+TFI factsheet still exists for this fund's category **W**.
+
+**2. The renames were pure name changes — no re-denomination.** NN IP TFI's
+client letter (2023-03-28) says the change "will not have impact on your
+investments"; ING's release (2026-06-17) says the new name "nie wymaga od
+klientów podejmowania żadnych działań". No split/denomination announcement exists
+for any of the renames, and the unbroken 1998 series is the structural proof: a
+re-denomination would have forced a series break. So the ratio is not units.
+
+**3. No other GS-named "Akcji" fund is near the target.** The only other one is
+**ING Akcji CEE** (`ING97`, ex-Goldman Sachs Akcji CEE — a different fund, CEE
+equities, ESG): A = 974.01, A2 = 1 012.53, K = 983.08 on 2026-09-25. Closest is
+51.4 PLN from the 922.63 target. `ING33` "NN Akcji Środkowoeuropejskich" is a
+separate fund and is not a predecessor of ING Akcji.
+
+**What this rules out, cumulatively:** it is not one of the nine categories (§72.20,
+closest W at 11.31), it is not a pre-rename series (§72.23), it is not a
+re-denomination (§72.23), and it is not a different ING/GS fund of a similar name
+(§72.23). A **fixed** 1.126x flat to 0.0013 over 3.4 years is also not what fee
+divergence looks like — those ratios drift.
+
+**So the constant multiplier is in the data, not in the fund's identity.** That
+means **a provider would not fix this**, which reverses the §72.6/§72.14/§72.16
+premise. The remaining candidates, in the order I would test them:
+
+1. **The sheet's price column.** A second populated price column, or a column that
+   is gross of an entry fee rather than the unit NAV. A 12.6% constant loading is
+   the size of an onetime commission column, not of a fund difference.
+2. **A restatement multiplier.** `restateSplits` replays `Split` rows in
+   sheets-sync; a ratio applied to prices rather than quantities, or applied to the
+   wrong rows, would produce exactly a constant multiplier on a subset of trades —
+   and 29 of 79 is the shape of "a group of rows was restated and another was not".
+3. **A currency restatement** on the Transakcje side (though 1.126 is not a
+   recognisable FX pair, which is what argues against it).
+
+- [ ] **The decisive check, and it is cheap:** for ONE flagged 2023-04-07 trade,
+      dump every raw column of that sheet row beside the stored row. Whatever
+      column produces 382 from 339 is the answer. This needs no provider, no
+      cluster and no code — and it is the first thing to do, because the three
+      candidates above are all distinguishable from the raw row.
+- [ ] If it is a restatement multiplier, check how many of the 79 rows carry a
+      `Split` marker; 29 restated and 50 not would explain the split exactly.
+- [ ] Keep `INGAKC.TFI` mapped to `ING Akcji` — it is the right fund and the right
+      class, whatever the price column turns out to say.
+- [ ] Still worth recording in `ticker_reference`: it knows zero `.TFI` symbols, so
+      nothing cross-checks these rows. Correct identifier, no new provider.
