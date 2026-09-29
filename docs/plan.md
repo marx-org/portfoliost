@@ -3400,3 +3400,66 @@ not "working", which is the whole point of this bug: the old config was valid to
 - [ ] After Flux applies: confirm the pods come up and that `kubectl describe`
       shows real `httpGet` probe blocks rather than absent ones. The push is
       merged; the rollout is Flux's.
+
+### 72.26 — FX backfill ran; it was NOT the cause. IKE Beata solved, IBKR still open
+
+**§72.24 executed.** `POST /jobs/fx-backfill/run` → **Succeeded**. And it did what it
+was supposed to: 2022-06 and 2023-04 now convert in full.
+
+```
+BTC-USD → PLN 2022-06-13..24:  fxFrom=2022-06-13, 10/10 dates, closes ~91k-101k
+BTC-USD → PLN 2023-04-03..11:  fxFrom=2023-04-03,  5/5  dates, closes ~119k-129k
+```
+
+**And the two steps are byte-identical afterwards.** IBKR still 2961 → 13291 at
+2022-06-20; IKE Beata still 14056 → 32183 at 2022-05-13. So §72.21's
+FX-coverage hypothesis is **wrong**. I was confident about it because the reasoning
+was tight, and the data said otherwise. Worth remembering that the FX backfill was
+still a real gap worth filling — it just was not this.
+
+**IKE Beata — solved, and legitimate.** `/api/portfolios/:id/cash/transactions`:
+
+```
+DEPOSIT 17,766 PLN on 2022-05-13
+```
+
+against a step of **+18,127**. The remainder is that day's market move on the
+positions already held. The portfolio really was worth more because money went in.
+
+**The blind spot in my own earlier check, which is the part worth keeping.** I
+concluded "0 transactions on that day" from
+`GET /api/portfolios/:id/transactions`. That endpoint returns **only**
+`["BUY","DIVIDEND","SELL"]` — cash movements live in a separate table and are not
+in it. Portfolio value is instruments **+ cash**, so a deposit is precisely the
+shape of a persistent step. I had checked half the explanation and called the other
+half absent. `cash/transactions` is the endpoint to use for this class of question,
+and the pair should always be read together.
+
+**IBKR — still unexplained, and now better bounded.** Not cash: IBKR has only **10
+cash rows, all between 2025-09-25 and 2026-09-02**, so it has no 2022 cash at all.
+Not a trade (912/912 paged, ±3 days empty). Not a symbol whose bars start then —
+checked all 35 open positions' first bar date against the boundary; the earliest
+are 2015-01-02, and none matches.
+
+Two candidates remain, and I did not have the context to settle them:
+
+1. **A day-boundary mismatch on `executedAt`.** The grid buckets by
+   `toDateStr(executedAt)` — the UTC day of the instant — while the sheet records a
+   local date. A Friday-local trade is Saturday-UTC, and 2022-06-20 was a Monday.
+   A transaction dated 2022-06-17 in the API could land on a different grid day than
+   its `executedAt` implies. The test: take the grid day 2022-06-20, and list every
+   IBKR transaction whose `executed_at` falls within ±24h of it, comparing the API
+   `executedAt` against the sheet's own date column for the same row.
+2. **A converted series beginning then, for a pair not yet checked.** Every symbol
+   was checked for its *first bar date*, not for the first date at which its
+   **PLN conversion** is available — and after §72.17 those are different things, a
+   symbol can have USD bars from 2015 and convertible bars only from 2022. The FX
+   backfill closed most of this, but not necessarily every pair.
+
+- [ ] IBKR: run test 1 (the ±24h `executed_at` window around 2022-06-20). This is
+      the likeliest of the two and needs one query.
+- [ ] IBKR: if that is empty, re-check every open symbol for the first date its
+      **currency=PLN** response returns a close, not its first bar date.
+- [x] FX backfill run and verified to have added history
+- [x] IKE Beata 2022-05-13 explained (deposit) — no action, it is correct
+- [x] §72.21's hypothesis falsified, recorded so it is not retried
