@@ -3918,3 +3918,54 @@ Also worth recording from this pass, both about `INGAKC.TFI`:
 - [ ] Correct row 604's price to the real 2023-04-07 NAV and re-import, then confirm
       the audit finding clears
 - [ ] Why is EUR absent from `fx_rates` while every other currency is stored?
+
+### 72.37 — §72.36's conclusion was WRONG. Retracted, with the error named
+
+**Retraction.** §72.36 concluded row 604's `382,05 zł` was a single bad cell to be
+corrected to ≈342. **That is wrong and the cell must not be edited.** The broker's
+own transaction detail shows:
+
+```
+Data zlecenia:  07.04.2023        (Good Friday)
+Data wyceny:   13.04.2023        ← a different date
+Cena Jednostki Uczestnictwa z dnia wyceny: 382,05 PLN
+Kwota nabycia: 2 498,07 PLN = 6,538594 × 382,05
+Wartość rejestru po transakcji: 40 264,92 PLN = 105,391757 × 382,05
+```
+
+The field is *"unit price **from the valuation date**"*. For a PPO/PPI fund the
+order is priced at the NAV of the valuation day, not the order day. 382,05 is what
+was actually paid, confirmed against the register total.
+
+**Two errors of mine, both the same shape — asserting a match I had not measured:**
+
+1. I wrote that `INGAKC.TFI` "prices ≈876 today matching the sheet's
+   `aktualny kurs` 876,94, so it is the same fund". **I never ran that query.**
+   `INGAKC.TFI` closed at **819.44** on 2026-09-25. It does not match 876.94, and my
+   "same fund, confirmed" was reasoning presented as evidence.
+2. I treated 382.05 / 339.47 = 1.1254 as the *smoking gun that the cell was wrong*.
+   The ratio is real; the inference was not. A fund's executed NAV legitimately
+   belongs to a different date than the bar the audit compared it against, so a
+   ratio near 1.13 says nothing about which side is wrong.
+
+I also asserted "a structural mismatch would be permanent, this is a single outlier"
+— a distinction I had not actually tested.
+
+**Corrected conclusion.** The trade is valid. The `1.126` factor that §72.19 and
+§72.20 chased across nine ING Akcji categories is **an artefact of the audit
+comparing an order-priced fund trade against the bar on `executed_at`**. The
+offending code is the comparison policy in `price-audit.ts`, not any data.
+
+- [x] §72.36 retracted; row 604 must NOT be edited
+- [x] `1.126` explained: an audit comparison against the wrong date for an
+      order-priced fund, not a fund class and not bad data
+- [ ] **Audit fix:** for fund/accumulation instruments (`*.TFI`, PPO/PPI) the
+      executed price belongs to the valuation date, so compare against a date window
+      rather than the exact `executed_at` bar — or skip the strict ratio and report
+      the pair as order-priced. Until then every NN TFI trade is a false positive.
+- [ ] **Still open, and genuinely open:** `INGAKC.TFI` does not reproduce the
+      executed NAVs — 351.93 on the 2023-04-13 valuation date against 382.05 paid,
+      and 819.44 today against the sheet's own `aktualny kurs` 876,94. Either the
+      TFI feed is a different series/class from the one orders execute against, or
+      the sheet's manually-maintained `aktualny kurs` column is simply stale. Not
+      resolved; do not assume the symbol mapping is right.
