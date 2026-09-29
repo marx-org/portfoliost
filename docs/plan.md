@@ -3557,3 +3557,31 @@ TWR/MWR on XTB is meaningless too**.
       check in the audit: positions exist AND total inflow == 0 → flag.
 - [x] XTB's 1680 negative snapshots explained — missing opening deposit, not a
       valuation bug
+
+### 72.30 — openst memory: baseline captured, and why NOT to enable MEM_DEBUG yet
+
+`/__mem` is live in prod and both replicas answer:
+
+```
+openst-…-9hbqh  rss=708 MiB  uptime=28904s   (0 restarts, 1/1)
+openst-…-wchj7  rss=587 MiB  uptime=28997s   (0 restarts, 1/1)
+```
+
+Flat across a 45s sample, but 45s cannot see a slow leak. Both are **above the 512Mi
+request** (limit is 2Gi, so no OOM and no restart loop; the replicas differ by 121Mi
+after the same 8h, consistent with traffic asymmetry rather than a leak — not
+proven either way).
+
+**Deliberately did not turn on `MEM_DEBUG`.** It is unset in prod (env is
+DATABASE_URL/REDIS_*/TZ only), and enabling it rolls the pods — which would reset
+uptime and **destroy the exact evidence the question needs**: RSS correlated against
+a long uptime. `traced_fraction` at t=8h is worth less than a growth rate measured
+over 24h+. Instrumentation that resets the thing it measures is the wrong order of
+operations. Revisit once a day-scale baseline exists.
+
+- [ ] Re-sample in ~24h and compute `(rss_now - 708MiB) / uptime_delta`. Flat or
+      sub-linear ⇒ no unbounded growth, close §73. Linear at a fixed rate ⇒ the
+      OpenBB singleton is leaking and the fix is a bounded cache, not more memory.
+      Command (no curl/wget in the pod — it is python-only, which is why an earlier
+      shell probe returned nothing and looked like a broken endpoint):
+      `kubectl -n pfire exec <pod> -- python3 -c "import urllib.request,json;print(json.load(urllib.request.urlopen('http://127.0.0.1:8080/__mem'))['rss_bytes'])"`
