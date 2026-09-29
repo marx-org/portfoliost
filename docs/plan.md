@@ -3585,3 +3585,58 @@ operations. Revisit once a day-scale baseline exists.
       Command (no curl/wget in the pod — it is python-only, which is why an earlier
       shell probe returned nothing and looked like a broken endpoint):
       `kubectl -n pfire exec <pod> -- python3 -c "import urllib.request,json;print(json.load(urllib.request.urlopen('http://127.0.0.1:8080/__mem'))['rss_bytes'])"`
+
+### 72.31 — window-wide gap reporting, shipped and verified in prod (wallets v1.1.96)
+
+Root cause of the IKE Marek 2022-06-13 +152% step, found in `price_bar_metadata`:
+
+```
+BST0922 | failed | HTTP 404 upstream .../ohlcv/BST0922
+INS0922 | failed | HTTP 404 ...   NVA0624 | failed   VOX0224 | failed
+```
+
+cachest has **never** had OHLCV for these bonds. They contributed nothing while held
+(understating the value ~10.3k PLN); the sale turned them into cash at real proceeds
+and the chart showed a spike. Because they were closed by the window's last day, the
+last-day-only gap scan saw nothing and stored `status=complete`.
+
+**Fixed:** `gapSymbols` is now the **window-wide** report. The abort guard is
+deliberately *not* derived from it any more.
+
+That second part is the real lesson. `isUnpriceable` was
+`gapSymbols.length >= heldSymbols`, which conflated *"reported a gap somewhere"* with
+*"priced nothing"*. The first version of this fix failed its own new test with
+`status=failed` and **zero snapshots written** — folding mid-window gaps into that
+array made a healthy portfolio look unpriceable. In prod that would have destroyed
+the history of every portfolio that ever held an illiquid bond. It now reads a
+separate `unpricedLastDay` count, so the report can be honest without the guard
+misfiring. The test earned its keep.
+
+Verified in prod by running `computeSnapshotBatch` in-pod (read-only, does not
+persist) for IKE Marek with a window ending 2022-06-15:
+
+```
+gapSymbols      = KRI0322, BST0922, ARH0722, VOX0224, INS0922, NVA0624
+heldSymbols     = 4
+unpricedLastDay = 1
+isUnpriceable   = false        <- guard correctly does NOT trip
+rows            = 236
+```
+
+Two things worth noting. It found **two more** unpriceable bonds I had not
+identified by hand (KRI0322, ARH0722) — six in total, all Polish government bonds.
+And the contrast shows what would have shipped: with `heldSymbols=4` and
+`gapSymbols.length=6`, the old predicate would have read "priced nothing" and thrown
+away the whole series.
+
+**This makes the history honest, not accurate.** With no bond price source the
+value genuinely cannot be right; the fix is that it is now *reported* as a partial
+sum instead of being stamped `complete`.
+
+- [x] Window-wide gap scan, separate abort accounting, tests, deployed v1.1.96
+- [ ] **Bond pricing is a data problem, not a code one.** Six PL bonds 404 upstream.
+      Either find a source that carries them, or accept the partial sum and make the
+      UI say so. Until then these portfolios' pre-sale history is understated by a
+      known-unknown amount.
+- [ ] Propagate the window-wide gap into the UI: `GET /:id/analytics` can flag the
+      value as partial, but "partial on which days" is not currently represented.
