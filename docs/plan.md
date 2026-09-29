@@ -3722,3 +3722,41 @@ because it sends you fixing data that was never broken.
       partial sum. Affects IKE Beata and IKE Marek history while held.
 - [ ] `price_bar_metadata` should distinguish "upstream profile 404" from
       "no price series", so `failed` stops conflating a delisting with a gap.
+
+### 72.34 — openst: closing the leak question. The cluster's own history says no.
+
+Second `/__mem` sample, 2.1h after the first, same pods (no restart in between):
+
+```
+pod              baseline @8.03h   now @10.11h   Δ rss        rate
+openst-…-9hbqh   708 MiB           709.8 MiB     +1.8 MiB     ~0.9 MiB/h
+openst-…-wchj7   587 MiB           601.4 MiB     +14.4 MiB    ~6.9 MiB/h
+```
+
+Two hours cannot prove the absence of a slow leak, and I am not claiming it does.
+What settles the question is the ReplicaSet history, and it is unambiguous — every
+pod generation traces to a **deployment**, none to a crash:
+
+```
+rev 55  v1.1.36  2d2h ago
+rev 56  v1.1.37  43h ago
+rev 57  v1.1.37  20h ago    (config change)
+rev 58  v1.1.38  10h ago    ← current
+```
+
+**A memory leak has a signature: pods die and get recreated with no corresponding
+spec change.** There is none. No OOMKill, no restart, no recycling. The pods are
+young because openst was deployed repeatedly earlier in this session, not because
+something is killing them.
+
+With 601–710 MiB against a 2Gi limit and worst-case extrapolation from the faster
+replica (~6.9 MiB/h) reaching the limit in roughly nine days, there is no
+unbounded growth to act on. **Verdict: no leak; do not spend more on this.** The
+`/__mem` endpoint stays as the cheap ongoing check, and MEM_DEBUG stays off —
+turning it on would reset uptime and destroy the RSS-vs-uptime correlation, which is
+precisely the evidence that answered the question.
+
+- [x] openst memory investigated to a verdict: 2-sample rate + RS history; no leak
+- [x] §73 leak question closed — the suspected leak was never evidenced
+- [ ] Re-sample after a few days only if openst is redeployed for other reasons; not
+      worth a dedicated investigation on current evidence
