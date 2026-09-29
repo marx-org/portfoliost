@@ -3760,3 +3760,51 @@ precisely the evidence that answered the question.
 - [x] §73 leak question closed — the suspected leak was never evidenced
 - [ ] Re-sample after a few days only if openst is redeployed for other reasons; not
       worth a dedicated investigation on current evidence
+
+### 72.35 — XTB's missing deposit: it is absent from the SHEET, and here is the exact fix
+
+Read the source sheet in-cluster (a throwaway pod on the sheets-sync image with
+`sheets-sync-secrets`, reusing the repo's own `fetchSheet`/`refreshToken`). The
+import is **not** at fault — the funding row does not exist in the data.
+
+Deposits come from rows whose `Typ` is `Wpłata` (`transakcje-mapper.ts:200`), not
+from the column labelled `wpłata/wypłata`. `Typ` counts per Konto:
+
+```
+IB          Wpłata=41  Wypłata=5     ← funded
+IKE Beata   Wpłata=6
+IKE Marek   Wpłata=6
+Crypto / Equate+ / NN TFI PPK / NN TFI PPO / Obligacje PKO / Rach. rejestrowy: none
+XTB         Kupno=5  Sprzedaż=5  Div=12      ← no Wpłata and no Wypłata at all
+```
+
+XTB's ledger is therefore negative by everything it ever spent, exactly as
+§72.29/§72.32 found. The `Gotówka` sheet has no XTB column either, so the funding
+was never recorded anywhere.
+
+**The fix — one row, `Konto = XTB`, dated on or before 2022-02-11:**
+
+| column | value |
+|---|---|
+| `Typ` | `Wpłata` |
+| `Aktywo` | `Gotówka XTB` |
+| `Ilość transakcyjna` | `2716,60` |
+| `Cena transakcyjna jednostki (PLN)` | `1,00 zł` |
+| `Wartość transakcji (PLN)` | `2 716,60 zł` |
+| `Waluta transakcji` / `Kurs waluty transakcji` | `PLN` / `1,00 zł` |
+| `Konto` | `XTB` |
+| `wpłata/wypłata` | `1` |
+
+**2 716,60 PLN is exact**: the sum of XTB's five buys (568,20 + 396,97 + 446,74 +
+434,75 + 869,94), against 2 957,88 PLN of sales — so the portfolio nets +241,28 PLN
+realised, which is the real result the ledger currently reports as −56,50.
+
+**`wpłata/wypłata` must be `1`.** Despite the name, the importer reads that column as
+the **AU flag** (`parseAuFlag(cell(46), rowNo)`), and `parseRow` *throws* on a
+`Wpłata`/`Wypłata` row whose AU flag is 0 — the whole import aborts. Worth knowing
+because the column is labelled "deposit/withdrawal" and looks like the thing to
+fill in; filling it alone would fund nothing and, on a `Wpłata` row, break the run.
+
+- [x] XTB root cause located in the source sheet, exact row specified
+- [ ] Add the `Wpłata` row above, re-import, confirm the unfunded-portfolio finding
+      clears and `invested` stops being 0
