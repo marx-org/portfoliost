@@ -3463,3 +3463,58 @@ Two candidates remain, and I did not have the context to settle them:
 - [x] FX backfill run and verified to have added history
 - [x] IKE Beata 2022-05-13 explained (deposit) — no action, it is correct
 - [x] §72.21's hypothesis falsified, recorded so it is not retried
+
+### 72.27 — every flagged "unexplained step" was an external cash flow
+
+Went at §72.26's two candidates with direct prod SQL (kubeconfig + CNPG pod, read-only).
+Both closed, and neither was what I expected.
+
+**The general tool, which is the actual finding: `value_snapshots.net_flow`.**
+Value step, `flow != 0` → money moved in, stop investigating. `flow = 0` on both
+sides → a real anomaly worth the time. That is a two-column test and it should be
+the standard way to triage a suspicious step.
+
+**Sweep result: 117 steps >20% across all 10 portfolios, 106 explained by external
+flow, 11 not.** Both flags I chased were in the explained bucket:
+
+```
+IBKR       2022-06-20  2960.71 -> 13290.64  | flow=10304.33
+  cash row: TRANSFER 2215.03211991 EUR on 2022-06-20   (x4.65 = 10304 PLN)
+IKE Beata  2022-05-13  14056  -> 32183     | cash row: DEPOSIT 17766.00 PLN
+```
+
+`invested` moved by exactly the same 10304.33, which is the signature of a flow and
+not a valuation change. Both are correct. Nothing to fix in the valuation engine.
+
+**I made the same unpaginated-read mistake twice, and it is the part to remember.**
+1. `/portfolios/:id/transactions` returns only `["BUY","DIVIDEND","SELL"]` — cash is
+   not in it at all, so "no transaction that day" was never evidence about cash.
+2. `/portfolios/:id/cash/transactions` **defaults to 10 rows**; I read the first
+   page and reported IBKR as having 10 cash rows, all 2025+. It has **50**.
+
+Twice I read half a question and reported the other half as absent. Any conclusion
+about a portfolio's history must page to exhaustion first.
+
+### 72.28 — the 11 that flow does NOT explain
+
+- [ ] **XTB: 1680 negative-value snapshots.** Values run -1.90 … -55.57 and XTB has
+      **zero** cash rows, so the negative is coming from the position side, not from
+      an overdraft. A negative portfolio value is a defect unless there is a genuine
+      short. First query: the actual `positions` columns (my `instrument_symbol`
+      guess was wrong) and any negative quantities.
+- [ ] **IKE Marek 2022-06-13, +152% (6796 -> 17123), explained but a real defect.**
+      Sold four bonds that day: BST0922, INS0922 (26 units each), NVA0624, VOX0224.
+      Selling illiquid bonds into cash is a *swap*, so value should not move — it
+      jumped 152%, meaning the pre-sale value was badly **understated**. This is
+      §63.8's `gapSymbols` case: a held symbol with no bar for the window is dropped
+      from the value, so the bond contributed ~0 until the sale turned it into cash
+      at real proceeds. The defect is not the drop (that is deliberate) but that the
+      under-reported snapshot was **stored as if complete**. Check whether the
+      persisted gap marker is honoured by analytics/chart, or whether the value is
+      silently wrong for illiquid hold periods.
+- [ ] **Re-run the 11 unexplained with the near-zero-denominator filter.** `9.49 ->
+      -4.04` is a 13 PLN move on a ~0 base, which is why XTB's small values keep
+      tripping a 20% threshold. Filter on `abs(pv) > 1000` and re-count before
+      treating any of them as bugs; several will be arithmetic noise.
+- [x] §72.21 / §72.26 step investigation closed — all four original flags were flows
+      or the bond-valuation case above
