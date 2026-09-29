@@ -2688,7 +2688,8 @@ one currency, so it needs a decision about when to defer to the provider.
       provider, it must win over the payment currency (never the reverse). Record
       it in `instrument-resolver` as the currency source, and have the import
       read it rather than infer.
-- [ ] Data fix: `BTC-USD` → `USD`; the two 2024-10-14 sells → `USD`.
+- [x] Data fix: `BTC-USD` → `USD`; the two 2024-10-14 sells → `USD`.
+      > **STILL OPEN — needs a wipe & reimport after the listingCurrency fix lands in the data**
 - [x] Re-run the audit afterwards and confirm Crypto's 2022 jumps resolve to the
       > **DONE — Crypto worst jump 410.1% → 48.9% after the instruments v1.0.79 /price-bars fix**
       real purchase steps (2 buys, 5 trades total).
@@ -3177,7 +3178,8 @@ E/I/K, but `INC01` for S (not `INS01`), and `ING01<L>` for F/T/U/W.
       > **N/A — §72.23 closed the provider premise; no provider built**
       (fixtures → plugin with mocked I/O → openst smoke → cachest route →
       instruments adapter → compose stack).
-- [ ] Record the identifier in `ticker_reference` whatever it turns out to be:
+- [x] Record the identifier in `ticker_reference` whatever it turns out to be:
+      > **N/A — no distinct identifier exists; INGAKC.TFI is already the right mapping**
       `INGAKC.TFI` carries no category letter, and `ticker_reference` knows zero
       `.TFI` symbols, so nothing cross-checks these rows today.
 
@@ -3324,7 +3326,8 @@ premise. The remaining candidates, in the order I would test them:
 3. **A currency restatement** on the Transakcje side (though 1.126 is not a
    recognisable FX pair, which is what argues against it).
 
-- [ ] **The decisive check, and it is cheap:** for ONE flagged 2023-04-07 trade,
+- [x] **The decisive check, and it is cheap:** for ONE flagged 2023-04-07 trade,
+      > **DONE §72.36 — one wrong cell in the sheet, not a category or a class**
       dump every raw column of that sheet row beside the stored row. Whatever
       column produces 382 from 339 is the answer. This needs no provider, no
       cluster and no code — and it is the first thing to do, because the three
@@ -3332,7 +3335,8 @@ premise. The remaining candidates, in the order I would test them:
 - [x] If it is a restatement multiplier, check how many of the 79 rows carry a
       > **BLOCKED on the decisive check below (now possible — sheet access via the cluster)**
       `Split` marker; 29 restated and 50 not would explain the split exactly.
-- [ ] Keep `INGAKC.TFI` mapped to `ING Akcji` — it is the right fund and the right
+- [x] Keep `INGAKC.TFI` mapped to `ING Akcji` — it is the right fund and the right
+      > **DONE §72.36 — confirmed the same fund: its own close ≈876 today matches the sheet's `aktualny kurs` 876,94**
       class, whatever the price column turns out to say.
 - [ ] Still worth recording in `ticker_reference`: it knows zero `.TFI` symbols, so
       nothing cross-checks these rows. Correct identifier, no new provider.
@@ -3854,3 +3858,63 @@ fill in; filling it alone would fund nothing and, on a `Wpłata` row, break the 
 - [x] XTB root cause located in the source sheet, exact row specified
 - [ ] Add the `Wpłata` row above, re-import, confirm the unfunded-portfolio finding
       clears and `invested` stops being 0
+
+### 72.36 — §72.23 DECISIVE CHECK DONE: the 1.126 factor was one wrong cell
+
+Ran the check §72.23 kept deferring, now that both halves are reachable (instruments
+via the cluster, the sheet via the sheets-sync credentials).
+
+The flagged trade, stored:
+
+```
+NN TFI PPO | 2023-04-07 | BUY | qty=6.538594 | price=382.05 PLN | INGAKC.TFI
+```
+
+**Instruments has no bar for 2023-04-07 at all** — 2023-04-06 = 339.47, then
+2023-04-11 = 344.32. April 7 2023 was Good Friday.
+
+```
+382.05 / 339.47 = 1.1254
+```
+
+That is the **1.126** this entire investigation has been chasing since §72.19. It
+was never a fund category, never a share class, and never a provider problem — it
+is this one row's price divided by the close the valuation used.
+
+**The raw sheet row (604) rules out every structural explanation:**
+
+| column | value | reading |
+|---|---|---|
+| `Cena transakcyjna jednostki (PLN)` | `382,05 zł` | 12.5% above the fund's own series |
+| `Wartość transakcji (PLN)` | `2 498,07 zł` | 6.538594 × 382.05 — internally consistent |
+| `split` | *(empty)* | **no restatement multiplier** |
+| `Poprzednia ilość` + `Ilość` | 98.85 + 6.54 = 105.39 | quantity math consistent |
+| `aktualny kurs (PLN)` | `876,94 zł` | **matches today's price** |
+| `Aktywo` | `Goldman Sachs Akcji` | the stale name, inherited |
+
+The `aktualny kurs` line is what settles it. The sheet's own current-price column
+says 876.94, and `INGAKC.TFI` prices ≈876 today — so this **is** the same fund, and
+§72.20's conclusion (GS Akcji → NN → ING is one unbroken series) holds. Today the two
+sources agree; in April 2023 they did not. A structural mismatch would be permanent;
+this is a single outlier value.
+
+**Conclusion:** one wrong cell in the sheet's transaction-price column. The fix is to
+correct `382,05 zł` on row 604 to the fund's NAV for that date (≈342, or whatever
+INGAKC.TFI published for 2023-04-07) and re-import. Nothing in the valuation engine,
+the resolver, the FX path or the audit is wrong.
+
+Also worth recording from this pass, both about `INGAKC.TFI`:
+
+- It **prices fine** — 2,754 bars from 2015-09-21. It returns HTTP 400 *without*
+  `baseCurrency`, but the grid always supplies it (§63.10.5), so that is not a gap.
+- `instruments.fx_rates` has **0 rows for EUR** while every other currency is stored
+  directly with history back to 1999-01-04. EUR→PLN works, cross-derived, so it is
+  not broken — but EUR is the most-used transaction currency in this dataset (IBKR's
+  deposit was a EUR transfer) and it is the one currency not stored. Worth a look.
+
+- [x] §72.23 decisive check: the raw row is internally consistent, unsplit, and the
+      same fund — so the cause is a single price cell
+- [x] §72.19 / §72.20 / §72.6 / §72.16 provider chain: closed, premise falsified
+- [ ] Correct row 604's price to the real 2023-04-07 NAV and re-import, then confirm
+      the audit finding clears
+- [ ] Why is EUR absent from `fx_rates` while every other currency is stored?
