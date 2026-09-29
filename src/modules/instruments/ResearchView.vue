@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
+import TickerBadge from "@/components/TickerBadge.vue"
 import InstrumentSearchModal from "@/modules/instruments/InstrumentSearchModal.vue"
 import RecentSearchesBar from "@/modules/instruments/RecentSearchesBar.vue"
 import { getInstrumentProfile } from "@/api/instruments"
@@ -97,12 +98,15 @@ async function addToWatchlist(): Promise<void> {
   <div>
     <div class="mb-6 flex flex-wrap items-center gap-3">
       <router-link :to="backTarget" class="btn-ghost" data-testid="research-back">&larr; Go back</router-link>
-      <img :src="`/api/logos/${routeSymbol}`" :alt="routeSymbol" class="h-9 w-9 rounded-full bg-slate-100 dark:bg-slate-800" />
-      <div>
-        <h1 class="text-2xl font-semibold">{{ routeSymbol }}</h1>
-        <p v-if="profile?.name" class="text-sm text-slate-500 dark:text-slate-400">{{ profile.name }}</p>
-      </div>
-      <span class="rounded-full bg-slate-200 dark:bg-slate-700/70 px-2 py-0.5 text-xs font-medium text-slate-600 dark:text-slate-300">{{ routeSymbol }}</span>
+      <TickerBadge
+        size="lg"
+        title-as="h1"
+        testid="research-ticker"
+        :symbol="routeSymbol"
+        :name="profile?.name"
+        :country-code="profile?.countryCode"
+        :asset-type="profile?.assetType"
+      />
       <button
         type="button"
         class="btn-secondary ml-auto text-sm"

@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue"
 import { useRoute } from "vue-router"
 import * as instrumentsApi from "@/api/instruments"
+import TickerBadge from "@/components/TickerBadge.vue"
 import StatGroup from "@/components/StatGroup.vue"
 import PriceChart from "@/components/PriceChart.vue"
 import CurrencyWarningBadge from "@/components/CurrencyWarningBadge.vue"
@@ -225,13 +226,17 @@ const targetSpread = computed(() => {
     <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading research data...</p>
 
     <template v-if="!loading && !error">
-      <div class="flex items-center gap-3">
-        <img :src="`/api/logos/${symbol}`" :alt="profile?.name ?? symbol" class="h-10 w-10 rounded-full bg-slate-100 dark:bg-slate-800" />
+      <div class="flex items-start gap-3">
         <div>
-          <div class="flex items-center gap-2">
-            <h2 class="text-lg font-semibold">{{ symbol }}</h2>
-            <span class="text-sm text-slate-500 dark:text-slate-400">{{ profile?.name }}</span>
-          </div>
+          <TickerBadge
+            size="lg"
+            title-as="h2"
+            testid="overview-ticker"
+            :symbol="symbol"
+            :name="profile?.name"
+            :country-code="profile?.countryCode"
+            :asset-type="profile?.assetType"
+          />
             <p v-if="quote?.currentPrice" class="flex flex-wrap items-center gap-2 text-sm">
               <span class="font-semibold">{{ formatAmount(quote.currentPrice, instrCcy) }}</span>
               <span :class="quote.change >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'" class="ml-0">

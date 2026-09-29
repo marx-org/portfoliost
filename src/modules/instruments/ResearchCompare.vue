@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue"
 import { useRoute } from "vue-router"
 import { getInstrumentPeers } from "@/api/instruments"
 import type { components } from "@/api/types"
+import TickerBadge from "@/components/TickerBadge.vue"
 import { COMPARE_METRICS } from "./compareMetrics"
 
 const route = useRoute()
@@ -44,8 +45,23 @@ const rows = computed(() =>
             <tr class="border-b border-slate-200 dark:border-slate-700/60 text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
               <th class="py-2 pr-3">Metric</th>
               <th v-for="r in items" :key="r.symbol" class="px-3 py-2 text-right">
-                <div :class="r.symbol === symbol ? 'font-bold text-blue-700 dark:text-blue-400' : 'font-medium'">{{ r.symbol }}</div>
-                <div class="text-[10px] font-normal normal-case text-slate-400 dark:text-slate-500">{{ r.name }}</div>
+                <!-- The primary column keeps its blue highlight; the badge
+                     supplies the rest of the identity block. `normal-case`
+                     because the column header's `uppercase` is meant for the
+                     metric labels, not for a company name. -->
+                <div
+                  class="normal-case tracking-normal"
+                  :class="r.symbol === symbol ? 'text-blue-700 dark:text-blue-400' : ''"
+                >
+                  <TickerBadge
+                    size="sm"
+                    align="right"
+                    :symbol="r.symbol ?? ''"
+                    :name="r.name"
+                    :country-code="r.countryCode"
+                    :asset-type="r.assetType"
+                  />
+                </div>
               </th>
             </tr>
           </thead>

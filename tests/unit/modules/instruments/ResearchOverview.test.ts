@@ -167,7 +167,12 @@ describe("ResearchOverview", () => {
     expect(mocked.getInstrumentProfile).toHaveBeenCalledWith("AAPL.US")
     expect(mocked.getInstrumentMetrics).toHaveBeenCalledWith("AAPL.US")
     expect(mocked.getQuote).toHaveBeenCalledWith("AAPL.US")
-    expect(wrapper.find("h2").text()).toContain("AAPL")
+    // §61.8 — the ticker lives in the shared identity block, not a bare h2
+    // (the first h2 on the page is the "About" heading).
+    const badge = wrapper.get('[data-testid="overview-ticker"]')
+    // the route symbol is the venue-qualified `AAPL.US`; the logo strips the suffix
+    expect(badge.find("h2").text()).toBe("AAPL.US")
+    expect(badge.find("img").attributes("src")).toContain("/api/logos/AAPL")
   })
 
   it("renders the current price from the quote", async () => {

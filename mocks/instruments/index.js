@@ -76,6 +76,12 @@ function profileFor(symbol, research) {
     ticker: symbol,
     name: research.overview.name,
     country: research.overview.country,
+    countryCode:
+      typeof research.overview.country === "string" && /^[A-Za-z]{2}$/.test(research.overview.country)
+        ? research.overview.country.toUpperCase()
+        : null,
+    // §61.8 — asset class for the shared identity block (TickerBadge).
+    assetType: research.overview.type ?? null,
     exchange: research.overview.exchange,
     logo: `/logos/${symbol}.svg`,
     marketCapitalization: research.basics.marketCap / 1e6,
