@@ -1,16 +1,35 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue"
+import { computed, onMounted, ref } from "vue"
 import { useRoute } from "vue-router"
 import { getPortfolioNews } from "@/api/portfolios"
+import { usePortfolioStore } from "@/stores/portfolios"
+import TickerBadge from "@/components/TickerBadge.vue"
 import type { components } from "@/api/types"
+import type { PortfolioPositions } from "@/api/types"
 
 const route = useRoute()
 const id = String(route.params.id)
+const store = usePortfolioStore()
 const data = ref<components["schemas"]["NewsArticleList"] | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
 
+/**
+ * §61.7 — a news article carries only a ticker, so the identity block's
+ * name/country/type come from the portfolio's own open positions. A ticker
+ * with no open position (rare: news is fetched for held stocks) degrades to
+ * logo + ticker rather than inventing a name.
+ */
+const positionBySymbol = computed(() => {
+  const map = new Map<string, PortfolioPositions[number]>()
+  for (const p of store.positions) map.set(String(p.symbol).toUpperCase(), p)
+  return map
+})
+const positionFor = (ticker: unknown) => positionBySymbol.value.get(String(ticker).toUpperCase())
+
 onMounted(async () => {
+  // The tab is reachable directly via its route, so the store may be empty.
+  if (!store.positions.length) await store.fetchPositions(id)
   try {
     data.value = await getPortfolioNews(id)
   } catch (err) {
@@ -39,9 +58,15 @@ function toneClass(tone: string | undefined): string {
           :key="idx"
           class="card flex flex-col p-5 transition-shadow hover:shadow-md"
         >
-          <div class="mb-2 flex items-center justify-between">
-            <span class="rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-xs font-medium uppercase text-slate-600 dark:text-slate-300">{{ a.ticker }}</span>
-            <span v-if="(a.sentiment as Record<string, unknown>)?.tone" class="rounded-full px-2 py-0.5 text-xs font-medium capitalize" :class="toneClass((a.sentiment as Record<string, string>).tone)">
+          <div class="mb-2 flex items-start justify-between gap-3">
+            <TickerBadge
+              size="sm"
+              :symbol="String(a.ticker)"
+              :name="positionFor(a.ticker)?.companyName"
+              :country-code="positionFor(a.ticker)?.country"
+              :asset-type="positionFor(a.ticker)?.assetType"
+            />
+            <span v-if="(a.sentiment as Record<string, unknown>)?.tone" class="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium capitalize" :class="toneClass((a.sentiment as Record<string, string>).tone)">
               {{ (a.sentiment as Record<string, string>).tone }}
             </span>
           </div>

@@ -74,6 +74,39 @@ test("portfolio detail shows metric strip, tabbed sections, and positions", asyn
   await expect(page).toHaveURL(/\/en\/research\/META\/overview/)
 })
 
+test("portfolio news cards show the shared identity block, enriched from the open position (§61.7)", async ({ page }) => {
+  await login(page)
+  await page.getByRole("link", { name: /Top10/ }).click()
+  await expect(page).toHaveURL(/\/en\/portfolios\/[^/]+\/holdings/)
+  const pid = new URL(page.url()).pathname.split("/")[3]
+  // Only a held ticker can be enriched, so read the held set off the holdings
+  // table first.
+  const heldBadges = page.locator("tbody [data-testid='ticker-badge']")
+  await expect(heldBadges.first()).toBeVisible({ timeout: 20000 })
+  const held = new Map<string, { details: string; name: string }>()
+  for (const t of await heldBadges.allInnerTexts()) {
+    const [symbol, details, , name] = t.split("\n").map((s) => s.trim())
+    if (name) held.set(symbol, { details, name })
+  }
+
+  await page.goto(`/en/portfolios/${pid}/news`)
+  await expect(page.locator("article").first()).toBeVisible({ timeout: 20000 })
+  // Match on the badge's own ticker line, not a substring of the whole card —
+  // `:has-text("KO")` also matches an ORCL card.
+  let checked = 0
+  for (const card of await page.locator("article").all()) {
+    const badge = card.getByTestId("ticker-badge")
+    const symbol = (await badge.innerText()).split("\n")[0].trim()
+    const expected = held.get(symbol)
+    if (!expected) continue
+    await expect(badge.locator("img")).toHaveAttribute("src", `/api/logos/${symbol}`)
+    await expect(badge.locator('[data-testid="ticker-badge-details"]')).toHaveText(expected.details)
+    await expect(badge.locator('[data-testid="ticker-badge-name"]')).toHaveText(expected.name)
+    checked++
+  }
+  expect(checked, "no news card matched a held position").toBeGreaterThan(0)
+})
+
 test("transactions page lists transactions with sortable columns and pagination", async ({ page }) => {
   await login(page)
   await page.goto("/en/investments/transactions")
