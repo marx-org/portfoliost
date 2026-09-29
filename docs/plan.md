@@ -1526,7 +1526,7 @@ upstreams.
 | `portfoliost-admin` | ~~5.0.1~~ 5.1.0 | liveness+readiness+**startup** (§64.1) | ~~`tcpSocket`~~ `httpGet` ✅ | `/health` 200 |
 | `portfoliost-users-auth` | 5.1.0 | liveness+readiness+**startup** (§64.1) | ~~`tcpSocket`~~ `httpGet` ✅ | `/health` 200 |
 | `portfoliost` (SPA) | 5.1.0 | ~~none~~ liveness+readiness (§64.3) | ~~—~~ `httpGet` ✅ on `/` | `/` 200 (`serve -s`, **not** nginx) |
-| `jobshot` | 5.1.0 | **none** | — | every path → `index.html` 200 |
+| `jobshot` | 5.1.0 | ~~none~~ liveness+readiness (§64.4) | ~~—~~ `httpGet` ✅ | `/health` 200, `/ready` 200/503 (were `index.html` for both) |
 | `mastra-ticker` | 5.1.0 | liveness (`custom: true`) | n/a — **no Deployment or Service in cluster** | unreachable |
 
 Struck-through cells are **superseded, not deleted** — the middle column records
@@ -1714,23 +1714,104 @@ startupProbe is needed is not "serve starts fast" (which was a guess) but that
 liveness allows `3 × 20s = 60s` before a kill, which bounds the risk no matter
 how slow a start becomes.
 
-### 64.4 — jobshot: needs a real health route (crosses a 3rd repo)
+### 64.4 — jobshot: a real health route (crosses a 3rd repo) — **DONE**
 
-- [ ] **Blocked on open question 1.** `jobshot` returns `index.html` for
-      `/health`, `/healthz` and `/ready` alike (SPA fallback), so any HTTP probe
-      on it is a no-op that always passes. Either add a real `/health` in the
-      `jobshot` repo, or accept a `/` probe that only proves nginx is up.
-- [ ] Tests: the chosen endpoint returns something other than the SPA shell
-      (assert on content, not just status), pod 1/1.
-- [ ] Commit.
+Open question 1 answered **YES** (add a real `/health`), so this was unblocked.
+
+The root cause was worse than "a no-op probe". `jobshot` is an Express server
+(`server.js`), and its SPA fallback sends `dist/index.html` for **every** path
+not starting with `/api/`. Measured in PROD before the change:
+
+```
+/health  status=0 bytes=454  <!doctype html><html lang="en…     ← the shell
+/ready   status=0 bytes=454  <!doctype html><html lang="en…     ← the shell
+/        status=0 bytes=454  <!doctype html><html lang="en…     ← the shell
+/api/jobs status=0 bytes=635 {"jobs":[{"name":"Scan single…      ← real JSON
+```
+
+All three shell responses are byte-identical. So a status-only probe here could
+not fail even in principle.
+
+- [x] Add a real `/health` in the `jobshot` repo — registered **above** the SPA
+      fallback, which is the only thing that mattered. `/health` is liveness and
+      touches nothing deliberately: the Kubernetes API is a network dependency,
+      and failing liveness on an API blip would restart-loop a pod whose UI is
+      fine, and restarting cannot fix the API server. jobshot **v1.7.0**
+      (`feat` → semantic-release minor), commit `c2d1525`.
+- [x] Also add `/ready`, checking only local files (`dist/index.html`,
+      `config/jobs.yaml`) — no network, so it cannot flap on an upstream. This
+      avoids recreating the "readiness duplicates liveness" problem that open
+      question 3 flags: if either file is gone the pod is up and answering while
+      unable to serve, which `/health` cannot see without becoming
+      dependency-aware.
+- [x] Tests: the endpoint returns something other than the SPA shell, asserted on
+      **content**; pod 1/1. Verified locally against a real server *and*
+      in-cluster on the deployed pod:
+
+      | request | before | after |
+      |---|---|---|
+      | `/health` | 200, 454 B shell | 200, 15 B `{"status":"ok"}` |
+      | `/ready` | 200, 454 B shell | 200, 18 B `{"status":"ready"}` |
+      | `/` | 200, 454 B shell | 200, 454 B shell (fallback intact) |
+      | `/some/spa/deep/route` | — | 200, 454 B (fallback intact) |
+      | `/assets/index-*.js` | — | 200 `text/javascript` (static intact) |
+      | `/api/jobs` | 200 JSON | 200 JSON (job API intact) |
+
+      The negative case, which is the one that carries the design: with
+      `config/jobs.yaml` removed, `/ready` → **503**
+      `{"status":"degraded","missing":["config/jobs.yaml"]}` while `/health`
+      stayed **200** — the liveness/readiness split working as intended, and the
+      only negative case this repo could run (it has no test framework; see
+      below).
+- [x] Commit. homelab `e4c79a782`, pin `1.6.1` → **`1.7.0`** (no `v`: this
+      repo's workflow uses `type=semver,pattern={{version}}`; verified `1.7.0`
+      exists in ghcr and `v1.7.0` does not). Pod `jobshot-5c7d7885df-l45z8` 1/1,
+      **0 restarts**, both probes live as `httpGet` on 3000,
+      `helmrelease/jobshot` back to `Ready=True` (`.v31`).
+
+#### jobshot is NOT on KEDA — the manifests are dead files
+
+Worth recording, because the app directory looks like a scale-to-zero service
+and is not one. Four independent signals:
+
+| signal | jobshot | a real KEDA app (investbrain/pgweb) |
+|---|---|---|
+| `httpscaledobject.yaml` in `app/` | present | present |
+| listed in `kustomization.yaml` `resources` | **no** | yes |
+| `ScaledObject` in the cluster | **none** | present |
+| `replicas` in helmrelease | **1** | 0 |
+| ingress target | **app service** | interceptor proxy |
+
+Flux never applies the unwired files, and the live namespace confirms it: the
+only `ScaledObject`s are `investbrain`, `pgweb`, `scanst-ui`. So liveness +
+readiness on a plain always-on Deployment is correct here. If that is ever
+wired up, `replicas` must become `0`, a `startupProbe` becomes mandatory, and
+liveness becomes near-pointless on a pod that is deleted when idle.
+
+**`scorest` carries the same dead `httpscaledobject.yaml` +
+`interceptor-service.yaml`** and is likewise not on KEDA. Left alone — out of
+this plan's scope, but it is the second app where the directory lies about the
+deployment shape.
+
+#### jobshot has no tests, and its CI has no test job
+
+`package.json` has no test script, there is no runner or test file in the repo,
+and `build.yml` runs `semantic-release` + build with no `test` step at all — the
+§64.2 GHA problem in a more complete form. Verification here was therefore done
+by running the real server and asserting on content, which is stronger than a
+unit test for this particular claim but is not something CI will ever re-check.
+Also pre-existing and unrelated: `yarn lint` fails on `master` with an eslint
+flat-config migration error in `eslint.config.js` (verified identical on a clean
+HEAD).
 
 
 ### Open questions
 
-1. **jobshot health route** — add a real `/health` in the `jobshot` repo
-   (3rd repo for this plan), or accept a `/` probe that only proves nginx is
-   up? The plan currently assumes a real route is preferred; §64.4 is blocked until this is
-   answered. YES
+1. **jobshot health route** — **resolved: YES, add a real route.** Done in
+   §64.4 (jobshot v1.7.0): the fix was registering `/health` and `/ready` above
+   the SPA fallback. The fallback was the whole problem — it answers `index.html`
+   for every non-`/api/` path, so `/health` and `/ready` were byte-identical to
+   `/`.
 2. **cachest `/ready`** — **resolved in §64.2: yes, add it.** The counter-argument
    was that cachest degrades gracefully to cache misses anyway. True, and it is
    exactly the reason it is needed: without a readiness gate the pod keeps taking
