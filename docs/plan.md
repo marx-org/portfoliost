@@ -3172,3 +3172,112 @@ NN TFI trade is a false positive, and a correct one for the wrong reason.
 - [ ] Step 3 — `ticker_reference` entry for the class + sweep the other `.TFI` rows
 - [ ] Step 4 — `positions.company_name` off the stale sheet name
 - [ ] Audit: date window / order-priced exemption for fund trades
+
+## 74. `price-audit` compares order-priced fund trades against the wrong day's bar (2026-09-29)
+
+Promoted out of §72.36, which reached a conclusion and was then retracted (§72.37);
+what survived is a real defect in the audit itself, and it deserves a main section
+rather than a footnote on a wrong theory.
+
+A PPO/PPI fund order is priced at the **NAV of the valuation date**, not the order
+date. The broker's own detail for the flagged row says so in its field names:
+
+```
+Data zlecenia:  07.04.2023   (Good Friday — the market was shut)
+Data wyceny:   13.04.2023
+Cena Jednostki Uczestnictwa z dnia wyceny: 382,05 PLN
+Wartość rejestru po transakcji: 40 264,92 PLN = 105,391757 × 382,05
+```
+
+`price-audit.ts:119` `pickBar()` takes the exact day, else the most recent **prior**
+close within `MAX_CARRY_DAYS` (7). For 2023-04-07 that is 2023-04-06 = 339.47, so
+the audit computes `382.05 / 339.47 = 1.1254`, exceeds `DEFAULT_TOLERANCE` (0.1), and
+reports a mismatch on a trade that reconciled exactly. Carrying *backward* is right
+for an exchange-traded holiday; it is wrong for a fund order priced forward.
+
+This is the `1.126` that §72.19 and §72.20 chased across nine ING Akcji categories
+before §72.23 kept deferring the check. It was never a fund class, a share class, or
+a provider gap. The number is an artefact of the comparison, and every NN TFI trade
+in the dataset is a false positive of the same shape.
+
+The price is correct. **Row 604 of the sheet must not be edited** — two earlier
+sections said to, and both were wrong.
+
+Repos touched: `portfoliost-wallets` only. No provider-tier ordering: this changes
+how the audit reads bars it already has, not how any bar is fetched.
+
+---
+
+### 74.1 — Pin the defect with a failing test before changing anything
+
+- [ ] `price-audit.test.ts`: a `*.TFI` trade dated on a non-trading day whose
+      executed price matches a **later** bar must not be reported as a mismatch.
+      Today it fails at 12.5% deviation; that failure is the proof the defect is
+      where §74 claims it is.
+- [ ] The same trade against a **prior** bar (the current behaviour) is kept as a
+      control, so the fix cannot be satisfied by simply widening every tolerance.
+- [ ] Tests: `npx vitest run src/scripts/price-audit.test.ts`.
+
+### 74.2 — Decide how an order-priced instrument is identified
+
+- [ ] `price-audit.ts` `main()` currently selects no `asset_type`. Extend the
+      `TradeRow` projection with `t.asset_type` so the rule has something to key on
+      rather than inferring from the symbol.
+- [ ] **Open question — do not guess:** is `asset_type` populated as `FUND` (or an
+      equivalent) for these rows in prod, or are they `null`/unset? Query
+      `portfolios.transactions` for `INGAKC.TFI` before writing the predicate. If
+      the column is not populated, identifying the instrument by asset type is not
+      available and the step must be re-specified from whatever *is* reliable.
+- [ ] If the column is empty, the fallback is a ticker-shape rule (`*.TFI`) — which
+      is a guess about provider conventions and must be recorded as such, not
+      presented as a classification.
+
+### 74.3 — Compare against the valuation-date window, not `executed_at`
+
+- [ ] Add `pickOrderPricedBar(bars, date, windowDays)`: the bar nearest `date`
+      within ±`windowDays` in **either** direction, reporting which side it took and
+      how far, so a finding can always be judged.
+- [ ] Keep `pickBar()` unchanged for exchange-traded instruments. Two functions,
+      one per pricing model, chosen by §74.2 — not one widened tolerance.
+- [ ] The window is a new constant alongside `MAX_CARRY_DAYS`. It is **not** a
+      number yet: §74.4 measures it.
+- [ ] Report the pair as `order-priced` with its date offset in the per-symbol
+      report, so a human can see *why* a bar was chosen rather than being handed a
+      ratio with no provenance.
+
+### 74.4 — Measure the window instead of guessing it
+
+- [ ] In prod, for every `*.TFI` BUY/SELL, find the nearest `INGAKC.TFI` bar to
+      `executed_at` and record the signed day offset. The spread of those offsets is
+      the number the constant should be.
+- [ ] Record the measurement in this step, including the outliers and how many
+      trades fall outside the chosen window. A window that silences the false
+      positives but also hides a genuine mismatch is worse than the defect.
+
+### 74.5 — The two facts that are still genuinely unresolved
+
+- [ ] **`INGAKC.TFI` reproduces neither price the broker quotes.** 351.93 on the
+      2023-04-13 valuation date against 382.05 paid; 819.44 on 2026-09-25 against
+      the sheet's own `aktualny kurs` of 876,94. Either the TFI feed is a different
+      series from the one orders execute against, or that manually-maintained column
+      is stale. Until this is answered, do not assume the symbol mapping is correct
+      and do not treat §74.3 as fixing valuation — it fixes the *audit*.
+- [ ] **Why is `EUR` absent from `instruments.fx_rates`** while 20+ other currencies
+      are stored directly with history to 1999-01-04? EUR→PLN resolves, so it is
+      cross-derived and not broken — but EUR is the most-used transaction currency
+      in this dataset, and it is the one currency not stored. Establish whether
+      that is deliberate (PLN base + a deliberately reduced currency set) or an
+      oversight in the FX importer's currency list.
+
+### 74.6 — Close the loop in prod
+
+- [ ] `price-audit` re-run; confirm the NN TFI false positives are gone and the
+      reported count only goes down.
+- [ ] Confirm no previously-clean symbol is now flagged, and that the `SAP.DE`
+      finding §72.18 shipped against is still resolved.
+- [ ] Then close §72.37's audit item, §72.22's re-read item, §72.23's decisive
+      check, and §72.4's "run it for real" — they are the same outstanding run.
+- [ ] `positions.company_name` still reads "Goldman Sachs Akcji", inherited from the
+      stale sheet name. Cosmetic, and it is what made this look like a wrong-fund
+      problem for several passes. Fix with §72.39 step 4.
+- [ ] Commit.
