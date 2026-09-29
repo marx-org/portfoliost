@@ -3969,3 +3969,61 @@ offending code is the comparison policy in `price-audit.ts`, not any data.
       TFI feed is a different series/class from the one orders execute against, or
       the sheet's manually-maintained `aktualny kurs` column is simply stale. Not
       resolved; do not assume the symbol mapping is right.
+
+### 72.38 — the openst class-provider plan is RESTORED. I killed a live plan on a conflation
+
+**What happened to it: I closed it, wrongly.** In the checkbox reconciliation I marked
+§72.6's and §72.16's provider items `N/A §72.23 — no distinct class exists`. The
+conflation: §72.20 established that the **name** lineage Goldman Sachs Akcji → NN
+Akcji → ING Akcji is one unbroken series, and I treated that as "therefore there is one
+price series". A fund can have a single name lineage and several unit categories,
+each with its own NAV. Name continuity says nothing about price series. That was my
+inference, not a finding.
+
+**§72.6's own decisive check had been answered in favour of the provider.** It said:
+*"if it is ~382 PLN the bar is the wrong series; if ~339 then we paid 12.6% above
+NAV"*. The broker's detail confirms **382,05 was actually paid**. So the bar is the
+wrong series — which is the premise for building the class provider, not a refutation
+of it.
+
+**And the ratio is not constant**, which corrects §72.6 in the other direction too.
+Comparing each trade against the bar on its own date:
+
+```
+2023-08-09  paid=432.49  bar=396.80  ratio=1.0899
+2024-06-13  paid=515.13  bar=466.96  ratio=1.1032
+2025-05-13  paid=643.28  bar=575.59  ratio=1.1176
+2026-08-19  paid=896.00  bar=795.02  ratio=1.1270
+```
+
+§72.6 argued a *fixed* multiplicative offset is the signature of two classes, and
+ruled out "compounding dividends (the ratio would grow)". But the ratio **does** grow,
+~1.2%/yr. So §72.6's expectation of a fixed offset was itself shaky: two classes with
+different ongoing fees diverge *progressively*, so growth is what a class difference
+should look like. A fixed offset would have pointed at an arithmetic error instead.
+The growth is consistent with the class hypothesis, not against it.
+
+`instruments.split_adjustments` has **0 rows**, so nothing is being adjusted — this is
+not an adjusted-vs-unadjusted artefact either. And §72.6 already established the bars
+track the provider's live quote (795.02 on 2026-08-19 vs 820.03 current), so the bar
+and the quote are one series while the broker's executions are priced off another.
+
+**Position: the broker executes against a series ~12.7% above the one the provider
+quotes, and the two diverge over time. That is two series, and the openst class
+provider is the right fix. Restored as open.**
+
+- [x] **§72.6 / §72.16 provider items RESTORED to open** — the N/A was a conflation
+      of name lineage with price series
+- [x] §72.37's "valuation-date artefact" explanation withdrawn — a date offset cannot
+      produce a ratio that grows 1.0899 → 1.1270 across three years
+- [ ] **Decisive, now cheap and unambiguous:** compare `INGAKC.TFI`'s bar against
+      ING01's *published* NAV for **2026-08-19** (bar 795.02, paid 896.00) and
+      **2023-04-13** (bar 351.93, paid 382.05). If ING01 ≈ 896/382 the bar is the
+      wrong class; if ING01 ≈ 795/352 then orders execute against a class with no
+      series at all. This is the check that settles it, and §72.6's version of it was
+      left open far too long.
+- [ ] Build the openst provider for that class, in the planner contract's provider-tier
+      order: fixture → plugin with mocked I/O → openst smoke → cachest route →
+      instruments adapter → compose.
+- [ ] `ticker_reference` knows zero `.TFI` symbols, so nothing cross-checks them.
+- [ ] `positions.company_name` still shows the stale "Goldman Sachs Akcji".
