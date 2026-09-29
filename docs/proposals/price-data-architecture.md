@@ -727,12 +727,30 @@ of the price tables.
   ⨝ fx_rates(EUR base)` for the requested window — a PK probe on both `fx_rates`
   sides (verified by EXPLAIN test; no seq scan). Same-currency/absent keeps the
   plain read. Unsupported currency or unresolvable base → 400.
-- **`fxFrom` floor semantics:** the response carries `baseCurrency`, the output
-  `currency`, and `fxFrom` — the earliest `fx_rates` date covering the window
-  (null when no conversion applied). Bars older than `fxFrom` are *unconverted*
-  (left in the base currency), never silently re-based — the SPA renders an
-  explicit caveat for that window. EUR is the implicit fx base (no EUR row; the
-  join uses 1.0).
+- **`fxFrom`, and unconvertible bars are now ABSENT (§72.17).** The response
+  carries `baseCurrency`, the output `currency`, and `fxFrom` — the earliest
+  `fx_rates` date that converted (null when no conversion applied). EUR is the
+  implicit fx base (no EUR row; the join uses 1.0).
+  - **Superseded, do not reimplement:** bars used to be left in the base currency
+    when no rate row existed for their date ("floor semantics"), while the
+    response still declared `currency: <target>` for the whole series. That
+    served a source-currency number under the target's label, and the wallets
+    grid multiplied it into a portfolio total — Crypto read 168.79 PLN the day
+    after a correct ~683, i.e. a −75% crash and a +300% recovery that never
+    happened. `convertSeries` now returns a `convertedMask` and the route drops
+    the masked-out bars from timestamps/OHLC/volumes together, so a converted
+    series contains nothing in another currency. A missing rate is a **gap**,
+    which every consumer already carries forward.
+  - **The gaps are not a prefix.** `fxFrom` describes only the first converted
+    date; `fx_rates` coverage holes are scattered through the window wherever a
+    pair is missing. `fxFrom` alone cannot tell a caller which later bars are
+    unconverted, which is why the mask had to come from the producer. The old
+    consumer-side guard (§72.16) cut the prefix and so fixed only part of the
+    problem — worth remembering as the reason not to infer currency from a
+    single boundary field.
+  - **Still missing:** the response does not say which bars were dropped. A
+    caller can see a shorter series but not why. `unconvertedDates` (or a count)
+    is the honest fix and needs a contracts change — tracked in plan §72.17.
 - **No new index:** the join is two PK lookups (`fx_rates (rate_date, currency)`)
   plus the existing window scan on the bars; an `EXPLAIN` test pins the plan. A
   conversion index would only pay off if the plan regresses, which the test

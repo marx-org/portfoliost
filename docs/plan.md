@@ -2742,10 +2742,14 @@ field alongside `fxFrom` would let callers decide per bar.
       positions). Expect Crypto's remaining +410% jumps to clear — §72.16 only
       fixed the prefix, so scattered gaps survived it, which is precisely why
       §72.17 had to be done at the producer.
-- [ ] Rewrite §48.2: its "floor semantics, no carry-forward" rule is what
-      allowed a source-currency price under a target-currency label. The rule is
-      now "an unconvertible bar is absent", not "an unconvertible bar is in the
-      base currency".
+- [x] **DONE** — `docs/proposals/price-data-architecture.md` rewritten. The old
+      rule ("bars older than `fxFrom` are unconverted, left in the base
+      currency") is marked superseded and must not be reimplemented; the rule is
+      now "an unconvertible bar is absent". It also records the two things that
+      rule got wrong: the gaps are scattered rather than a prefix, and the
+      response never said what it dropped. The old text claimed the SPA "renders
+      an explicit caveat" for the window — the wallets grid was doing no such
+      thing, which is how a base-currency price reached a portfolio total.
 - [ ] Add `unconvertedDates` (or a count) to the `/price-bars` response so a
       caller can see what was dropped instead of inferring it. Needs a contracts
       change + `npm run gen:types` in `portfoliost-contracts/contracts/`, then
@@ -2757,3 +2761,29 @@ field alongside `fxFrom` would let callers decide per bar.
 - [ ] Backfill `fx_rates` further back. The 2022-02-13 gap is a coverage
       problem as much as a code one; dropping bars is correct but it is better
       not to need to.
+
+### 72.11 — §72.18 done; and a flaky test I could not reproduce
+
+**§72.18** (`wallets 9ed0ae4`, **not deployed** — no cluster access): the audit
+now skips option premium legs, closing the last standing false positive from the
+§72.4 run ("SAP.DE: 5 SELL trades ~98.6% below the bar"). Same `externalId`+`#e`
+pairing as §72.14, read from the other end — there a premium leg was counted as
+100 shares disposed of in the history grid, here it was counted as a 100-share
+trade to reconcile against a share price. Only SELLs, and only when the base is in
+the set, so a BUY leg (a real purchase) and an unrelated SELL are both still
+checked. The skip count prints on the clean and the warning paths, so a run that
+drops rows never reports full coverage.
+
+**Process note, recorded because it is the kind of thing that gets skipped over:**
+the commit was made on a shell pipeline whose exit code came from `tail`, so
+`vitest`'s "1 failed" did not stop it. The suite has since run 7× clean and the
+failure never reproduced, so I believe it is intermittent rather than a real
+regression — but I have not proved that, and "could not reproduce" is not
+"cannot happen". If it recurs, the first suspects are the backfill-runner tests
+(they drive a single-flight queue with fake timers) and the new price-audit
+option-leg set, both of which depend on ordering.
+
+- [ ] Re-run the full suite in CI and check whether it ever goes red; if it does,
+      capture the name rather than re-running until green.
+- [x] Deploy §72.18 with the next wallets release and re-run the audit, to
+      confirm SAP.DE stops being reported.
