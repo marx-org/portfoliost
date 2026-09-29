@@ -3057,3 +3057,46 @@ coincides with a transaction; that check is the next step and it is mechanical.
       still a bug, and the symbol and currency for that date name it.
 - [ ] Re-run the price audit (§72.18 shipped but the audit has not been re-run) and
       confirm SAP.DE stops being reported.
+
+### 72.19 — §72.16 narrowed: the class is NOT K, and the target is now numeric
+
+analizy.pl's URL scheme is `ING<NN><CATEGORY>` for the A class and `INK01` /
+`ING77E` / `ING55E` / `ING61K` for others, so each category is directly fetchable.
+Measured on **2026-09-25**, the same date for every row:
+
+| category | URL | NAV (PLN) | vs A |
+|---|---|---|---|
+| **A** | `ING01` | **819.44** | — (this is what we serve) |
+| **K** | `INK01` | **876.94** | **+7.02%** |
+
+**K is ruled out.** Our trades sit at a constant 1.126× the bar, and the bar is
+category A, so our class's NAV on 2026-09-25 is `1.126 × 819.44 ≈` **922.5 PLN** —
+a category ~12.6% *above* A. K is 7.0% above A, so it is the wrong class, and worth
+recording because it was the plausible-looking candidate: K is the one category
+analizy.pl lists that is unambiguously *above* A, so "the class is higher than the
+one we serve" was nearly enough to conclude K.
+
+Still to check, same date, target **922.5 ± a few PLN**: **E, F, I, S, T, U, W**
+(`ING01E`, `ING01F`, `ING01I`, `ING01S`, `ING01T`, `ING01U`, `ING01W` — exact slug
+form to be confirmed; `INK01` shows the category letter can precede the number).
+
+Two things that would make the provider the wrong answer, to check against the
+measurement rather than assumed:
+
+- **A 12.6% constant gap is large for a fee difference.** Management-fee
+  differences between Polish fund categories run a few tenths of a percent a year;
+  12.6% flat over 3.4 years is not that. It is more characteristic of a
+  distribution policy difference (K's "P" marker and the others' — whatever "P"
+  denotes on analizy.pl — is worth identifying, since a dividend-distributing class
+  does drift), a unit split, or the sheet's price column. The user states the class
+  differs, which settles it for planning; the measurement settles whether a
+  *provider* is the fix.
+- **Whatever category it is, the symbol will still not name it.** `INGAKC.TFI` has
+  no category letter. So even a correct provider needs the class recorded
+  explicitly in `ticker_reference` — the identifier is the point, not the series.
+
+- [ ] Fetch E, F, I, S, T, U, W on 2026-09-25 and find the one at ≈922.5 PLN.
+- [ ] Confirm on a second date (2026-08-19, where our bar is 795.02 and the target
+      is ≈706) so a coincidental match cannot pass.
+- [ ] If no category lands there, stop and treat the sheet's price column as the
+      suspect — do not build a provider against a series that is not the problem.
