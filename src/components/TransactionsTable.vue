@@ -22,6 +22,7 @@ import LabelChips from "@/components/LabelChips.vue"
 import LabelManagerDialog from "@/components/LabelManagerDialog.vue"
 import LabelPickerPopover from "@/components/LabelPickerPopover.vue"
 import type { EntityKind } from "@/components/LabelPickerPopover.vue"
+import { triggerRectFromEvent, type TriggerRect } from "@/utils/popoverPosition"
 import EditTransactionModal from "@/modules/portfolios/EditTransactionModal.vue"
 import ConfirmDeleteModal from "@/modules/portfolios/ConfirmDeleteModal.vue"
 import type { PortfoliosTransactions, PortfolioTransactionsPage } from "@/api/types"
@@ -56,6 +57,7 @@ const manageLabelsOpen = ref(false)
 const pickerOpen   = ref(false)
 const pickerTx     = ref<Tx | null>(null)
 const pickerKind   = ref<EntityKind>("transaction")
+const pickerTrigger = ref<TriggerRect | null>(null)
 
 // ── Sortable columns (shared) ─────────────────────────────────────────
 
@@ -266,15 +268,21 @@ async function submitDelete() {
 
 // ── Labels ─────────────────────────────────────────────────────────────
 
-function openLabelPicker(tx: Tx) {
+function openLabelPicker(tx: Tx, e: MouseEvent) {
   pickerTx.value = tx
   pickerKind.value = "transaction"
+  pickerTrigger.value = triggerRectFromEvent(e.currentTarget)
   pickerOpen.value = true
 }
 
-function onPickerSaved() {
-  pickerTx.value = null
+function onPickerClosed() {
   pickerOpen.value = false
+  pickerTx.value = null
+  pickerTrigger.value = null
+}
+
+function onPickerSaved() {
+  onPickerClosed()
   load()
 }
 
@@ -456,7 +464,7 @@ const colCount = computed(() =>
               <td class="px-5 py-3">
                 <div class="flex justify-end gap-1">
                   <button type="button" class="btn-ghost px-2 py-1 text-xs" aria-label="Edit transaction" @click="openEdit(tx)">Edit</button>
-                  <button type="button" class="btn-ghost px-2 py-1 text-xs" aria-label="Set labels" @click="openLabelPicker(tx)">Labels</button>
+                  <button type="button" class="btn-ghost px-2 py-1 text-xs" aria-label="Set labels" @click="openLabelPicker(tx, $event)">Labels</button>
                   <button
                     type="button"
                     class="btn-ghost px-2 py-1 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10"
@@ -526,16 +534,16 @@ const colCount = computed(() =>
 
     <LabelManagerDialog :open="manageLabelsOpen" @close="manageLabelsOpen = false" />
 
-    <div v-if="pickerTx" class="relative inline-block">
-      <LabelPickerPopover
-        :open="pickerOpen"
-        :entity-id="pickerTx.id"
-        :entity-kind="pickerKind"
-        :portfolio-id="pickerTx.portfolioId"
-        :current-labels="(pickerTx as PortfolioTx).labels ?? []"
-        @close="pickerOpen = false"
-        @saved="onPickerSaved"
-      />
-    </div>
+    <LabelPickerPopover
+      v-if="pickerTx"
+      :open="pickerOpen"
+      :entity-id="pickerTx.id"
+      :entity-kind="pickerKind"
+      :portfolio-id="pickerTx.portfolioId"
+      :current-labels="(pickerTx as PortfolioTx).labels ?? []"
+      :trigger="pickerTrigger"
+      @close="onPickerClosed"
+      @saved="onPickerSaved"
+    />
   </div>
 </template>

@@ -75,14 +75,15 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ### 57.1 — Floating label picker anchored to the clicked button (fixes "labels button does not work")
 
-- [ ] New `src/utils/popoverPosition.ts`: pure
+- [x] New `src/utils/popoverPosition.ts`: pure
   `computePopoverPosition(trigger: {top, right, bottom, left}, panel:
   {width, height}, viewport: {width, height}): {top, left}` — default below
   the trigger, panel's right edge aligned to the trigger's right; flip above
   (`top = trigger.top − gap − panel.height`) when the below position exceeds
   `viewport.height`; clamp `left ≥ 8` and `top ≥ 8`. Plain objects, no DOM —
-  unit-testable.
-- [ ] `LabelPickerPopover.vue`:
+  unit-testable. (Plus `triggerRectFromEvent(target)` — the rect snapshot every
+  call site takes at click time.)
+- [x] `LabelPickerPopover.vue`:
   - New prop `trigger: {top, right, bottom, left} | null` (rect numbers
     captured at click time — the trigger may unmount after a kebab menu
     closes, so store numbers, not the element).
@@ -94,7 +95,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
     the panel) and `Escape`; recompute position on `scroll` (capture) and
     `resize` while open. The `open` prop and `close`/`saved` emits are
     unchanged so the three call sites keep their contract.
-- [ ] Rewire the call sites — delete the detached anchor div, pass the
+- [x] Rewire the call sites — delete the detached anchor div, pass the
   clicked button's rect:
   - `TransactionsTable.vue`: `openLabelPicker(tx, e: MouseEvent)` stores
     `pickerTrigger` from `e.currentTarget.getBoundingClientRect()`; replace
@@ -103,14 +104,17 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
     lingering empty anchor after Cancel).
   - `CashTransactionsView.vue:380–390` and `PortfolioHoldingsTab.vue:575–584`:
     same change (holdings passes the kebab "Set labels…" item's rect).
-- [ ] Unit tests:
+    *File moved by §62: the cash anchor now lives in
+    `src/components/CashTransactionsTable.vue:508` (the shared table both
+    `CashTransactionsView` and `PortfolioCashTab` render).*
+- [x] Unit tests:
   - New `tests/unit/utils/popoverPosition.test.ts`: fits-below → below,
     right-aligned; no room below → flip above; narrow viewport → left clamped
     ≥ 8; no negative top.
   - Extend existing `tests/unit/components/LabelPickerPopover.test.ts`: panel
     renders into `document.body` (teleport) at the util-computed position for
     a given trigger rect; outside click emits `close`; Escape emits `close`.
-- [ ] E2E: new `tests/e2e/transactions-labels.spec.ts` (serial, reuse the
+- [x] E2E: new `tests/e2e/transactions-labels.spec.ts` (serial, reuse the
   `login` helper from `labels.spec.ts`): on the portfolio transactions tab —
   click a row's "Labels" → `dialog[name="Set labels"]` visible **and** its
   `boundingBox()` inside the viewport with `top` within ~250px of the clicked
@@ -118,9 +122,20 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
   check a label, Save → chip `[title=<name>]` appears in that row. Repeat the
   open+assert flow on the global `/en/investments/transactions` view (the bug-1
   site).
-- [ ] Tests: `npm run test`, `npm run build`, `npm run test:mock`,
-  `npm run test:e2e` (docker compose) green.
-- [ ] Commit.
+  *Shipped assertion is stricter and exact rather than a ±250px y-window: the
+  vertical gap to the button must be ≤ 16px *above or below* (the util flips),
+  the panel must be fully inside the viewport, and the right edges must align
+  to within 16px. The button rect is measured **after** the click — Playwright
+  scrolls the row into view, which moves the button. The right-edge assertion
+  falls back to "clamped to the viewport" only while the actions column still
+  overflows the table (fixed by 57.2).*
+- [x] Tests: `npm run test`, `npm run build`, `npm run test:mock`,
+  `npm run test:e2e` green.
+  *(431 unit + 227 mock green; e2e: 100 passed, 6 failed — all 6 pre-existing
+  chart/series failures, reproduced identically on a stashed clean tree; see
+  §75. `portfolios.spec.ts:193/:217` failed once and did not reproduce on
+  either re-run — flake, not a regression.)*
+- [x] Commit.
 
 ### 57.2 — Sticky actions column in the transactions tables (example-service parity; fixes hidden Edit/Labels/Delete)
 

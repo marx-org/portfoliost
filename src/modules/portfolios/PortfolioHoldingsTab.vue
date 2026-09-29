@@ -19,6 +19,7 @@ import LabelFilterBar from "@/components/LabelFilterBar.vue"
 import LabelChips from "@/components/LabelChips.vue"
 import LabelManagerDialog from "@/components/LabelManagerDialog.vue"
 import LabelPickerPopover from "@/components/LabelPickerPopover.vue"
+import { triggerRectFromEvent, type TriggerRect } from "@/utils/popoverPosition"
 import PriceChart from "@/components/PriceChart.vue"
 
 type Position = PortfolioPositions[number]
@@ -38,6 +39,7 @@ const labelFilter = ref<string[]>([])
 const manageLabelsOpen = ref(false)
 const pickerOpen = ref(false)
 const pickerPosition = ref<PortfolioPositions[number] | null>(null)
+const pickerTrigger = ref<TriggerRect | null>(null)
 
 const removeTarget = ref<Position | null>(null)
 const removeBusy = ref(false)
@@ -324,15 +326,23 @@ function openChartView(position: Position): void {
   chartPosition.value = position
 }
 
-function openLabelPicker(position: Position): void {
+function openLabelPicker(position: Position, e: MouseEvent): void {
+  // The kebab menu closes (and unmounts this button) right after the click, so
+  // the rect has to be snapshotted now — the panel is placed from the numbers.
+  pickerTrigger.value = triggerRectFromEvent(e.currentTarget)
   openMenuId.value = null
   pickerPosition.value = position
   pickerOpen.value = true
 }
 
-function onPickerSaved() {
+function onPickerClosed() {
   pickerPosition.value = null
   pickerOpen.value = false
+  pickerTrigger.value = null
+}
+
+function onPickerSaved() {
+  onPickerClosed()
   void store.fetchPositions(id, labelFilter.value)
 }
 </script>
@@ -490,7 +500,7 @@ function onPickerSaved() {
                       <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="openEditPosition(pos)">Edit position</button>
                       <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="goResearch(pos)">Research</button>
                       <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="openChartView(pos)">View chart</button>
-                      <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="openLabelPicker(pos)">Set labels...</button>
+                      <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="openLabelPicker(pos, $event)">Set labels...</button>
                       <button type="button" class="block w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10" @click="openRemoveConfirm(pos)">Remove position</button>
                     </div>
                   </template>
@@ -561,16 +571,16 @@ function onPickerSaved() {
 
     <LabelManagerDialog :open="manageLabelsOpen" @close="manageLabelsOpen = false" />
 
-    <div v-if="pickerPosition" class="relative">
-      <LabelPickerPopover
-        :open="pickerOpen"
-        :entity-id="pickerPosition.id"
-        entity-kind="position"
-        :current-labels="pickerPosition.labels ?? []"
-        @close="pickerOpen = false"
-        @saved="onPickerSaved"
-      />
-    </div>
+    <LabelPickerPopover
+      v-if="pickerPosition"
+      :open="pickerOpen"
+      :entity-id="pickerPosition.id"
+      entity-kind="position"
+      :current-labels="pickerPosition.labels ?? []"
+      :trigger="pickerTrigger"
+      @close="onPickerClosed"
+      @saved="onPickerSaved"
+    />
 
     <div v-if="chartPosition" class="fixed inset-0 z-50 overflow-auto bg-white dark:bg-slate-900 p-6">
       <div class="mb-3 flex items-center justify-between">

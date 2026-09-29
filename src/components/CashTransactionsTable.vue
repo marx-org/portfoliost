@@ -23,6 +23,7 @@ import LabelFilterBar from "@/components/LabelFilterBar.vue"
 import LabelChips from "@/components/LabelChips.vue"
 import LabelManagerDialog from "@/components/LabelManagerDialog.vue"
 import LabelPickerPopover from "@/components/LabelPickerPopover.vue"
+import { triggerRectFromEvent, type TriggerRect } from "@/utils/popoverPosition"
 import PortfolioCashModals from "@/modules/portfolios/PortfolioCashModals.vue"
 import ConfirmDeleteModal from "@/modules/portfolios/ConfirmDeleteModal.vue"
 import type { components } from "@/api/types"
@@ -89,6 +90,7 @@ const labelFilter      = ref<string[]>([])
 const manageLabelsOpen = ref(false)
 const pickerOpen       = ref(false)
 const pickerTx         = ref<Tx | null>(null)
+const pickerTrigger    = ref<TriggerRect | null>(null)
 
 // Edit / delete
 const editing      = ref<Tx | null>(null)
@@ -326,14 +328,20 @@ async function submitDelete() {
 
 // ── Labels ───────────────────────────────────────────────────────────────
 
-function openLabelPicker(tx: Tx) {
+function openLabelPicker(tx: Tx, e: MouseEvent) {
   pickerTx.value   = tx
+  pickerTrigger.value = triggerRectFromEvent(e.currentTarget)
   pickerOpen.value = true
 }
 
-function onPickerSaved() {
-  pickerTx.value   = null
+function onPickerClosed() {
   pickerOpen.value = false
+  pickerTx.value   = null
+  pickerTrigger.value = null
+}
+
+function onPickerSaved() {
+  onPickerClosed()
   void load()
 }
 </script>
@@ -423,7 +431,7 @@ function onPickerSaved() {
                     type="button"
                     class="btn-ghost px-2 py-1 text-xs"
                     aria-label="Set labels"
-                    @click="openLabelPicker(tx)"
+                    @click="openLabelPicker(tx, $event)"
                   >
                     Labels
                   </button>
@@ -505,16 +513,16 @@ function onPickerSaved() {
 
     <LabelManagerDialog :open="manageLabelsOpen" @close="manageLabelsOpen = false" />
 
-    <div v-if="pickerTx" class="relative inline-block">
-      <LabelPickerPopover
-        :open="pickerOpen"
-        :entity-id="pickerTx.id"
-        entity-kind="cash-transaction"
-        :portfolio-id="pickerTx.portfolioId"
-        :current-labels="pickerTx.labels ?? []"
-        @close="pickerOpen = false"
-        @saved="onPickerSaved"
-      />
-    </div>
+    <LabelPickerPopover
+      v-if="pickerTx"
+      :open="pickerOpen"
+      :entity-id="pickerTx.id"
+      entity-kind="cash-transaction"
+      :portfolio-id="pickerTx.portfolioId"
+      :current-labels="pickerTx.labels ?? []"
+      :trigger="pickerTrigger"
+      @close="onPickerClosed"
+      @saved="onPickerSaved"
+    />
   </div>
 </template>

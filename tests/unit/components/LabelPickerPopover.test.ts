@@ -1,8 +1,9 @@
 import { nextTick } from "vue"
-import { flushPromises, mount } from "@vue/test-utils"
+import { flushPromises, mount, type VueWrapper } from "@vue/test-utils"
 import { createPinia, setActivePinia } from "pinia"
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import LabelPickerPopover from "@/components/LabelPickerPopover.vue"
+import { ESTIMATED_PANEL } from "@/utils/popoverPosition"
 import * as labelsApi from "@/api/labels"
 
 vi.mock("@/api/labels", async (importOriginal) => {
@@ -31,8 +32,17 @@ function makePinia() {
 
 function mountPopover(props: Record<string, unknown>) {
   return mount(LabelPickerPopover, {
-    props: { open: true, entityId: "pos1", entityKind: "position", currentLabels: [], ...props },
-    global: { plugins: [makePinia()] },
+    props: {
+      open: true,
+      entityId: "pos1",
+      entityKind: "position",
+      currentLabels: [],
+      trigger: { top: 300, right: 1000, bottom: 328, left: 900 },
+      ...props,
+    },
+    // The panel is teleported to document.body; stubbing teleport keeps the
+    // wrapper queries below working. The real teleport is asserted separately.
+    global: { plugins: [makePinia()], stubs: { teleport: true } },
   })
 }
 
@@ -96,5 +106,75 @@ describe("LabelPickerPopover (3.11)", () => {
     const checks = w.findAll('input[type="checkbox"]')
     expect(checks).toHaveLength(3)
     expect((checks[0].element as HTMLInputElement).checked).toBe(true) // Core — sorted first, just created & selected
+  })
+})
+
+// ── §57.1 — the panel floats next to the clicked row, not inside a clipped card ──
+
+describe("LabelPickerPopover placement (57.1)", () => {
+  const mounted: VueWrapper[] = []
+
+  afterEach(() => {
+    while (mounted.length) mounted.pop()!.unmount()
+  })
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocked.getLabels.mockResolvedValue([label("a", "Dividend"), label("b", "Fund")])
+  })
+
+  it("renders the panel into document.body at the computed position", async () => {
+    const trigger = { top: 300, right: 1000, bottom: 328, left: 900 }
+    const w = mount(LabelPickerPopover, {
+      props: {
+        open: true,
+        entityId: "pos1",
+        entityKind: "position",
+        currentLabels: [],
+        trigger,
+      },
+      global: { plugins: [makePinia()] },
+      attachTo: document.body,
+    })
+    mounted.push(w)
+    await flushPromises()
+
+    const dialog = document.body.querySelector<HTMLElement>('[role="dialog"][aria-label="Set labels"]')
+    expect(dialog).not.toBeNull()
+    // Below the trigger, right edges aligned, fixed-positioned (not clipped by a card).
+    expect(dialog!.className).toContain("fixed")
+    expect(dialog!.className).not.toContain("absolute")
+    expect(parseFloat(dialog!.style.top)).toBe(328 + 8)
+    expect(parseFloat(dialog!.style.left)).toBe(1000 - ESTIMATED_PANEL.width)
+  })
+
+  it("renders nothing without a trigger rect", async () => {
+    const w = mountPopover({ trigger: null })
+    await flushPromises()
+    expect(w.find('[role="dialog"]').exists()).toBe(false)
+  })
+
+  it("emits close on an outside pointerdown", async () => {
+    const w = mountPopover({})
+    await flushPromises()
+    document.body.dispatchEvent(new Event("pointerdown", { bubbles: true }))
+    await nextTick()
+    expect(w.emitted("close")).toBeTruthy()
+  })
+
+  it("does not emit close for a pointerdown inside the panel", async () => {
+    const w = mountPopover({})
+    await flushPromises()
+    w.find('[role="dialog"]').element.dispatchEvent(new Event("pointerdown", { bubbles: true }))
+    await nextTick()
+    expect(w.emitted("close")).toBeFalsy()
+  })
+
+  it("emits close on Escape", async () => {
+    const w = mountPopover({})
+    await flushPromises()
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }))
+    await nextTick()
+    expect(w.emitted("close")).toBeTruthy()
   })
 })
