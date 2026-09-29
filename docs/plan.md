@@ -2949,3 +2949,55 @@ instrumentation exists to prevent, and one the first test caught on macOS becaus
 - [ ] If it is small: stop looking here. Options are bounding OpenBB's caches at
       the singleton, or a worker-per-request model. Both are bigger than the 2Gi
       mitigation already in place, and the measurement decides which.
+
+### 72.16 — §72.6 RESTORED: a provider IS needed; the ticker just cannot say which class
+
+**I was wrong to withdraw this step** (§72.14). The user is right: the transactions
+are in a different unit class than the series we serve, and no amount of verifying
+that our bars match class A establishes that class A is the right one. Verifying
+the wrong series is not an answer.
+
+What is established, and all of it from public data (fetched 2026-09-29):
+
+- `analizy.pl` for **ING Akcji (ING Parasol FIO)** lists these unit categories:
+  **A, E, F, I, K, S, T, U, W** — nine, each in PLN.
+- The value shown is category A's: **819.44 PLN on 2026-09-25**. Our provider's
+  live quote for `INGAKC.TFI` is **820.03**, so our bars are category A. That part
+  was never in doubt.
+- **`INGAKC.TFI` contains no category letter at all.** Its categories are A, E, F,
+  I, K, S, T, U and W — there is no C. So the "C" in the symbol is *not* a unit
+  category; the ticker is not self-describing about class, and neither is the sheet
+  (which says "Goldman Sachs Akcji" and predates the GS→NN→ING rename).
+
+That is the actual reason a provider is required, and it is stronger than the
+argument I made before: **we cannot map the symbol to a class, and the gap tells us
+which one we mean.** 29 of 79 trades sit at a constant **1.126×** above the class-A
+bar while 50 reconcile exactly. So our class's NAV is `1 / 1.126 ≈ 0.888 ×` class A
+— about **12.6% below** it. Any of E, F, I, K, S, T, U, W that sits at ~0.888 × A
+on a known date is ours, and that single comparison identifies it.
+
+**One caveat to check before building, because it would make the provider the wrong
+answer:** a 12.6% *constant* offset is large for a fee-driven class difference —
+those run a few tenths of a percent a year, not an eighth of the fund. A
+ratio that is perfectly flat over 3.4 years is more characteristic of a different
+fund, a unit split, or the sheet's price column. The user states the class differs
+and that settles it for planning purposes; the point here is that if the
+identification lands on a category whose NAV is *not* ~0.888 × A, the answer is
+upstream of the provider and the provider will not fix it.
+
+- [ ] Fetch the NAV of all nine categories (A, E, F, I, K, S, T, U, W) for one
+      known date, e.g. 2026-08-19 where our bar is 795.02. The class at
+      **≈706 PLN** is ours. This is the identifying step and needs no code.
+- [ ] If identified, build the openst provider per the planner contract's
+      provider-tier order: capture the provider response into
+      `openst/tests/fixtures/` first, then the plugin with mocked I/O, then openst
+      standalone smoke, then the `cachest` route, then the
+      `portfoliost-instruments` adapter, then the full compose stack.
+- [ ] Map the class explicitly in `ticker_reference` (`INGAKC.TFI` → category), so
+      the class stops being implicit. `ticker_reference` currently knows **zero**
+      `.TFI` symbols, which is why nothing cross-checks them.
+- [ ] Fix the stored `positions.company_name` ("Goldman Sachs Akcji"), inherited
+      from the stale sheet name.
+- [ ] Sweep the other `.TFI` rows: the same sheet names one family "NN Emerytura
+      2025/2030" and another "Goldman Sachs Emerytura 2060/2065" — the same rename
+      applied inconsistently across rows.
