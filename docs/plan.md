@@ -3640,3 +3640,41 @@ sum instead of being stamped `complete`.
       known-unknown amount.
 - [ ] Propagate the window-wide gap into the UI: `GET /:id/analytics` can flag the
       value as partial, but "partial on which days" is not currently represented.
+
+### 72.32 — unfunded-portfolio audit finding (wallets v1.1.97, verified in prod)
+
+§72.29's guard is now code. New `unfunded-portfolio` finding in the fleet-wide
+valuation audit: **has trades, zero external inflow, and the cash ledger bottoms out
+negative.** Before this such a portfolio was silently valid.
+
+Run in-pod against prod:
+
+```
+[{ "kind": "unfunded-portfolio", "portfolioName": "XTB", "tradeCount": 22,
+   "impliedFunding": 656.96, "minBalance": -6.22 }]
+```
+
+The only unfunded portfolio in the fleet, and it is the one §72.29 traced by hand.
+The fix is data-side: the opening deposit has to appear in the source sheet.
+
+**The first implementation of the check found nothing, and that was informative.**
+I summed `portfolio_cash_transactions` in SQL and got zero rows for XTB, so
+`balance < 0` was false and it reported clean. The negative is produced by the
+*trade* cash effects (BUY moves cash), not by the cash rows — and XTB has no cash
+rows at all. So the balance is now read through the real `cashBalances()` instead of
+being re-derived in SQL. Re-implementing cash arithmetic in a query is precisely how
+it drifts from the ledger, and a data-quality check that silently reports clean is
+worse than no check.
+
+**Deploy note.** Pinned v1.1.97 while the GitHub release existed but the image was
+not yet in GHCR — the new pod sat in `ErrImagePull`. No outage, because the previous
+pod stayed `1/1` throughout, but the pin should follow the *image*, not the release.
+The registry manifest appeared ~40s later. Worth checking
+`docker manifest inspect` before pinning.
+
+- [x] unfunded-portfolio finding, 4 tests, deployed v1.1.97, verified against prod
+- [ ] XTB: add the opening deposit to the source sheet and re-import. Until then its
+      value history is offset and its TWR/MWR is meaningless.
+- [ ] The bond gap (§72.31) and this check are both "the import is incomplete" and
+      both were invisible. Consider one import-completeness report rather than two
+      checks living in different places.
