@@ -240,12 +240,21 @@ export function register(app) {
     ctx.res.json(research.fundamentals)
   })
 
+  // §61.4 — the compare rows carry the instrument identity the shared
+  // TickerBadge needs. Derived from the seeded research profile; null (never
+  // guessed) when that profile does not carry a country.
+  function withIdentity(research) {
+    const ov = research?.overview ?? {}
+    const cc = typeof ov.country === "string" && /^[A-Za-z]{2}$/.test(ov.country) ? ov.country.toUpperCase() : null
+    return { ...research.compare, countryCode: cc, assetType: ov.type ?? null }
+  }
+
   app.get("/api/instruments/:symbol/compare", (ctx) => {
     if (!requireAuth(ctx)) return
     const symbol = getSymbol(ctx)
     const research = loadResearch(symbol)
     if (!research) return ctx.res.status(404).json({ error: "NotFound", message: `Unknown symbol ${symbol}` })
-    ctx.res.json(research.compare)
+    ctx.res.json(withIdentity(research))
   })
 
   app.get("/api/instruments/:symbol/peers", (ctx) => {
@@ -258,7 +267,7 @@ export function register(app) {
       .map((s) => loadResearch(s))
       .filter((r) => r && r.symbol !== symbol && (sector ? r.overview.sector === sector : true))
     const peers = candidates.slice(0, 4)
-    ctx.res.json({ symbol, items: [research.compare, ...peers.map((p) => p.compare)] })
+    ctx.res.json({ symbol, items: [withIdentity(research), ...peers.map((p) => withIdentity(p))] })
   })
 
   app.get("/api/instruments/:symbol/ownership", (ctx) => {
