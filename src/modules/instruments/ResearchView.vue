@@ -4,6 +4,7 @@ import { useRoute, useRouter } from "vue-router"
 import InstrumentSearchModal from "@/modules/instruments/InstrumentSearchModal.vue"
 import RecentSearchesBar from "@/modules/instruments/RecentSearchesBar.vue"
 import { getInstrumentProfile } from "@/api/instruments"
+import { researchBackTarget, researchSymbol } from "@/utils/research"
 import { useWatchlistsStore } from "@/stores/watchlists"
 import { useRecentSearchesStore } from "@/stores/recentSearches"
 import type { InstrumentsProfile } from "@/api/types"
@@ -30,8 +31,17 @@ const tabs = [
   { name: "research-dividends", label: "Dividends" },
 ]
 
+const backTarget = computed(() => researchBackTarget(route.query))
+const preservedQuery = computed(() =>
+  route.query.from ? { from: String(route.query.from) } : undefined,
+)
+
 function goToSymbol(s: string) {
-  router.push({ name: String(route.name), params: { symbol: s.toUpperCase() } })
+  router.push({
+    name: String(route.name),
+    params: { symbol: researchSymbol(s) },
+    query: preservedQuery.value,
+  })
 }
 
 onMounted(async () => {
@@ -86,7 +96,7 @@ async function addToWatchlist(): Promise<void> {
 <template>
   <div>
     <div class="mb-6 flex flex-wrap items-center gap-3">
-      <router-link to="/en/investments" class="btn-ghost">&larr; Go back</router-link>
+      <router-link :to="backTarget" class="btn-ghost" data-testid="research-back">&larr; Go back</router-link>
       <img :src="`/api/logos/${routeSymbol}`" :alt="routeSymbol" class="h-9 w-9 rounded-full bg-slate-100 dark:bg-slate-800" />
       <div>
         <h1 class="text-2xl font-semibold">{{ routeSymbol }}</h1>
@@ -112,7 +122,7 @@ async function addToWatchlist(): Promise<void> {
       <router-link
         v-for="tab in tabs"
         :key="tab.name"
-        :to="{ name: tab.name, params: { symbol: routeSymbol } }"
+        :to="{ name: tab.name, params: { symbol: routeSymbol }, query: preservedQuery }"
         class="whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100"
         :class="route.name === tab.name ? 'border-blue-600 text-blue-700 dark:text-blue-400' : 'border-transparent'"
       >
