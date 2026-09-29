@@ -3152,3 +3152,56 @@ E/I/K, but `INC01` for S (not `INS01`), and `ING01<L>` for F/T/U/W.
 - [ ] Record the identifier in `ticker_reference` whatever it turns out to be:
       `INGAKC.TFI` carries no category letter, and `ticker_reference` knows zero
       `.TFI` symbols, so nothing cross-checks these rows today.
+
+### 72.21 — the remaining jumps are STEPS, not spikes, and Equate+'s is a real trade
+
+Checked every portfolio's worst day-over-day against that day's transactions,
+paging the full transaction set rather than the first page (the endpoint caps
+`limit` at 100 regardless of what is asked for, which made a first attempt report
+"no trade" for portfolios of 912, 389 and 254 rows — a pagination artefact that
+would have been an entirely wrong conclusion).
+
+| portfolio | jump | transactions that day | verdict |
+|---|---|---|---|
+| Equate+ | 104.1% @ 2025-03-12 | `BUY SAP.DE 11.7392 @ 242.2 EUR` | **real purchase** |
+| IBKR | 348.9% @ 2022-06-20 | 0 of 912 | **unexplained** |
+| IKE Beata | 129.0% @ 2022-05-13 | 0 of 389 | **unexplained** |
+| IKE Marek | (see below) | 0 of 254 | **measurement unstable** |
+
+**Equate+ is settled** — a genuine 11.74-share SAP.DE purchase.
+
+**IBKR and IKE Beata are steps, not spikes**, which is a different defect from
+Crypto's and worth separating rather than lumping together:
+
+```
+IBKR       2022-06-17  2961     2022-06-20  13291   +348.9%   2022-06-23  13619
+IKE Beata  2022-05-12 14056     2022-05-13  32183   +129.0%   2022-05-16  32361
+```
+
+The level **stays** at the new value afterwards. A market move reverses; this does
+not. It is the signature of a position's contribution *beginning* — the value
+switching on for good, with no transaction to cause it.
+
+**Most likely cause, and it is a direct consequence of §72.17:** that change made
+instruments DROP bars it cannot convert. So where `fx_rates` has no row for a pair,
+the position is absent before the coverage boundary and present after it — and the
+boundary now shows up as a step in the series. §72.17 replaced a silent wrong
+number with an honest gap, and the gap's edge is a visible discontinuity. That is
+the right trade (the old numbers were wrong by the FX rate), but it means the
+series now has steps wherever FX coverage begins, and those steps are artefacts of
+coverage rather than of the portfolios.
+
+- [ ] Confirm the hypothesis: find the earliest `fx_rates` date for the pairs held
+      by IBKR and IKE Beata, and check it lands on 2022-06-20 and 2022-05-13. The
+      endpoint is `GET /ohlcv/FX?symbol=<pair>&start=&end=` — note that passing
+      `from`/`to` instead of `symbol`/`start`/`end` makes the router read `FX` as
+      the SYMBOL, which is how that call failed first time.
+- [ ] **Backfill `fx_rates` further back** (already a §72.17 follow-up, now
+      load-bearing: it is what removes these steps).
+- [ ] Make the coverage boundary visible rather than leaving it to look like a
+      market move — the same job `gapSymbols` does for missing bars, extended to FX.
+- [ ] **IKE Marek: the number moved between measurements** — reported as 176.4% @
+      2025-05-02, then re-measured as +1.4% on the same series with no recompute in
+      between. Treat any single "worst jump" figure from that portfolio as
+      unverified until it reproduces twice. Worth understanding what is unstable —
+      possibly the analytics series being rebuilt while read.
