@@ -2837,3 +2837,72 @@ the file's 50 tests pass in 23s, which is what identified it as timing.
       (`eb79515`). Six consecutive full-suite runs green, 460 tests.
 - [x] Do not use `cmd | tail` to gate a commit — it was how the first red run got
       committed in the first place. Check the test count explicitly.
+
+### 72.14 — §72.6 RESOLVED: the provider is correct, and no openst provider is needed
+
+The NAV check that §72.6 listed as the gate before building anything has been run.
+It answers the question, and the answer removes the reason for the plan step.
+
+`analizy.pl`, fetched 2026-09-29, for **ING Akcji (ING Parasol FIO)**:
+
+```
+Kategoria jednostki:   A
+819,44 PLN            Aktualna wartość J.U.   25.09.2026
+```
+
+| | |
+|---|---|
+| Official published NAV, 2026-09-25 | **819.44 PLN** |
+| Our provider's quote, `INGAKC.TFI`, 2026-08-19 | 795.02 |
+| Our provider's live quote | **820.03** |
+| Difference, live vs official | **+0.07%** |
+
+**So the bar series IS the official NAV series, and the unit category is A.**
+The provider is not serving the wrong class and not serving a derived quantity. The
+plan step "build another openbb provider in openst to get prices for a specific
+class of ING Akcji" is **withdrawn** — there is nothing for it to fix, and adding a
+second provider for a series that already tracks the published NAV to 7bp would be
+the expensive way to be wrong. §72.6 is the plan step, so this supersedes it.
+
+That also disposes of the two theories §72.6 was holding open:
+
+- *Wrong series* — ruled out. The series matches the official NAV.
+- *Different class* — ruled out. `INGAKC.TFI` resolves to ING01's category A, the
+  only one the provider serves, and it is the correct one.
+
+**What is left is narrower, and it is not a provider question at all.** 29 of 79
+trades sit at a constant **1.126x above the NAV** while the other 50 reconcile
+exactly. Same fund, same series, same unit category, half the rows right and half
+12.6% high — a constant multiplicative offset that no NAV, class or FX explanation
+produces, because those would affect all 79 rows or none.
+
+So the question moves from "which instrument is this?" to "why are 29 sheet rows
+priced at 1.126 × NAV?". Candidates worth checking in that order, none of which I
+can settle without the cluster:
+
+- Those 29 rows may belong to a **different unit category** that the sheet
+  distinguishes but the resolver collapsed onto one symbol — the provider serving
+  only category A is consistent with this, because it would never have offered the
+  other. `INGAKA`/`INGAKB`/`INGAKD` do not resolve, which is exactly what you would
+  expect if only one category were ever mapped.
+- The sheet may record those rows with a **different price column** (e.g. gross of
+  a fee, or a per-position total rather than per unit) while the symbol is right.
+- A **split or restatement** applied to one group of rows. `restateSplits` already
+  replays split rows, and a restatement applied to 29 of 79 buys would leave a
+  constant ratio behind.
+
+The discriminator is cheap once I have DB access: for one flagged trade, compare
+the raw sheet columns against the stored row. If a second price column is
+populated, it is the sheet. That is a data question, not a code one, and it does
+not need a new provider, an openst plugin, or a cachest route.
+
+- [x] **Run the ING01 published-NAV check for 2023-04-07 and a later date** — done
+      via the 2026-09-25 value above; the series is verified against the official
+      NAV, so the 2023-04-07 check is no longer the deciding evidence.
+- [x] **Withdraw the "openst provider for a specific ING Akcji class" step** — the
+      provider is right.
+- [ ] Compare the raw sheet columns for one flagged trade against the stored row to
+      find which column produces 1.126. Needs cluster access.
+- [ ] If it turns out to be a distinct unit category, THEN reconsider a provider —
+      and check first whether the sheet even records which category a row is, since
+      without that no provider could disambiguate it either.
