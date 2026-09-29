@@ -1578,7 +1578,8 @@ verification**, and each helmrelease change must be validated against
       round-trip, not a connection flag.
 - [x] Add liveness (`/health`), readiness (`/ready`) and startup probes to
       `cluster/apps/pfire/cachest/app/helmrelease.yaml`. → homelab
-      `f4cd384bd` (rebased onto the renovate bumps), pin **v1.0.46**.
+      `f4cd384bd` (rebased onto the renovate bumps), pin **v1.0.46**, later
+      **v1.0.47** for the RateLimiter fix found while running the suite.
 - [x] `cachest`: add `test_ready_reports_503_when_redis_is_unreachable` and
       `test_health_stays_ok_while_redis_is_down`; full suite green
       (`docker build --target test -t cachest-test . && docker run --rm cachest-test`).
@@ -1628,10 +1629,10 @@ A rollback to v1.0.44 or older 404s `/ready`, and a probe against a 404 never
 passes — the pod would sit at `0/1` forever rather than serving. Recorded in
 the helmrelease so the next rollback is not attempted blind.
 
-#### Found while running the suite: GHA ships a red suite
+#### Found while running the suite: GHA ships a red suite — and the red suite was a real bug
 
-`test` has been failing in CI since 2026-09-27 (run `36334269096`) and
-**v1.0.44 was published anyway**. In every pfire service's
+`test` had been failing in CI since 2026-09-27 (run `36334269096`) and **v1.0.44
+was published anyway**. In every pfire service's
 `.github/workflows/docker-image.yml`, `build` needs only `release`:
 
 ```yaml
@@ -1640,22 +1641,64 @@ build:
 ```
 
 `test` is not in the graph, so a red suite is invisible — the image is built and
-pushed regardless. That is how a broken test survived two releases here. Two
-separate fixes, and only the first is done:
+pushed regardless. That is how a broken test survived two releases here.
 
-- [x] The flake itself: `test_shipped_singleton_route_is_still_serialized`
-      asserted `responses[0].status_code == 200`, but `pool.map` yields in
-      **submission** order, so `responses[0]` is not the thread that won the
-      depth-1 semaphore — a coin flip that failed on loaded CI runners. Now
-      asserts the multiset `[200, 503, 503, 503]`, which is also strictly
-      stronger (the old form passed on `[200, 200, 503, 503]`, the opposite
-      failure). cachest **v1.0.46**, GHA green. Verified 15× clean, then 10×
-      under 8-way CPU contention to reproduce the CI conditions.
-- [ ] Gate `build` on `test` in all 9 `ghcr.io/marx2/*` workflows
-      (`needs: [release, test]` — or better, make `test` a real gate on
-      `release` so a skipped release never orphans a bump). Not done here: it
-      is a cross-repo change, and openst/scanst/scorest/stooq-* may have
-      intentional red suites that would start blocking their own releases.
+**The failure was not a flake, and my first diagnosis of it was wrong.** I
+attributed it to `pool.map` yielding in *submission* order, making
+`responses[0] == 200` a thread-ordering coin flip. That was incorrect. The
+actual cause was a defect in `RateLimiter`:
+
+```python
+self._last_fetch: float = 0.0     # reads as "a fetch happened at time zero"
+sleep = self._interval - (time.monotonic() - self._last_fetch)
+```
+
+`0.0` is not "no fetch yet" — it asserts that `time.monotonic()` is already
+large when the process starts. Under a namespaced `CLOCK_MONOTONIC` it is ~0, so
+a 60 s interval computed a ~57 s wait, found it exceeded `fetch_max_wait: 4`,
+and **rejected every caller with 503 for the first `interval` seconds of process
+life**. GitHub Actions runs the suite in the first ~12 s of a fresh container, so
+`/corp-bond/catalogue` returned `[503, 503, 503, 503]`. A developer machine has
+host-uptime monotonic values, so it passed locally every time — which is also why
+the pre-existing `test_first_acquire_returns_true` never caught it: it asserted
+the right thing and passed by accident of the platform.
+
+Fixed in cachest `317d1ca` (v1.0.47): `_last_fetch` is `None` until the first
+acquire, and that state is handled explicitly so the first caller always gets the
+slot whatever the clock reads.
+`test_first_acquire_succeeds_when_the_clock_starts_near_zero` pins
+`time.monotonic()` to 3.0, and was verified to fail on the old sentinel and pass
+on the new one. **205 passed**, and green in real CI. Deployed to PROD
+(homelab `4b81358ab`, pin → v1.0.47); PROD blast radius was probably nil, since
+in-cluster the clock is host uptime, but leaving PROD on a tag with a known
+defect is the wrong trade.
+
+The multiset assertion in `test_main.py` is still the right assertion — the old
+positional one would have accepted `[200, 200, 503, 503]`, the opposite failure —
+but it *surfaced* the bug rather than papering over it.
+
+- [x] The bug and the GHA gate, in the two repos that have a `test` job at all
+      (`openst`, `cachest`). `release` now needs `test` (no bump, no tag, no
+      Release on a red suite) and `build` needs `[release, test]` **and**
+      asserts `needs.test.result == 'success'`. That assertion is load-bearing:
+      these jobs use `if: always()`, which bypasses the implicit skip that
+      `needs:` alone causes — so listing `test` without it would look like a gate
+      in review and gate nothing, the same failure mode as §64.1's false friends.
+      **Both paths verified in real CI, not assumed:** red — run `36620781878`
+      (Test failed → `release` and `build` both *skipped*, no release created);
+      green — run `36621548366` (all success → v1.0.47 released). openst's happy
+      path likewise green on v1.1.39.
+- [ ] **The other 7 repos never run their tests in CI at all** — this is the
+      bigger half of the problem and is not started. Measured across every
+      workflow file: `portfoliost-wallets`, `-instruments`, `-admin`,
+      `-users-auth`, `portfoliost` (SPA), `jobshot` and `mastra-ticker` have
+      **no `test` job and no test command anywhere in CI**. `npm run test` in
+      AGENTS.md is a local convention with zero enforcement. So for those seven
+      the work is not "gate the build", it is "add a test job", which needs a
+      per-repo test command and a green suite first — adding a test job to a repo
+      whose suite is red would block its releases. Not attempted blind.
+      (mastra-ticker's recent red runs are the **Dependabot** workflow, not its
+      image pipeline.)
 
 ### 64.3 — portfoliost SPA: probe the static server, and say what it cannot see
 
