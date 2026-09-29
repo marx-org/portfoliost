@@ -58,9 +58,25 @@ describe("PortfolioHoldingsTab", () => {
 
     expect(wrapper.text()).toContain("META")
     expect(wrapper.text()).toContain("Meta Platforms Inc")
-    expect(wrapper.text()).toContain("(US) Stock")
     expect(wrapper.text()).toContain("13,088.24")
     expect(wrapper.find("button[aria-label='Position actions']").exists()).toBe(true)
+    // §61.5 — the identity block; the fixture has no `country`, and the
+    // details line says so rather than defaulting it to "US" (§66.2: never
+    // guess). `ticker-badge`/`-details` are the stable testids.
+    const badge = wrapper.find('[data-testid="ticker-badge"]')
+    expect(badge.exists()).toBe(true)
+    expect(badge.find("img").attributes("src")).toBe("/api/logos/META")
+    expect(badge.text()).toContain("Meta Platforms Inc")
+    expect(badge.get('[data-testid="ticker-badge-details"]').text()).toBe("Stock")
+  })
+
+  it("renders the full details line when the position carries a country", async () => {
+    mocked.getPortfolioPositions.mockResolvedValue([
+      { ...position(), country: "PL", assetType: "STOCK" } as never,
+    ])
+    const wrapper = mount(PortfolioHoldingsTab)
+    await flushPromises()
+    expect(wrapper.get('[data-testid="ticker-badge-details"]').text()).toBe("(PL) Stock")
   })
 
   it("sorts positions by symbol when the Symbol column header is clicked", async () => {

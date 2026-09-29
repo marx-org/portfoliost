@@ -10,6 +10,7 @@ import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
 import { useDisplayConversion } from "@/composables/useDisplayConversion"
 import { storeToRefs } from "pinia"
 import { getLatestRate } from "@/api/fx"
+import TickerBadge from "@/components/TickerBadge.vue"
 import InstrumentSearchModal from "@/modules/instruments/InstrumentSearchModal.vue"
 import PortfolioPerformanceChart from "@/components/PortfolioPerformanceChart.vue"
 
@@ -351,10 +352,13 @@ const chartBenchmarks = computed(() => {
         <p v-if="!performers.top.length" class="text-sm text-slate-500 dark:text-slate-400">No open positions.</p>
         <ul v-else class="divide-y divide-slate-100 dark:divide-slate-800">
           <li v-for="p in performers.top" :key="p.id" class="flex items-center justify-between py-2 text-sm">
-            <div>
-              <span class="font-medium text-slate-900 dark:text-slate-100">{{ p.symbol }}</span>
-              <p class="text-xs text-slate-500 dark:text-slate-400">{{ p.companyName }}</p>
-            </div>
+            <TickerBadge
+              size="sm"
+              :symbol="p.symbol"
+              :name="p.companyName"
+              :country-code="p.country"
+              :asset-type="p.assetType"
+            />
             <div class="text-right">
               <p class="font-medium tabular-nums" :class="gainClass(p.unrealizedGainLoss)">{{ formatSignedCurrency(p.unrealizedGainLoss, p.instrumentCurrency) }}</p>
               <p class="text-xs tabular-nums" :class="gainClass(p.percentageChange)">
@@ -371,10 +375,13 @@ const chartBenchmarks = computed(() => {
         <p v-if="!performers.bottom.length" class="text-sm text-slate-500 dark:text-slate-400">No open positions.</p>
         <ul v-else class="divide-y divide-slate-100 dark:divide-slate-800">
           <li v-for="p in performers.bottom" :key="p.id" class="flex items-center justify-between py-2 text-sm">
-            <div>
-              <span class="font-medium text-slate-900 dark:text-slate-100">{{ p.symbol }}</span>
-              <p class="text-xs text-slate-500 dark:text-slate-400">{{ p.companyName }}</p>
-            </div>
+            <TickerBadge
+              size="sm"
+              :symbol="p.symbol"
+              :name="p.companyName"
+              :country-code="p.country"
+              :asset-type="p.assetType"
+            />
             <div class="text-right">
               <p class="font-medium tabular-nums" :class="gainClass(p.unrealizedGainLoss)">{{ formatSignedCurrency(p.unrealizedGainLoss, p.instrumentCurrency) }}</p>
               <p class="text-xs tabular-nums" :class="gainClass(p.percentageChange)">

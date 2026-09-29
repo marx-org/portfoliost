@@ -9,6 +9,7 @@ import { removePortfolioPosition, getPortfolioTransactions } from "@/api/portfol
 import { formatAmount, formatNumber, formatPercent, formatSignedAmount } from "@/utils/format"
 import { researchRoute } from "@/utils/research"
 import type { PortfolioPositions } from "@/api/types"
+import TickerBadge from "@/components/TickerBadge.vue"
 import EditPositionDialog from "@/modules/portfolios/EditPositionDialog.vue"
 import AddPositionDialog from "@/modules/portfolios/AddPositionDialog.vue"
 import RecordDividendDialog from "@/modules/portfolios/RecordDividendDialog.vue"
@@ -223,11 +224,6 @@ function gainClass(value: number | undefined): string {
   return (value ?? 0) >= 0 ? "text-green-600" : "text-red-600"
 }
 
-function assetLabel(pos: Position): string {
-  const kind = pos.assetType ? pos.assetType.charAt(0) + pos.assetType.slice(1).toLowerCase() : "Stock"
-  return `(${pos.country || "US"}) ${kind}`
-}
-
 function exportCsv() {
   const rows = positions.value.map((p) =>
     [
@@ -418,20 +414,15 @@ function onPickerSaved() {
             <tr v-for="pos in g.items" :key="pos.id" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
               <template v-if="visibleColumns.includes('symbol')">
                 <td class="px-5 py-3">
-                  <div class="flex items-center gap-3">
-                    <img :src="`/api/logos/${pos.symbol}`" :alt="pos.symbol" class="h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800" />
-                    <div>
-                      <router-link
-                        :to="researchRoute(pos.symbol, route.fullPath)"
-                        class="font-medium text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 hover:underline"
-                      >
-                        {{ pos.symbol }}
-                      </router-link>
-                      <p class="text-xs text-slate-500 dark:text-slate-400">{{ pos.companyName }}</p>
-                      <p class="text-[11px] text-slate-400 dark:text-slate-500">{{ assetLabel(pos) }}</p>
-                      <LabelChips v-if="pos.labels?.length" :labels="pos.labels" :max="4" class="mt-1" />
-                    </div>
-                  </div>
+                  <router-link :to="researchRoute(pos.symbol, route.fullPath)" class="block">
+                    <TickerBadge
+                      :symbol="pos.symbol"
+                      :name="pos.companyName"
+                      :country-code="pos.country"
+                      :asset-type="pos.assetType"
+                    />
+                  </router-link>
+                  <LabelChips v-if="pos.labels?.length" :labels="pos.labels" :max="4" class="mt-1" />
                 </td>
               </template>
               <td v-if="visibleColumns.includes('quantity')" class="px-5 py-3 text-right tabular-nums">{{ formatNumber(pos.quantity, 0) }}</td>
