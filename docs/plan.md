@@ -3302,3 +3302,47 @@ premise. The remaining candidates, in the order I would test them:
       class, whatever the price column turns out to say.
 - [ ] Still worth recording in `ticker_reference`: it knows zero `.TFI` symbols, so
       nothing cross-checks these rows. Correct identifier, no new provider.
+
+### 72.24 — FX history backfill wired up (admin v1.0.59), not yet run
+
+**The gap.** `instruments` has had a one-shot full-history FX importer since D25 —
+`importHistory` pulls every pair from `DEFAULT_HISTORY_START` (`1999-01-04`) and
+upserts it. It was wired to nothing. The only FX Job in the cluster is `fx-sync`,
+running `syncDaily`, a **rolling recent window**. So `fx_rates` has only ever grown
+forward, and a currency added later has no history behind it.
+
+**Why that is now visible rather than theoretical.** §72.17 made instruments drop
+bars it cannot convert, which is correct — a base-currency price under a
+target-currency label is how Crypto read 85 PLN one day and ~400 the next. But the
+consequence is that a position whose pair has no rate before the sync started is
+**absent from the series and present afterwards**, and the boundary reads as a step.
+The two live ones, neither with a trade to explain it:
+
+```
+IBKR       2022-06-19  2961  →  2022-06-20  13291  (+348.9%)  then stays ~13,300
+IKE Beata  2022-05-12 14056  →  2022-05-13  32183  (+129.0%)  then stays ~32,200
+```
+
+A market move reverses; these do not. So the fix is to give `fx_rates` the history
+it was supposed to have — and that code has existed the whole time.
+
+**What landed.** `admin v1.0.59` (`eda1ba5`) adds `/jobs/fx-backfill/{run,status}`,
+running the **instruments** image with price-audit's
+`export DATABASE_URL="$uri"` wrapper (jobshot wires the pguser Secret through
+`envFrom` under the key `uri`, not `DATABASE_URL`, so without the wrapper the Job
+starts and immediately cannot connect). No `--start` is passed: coverage comes from
+the script's constant, not from a helm value that could quietly narrow it.
+
+`INSTRUMENTS_IMAGE` is now **pinned in the admin HelmRelease**, not left to the
+code's `:latest` default — this Job writes the table every converted price depends
+on, and an unpinned tag would let a release change what it wrote mid-run. It moves
+in step with the instruments HelmRelease, like `WALLETS_IMAGE`.
+
+- [ ] **Run it** — `POST /api/admin/jobs/fx-backfill/run`. Not run: the Playwright
+      session had expired and I was not going to sit waiting.
+- [ ] Recompute the affected portfolios afterwards and confirm the IBKR /
+      IKE Beata steps are gone or much reduced.
+- [ ] Confirm `fx_rates` row count and earliest date per currency afterwards — the
+      number to watch is the EARLIEST date, since the whole point is history.
+- [ ] If the steps survive, the boundary is not FX coverage and §72.21's hypothesis
+      is wrong; the next suspect is a symbol whose bars simply start then.
