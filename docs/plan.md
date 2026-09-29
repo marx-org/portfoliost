@@ -3518,3 +3518,42 @@ about a portfolio's history must page to exhaustion first.
       treating any of them as bugs; several will be arithmetic noise.
 - [x] §72.21 / §72.26 step investigation closed — all four original flags were flows
       or the bond-valuation case above
+
+### 72.29 — XTB: the portfolio has no deposits, so its value is negative by construction
+
+XTB is all 22 transactions and 4 positions; all positions are closed, quantity 0.
+There is **not one cash transaction**. Traced by hand:
+
+```
+BUY  PSEC 12 + INTC 3 (02-11) · PSEC 14 (02-24) · OXLC 14 (02-25) · META 1 (03-03)
+SELL OXLC 14, INTC 3, PSEC 25 (03-07) · META 1 (03-08) · PSEC 1 (2023-02-21)
+```
+
+The quantities balance exactly (PSEC 26 bought, 26 sold). So the *arithmetic is
+right* and the *data is incomplete*: the money that funded those buys was never
+imported as a `DEPOSIT`, so the cash ledger's running balance is **negative by
+everything that was ever spent**, and value = instruments + cash inherits it.
+
+```
+2022-03-04  val= 1925.70   inv=0.00   (holding, negative cash netting the value)
+2022-03-07  val=  -56.50   inv=0.00   (everything sold → value is just the residue)
+2022-03-09  val=  -29.46
+... 1680 negative-value snapshots in total
+```
+
+The residue is the fees and the small realised difference — a genuine -56.50 PLN.
+What is wrong is that the portfolio was funded by an import that is not there, so
+XTB's whole value history is off by whatever was deposited, and **`inv=0` means
+TWR/MWR on XTB is meaningless too**.
+
+- [ ] **XTB needs its opening cash.** Data-side, not code: either the sheet is
+      missing a DEPOSIT/transfer-in row, or sheets-sync should synthesise an
+      opening deposit when a portfolio has positions but zero inflows. The
+      `transactions.synthesized_opening_lot` / `is_gift` columns suggest a mechanism
+      for exactly this already exists — check whether it was meant to cover cash and
+      does not.
+- [ ] **Guard against the general case.** A portfolio with positions but no inflow
+      is silently "valid" today and produces a negative history. Worth an explicit
+      check in the audit: positions exist AND total inflow == 0 → flag.
+- [x] XTB's 1680 negative snapshots explained — missing opening deposit, not a
+      valuation bug
