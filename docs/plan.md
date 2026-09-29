@@ -2732,11 +2732,28 @@ Whatever is chosen, `convertSeries` must not be able to emit a number in a
 currency the response does not declare. A `convertedFrom`/`unconvertedDates`
 field alongside `fxFrom` would let callers decide per bar.
 
-- [ ] Choose the semantics (recommend: drop the bar, plus an explicit
-      `unconvertedDates` field so the loss is visible rather than inferred).
-- [ ] Update §48.2 in the plan, since its floor semantics are what produced this.
-- [ ] Check every consumer of `?currency=` before changing it: wallets grid,
-      benchmarks (`buildBenchmarkSeries`), the SPA history/compare charts, and
-      the mock API in `mocks/`.
-- [ ] Backfill `fx_rates` far enough back that the floor path is rare — the
-      2022-02-13 gap is an fx_rates coverage problem as much as a code one.
+- [x] **DONE (instruments `375c91f`, NOT DEPLOYED — no cluster access).**
+      Semantics chosen: **drop the bar**. `convertSeries` returns a
+      `convertedMask`; the route filters timestamps/OHLC/volumes through it, so
+      the series really is in `targetCcy`. A missing rate becomes a gap the
+      consumer carries forward. 379 pass, build clean.
+- [ ] **Deploy `v1.0.77` when a cluster is available**, then recompute Crypto,
+      IKE Marek, IKE Beata, IBKR and Equate+ (the portfolios with non-PLN
+      positions). Expect Crypto's remaining +410% jumps to clear — §72.16 only
+      fixed the prefix, so scattered gaps survived it, which is precisely why
+      §72.17 had to be done at the producer.
+- [ ] Rewrite §48.2: its "floor semantics, no carry-forward" rule is what
+      allowed a source-currency price under a target-currency label. The rule is
+      now "an unconvertible bar is absent", not "an unconvertible bar is in the
+      base currency".
+- [ ] Add `unconvertedDates` (or a count) to the `/price-bars` response so a
+      caller can see what was dropped instead of inferring it. Needs a contracts
+      change + `npm run gen:types` in `portfoliost-contracts/contracts/`, then
+      the SPA mocks in `mocks/` that assert the response shape.
+- [ ] Re-check the other `?currency=` consumers now that the response is
+      shorter than requested: wallets grid (covered), `buildBenchmarkSeries`,
+      the SPA history/compare charts, and `mocks/`. A consumer that assumed a
+      returned series spanned its whole window will now see gaps.
+- [ ] Backfill `fx_rates` further back. The 2022-02-13 gap is a coverage
+      problem as much as a code one; dropping bars is correct but it is better
+      not to need to.
