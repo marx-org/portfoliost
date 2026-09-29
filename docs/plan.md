@@ -2679,3 +2679,64 @@ one currency, so it needs a decision about when to defer to the provider.
 - [ ] Data fix: `BTC-USD` → `USD`; the two 2024-10-14 sells → `USD`.
 - [ ] Re-run the audit afterwards and confirm Crypto's 2022 jumps resolve to the
       real purchase steps (2 buys, 5 trades total).
+
+### 72.9 — §72.15/§72.16 deployed; the Crypto jumps were an FX-labelling bug
+
+`portfoliost-wallets v1.1.92` (§72.15), then `v1.1.93` (§72.16). Crypto
+recomputed; the +410% jumps are gone from the converted days.
+
+**§72.15** — the grid trusted `transactions.instrument_currency`, which the
+import fills from the PAYMENT currency. BTC-USD bought for 690.64 PLN was stored
+as PLN, so a USD close was multiplied straight into a PLN total (168.79 where it
+is 675.16). `GET /price-bars` already returns `currency`; the grid now checks the
+response instead of assuming the answer to the question it asked.
+
+**§72.16** — the deeper one, and it was in instruments all along:
+
+```
+?currency=PLN -> {"currency":"PLN","fxFrom":"2022-02-14",
+                  "closes":[42197.5156, 170859.4978, 176949.2152, ...]}
+```
+
+`convertSeries` (instruments `src/services/fx-convert.ts:52-53`) keeps a bar in
+its SOURCE currency when no rate row exists for that date — §48.2 "floor
+semantics, no carry-forward" — while the response declares `currency: <target>`
+for the whole series and reports the first converted date as `fxFrom`. So
+2022-02-13 is a USD number wearing a PLN label, off by the FX rate, next to
+neighbours that are correct. The grid multiplied it into the portfolio total,
+which is what produced +410% one-day jumps: 168.79 the day after a correctly
+converted ~683 is a -75% crash followed by a +300% recovery. Neither number was
+a market move.
+
+- [x] §72.15 — grid checks the bar's own currency (deployed `v1.1.92`)
+- [x] §72.16 — grid drops the prefix before `fxFrom` (deployed `v1.1.93`)
+- [x] Recompute Crypto and confirm the jumps resolve
+
+### 72.10 — §72.17: a converted series must not contain another currency
+
+`convertSeries` returning mixed currencies under one `currency` label is the root
+defect; §72.16 is the consumer-side guard, and this is the producer-side fix.
+
+The question is what a converted series should do about a date it cannot convert:
+
+- **Drop the bar** (current consumer behaviour: gap, carried forward). Honest,
+  but silently shortens the series and loses a real price the caller may have
+  wanted in source currency.
+- **Refuse the conversion** and return 422/400 naming the missing pair and date.
+  Loudest and safest, but breaks the SPA charts and benchmarks, which request
+  conversions over windows where early dates often predate the fx_rates table.
+- **Carry the earliest available rate backwards.** Contradicts the documented
+  no-carry-forward rule and would need its own justification.
+
+Whatever is chosen, `convertSeries` must not be able to emit a number in a
+currency the response does not declare. A `convertedFrom`/`unconvertedDates`
+field alongside `fxFrom` would let callers decide per bar.
+
+- [ ] Choose the semantics (recommend: drop the bar, plus an explicit
+      `unconvertedDates` field so the loss is visible rather than inferred).
+- [ ] Update §48.2 in the plan, since its floor semantics are what produced this.
+- [ ] Check every consumer of `?currency=` before changing it: wallets grid,
+      benchmarks (`buildBenchmarkSeries`), the SPA history/compare charts, and
+      the mock API in `mocks/`.
+- [ ] Backfill `fx_rates` far enough back that the floor path is rare — the
+      2022-02-13 gap is an fx_rates coverage problem as much as a code one.
