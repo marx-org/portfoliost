@@ -10276,3 +10276,449 @@ precisely the evidence that answered the question.
 - [x] Re-sample after a few days only if openst is redeployed for other reasons; not
       > **not worth a dedicated investigation on current evidence**
       worth a dedicated investigation on current evidence
+
+---
+
+<!-- Archived from plan.md on 2026-09-29. Closed the same day: both in-scope
+     steps done and verified in-cluster, all four open questions answered
+     (folded into 'Design decisions (resolved)'). The one unticked box is a
+     declined, out-of-scope item, kept deliberately. -->
+
+## 64. Kubernetes probes for the pfire fleet (found 2026-09-27 while deploying openst v1.1.36) — **CLOSED 2026-09-29**
+
+No marx2-owned service in `pfire` had a working HTTP health probe until
+openst v1.1.36. Auditing all nine against the live cluster found three
+distinct states, and — worse — that the pattern already in the repo is a
+**false friend**: it reads like an HTTP health check but deploys as a TCP
+socket check. At the time of discovery nothing in the namespace could express
+"degraded" and nothing restarted a hung process.
+
+> **This section is closed.** Both in-scope steps are done and verified in the
+> cluster, and all four open questions are answered — see the **"§64 closed"**
+> summary at the end of this section for the final state, the three false
+> premises that were corrected along the way, and what was deliberately left
+> undone. The prose below is kept as the record of *how* the audit reached its
+> conclusions, including the parts that turned out to be wrong.
+
+Scope: the 9 `ghcr.io/marx2/*` services in `cluster/apps/pfire/`. Third-party
+images (`ghostfolio`, `pgadmin`, `pgweb`, `postgrest`, `swagger-ui`,
+`investbrain`) are **out of scope** — their probe semantics belong to their
+upstreams.
+
+### Audited state (live, 2026-09-27 — not inferred)
+
+| Service | chart | probes in yaml | renders as | health endpoint |
+|---|---|---|---|---|
+| `openst` | 5.1.0 | liveness+readiness+startup | `httpGet` ✅ | `/health` 200, `/ready` 200 |
+| `cachest` | 5.1.0 | ~~none~~ liveness+readiness+startup (§64.2) | ~~—~~ `httpGet` ✅ | `/health` 200, ~~`/ready` 404~~ `/ready` 200/503 |
+| `portfoliost-wallets` | ~~5.0.1~~ 5.1.0 | liveness+readiness+**startup** (§64.1) | ~~`tcpSocket`~~ `httpGet` ✅ | `/health` 200 |
+| `portfoliost-instruments` | 5.1.0 | liveness+readiness+**startup** (§64.1) | ~~`tcpSocket`~~ `httpGet` ✅ | `/health` 200 |
+| `portfoliost-admin` | ~~5.0.1~~ 5.1.0 | liveness+readiness+**startup** (§64.1) | ~~`tcpSocket`~~ `httpGet` ✅ | `/health` 200 |
+| `portfoliost-users-auth` | 5.1.0 | liveness+readiness+**startup** (§64.1) | ~~`tcpSocket`~~ `httpGet` ✅ | `/health` 200 |
+| `portfoliost` (SPA) | 5.1.0 | ~~none~~ liveness+readiness (§64.3) | ~~—~~ `httpGet` ✅ on `/` | `/` 200 (`serve -s`, **not** nginx) |
+| `jobshot` | 5.1.0 | ~~none~~ liveness+readiness (§64.4) | ~~—~~ `httpGet` ✅ | `/health` 200, `/ready` 200/503 (were `index.html` for both) |
+| `mastra-ticker` | 5.1.0 | liveness (`custom: true`) | n/a — **no Deployment or Service in cluster** | unreachable |
+
+Struck-through cells are **superseded, not deleted** — the middle column records
+what §64.1/§64.2/§64.3 found and replaced. Re-verified against the live
+Deployment objects 2026-09-29: all seven services above now render real
+`httpGet`. The two rows still open are `jobshot` (§64.4) and `mastra-ticker`
+(a dead helmrelease — its step was dropped from this plan).
+
+The SPA's health endpoint is corrected here too: the container is
+`serve -s /app/dist -l 80`, so there is no nginx in the pod at all. The nginx
+is the *ingress* in front of it, which a pod probe never touches.
+
+
+### The chart contract (read from the chart, not guessed)
+
+`app-template` 5.x nests probes at
+`controllers.<c>.containers.<name>.probes.<probeName>`:
+
+- `enabled: true` is **required** — a probe without it is silently skipped.
+- `type` defaults to **`TCP`**, not HTTP. `type: HTTP` is needed for `httpGet`.
+- `path` / `port` are read from the **probe** level; `initialDelaySeconds`,
+  `failureThreshold`, `timeoutSeconds`, `periodSeconds` are read from `spec`.
+- `port` defaults to the controller's primary service port.
+- `custom: true` + a raw `spec` is the escape hatch that renders verbatim.
+
+**Why the four existing probes are wrong:** they put `path: /health` inside
+`spec:` and omit `type`. The template only lifts the four timing keys out of
+`spec` and never reads `path` from there, so the path is dropped and the
+default `TCP` applies. Verified live — all four render as
+`tcpSocket: {port: 3000}`. A process that accepts connections but no longer
+answers (deadlocked, event loop wedged, exhausted pool) passes both probes.
+
+Rules: one step = one commit; step `[x]` only after its tests pass. Probe
+changes are cluster-visible, so **every step ends with a Flux + `kubectl`
+verification**, and each helmrelease change must be validated against
+`app-template`'s `values.schema.json` **before** pushing — see §64.1.
+
+---
+
+### 64.2 — cachest: add `/ready`, then probes
+
+- [x] `cachest`: add `GET /ready` mirroring openst's — `503` +
+      `{"status":"degraded","redis":"unreachable"}` when the cache is down,
+      `200` otherwise; keep `/health` as pure liveness that never touches Redis
+      (a dependency-aware liveness probe restart-loops the pod during a cache
+      blip, which cannot fix the cache). Since cachest's `RedisCache.get/set`
+      already degrade to misses, readiness is the only honest place to drop the
+      pod from rotation. → cachest **v1.0.45**, `RedisCache.ping()` is a real
+      round-trip, not a connection flag.
+- [x] Add liveness (`/health`), readiness (`/ready`) and startup probes to
+      `cluster/apps/pfire/cachest/app/helmrelease.yaml`. → homelab
+      `f4cd384bd` (rebased onto the renovate bumps), pin **v1.0.46**, later
+      **v1.0.47** for the RateLimiter fix found while running the suite.
+- [x] `cachest`: add `test_ready_reports_503_when_redis_is_unreachable` and
+      `test_health_stays_ok_while_redis_is_down`; full suite green
+      (`docker build --target test -t cachest-test . && docker run --rm cachest-test`).
+      **204 passed.** Also 3 tests on `RedisCache.ping` itself in
+      `test_cache.py` — mocking `ping` away in a route test asserts the mock,
+      not the `try/except` that makes it safe.
+- [x] Tests: pod 1/1 with 0 restarts; probes render `httpGet`; `/ready` returns
+      200 in-cluster; and a deliberate Redis outage (scale the cache down) takes
+      the pod out of rotation **without** `/health` flapping. Verified live
+      2026-09-29 — timeline below.
+- [x] Commit: `cachest` code + tests, then the homelab tag bump + probes.
+
+#### Verified live (2026-09-29, `KUBECONFIG=$HOME/.kube/homylab`)
+
+`helm template` + the live Deployment object, not just schema validity (§64.1's
+lesson): all three probes render `httpGet` on port `8080`. `port: http`
+resolves from the service even though the container declares no `ports:`, which
+is worth knowing — the four TS services in §64.1 got away with the same
+`port: http` only because they do declare a named container port.
+
+`kubectl scale deploy/redis -n pfire --replicas=0` (cachest db1, openst db2,
+ghostfolio db0 share this instance — so this is a real outage for the whole
+cache tier, approved as such):
+
+| t | `/health` | `/ready` | in Service endpoints | containerReady | restarts |
+|---|---|---|---|---|---|
+| baseline | 200 | 200 `ready`/`ok` | yes | true | 0 |
+| +8…+24s | 200 | 200 `ready`/`ok` | yes | true | 0 |
+| +32s | 200 | **503** `degraded`/`unreachable` | yes | true | 0 |
+| +40s | 200 | 503 | **no** | **false** | **0** |
+| redis restored, +8s | 200 | 200 `ready`/`ok` | yes | true | 0 |
+
+The load-bearing result: `/health` never moved and `restartCount` stayed **0**
+across the whole outage. That is the difference §64.2 was buying — a
+dependency-aware liveness probe would have restarted the one pod still
+answering, which cannot fix Redis.
+
+**Detection lagged the outage by ~30 s**, and that is not a probe problem: the
+redis pod's `Terminating` phase kept serving existing connections, so `PING`
+succeeded until the process was actually gone. `failureThreshold: 2` ×
+`periodSeconds: 10` is the rest. Anything reading "readiness caught it
+instantly" from a scale-down test would be wrong.
+
+#### The tag bump is load-bearing, not cosmetic
+
+A rollback to v1.0.44 or older 404s `/ready`, and a probe against a 404 never
+passes — the pod would sit at `0/1` forever rather than serving. Recorded in
+the helmrelease so the next rollback is not attempted blind.
+
+#### Found while running the suite: GHA ships a red suite — and the red suite was a real bug
+
+`test` had been failing in CI since 2026-09-27 (run `36334269096`) and **v1.0.44
+was published anyway**. In every pfire service's
+`.github/workflows/docker-image.yml`, `build` needs only `release`:
+
+```yaml
+build:
+  needs: release
+```
+
+`test` is not in the graph, so a red suite is invisible — the image is built and
+pushed regardless. That is how a broken test survived two releases here.
+
+**The failure was not a flake, and my first diagnosis of it was wrong.** I
+attributed it to `pool.map` yielding in *submission* order, making
+`responses[0] == 200` a thread-ordering coin flip. That was incorrect. The
+actual cause was a defect in `RateLimiter`:
+
+```python
+self._last_fetch: float = 0.0     # reads as "a fetch happened at time zero"
+sleep = self._interval - (time.monotonic() - self._last_fetch)
+```
+
+`0.0` is not "no fetch yet" — it asserts that `time.monotonic()` is already
+large when the process starts. Under a namespaced `CLOCK_MONOTONIC` it is ~0, so
+a 60 s interval computed a ~57 s wait, found it exceeded `fetch_max_wait: 4`,
+and **rejected every caller with 503 for the first `interval` seconds of process
+life**. GitHub Actions runs the suite in the first ~12 s of a fresh container, so
+`/corp-bond/catalogue` returned `[503, 503, 503, 503]`. A developer machine has
+host-uptime monotonic values, so it passed locally every time — which is also why
+the pre-existing `test_first_acquire_returns_true` never caught it: it asserted
+the right thing and passed by accident of the platform.
+
+Fixed in cachest `317d1ca` (v1.0.47): `_last_fetch` is `None` until the first
+acquire, and that state is handled explicitly so the first caller always gets the
+slot whatever the clock reads.
+`test_first_acquire_succeeds_when_the_clock_starts_near_zero` pins
+`time.monotonic()` to 3.0, and was verified to fail on the old sentinel and pass
+on the new one. **205 passed**, and green in real CI. Deployed to PROD
+(homelab `4b81358ab`, pin → v1.0.47); PROD blast radius was probably nil, since
+in-cluster the clock is host uptime, but leaving PROD on a tag with a known
+defect is the wrong trade.
+
+The multiset assertion in `test_main.py` is still the right assertion — the old
+positional one would have accepted `[200, 200, 503, 503]`, the opposite failure —
+but it *surfaced* the bug rather than papering over it.
+
+- [x] The bug and the GHA gate, in the two repos that have a `test` job at all
+      (`openst`, `cachest`). `release` now needs `test` (no bump, no tag, no
+      Release on a red suite) and `build` needs `[release, test]` **and**
+      asserts `needs.test.result == 'success'`. That assertion is load-bearing:
+      these jobs use `if: always()`, which bypasses the implicit skip that
+      `needs:` alone causes — so listing `test` without it would look like a gate
+      in review and gate nothing, the same failure mode as §64.1's false friends.
+      **Both paths verified in real CI, not assumed:** red — run `36620781878`
+      (Test failed → `release` and `build` both *skipped*, no release created);
+      green — run `36621548366` (all success → v1.0.47 released). openst's happy
+      path likewise green on v1.1.39.
+- [ ] **The other 7 repos never run their tests in CI at all** — **declined,
+      out of scope; §64 closes without it.** Measured across every workflow
+      file: `portfoliost-wallets`, `-instruments`, `-admin`, `-users-auth`,
+      `portfoliost` (SPA), `jobshot` and `mastra-ticker` have **no `test` job and
+      no test command anywhere in CI**. `npm run test` in AGENTS.md is a local
+      convention with zero enforcement for those seven.
+
+      Left unticked deliberately, not overlooked. Adding a test job is not the
+      same task as gating one: it needs a per-repo test command and a green
+      suite first, and wiring a test job into a repo whose suite is red blocks
+      that repo's releases. Doing that across seven repos blind is a project,
+      not a closing step. The finding is recorded here so the next audit starts
+      from it instead of rediscovering it.
+
+      (mastra-ticker's recent red runs are the **Dependabot** workflow, not its
+      image pipeline.)
+
+### 64.3 — portfoliost SPA: probe the static server, and say what it cannot see
+
+The original wording of this step said "probe nginx". **That premise was wrong
+and is corrected here:** the SPA image has no nginx. PID 1 is
+`node /usr/local/bin/serve -s /app/dist -l 80` (`Dockerfile:44`). The nginx is
+the *ingress* in front of the pod, which a pod probe never touches.
+
+- [x] Add liveness + readiness on `GET /`. → homelab `a34386a57` (comment
+      corrected in `734d83f8f`), pin stays **v1.0.260** — probes are cluster
+      config, so this step needed no image bump.
+- [x] Add a comment in the helmrelease recording that this probe covers the
+      static server only, so a future reader does not assume it validates the
+      app. That comment carries the measured response table below, because the
+      limits are the whole point of writing it.
+- [x] Tests: pod 1/1; probe renders `httpGet` on `/`; rolling the deployment
+      does not flap. → `portfoliost-5f8664b545-5ls9t`, 1/1, **0 restarts**,
+      observed stable 180 s (9 probe cycles) with the pod in Service endpoints
+      and `helmrelease/portfoliost` back to `Ready=True`
+      (`portfoliost.v154`).
+- [x] Commit.
+
+#### What the probe can and cannot see
+
+`serve -s` serves real files correctly and falls back to `index.html` for any
+path that does not resolve to one. Measured in-pod and through the PROD
+ingress, 2026-09-29:
+
+| path | status | content-type | bytes |
+|---|---|---|---|
+| `/` | 200 | `text/html` | 898 |
+| `/index.html` | 200 | `text/html` | 898 |
+| `/runtime-config.js` | 200 | `application/javascript` | 189 |
+| `/assets/index-BDN4ASw9.js` | 200 | `application/javascript` | 670094 |
+| `/definitely-not-a-real-asset.js` | 200 | `text/html` | 898 |
+
+and that last row is **byte-identical to `/`** (same md5, `8f7a7892…`). So the
+probe catches a wedged or non-answering static server and an unreadable
+`/app/dist` — and it *cannot* catch a missing or corrupt asset, a bundle that
+throws at runtime, a broken Vue app, or any API being down. A missing asset is
+indistinguishable from a healthy one to a status-only probe, because the
+catch-all answers 200 either way. That is a limitation of `httpGet`, not of the
+path chosen: probing a known asset instead would not help, since its absence
+also yields 200.
+
+What actually catches a broken bundle is `npm run test:e2e` in the SPA repo, or
+asserting that a fetched asset is *not* byte-identical to `index.html` — which
+no probe can do. The API is a separate Deployment and has had real `httpGet`
+probes since §64.1.
+
+#### No startupProbe, and the real reason
+
+A cold pod logs exactly one expected `Readiness probe failed: connection
+refused` before `serve` binds port 80; it resolves sub-second. The reason no
+startupProbe is needed is not "serve starts fast" (which was a guess) but that
+liveness allows `3 × 20s = 60s` before a kill, which bounds the risk no matter
+how slow a start becomes.
+
+### 64.4 — jobshot: a real health route (crosses a 3rd repo) — **DONE**
+
+Open question 1 answered **YES** (add a real `/health`), so this was unblocked.
+
+The root cause was worse than "a no-op probe". `jobshot` is an Express server
+(`server.js`), and its SPA fallback sends `dist/index.html` for **every** path
+not starting with `/api/`. Measured in PROD before the change:
+
+```
+/health  status=0 bytes=454  <!doctype html><html lang="en…     ← the shell
+/ready   status=0 bytes=454  <!doctype html><html lang="en…     ← the shell
+/        status=0 bytes=454  <!doctype html><html lang="en…     ← the shell
+/api/jobs status=0 bytes=635 {"jobs":[{"name":"Scan single…      ← real JSON
+```
+
+All three shell responses are byte-identical. So a status-only probe here could
+not fail even in principle.
+
+- [x] Add a real `/health` in the `jobshot` repo — registered **above** the SPA
+      fallback, which is the only thing that mattered. `/health` is liveness and
+      touches nothing deliberately: the Kubernetes API is a network dependency,
+      and failing liveness on an API blip would restart-loop a pod whose UI is
+      fine, and restarting cannot fix the API server. jobshot **v1.7.0**
+      (`feat` → semantic-release minor), commit `c2d1525`.
+- [x] Also add `/ready`, checking only local files (`dist/index.html`,
+      `config/jobs.yaml`) — no network, so it cannot flap on an upstream. This
+      avoids recreating the "readiness duplicates liveness" problem that open
+      question 3 flags: if either file is gone the pod is up and answering while
+      unable to serve, which `/health` cannot see without becoming
+      dependency-aware.
+- [x] Tests: the endpoint returns something other than the SPA shell, asserted on
+      **content**; pod 1/1. Verified locally against a real server *and*
+      in-cluster on the deployed pod:
+
+      | request | before | after |
+      |---|---|---|
+      | `/health` | 200, 454 B shell | 200, 15 B `{"status":"ok"}` |
+      | `/ready` | 200, 454 B shell | 200, 18 B `{"status":"ready"}` |
+      | `/` | 200, 454 B shell | 200, 454 B shell (fallback intact) |
+      | `/some/spa/deep/route` | — | 200, 454 B (fallback intact) |
+      | `/assets/index-*.js` | — | 200 `text/javascript` (static intact) |
+      | `/api/jobs` | 200 JSON | 200 JSON (job API intact) |
+
+      The negative case, which is the one that carries the design: with
+      `config/jobs.yaml` removed, `/ready` → **503**
+      `{"status":"degraded","missing":["config/jobs.yaml"]}` while `/health`
+      stayed **200** — the liveness/readiness split working as intended, and the
+      only negative case this repo could run (it has no test framework; see
+      below).
+- [x] Commit. homelab `e4c79a782`, pin `1.6.1` → **`1.7.0`** (no `v`: this
+      repo's workflow uses `type=semver,pattern={{version}}`; verified `1.7.0`
+      exists in ghcr and `v1.7.0` does not). Pod `jobshot-5c7d7885df-l45z8` 1/1,
+      **0 restarts**, both probes live as `httpGet` on 3000,
+      `helmrelease/jobshot` back to `Ready=True` (`.v31`).
+
+#### jobshot is NOT on KEDA — the manifests are dead files
+
+Worth recording, because the app directory looks like a scale-to-zero service
+and is not one. Four independent signals:
+
+| signal | jobshot | a real KEDA app (investbrain/pgweb) |
+|---|---|---|
+| `httpscaledobject.yaml` in `app/` | present | present |
+| listed in `kustomization.yaml` `resources` | **no** | yes |
+| `ScaledObject` in the cluster | **none** | present |
+| `replicas` in helmrelease | **1** | 0 |
+| ingress target | **app service** | interceptor proxy |
+
+Flux never applies the unwired files, and the live namespace confirms it: the
+only `ScaledObject`s are `investbrain`, `pgweb`, `scanst-ui`. So liveness +
+readiness on a plain always-on Deployment is correct here. If that is ever
+wired up, `replicas` must become `0`, a `startupProbe` becomes mandatory, and
+liveness becomes near-pointless on a pod that is deleted when idle.
+
+**`scorest` carries the same dead `httpscaledobject.yaml` +
+`interceptor-service.yaml`** and is likewise not on KEDA. Left alone — out of
+this plan's scope, but it is the second app where the directory lies about the
+deployment shape.
+
+#### jobshot has no tests, and its CI has no test job
+
+`package.json` has no test script, there is no runner or test file in the repo,
+and `build.yml` runs `semantic-release` + build with no `test` step at all — the
+§64.2 GHA problem in a more complete form. Verification here was therefore done
+by running the real server and asserting on content, which is stronger than a
+unit test for this particular claim but is not something CI will ever re-check.
+Also pre-existing and unrelated: `yarn lint` fails on `master` with an eslint
+flat-config migration error in `eslint.config.js` (verified identical on a clean
+HEAD).
+
+
+### Design decisions (resolved)
+
+All four questions that gated this plan are answered; the reasoning lives in the
+step each one owned, so this is only the index.
+
+1. **jobshot health route → add a real route** (owned by §64.4). The fix was
+   registering `/health` and `/ready` *above* the SPA fallback, which was the
+   whole problem: it answers `index.html` for every non-`/api/` path, so both
+   were byte-identical to `/`.
+2. **cachest `/ready` → add it** (owned by §64.2). The counter-argument was
+   that cachest degrades gracefully to cache misses anyway — true, and exactly
+   why it is needed: with no readiness gate the pod keeps taking traffic it
+   cannot serve quickly. Confirmed live, where a 30 s Redis outage left
+   `/health` at 200 while every request paid a full upstream walk.
+3. **Four TS services keep a duplicated readiness probe — deliberately**
+   (constraint, recorded so it is not "fixed" later). They share one database,
+   `admin` fans out to five services, and `instruments` deliberately serves
+   stale data when cachest is down, so dependency-gating them would evict
+   working pods and cause a correlated fleet-wide exit. Degraded belongs in
+   `/metrics` (all four already serve it), not in a probe. If anyone revisits
+   this, the readiness **must be latched** (hold the last good verdict ~30 s)
+   so a brief blip cannot flap four pods at once. Full evidence in §64.2's
+   closing note above.
+4. **Third-party images stay out of scope.** `postgrest` / `swagger-ui` /
+   `pgadmin` / `pgweb` are declared here but built elsewhere, so their probe
+   semantics belong to their upstreams; a probe that disagrees with the
+   upstream's own contract is worse than no probe.
+
+
+### §64 closed (2026-09-29)
+
+Both numbered steps that were in scope are done and verified in the cluster;
+all four open questions are answered. Final state of the 9 audited services:
+
+| service | probes | renders as | endpoint | helmrelease |
+|---|---|---|---|---|
+| `openst` | liveness+readiness+startup | `httpGet` ✅ | `/health`, `/ready` | — |
+| `cachest` | liveness+readiness+startup | `httpGet` ✅ | `/health`, `/ready` 200/503 | `4b81358ab` |
+| `portfoliost-wallets` | liveness+readiness+startup | `httpGet` ✅ | `/health` | §64.1 |
+| `portfoliost-instruments` | liveness+readiness+startup | `httpGet` ✅ | `/health` | §64.1 |
+| `portfoliost-admin` | liveness+readiness+startup | `httpGet` ✅ | `/health` | §64.1 |
+| `portfoliost-users-auth` | liveness+readiness+startup | `httpGet` ✅ | `/health` | §64.1 |
+| `portfoliost` (SPA) | liveness+readiness | `httpGet` ✅ on `/` | `/` 200 | `734d83f8f` |
+| `jobshot` | liveness+readiness | `httpGet` ✅ | `/health`, `/ready` 200/503 | `e4c79a782` |
+| `mastra-ticker` | — | n/a | no Deployment/Service in cluster | §64.5 dropped |
+
+Eight of nine now probe something real. `mastra-ticker` is the exception and
+its step was dropped: it has a helmrelease with a `custom: true` probe and
+nothing to protect.
+
+**Three false premises in this plan were corrected against the running system,
+and all three mattered more than the probes themselves:**
+
+1. "probe nginx" for the SPA (§64.3) — the image has no nginx; PID 1 is
+   `node /usr/local/bin/serve -s /app/dist -l 80`. The nginx is the ingress,
+   which a pod probe never touches.
+2. "jobshot returns index.html for /health, so add a real route" (§64.4) —
+   right conclusion, but the plan understated it: the SPA fallback made *any*
+   status-only probe on that pod incapable of failing, not just `/health`.
+3. "the failing test is a thread-ordering flake" (§64.2) — wrong, and it was a
+   real defect: `RateLimiter._last_fetch = 0.0` read a near-zero
+   `time.monotonic()` as "a fetch just happened" and rejected every caller for
+   the first `interval` seconds. Fixed in cachest v1.0.47 and deployed.
+
+**The transferable lesson**, and the reason the plan insisted on `helm template`
+and a real `kubectl` check over a schema pass: every one of the three was
+*schema-valid and plausible*. A probe with `path` under `spec` renders as a
+working-looking `tcpSocket`. A `needs:` list next to `if: always()` renders as
+a working-looking gate. A passing local suite renders as a working-looking test.
+Nothing short of rendering it, or breaking it on purpose, told us otherwise —
+and for the RateLimiter, deliberately breaking it in CI is what proved both the
+bug and the new gate.
+
+**Deliberately not done, recorded so the next audit starts here:**
+- The 7 repos that never run tests in CI (see the unticked box in §64.2).
+- Dependency-aware readiness for the four TS services, and the
+  `dependency_up` gauge that would replace it (open question 3).
+- Third-party images (open question 4).
+- `mastra-ticker`'s dead helmrelease (§64.5, dropped).
