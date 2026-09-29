@@ -3148,3 +3148,124 @@ how the audit reads bars it already has, not how any bar is fetched.
       stale sheet name. Cosmetic, and it is what made this look like a wrong-fund
       problem for several passes. Fix with §72.39 step 4.
 - [ ] Commit.
+
+---
+
+## 75. Six chart e2e specs fail: the seed's `value_snapshots` insert has been a no-op since §46.4 (found 2026-09-29)
+
+Proposal: — (found while running §57's gate; no proposal doc).
+
+`npm run test:e2e` fails 6 specs, all of them charts, and all of them for one
+reason. Reproduced identically on a clean tree (stash + rebuild + full run), so
+it is **not** a §57 regression — but it is a red suite and it gets fixed here
+rather than written off.
+
+The six: `chart-currency.spec.ts:135`, `chart-recompute.spec.ts:13`,
+`combined-chart.spec.ts:11` and `:19`, `parity-portfolios.spec.ts:53`,
+`performance-display-currency.spec.ts:39`.
+
+### 75.1 — The cause, measured
+
+`mocks/db-seed/portfolios.mjs:127` inserts the seeded value snapshots through
+
+```js
+for (const s of snapshots.length ? [] : []) {
+```
+
+which iterates an empty array — **zero rows are ever inserted**. `seededSnapshots()`
+sits right above it, generating 48 rows, and the completion log printed
+`48 snapshots` (the *generated* count, not the inserted one), so the no-op was
+invisible in the seed output. `git log -S` dates the line to `68de01c`
+(2026-09-21, §46.4) — it has never worked.
+
+Measured on the compose stack: `portfolios.value_snapshots` holds **1** row for
+the seeded Top10 portfolio, dated today, written by an e2e test's recompute —
+not by the seed. And wallets answers
+
+```
+GET /api/portfolios/3cb589d8…/analytics?timeframe=ALL
+  → {"backfillStatus":"pending","performance":{"timeSeries":[], …}}
+```
+
+`portfolios.ts:740–746` marks a portfolio pending when it has `< 2` snapshots
+**and** `hasBackfillableHistory()`; a pending portfolio makes the whole
+`/api/portfolios/merged` response an empty series (`portfolios.ts:767–779`), so
+the combined chart block never renders (`InvestmentsView.vue:373` is
+`v-if`'d on a non-empty `timeSeries`).
+
+**Why it passed before and broke now.** §72.7 (wallets, 2026-09-28) removed the
+`runBackfill` that these GET routes used to fire — deliberately, because a GET
+was mutating state and was downgrading queued recalcs. That call was papering
+over the broken seed: loading the dashboard used to backfill Top10 and populate
+the snapshots, so the charts worked. With the GET-side self-healing gone, the
+fixture is the only thing that can supply the series, and it supplies nothing.
+`performance-display-currency.spec.ts:66` ("Top10 has a populated 1Y series")
+was already the regression guard; it had nothing to assert against.
+
+Not a gateway problem, though it looks like one: the same request against the
+example-service mock on `:4010` returns 11 points, but `/api/portfolios*` is routed to
+the real `wallets` service (gateway `default.conf`) — and wallets is the service
+with the empty series.
+
+The six are **not** all this one cause. Five are. `chart-currency.spec.ts:135`
+is a stale test: once the series existed it got past the empty chart and failed
+on `usd.closes[native.length - 1]` = `undefined`. That one is §75.3.
+
+### 75.2 — Fix the fixture, and make it impossible to no-op again
+
+- [x] `mocks/db-seed/portfolios.mjs`: insert what `seededSnapshots()` produced —
+  the `for…of` iterates `snapshots`. Snapshot columns stay
+  `(portfolio_id, snapshot_date, value, invested, net_flow)`.
+- [x] Anchor the window to **today** instead of the hardcoded
+  `2026-08-01…2026-09-18`: 48 daily rows ending today (49 inserted, measured
+  `2026-08-12…2026-09-29`). The hardcoded window was already 11 days stale when
+  found, and it silently expires out of the `1Y` timeframe the specs query —
+  the same class of rot `reset-mock-state.sh` already calls out for
+  `pricebars-sim`. The seeded transactions stay at `2026-08-02`; a snapshot
+  history that starts after the funding date is consistent, and it is what makes
+  `n >= 2` resolve `complete`.
+- [x] Log the **inserted** row count with its date range, not the generated one,
+  and throw if `snapshots.length === 0` — a fixture that silently seeds nothing
+  must not be able to report success again.
+- [x] Tests: `docker compose build mock-db-seed` first — **`reset-mock-state.sh`
+  does not build it**, and `docker compose run --rm mock-db-seed` silently reuses
+  the old image, so the first attempt after this fix still seeded zero rows. Then
+  `bash scripts/reset-mock-state.sh`, then
+  `SELECT count(*) … FROM portfolios.value_snapshots` = 49, and
+  `combined-chart` / `chart-recompute` / `parity-portfolios` /
+  `performance-display-currency` green.
+- [x] Full gate: `npm run build`, `npm run test` (431), `npm run test:mock` (227),
+  `npm run test:e2e` — **106 passed, 0 failed, 1 skipped**: the first fully green
+  e2e run of this stack.
+- [x] Commit; then continue §57.2.
+
+### 75.3 — `chart-currency.spec.ts:135` asserted a response shape §72.17 deleted
+
+- [x] The test indexed both series at one index
+  (`usd.closes[native.length - 1]`), expected an unconverted head
+  (`firstConverted > 0`) and expected the §48.5a caveat line to render.
+  Measured on the same window: native `?from=2015-09-29&to=2026-09-29` →
+  **5664** bars; the same window plus `&currency=USD` → **44**. `undefined` in,
+  `NaN` out.
+- [x] The service is right; the test is stale. `conversionJoinSql`
+  (`portfoliost-instruments/src/services/price-bars.ts:152`) filters on
+  `hasRates`: *"§72.17 — when a conversion was actually asked for, a bar that
+  cannot be converted is dropped rather than passed through in the source
+  currency."* plan-archive §72.10 is titled "a converted series must not contain
+  another currency". The SPA already matches — `windowStartIso` is the first
+  **visible** bar, so with nothing unconverted left `fxCaveat()` returns null and
+  no caveat renders (verified live: the string is absent from the page). Making
+  the service emit an unconverted head again would reintroduce the defect §72.17
+  closed.
+- [x] Test rewritten to the current contract: the converted series is a strict
+  subset of the native dates; **every** returned bar equals the native close for
+  the same date × `DEMO_FX.USD / DEMO_FX.PLN` (matched by date, not index — the
+  arrays differ in length and `price_bars_all` can carry two sources per date);
+  `fxFrom` is the first row of the response; the first converted date is later
+  than the first native date; and the "earlier bars in …" caveat is absent.
+
+**Not in scope:** the `merged` route's all-or-nothing pending rule (one
+mid-backfill portfolio blanks the whole dashboard series) and the
+`E2E …`-named portfolios that tests leave behind with a single snapshot. Both
+are wallets-side design questions, not fixture bugs; recorded here so they are
+not rediscovered from scratch.

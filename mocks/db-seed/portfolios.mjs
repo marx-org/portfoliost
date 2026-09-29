@@ -13,16 +13,27 @@ function seededTotalInvested() {
 }
 
 // Daily value snapshots for Top10 so the REAL wallets /portfolios/merged and
-// /:id/analytics routes serve a non-empty series in e2e (§46.4). The merged
-// route stays "pending" until a portfolio has ≥2 rows, so without this the
-// combined chart never renders. Deterministic: ~6% growth over the window with
-// a gentle wobble (no randomness).
-function seededSnapshots(totalInvested) {
+// /:id/analytics routes serve a non-empty series in e2e (§46.4, §75.1). The
+// analytics routes report "pending" — and answer with an EMPTY series — for any
+// portfolio holding <2 snapshot rows, so without this the combined chart never
+// renders. Since §72.7 (wallets, 2026-09-28) a GET no longer backfills, so the
+// seed is the only thing that can supply the history.
+//
+// The window is anchored to TODAY, 48 daily rows ending today. It used to be a
+// hardcoded 2026-08-01…2026-09-18, which was already 11 days stale when §75
+// found it and would eventually slide out of the 1Y timeframe the specs query —
+// the same rot `reset-mock-state.sh` calls out for pricebars-sim. The seeded
+// transactions stay at 2026-08-02; a history starting after the funding date is
+// consistent, and it is what makes the "n >= 2" check resolve complete.
+//
+// Deterministic: ~6% growth over the window with a gentle wobble (no randomness).
+function seededSnapshots(totalInvested, now = new Date()) {
   const rows = []
   const invested = Math.round(totalInvested * 100) / 100
-  const start = Date.UTC(2026, 7, 1) // 2026-08-01
-  const end = Date.UTC(2026, 8, 18) // 2026-09-18
   const windowDays = 48
+  // UTC midnight of today, so the row dates do not shift with the runner's TZ.
+  const end = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  const start = end - windowDays * 86400000
   for (let t = start; t <= end; t += 86400000) {
     const elapsed = Math.round((t - start) / 86400000)
     const growth = 1 + 0.06 * (elapsed / windowDays) + 0.004 * (elapsed % 7)
@@ -45,10 +56,18 @@ export async function seedPortfolios(sql) {
 
   const totalInvested = seededTotalInvested()
   const snapshots = seededSnapshots(totalInvested)
+  if (snapshots.length === 0) {
+    // §75.2 — a fixture that seeds nothing must fail loudly. This exact class of
+    // silent no-op shipped once already: the insert loop iterated an empty array
+    // while the log line printed the *generated* count, so the seed reported
+    // "48 snapshots" and inserted none.
+    throw new Error("seededSnapshots() produced no rows — refusing to seed a portfolio with no snapshot history")
+  }
   const createdAt = "2026-08-01T10:14:16.111Z"
   const updatedAt = "2026-08-02T08:57:38.461Z"
   const txExecutedAt = "2026-08-02T00:00:00.000Z"
   const posOpenedAt = "2026-08-02T00:00:00.000Z"
+  let insertedSnapshots = 0
 
   await sql.begin(async tx => {
     // Portfolio (wallet entity dropped in §62.2 — no wallet_id / currency column)
@@ -124,8 +143,11 @@ export async function seedPortfolios(sql) {
     `
 
     // Value snapshots — the wallets analytics routes need ≥2 rows per portfolio
-    // to resolve "complete" instead of firing a backfill (§46.4).
-    for (const s of snapshots.length ? [] : []) {
+    // to resolve "complete" instead of firing a backfill (§46.4, §75.2). This
+    // loop used to iterate `snapshots.length ? [] : []`, i.e. nothing: the seed
+    // inserted zero rows and only §72.7's removal of the GET-side backfill made
+    // that visible.
+    for (const s of snapshots) {
       await tx`
         INSERT INTO portfolios.value_snapshots
           (portfolio_id, snapshot_date, value, invested, net_flow)
@@ -133,6 +155,7 @@ export async function seedPortfolios(sql) {
           (${SEED_PORTFOLIO_ID}, ${s.snapshotDate}, ${s.value}, ${s.invested}, ${"0"})
       `
     }
+    insertedSnapshots = snapshots.length
   })
-  console.log(`[db-seed] portfolios: inserted Top10 portfolio, ${SEED_POSITIONS.length} positions, ${SEED_TRANSACTIONS.length} transactions, ${snapshots.length} snapshots`)
+  console.log(`[db-seed] portfolios: inserted Top10 portfolio, ${SEED_POSITIONS.length} positions, ${SEED_TRANSACTIONS.length} transactions, ${insertedSnapshots} snapshots (${snapshots[0].snapshotDate}…${snapshots[snapshots.length - 1].snapshotDate})`)
 }

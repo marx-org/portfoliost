@@ -127,12 +127,20 @@ test("price chart keeps the rendered series when /history 502s (provider burst)"
 /**
  * Plan §48.5 — the chart title currency is a selector (registry from
  * /api/currencies, default = the instrument's base currency). Selecting a
- * currency re-fetches both legs with ?currency= (server-side conversion),
- * converts the axis, and caveats via fxFrom when the visible window holds
- * unconverted bars. FX expectations derive from the seeded fixture only
+ * currency re-fetches both legs with ?currency= (server-side conversion) and
+ * converts the axis. FX expectations derive from the seeded fixture only
  * (mocks/db-seed DEMO_FX — the §48.4 rule).
+ *
+ * §75.3: a converted series no longer carries an unconverted head. §72.17
+ * (instruments, 2026-09-28) made `?currency=` DROP a bar it cannot convert
+ * instead of passing it through in the source currency — "a converted series
+ * must not contain another currency". So the response is a strict subset of
+ * the native dates, every returned bar is converted, and there is nothing left
+ * to caveat. This test used to assert the old §48.5 shape (same-length arrays,
+ * `firstConverted > 0`, the caveat line) and went NaN on
+ * `usd.closes[native.length - 1]` once the service changed under it.
  */
-test("§48.5 — currency selector converts the series + caveat (SNT.WA PLN→USD)", async ({ page }) => {
+test("§48.5/§72.17 — currency selector converts the series (SNT.WA PLN→USD)", async ({ page }) => {
   await login(page)
 
   // Capture both price-bars responses (native on load, converted after the
@@ -176,23 +184,45 @@ test("§48.5 — currency selector converts the series + caveat (SNT.WA PLN→US
     }, { timeout: 30000 })
     .toBe(true)
 
-  // The converted response: USD output, PLN base, converted tail at the
-  // seeded fixture rate (flat schedule — exact), unconverted head.
+  // The converted response: USD output, PLN base, every bar converted at the
+  // seeded fixture rate (flat schedule — exact).
   await expect.poll(async () => !!captured.usd, { timeout: 15000 }).toBe(true)
   expect(captured.usd!.currency).toBe("USD")
   expect(captured.usd!.baseCurrency).toBe("PLN")
   const rate = DEMO_FX.USD / DEMO_FX.PLN
-  const last = captured.native!.closes.length - 1
-  expect(Math.abs(captured.usd!.closes[last] - captured.native!.closes[last] * rate)).toBeLessThan(1e-6)
 
-  // fxFrom floor: the first bar actually converted (the seeded 30-day
-  // schedule starts ~29 days before today, so the default 1Y window still
-  // shows unconverted bars) → the caveat renders.
-  const firstConverted = captured.usd!.closes.findIndex((c, i) => c !== captured.native!.closes[i])
-  expect(firstConverted).toBeGreaterThan(0)
-  const fxFrom = captured.native!.dates[firstConverted]
-  expect(captured.usd!.fxFrom).toBe(fxFrom)
-  await expect(page.getByText(`FX rates from ${fxFrom}; earlier bars in PLN`)).toBeVisible({ timeout: 15000 })
+  // §72.17: the FX floor drops what it cannot convert, so the converted series
+  // is a strict subset of the native one (SNT.WA has USD-denominated bars back
+  // to 2015; the seeded 30-day FX schedule only covers the last 30 days).
+  expect(captured.usd!.closes.length).toBeGreaterThan(0)
+  expect(captured.usd!.closes.length).toBeLessThan(captured.native!.closes.length)
+
+  // Every converted bar is the native close for the SAME date times the rate.
+  // Keyed by date, not by index: the two series have different lengths, and
+  // price_bars_all can hold two sources (stooq + openst) for one date.
+  const nativeByDate = new Map<string, number[]>()
+  captured.native!.dates.forEach((d, i) => {
+    const list = nativeByDate.get(d) ?? []
+    list.push(captured.native!.closes[i])
+    nativeByDate.set(d, list)
+  })
+  const lastIdx = captured.usd!.closes.length - 1
+  for (let i = 0; i <= lastIdx; i++) {
+    const natives = nativeByDate.get(captured.usd!.dates[i]) ?? []
+    const expected = natives.map((c) => c * rate)
+    expect(
+      expected.some((c) => Math.abs(captured.usd!.closes[i] - c) < 1e-6),
+      `${captured.usd!.dates[i]}: ${captured.usd!.closes[i]} is not any native close × ${rate}`,
+    ).toBe(true)
+  }
+
+  // fxFrom = the first bar that converted. With nothing left unconverted it is
+  // the first row of the response, and the chart shows no bars before it — so
+  // the §48.5a caveat ("earlier bars in PLN") must NOT render: the SPA derives
+  // windowStartIso from the first VISIBLE bar, which now equals fxFrom.
+  expect(captured.usd!.fxFrom).toBe(captured.usd!.dates[0])
+  expect(captured.usd!.dates[0] > captured.native!.dates[0]).toBe(true)
+  await expect(page.getByText(/earlier bars in/)).toHaveCount(0)
 
   // §48.5b — the benchmark overlay shares the selected currency: with the
   // USD benchmark on a now-USD axis there is no cross-currency note.
