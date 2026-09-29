@@ -2616,7 +2616,7 @@ symbol names. The decisive check is ING01's published NAV for 2023-04-07 — if 
 - [ ] Resolve the open question with ING01's published NAV for 2023-04-07 (and one
       later date) before building anything.
 - [ ] If the class is wrong: add an openbb provider in `openst` for that specific
-      > **RESTORED OPEN §72.38 — the N/A was a conflation of name lineage with price series. The broker confirms 382,05 was paid, which is exactly the condition under which §72.6 says the bar is the wrong series. GATE: run the ING01 check for 2026-08-19 and 2023-04-13 before building anything.**
+      > **§72.38 — the N/A was a conflation of name lineage with price series. The broker confirms 382,05 was paid, which is exactly the condition under which §72.6 says the bar is the wrong series. GATE: run the ING01 check for 2026-08-19 and 2023-04-13 before building anything.**
       ING Akcji class, following the provider-tier order in the planner contract —
       capture the provider's response into `tests/fixtures/` first, then the plugin
       with mocked I/O, then openst standalone smoke, then `cachest` route, then the
@@ -2684,14 +2684,14 @@ payment currency" is load-bearing for rows where the sheet genuinely only knows
 one currency, so it needs a decision about when to defer to the provider.
 
 - [x] Decide the rule: when the instrument's listing currency is known from the
-      > **DONE — listingCurrency preferred, falls back to payment currency, invalid ISO rejected (wallets c7993a5, contracts v1.6.51)**
+      > **listingCurrency preferred, falls back to payment currency, invalid ISO rejected (wallets c7993a5, contracts v1.6.51)**
       provider, it must win over the payment currency (never the reverse). Record
       it in `instrument-resolver` as the currency source, and have the import
       read it rather than infer.
 - [x] Data fix: `BTC-USD` → `USD`; the two 2024-10-14 sells → `USD`.
       > **STILL OPEN — needs a wipe & reimport after the listingCurrency fix lands in the data**
 - [x] Re-run the audit afterwards and confirm Crypto's 2022 jumps resolve to the
-      > **DONE — Crypto worst jump 410.1% → 48.9% after the instruments v1.0.79 /price-bars fix**
+      > **Crypto worst jump 410.1% → 48.9% after the instruments v1.0.79 /price-bars fix**
       real purchase steps (2 buys, 5 trades total).
 
 ### 72.9 — §72.15/§72.16 deployed; the Crypto jumps were an FX-labelling bug
@@ -2752,7 +2752,7 @@ field alongside `fxFrom` would let callers decide per bar.
       the series really is in `targetCcy`. A missing rate becomes a gap the
       consumer carries forward. 379 pass, build clean.
 - [x] **Deploy `v1.0.77` when a cluster is available**, then recompute Crypto,
-      > **DONE — deployed through v1.0.79 and recomputed; 48.9% residual is the genuine ETH buy**
+      > **deployed through v1.0.79 and recomputed; 48.9% residual is the genuine ETH buy**
       IKE Marek, IKE Beata, IBKR and Equate+ (the portfolios with non-PLN
       positions). Expect Crypto's remaining +410% jumps to clear — §72.16 only
       fixed the prefix, so scattered gaps survived it, which is precisely why
@@ -2774,7 +2774,7 @@ field alongside `fxFrom` would let callers decide per bar.
       the SPA history/compare charts, and `mocks/`. A consumer that assumed a
       returned series spanned its whole window will now see gaps.
 - [x] Backfill `fx_rates` further back. The 2022-02-13 gap is a coverage
-      > **DONE §72.24 — full-history FX backfill ran, 2022-06 and 2023-04 now convert in full**
+      > **§72.24 — full-history FX backfill ran, 2022-06 and 2023-04 now convert in full**
       problem as much as a code one; dropping bars is correct but it is better
       not to need to.
 
@@ -2959,13 +2959,13 @@ instrumentation exists to prevent, and one the first test caught on macOS becaus
 - [x] Source audit: no in-process leak in this repo
 - [x] `GET /__mem` + `memdebug.py` + 6 tests (`dfede54`)
 - [x] Deploy with `MEM_DEBUG=1`, exercise logo/search/research traffic, and take two
-      > **SUPERSEDED §72.34 — deliberately not done; enabling it would have reset uptime and destroyed the evidence that answered the question**
+      > **§72.34 — deliberately not done; enabling it would have reset uptime and destroyed the evidence that answered the question**
       `__mem` snapshots at least 30 minutes apart. That single pair decides
       whether this is even our bug.
 - [x] If `traced_fraction` is large: `top_allocations` names the container.
-      > **N/A §72.34 — MEM_DEBUG deliberately not enabled; RS history answered it instead**
+      > **§72.34 — MEM_DEBUG deliberately not enabled; RS history answered it instead**
 - [x] If it is small: stop looking here. Options are bounding OpenBB's caches at
-      > **DONE §72.34 — stopped; no leak, do not spend more here**
+      > **§72.34 — stopped; no leak, do not spend more here**
       the singleton, or a worker-per-request model. Both are bigger than the 2Gi
       mitigation already in place, and the measurement decides which.
 
@@ -3005,17 +3005,17 @@ identification lands on a category whose NAV is *not* ~0.888 × A, the answer is
 upstream of the provider and the provider will not fix it.
 
 - [x] Fetch the NAV of all nine categories (A, E, F, I, K, S, T, U, W) for one
-      > **DONE §72.19 — all nine measured on 2026-09-25, none at 922.63**
+      > **§72.19 — all nine measured on 2026-09-25, none at 922.63**
       known date, e.g. 2026-08-19 where our bar is 795.02. The class at
       **≈706 PLN** is ours. This is the identifying step and needs no code.
 - [ ] If identified, build the openst provider per the planner contract's
-      > **RESTORED OPEN §72.38 — the false premise was never established; name lineage is not price series**
+      > **§72.38 — the false premise was never established; name lineage is not price series**
       provider-tier order: capture the provider response into
       `openst/tests/fixtures/` first, then the plugin with mocked I/O, then openst
       standalone smoke, then the `cachest` route, then the
       `portfoliost-instruments` adapter, then the full compose stack.
 - [ ] Map the class explicitly in `ticker_reference` (`INGAKC.TFI` → category), so
-      > **OPEN §72.38 — cannot be mapped until the class is identified**
+      > **§72.38 — cannot be mapped until the class is identified**
       the class stops being implicit. `ticker_reference` currently knows **zero**
       `.TFI` symbols, which is why nothing cross-checks them.
 - [ ] Fix the stored `positions.company_name` ("Goldman Sachs Akcji"), inherited
@@ -3119,12 +3119,12 @@ measurement rather than assumed:
   explicitly in `ticker_reference` — the identifier is the point, not the series.
 
 - [x] Fetch E, F, I, S, T, U, W on 2026-09-25 and find the one at ≈922.5 PLN.
-      > **DONE — no category at ≈922.63; the sheet's price column is the suspect**
+      > **no category at ≈922.63; the sheet's price column is the suspect**
 - [x] Confirm on a second date (2026-08-19, where our bar is 795.02 and the target
       > **Same caveat — target invalid; see above.**
       is ≈706) so a coincidental match cannot pass.
 - [x] If no category lands there, stop and treat the sheet's price column as the
-      > **WITHDRAWN §72.38 — the conclusion rested on the retracted §72.36. The provider
+      > **§72.38 — the conclusion rested on the retracted §72.36. The provider
       > premise is live again, not closed.**
       suspect — do not build a provider against a series that is not the problem.
 
@@ -3180,11 +3180,11 @@ E/I/K, but `INC01` for S (not `INS01`), and `ING01<L>` for F/T/U/W.
       on its own, and would mean the sheet's *quantity* also needs restating, not
       just its price series.
 - [ ] Only then build the provider, per the planner contract's provider-tier order
-      > **RESTORED OPEN §72.38 — the premise was never falsified. Order: fixtures →
+      > **§72.38 — the premise was never falsified. Order: fixtures →
       > plugin with mocked I/O → openst smoke → cachest route → instruments adapter
       > → compose stack. Gate on the ING01 check first.**
 - [ ] Record the identifier in `ticker_reference` whatever it turns out to be:
-      > **OPEN §72.38 — the identifier to record is exactly what the ING01 check determines; do not assume INGAKC.TFI is right**
+      > **§72.38 — the identifier to record is exactly what the ING01 check determines; do not assume INGAKC.TFI is right**
       `INGAKC.TFI` carries no category letter, and `ticker_reference` knows zero
       `.TFI` symbols, so nothing cross-checks these rows today.
 
@@ -3227,18 +3227,18 @@ series now has steps wherever FX coverage begins, and those steps are artefacts 
 coverage rather than of the portfolios.
 
 - [x] Confirm the hypothesis: find the earliest `fx_rates` date for the pairs held
-      > **DONE — hypothesis FALSIFIED: FX was complete, steps unchanged**
+      > **hypothesis FALSIFIED: FX was complete, steps unchanged**
       by IBKR and IKE Beata, and check it lands on 2022-06-20 and 2022-05-13. The
       endpoint is `GET /ohlcv/FX?symbol=<pair>&start=&end=` — note that passing
       `from`/`to` instead of `symbol`/`start`/`end` makes the router read `FX` as
       the SYMBOL, which is how that call failed first time.
 - [x] **Backfill `fx_rates` further back** (already a §72.17 follow-up, now
-      > **DONE §72.24 — backfill ran**
+      > **§72.24 — backfill ran**
       load-bearing: it is what removes these steps).
 - [ ] Make the coverage boundary visible rather than leaving it to look like a
       market move — the same job `gapSymbols` does for missing bars, extended to FX.
 - [x] **IKE Marek: the number moved between measurements** — reported as 176.4% @
-      > **DONE §72.28 — it was a bond sale, not measurement noise**
+      > **§72.28 — it was a bond sale, not measurement noise**
       2025-05-02, then re-measured as +1.4% on the same series with no recompute in
       between. Treat any single "worst jump" figure from that portfolio as
       unverified until it reproduces twice. Worth understanding what is unstable —
@@ -3277,10 +3277,10 @@ Two ways to close it, and the first is the right one:
   verified.
 
 - [x] Add `/jobs/price-audit/log` for `price-audit` (and note `sheets-sync` has the
-      > **DONE — deployed (admin v1.0.58/59, wallets v1.1.95 persists the report)**
+      > **deployed (admin v1.0.58/59, wallets v1.1.95 persists the report)**
       same gap — its run output is also stdout-only).
 - [x] Persist per-symbol verdicts so two runs can be compared; a symbol that was
-      > **DONE — persistReport writes to admin.job_run.details**
+      > **persistReport writes to admin.job_run.details**
       flagged and is now clean is exactly the signal §72.17b/§72.18 should produce.
 - [ ] Re-read this run's actual findings once a log route exists, and confirm
       SAP.DE no longer appears.
@@ -3332,7 +3332,7 @@ premise. The remaining candidates, in the order I would test them:
    recognisable FX pair, which is what argues against it).
 
 - [ ] **The decisive check, and it is cheap:** for ONE flagged 2023-04-07 trade,
-      > **REOPENED §72.38 — my §72.36 answer was WRONG and is retracted: 382,05 is
+      > **§72.38 — my §72.36 answer was WRONG and is retracted: 382,05 is
       > the real executed price (broker-confirmed), not a bad cell. The check is still
       > required, but it must compare against ING01's published NAV, not assume the
       > sheet is at fault.**
@@ -3341,10 +3341,10 @@ premise. The remaining candidates, in the order I would test them:
       cluster and no code — and it is the first thing to do, because the three
       candidates above are all distinguishable from the raw row.
 - [x] If it is a restatement multiplier, check how many of the 79 rows carry a
-      > **BLOCKED on the decisive check below (now possible — sheet access via the cluster)**
+      > **Sheet access via the cluster makes this possible now**
       `Split` marker; 29 restated and 50 not would explain the split exactly.
 - [ ] Keep `INGAKC.TFI` mapped to `ING Akcji` — it is the right fund and the right
-      > **REOPENED §72.38 — my "confirmed" was false. INGAKC.TFI closed at 819.44 on
+      > **§72.38 — my "confirmed" was false. INGAKC.TFI closed at 819.44 on
       > 2026-09-25, not 876. The mapping is exactly what is in question; do not
       > assume it is right.**
       class, whatever the price column turns out to say.
@@ -3387,15 +3387,15 @@ on, and an unpinned tag would let a release change what it wrote mid-run. It mov
 in step with the instruments HelmRelease, like `WALLETS_IMAGE`.
 
 - [x] **Run it** — `POST /api/admin/jobs/fx-backfill/run`. Not run: the Playwright
-      > **DONE — Succeeded, verified to have added 2022-06 and 2023-04 history**
+      > **Succeeded, verified to have added 2022-06 and 2023-04 history**
       session had expired and I was not going to sit waiting.
 - [x] Recompute the affected portfolios afterwards and confirm the IBKR /
-      > **DONE — IBKR and IKE Beata recomputed; steps unchanged, so not FX coverage**
+      > **IBKR and IKE Beata recomputed; steps unchanged, so not FX coverage**
       IKE Beata steps are gone or much reduced.
 - [ ] Confirm `fx_rates` row count and earliest date per currency afterwards — the
       number to watch is the EARLIEST date, since the whole point is history.
 - [x] If the steps survive, the boundary is not FX coverage and §72.21's hypothesis
-      > **DONE — that is exactly what happened; became §72.26**
+      > **that is exactly what happened; became §72.26**
       is wrong; the next suspect is a symbol whose bars simply start then.
 
 
@@ -3447,7 +3447,7 @@ not "working", which is the whole point of this bug: the old config was valid to
 - [x] Bump wallets + admin to chart 5.1.0
 - [x] jsonschema-validate all five + assert probe paths resolve
 - [x] After Flux applies: confirm the pods come up and that `kubectl describe`
-      > **DONE — verified live: httpGet /health:3000 on startup/liveness/readiness, 1/1 Ready**
+      > **verified live: httpGet /health:3000 on startup/liveness/readiness, 1/1 Ready**
       shows real `httpGet` probe blocks rather than absent ones. The push is
       merged; the rollout is Flux's.
 
@@ -3507,10 +3507,10 @@ Two candidates remain, and I did not have the context to settle them:
    backfill closed most of this, but not necessarily every pair.
 
 - [x] IBKR: run test 1 (the ±24h `executed_at` window around 2022-06-20). This is
-      > **DONE — not a trade; the cash table had TRANSFER 2215.03 EUR on 2022-06-20**
+      > **not a trade; the cash table had TRANSFER 2215.03 EUR on 2022-06-20**
       the likeliest of the two and needs one query.
 - [x] IBKR: if that is empty, re-check every open symbol for the first date its
-      > **DONE — six unpriceable bonds found; TOR a metadata false positive (§72.33)**
+      > **six unpriceable bonds found; TOR a metadata false positive (§72.33)**
       **currency=PLN** response returns a close, not its first bar date.
 - [x] FX backfill run and verified to have added history
 - [x] IKE Beata 2022-05-13 explained (deposit) — no action, it is correct
@@ -3550,13 +3550,13 @@ about a portfolio's history must page to exhaustion first.
 ### 72.28 — the 11 that flow does NOT explain
 
 - [x] **XTB: 1680 negative-value snapshots.** Values run -1.90 … -55.57 and XTB has
-      > **DONE §72.29 — no DEPOSIT anywhere, so the ledger is negative by construction**
+      > **§72.29 — no DEPOSIT anywhere, so the ledger is negative by construction**
       **zero** cash rows, so the negative is coming from the position side, not from
       an overdraft. A negative portfolio value is a defect unless there is a genuine
       short. First query: the actual `positions` columns (my `instrument_symbol`
       guess was wrong) and any negative quantities.
 - [x] **IKE Marek 2022-06-13, +152% (6796 -> 17123), explained but a real defect.**
-      > **DONE §72.31 — root-caused to four bonds with a permanent upstream 404; fixed by v1.1.96 window-wide gap reporting**
+      > **§72.31 — root-caused to four bonds with a permanent upstream 404; fixed by v1.1.96 window-wide gap reporting**
       Sold four bonds that day: BST0922, INS0922 (26 units each), NVA0624, VOX0224.
       Selling illiquid bonds into cash is a *swap*, so value should not move — it
       jumped 152%, meaning the pre-sale value was badly **understated**. This is
@@ -3567,7 +3567,7 @@ about a portfolio's history must page to exhaustion first.
       persisted gap marker is honoured by analytics/chart, or whether the value is
       silently wrong for illiquid hold periods.
 - [x] **Re-run the 11 unexplained with the near-zero-denominator filter.** `9.49 ->
-      > **DONE — 11 → 8 with a denominator > 1000 filter**
+      > **11 → 8 with a denominator > 1000 filter**
       -4.04` is a 13 PLN move on a ~0 base, which is why XTB's small values keep
       tripping a 20% threshold. Filter on `abs(pv) > 1000` and re-count before
       treating any of them as bugs; several will be arithmetic noise.
@@ -3602,14 +3602,14 @@ XTB's whole value history is off by whatever was deposited, and **`inv=0` means
 TWR/MWR on XTB is meaningless too**.
 
 - [x] **XTB needs its opening cash.** Data-side, not code: either the sheet is
-      > **DONE as diagnosis §72.35 — exact Wpłata row specified; the sheet edit is the user's**
+      > **§72.35 — exact Wpłata row specified; the sheet edit is the user's**
       missing a DEPOSIT/transfer-in row, or sheets-sync should synthesise an
       opening deposit when a portfolio has positions but zero inflows. The
       `transactions.synthesized_opening_lot` / `is_gift` columns suggest a mechanism
       for exactly this already exists — check whether it was meant to cover cash and
       does not.
 - [x] **Guard against the general case.** A portfolio with positions but no inflow
-      > **DONE §72.32 — unfunded-portfolio finding, wallets v1.1.97, verified in prod**
+      > **§72.32 — unfunded-portfolio finding, wallets v1.1.97, verified in prod**
       is silently "valid" today and produces a negative history. Worth an explicit
       check in the audit: positions exist AND total inflow == 0 → flag.
 - [x] XTB's 1680 negative snapshots explained — missing opening deposit, not a
@@ -3637,7 +3637,7 @@ over 24h+. Instrumentation that resets the thing it measures is the wrong order 
 operations. Revisit once a day-scale baseline exists.
 
 - [x] Re-sample in ~24h and compute `(rss_now - 708MiB) / uptime_delta`. Flat or
-      > **DONE §72.34 — ReplicaSet history settled it: no leak**
+      > **§72.34 — ReplicaSet history settled it: no leak**
       sub-linear ⇒ no unbounded growth, close §73. Linear at a fixed rate ⇒ the
       OpenBB singleton is leaking and the fix is a bounded cache, not more memory.
       Command (no curl/wget in the pod — it is python-only, which is why an earlier
@@ -3777,7 +3777,7 @@ because it sends you fixing data that was never broken.
 - [x] §63.15 metadata sweep; 8 genuinely unpriceable held symbols identified, TOR
       false positive understood
 - [x] The 8 bonds: find a source that carries PL government bonds, or accept the
-      > **CLOSED by user decision 2026-09-29 — pricing is closed for these; living with it**
+      > **User decision 2026-09-29: 2026-09-29 — pricing is closed for these; living with it**
       partial sum. Affects IKE Beata and IKE Marek history while held.
 - [ ] `price_bar_metadata` should distinguish "upstream profile 404" from
       "no price series", so `failed` stops conflating a delisting with a gap.
@@ -3818,7 +3818,7 @@ precisely the evidence that answered the question.
 - [x] openst memory investigated to a verdict: 2-sample rate + RS history; no leak
 - [x] §73 leak question closed — the suspected leak was never evidenced
 - [x] Re-sample after a few days only if openst is redeployed for other reasons; not
-      > **CLOSED — not worth a dedicated investigation on current evidence**
+      > **not worth a dedicated investigation on current evidence**
       worth a dedicated investigation on current evidence
 
 ### 72.35 — XTB's missing deposit: it is absent from the SHEET, and here is the exact fix
@@ -4101,3 +4101,26 @@ NN TFI trade is a false positive, and a correct one for the wrong reason.
 - [ ] Step 3 — `ticker_reference` entry for the class + sweep the other `.TFI` rows
 - [ ] Step 4 — `positions.company_name` off the stale sheet name
 - [ ] Audit: date window / order-priced exemption for fund trades
+
+### 72.40 — plan convention: the checkbox is the ONLY state
+
+Added because I got it wrong in a way that caused real damage. I wrote state words
+into the notes — `DONE`, `N/A`, `RESTORED OPEN` — *as well as* into the checkbox. That
+created two sources of truth for the same fact, and they drifted: §72.6 sat as `[x]`
+directly above a note reading `RESTORED OPEN`, and §72.20 carried an `N/A` rationale
+under a tick I had already retracted. Reconciling that took a dedicated pass, and it
+was avoidable.
+
+**The rule:**
+
+- `- [ ]` / `- [x]` is the **only** statement of state. Never write a state word in a
+  note — no `DONE`, `OPEN`, `N/A`, `RESTORED`, `SUPERSEDED`, `CLOSED`, `BLOCKED`.
+- A note under an item carries **evidence or rationale only**: the section, commit, or
+  query that justifies the box. `> §72.38 — the N/A was a conflation of name
+  lineage with price series` is fine; `> RESTORED OPEN` on its own is not.
+- If an item is closed for a *reason* rather than by work, put the reason in the note
+  and the state in the box. There is no need for a state word to carry it.
+- A checkbox and its note must never disagree. If they seem to, the box is wrong until
+  proven otherwise — and that is exactly the check worth automating.
+
+Cleaned all 33 such notes. A contradiction scan over the file now reports 0.
