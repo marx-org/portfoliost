@@ -137,16 +137,23 @@ fixtures (the seeded portfolio with transactions that
 
 ### 60.4 — Release + PROD verify
 
-- [ ] Push `portfoliost` → GHA patch-bump → pin the **real** tag from
-  `gh release list` in the homelab portfoliost helmrelease
-  (`KUBECONFIG=$HOME/.kube/homylab`, ns `pfire`); Flux + kubectl verify
-  the rollout.
+- [x] Push `portfoliost` → GHA patch-bump → pin the **real** tag from
+      `gh release list` in the homelab portfoliost helmrelease
+      (`KUBECONFIG=$HOME/.kube/homylab`, ns `pfire`); Flux + kubectl verify
+      the rollout.
+      > **done 2026-09-30 — `v1.0.285` pinned (homelab `df9974a1d`), rollout 1/1
+      > `ghcr.io/marx2/portfoliost:v1.0.285`, pod serving 200s.**
 - [ ] Playwright PROD (user's passkey session):
   - Open a portfolio → Holdings → click a holding's symbol → research;
     "Go back" → back on that portfolio's holdings tab.
   - Global transactions list → click a row's symbol → research; "Go back"
     → back on the transactions list (filters intact if any were set).
   - On research, switch a tab → "Go back" still targets the origin.
+  - **BLOCKED 2026-09-30 (needs the user).** The PROD session had expired and
+    Pocket-ID offers only *Sign in with another device* (QR) or a *Login Code* —
+    both require the user. The behaviour is proven by the §60.3 e2e suite
+    (5 tests, all origins + the tab-switch + the deep-link fallback) against
+    the same compose stack, so this is a PROD visual confirmation only.
 - [ ] Commit (plan closeout) + archive §60 to `plan-archive.md`.
 
 ---
