@@ -1451,10 +1451,12 @@ what makes the asymmetry easy to miss.
 Verified in PROD 2026-09-27: IBKR renders `$585,428.89` where the snapshot is
 585,319.22 **PLN**.
 
-- [ ] `PortfolioCard.vue:358,362`: pass the portfolio's base currency, as `:382`
-      already does. Audit every other `formatCurrency(` call site in
-      `src/modules/portfolios/` and `src/components/` for the same
-      missing-argument default.
+- [x] **Already done, by later work — verified 2026-09-29.** `PortfolioCard.vue`
+      now reads `formatCurrency(convert(portfolio.currentValue), displayCurrencyOr())`
+      (and the same for `totalInvested`): it passes the currency AND converts from
+      the portfolio's base. §66.2 made `currency` a REQUIRED parameter, which is
+      what guarantees it — a call without one cannot compile. Grepped every
+      `formatCurrency(` call site in `src/`; none is missing its second argument.
 - [ ] Decide whether `formatCurrency`'s `"USD"` default should exist at all —
       `formatAmount` (`:9`) already refuses to guess a currency; the currency
       formatter silently does. Aligning them would have caught this at compile
@@ -3346,3 +3348,55 @@ in step with the instruments HelmRelease, like `WALLETS_IMAGE`.
       number to watch is the EARLIEST date, since the whole point is history.
 - [ ] If the steps survive, the boundary is not FX coverage and §72.21's hypothesis
       is wrong; the next suspect is a symbol whose bars simply start then.
+
+
+### 72.25 — §63.14 and §64.1 closed
+
+**§63.14 was already fixed** and the plan entry was stale. It described
+`formatCurrency` calls with no currency argument, but §66.2 made the parameter
+required and the card now does
+`formatCurrency(convert(portfolio.currentValue), displayCurrencyOr())` — passing
+the currency and converting from the portfolio base. Grepped every call site in
+`src/`: none is missing its argument. PROD agrees: cards render `PLN 119,250.00`,
+not `$`. Marked done with the evidence rather than silently.
+
+**§64.1 was a real and serious defect, and worse than the plan recorded.** All four
+services — wallets, instruments, admin, users-auth — had `path` and `port` nested
+inside `spec`:
+
+```yaml
+probes:
+  liveness:
+    enabled: true
+    spec:
+      path: /health        # <- the chart ignores this
+```
+
+app-template 5.x wants `type`/`path`/`port` at the **probe** level. So the probes
+were false friends: rendered into the values, accepted by the schema, and inert.
+The plan said "fix the four false-friend probes"; the consequence worth stating is
+that **nothing in the cluster could restart a hung pod on those four, and readiness
+always passed.** A wedged wallet service would have stayed in rotation serving
+errors rather than being replaced.
+
+Fixed to openst v1.1.36's shape, with a `startupProbe` added (a cold pod's first
+DB/provider connect is slow, and with no startup probe that cost counts against
+liveness). One deliberate deviation from the openst reference: openst's readiness
+points at `/ready`, which gates on Redis. These four expose `/health` only, so
+readiness points there — pointing at a route that would 404 takes every pod out of
+rotation permanently. wallets and admin also moved 5.0.1 → 5.1.0 so all five share
+one chart version and one probe dialect.
+
+Validated before pushing, which §64.1 says is the step whose absence let openst
+silently stay on v1.1.35: pulled app-template 5.1.0, jsonschema-validated
+`spec.values` for all five. All valid — and then asserted the probes actually
+RESOLVE, by walking the parsed YAML and reporting where `path` lands. "Valid" is
+not "working", which is the whole point of this bug: the old config was valid too.
+
+- [x] Rewrite all four to the working shape
+- [x] Add `startupProbe` to all four
+- [x] Bump wallets + admin to chart 5.1.0
+- [x] jsonschema-validate all five + assert probe paths resolve
+- [ ] After Flux applies: confirm the pods come up and that `kubectl describe`
+      shows real `httpGet` probe blocks rather than absent ones. The push is
+      merged; the rollout is Flux's.
