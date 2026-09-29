@@ -16,6 +16,7 @@ import { getAllTransactions, getPortfolioTransactions, deletePortfolioTransactio
 import { formatCurrency, formatDate, formatDateTime, formatNumber } from "@/utils/format"
 import { useRoute } from "vue-router"
 import { researchRoute } from "@/utils/research"
+import TickerBadge from "@/components/TickerBadge.vue"
 import FeeCell from "@/components/FeeCell.vue"
 import DualCurrencyCell from "@/components/DualCurrencyCell.vue"
 import LabelFilterBar from "@/components/LabelFilterBar.vue"
@@ -231,11 +232,6 @@ function typeLabel(type: string): string {
   return type.charAt(0) + type.slice(1).toLowerCase()
 }
 
-function assetLabel(tx: Tx): string {
-  const kind = tx.assetType ? tx.assetType.charAt(0) + tx.assetType.slice(1).toLowerCase() : "Stock"
-  return `(${tx.country || "US"}) ${kind}`
-}
-
 // ── Edit / Delete ─────────────────────────────────────────────────────
 
 const editing      = ref<Tx | null>(null)
@@ -388,28 +384,19 @@ const colCount = computed(() =>
                 </span>
               </td>
 
-              <!-- Symbol — global: logo + assetType badge; portfolio: symbol + name only -->
+              <!-- Symbol — §61.6: the shared identity block; the note and the
+                   label chips are transaction-level, so they stay below it. -->
               <td class="px-5 py-3">
-                <router-link
-                  :to="researchRoute(tx.instrumentSymbol, route.fullPath)"
-                  class="flex items-center gap-3"
-                >
-                  <img
-                    v-if="mode === 'global'"
-                    :src="`/api/logos/${tx.instrumentSymbol}`"
-                    :alt="tx.instrumentSymbol"
-                    class="h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800"
+                <router-link :to="researchRoute(tx.instrumentSymbol, route.fullPath)" class="block">
+                  <TickerBadge
+                    :symbol="tx.instrumentSymbol"
+                    :name="tx.instrumentName"
+                    :country-code="tx.country"
+                    :asset-type="tx.assetType"
                   />
-                  <span>
-                    <span class="flex items-center gap-1 font-medium text-slate-900 dark:text-slate-100">
-                      {{ tx.instrumentSymbol }}
-                      <span class="text-xs font-normal text-slate-400 dark:text-slate-500">{{ assetLabel(tx) }}</span>
-                    </span>
-                    <span class="block text-xs text-slate-500 dark:text-slate-400">{{ tx.instrumentName }}</span>
-                    <span v-if="txNotes(tx)" class="text-[11px] font-normal text-amber-600 dark:text-amber-400" :title="txNotes(tx)">note</span>
-                    <LabelChips v-if="tx.labels?.length" :labels="tx.labels" :max="3" class="mt-0.5" />
-                  </span>
                 </router-link>
+                <span v-if="txNotes(tx)" class="block text-[11px] font-normal text-amber-600 dark:text-amber-400" :title="txNotes(tx)">note</span>
+                <LabelChips v-if="tx.labels?.length" :labels="tx.labels" :max="3" class="mt-0.5" />
               </td>
 
               <!-- Portfolio (global only) -->

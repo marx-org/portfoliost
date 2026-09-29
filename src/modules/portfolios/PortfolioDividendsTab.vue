@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue"
 import { useRoute } from "vue-router"
 import { getPortfolioDividends } from "@/api/portfolios"
+import TickerBadge from "@/components/TickerBadge.vue"
 import type { components } from "@/api/types"
 
 type DividendItem = NonNullable<components["schemas"]["DividendsData"]["items"]>[number]
@@ -93,7 +94,15 @@ function fmt(n: number | null | undefined, currency?: string): string {
             </thead>
             <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
               <tr v-for="(d, i) in rows.slice(0, limit)" :key="`${d.symbol}-${d.date}-${i}`" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                <td class="px-5 py-3 font-medium whitespace-nowrap">{{ d.symbol }}</td>
+                <td class="px-5 py-3 whitespace-nowrap">
+                  <TickerBadge
+                    size="sm"
+                    :symbol="d.symbol"
+                    :name="d.instrumentName"
+                    :country-code="d.country"
+                    :asset-type="d.assetType"
+                  />
+                </td>
                 <td class="px-5 py-3 whitespace-nowrap">{{ String(d.date ?? "").slice(0, 10) }}</td>
                 <td class="px-5 py-3 text-right tabular-nums">{{ fmt(d.gross, d.currency) }}</td>
                 <td class="px-5 py-3 text-right tabular-nums">

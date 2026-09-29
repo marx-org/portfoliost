@@ -733,6 +733,10 @@ export function register(app) {
       return {
         symbol: t.instrumentSymbol,
         instrumentName: t.instrumentName,
+        // §61.6 — the instrument identity for the shared TickerBadge; tx rows
+        // already carry both (enrichTx), and neither is ever guessed.
+        assetType: t.assetType ?? null,
+        country: t.country ?? null,
         date: t.executedAt,
         quantity: t.quantity,
         gross,
