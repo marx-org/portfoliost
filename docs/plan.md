@@ -1501,14 +1501,21 @@ unreliable.
 
 ---
 
-## 64. Kubernetes probes for the pfire fleet (found 2026-09-27 while deploying openst v1.1.36)
+## 64. Kubernetes probes for the pfire fleet (found 2026-09-27 while deploying openst v1.1.36) — **CLOSED 2026-09-29**
 
 No marx2-owned service in `pfire` had a working HTTP health probe until
 openst v1.1.36. Auditing all nine against the live cluster found three
 distinct states, and — worse — that the pattern already in the repo is a
 **false friend**: it reads like an HTTP health check but deploys as a TCP
-socket check. Nothing in the namespace can currently express "degraded", and
-nothing restarts a hung process.
+socket check. At the time of discovery nothing in the namespace could express
+"degraded" and nothing restarted a hung process.
+
+> **This section is closed.** Both in-scope steps are done and verified in the
+> cluster, and all four open questions are answered — see the **"§64 closed"**
+> summary at the end of this section for the final state, the three false
+> premises that were corrected along the way, and what was deliberately left
+> undone. The prose below is kept as the record of *how* the audit reached its
+> conclusions, including the parts that turned out to be wrong.
 
 Scope: the 9 `ghcr.io/marx2/*` services in `cluster/apps/pfire/`. Third-party
 images (`ghostfolio`, `pgadmin`, `pgweb`, `postgrest`, `swagger-ui`,
@@ -1688,15 +1695,20 @@ but it *surfaced* the bug rather than papering over it.
       (Test failed → `release` and `build` both *skipped*, no release created);
       green — run `36621548366` (all success → v1.0.47 released). openst's happy
       path likewise green on v1.1.39.
-- [ ] **The other 7 repos never run their tests in CI at all** — this is the
-      bigger half of the problem and is not started. Measured across every
-      workflow file: `portfoliost-wallets`, `-instruments`, `-admin`,
-      `-users-auth`, `portfoliost` (SPA), `jobshot` and `mastra-ticker` have
-      **no `test` job and no test command anywhere in CI**. `npm run test` in
-      AGENTS.md is a local convention with zero enforcement. So for those seven
-      the work is not "gate the build", it is "add a test job", which needs a
-      per-repo test command and a green suite first — adding a test job to a repo
-      whose suite is red would block its releases. Not attempted blind.
+- [ ] **The other 7 repos never run their tests in CI at all** — **declined,
+      out of scope; §64 closes without it.** Measured across every workflow
+      file: `portfoliost-wallets`, `-instruments`, `-admin`, `-users-auth`,
+      `portfoliost` (SPA), `jobshot` and `mastra-ticker` have **no `test` job and
+      no test command anywhere in CI**. `npm run test` in AGENTS.md is a local
+      convention with zero enforcement for those seven.
+
+      Left unticked deliberately, not overlooked. Adding a test job is not the
+      same task as gating one: it needs a per-repo test command and a green
+      suite first, and wiring a test job into a repo whose suite is red blocks
+      that repo's releases. Doing that across seven repos blind is a project,
+      not a closing step. The finding is recorded here so the next audit starts
+      from it instead of rediscovering it.
+
       (mastra-ticker's recent red runs are the **Dependabot** workflow, not its
       image pipeline.)
 
@@ -1911,9 +1923,66 @@ HEAD).
    closes the gap §64 opened on ("nothing in the namespace can express
    degraded") without the correlated-failure risk, and it is one PR per repo
    instead of a route + probe changes + four tag pins.
-4. **Third-party images** — deliberately excluded here. Should the audit cover
-   `postgrest` / `swagger-ui` / `pgadmin` / `pgweb` too, or stay scoped to
-   images this monorepo builds?
+4. **Third-party images** — **resolved: no, keep the scope.** The audit stays on
+   the 9 `ghcr.io/marx2/*` images. `postgrest` / `swagger-ui` / `pgadmin` /
+   `pgweb` are declared in this repo but built elsewhere, so their probe
+   semantics belong to their upstreams — changing them here would mean editing
+   a chart to assert something about an image we do not control, and a probe
+   that disagrees with the upstream's own contract is worse than no probe.
+   `§64.2`'s finding stands unchanged: the bug this plan fixed was a *false
+   friend* in our own dialect, and it was found by reading the chart rather than
+   by pattern-matching against third-party manifests.
+
+### §64 closed (2026-09-29)
+
+Both numbered steps that were in scope are done and verified in the cluster;
+all four open questions are answered. Final state of the 9 audited services:
+
+| service | probes | renders as | endpoint | helmrelease |
+|---|---|---|---|---|
+| `openst` | liveness+readiness+startup | `httpGet` ✅ | `/health`, `/ready` | — |
+| `cachest` | liveness+readiness+startup | `httpGet` ✅ | `/health`, `/ready` 200/503 | `4b81358ab` |
+| `portfoliost-wallets` | liveness+readiness+startup | `httpGet` ✅ | `/health` | §64.1 |
+| `portfoliost-instruments` | liveness+readiness+startup | `httpGet` ✅ | `/health` | §64.1 |
+| `portfoliost-admin` | liveness+readiness+startup | `httpGet` ✅ | `/health` | §64.1 |
+| `portfoliost-users-auth` | liveness+readiness+startup | `httpGet` ✅ | `/health` | §64.1 |
+| `portfoliost` (SPA) | liveness+readiness | `httpGet` ✅ on `/` | `/` 200 | `734d83f8f` |
+| `jobshot` | liveness+readiness | `httpGet` ✅ | `/health`, `/ready` 200/503 | `e4c79a782` |
+| `mastra-ticker` | — | n/a | no Deployment/Service in cluster | §64.5 dropped |
+
+Eight of nine now probe something real. `mastra-ticker` is the exception and
+its step was dropped: it has a helmrelease with a `custom: true` probe and
+nothing to protect.
+
+**Three false premises in this plan were corrected against the running system,
+and all three mattered more than the probes themselves:**
+
+1. "probe nginx" for the SPA (§64.3) — the image has no nginx; PID 1 is
+   `node /usr/local/bin/serve -s /app/dist -l 80`. The nginx is the ingress,
+   which a pod probe never touches.
+2. "jobshot returns index.html for /health, so add a real route" (§64.4) —
+   right conclusion, but the plan understated it: the SPA fallback made *any*
+   status-only probe on that pod incapable of failing, not just `/health`.
+3. "the failing test is a thread-ordering flake" (§64.2) — wrong, and it was a
+   real defect: `RateLimiter._last_fetch = 0.0` read a near-zero
+   `time.monotonic()` as "a fetch just happened" and rejected every caller for
+   the first `interval` seconds. Fixed in cachest v1.0.47 and deployed.
+
+**The transferable lesson**, and the reason the plan insisted on `helm template`
+and a real `kubectl` check over a schema pass: every one of the three was
+*schema-valid and plausible*. A probe with `path` under `spec` renders as a
+working-looking `tcpSocket`. A `needs:` list next to `if: always()` renders as
+a working-looking gate. A passing local suite renders as a working-looking test.
+Nothing short of rendering it, or breaking it on purpose, told us otherwise —
+and for the RateLimiter, deliberately breaking it in CI is what proved both the
+bug and the new gate.
+
+**Deliberately not done, recorded so the next audit starts here:**
+- The 7 repos that never run tests in CI (see the unticked box in §64.2).
+- Dependency-aware readiness for the four TS services, and the
+  `dependency_up` gauge that would replace it (open question 3).
+- Third-party images (open question 4).
+- `mastra-ticker`'s dead helmrelease (§64.5, dropped).
 
 
 ## 65. Gotówka reconciliation: the sheet is missing cash rows (2026-09-27)
