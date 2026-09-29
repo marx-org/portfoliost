@@ -3075,7 +3075,7 @@ coincides with a transaction; that check is the next step and it is mechanical.
 - [x] Recompute the five non-PLN portfolios
 - [x] Confirm Crypto's jumps cleared (410.1% → 48.9%, alternating days now a curve)
 - [x] For IBKR/IKE Beata/IKE Marek/Equate+, check each remaining worst-jump date
-      > **DONE §72.26-72.28 — IBKR a TRANSFER of 2215.03 EUR, IKE Beata a 17766 PLN deposit, Equate+ clean, IKE Marek the bond case**
+      > **§72.26-72.28 — IBKR a TRANSFER of 2215.03 EUR, IKE Beata a 17766 PLN deposit, Equate+ clean, IKE Marek the bond case**
       against that day's transactions. A jump with a trade is real; one without is
       still a bug, and the symbol and currency for that date name it.
 - [ ] Re-run the price audit (§72.18 shipped but the audit has not been re-run) and
