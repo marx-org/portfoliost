@@ -2616,7 +2616,7 @@ symbol names. The decisive check is ING01's published NAV for 2023-04-07 — if 
 - [ ] Resolve the open question with ING01's published NAV for 2023-04-07 (and one
       later date) before building anything.
 - [x] If the class is wrong: add an openbb provider in `openst` for that specific
-      > **N/A §72.23 — no distinct class exists, so no provider was needed**
+      > **RESTORED OPEN §72.38 — the N/A was a conflation of name lineage with price series. The broker confirms 382,05 was paid, which is exactly the condition under which §72.6 says the bar is the wrong series. GATE: run the ING01 check for 2026-08-19 and 2023-04-13 before building anything.**
       ING Akcji class, following the provider-tier order in the planner contract —
       capture the provider's response into `tests/fixtures/` first, then the plugin
       with mocked I/O, then openst standalone smoke, then `cachest` route, then the
@@ -3009,13 +3009,13 @@ upstream of the provider and the provider will not fix it.
       known date, e.g. 2026-08-19 where our bar is 795.02. The class at
       **≈706 PLN** is ours. This is the identifying step and needs no code.
 - [x] If identified, build the openst provider per the planner contract's
-      > **N/A §72.23 — closed as a false premise**
+      > **RESTORED OPEN §72.38 — the false premise was never established; name lineage is not price series**
       provider-tier order: capture the provider response into
       `openst/tests/fixtures/` first, then the plugin with mocked I/O, then openst
       standalone smoke, then the `cachest` route, then the
       `portfoliost-instruments` adapter, then the full compose stack.
 - [x] Map the class explicitly in `ticker_reference` (`INGAKC.TFI` → category), so
-      > **STILL OPEN but lower priority — no class to map; the remaining ticker_reference gaps are tracked in §72.23**
+      > **OPEN §72.38 — cannot be mapped until the class is identified**
       the class stops being implicit. `ticker_reference` currently knows **zero**
       `.TFI` symbols, which is why nothing cross-checks them.
 - [ ] Fix the stored `positions.company_name` ("Goldman Sachs Akcji"), inherited
@@ -3174,12 +3174,12 @@ E/I/K, but `INC01` for S (not `INS01`), and `ING01<L>` for F/T/U/W.
       rename plus re-denomination. A re-denomination would explain a constant ratio
       on its own, and would mean the sheet's *quantity* also needs restating, not
       just its price series.
-- [x] Only then build the provider, per the planner contract's provider-tier order
-      > **N/A — §72.23 closed the provider premise; no provider built**
-      (fixtures → plugin with mocked I/O → openst smoke → cachest route →
-      instruments adapter → compose stack).
+- [ ] Only then build the provider, per the planner contract's provider-tier order
+      > **RESTORED OPEN §72.38 — the premise was never falsified. Order: fixtures →
+      > plugin with mocked I/O → openst smoke → cachest route → instruments adapter
+      > → compose stack. Gate on the ING01 check first.**
 - [x] Record the identifier in `ticker_reference` whatever it turns out to be:
-      > **N/A — no distinct identifier exists; INGAKC.TFI is already the right mapping**
+      > **OPEN §72.38 — the identifier to record is exactly what the ING01 check determines; do not assume INGAKC.TFI is right**
       `INGAKC.TFI` carries no category letter, and `ticker_reference` knows zero
       `.TFI` symbols, so nothing cross-checks these rows today.
 
@@ -4016,6 +4016,9 @@ provider is the right fix. Restored as open.**
       of name lineage with price series
 - [x] §72.37's "valuation-date artefact" explanation withdrawn — a date offset cannot
       produce a ratio that grows 1.0899 → 1.1270 across three years
+- [x] **No splits in this fund** (user-confirmed 2026-09-29), consistent with
+      `instruments.split_adjustments` holding 0 rows. Rules out the split/restatement
+      branch entirely — the divergence is not a units restatement.
 - [ ] **Decisive, now cheap and unambiguous:** compare `INGAKC.TFI`'s bar against
       ING01's *published* NAV for **2026-08-19** (bar 795.02, paid 896.00) and
       **2023-04-13** (bar 351.93, paid 382.05). If ING01 ≈ 896/382 the bar is the
