@@ -2379,7 +2379,9 @@ columns of the same table and nothing read both.
       Bare `SRT` in the reference is **SRT Marine Systems plc** (LSE), an
       unrelated company. Override added to `NAME_VENUE_OVERRIDES`; `sheets-sync`
       v1.0.28 (`7c0290d`).
-- [ ] **`Equate+` +118.7%** (stored 3,947.57 vs live 8,635.30). Not a currency
+- [x] **`Equate+` +118.7%** (stored 3,947.57 vs live 8,635.30). Not a currency
+      > **§72.14 — root-caused: option premium legs entering the historical quantity
+      > grid via their `EXPIRATION` sibling. Fixed and verified in prod in §72.7.**
       finding. It is a margin account, which is a plausible innocent explanation,
       but that is a hypothesis and has not been tested.
 - [ ] `MFC` is a **known false positive** in `valuation-audit`: a dual-listed
@@ -2492,7 +2494,8 @@ conversion).
 
 ### 72.5 — close out §71.6
 
-- [ ] Resolve or record the **`Equate+` +118.7%** reconciliation gap.
+- [x] Resolve or record the **`Equate+` +118.7%** reconciliation gap.
+      > **§72.14 / §72.7 — root-caused and fixed in prod; history is a curve again.**
 - [ ] Archive §71 and §72 to `plan-archive.md`.
 
 ---
