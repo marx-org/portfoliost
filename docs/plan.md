@@ -2615,7 +2615,7 @@ symbol names. The decisive check is ING01's published NAV for 2023-04-07 — if 
 
 - [ ] Resolve the open question with ING01's published NAV for 2023-04-07 (and one
       later date) before building anything.
-- [x] If the class is wrong: add an openbb provider in `openst` for that specific
+- [ ] If the class is wrong: add an openbb provider in `openst` for that specific
       > **RESTORED OPEN §72.38 — the N/A was a conflation of name lineage with price series. The broker confirms 382,05 was paid, which is exactly the condition under which §72.6 says the bar is the wrong series. GATE: run the ING01 check for 2026-08-19 and 2023-04-13 before building anything.**
       ING Akcji class, following the provider-tier order in the planner contract —
       capture the provider's response into `tests/fixtures/` first, then the plugin
@@ -3008,13 +3008,13 @@ upstream of the provider and the provider will not fix it.
       > **DONE §72.19 — all nine measured on 2026-09-25, none at 922.63**
       known date, e.g. 2026-08-19 where our bar is 795.02. The class at
       **≈706 PLN** is ours. This is the identifying step and needs no code.
-- [x] If identified, build the openst provider per the planner contract's
+- [ ] If identified, build the openst provider per the planner contract's
       > **RESTORED OPEN §72.38 — the false premise was never established; name lineage is not price series**
       provider-tier order: capture the provider response into
       `openst/tests/fixtures/` first, then the plugin with mocked I/O, then openst
       standalone smoke, then the `cachest` route, then the
       `portfoliost-instruments` adapter, then the full compose stack.
-- [x] Map the class explicitly in `ticker_reference` (`INGAKC.TFI` → category), so
+- [ ] Map the class explicitly in `ticker_reference` (`INGAKC.TFI` → category), so
       > **OPEN §72.38 — cannot be mapped until the class is identified**
       the class stops being implicit. `ticker_reference` currently knows **zero**
       `.TFI` symbols, which is why nothing cross-checks them.
@@ -3121,10 +3121,11 @@ measurement rather than assumed:
 - [x] Fetch E, F, I, S, T, U, W on 2026-09-25 and find the one at ≈922.5 PLN.
       > **DONE — no category at ≈922.63; the sheet's price column is the suspect**
 - [x] Confirm on a second date (2026-08-19, where our bar is 795.02 and the target
-      > **DONE — measured across several dates; no match**
+      > **Same caveat — target invalid; see above.**
       is ≈706) so a coincidental match cannot pass.
 - [x] If no category lands there, stop and treat the sheet's price column as the
-      > **DONE §72.23 — treated as sheet data, not a missing provider**
+      > **WITHDRAWN §72.38 — the conclusion rested on the retracted §72.36. The provider
+      > premise is live again, not closed.**
       suspect — do not build a provider against a series that is not the problem.
 
 ### 72.20 — §72.16 measured: the 1.126x is NOT an ING Akcji category. It is not A either.
@@ -3166,11 +3167,15 @@ URL scheme, for whoever fetches more of these later: irregular. `IN<L>01` for
 E/I/K, but `INC01` for S (not `INS01`), and `ING01<L>` for F/T/U/W.
 
 - [x] Look for the **Goldman Sachs TFI-era "Akcji" series** and its unit categories
-      > **DONE — GS/NN Akcji is the same unbroken ING01 series since 1998-03-09**
+      > **Measurement done, and the NAME lineage is unbroken since 1998-03-09. This is what
+      > I wrongly treated as 'one price series' — a fund can have one name lineage and
+      > several NAV series. See §72.38.**
       (GS Akcji A/E/F/I/K…), and find the one at ≈1.126× the ING-era A series. This
       is the actual identification question now.
 - [x] Establish what the GS → NN → ING rename did to the units: rename only, or
-      > **DONE — rename only, no re-denomination**
+      > **Rename only, no re-denomination — true, and consistent with the user's confirmation
+      > that there were no splits. It says nothing about which NAV series trades execute
+      > against, which is the open question.**
       rename plus re-denomination. A re-denomination would explain a constant ratio
       on its own, and would mean the sheet's *quantity* also needs restating, not
       just its price series.
@@ -3178,7 +3183,7 @@ E/I/K, but `INC01` for S (not `INS01`), and `ING01<L>` for F/T/U/W.
       > **RESTORED OPEN §72.38 — the premise was never falsified. Order: fixtures →
       > plugin with mocked I/O → openst smoke → cachest route → instruments adapter
       > → compose stack. Gate on the ING01 check first.**
-- [x] Record the identifier in `ticker_reference` whatever it turns out to be:
+- [ ] Record the identifier in `ticker_reference` whatever it turns out to be:
       > **OPEN §72.38 — the identifier to record is exactly what the ING01 check determines; do not assume INGAKC.TFI is right**
       `INGAKC.TFI` carries no category letter, and `ticker_reference` knows zero
       `.TFI` symbols, so nothing cross-checks these rows today.
@@ -3326,8 +3331,11 @@ premise. The remaining candidates, in the order I would test them:
 3. **A currency restatement** on the Transakcje side (though 1.126 is not a
    recognisable FX pair, which is what argues against it).
 
-- [x] **The decisive check, and it is cheap:** for ONE flagged 2023-04-07 trade,
-      > **DONE §72.36 — one wrong cell in the sheet, not a category or a class**
+- [ ] **The decisive check, and it is cheap:** for ONE flagged 2023-04-07 trade,
+      > **REOPENED §72.38 — my §72.36 answer was WRONG and is retracted: 382,05 is
+      > the real executed price (broker-confirmed), not a bad cell. The check is still
+      > required, but it must compare against ING01's published NAV, not assume the
+      > sheet is at fault.**
       dump every raw column of that sheet row beside the stored row. Whatever
       column produces 382 from 339 is the answer. This needs no provider, no
       cluster and no code — and it is the first thing to do, because the three
@@ -3335,8 +3343,10 @@ premise. The remaining candidates, in the order I would test them:
 - [x] If it is a restatement multiplier, check how many of the 79 rows carry a
       > **BLOCKED on the decisive check below (now possible — sheet access via the cluster)**
       `Split` marker; 29 restated and 50 not would explain the split exactly.
-- [x] Keep `INGAKC.TFI` mapped to `ING Akcji` — it is the right fund and the right
-      > **DONE §72.36 — confirmed the same fund: its own close ≈876 today matches the sheet's `aktualny kurs` 876,94**
+- [ ] Keep `INGAKC.TFI` mapped to `ING Akcji` — it is the right fund and the right
+      > **REOPENED §72.38 — my "confirmed" was false. INGAKC.TFI closed at 819.44 on
+      > 2026-09-25, not 876. The mapping is exactly what is in question; do not
+      > assume it is right.**
       class, whatever the price column turns out to say.
 - [ ] Still worth recording in `ticker_reference`: it knows zero `.TFI` symbols, so
       nothing cross-checks these rows. Correct identifier, no new provider.
@@ -4030,3 +4040,64 @@ provider is the right fix. Restored as open.**
       instruments adapter → compose.
 - [ ] `ticker_reference` knows zero `.TFI` symbols, so nothing cross-checks them.
 - [ ] `positions.company_name` still shows the stale "Goldman Sachs Akcji".
+
+### 72.39 — the recovered openst class-provider plan, in one place
+
+Scattered across §72.6 / §72.16 / §72.19 / §72.20 / §72.23 and contradicted by my own
+notes for three turns. Consolidated, with the order that actually matters.
+
+**The problem, stated correctly for the first time.** The broker executes ING Akcji
+orders against a price series that is **not** the one `INGAKC.TFI` carries, and the two
+diverge over time:
+
+```
+date         paid     bar     ratio
+2023-08-09   432.49   396.80  1.0899
+2024-06-13   515.13   466.96  1.1032
+2025-05-13   643.28   575.59  1.1176
+2026-08-19   896.00   795.02  1.1270
+```
+
+Confirmed by the user: **382,05 is the real executed price** (broker detail, register
+total agrees), and there were **no splits** in this fund — matching
+`split_adjustments` at 0 rows. The bars already track the provider's live quote
+(795.02 vs 820.03 current), so bar and quote are one series and the broker's executions
+are priced off another. Growing divergence is the expected signature of two classes
+with different fee loads.
+
+**Step 1 — the one check that settles it, and it is two lookups.** ING01's *published*
+NAV for the two dates where both numbers are known:
+
+- **2026-08-19** — bar 795.02, paid 896.00
+- **2023-04-13** — bar 351.93, paid 382.05
+
+→ ING01 ≈ 896/382 means the bar is the wrong class and the provider is needed.
+→ ING01 ≈ 795/352 means orders execute against a class with **no series at all**, which
+is a bigger and more interesting finding. Either way the answer changes what gets built,
+which is why nothing should be built before it.
+
+**Step 2 — build it, in the planner contract's provider-tier order**, for whichever class
+step 1 identifies: fixture into `tests/fixtures/` → openbb plugin with mocked I/O →
+openst standalone smoke → `cachest` route → `portfoliost-instruments` adapter → full
+compose stack.
+
+**Step 3 — stop the same defect recurring silently.** `ticker_reference` knows **zero**
+`.TFI` symbols, so nothing cross-checks a TFI price series against the fund that
+actually trades. Add the class once known, and sweep the other `.TFI` rows (the same
+family is named "NN Emerytura 2025/2030" but "Goldman Sachs Emerytura 2060/2065" in the
+same sheet — a rename applied inconsistently).
+
+**Step 4 — cosmetic but load-bearing.** `positions.company_name` still reads
+"Goldman Sachs Akcji". It is what made this look like a wrong-fund problem instead of a
+series problem for several passes.
+
+**Also still owed, from §72.37:** the price audit compares a trade price to the bar on
+`executed_at`, which for an order-priced fund is the wrong comparison. Once the class is
+resolved, the audit needs a date window or an order-priced exemption — otherwise every
+NN TFI trade is a false positive, and a correct one for the wrong reason.
+
+- [ ] Step 1 — ING01 published NAV for 2026-08-19 and 2023-04-13
+- [ ] Step 2 — openst provider for the identified class, tier order
+- [ ] Step 3 — `ticker_reference` entry for the class + sweep the other `.TFI` rows
+- [ ] Step 4 — `positions.company_name` off the stale sheet name
+- [ ] Audit: date window / order-priced exemption for fund trades
