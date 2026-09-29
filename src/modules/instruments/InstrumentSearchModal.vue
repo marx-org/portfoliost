@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { useInstrumentsStore } from "@/stores/instruments"
 import { useRecentSearchesStore } from "@/stores/recentSearches"
+import TickerBadge from "@/components/TickerBadge.vue"
 import RecentSearchesBar from "@/modules/instruments/RecentSearchesBar.vue"
 import { researchRoute } from "@/utils/research"
 
@@ -93,16 +94,14 @@ function onKeydown(e: KeyboardEvent) {
                 class="flex w-full items-center gap-3 px-2 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50"
                 @click="openResult(result.symbol, result.name)"
               >
-                <img loading="lazy" :src="`/api/logos/${result.symbol}`" alt="" class="h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800" />
                 <span class="flex-1">
-                  <span class="block text-sm font-medium text-slate-900 dark:text-slate-100">{{ result.symbol }}</span>
-                  <span class="block text-xs text-slate-500 dark:text-slate-400">{{ result.name }}</span>
-                  <span v-if="result.exchange || result.countryCode" class="block text-[10px] text-slate-400 dark:text-slate-500">
-                    {{ result.exchange }}<template v-if="result.exchange && result.countryCode"> · </template>{{ result.countryCode }}
-                  </span>
-                </span>
-                <span class="rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium uppercase text-slate-500 dark:text-slate-400">
-                  {{ result.type }}
+                  <TickerBadge
+                    :symbol="result.symbol"
+                    :name="result.name"
+                    :country-code="result.countryCode"
+                    :asset-type="result.type"
+                  />
+                  <span v-if="result.exchange" class="block text-[10px] text-slate-400 dark:text-slate-500">{{ result.exchange }}</span>
                 </span>
               </button>
             </li>

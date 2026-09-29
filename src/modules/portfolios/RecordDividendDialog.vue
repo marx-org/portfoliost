@@ -52,10 +52,6 @@ watch(
 
 const txCcy = computed(() => (props.position?.instrumentCurrency ?? props.position?.purchaseCurrency ?? "").toUpperCase())
 const ccySymbol = computed(() => currenciesStore.info(txCcy.value)?.symbol ?? txCcy.value)
-const assetLabel = computed(() => {
-  const t = props.position?.assetType
-  return t ? t.charAt(0) + t.slice(1).toLowerCase() : "Stock"
-})
 const totals = computed(() => dividendTotals(perShare.value, grossTotal.value, perShareGross.value, quantity.value, taxes.value))
 
 // The dividend is paid into the portfolio; the FX leg converts the tx currency
@@ -105,6 +101,7 @@ async function submit(): Promise<void> {
     busy.value = false
   }
 }
+import TickerBadge from "@/components/TickerBadge.vue"
 </script>
 
 <template>
@@ -124,17 +121,13 @@ async function submit(): Promise<void> {
       <div class="p-5">
         <div class="mb-4 rounded-xl border border-slate-200 p-3 dark:border-slate-700/60">
           <div class="flex items-center gap-3">
-            <img :src="`/api/logos/${position.symbol}`" :alt="position.symbol" class="h-9 w-9 rounded-full bg-slate-100 dark:bg-slate-800" />
-            <div class="min-w-0 flex-1">
-              <div class="flex items-center gap-2 text-sm font-semibold">
-                {{ position.symbol }}
-                <span class="text-xs font-normal text-slate-500 dark:text-slate-400">({{ position.country || "US" }})</span>
-                <span class="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                  {{ assetLabel }}
-                </span>
-              </div>
-              <p class="truncate text-xs text-slate-500 dark:text-slate-400">{{ position.companyName }}</p>
-            </div>
+            <TickerBadge
+              size="lg"
+              :symbol="position.symbol"
+              :name="position.companyName"
+              :country-code="position.country"
+              :asset-type="position.assetType"
+            />
           </div>
           <p class="mt-2 text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500" data-testid="dividend-shares-held">
             Shares held:

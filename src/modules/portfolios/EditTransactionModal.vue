@@ -18,6 +18,8 @@ export interface EditTransaction {
   instrumentSymbol: string
   instrumentName: string
   assetType: string
+  /** 2-letter country code of the instrument; null when unknown (§61.9). */
+  country?: string | null
   quantity: number
   price: number
   fees: number | null
@@ -162,6 +164,7 @@ function goResearch() {
   emit("close")
   router.push(researchRoute(props.transaction.instrumentSymbol, route.fullPath))
 }
+import TickerBadge from "@/components/TickerBadge.vue"
 </script>
 
 <template>
@@ -178,20 +181,14 @@ function goResearch() {
       </div>
 
       <div class="mb-4 flex items-center gap-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50">
-        <img
-          :src="`/api/logos/${transaction.instrumentSymbol}`"
-          :alt="transaction.instrumentSymbol"
-          class="h-9 w-9 shrink-0 rounded-full bg-slate-100 dark:bg-slate-800"
+        <TickerBadge
+          size="lg"
+          :symbol="transaction.instrumentSymbol"
+          :name="transaction.instrumentName"
+          :country-code="transaction.country"
+          :asset-type="transaction.assetType"
         />
         <div class="min-w-0 flex-1">
-          <p class="font-medium text-slate-900 dark:text-slate-100">
-            {{ transaction.instrumentSymbol }}
-            <span v-if="!isDividend" class="text-xs font-normal text-slate-400 dark:text-slate-500">(US)</span>
-            <span class="ml-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-              {{ typeLabel(transaction.assetType || "STOCK") }}
-            </span>
-          </p>
-          <p class="truncate text-xs text-slate-500 dark:text-slate-400">{{ transaction.instrumentName || "—" }}</p>
           <p v-if="isDividend" class="mt-1 text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500" data-testid="edit-tx-shares-held">
             Shares:
             <span class="font-semibold text-slate-900 dark:text-slate-100">{{ quantityStr }}</span>

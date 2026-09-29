@@ -464,6 +464,7 @@ function goResearch() {
 }
 
 defineExpose({ pendingMarketPrice })
+import TickerBadge from "@/components/TickerBadge.vue"
 </script>
 
 <template>
@@ -549,11 +550,9 @@ defineExpose({ pendingMarketPrice })
           <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="close">✕</button>
         </div>
         <div class="mb-4 flex items-center gap-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50">
-          <img :src="`/api/logos/${optionPending?.symbol}`" :alt="optionPending?.symbol" class="h-9 w-9 rounded-full bg-slate-100 dark:bg-slate-800" />
-          <div class="flex-1">
-            <p class="font-medium text-slate-900 dark:text-slate-100">{{ optionPending?.symbol }} <span class="text-xs font-normal text-slate-500 dark:text-slate-400">(US)</span></p>
-            <p class="text-xs text-slate-500 dark:text-slate-400">{{ optionPending?.name }}</p>
-          </div>
+          <!-- The picker's result carries a name but no country or asset
+               class, so the badge shows logo + ticker + name. -->
+          <TickerBadge size="lg" :symbol="optionPending?.symbol ?? ''" :name="optionPending?.name" />
         </div>
         <form @submit.prevent="submitOption">
           <label for="opt-trans-type" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Transaction Type</label>

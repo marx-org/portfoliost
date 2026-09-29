@@ -47,19 +47,23 @@ const tf = useTransactionForm(
   paymentCurrency,
   computed(() => props.txCurrency),
 )
+import TickerBadge from "@/components/TickerBadge.vue"
 </script>
 
 <template>
   <form @submit.prevent="emit('submit')">
     <div :data-testid="`${testid}-fields`">
       <div v-if="showHeader !== false" class="mb-4 flex items-center gap-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50">
-        <img :src="`/api/logos/${symbol}`" :alt="symbol" class="h-9 w-9 rounded-full bg-slate-100 dark:bg-slate-800" />
+        <!-- §61.9 — the shared identity block. It no longer defaults a missing
+             country to "US": `tickerDetails` omits the part it does not know. -->
+        <TickerBadge
+          size="lg"
+          :symbol="symbol"
+          :name="name"
+          :country-code="country"
+          :asset-type="assetType"
+        />
         <div class="flex-1">
-          <p class="font-medium text-slate-900 dark:text-slate-100">
-            {{ symbol }} <span class="text-xs font-normal text-slate-500 dark:text-slate-400">({{ country || "US" }})</span>
-            <span class="ml-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-slate-500 dark:bg-slate-800 dark:text-slate-400">{{ assetType || "Stock" }}</span>
-          </p>
-          <p class="text-xs text-slate-500 dark:text-slate-400">{{ name || "—" }}</p>
         </div>
         <div class="text-right">
           <button v-if="showViewChart !== false" type="button" class="text-xs text-blue-600 hover:underline" @click="emit('view-chart')">View chart</button>

@@ -4,6 +4,7 @@ import { useWatchlistsStore } from "@/stores/watchlists"
 import type { Watchlist } from "@/api/watchlists"
 import InvestmentsTabs from "@/modules/portfolios/InvestmentsTabs.vue"
 import { useRoute } from "vue-router"
+import TickerBadge from "@/components/TickerBadge.vue"
 import { researchRoute } from "@/utils/research"
 
 const store = useWatchlistsStore()
@@ -122,14 +123,14 @@ async function deleteWatchlist(wl: Watchlist) {
 
         <ul v-if="wl.items.length" class="divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-700/60">
           <li v-for="item in wl.items" :key="item.symbol" class="flex items-center gap-3 px-3 py-2">
+            <!-- A watchlist item stores no country or asset class, so the
+                 badge degrades to logo + ticker + name (§61.9). -->
             <router-link
               :to="researchRoute(item.symbol, route.fullPath)"
-              class="flex-1 text-sm font-medium text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 hover:underline"
+              class="min-w-0 flex-1 hover:opacity-80"
             >
-              {{ item.symbol }}
+              <TickerBadge :symbol="item.symbol" :name="item.name" />
             </router-link>
-            <span class="flex-1 text-xs text-slate-500 dark:text-slate-400">{{ item.name }}</span>
-            <span class="rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium uppercase text-slate-500 dark:text-slate-400">{{ item.type }}</span>
             <button type="button" class="btn-ghost px-2 py-0.5 text-xs text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400" @click="removeItem(wl, item.symbol)">
               Remove
             </button>

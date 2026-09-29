@@ -37,6 +37,7 @@ const POSITION = {
   symbol: "AAPL",
   companyName: "Apple Inc",
   assetType: "STOCK",
+  country: "US",
   instrumentCurrency: "USD",
   purchaseCurrency: "USD",
   quantity: 10,
@@ -82,9 +83,11 @@ describe("RecordDividendDialog (§49.4)", () => {
     const held = wrapper.find('[data-testid="dividend-shares-held"]')
     expect(held.text()).toContain("Shares held:")
     expect(held.text()).toContain("10")
-    expect(wrapper.find("img").attributes("src")).toBe("/api/logos/AAPL")
-    expect(wrapper.text()).toContain("(US)")
-    expect(wrapper.text()).toContain("Stock")
+    // §61.9 — the shared identity block, on the testids
+    const badge = wrapper.get('[data-testid="ticker-badge"]')
+    expect(badge.find("img").attributes("src")).toBe("/api/logos/AAPL")
+    expect(badge.get('[data-testid="ticker-badge-details"]').text()).toBe("(US) Stock")
+    expect(badge.get('[data-testid="ticker-badge-name"]').text()).toBe("Apple Inc")
   })
 
   it("total mode — net = gross − tax; submit posts DIVIDEND with taxes+notes (§49.4)", async () => {
