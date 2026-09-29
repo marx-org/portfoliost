@@ -35,8 +35,10 @@ test("price chart shows native currency + cross-currency note (SNT.WA vs SPY)", 
 
   // Native currency on the y-axis: mock research SNT is PLN, so axis labels
   // must carry "PLN", never a "$" USD symbol.
+  await expect
+    .poll(async () => (await priceChartYAxis(page)).length, { timeout: 15000 })
+    .toBeGreaterThan(0)
   const ylabels = await priceChartYAxis(page)
-  expect(ylabels.length).toBeGreaterThan(0)
   expect(ylabels.some((t) => t.includes("PLN"))).toBe(true)
   expect(ylabels.every((t) => !t.includes("$"))).toBe(true)
 
