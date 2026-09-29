@@ -3678,3 +3678,47 @@ The registry manifest appeared ~40s later. Worth checking
 - [ ] The bond gap (§72.31) and this check are both "the import is incomplete" and
       both were invisible. Consider one import-completeness report rather than two
       checks living in different places.
+
+### 72.33 — §63.15 price-bar metadata sweep: exactly 8 held symbols are genuinely unpriceable
+
+Fleet state: `instruments.price_bar_metadata` is **248 ok / 131 failed**. Only the
+held ones matter, and there are **9** — 8 Polish government bonds plus `TOR`.
+
+`TOR` is a **false positive in the metadata**. It is marked
+`failed — HTTP 404 upstream .../equity/profile/TOR` because cachest has no profile
+(it is delisted), but the stooq fallback serves it: 3,034 bars, 2014-07-08 →
+2026-08-28, and the API returns 20 converted bars. **`fetch_status` is not a
+proxy for "can the grid price this"** and must not be used as a gate — that is the
+architectural note worth keeping from this sweep.
+
+The 8 that are genuinely unpriceable, each 0 rows under **every** base currency and
+across the full hold window:
+
+```
+ARH0324  ARH0722  BST0922  INS0922  KIN1025  KRI0322  NVA0624  VOX0224
+IKE Beata: ARH0324, ARH0722, BST0922, INS0922, KIN1025, NVA0624, VOX0224
+IKE Marek: ARH0722, BST0922, INS0922, KRI0322, NVA0624, VOX0224
+```
+
+A broader sweep over all 261 distinct `(symbol, declared currency)` pairs in
+`transactions` found **0 currency-mislabelled** symbols: every declared base priced
+its symbol, or the symbol had no data at all. So the §72.8 `listingCurrency` work
+introduced no new mislabelling, and there is no third class of currency defect
+hiding behind the bonds.
+
+**My first sweep was wrong, in the same shape as two earlier mistakes.** It probed
+one shared recent window (2026-08-01 → 2026-09-29) and reported `MPW` and `WBA` as
+unpriceable. Both are delisted — MPW's last bar is 2026-01-30, WBA's 2025-08-28 — so
+the window simply post-dates their existence. Probed over their actual hold periods
+they price fine (MPW 211 bars, WBA 239). This is the third time this session a
+single convenient parameter made data look absent: two unpaginated reads and now a
+shared date window. **Probe each subject over its own range, and page to
+exhaustion.** A "missing" conclusion is the most expensive kind of wrong here,
+because it sends you fixing data that was never broken.
+
+- [x] §63.15 metadata sweep; 8 genuinely unpriceable held symbols identified, TOR
+      false positive understood
+- [ ] The 8 bonds: find a source that carries PL government bonds, or accept the
+      partial sum. Affects IKE Beata and IKE Marek history while held.
+- [ ] `price_bar_metadata` should distinguish "upstream profile 404" from
+      "no price series", so `failed` stops conflating a delisting with a gap.
