@@ -266,3 +266,71 @@ test("search modal opens and navigates to a popular symbol", async ({ page }) =>
   await expect(page).toHaveURL(/\/en\/research\/MSFT\/overview/)
   await expect(page.getByRole("heading", { name: "MSFT", exact: true }).first()).toBeVisible({ timeout: 15000 })
 })
+
+test.describe("research \"Go back\" returns to the origin page (60.3)", () => {
+  const backLink = (page: import("@playwright/test").Page) => page.getByTestId("research-back")
+
+  test("holdings origin: back returns to the portfolio's holdings tab", async ({ page }) => {
+    await login(page)
+    await page.getByRole("link", { name: /Top10/ }).click()
+    await expect(page).toHaveURL(/\/en\/portfolios\/[^/]+\/holdings/)
+    const holdingsPath = new URL(page.url()).pathname
+
+    await page.locator("tbody tr").first().getByRole("link").first().click()
+    await expect(page).toHaveURL(/\/en\/research\//)
+    await expect(backLink(page)).toHaveAttribute("href", holdingsPath)
+
+    await backLink(page).click()
+    await expect(page).toHaveURL(new RegExp(`${holdingsPath}$`))
+    await expect(page.getByRole("button", { name: "Manage labels" })).toBeVisible({ timeout: 20000 })
+  })
+
+  test("global transactions origin: back returns to the transactions list", async ({ page }) => {
+    await login(page)
+    await page.goto("/en/investments/transactions")
+    await page.waitForSelector("tbody tr a[href^='/en/research/']", { timeout: 20000 })
+
+    await page.locator("tbody tr a[href^='/en/research/']").first().click()
+    await expect(page).toHaveURL(/\/en\/research\//)
+    await expect(backLink(page)).toHaveAttribute("href", "/en/investments/transactions")
+
+    await backLink(page).click()
+    await expect(page).toHaveURL(/\/en\/investments\/transactions$/)
+  })
+
+  test("per-portfolio transactions origin: back returns to that portfolio's tab", async ({ page }) => {
+    await login(page)
+    await page.getByRole("link", { name: /Top10/ }).click()
+    await expect(page).toHaveURL(/\/en\/portfolios\/[^/]+\/holdings/)
+    const pid = new URL(page.url()).pathname.split("/")[3]
+    const txPath = `/en/portfolios/${pid}/transactions`
+    await page.goto(txPath)
+    await page.waitForSelector("tbody tr a[href^='/en/research/']", { timeout: 20000 })
+
+    await page.locator("tbody tr a[href^='/en/research/']").first().click()
+    await expect(page).toHaveURL(/\/en\/research\//)
+    await expect(backLink(page)).toHaveAttribute("href", txPath)
+
+    await backLink(page).click()
+    await expect(page).toHaveURL(new RegExp(`${txPath}$`))
+  })
+
+  test("the origin survives a research tab switch", async ({ page }) => {
+    await login(page)
+    await page.getByRole("link", { name: /Top10/ }).click()
+    await expect(page).toHaveURL(/\/en\/portfolios\/[^/]+\/holdings/)
+    const holdingsPath = new URL(page.url()).pathname
+    await page.locator("tbody tr").first().getByRole("link").first().click()
+    await expect(page).toHaveURL(/\/en\/research\//)
+
+    await page.getByRole("link", { name: "Dividends", exact: true }).click()
+    await expect(page).toHaveURL(/\/en\/research\/[A-Z0-9.-]+\/dividends/)
+    await expect(backLink(page)).toHaveAttribute("href", holdingsPath)
+  })
+
+  test("deep link with no origin falls back to the investments page", async ({ page }) => {
+    await login(page)
+    await page.goto("/en/research/AAPL/overview")
+    await expect(backLink(page)).toHaveAttribute("href", "/en/investments")
+  })
+})
