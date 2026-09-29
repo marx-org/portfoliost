@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue"
-import { useRouter } from "vue-router"
+import { useRoute, useRouter } from "vue-router"
 import { updatePortfolioTransaction } from "@/api/portfolios"
 import { formatCurrency, formatDate } from "@/utils/format"
-import { researchSymbol } from "@/utils/research"
+import { researchRoute } from "@/utils/research"
 import FeeFields from "@/components/FeeFields.vue"
 import FxRateFields from "@/components/FxRateFields.vue"
 import DividendFields, { dividendTotals } from "@/components/DividendFields.vue"
@@ -39,6 +39,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{ (e: "close"): void; (e: "saved"): void }>()
 
+const route = useRoute()
 const router = useRouter()
 const currenciesStore = useCurrenciesStore()
 
@@ -159,7 +160,7 @@ async function submit() {
 function goResearch() {
   if (!props.transaction) return
   emit("close")
-  router.push({ name: "research-overview", params: { symbol: researchSymbol(props.transaction.instrumentSymbol) } })
+  router.push(researchRoute(props.transaction.instrumentSymbol, route.fullPath))
 }
 </script>
 

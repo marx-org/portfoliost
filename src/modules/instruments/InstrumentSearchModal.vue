@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue"
-import { useRouter } from "vue-router"
+import { useRoute, useRouter } from "vue-router"
 import { useInstrumentsStore } from "@/stores/instruments"
 import { useRecentSearchesStore } from "@/stores/recentSearches"
 import RecentSearchesBar from "@/modules/instruments/RecentSearchesBar.vue"
+import { researchRoute } from "@/utils/research"
 
 const props = withDefaults(defineProps<{ open: boolean; mode?: "navigate" | "add"; title?: string }>(), {
   mode: "navigate",
@@ -13,6 +14,7 @@ const emit = defineEmits<{ (e: "close"): void; (e: "add", symbol: string, name: 
 
 const store = useInstrumentsStore()
 const recentSearches = useRecentSearchesStore()
+const route = useRoute()
 const router = useRouter()
 const query = ref("")
 
@@ -44,7 +46,7 @@ function openResult(symbol: string, name = "") {
     emit("add", symbol, name)
     return
   }
-  router.push({ name: "research-overview", params: { symbol: symbol.toUpperCase() } })
+  router.push(researchRoute(symbol, route.fullPath))
 }
 
 function onKeydown(e: KeyboardEvent) {

@@ -3,7 +3,7 @@ import { onMounted, ref } from "vue"
 import { useRoute } from "vue-router"
 import { getPortfolioCompare } from "@/api/portfolios"
 import { formatCurrency, formatNumber, formatPercent } from "@/utils/format"
-import { researchSymbol } from "@/utils/research"
+import { researchRoute } from "@/utils/research"
 import type { components } from "@/api/types"
 
 const route = useRoute()
@@ -57,7 +57,7 @@ function num(value: unknown, format: (v: number) => string): string {
             <tr v-for="r in rows" :key="r.symbol" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
               <td class="px-5 py-3">
                 <router-link
-                  :to="{ name: 'research-overview', params: { symbol: researchSymbol(r.symbol ?? '') } }"
+                  :to="researchRoute(r.symbol ?? '', route.fullPath)"
                   class="font-medium text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 hover:underline"
                 >
                   {{ r.symbol }}

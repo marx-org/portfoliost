@@ -14,7 +14,8 @@
 import { computed, onMounted, ref, watch } from "vue"
 import { getAllTransactions, getPortfolioTransactions, deletePortfolioTransaction } from "@/api/portfolios"
 import { formatCurrency, formatDate, formatDateTime, formatNumber } from "@/utils/format"
-import { researchSymbol } from "@/utils/research"
+import { useRoute } from "vue-router"
+import { researchRoute } from "@/utils/research"
 import FeeCell from "@/components/FeeCell.vue"
 import DualCurrencyCell from "@/components/DualCurrencyCell.vue"
 import LabelFilterBar from "@/components/LabelFilterBar.vue"
@@ -35,6 +36,8 @@ const props = defineProps<{
   mode: "global" | "portfolio"
   portfolioId?: string   // required when mode === "portfolio"
 }>()
+
+const route = useRoute()
 
 // ── State ────────────────────────────────────────────────────────────────
 
@@ -388,7 +391,7 @@ const colCount = computed(() =>
               <!-- Symbol — global: logo + assetType badge; portfolio: symbol + name only -->
               <td class="px-5 py-3">
                 <router-link
-                  :to="{ name: 'research-overview', params: { symbol: researchSymbol(tx.instrumentSymbol) } }"
+                  :to="researchRoute(tx.instrumentSymbol, route.fullPath)"
                   class="flex items-center gap-3"
                 >
                   <img

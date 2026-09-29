@@ -7,7 +7,7 @@ import { useDisplayConversion } from "@/composables/useDisplayConversion"
 import { storeToRefs } from "pinia"
 import { removePortfolioPosition, getPortfolioTransactions } from "@/api/portfolios"
 import { formatAmount, formatNumber, formatPercent, formatSignedAmount } from "@/utils/format"
-import { researchSymbol } from "@/utils/research"
+import { researchRoute } from "@/utils/research"
 import type { PortfolioPositions } from "@/api/types"
 import EditPositionDialog from "@/modules/portfolios/EditPositionDialog.vue"
 import AddPositionDialog from "@/modules/portfolios/AddPositionDialog.vue"
@@ -316,7 +316,7 @@ async function confirmRemovePosition(): Promise<void> {
 
 function goResearch(position: Position): void {
   openMenuId.value = null
-  router.push({ name: "research-overview", params: { symbol: researchSymbol(position.symbol) } })
+  router.push(researchRoute(position.symbol, route.fullPath))
 }
 
 const chartPosition = ref<Position | null>(null)
@@ -422,7 +422,7 @@ function onPickerSaved() {
                     <img :src="`/api/logos/${pos.symbol}`" :alt="pos.symbol" class="h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800" />
                     <div>
                       <router-link
-                        :to="{ name: 'research-overview', params: { symbol: researchSymbol(pos.symbol) } }"
+                        :to="researchRoute(pos.symbol, route.fullPath)"
                         class="font-medium text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 hover:underline"
                       >
                         {{ pos.symbol }}

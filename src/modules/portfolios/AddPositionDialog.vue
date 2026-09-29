@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue"
-import { useRouter } from "vue-router"
+import { useRoute, useRouter } from "vue-router"
 import { createPortfolioPosition, createPortfolioTransaction, updatePortfolioPosition, removePortfolioPosition } from "@/api/portfolios"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { formatCurrency } from "@/utils/format"
@@ -11,6 +11,7 @@ import FxRateFields from "@/components/FxRateFields.vue"
 import TransactionFormFields from "@/components/TransactionFormFields.vue"
 import { useCurrenciesStore } from "@/stores/currencies"
 import { useTargetCurrency } from "@/composables/useTargetCurrency"
+import { researchRoute } from "@/utils/research"
 import type { PortfolioPositions } from "@/api/types"
 
 type Position = PortfolioPositions[number]
@@ -25,6 +26,7 @@ const emit = defineEmits<{ (e: "close"): void; (e: "added"): void; (e: "saved"):
 
 const store = usePortfolioStore()
 const currenciesStore = useCurrenciesStore()
+const route = useRoute()
 const router = useRouter()
 
 type Step = "chooser" | "stock" | "option" | "cfd"
@@ -458,7 +460,7 @@ function close() {
 function goResearch() {
   const symbol = stockForm.value.symbol
   close()
-  if (symbol) router.push({ name: "research-overview", params: { symbol: symbol.endsWith(".US") ? symbol : `${symbol}.US` } })
+  if (symbol) router.push(researchRoute(symbol.endsWith(".US") ? symbol : `${symbol}.US`, route.fullPath))
 }
 
 defineExpose({ pendingMarketPrice })

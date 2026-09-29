@@ -3,9 +3,11 @@ import { onMounted, ref } from "vue"
 import { useWatchlistsStore } from "@/stores/watchlists"
 import type { Watchlist } from "@/api/watchlists"
 import InvestmentsTabs from "@/modules/portfolios/InvestmentsTabs.vue"
-import { researchSymbol } from "@/utils/research"
+import { useRoute } from "vue-router"
+import { researchRoute } from "@/utils/research"
 
 const store = useWatchlistsStore()
+const route = useRoute()
 const loading = ref(true)
 const error = ref<string | null>(null)
 const showCreate = ref(false)
@@ -121,7 +123,7 @@ async function deleteWatchlist(wl: Watchlist) {
         <ul v-if="wl.items.length" class="divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-700/60">
           <li v-for="item in wl.items" :key="item.symbol" class="flex items-center gap-3 px-3 py-2">
             <router-link
-              :to="{ name: 'research-overview', params: { symbol: researchSymbol(item.symbol) } }"
+              :to="researchRoute(item.symbol, route.fullPath)"
               class="flex-1 text-sm font-medium text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 hover:underline"
             >
               {{ item.symbol }}

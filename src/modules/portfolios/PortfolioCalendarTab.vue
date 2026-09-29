@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from "vue"
 import { useRoute } from "vue-router"
 import { getPortfolioCalendar } from "@/api/portfolios"
 import { formatAmount } from "@/utils/format"
-import { researchSymbol } from "@/utils/research"
+import { researchRoute } from "@/utils/research"
 import type { components } from "../../../generated/api-types"
 
 type CalendarHolding = components["schemas"]["CalendarHolding"]
@@ -218,7 +218,7 @@ function chipText(c: Chip): string {
               <router-link
                 v-for="(chip, i) in cell.chips.slice(0, MAX_CHIPS_PER_DAY)"
                 :key="`${chip.symbol}-${chip.type}-${i}`"
-                :to="{ name: 'research-overview', params: { symbol: researchSymbol(chip.symbol) } }"
+                :to="researchRoute(chip.symbol, route.fullPath)"
                 class="block truncate rounded px-1 py-0.5 text-xs font-medium tabular-nums hover:underline"
                 :class="chipClass(chip.type)"
               >
