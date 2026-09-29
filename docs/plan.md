@@ -3205,3 +3205,42 @@ coverage rather than of the portfolios.
       between. Treat any single "worst jump" figure from that portfolio as
       unverified until it reproduces twice. Worth understanding what is unstable —
       possibly the analytics series being rebuilt while read.
+
+### 72.22 — the audit ran clean, but its findings are unreadable without kubectl
+
+`POST /api/admin/jobs/price-audit/run` → **Succeeded**, `succeeded: 1, failed: 0`
+(~10 min, up from ~7.5: §72.15 adds a corrective fetch for every symbol whose bars
+come back in a currency the grid did not expect).
+
+**And that is the only thing the UI can tell you.** The status endpoint returns
+`{jobName, status, details, startedAt}` and `details` is `null` on success; the
+findings are written to the Job's stdout and nothing persists them. There is no
+`/jobs/price-audit/log` route — `/jobs/stooq-import/log` exists, and it works by
+reading `admin.job_run`, a table **the stooq job writes its results into**. The
+price-audit job has no equivalent.
+
+So the Data quality card can start an audit and confirm it finished, but cannot
+show what it found. Reading the §72.18 result (does SAP.DE clear?) needs kubectl
+`logs` on the Job pod. That is a real gap, not a cosmetic one: the feature's
+entire value is its output.
+
+Two ways to close it, and the first is the right one:
+
+- **Persist the findings** — have the audit script write its per-symbol verdicts into
+  a table admin already reads (`job_run` is the existing precedent), and expose
+  `/jobs/price-audit/log`. Queryable, survives pod deletion, diffable between runs,
+  and it makes "did this get better or worse" answerable. Costs a schema change in
+  contracts + `gen:types`, and the audit script gains a write path it does not have
+  today (it is currently strictly read-only, which is a property worth keeping —
+  so write to a results table, never to portfolios).
+- **Expose the pod log** — admin reads the Job's logs via the k8s API. Far less
+  code, and no schema change, but the output disappears with the pod, is not
+  diffable, and depends on admin holding RBAC to read pod logs, which I have not
+  verified.
+
+- [ ] Add `/jobs/price-audit/log` for `price-audit` (and note `sheets-sync` has the
+      same gap — its run output is also stdout-only).
+- [ ] Persist per-symbol verdicts so two runs can be compared; a symbol that was
+      flagged and is now clean is exactly the signal §72.17b/§72.18 should produce.
+- [ ] Re-read this run's actual findings once a log route exists, and confirm
+      SAP.DE no longer appears.
