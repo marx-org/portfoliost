@@ -654,7 +654,7 @@ function tooltipCustom({ series, dataPointIndex, w }: {
     const isPriceUnit = mode.value === "Price" && axisUnit.value === "price"
     const formatted =
       typeof value === "number" ? (isPriceUnit ? formatAmount(value, chartCurrency.value) : `${value.toFixed(2)}%`) : "—"
-    lines.push(`<div class="apexcharts-tooltip-series-group"><span>${name}: ${formatted}</span></div>`)
+    lines.push(`<div class="price-chart-tooltip-row"><span>${name}: ${formatted}</span></div>`)
   }
   let txHtml = ""
   if (showTransactions.value && dataPointIndex >= 0 && startIdx >= 0 && startIdx + dataPointIndex < n) {
@@ -671,10 +671,10 @@ function tooltipCustom({ series, dataPointIndex, w }: {
           return `<div>${icon} ${label} ${formatNumber(tx.quantity)} @ ${formatCurrency(tx.price, tx.priceCurrency)} = ${formatCurrency(tx.totalAmount, tx.currency)}${fee}</div>`
         })
         .join("")
-      txHtml = `<div class="apexcharts-tooltip-transactions"><div><strong>Transactions:</strong></div>${rows}</div>`
+      txHtml = `<div class="price-chart-tooltip-transactions"><div><strong>Transactions:</strong></div>${rows}</div>`
     }
   }
-  return `<div class="apexcharts-tooltip-custom">${lines.join("")}${txHtml}</div>`
+  return `<div class="price-chart-tooltip">${lines.join("")}${txHtml}</div>`
 }
 
 const chartOptions = computed(() => ({
