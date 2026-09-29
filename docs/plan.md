@@ -83,41 +83,73 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ### 59.1 — Bump `apexcharts` to `^7.5.1`
 
-- [ ] `package.json`: `"apexcharts": "^7.5.1"`; `npm install` → commit the
+- [x] `package.json`: `"apexcharts": "^7.5.1"`; `npm install` → commit the
   `package-lock.json` change; assert the tree resolves `apexcharts@7.5.1` and
   `vue3-apexcharts@1.11.1` (unchanged) — `npm ls apexcharts vue3-apexcharts`.
-- [ ] No source changes expected (config compatibility verified in the
+  **Resolved to `apexcharts@7.6.1`** (user decision 2026-09-29: newest
+  possible — 7.6.0/7.6.1 published 2026-09-24/27, *after* the verification
+  smoke above, so 59.2 re-checks the delta). `vue3-apexcharts` stays 1.11.1:
+  already npm `latest`, peer range `apexcharts >=5.10.0` covers 7.x.
+- [x] No source changes expected (config compatibility verified in the
   section intro). If `vue-tsc` surfaces type fallout from the types v6+ ships
   in-package (e.g. `chart.type` literal narrowing in the `as const` options
   objects), fix it in the affected chart components only — minimal diff, no
-  behaviour change.
-- [ ] Tests: `npm run build` (includes `vue-tsc --noEmit`), `npm run test`,
+  behaviour change. — none surfaced.
+- [x] Tests: `npm run build` (includes `vue-tsc --noEmit`), `npm run test`,
   `npm run test:mock`, `docker compose up -d --build` +
   `npm run test:e2e` (the chart specs — `chart-currency`,
   `chart-title-stability`, `chart-recompute`, `charting`, `combined-chart`,
   `parity-portfolios`, `research`, `performance-display-currency` — assert on
   the `.apexcharts-*` DOM and double as the v7 DOM-compatibility gate) green.
-- [ ] Commit.
+  All green, twice consecutively. One gate failure along the way was a **test
+  race, not a v7 DOM break**: `chart-currency.spec.ts:38` read the y-axis
+  labels without waiting, while its siblings in the same file (lines 99/121/
+  165) already poll. Under cold full-suite load the labels were not in the DOM
+  yet — 1 failure in 3 cold runs on 7.6.1, a cold 5.16.0 baseline run was
+  clean, so v7 did not break the selector (the sibling tests using the very
+  same `priceChartYAxis` helper passed on 7.6.1). Fixed by polling.
+- [x] Commit — `989b14e`.
 
 ### 59.2 — Visual + console sweep across all chart surfaces (docker compose)
 
-- [ ] Against the rebuilt compose stack (`:8080`), Playwright pass at 1280px
-  over every chart surface: main page (portfolio-card sparklines +
-  "Portfolio Value" line), research overview (PriceChart: render, custom
-  tooltip on hover shows title + series row + transactions block when
-  transactions are enabled, buy/sell markers), seasonality + EPS bar charts
-  (data labels legible), allocation + projections donuts, charting grouped
-  bars (preset-loaded), wallet balance area.
-- [ ] Per surface assert: chart visible (`.apexcharts-canvas`), console has
+- [x] Against the rebuilt compose stack, Playwright pass at 1280px over every
+  chart surface: main page (portfolio-card sparklines + "Portfolio Value" line),
+  research overview (PriceChart: render, custom tooltip on hover shows title +
+  series row + transactions block when transactions are enabled, buy/sell
+  markers), seasonality + EPS bar charts (data labels legible), allocation +
+  projections donuts, charting grouped bars (preset-loaded), wallet balance
+  area. **The SPA is served on `:3000`, not `:8080`** — `:8080` is the gateway
+  and answers `/api/*` only (`/login` there is a 404); the Playwright
+  `baseURL` is already `:3000`.
+- [x] Per surface assert: chart visible (`.apexcharts-canvas`), console has
   **zero** errors/warnings mentioning apexcharts — in particular no v7
   "feature … configured but … not loaded" warning and no watermark overlay or
-  "Premium" text in the rendered page.
-- [ ] If a surface drifted (label animation unwanted on the static bar
-  charts, tooltip placement, sizing): adjust that component's options (e.g.
-  `dataLabels: { animate: { enabled: false } }`) — re-run the sweep and the
-  chart e2e specs.
-- [ ] Commit (the fixes, if any; a verification-only step otherwise — note
-  that in the commit of 59.3's plan closeout).
+  "Premium" text in the rendered page. Every surface logged **zero** console
+  messages of any kind. The one `premium` hit was a false positive: "licenses"
+  inside the AAPL business description.
+- [x] If a surface drifted … — **one real defect found and fixed.** The
+  research PriceChart tooltip **never painted**: the crosshair and marker drew,
+  but no tooltip box. `tooltipCustom` emitted
+  `<div class="apexcharts-tooltip-series-group">` — apexcharts' *internal*
+  class — and apexcharts ships `.apexcharts-tooltip-series-group { display:
+  none }`, revealing only the group apexcharts generates itself (it marks that
+  one `.apexcharts-active`). Ours was injected but laid out at 0x0, so the
+  tooltip measured 2×6px while reporting `visibility: visible`.
+  **Not a v7 regression**: 5.16.0 ships the identical rule and measured
+  identically (2×6, `display: none`) — it has been broken on both versions.
+  §59's smoke asserted DOM *structure* (`<span>AAPL: $333.26</span>` present)
+  and read that as "tooltip works"; no e2e asserted tooltip visibility, so
+  nothing caught it. Fixed by using our own class names for the custom content
+  instead of reusing apexcharts internals (nothing referenced the old names —
+  no app CSS, no e2e selector — so the diff is three template strings).
+  Post-fix at 1280px: tooltip 92×26, white background, series row
+  `AAPL: $329.40`, transactions block renders both buy rows
+  (`▲ Buy 5 @ $100.00 = $500.00`), buy/sell markers draw on the plot.
+  Note for future sweeps: the tooltip's series row and the *transactions* block
+  only appear on a bar date that has transactions — the e2e-seeded AAPL
+  transactions all land on the last bar (2026-09-29), so hover `~0.995` across
+  the plot, not mid-chart.
+- [x] Commit — `4385d59`.
 
 ### 59.3 — Release + PROD verify
 
