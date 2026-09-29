@@ -1520,7 +1520,7 @@ upstreams.
 | Service | chart | probes in yaml | renders as | health endpoint |
 |---|---|---|---|---|
 | `openst` | 5.1.0 | liveness+readiness+startup | `httpGet` ✅ | `/health` 200, `/ready` 200 |
-| `cachest` | 5.1.0 | **none** | — | `/health` 200, `/ready` **404** |
+| `cachest` | 5.1.0 | ~~none~~ liveness+readiness+startup (§64.2) | ~~—~~ `httpGet` ✅ | `/health` 200, ~~`/ready` 404~~ `/ready` 200/503 |
 | `portfoliost-wallets` | **5.0.1** | liveness+readiness | `tcpSocket` ⚠️ | `/health` 200 |
 | `portfoliost-instruments` | 5.1.0 | liveness+readiness | `tcpSocket` ⚠️ | `/health` 200 |
 | `portfoliost-admin` | **5.0.1** | liveness+readiness | `tcpSocket` ⚠️ | `/health` 200 |
@@ -1557,22 +1557,94 @@ verification**, and each helmrelease change must be validated against
 
 ### 64.2 — cachest: add `/ready`, then probes
 
-- [ ] `cachest`: add `GET /ready` mirroring openst's — `503` +
+- [x] `cachest`: add `GET /ready` mirroring openst's — `503` +
       `{"status":"degraded","redis":"unreachable"}` when the cache is down,
       `200` otherwise; keep `/health` as pure liveness that never touches Redis
       (a dependency-aware liveness probe restart-loops the pod during a cache
       blip, which cannot fix the cache). Since cachest's `RedisCache.get/set`
       already degrade to misses, readiness is the only honest place to drop the
-      pod from rotation.
-- [ ] Add liveness (`/health`), readiness (`/ready`) and startup probes to
-      `cluster/apps/pfire/cachest/app/helmrelease.yaml`.
-- [ ] `cachest`: add `test_ready_reports_503_when_redis_is_unreachable` and
+      pod from rotation. → cachest **v1.0.45**, `RedisCache.ping()` is a real
+      round-trip, not a connection flag.
+- [x] Add liveness (`/health`), readiness (`/ready`) and startup probes to
+      `cluster/apps/pfire/cachest/app/helmrelease.yaml`. → homelab
+      `f4cd384bd` (rebased onto the renovate bumps), pin **v1.0.46**.
+- [x] `cachest`: add `test_ready_reports_503_when_redis_is_unreachable` and
       `test_health_stays_ok_while_redis_is_down`; full suite green
       (`docker build --target test -t cachest-test . && docker run --rm cachest-test`).
-- [ ] Tests: pod 1/1 with 0 restarts; probes render `httpGet`; `/ready` returns
+      **204 passed.** Also 3 tests on `RedisCache.ping` itself in
+      `test_cache.py` — mocking `ping` away in a route test asserts the mock,
+      not the `try/except` that makes it safe.
+- [x] Tests: pod 1/1 with 0 restarts; probes render `httpGet`; `/ready` returns
       200 in-cluster; and a deliberate Redis outage (scale the cache down) takes
-      the pod out of rotation **without** `/health` flapping.
-- [ ] Commit: `cachest` code + tests, then the homelab tag bump + probes.
+      the pod out of rotation **without** `/health` flapping. Verified live
+      2026-09-29 — timeline below.
+- [x] Commit: `cachest` code + tests, then the homelab tag bump + probes.
+
+#### Verified live (2026-09-29, `KUBECONFIG=$HOME/.kube/homylab`)
+
+`helm template` + the live Deployment object, not just schema validity (§64.1's
+lesson): all three probes render `httpGet` on port `8080`. `port: http`
+resolves from the service even though the container declares no `ports:`, which
+is worth knowing — the four TS services in §64.1 got away with the same
+`port: http` only because they do declare a named container port.
+
+`kubectl scale deploy/redis -n pfire --replicas=0` (cachest db1, openst db2,
+ghostfolio db0 share this instance — so this is a real outage for the whole
+cache tier, approved as such):
+
+| t | `/health` | `/ready` | in Service endpoints | containerReady | restarts |
+|---|---|---|---|---|---|
+| baseline | 200 | 200 `ready`/`ok` | yes | true | 0 |
+| +8…+24s | 200 | 200 `ready`/`ok` | yes | true | 0 |
+| +32s | 200 | **503** `degraded`/`unreachable` | yes | true | 0 |
+| +40s | 200 | 503 | **no** | **false** | **0** |
+| redis restored, +8s | 200 | 200 `ready`/`ok` | yes | true | 0 |
+
+The load-bearing result: `/health` never moved and `restartCount` stayed **0**
+across the whole outage. That is the difference §64.2 was buying — a
+dependency-aware liveness probe would have restarted the one pod still
+answering, which cannot fix Redis.
+
+**Detection lagged the outage by ~30 s**, and that is not a probe problem: the
+redis pod's `Terminating` phase kept serving existing connections, so `PING`
+succeeded until the process was actually gone. `failureThreshold: 2` ×
+`periodSeconds: 10` is the rest. Anything reading "readiness caught it
+instantly" from a scale-down test would be wrong.
+
+#### The tag bump is load-bearing, not cosmetic
+
+A rollback to v1.0.44 or older 404s `/ready`, and a probe against a 404 never
+passes — the pod would sit at `0/1` forever rather than serving. Recorded in
+the helmrelease so the next rollback is not attempted blind.
+
+#### Found while running the suite: GHA ships a red suite
+
+`test` has been failing in CI since 2026-09-27 (run `36334269096`) and
+**v1.0.44 was published anyway**. In every pfire service's
+`.github/workflows/docker-image.yml`, `build` needs only `release`:
+
+```yaml
+build:
+  needs: release
+```
+
+`test` is not in the graph, so a red suite is invisible — the image is built and
+pushed regardless. That is how a broken test survived two releases here. Two
+separate fixes, and only the first is done:
+
+- [x] The flake itself: `test_shipped_singleton_route_is_still_serialized`
+      asserted `responses[0].status_code == 200`, but `pool.map` yields in
+      **submission** order, so `responses[0]` is not the thread that won the
+      depth-1 semaphore — a coin flip that failed on loaded CI runners. Now
+      asserts the multiset `[200, 503, 503, 503]`, which is also strictly
+      stronger (the old form passed on `[200, 200, 503, 503]`, the opposite
+      failure). cachest **v1.0.46**, GHA green. Verified 15× clean, then 10×
+      under 8-way CPU contention to reproduce the CI conditions.
+- [ ] Gate `build` on `test` in all 9 `ghcr.io/marx2/*` workflows
+      (`needs: [release, test]` — or better, make `test` a real gate on
+      `release` so a skipped release never orphans a bump). Not done here: it
+      is a cross-repo change, and openst/scanst/scorest/stooq-* may have
+      intentional red suites that would start blocking their own releases.
 
 ### 64.3 — portfoliost SPA: probe nginx, and say so
 
@@ -1629,10 +1701,11 @@ verification**, and each helmrelease change must be validated against
    (3rd repo for this plan), or accept a `/` probe that only proves nginx is
    up? The plan currently assumes a real route is preferred; §64.4 is blocked
    until this is answered.
-2. **cachest `/ready`** — is a second endpoint worth it, given cachest already
-   degrades gracefully to cache misses? The argument for it is that without it
-   readiness would duplicate liveness and the pod would keep taking traffic it
-   cannot serve quickly. Confirm before §64.2.
+2. **cachest `/ready`** — **resolved in §64.2: yes, add it.** The counter-argument
+   was that cachest degrades gracefully to cache misses anyway. True, and it is
+   exactly the reason it is needed: without a readiness gate the pod keeps taking
+   traffic it cannot serve quickly. Confirmed live — a 30 s Redis outage left
+   `/health` at 200 while every request paid a full upstream walk.
 3. **Separate liveness vs readiness paths for the four TS services** — all four
    expose only `/health` (200); `/ready` is 404 on every one. So readiness
    would be a duplicate of liveness unless each service grows a `/ready` that
