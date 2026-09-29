@@ -1817,11 +1817,57 @@ HEAD).
    exactly the reason it is needed: without a readiness gate the pod keeps taking
    traffic it cannot serve quickly. Confirmed live — a 30 s Redis outage left
    `/health` at 200 while every request paid a full upstream walk.
-3. **Separate liveness vs readiness paths for the four TS services** — all four
-   expose only `/health` (200); `/ready` is 404 on every one. So readiness
-   would be a duplicate of liveness unless each service grows a `/ready` that
-   checks its own dependencies (db, redis). Is a duplicated probe acceptable, or
-   should `/ready` be added to each service?
+3. **Separate liveness vs readiness paths for the four TS services** —
+   **resolved: keep readiness on `/health`, deliberately.** Audited 2026-09-29
+   rather than reasoned from the framing above, and the answer inverts. The
+   measured facts:
+
+   | | wallets | instruments | admin | users-auth |
+   |---|---|---|---|---|
+   | database | **same** `postgres-pfire-pguser-portfoliost/uri` | same | same | same |
+   | upstream deps | — | cachest | cachest, instruments, jobshot, openst, users-auth, wallets, Prometheus | Pocket-ID |
+   | migrations at boot | none | none | none | none |
+   | degrades gracefully | — | **yes** — per-symbol circuit breaker serves stale on cachest failure | partly | **yes** — `jose` caches the JWKS, so a Pocket-ID outage does not break token validation |
+   | `/metrics` | 200 | 200 | 200 | 200 |
+
+   The duplicate is the right answer for this tier, and a dependency-aware
+   `/ready` would be actively harmful:
+
+   - **One shared database.** A DB-aware readiness fails on all four
+     *simultaneously* — a correlated, fleet-wide exit from rotation, converting
+     partial degradation into a total 502 storm with no service left to serve
+     anything.
+   - **`admin` fans out to five services**, so a dependency gate would pull it
+     out whenever any of them blipped, including cachest and openst, which are
+     built to degrade.
+   - **`instruments` deliberately serves stale data when cachest is down**, so a
+     cachest gate would remove a *working* service from rotation — a probe
+     reporting a fault where there is none.
+
+   The asymmetry with cachest/openst is therefore real but explainable: blast
+   radius, not inconsistency. openst and cachest are single-purpose tier
+   services with no graceful-degradation path and few dependents, so dropping
+   them is the correct response to a dead dependency. These four are the
+   front-line tier, built to degrade, sitting behind an ingress where "not
+   ready" means users get 502s.
+
+   The one pattern that would make readiness genuinely non-duplicative — a
+   latched warmup flag set after startup work — was checked and **does not
+   apply**: none of the four run migrations at boot, so there is nothing to
+   wait for.
+
+   **Constraint if anyone revisits this:** a dependency-aware readiness on these
+   four must be *latched* (hold the last good verdict for ~30s) so a brief blip
+   cannot flap four pods simultaneously. Not worth building — see below.
+
+   **Where "degraded" actually belongs: metrics + alerts.** All four already
+   expose `/metrics` (verified 200 in-cluster). A
+   `dependency_up{dep="postgres"|"cachest"|"jobshot"}` gauge plus an alert
+   expresses degraded *better than a probe can* — a threshold, a duration and a
+   dashboard, where a probe only ever contributes one bit to routing. That
+   closes the gap §64 opened on ("nothing in the namespace can express
+   degraded") without the correlated-failure risk, and it is one PR per repo
+   instead of a route + probe changes + four tag pins.
 4. **Third-party images** — deliberately excluded here. Should the audit cover
    `postgrest` / `swagger-ui` / `pgadmin` / `pgweb` too, or stay scoped to
    images this monorepo builds?
