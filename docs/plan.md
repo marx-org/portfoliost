@@ -2906,3 +2906,46 @@ not need a new provider, an openst plugin, or a cachest route.
 - [ ] If it turns out to be a distinct unit category, THEN reconsider a provider —
       and check first whether the sheet even records which category a row is, since
       without that no provider could disambiguate it either.
+
+### 72.15 — §73: leak instrumentation landed; the first question is now answerable
+
+`openst dfede54` (**not deployed** — no cluster access). `GET /__mem`, plus
+`src/memdebug.py` and six tests.
+
+**What the source audit settled without a cluster:** nothing in this repository
+retains memory. The only unbounded container is the 404 negative cache, and it
+lives in Redis behind a 6h TTL, not in the process. The 29 `obb.*` calls go
+through OpenBB's module-level singleton, whose internal provider/DataFrame caches
+are not readable from here. The earlier "logo/search correlate with growth" note
+is correlation, not evidence — the SPA's research page fires logo and search
+together, so they would correlate with traffic and with each other regardless.
+
+**So the split worth measuring is Python heap versus native memory**, and that is
+fully observable:
+
+| `traced_fraction` | meaning | next step |
+|---|---|---|
+| small, `rss_bytes` large | native — OpenBB, numpy/pandas buffers | not fixable here; bound it or move it |
+| large | a Python container | read `top_allocations`, fix it |
+
+`diff_report()` compares two snapshots minutes apart with traffic between, which
+is what actually *names* a cause. One sample only says where memory is, and in a
+long-lived process that is mostly wherever the cache is.
+
+`tracemalloc` runs only under `MEM_DEBUG=1`, started in the lifespan hook.
+Deliberate: left permanently on it adds per-allocation overhead to a
+latency-sensitive service, which is a bad trade for diagnosing a leak that may not
+be a Python leak. When it is off the response says `tracing: false` so
+`traced_bytes: 0` is never misread as an empty heap — the exact failure mode this
+instrumentation exists to prevent, and one the first test caught on macOS because
+`rss_bytes()` only knew about `/proc`.
+
+- [x] Source audit: no in-process leak in this repo
+- [x] `GET /__mem` + `memdebug.py` + 6 tests (`dfede54`)
+- [ ] Deploy with `MEM_DEBUG=1`, exercise logo/search/research traffic, and take two
+      `__mem` snapshots at least 30 minutes apart. That single pair decides
+      whether this is even our bug.
+- [ ] If `traced_fraction` is large: `top_allocations` names the container.
+- [ ] If it is small: stop looking here. Options are bounding OpenBB's caches at
+      the singleton, or a worker-per-request model. Both are bigger than the 2Gi
+      mitigation already in place, and the measurement decides which.
