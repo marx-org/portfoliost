@@ -3100,3 +3100,55 @@ measurement rather than assumed:
       is ≈706) so a coincidental match cannot pass.
 - [ ] If no category lands there, stop and treat the sheet's price column as the
       suspect — do not build a provider against a series that is not the problem.
+
+### 72.20 — §72.16 measured: the 1.126x is NOT an ING Akcji category. It is not A either.
+
+All nine unit categories, measured on **2026-09-25** from analizy.pl, each page
+confirmed to be ING Akcji (ING Parasol FIO) and not another ING fund. Ratios to A
+= 819.44:
+
+| cat | NAV | × A | | cat | NAV | × A |
+|---|---|---|---|---|---|---|
+| I | 822.63 | 1.0039 | | **W** | **933.94** | **1.1397** |
+| **A** | **819.44** | **1.0000** | | S | 954.90 | 1.1654 |
+| U | 861.14 | 1.0509 | | T | 1 061.42 | 1.2953 |
+| K | 876.94 | 1.0702 | | F | 1 066.43 | 1.3016 |
+| | | | | E | 1 256.01 | 1.5329 |
+
+Target from the audit is `1.126 × 819.44 =` **922.63 PLN**. The nearest category is
+**W at 933.94 (1.1397×)** — 11.31 PLN away, 1.22% off in ratio, outside any
+tolerance that would make it a match. K is 45.7 the other way.
+
+**So the 1.126x factor is not any of the nine current categories.** That does not
+overturn the user's statement that the transactions are in a different class; it
+sharpens *what* that class is. The sheet says **"Goldman Sachs Akcji"** — the
+pre-2023 name, before GS → NN → ING. So the trades were most likely executed
+against the **Goldman Sachs TFI-era series**, which is not a category of today's
+ING Akcji at all. That is a different *series*, and a provider is still needed —
+but it must serve the GS-era series, not "a category of ING Akcji". Building the
+latter would have been the wrong provider, and the measurement is what stopped it.
+
+**Why a constant ratio is itself the clue.** Categories diverge over time by their
+fee differences, so a genuine category mismatch would be a *growing* ratio. Ours
+is flat: 1.1256 in 2023-04 and 1.1269 in 2026-08, a spread of 0.0013 over 3.4
+years. A constant multiplicative offset is not fee divergence. It is more
+consistent with a different valuation basis (cumulative vs distributing units, a
+re-denomination) or a different series entirely — consistent with the stale GS name
+and with a ratio that no current category produces.
+
+URL scheme, for whoever fetches more of these later: irregular. `IN<L>01` for
+E/I/K, but `INC01` for S (not `INS01`), and `ING01<L>` for F/T/U/W.
+
+- [ ] Look for the **Goldman Sachs TFI-era "Akcji" series** and its unit categories
+      (GS Akcji A/E/F/I/K…), and find the one at ≈1.126× the ING-era A series. This
+      is the actual identification question now.
+- [ ] Establish what the GS → NN → ING rename did to the units: rename only, or
+      rename plus re-denomination. A re-denomination would explain a constant ratio
+      on its own, and would mean the sheet's *quantity* also needs restating, not
+      just its price series.
+- [ ] Only then build the provider, per the planner contract's provider-tier order
+      (fixtures → plugin with mocked I/O → openst smoke → cachest route →
+      instruments adapter → compose stack).
+- [ ] Record the identifier in `ticker_reference` whatever it turns out to be:
+      `INGAKC.TFI` carries no category letter, and `ticker_reference` knows zero
+      `.TFI` symbols, so nothing cross-checks these rows today.
