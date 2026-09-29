@@ -45,7 +45,11 @@ pass (unit + docker-compose level per AGENTS.md).
 
 ### 60.1 — Core: `from` query param + back-target resolution (`research.ts`, `ResearchView.vue`)
 
-- [ ] `src/utils/research.ts`:
+> **DONE 2026-09-30** (`9945b77`). 438 unit green at the time; `researchRoute`
+> omits the `query` key entirely when there is no origin (a `query: undefined`
+> key is present-but-absent and was exactly the kind of thing the test caught).
+
+- [x] `src/utils/research.ts`:
   - `researchRoute(symbol: string, from?: string | null): RouteLocationRaw`
     → `{ name: "research-overview", params: { symbol:
       researchSymbol(symbol) }, query: from ? { from } : undefined }`
@@ -78,35 +82,39 @@ pass (unit + docker-compose level per AGENTS.md).
 
 Every navigation into research below switches to
 `researchRoute(symbol, route.fullPath)` (add `useRoute()` where the
-component does not already use it):
+component does not already use it).
 
-- [ ] `src/components/TransactionsTable.vue:373` — shared by the global
+> **DONE 2026-09-30** (`e2c8f1a`). One source of truth: eight call sites, no
+> inline `researchSymbol` left outside the helper. `TransactionsTable` and
+> `WatchlistsView` needed `useRoute()` added.
+
+- [x] `src/components/TransactionsTable.vue:373` — shared by the global
   `/en/investments/transactions` view and the per-portfolio transactions
   tab (the reported bug site).
-- [ ] `src/modules/portfolios/PortfolioHoldingsTab.vue` — `goResearch()`
+- [x] `src/modules/portfolios/PortfolioHoldingsTab.vue` — `goResearch()`
   (:328, kebab "Research") and the symbol router-link (:426).
-- [ ] `src/modules/portfolios/PortfolioCalendarTab.vue:221` (event chips).
-- [ ] `src/modules/portfolios/PortfolioCompareTab.vue:60` (rows).
-- [ ] `src/modules/portfolios/EditTransactionModal.vue:173` (`goResearch` —
+- [x] `src/modules/portfolios/PortfolioCalendarTab.vue:221` (event chips).
+- [x] `src/modules/portfolios/PortfolioCompareTab.vue:60` (rows).
+- [x] `src/modules/portfolios/EditTransactionModal.vue:173` (`goResearch` —
   `from` = the page the modal was opened over, since the route is
   unchanged while a modal is open).
-- [ ] `src/modules/portfolios/AddPositionDialog.vue:470` (`goResearch` —
+- [x] `src/modules/portfolios/AddPositionDialog.vue:470` (`goResearch` —
   keep the existing `.US` suffix handling, then call the helper).
-- [ ] `src/modules/instruments/InstrumentSearchModal.vue:47`
+- [x] `src/modules/instruments/InstrumentSearchModal.vue:47`
   (`openResult`, default mode only — the `mode="add"` mounts in
   ChartingView / AddPositionDialog / PortfolioPerformanceTab emit instead
   of navigating and are untouched; when mounted on the research page itself,
   `from` = the current research path, so switching symbols keeps the
   previous symbol reachable via back).
-- [ ] `src/modules/watchlists/WatchlistsView.vue:124` (watchlist items →
+- [x] `src/modules/watchlists/WatchlistsView.vue:124` (watchlist items →
   back returns to the watchlist).
-- [ ] Explicitly unchanged: `src/layout/SidebarNav.vue:60` (top-level nav
+- [x] Explicitly unchanged: `src/layout/SidebarNav.vue:60` (top-level nav
   entry, no context — falls back to `/en/investments`).
-- [ ] Tests: `npm run build`, `npm run test`, `npm run test:mock` green.
+- [x] Tests: `npm run build`, `npm run test`, `npm run test:mock` green.
   This step is behaviour-neutral on its own (no entry point passed `from`
   before 60.1, and the back target only changes when the param is present);
   the user-visible fix is proven by the e2e in 60.3.
-- [ ] Commit.
+- [x] Commit.
 
 ### 60.3 — E2E: back returns to the origin (extend `tests/e2e/research.spec.ts`)
 
@@ -114,26 +122,32 @@ Reuse the existing spec's login helper and seeded portfolio/transaction
 fixtures (the seeded portfolio with transactions that
 `tests/e2e/labels.spec.ts` already uses on the per-portfolio tab).
 
-- [ ] Portfolio origin: main page → open the seeded portfolio → Holdings
+> **DONE 2026-09-30** (`c277a8e`). 5 tests, all five origins + the tab switch
+> + the deep-link fallback, 113 e2e green. Two of them failed first for one
+> reason: I read `page.url()` straight after `click()` without awaiting the
+> URL, so the "origin" I asserted on was still `/en/investments`. A test that
+> captures a path must wait for the navigation that produces it.
+
+- [x] Portfolio origin: main page → open the seeded portfolio → Holdings
   tab → click a position's symbol link → research overview for that symbol;
   assert the "Go back" link's `href` equals `/en/portfolios/<id>/holdings`;
   click it → URL is that portfolio's holdings tab and the holdings table is
   visible.
-- [ ] Global transactions origin: `/en/investments/transactions` → click a
+- [x] Global transactions origin: `/en/investments/transactions` → click a
   row's symbol → research; back link `href` =
   `/en/investments/transactions`; click → the transactions table is
   visible.
-- [ ] Per-portfolio transactions origin: open the seeded portfolio's
+- [x] Per-portfolio transactions origin: open the seeded portfolio's
   Transactions tab → click a row's symbol → research; back link `href` =
   `/en/portfolios/<id>/transactions`; click → that tab is shown.
-- [ ] Origin survives tab switch: arriving at research from Holdings, click
+- [x] Origin survives tab switch: arriving at research from Holdings, click
   the "Dividends" research tab → the back link `href` still equals the
   holdings path.
-- [ ] Deep-link fallback: navigate directly to
+- [x] Deep-link fallback: navigate directly to
   `/en/research/<seeded symbol>/overview` (no `from`) → back link `href` =
   `/en/investments`.
-- [ ] Tests: `npm run test:e2e` (docker compose) green.
-- [ ] Commit.
+- [x] Tests: `npm run test:e2e` (docker compose) green.
+- [x] Commit.
 
 ### 60.4 — Release + PROD verify
 
@@ -226,7 +240,13 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 
 ### 61.1 — SPA: `TickerBadge.vue` component + unit tests
 
-- [ ] New `src/components/TickerBadge.vue`:
+> **DONE 2026-09-30** (`8b50fe5`, 16 unit tests). The logo plate is example-service's
+> rounded square (`rounded-[9px] object-contain`), verified against
+> `app.example-service.ai` in 61.10 — a live measurement, not the plan's estimate.
+> `TFI` is in `formatAssetType`'s map because `ticker_reference.asset_type`
+> stores that word and `toInstrumentType` already maps it to FUND.
+
+- [x] New `src/components/TickerBadge.vue`:
   - Props (`<script setup lang="ts">`, typed `defineProps`):
     `symbol: string` (required); `name?: string | null`; `countryCode?: string | null`
     (2-letter code, uppercased on render); `assetType?: string | null` (accepts the
@@ -250,7 +270,7 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
     `tickerDetails(countryCode?: string | null, assetType?: string | null):
     string | null` — `(${CC}) ${Type}` over the non-empty parts, `null` when both are
     missing. Both pure and unit-tested; no other call site re-derives the format.
-- [ ] Unit tests, new `tests/unit/components/TickerBadge.test.ts`:
+- [x] Unit tests, new `tests/unit/components/TickerBadge.test.ts`:
   - full props → logo `img[src*="/api/logos/SAP"]`, ticker `SAP`, name line,
     details `(PL) Stock` (and `${tid}-details` testid);
   - no `name` → no name line; no details → no details span; countryCode only →
@@ -259,100 +279,142 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
     `tickerDetails(null, null) === null`;
   - `size` sm/lg swap the logo class; `align="right"` adds the row-reverse class;
     `titleAs="h1"` renders an `<h1>`; custom `testid` prefixes the root + details.
-- [ ] Tests: `npm run test`, `npm run build` green.
-- [ ] Commit.
+- [x] Tests: `npm run test`, `npm run build` green.
+- [x] Commit.
 
 ### 61.2 — contracts: dividends items + compare rows carry identity fields
 
-- [ ] `portfoliost-contracts/contracts/openapi.yaml`:
+> **DONE 2026-09-30** — `portfoliost-contracts` `99246eb` → **v1.6.52**,
+> installed + `gen:types` in all three consumers. A second contracts change
+> landed inside 61.8 (`assetType` on `InstrumentProfile` → **v1.6.53**), because
+> the research header's details line needs an asset class and
+> `InstrumentProfile` had none. Recording that because 61.8's own step text
+> assumed `profile.type` existed; it did not, and shipping a details line with
+> no type would have rendered `(US)` alone.
+
+- [x] `portfoliost-contracts/contracts/openapi.yaml`:
   - `DividendsData.items` item: add `assetType: { type: string, nullable: true }` and
     `country: { type: string, nullable: true }` (nullable — the research-backed
     `history` shape has neither).
   - `ResearchCompare`: add `countryCode: { type: string, nullable: true }` and
     `assetType: { type: string, nullable: true }` (nullable — never guessed, 61.4).
-- [ ] Push contracts main → GHA patch bump; `NODE_AUTH_TOKEN=$(gh auth token)
+- [x] Push contracts main → GHA patch bump; `NODE_AUTH_TOKEN=$(gh auth token)
   npm install @marx2/contracts@<new>` + `npm run gen:types` in `portfoliost`,
   `portfoliost-wallets`, `portfoliost-instruments` (all three have generated types).
-- [ ] Tests: contracts `npm test` (spec validity) green.
-- [ ] Commit (portfoliost-contracts) + consumer install commits.
+- [x] Tests: contracts `npm test` (spec validity) green.
+- [x] Commit (portfoliost-contracts) + consumer install commits.
 
 ### 61.3 — wallets: `assetType` + `country` on `GET /:id/dividends` items
 
-- [ ] `portfoliost-wallets src/routes/portfolios.ts` `/:id/dividends` (:1105): the
+> **DONE 2026-09-30** (`df6c8e9`, 467 green). **Measured in PROD
+> 2026-09-30**: `portfolios.transactions` has `asset_type` on 1960/1960 rows
+> and `country` on **0/1960**. So the dividends tab in PROD renders
+> `Stock` with no `(CC)` — the country is genuinely unknown there, and
+> guessing it is the exact defect §63.14/§66.2 were about. The import does not
+> carry a country; that is a separate gap, recorded below.
+
+- [x] `portfoliost-wallets src/routes/portfolios.ts` `/:id/dividends` (:1105): the
   item map adds `assetType: r.assetType ?? null` and `country: r.country ?? null` —
   both columns are already selected (`select()` over `portfolioTransactions`); no
   schema/DB change.
-- [ ] Unit test (`portfolios.test.ts` dividends describe): a DIVIDEND tx seeded with
+- [x] Unit test (`portfolios.test.ts` dividends describe): a DIVIDEND tx seeded with
   `assetType: "ETF"`, `country: "PL"` → response `items[0].assetType === "ETF"`,
   `items[0].country === "PL"`; a tx without them → `null`.
-- [ ] Full wallets suite green (`npm run test`) + `npm run build`.
-- [ ] Commit (portfoliost-wallets).
+- [x] Full wallets suite green (`npm run test`) + `npm run build`.
+- [x] Commit (portfoliost-wallets).
 
 ### 61.4 — instruments: `countryCode` + `assetType` on `/:symbol/peers` rows (+ SPA mock)
 
-- [ ] `portfoliost-instruments src/routes/instruments.ts` `/:symbol/peers` (:1346):
+> **DONE 2026-09-30** (`f1915b9` + mock `8b76419`, 385 green). Verified in
+> PROD on the running service:
+> `PEERS 200 [{"s":"AAPL","cc":"US","at":"STOCK"}, …]`.
+> `toCompare` now emits explicit `countryCode: null` / `assetType: null` so
+> "no reference row" is a *value* in the response rather than an absent key —
+> otherwise `undefined` and `null` read differently to every consumer.
+
+- [x] `portfoliost-instruments src/routes/instruments.ts` `/:symbol/peers` (:1346):
   after each `toCompare(...)` item is built, enrich from the local reference table —
   same pattern as the profile route (:1602): `searchTickerReference(getDb(),
   sym.split(".")[0], 1)`, only when `ref.ticker === baseTicker` set
   `item.countryCode = ref.countryCode ?? null` and
   `item.assetType = toInstrumentType(ref.assetType)`; no ref row → both stay null
   (never guessed). `toCompare` (translate.ts) stays pure.
-- [ ] Unit test (`instruments.test.ts` peers describe): a ref row for the primary
+- [x] Unit test (`instruments.test.ts` peers describe): a ref row for the primary
   symbol (e.g. AAPL → `US` / `STOCK`) → `items[0].countryCode === "US"`,
   `items[0].assetType === "STOCK"`; a symbol with no ref row → both null.
-- [ ] Full instruments suite green (`npm run test`) + `npm run build`.
-- [ ] Commit (portfoliost-instruments).
-- [ ] SPA mock (e2e runs against the compose mock backend): `mocks/instruments/
+- [x] Full instruments suite green (`npm run test`) + `npm run build`.
+- [x] Commit (portfoliost-instruments).
+- [x] SPA mock (e2e runs against the compose mock backend): `mocks/instruments/
   index.js` — the `/compare` and `/peers` mappers add `countryCode`/`assetType` to
   each compare row, derived from the seeded research data where it carries a country
   (else `null`).
-- [ ] Tests: `npm run test:mock` green (portfoliost).
-- [ ] Commit (portfoliost).
+- [x] Tests: `npm run test:mock` green (portfoliost).
+- [x] Commit (portfoliost).
 
 ### 61.5 — SPA: adopt in holdings table + top/bottom performers
 
-- [ ] `PortfolioHoldingsTab.vue` symbol cell (:420–433): replace the logo `img` +
+> **DONE 2026-09-30** (`eb72df7`). Two local `assetLabel()` helpers deleted.
+> Both defaulted a missing country to `"US"` — the holdings unit test had to
+> change from asserting `(US) Stock` to asserting `Stock` on a fixture with
+> no `country`, which is the honest reading and the point of the change.
+
+- [x] `PortfolioHoldingsTab.vue` symbol cell (:420–433): replace the logo `img` +
   symbol `router-link` + `assetLabel(pos)` line with the existing `router-link`
   wrapping `<TickerBadge :symbol="pos.symbol" :name="pos.companyName"
   :country-code="pos.country" :asset-type="pos.assetType" />`; delete the now-unused
   `assetLabel` function (:235) — its format lives in the component's
   `tickerDetails`.
-- [ ] `PortfolioPerformanceTab.vue` Top/Bottom performers lists (:350, :370):
+- [x] `PortfolioPerformanceTab.vue` Top/Bottom performers lists (:350, :370):
   replace the `symbol` + `companyName` div with
   `<TickerBadge size="sm" :symbol="p.symbol" :name="p.companyName"
   :country-code="p.country" :asset-type="p.assetType" />`; the P/L right column is
   untouched.
-- [ ] Update the affected unit tests (holdings/performance specs that assert the old
+- [x] Update the affected unit tests (holdings/performance specs that assert the old
   markup) to select on `ticker-badge` / `ticker-badge-details`.
-- [ ] Tests: `npm run build`, `npm run test`, `npm run test:mock` green;
+- [x] Tests: `npm run build`, `npm run test`, `npm run test:mock` green;
   `docker compose up -d --build` + `npm run test:e2e` (holdings +
   `top-performers-currency.spec.ts`) green.
-- [ ] Commit.
+- [x] Commit.
 
 ### 61.6 — SPA: adopt in transactions table + portfolio dividends tab (+ SPA mock)
 
-- [ ] `TransactionsTable.vue` symbol cell (:370–392): replace the global-mode logo
+> **DONE 2026-09-30** (`21f9141`). The note line and `LabelChips` moved out of
+> the `<router-link>` and below the badge: they are transaction-level, not
+> identity, and nesting them inside the link made a whole row clickable.
+
+- [x] `TransactionsTable.vue` symbol cell (:370–392): replace the global-mode logo
   `img` + `symbol` + `assetLabel(tx)` + `instrumentName` lines with
   `<TickerBadge :symbol="tx.instrumentSymbol" :name="tx.instrumentName"
   :country-code="tx.country" :asset-type="tx.assetType" />` inside the existing
   `router-link`; the note line and `LabelChips` stay below the badge (transaction-
   level, not identity).
-- [ ] `PortfolioDividendsTab.vue` symbol cell (:96): replace the plain
+- [x] `PortfolioDividendsTab.vue` symbol cell (:96): replace the plain
   `{{ d.symbol }}` with
   `<TickerBadge size="sm" :symbol="d.symbol" :name="d.instrumentName"
   :country-code="d.country" :asset-type="d.assetType" />` — the 61.2/61.3 fields are
   nullable, so a research-backed legacy row degrades to ticker-only.
-- [ ] SPA mock: `mocks/portfolios/index.js` dividends mapper (:731) adds
+- [x] SPA mock: `mocks/portfolios/index.js` dividends mapper (:731) adds
   `assetType: t.assetType ?? null, country: t.country ?? null` (tx rows already carry
   both via `enrichTx`).
-- [ ] Update affected unit tests; e2e: `dividends.spec.ts` + the transactions specs.
-- [ ] Tests: `npm run build`, `npm run test`, `npm run test:mock`,
+- [x] Update affected unit tests; e2e: `dividends.spec.ts` + the transactions specs.
+- [x] Tests: `npm run build`, `npm run test`, `npm run test:mock`,
   `docker compose up -d --build` + `npm run test:e2e` green.
-- [ ] Commit.
+- [x] Commit.
 
 ### 61.7 — SPA: adopt in portfolio news cards
 
-- [ ] `PortfolioNewsTab.vue` (:43): replace the uppercase `a.ticker` chip with
+> **DONE 2026-09-30** (`c586c9e`, 4 unit + 1 e2e). A news article carries only
+> a ticker, so name/country/type come from the portfolio's own open positions.
+> Measured in the compose stack: `MSFT → (US) Stock + Microsoft Corporation`,
+> `AMD → (AU) Stock`, and an unheld ticker (`FDVV`) degrades to logo + ticker
+> exactly as designed.
+> **The sentiment chip is NOT in the e2e assertion, on purpose:** the real
+> `getPortfolioNews` in wallets never maps `sentiment`, so it has never
+> rendered in the real stack. §61.7's "the sentiment chip is still present" is
+> covered by a unit test instead. Asserting it in e2e would have needed a
+> wallets change outside this step's scope.
+
+- [x] `PortfolioNewsTab.vue` (:43): replace the uppercase `a.ticker` chip with
   `<TickerBadge size="sm" :symbol="a.ticker" :name="..." :country-code="..."
   :asset-type="...">` enriched from a `symbol → position` map over
   `usePortfolioStore().positions` (`companyName` / `country` / `assetType`); call
@@ -360,95 +422,155 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
   directly reachable via its route). A ticker absent from open positions degrades to
   logo + ticker (news is fetched for held stocks, so this is the rare case). The
   sentiment chip stays on the right.
-- [ ] E2E: portfolio News tab — a card for a held ticker shows the badge with the
+- [x] E2E: portfolio News tab — a card for a held ticker shows the badge with the
   position's name and details; the sentiment chip is still present.
-- [ ] Tests: `npm run build`, `npm run test`, `npm run test:mock`,
+- [x] Tests: `npm run build`, `npm run test`, `npm run test:mock`,
   `docker compose up -d --build` + `npm run test:e2e` green.
-- [ ] Commit.
+- [x] Commit.
 
 ### 61.8 — SPA: adopt in research header, overview header, compare columns
 
-- [ ] `ResearchView.vue` header (:88–105): replace the logo `img` + `h1` ticker +
+> **DONE 2026-09-30** (`5e4f03e`, instruments `309e3ba`, contracts
+> **v1.6.53**). Verified live in PROD:
+> `PROFILE 200 {"t":"AAPL","cc":"US","at":"STOCK","name":"Apple Inc."}`.
+> Two drifts found and fixed in the **component**, per 61.10's rule:
+> the compare column's `uppercase` (a metric-label class) was shouting
+> `APPLE INC.`, and the header ticker was 16px against example-service's 20px.
+
+- [x] `ResearchView.vue` header (:88–105): replace the logo `img` + `h1` ticker +
   name line + the duplicate ticker pill with
   `<TickerBadge size="lg" title-as="h1" :symbol="routeSymbol" :name="profile?.name"
   :country-code="profile?.countryCode" :asset-type="profile?.type" />` (details and
   name appear when the profile resolves; the `Add to Watchlist` / search buttons and
   the `from`-aware back link are untouched).
-- [ ] `ResearchOverview.vue` header block (:229–232): replace the logo `img` + `h2`
+- [x] `ResearchOverview.vue` header block (:229–232): replace the logo `img` + `h2`
   symbol + name with `<TickerBadge title-as="h2" :symbol="symbol"
   :name="profile?.name" :country-code="profile?.countryCode"
   :asset-type="profile?.type" />`.
-- [ ] `ResearchCompare.vue` column headers (:46–49): replace the symbol + name
+- [x] `ResearchCompare.vue` column headers (:46–49): replace the symbol + name
   divs with `<TickerBadge size="sm" align="right" :symbol="r.symbol" :name="r.name"
   :country-code="r.countryCode" :asset-type="r.assetType" />` (61.4 fields, nullable);
   the primary column keeps its `font-bold text-blue-700 dark:text-blue-400` highlight
   via a wrapper class.
-- [ ] Tests: `npm run build`, `npm run test`, `npm run test:mock` green;
+- [x] Tests: `npm run build`, `npm run test`, `npm run test:mock` green;
   `docker compose up -d --build` + `npm run test:e2e` (`research.spec.ts`,
   `logos.spec.ts`) green.
-- [ ] Playwright visual pass (1280px, compose stack): research header shows logo +
+- [x] Playwright visual pass (1280px, compose stack): research header shows logo +
   ticker + `(US) Stock` + name at 32px; compare table column headers show the badge
   with details, right-aligned.
-- [ ] Commit.
+- [x] Commit.
 
 ### 61.9 — SPA: adopt in search modal, watchlists, form previews
 
-- [ ] `InstrumentSearchModal.vue` result row: replace the logo `img` + symbol/name/
+> **DONE 2026-09-30** (`f99a65a`). **The four form previews were the real
+> find here**: all of them hardcoded a `(US)` country hint for an instrument
+> whose country they do not know — the guess §66.2 forbids, in four places at
+> once. They now render whatever the badge actually knows.
+> `EditTransaction`'s local interface was missing `country` (the API has sent
+> it all along); added as optional.
+
+- [x] `InstrumentSearchModal.vue` result row: replace the logo `img` + symbol/name/
   exchange block + type pill with
   `<TickerBadge :symbol="result.symbol" :name="result.name"
   :country-code="result.countryCode" :asset-type="result.type" />` (search results
   already carry all four fields).
-- [ ] `WatchlistsView.vue` items (:122–131): replace the plain symbol `router-link`
+- [x] `WatchlistsView.vue` items (:122–131): replace the plain symbol `router-link`
   + name span with the link wrapping
   `<TickerBadge :symbol="item.symbol" :name="item.name" />` (no country/type stored —
   details omitted).
-- [ ] Form symbol previews — `AddPositionDialog.vue`, `EditTransactionModal.vue`,
+- [x] Form symbol previews — `AddPositionDialog.vue`, `EditTransactionModal.vue`,
   `RecordDividendDialog.vue`, `TransactionFormFields.vue`: replace each
   logo-`img`+symbol pair with `<TickerBadge :symbol="..." :name="..." />` (name from
   the selected search result where the dialog keeps it; typed-only symbols degrade to
   ticker-only).
-- [ ] `RecentSearchesBar.vue` unchanged (decision — dense symbol-only chips).
-- [ ] Tests: `npm run build`, `npm run test`, `npm run test:mock`,
+- [x] `RecentSearchesBar.vue` unchanged (decision — dense symbol-only chips).
+- [x] Tests: `npm run build`, `npm run test`, `npm run test:mock`,
   `docker compose up -d --build` + `npm run test:e2e` (watchlists + add-position
   specs) green.
-- [ ] Commit.
+- [x] Commit.
 
 ### 61.10 — Sweep, docs, parity check
 
-- [ ] Sweep: `grep -rn "/api/logos/" src` returns hits **only** in
+> **DONE 2026-09-30** (`5867fc1`). Sweep result: `/api/logos/` appears in
+> `TickerBadge.vue` and `RecentSearchesBar.vue` only — the latter is the
+> documented exception, and it now carries a comment saying so, so the next
+> sweep does not "fix" it.
+> Parity **measured** on `app.example-service.ai` (live session, read-only, Top10 not
+> touched):
+
+  | | example-service | this repo, after |
+  |---|---|---|
+  | logo box | 32×32 | 32×32 ✓ |
+  | logo radius | 9px | 9px ✓ |
+  | logo object-fit | contain | contain ✓ |
+  | ticker heading | `h1` 20px/600 | `h1` 20px/600 ✓ (was 16px) |
+  | details chip | 11px/500 | 11px/500 ✓ (was 400) |
+
+  The holdings-table cell could not be re-measured: example-service's `/en/portfolios/
+  wallets/<id>/holdings` deep link redirects to the dashboard, so the cell is
+  only reachable by clicking the card. The 24/28px figure in this section's
+  intro stands as the 2026-09-24 audit's measurement, unverified today.
+
+- [x] Sweep: `grep -rn "/api/logos/" src` returns hits **only** in
   `src/components/TickerBadge.vue` — fix any leftover ad-hoc logo renders surfaced by
   the grep (the form previews of 61.9 are the expected tail).
-- [ ] `docs/COMPONENTS.md`: update the instrument-logo line (the rounded-square
+- [x] `docs/COMPONENTS.md`: update the instrument-logo line (the rounded-square
   `object-contain` plate, not the circle) and add `TickerBadge` to the reference
   table (presentational identity block; `ticker-badge` testid prefix;
   `tickerDetails`/`formatAssetType` shared exports).
-- [ ] Playwright parity pass (AGENTS.md): side-by-side a11y snapshots + screenshots
+- [x] Playwright parity pass (AGENTS.md): side-by-side a11y snapshots + screenshots
   at 1280px vs `app.example-service.ai` for the holdings table, the performance tab, the
   research header, and the compare tab; fix visual drift (spacing/truncation) in the
   component, not per call site.
-- [ ] Tests: full suite green — `npm run build`, `npm run test`,
+- [x] Tests: full suite green — `npm run build`, `npm run test`,
   `npm run test:mock`, `npm run test:e2e`.
-- [ ] Commit.
+- [x] Commit.
 
 ### 61.11 — Release + PROD verify
 
-- [ ] Push `portfoliost-wallets`, `portfoliost-instruments`, `portfoliost` → GHA
+> **RELEASED 2026-09-30** — wallets **v1.1.98**, instruments **v1.0.80** (all
+> 4 occurrences), SPA **v1.0.286**; homelab `472e85d98`; all three rollouts 1/1.
+> The browser pass is still blocked on the Pocket-ID login (see 60.4), so the
+> `InstrumentProfile`/peers payloads were verified against the **running
+> service** instead (quoted above) and the visual pass against
+> `app.example-service.ai` (61.10).
+
+- [x] Push `portfoliost-wallets`, `portfoliost-instruments`, `portfoliost` → GHA
   patch bumps → pin the **real** tags from `gh release list` in the homelab
   helmreleases (`KUBECONFIG=$HOME/.kube/homylab`, ns `pfire`); for instruments bump
   **all 4 occurrences** (app + tickersync + corpbondsync + fxsyync cronjobs, §56.2).
   Contracts ship inside the npm installs — no deploy.
-- [ ] Flux + kubectl verify all three rollouts (if the RWO logos PVC multi-attach
+- [x] Flux + kubectl verify all three rollouts (if the RWO logos PVC multi-attach
   stalls the instruments rollout, scale to 0, wait, scale back to 1 — known gotcha).
-- [ ] Playwright PROD (user's passkey session):
+- [ ] Playwright PROD (user's passkey session) — **BLOCKED on the login, same as
+  §60.4. Needs the user.** Every surface below is proven in the compose stack
+  (unit + e2e) and the payloads are proven against the running PROD service;
+  what is left is a visual confirmation:
   - Holdings table row: rounded-square logo + ticker + `(US) Stock`-style details +
     company name.
   - Top/Bottom performers: badge with details on each row.
-  - Portfolio Dividends tab: rows show name + details for held instruments
-    (the 61.3 fields from the re-imported tx rows).
-  - Portfolio News tab: cards show the badge (position-enriched) + sentiment chip.
+  - Portfolio Dividends tab: rows show the name; **the `(CC)` will be missing**,
+    because `transactions.country` is NULL on all 1960 PROD rows (measured in
+    61.3) — see the follow-up below.
+  - Portfolio News tab: cards show the badge (position-enriched).
   - Research: header badge (32px logo, `h1` ticker, details from the profile),
     Compare-with-peers column headers show details.
 - [ ] Commit (plan closeout) + archive §61 to `plan-archive.md`.
+
+#### Follow-up this step uncovered: the import carries no country
+
+`portfolios.transactions.country` is **NULL on 1960 of 1960** PROD rows
+(`asset_type` is 1960/1960, so the column exists and is populated — only
+`country` never is). The sheet's `Transakcje` block has no country column, and
+`sheets-sync` sends none, so every surface that wants a `(CC)` has to get it
+from the **ticker reference** instead, exactly as `instruments`' peers/profile
+routes now do (61.4/61.8).
+
+That is a real gap and it is not §61's to close: the honest options are (a) map
+it in `sheets-sync`'s resolver the way `NAME_VENUE_OVERRIDES` already maps a
+symbol, or (b) have wallets fall back to the instruments ticker reference when
+building a transaction row. Both are cross-repo and neither is in this section.
+Recorded here so it is not rediscovered as "the badge is missing a country".
 
 ---
 
