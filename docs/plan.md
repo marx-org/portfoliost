@@ -3001,3 +3001,59 @@ upstream of the provider and the provider will not fix it.
 - [ ] Sweep the other `.TFI` rows: the same sheet names one family "NN Emerytura
       2025/2030" and another "Goldman Sachs Emerytura 2060/2065" — the same rename
       applied inconsistently across rows.
+
+### 72.17 — §72.17b deployed and verified: the /price-bars join was the one that mattered
+
+`instruments v1.0.79` (`44826d4`), live and verified through the service.
+
+**I patched the wrong endpoint first.** `375c91f` fixed `convertSeries`, which is
+the provider-fetched `/history` and `/price` leg. The architecture doc had said it
+all along — "the read path converts inside the join (`queryViewAs`)" — and the grid
+calls `/price-bars`. Asking the running service is what caught it: with `v1.0.78`
+live, BTC-USD → PLN over 2022-07-14..19 still returned
+
+```
+closes: [98986, 99330, 21190, 20779, 106003, 108667]   currency: "PLN"
+```
+
+Two of six were raw USD, from the join's `else b.close` branch. After `44826d4`:
+
+```
+closes: [98986, 99330,             106003, 108667]      currency: "PLN"
+```
+
+**Lesson worth keeping, because it nearly went the other way twice:** a deploy that
+reports success and a test suite that is green both said this was fixed. Neither was
+wrong; both were measuring a different code path than the one in production. The
+only thing that caught it was asking the live service for the exact response the
+audit had flagged.
+
+### 72.18 — result after the recomputes
+
+| portfolio | worst day-over-day, before | after |
+|---|---|---|
+| **Crypto** | 410.1% @ 2022-07-18 | **48.9%** @ 2022-09-03 |
+| IBKR | 348.9% @ 2022-06-20 | 348.9% @ 2022-06-20 |
+| IKE Beata | 129.0% @ 2022-05-13 | 129.0% @ 2022-05-13 |
+| IKE Marek | 176.4% @ 2025-05-02 | 176.4% @ 2025-05-02 |
+| Equate+ | 104.1% @ 2025-03-12 | 104.1% @ 2025-03-12 |
+
+Crypto's 2022-07-15/16/17 now read 397/397/397 — carried forward from the last
+converted close — instead of alternating 397/85/85/424. The surviving 48.9% is
+2022-09-03, which is the ETH-USD buy (0.025) and a BTC disposal: a real portfolio
+change, not an artefact.
+
+**The other four are unchanged, and that is expected rather than a result.** They
+all moved to 2026-09-29 as their last point, so the recomputes ran, but their worst
+jumps are on dates where no unconvertible bar was involved. The one shape that
+would distinguish "still broken" from "a real trade" is whether the jump day
+coincides with a transaction; that check is the next step and it is mechanical.
+
+- [x] Deploy `v1.0.79` and verify the live response
+- [x] Recompute the five non-PLN portfolios
+- [x] Confirm Crypto's jumps cleared (410.1% → 48.9%, alternating days now a curve)
+- [ ] For IBKR/IKE Beata/IKE Marek/Equate+, check each remaining worst-jump date
+      against that day's transactions. A jump with a trade is real; one without is
+      still a bug, and the symbol and currency for that date name it.
+- [ ] Re-run the price audit (§72.18 shipped but the audit has not been re-run) and
+      confirm SAP.DE stops being reported.
