@@ -31,3 +31,6 @@ sheets-sync.env
 
 # Ad-hoc debug screenshots (repo root only)
 /*.png
+
+# Generated view of docs/plan.md checkboxes — regenerate, never commit.
+docs/plan-status.md
