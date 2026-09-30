@@ -305,6 +305,44 @@ quotes — §63.5 is gated on reproducing the bad symbol's provider response.
   cash total against the Gotówka snapshot on the right basis/currency (resolve
   the IB=USD vs column=PLN basis) so the 3 tracked accounts give a meaningful
   Δ instead of the current full-history mismatch.
+      > **Two of the three clauses hold; the one the item is actually about has
+      > not been started.**
+      >
+      > - *Warn-only* — done. `gotowka-recon.ts:9-10` states the recon never
+      >   changes the exit code, and `sync.ts:277-302` sets `process.exitCode`
+      >   from `totalErrors` alone.
+      > - *Per-currency ledger* — done, but **in wallets, not sheets-sync**:
+      >   `cashLedger.ts` (`tradeCashEffects:51`, `cashBalances:78`,
+      >   `cashBalanceSeries:153`, `dailyExternalFlows:255`), surfaced at
+      >   `routes/portfolio-cash.ts:129`. It is not per-currency on the wire —
+      >   `openapi.yaml:1185` is one aggregate base-currency `cash` — and the SPA
+      >   never calls it.
+      > - *Compare DERIVED cash to the Gotówka snapshot* — **not started, and the
+      >   recon cannot currently do it.** `gotowka-recon.ts:36-40` builds each
+      >   effect from the **Transakcje sheet's own** signed PLN `cashFlow`
+      >   (col 19, else col 12), and `base` is the **Gotówka column's own** first
+      >   non-blank balance (`:106-114`); `recon = base + Σ effects` (`:136`) and
+      >   `diff = lastSheet − recon` (`:137`). **Both sides of the comparison are
+      >   the user's own workbook** — it checks the sheet against itself, which is
+      >   how a sheet with missing rows can agree with itself and still be wrong.
+      >   And sheets-sync never reads wallets back: `wallets-api-client.ts` posts
+      >   import endpoints only (`:202, 208, 217`), so the derived ledger is not
+      >   reachable from the process that would need it.
+      >
+      > **The basis problem is knowingly left open**, in a comment rather than in
+      > code: `gotowka-recon.ts:140-143` says *"IBKR diffs are compared at the
+      > latest row rate, approximated here by the raw diff — the IBKR column is
+      > USD but the tolerance is loose."* `recon` is PLN (`:136`), the IB column is
+      > USD, and `GOTOWKA_TOL.IB` (`:23`) declares the tolerance in USD — so
+      > `diff` subtracts across units. It passes only because the tolerance is
+      > loose and the line is warn-only, which is the worst combination: a check
+      > that cannot fail.
+      >
+      > **Consequence for the sequencing.** Doing this properly means the recon
+      > needs the *derived* per-currency balance, which lives behind a wallets API
+      > that does not currently expose the per-currency split. So this is a
+      > contracts + wallets change before it is a sheets-sync change — narrower
+      > than it looks, and it should not be started as a sheets-sync edit.
 - [ ] Tests: derived free-cash for a funded-buy round-trip (inflow + buy) ≈ 0
   net; Gotówka recon warn-line compares derived vs snapshot within tolerance.
 - [ ] Tests: `npm run build`, full `vitest` green.
@@ -1464,8 +1502,19 @@ that all produced plausible numbers instead of errors.
       > — the check §63.3's reconciliation has been chasing since the fact-check,
       > run for real and clean. The one remaining finding is §72.32/§72.35's XTB
       > data gap, which needs a row added to the user's sheet.
-- [ ] Pin `instruments` to the `f01e639` comment commit's release (a code comment
+- [x] Pin `instruments` to the `f01e639` comment commit's release (a code comment
       that records a trap should not sit unpinned).
+      > **Already pinned, and the trap is live in the source, not reverted.**
+      > `homelab/cluster/apps/pfire/portfoliost-instruments/app/helmrelease.yaml:50`
+      > pins **v1.0.84**; `f01e639` is tagged v1.0.77 and is an ancestor of the
+      > commit v1.0.84 was built from, so the comment ships. The trap it warns
+      > about is still live: `price-bars.ts:504-519`, where
+      > `const baseCcy = resolvedBase ?? declared` is the line a future edit could
+      > invert.
+      > **Repo path worth fixing:** the live repo is `~/prv/homelab/homelab/`, not
+      > `~/prv/pfire/homelab/` — the latter is an empty skeleton with no
+      > `cluster/apps/pfire/`. An audit pointed at the wrong path would have
+      > concluded this pin did not exist.
 
 ---
 
@@ -1932,14 +1981,54 @@ field alongside `fxFrom` would let callers decide per bar.
       response never said what it dropped. The old text claimed the SPA "renders
       an explicit caveat" for the window — the wallets grid was doing no such
       thing, which is how a base-currency price reached a portfolio total.
-- [ ] Add `unconvertedDates` (or a count) to the `/price-bars` response so a
+- [x] Add `unconvertedDates` (or a count) to the `/price-bars` response so a
       caller can see what was dropped instead of inferring it. Needs a contracts
       change + `npm run gen:types` in `portfoliost-contracts/contracts/`, then
       the SPA mocks in `mocks/` that assert the response shape.
-- [ ] Re-check the other `?currency=` consumers now that the response is
+      > **The mocks half is now done, and it was the urgent half** — see the
+      > commit below. The contracts field is still open and is a smaller job than
+      > this item implied: `convertSeries` already returns `convertedMask`
+      > (`fx-convert.ts:60-71`) and the routes already slice through it
+      > (`instruments.ts:646-659`); the mask simply never leaves the service.
+      > Surfacing it is a response field on `PriceHistory` / `PriceBarSeries`
+      > (`openapi.yaml:603-618`, `:954-971`), a `gen:types` in three repos, and a
+      > field on the mock.
+      >
+      > **A related contract statement is now false and should be fixed in the
+      > same pass:** `openapi.yaml:618` and `:965` both say *"bars before it
+      > (`fxFrom`) are unconverted (native baseCurrency)"* — that is precisely
+      > the rule this section's own DONE note marks superseded. A caller reading
+      > the spec today would implement the defect.
+- [x] Re-check the other `?currency=` consumers now that the response is
       shorter than requested: wallets grid (covered), `buildBenchmarkSeries`,
       the SPA history/compare charts, and `mocks/`. A consumer that assumed a
       returned series spanned its whole window will now see gaps.
+      > **Audited; the premise does not hold for any of the named consumers, and
+      > one was never a `?currency=` consumer at all.**
+      >
+      > - **`buildBenchmarkSeries` does not use `?currency=`.** It calls
+      >   `fetchPriceBars(symbol, from, to, authToken)` with no currency
+      >   (`backfill.ts:268`) and converts client-side with one static resolved
+      >   rate (`:275-276`), so §72.17's producer change cannot reach it. It is
+      >   also **date-keyed, not index-keyed** — `calendarDays` → `buildPriceMap`
+      >   carry-forward → `closeMap.get(day)` (`:279-283`) — and re-bases at the
+      >   first available point (`:291`). A short series is safe by construction.
+      > - **The SPA history/compare charts** slice with a shared index
+      >   (`PriceChart.vue:355-393`), which is safe only because instruments keeps
+      >   `compare` parallel by construction (`instruments.ts:688-698` derives
+      >   `closePrices` from the same already-masked `dates`).
+      > - **`mocks/`** was the one that *did* assume spanning, and it was wrong
+      >   about the SERVICE, not the other way round — see below.
+      >
+      > **Residual, real and small:** `dropUnconvertedPrefix`
+      > (`backfill.ts:117-123`, doc `:102-116`) is now a **no-op** — `fxFrom` is
+      > `min()` over the already-filtered rows (`price-bars.ts:160`), so it equals
+      > the first returned date, `findIndex` returns 0 and nothing is dropped. Its
+      > doc describes the pre-§72.17 world. And the SPA caveat string is
+      > **factually wrong**: `priceChartFx.ts:7-8, 28-34, 43` still says "earlier
+      > bars in BASE", rendered at `PriceChart.vue:236, 422-424, 895, 906`. The
+      > earlier bars are *absent*. §75.3 confirmed the string no longer renders,
+      > which is why this went unnoticed — dead and wrong, in that order.
 - [x] Backfill `fx_rates` further back. The 2022-02-13 gap is a coverage
       > **§72.24 — full-history FX backfill ran, 2022-06 and 2023-04 now convert in full**
       problem as much as a code one; dropping bars is correct but it is better
@@ -2335,6 +2424,27 @@ coverage rather than of the portfolios.
       load-bearing: it is what removes these steps).
 - [ ] Make the coverage boundary visible rather than leaving it to look like a
       market move — the same job `gapSymbols` does for missing bars, extended to FX.
+      > **Still open, and structurally blind at exactly the point it needs to
+      > report.** There is no FX-coverage reporting anywhere: grep for
+      > `coverage`/`boundary` across `backfill.ts` and the analytics route returns
+      > nothing, `GET /:id/analytics` emits only `gapSymbols`
+      > (`routes/portfolios.ts:1314-1334`), and no field in `openapi.yaml` says
+      > "N bars were dropped for want of an FX rate".
+      >
+      > **The gap scan cannot see the case that matters.** The scan tests
+      > `prices.has(day)` (`backfill.ts:943-948`), but `buildPriceMap` sets
+      > **every** day from the first surviving bar onward by carry-forward
+      > (`:388-395`). So:
+      > - a **prefix** hole is caught — the day is absent from the map — and is
+      >   reported as `gapSymbols`, indistinguishable from a missing price bar;
+      > - a **scattered mid-window** FX hole, which is what §72.17's damage
+      >   actually looked like (`fx-convert.ts:44-45`), is silently carried
+      >   forward at the last converted close and is **never reported at all**.
+      >
+      > So the fix is not a new field on the response; it is a **hole count taken
+      > before `buildPriceMap` erases the evidence**. Anything added downstream of
+      > the carry-forward would report a number that is structurally incapable of
+      > being non-zero for the scattered case.
 - [x] **IKE Marek: the number moved between measurements** — reported as 176.4% @
       > **§72.28 — it was a bond sale, not measurement noise**
       2025-05-02, then re-measured as +1.4% on the same series with no recompute in
@@ -2603,6 +2713,29 @@ sum instead of being stamped `complete`.
       known-unknown amount.
 - [ ] Propagate the window-wide gap into the UI: `GET /:id/analytics` can flag the
       value as partial, but "partial on which days" is not currently represented.
+      > **Half of this is already shipped — the item reads as if nothing
+      > propagated, and the flag propagates end to end.** `gapSymbols` is
+      > window-wide (`backfill.ts:925-948`), persisted (`persistGapSymbols`
+      > `:652-666`), returned by `GET /:id/analytics` (`routes/portfolios.ts:1312,
+      > 1317`), contracted (`openapi.yaml:1490`) and rendered in three places
+      > (`PortfolioPerformanceTab.vue:314`, `PortfolioCard.vue:111, 126`,
+      > `PortfolioPerformanceChart.vue:43-45, 59-64`) with a test.
+      >
+      > **What is genuinely missing is only the day axis**, plus one field:
+      > - `unpricedLastDay` is **never persisted and never exposed**. It exists
+      >   only in-process (`backfill.ts:611, 615, 644, 927, 939, 999`) as an input
+      >   to `isUnpriceable`, and it appears nowhere in `openapi.yaml` or on any
+      >   route — grep finds it in this plan file and in `backfill.ts`, nowhere
+      >   else. It is the number §72.31's own table reports (`unpricedLastDay = 1`
+      >   with `gapSymbols` of 6), and it is the one that distinguishes "cheap" from
+      >   "at the ceiling".
+      > - "Partial on which days" has no representation: no `gapDays` /
+      >   `partialDays` / `unpricedDays` field exists in wallets or the contract,
+      >   and the chart message is window-agnostic
+      >   (`PortfolioPerformanceChart.vue:62`).
+      >
+      > So the real deliverable is a persisted per-day (or per-range) gap set, one
+      > openapi field, and chart wording that can say *when*.
 
 ### 72.32 — unfunded-portfolio audit finding (wallets v1.1.97, verified in prod)
 
@@ -2686,6 +2819,28 @@ because it sends you fixing data that was never broken.
       partial sum. Affects IKE Beata and IKE Marek history while held.
 - [ ] `price_bar_metadata` should distinguish "upstream profile 404" from
       "no price series", so `failed` stops conflating a delisting with a gap.
+      > **Confirmed still open, and a source comment claimed otherwise.**
+      > `price-bars.ts:566-570` asserted that the new `sanity_failed` status
+      > "keeps 'could not fetch' and 'fetched something impossible'
+      > distinguishable, **which §72.33 asks for too**". It does not — that is a
+      > different axis. `sanity_failed` splits *fetched-but-impossible* from
+      > *could-not-fetch*; §72.33 asks to split *upstream-404* from *no-series*.
+      > `TOR` is recorded exactly like the 8 unpriceable bonds even though the
+      > stooq fallback serves it 3,034 bars. The comment is corrected in place.
+      >
+      > What exists is a **retry-policy** distinction, not a reported one:
+      > `cooldownFor()` branches on a substring of free text
+      > (`lastError?.includes("HTTP 404")`, `price-bars.ts:231-236`) and its result
+      > is read at exactly one place (`:539`) to pick a breaker window.
+      > `isTransientFailure` (`:225-228`) is the same distinction, in-process,
+      > never persisted. The schema has no room for it: `fetchStatus` and
+      > `lastError` are both free text (`schema.ts:93-100`).
+      >
+      > **And nothing reports it anywhere** — `price_bar_metadata` has no reader
+      > outside `price-bars.ts` itself: no route, no contract field, no consumer
+      > in the SPA, wallets or `openapi.yaml`. So this is not a small amendment to
+      > §63.9.2's `lastError`; it is a new persisted status plus the reporting
+      > surface that makes it worth having.
 
 ### 72.35 — XTB's missing deposit: it is absent from the SHEET, and here is the exact fix
 
