@@ -3528,22 +3528,48 @@ portfolio. §76.5's cron-coverage check is the thing that should catch it.
 
 ### 76.2 — One manual refresh per portfolio, on the additive path (SPA + wallets)
 
-- [ ] The control already exists but only renders when a chart has **already failed**
+- [x] The control already exists but only renders when a chart has **already failed**
       (`PortfolioCard.vue:352-360`, `data-testid="card-chart-recompute"`, gated on
       `backfillFailed`). Surface it unconditionally on each card.
-- [ ] It must call the **additive** mode, not the default. `POST /:id/recompute` with no
+- [x] It must call the **additive** mode, not the default. `POST /:id/recompute` with no
       `mode` is `forcePortfolioRecalc` — DELETE every snapshot row and rebuild. For a
       routine "refresh now" on a 108-position portfolio that is the wrong tool;
-      `?mode=upsert` re-values the last two days without deleting. Add
+      `?mode=upsert` re-values without deleting. Add
       `?mode=upsert` to the API client's recompute call for this control and keep the
       existing failure-path button on the same mode.
-- [ ] Show the resulting freshness rather than implying liveness: the card should keep
+- [x] Show the resulting freshness rather than implying liveness: the card should keep
       carrying the snapshot's own as-of, so a user who did not press the button can see
       the number is up to ~12h old. §70's rule — label it, do not fabricate it.
-- [ ] Tests: e2e asserts the button issues `POST /:id/recompute?mode=upsert` (not the
+- [x] Tests: e2e asserts the button issues `POST /:id/recompute?mode=upsert` (not the
       bare path), and a second e2e asserts a plain navigation issues **no** POST and no
       write.
-- [ ] Commit.
+- [x] Commit.
+
+Shipped as `portfoliost` `v1.0.304` (`df2e205`) + `v1.0.305` (false-label fix),
+pinned in homelab `2c7d767b5` + `b0a4f4c31`. Build/typecheck clean, 463 unit, 227
+mock checks, 118 e2e green (0 failed).
+
+Verified in PROD: all **10/10** cards carry the control, clicking one issues exactly
+`POST /api/portfolios/b873872c…/recompute?mode=upsert`, and the card reads *"Prices as
+of 30 Sept, 17:22"* — a timestamp minutes after the 17:20 UTC cron, which is §76.5's
+cron-coverage question answered incidentally.
+
+**The plan's description of `mode=upsert` was wrong, and that mattered.** It says
+"re-values the last two days". `computeSnapshotBatch` (`backfill.ts:677-691`) takes its
+window *start* from the portfolio's earliest BUY/SELL trade or cash row and only
+`toOverride` from the caller, so `?mode=upsert` recomputes the **whole series** — it
+does rebuild a missing chart, which is what made it safe to move the failure-path
+button onto the same mode. The two-day phrasing describes only the window *end* (today
+rather than yesterday). What upsert never does is delete rows outside the range, and
+that is the only thing force adds. Wording corrected in `src/api/portfolios.ts`.
+
+**A small fib, caught by looking at the screenshot.** The first cut of the freshness row
+rendered `Prices not yet loaded` whenever `priceAsOf` was null — which is also what a
+portfolio with **zero open positions** looks like. So an empty portfolio claimed its
+prices had failed to load. The fallback is now gated on `openPositions > 0` and reads
+*"No price timestamp yet"*; with no positions there is nothing to be stale, and the row
+says nothing. A wrong label is worse than no label. (`v1.0.305`.) PROD now shows 8
+labelled cards, 0 false warnings, and 2 silent ones that have nothing to price.
 
 ### 76.3 — Collapse the two overlapping background queues (wallets)
 
