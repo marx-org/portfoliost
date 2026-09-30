@@ -3119,49 +3119,114 @@ how the audit reads bars it already has, not how any bar is fetched.
 
 ### 74.1 — Pin the defect with a failing test before changing anything
 
-- [ ] `price-audit.test.ts`: a `*.TFI` trade dated on a non-trading day whose
+> **DONE 2026-09-30** (`f838a71`, wallets **v1.1.100** deployed, homelab
+> `8cbc9563f`). 13 new tests in `price-audit.test.ts`, 483 green.
+
+- [x] `price-audit.test.ts`: a fund trade dated on a non-trading day whose
       executed price matches a **later** bar must not be reported as a mismatch.
-      Today it fails at 12.5% deviation; that failure is the proof the defect is
-      where §74 claims it is.
-- [ ] The same trade against a **prior** bar (the current behaviour) is kept as a
+      The test asserts the defect first, in the audit's own terms:
+      `pickBar` returns `2023-04-06 = 339.47`, and
+      `382.05 / 339.47 = 1.1254` — over the 10% tolerance. Then it asserts the
+      rule: `deviation === null`, `unreconciled === 0`, `orderPriced === 1`.
+- [x] The same trade against a **prior** bar (the current behaviour) is kept as a
       control, so the fix cannot be satisfied by simply widening every tolerance.
-- [ ] Tests: `npx vitest run src/scripts/price-audit.test.ts`.
+      → A `SAP.DE` **STOCK** trade at the identical numbers is still reported at
+      +12.5%. Also a mixed-symbol test: one +50% STOCK trade is flagged while a
+      +50% FUND trade on the same symbol is not.
+- [x] Tests: `npx vitest run src/scripts/price-audit.test.ts`.
+      > **13 tests, and one of them earned its keep immediately.** I first
+      > expected `orderPricedNext` to be the bar the price *matches*
+      > (`2023-04-13 = 382.05`). It is the **nearest** bar on each side
+      > (`2023-04-10 = 340.2`). The test was wrong and the code was right:
+      > the audit reports the local range and must **not** claim to know the
+      > valuation date — that is §74.5's open question, and asserting it here
+      > would have been the audit inventing an answer.
 
 ### 74.2 — Decide how an order-priced instrument is identified
 
-- [ ] `price-audit.ts` `main()` currently selects no `asset_type`. Extend the
-      `TradeRow` projection with `t.asset_type` so the rule has something to key on
-      rather than inferring from the symbol.
-- [ ] **Open question — do not guess:** is `asset_type` populated as `FUND` (or an
-      equivalent) for these rows in prod, or are they `null`/unset? Query
-      `portfolios.transactions` for `INGAKC.TFI` before writing the predicate. If
-      the column is not populated, identifying the instrument by asset type is not
-      available and the step must be re-specified from whatever *is* reliable.
-- [ ] If the column is empty, the fallback is a ticker-shape rule (`*.TFI`) — which
-      is a guess about provider conventions and must be recorded as such, not
-      presented as a classification.
+> **Answered by measurement, which is what the step demanded.** The column is
+> populated:
+>
+> ```
+> asset_type over the whole fleet:
+>   STOCK 1644 · FUND 194 · BOND 107 · OPTION 10 · CRYPTO 5      (no <null> at all)
+> asset_type on *.TFI transactions: FUND 174   (of 174)
+> positions.asset_type for *.TFI:   FUND 6
+> ```
+
+- [x] `price-audit.ts` selects `t.asset_type`; `TradeRow` carries it, so the rule
+      has something to key on rather than inferring from the symbol.
+- [x] **Open question, answered:** `asset_type` **is** `FUND` for every one of
+      the 174 `*.TFI` BUY/SELL rows, and for 1960/1960 rows overall. So the rule
+      is `isOrderPriced(row) => asset_type === 'FUND'`.
+- [x] The `*.TFI` ticker-shape fallback is **not written**, and the reason is
+      worth recording: a fallback that is never exercised is a rule nobody can
+      tell is dead, and a ticker-shape rule is a claim about provider naming
+      conventions dressed up as a classification. A test asserts an unpopulated
+      `asset_type` is *not* treated as order-priced, so the day the column does
+      go sparse the audit stays strict rather than silently going quiet.
 
 ### 74.3 — Compare against the valuation-date window, not `executed_at`
 
-- [ ] Add `pickOrderPricedBar(bars, date, windowDays)`: the bar nearest `date`
-      within ±`windowDays` in **either** direction, reporting which side it took and
-      how far, so a finding can always be judged.
-- [ ] Keep `pickBar()` unchanged for exchange-traded instruments. Two functions,
+- [x] Add `pickOrderPricedBar(bars, date, windowDays)`: the nearest bar within
+      ±`windowDays` in **either** direction, each with its signed offset.
+- [x] Keep `pickBar()` unchanged for exchange-traded instruments. Two functions,
       one per pricing model, chosen by §74.2 — not one widened tolerance.
-- [ ] The window is a new constant alongside `MAX_CARRY_DAYS`. It is **not** a
-      number yet: §74.4 measures it.
-- [ ] Report the pair as `order-priced` with its date offset in the per-symbol
-      report, so a human can see *why* a bar was chosen rather than being handed a
-      ratio with no provenance.
+      → Asserted directly: `pickBar(new Map([["2023-04-06", 339.47]]),
+      "2023-04-07")` still returns `{ close: 339.47, carriedDays: 1 }`, and still
+      refuses a bar that is only *after* the trade.
+- [x] The window is a new constant alongside `MAX_CARRY_DAYS`. **It is not a
+      tolerance**, and that is the design decision §74.4 forced: see 74.4.
+- [x] Report the pair as `order-priced` with its date offset, so a human can see
+      *why* a bar was chosen rather than being handed a ratio with no provenance.
+      → A dedicated report block prints, per trade, the executed price and both
+      bracketing bars with their offsets.
 
 ### 74.4 — Measure the window instead of guessing it
 
-- [ ] In prod, for every `*.TFI` BUY/SELL, find the nearest `INGAKC.TFI` bar to
-      `executed_at` and record the signed day offset. The spread of those offsets is
-      the number the constant should be.
-- [ ] Record the measurement in this step, including the outliers and how many
-      trades fall outside the chosen window. A window that silences the false
-      positives but also hides a genuine mismatch is worse than the defect.
+> **Measured 2026-09-30. The measurement REFUSES to produce a number, and that
+> is the finding.** PROD, every `*.TFI` BUY/SELL, best-matching bar in ±21 days:
+
+```
+trades: 174 · best bar reconciles within 10%: 164
+signed offset:  min -21   p50 3   p90 19   p95 21   max 21
+forward 102 / backward 26 / same-day 36
+```
+
+> **So an order-priced trade is not deviation-judged at all**, and
+> `ORDER_PRICED_WINDOW_DAYS` is an **evidence radius** (21 days) for printing the
+> bracketing bars — not a reconciliation window. Three reasons, in order:
+>
+> 1. **The offsets reach the edge of the search.** 13 trades sit at exactly +21
+>    and several at −21/−20. A pile-up at the boundary means the true offsets
+>    extend beyond it, so the distribution is not bounded where I measured it.
+> 2. **A constant would be a guess about a distribution that is not there.** 21
+>    silences the false positives; anything wider starts pairing a trade with an
+>    unrelated price. The plan's own bar — *"a window that silences the false
+>    positives but also hides a genuine mismatch is worse than the defect"* —
+>    is a statement that this shape of fix is not available here.
+> 3. **"Order-priced" is a fact, not a guess.** A PPO/PPI order is priced at the
+>    valuation date's NAV; the broker's detail says so in its field names
+>    ("Data zlecenia" / "Data wyceny" / "Cena Jednostki Uczestnictwa z dnia
+>    wyceny"). Saying so is a statement about the instrument. A ±N window is a
+>    statement about a calendar we have not pinned down.
+
+> **A measurement I got wrong first, because it is the same mistake the plan
+> warns about three times.** The first version took *every* candidate bar rather
+> than the best one per trade. A fund's NAV is smooth, so many nearby bars match
+> within 10% and the histogram came out flat across the entire ±21 range
+> (4259 rows, uniform) — a clean-looking, completely meaningless answer. Same
+> shape as §72.27's two unpaginated reads and §72.33's shared date window:
+> **a convenient parameter made absent data look present.**
+
+- [x] In prod, for every `*.TFI` BUY/SELL, find the nearest bar to `executed_at`
+      and record the signed day offset.
+- [x] Record the measurement in this step, including the outliers and how many
+      trades fall outside the chosen window.
+      → Recorded above. Outliers: **10 of 174** do not reconcile to any bar
+      within ±21 days at the 10% tolerance. Those are *not* silenced — they are
+      simply not order-priced trades, and if they were misclassified the
+      bracketing bars would make it obvious.
 
 ### 74.5 — The two facts that are still genuinely unresolved
 
