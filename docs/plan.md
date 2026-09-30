@@ -3573,21 +3573,64 @@ labelled cards, 0 false warnings, and 2 silent ones that have nothing to price.
 
 ### 76.3 — Collapse the two overlapping background queues (wallets)
 
-- [ ] There are two independent debounced/locked recalc mechanisms, and a single
+- [x] There are two independent debounced/locked recalc mechanisms, and a single
       mutation drives **both**: `notifyTransactionsChanged` (`services/recalc-queue.ts`,
       fired from `portfolio-transactions.ts:568,669,762,892,1191` and `routes/import.ts`)
       *and* `refreshQuotes` → `enqueueBackfill` (`services/backfill-runner.ts`). Two
       locks, overlapping work, and the ordering between them is unexpressed — which is
       the same "two writers, timing decides" shape as the §63.2 race.
-- [ ] Measure first: for one mutation, log what each mechanism enqueues and what each
+- [x] Measure first: for one mutation, log what each mechanism enqueues and what each
       writes. Then keep exactly one. Record which was dropped and why in the commit —
       `recalc-queue`'s debounce and `backfill-runner`'s serialization solve different
       problems (burst collapsing vs torn series), so the survivor may need both
       properties, and that has to be established rather than assumed.
-- [ ] Tests: a mutation test asserting exactly one recalc is enqueued per change, and
+- [x] Tests: a mutation test asserting exactly one recalc is enqueued per change, and
       that two concurrent mutations for the same portfolio cannot interleave into a torn
       series.
-- [ ] Commit.
+- [x] Commit.
+
+Shipped as wallets `v1.1.106` (`1134ff8`), pinned in homelab `1e2f0a71d`. tsc clean,
+494 tests green.
+
+**The plan's premise was wrong, so "keep exactly one" was not a meaningful operation.**
+Measured, the two mechanisms are **layered, not parallel**: `recalc-queue`'s own header
+says *"Passes execute through the global backfill runner"* — the debounce feeds the
+serializer, and `enqueueBackfill` is what `refreshQuotes` also calls. Two locks solving
+two problems, both load-bearing: the grace timer collapses a broker import's thousands
+of mutations into one pass, the runner keeps concurrency at 1 (the 2026-09-19 CPU
+saturation fix). **Both stay.**
+
+The genuine duplication was one level down: a single position edit ran **two passes**.
+The route called `refreshQuotes` (pricing + today's snapshot, awaited, so the 201 could
+return a live price), then `notifyTransactionsChanged` armed its 3s timer and ran
+`recalcPortfolioHistory` — whose tail is `refreshQuotesUnlocked`. Pass 2 therefore
+redid pass 1's work, and in between `DELETE`d every snapshot row and rebuilt: **1,661
+rows deleted and rewritten on IBKR to add one position.**
+
+So the queue now runs a new `recalcPortfolioSeries` (`backfill.ts`): the same
+`computeSnapshotBatch` upsert, the same pricing tail, the same return-column and
+`current_value` sync, minus the DELETE. What force uniquely bought is dropping rows
+*outside* the recomputed window — earliest trade deleted, or a wipe-and-reimport — which
+keeps its own path (`POST /:id/recompute` with no `mode`, what §63.6's re-import uses).
+
+**The pricing tail was kept deliberately.** `routes/import.ts` fires neither
+`refreshQuotes` nor portfolio-open, so an additive pass that skipped pricing would leave
+every imported position with a NULL `market_value` — §70's failure, where a full
+18,488-row history sat beside 99 unpriced positions.
+
+Tests: the queue suite is retargeted to the new entry point, plus one-mutation→one-pass
+and a peak-concurrency-1 assertion with a start→end trace. `backfill.test.ts` gains
+**real, unmocked** coverage: the window is re-valued in place and an out-of-window
+orphan row **survives** — the discriminating assertion, since force would drop it.
+
+**A cross-suite leak, caught because a test passed alone and failed in the full run.**
+Proving the pricing tail works requires a *successful* quote, which populates the
+process-wide, symbol-keyed `quoteCache` in `quotes.ts` — and there was no way to reset
+it. A later `recalcPortfolioHistory` suite then ran against a warm cache, priced from
+it, and wrote a today's-snapshot row its own assertion said must not exist. Added
+`__resetQuoteCachesForTests()`, following the existing `__reset*ForTests` convention.
+Worth noting the shape: a test that only *succeeds* is as much a hazard as one that
+fails.
 
 ### 76.4 — One writer per (portfolio, date) in `value_snapshots`
 
