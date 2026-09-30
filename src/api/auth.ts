@@ -31,6 +31,10 @@ export async function fetchMe(): Promise<AuthMe> {
   return http.get<AuthMe>("/api/auth/me")
 }
 
+export async function refresh(idToken: string): Promise<AuthResponse> {
+  return http.post<AuthResponse>("/api/auth/refresh", { id_token: idToken })
+}
+
 export async function logout(idToken: string | null): Promise<void> {
   // Send the current token so the backend can delete the matching refresh
   // session. Omitting it still works, but revokes nothing server-side.

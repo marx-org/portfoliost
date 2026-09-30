@@ -2,7 +2,7 @@ import { createPinia, setActivePinia } from "pinia"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { useAuthStore } from "@/stores/auth"
 import * as authApi from "@/api/auth"
-import { NetworkError } from "@/api/client"
+import { ApiError, NetworkError } from "@/api/client"
 import type { AuthMe, AuthResponse } from "@/api/types"
 
 vi.mock("@/api/auth", () => ({
@@ -11,6 +11,7 @@ vi.mock("@/api/auth", () => ({
   fetchMe: vi.fn(),
   logout: vi.fn(),
   loginWithCode: vi.fn(),
+  refresh: vi.fn(),
   buildEndSessionUrl: vi.fn((issuer: string) => `${issuer}/api/oidc/end-session`),
 }))
 
@@ -139,6 +140,49 @@ describe("auth store", () => {
     await store.logout()
 
     expect(store.isAuthenticated).toBe(false)
+    expect(assign).not.toHaveBeenCalled()
+    vi.unstubAllGlobals()
+  })
+
+  it("swaps in the refreshed token and user (§77.5)", async () => {
+    mocked.refresh.mockResolvedValue(makeResponse())
+    localStorage.setItem("portfoliost_token", "stale")
+    const store = useAuthStore()
+
+    await expect(store.refreshSession()).resolves.toBe(true)
+
+    expect(mocked.refresh).toHaveBeenCalledWith("stale")
+    expect(localStorage.getItem("portfoliost_token")).toBe("mock-token")
+    expect(store.user?.email).toBe("demo@example.com")
+  })
+
+  it("clears the session and sends the user to login when the refresh is rejected (§77.5)", async () => {
+    mocked.refresh.mockRejectedValue(new ApiError(401, { message: "No active session" }))
+    localStorage.setItem("portfoliost_token", "stale")
+    const assign = vi.fn()
+    vi.stubGlobal("location", { ...window.location, assign })
+
+    const store = useAuthStore()
+    await expect(store.refreshSession()).resolves.toBe(false)
+
+    expect(store.isAuthenticated).toBe(false)
+    expect(localStorage.getItem("portfoliost_token")).toBeNull()
+    expect(assign).toHaveBeenCalledWith("/login")
+    vi.unstubAllGlobals()
+  })
+
+  it("keeps the session when the refresh fails on a network error (§77.5)", async () => {
+    // A transient failure must not sign the user out — only an explicit 401
+    // means the session is actually dead.
+    mocked.refresh.mockRejectedValue(new NetworkError())
+    localStorage.setItem("portfoliost_token", "stale")
+    const assign = vi.fn()
+    vi.stubGlobal("location", { ...window.location, assign })
+
+    const store = useAuthStore()
+    await expect(store.refreshSession()).resolves.toBe(false)
+
+    expect(localStorage.getItem("portfoliost_token")).toBe("stale")
     expect(assign).not.toHaveBeenCalled()
     vi.unstubAllGlobals()
   })

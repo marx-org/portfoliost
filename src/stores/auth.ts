@@ -1,6 +1,6 @@
 import { defineStore } from "pinia"
 import { computed, ref } from "vue"
-import { clearToken, getToken, NetworkError, setToken } from "@/api/client"
+import { ApiError, clearToken, getToken, NetworkError, setRefreshHandler, setToken } from "@/api/client"
 import * as authApi from "@/api/auth"
 import type { AuthUser } from "@/api/types"
 import { getOidcConfig } from "@/runtime-config"
@@ -90,5 +90,50 @@ export const useAuthStore = defineStore("auth", () => {
     }
   }
 
-  return { token, user, loading, error, isAuthenticated, isAdmin, login, loginWithCode, fetchMe, logout }
+  /**
+   * Rotate the session (§77.5). Returns true when a fresh token is in place.
+   *
+   * Only an explicit 401 from the refresh endpoint means the session is truly
+   * dead (logged out, user disabled, refresh revoked) and re-authentication is
+   * the only way forward. A network error is transient, so it must not sign
+   * the user out — the caller raises the original 401 instead.
+   */
+  // client.ts cannot import the store (cycle), so it calls back into here.
+  setRefreshHandler(refreshSession)
+
+  async function refreshSession(): Promise<boolean> {
+    const current = token.value
+    if (!current) return false
+    try {
+      const res = await authApi.refresh(current)
+      token.value = res.access_token
+      user.value = res.user
+      setToken(res.access_token)
+      return true
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        token.value = null
+        user.value = null
+        clearToken()
+        // Dead session: a full navigation gives a clean slate, and mirrors what
+        // logout already does.
+        window.location.assign("/login")
+      }
+      return false
+    }
+  }
+
+  return {
+    token,
+    user,
+    loading,
+    error,
+    isAuthenticated,
+    isAdmin,
+    login,
+    loginWithCode,
+    fetchMe,
+    logout,
+    refreshSession,
+  }
 })
