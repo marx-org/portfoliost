@@ -3514,18 +3514,56 @@ NN TFI trade is a false positive, and a correct one for the wrong reason.
       > stale `"goldman sachs akcji"` now resolves to `GMSAKW.TFI`. One string.
       > 158 green. **Not deployed** — it re-prices the holding, so it needs a
       > reimport and the user's go-ahead.
-- [ ] Step 3 — `ticker_reference` entry for the class + sweep the other `.TFI` rows
-      > The sweep is now the valuable half, and it is **wider than ING Akcji**:
-      > every `.TFI` row in the sheet was mapped by *old fund name* and never
-      > checked against the class the broker trades, which is precisely the defect
-      > this found. `ticker_reference` knows zero `.TFI` symbols, so nothing
-      > cross-checks any of them.
+- [x] Step 3 — sweep the other `.TFI` rows. **Run against PROD 2026-09-30, and
+      exactly one symbol was wrong — the one already fixed.**
+      > **The sweep was worth more than the fix, because it produced a
+      > discriminator that separates the two defects this family confuses.**
       >
-      > The right check is the one that worked here and costs nothing: **take each
-      > stored trade price and ask the provider's series for the same date.** Four
-      > of five matched to the cent; a mismatch is a wrong symbol, immediately. That
-      > is a far stronger signal than a ratio against a category table, and it needs
-      > no new provider and no scraping.
+      > Method: for each stored BUY/SELL, ask *our own provider* for the bar on that
+      > trade's own date and compare to the executed price. No category table, no
+      > scraping, no drift assumption — the executed price is the test. 174 trades
+      > over 6 symbols, from `portfolios.transactions` via the CNPG pod:
+      >
+      > | symbol | trades | cent-exact | mean(paid/bar) | trend/yr | verdict |
+      > |---|---|---|---|---|---|
+      > | `INGAKC.TFI` | 78 | **0** | **1.0840** | **+1.80%** | **wrong class** |
+      > | `INGOBL.TFI` | 2 | 0 | 1.0139 | +0.99% | *n too small to judge* |
+      > | `NNEP25.TFI` | 2 | 2 | 1.0000 | 0.00% | symbol OK |
+      > | `NNEP30.TFI` | 5 | 5 | 1.0000 | 0.00% | symbol OK |
+      > | `NNEP60.TFI` | 20 | 2 | 0.9993 | +0.59% | symbol OK |
+      > | `NNEP65.TFI` | 66 | **34** | **1.0000** | +0.05% | symbol OK |
+      >
+      > **The discriminator is trend, not magnitude.** A wrong *unit class* is a
+      > systematic offset that **grows** — two classes with different ongoing fees
+      > diverge progressively, which §72.38 already worked out. An *order priced at
+      > the valuation date* is noise centred on 1.0 with no trend, and its exact hits
+      > are precisely the days where the order date and valuation date coincided.
+      >
+      > **`NNEP65.TFI` is the proof that this works, and it is worth keeping:**
+      > 34 of 66 trades match to the cent. A wrong class cannot produce cent-exact
+      > identity on half its trades. That is what makes the sweep's negative results
+      > credible — "no exact matches" alone would prove nothing, because an
+      > order-priced fund produces exactly that on a valuation-date mismatch.
+      >
+      > So the `.TFI` family is **one wrong symbol, not a class of them**, and it is
+      > `INGAKC.TFI` — fixed in sheets-sync `a29dbe3`. The `NNEP*` Emerytura funds
+      > and `INGOBL` were always mapped correctly.
+      >
+      > **`INGOBL.TFI` is flagged, not cleared.** Two trades, and a mean of 1.0139
+      > with a +0.99%/yr slope is *shaped* like a small class difference. That is
+      > nowhere near enough to act on, and it is recorded rather than quietly
+      > dropped into "OK" because the row would otherwise read as verified. It needs
+      > either more trades or a deliberate check of whether an alternative category
+      > exists — which is the same question step 1b just answered for ING Akcji, and
+      > the same method answers it: compare the stored prices against that
+      > candidate's series.
+      >
+      > **What this does not settle.** A symbol can be right and a *class* still
+      > wrong in principle; here the 34 cent-exact matches make that moot for
+      > `NNEP65`, but the sweep's guarantee is only as good as "the provider serves
+      > one class per `.TFI` ticker" — which is an assumption about the provider, not
+      > something this measured.
+
 - [ ] Step 4 — `positions.company_name` off the stale sheet name
       > A `sheets-sync` resolver mapping. Now unblocked in the sense that matters:
       > the class is confirmed, so the symbol is no longer in question — which was
