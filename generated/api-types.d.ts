@@ -72,6 +72,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Exchange an expired session for a fresh token
+         * @description Rotates the server-side refresh session identified by the submitted
+         *     token's `jti` and returns a new one.
+         *
+         *     The refresh token never leaves the backend: it is held hashed, keyed by
+         *     the `jti` of the id_token handed to the client, and re-keyed to the new
+         *     `jti` on every call. Rotation is mandatory — the old token is consumed,
+         *     so replaying a previously used id_token fails with 401.
+         *
+         *     Callers must serialise this: concurrent 401s should share one in-flight
+         *     refresh, or all but the first will fail.
+         */
+        post: operations["refresh"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/users/profile": {
         parameters: {
             query?: never;
@@ -2118,6 +2147,16 @@ export interface components {
             email: string;
             password: string;
         };
+        RefreshRequest: {
+            /**
+             * @description The caller's current bearer token. It is normally already expired —
+             *     that is the normal case, not an error. The signature, issuer and
+             *     audience are verified; `exp` is deliberately NOT checked, because
+             *     the token's only job here is to identify which server-side refresh
+             *     session to rotate. Never read identity claims from the raw body.
+             */
+            id_token: string;
+        };
         AuthResponse: {
             access_token: string;
             /** @default bearer */
@@ -2525,9 +2564,11 @@ export interface components {
             baseCurrency?: string | null;
             /**
              * Format: date
-             * @description Earliest FX rate date covering the window; bars before it are unconverted (native baseCurrency). Null when no conversion was applied (plan §48.2)
+             * @description Earliest FX rate date covering the window. §72.17 SUPERSEDES the old rule this field documented: a bar that cannot be converted is **absent from the response**, not passed through in the native baseCurrency. So when a conversion was requested this is the first row of the returned series, and the series may be shorter than the requested window. Do not reimplement the pre-§72.17 behaviour — a base-currency price under a target-currency label is how a portfolio read 85 PLN one day and ~400 the next. Null when no conversion was applied.
              */
             fxFrom?: string | null;
+            /** @description Dates in the REQUESTED window that were dropped because no FX rate existed for the pair (§72.10). Present only when ?currency= asked for a conversion; empty when nothing was dropped, absent when no conversion was applied. A caller can therefore tell a short series from a truncated one instead of inferring it — the gaps are scattered as well as prefixed, so `fxFrom` alone cannot express them. */
+            unconvertedDates?: string[];
         };
         SearchResult: {
             symbol?: string;
@@ -2769,9 +2810,11 @@ export interface components {
             baseCurrency?: string | null;
             /**
              * Format: date
-             * @description Earliest FX rate date covering the window; bars before it are unconverted (native baseCurrency). Null when no conversion was applied (plan §48.2)
+             * @description Earliest FX rate date covering the window. §72.17 SUPERSEDES the old rule this field documented: a bar that cannot be converted is **absent from the response**, not passed through in the native baseCurrency. So when a conversion was requested this is the first row of the returned series, and the series may be shorter than the requested window. Do not reimplement the pre-§72.17 behaviour — a base-currency price under a target-currency label is how a portfolio read 85 PLN one day and ~400 the next. Null when no conversion was applied.
              */
             fxFrom?: string | null;
+            /** @description Dates in the REQUESTED window whose bars were dropped because no FX rate existed for the pair (§72.10). Present only when ?currency= asked for a conversion; empty when nothing was dropped, absent when no conversion was applied. Lets a caller distinguish a short series from a truncated one instead of inferring it — the dropped bars are scattered as well as prefixed, so `fxFrom` alone cannot express them. */
+            unconvertedDates?: string[];
             dates: string[];
             closes: number[];
         };
@@ -4049,6 +4092,42 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    refresh: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefreshRequest"];
+            };
+        };
+        responses: {
+            /** @description Refreshed — a new access_token for the same user */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthResponse"];
+                };
+            };
+            /**
+             * @description No refresh session for this token, or the token failed signature /
+             *     issuer / audience verification. The client must re-authenticate.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
             };
         };
     };
