@@ -2117,10 +2117,41 @@ per symbol** — the space was reused.
 of concurrent provider walks**, and the peak is reused after the burst rather
 than re-grown. Roughly 5.4 MiB per concurrent provider walk × the burst width.
 
-**So §73 is not a leak, and that is why every leak-shaped fix failed.** Nothing
-retains a reference; the process simply holds the largest burst it has ever
-served. The OOMKill is **peak-vs-limit under burst width**, and the two obvious
-leak remedies are both irrelevant to it.
+**The clean experiment that settles it — and it overturned my own reading above.**
+Every figure so far came from batches that started at *different* RSS, so
+"+84.5 MiB for 16 symbols" and "0.0 MiB per symbol" were never comparable
+numbers. Measured from a genuinely cold pod (scaled 0 then 1, no traffic):
+
+```
+cold floor, 46s uptime, no traffic     rss 375.9 MiB   traced 1.61 MiB
+one cold /equity/logo NVDA            dRSS   +0.3 MiB
+another cold /equity/logo ADBE        dRSS   +0.0 MiB
+```
+
+**A single successful provider walk costs ~0.3 MiB, and the next one is free.** So
+the +84.5 MiB batch was never "5.4 MiB per symbol". What that batch had that
+these do not: **12 of 15 requests returned 200 — three failed**, and a failure
+walks the *entire* provider chain (`PROFILE_PROVIDERS` / `SEARCH_PROVIDERS`
+fallbacks) before giving up. That is the most expensive path in the service and
+it allocates the most before returning nothing.
+
+**So the mechanism, stated properly: the peak is the FAILED multi-provider walk,
+paid once per newly-unresolvable symbol.** The negative cache
+(`_NEGATIVE_SENTINEL`, `NEGATIVE_TTL = 6h`, `main.py:71-75`) stops the *second*
+sight for six hours — it does nothing for the first, and a per-symbol sweep meets
+a *new* unknown ticker every time, so each one pays the full chain once and the
+arena keeps the resulting high-water.
+
+This also explains §73.1's own observation, which three passes had treated as
+suspicious correlation. Both pods died walking `CREC.PS`, `CREO.L`, `CRES.BA`,
+`CREX`, `CRET.ST` — obscure listings that resolve on no provider at all. The
+correlated path was not "logos" and not "search"; it was **failing to resolve
+anything**.
+
+**Nothing here is a leak, and that is why every leak-shaped fix failed.** No
+reference is retained; the process holds the largest *failed* walk it has ever
+served. The OOMKill is peak-vs-limit, and both obvious leak remedies
+(`malloc_trim`, memo bounds) are irrelevant to it.
 
 **The cross-finding worth acting on — §63.9 made this worse, deliberately.**
 §63.9's fix raised cachest's `fetch_max_wait` so a queue would "absorb a whole
@@ -2156,13 +2187,19 @@ and the shape is unchanged.
 
 **What would actually bound it**, in descending order of honesty:
 
-1. **Bound the burst width openst is asked to serve.** This is the mechanism
-   §73.4 measured: peak ≈ 5.4 MiB × concurrent provider walks. `cachest` already
-   declares `UPSTREAM_MAX_INFLIGHT = 8`, and §63.9 deliberately widened how much
-   cachest will have queued. A cap on openst's own in-flight provider walks would
-   bound the peak without touching the sweep's completeness — the sweep gets
-   slower, not wrong. **This is the real fix and it belongs in openst**
-   (`UPSTREAM_MAX_INFLIGHT` is already a constant there).
+1. **Stop walking the whole provider chain for symbols that cannot resolve.**
+   This is the mechanism §73.4 landed on: a successful walk is ~0.3 MiB and
+   free thereafter, while a *failing* walk allocates the most and is paid once
+   per newly-unresolvable symbol. The negative cache already exists and already
+   covers this route — it just does not help on first contact, which is the only
+   contact a per-symbol sweep ever has. The fix is to make "cannot resolve" a
+   **cheap** answer rather than an expensive one: check the local ticker
+   reference / bond catalogue before falling through to a provider chain, and
+   lengthen the negative TTL for the symbol shapes a sweep produces. **This is
+   the real fix and it belongs in openst.**
+   > Note: `UPSTREAM_MAX_INFLIGHT = 8` (`main.py:81`) already bounds the width,
+   > so "bound the burst" is **not available as a new change** — the bound
+   > exists and has existed since the 2026-09-20 OOM.
 2. **Reclaim the peak between bursts.** `malloc_trim` was measured and
    **rejected** — no effect on the burst number (§73.4). Recording the negative
    result so it is not re-attempted.
