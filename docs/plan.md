@@ -694,30 +694,41 @@ The real fix for those 50 rows is the one §28.6/§66.2 already identified — a
 country source for bonds/funds/crypto. Cross-repo, out of scope, and not to be
 slipped in here.
 
-#### Open: locating the 37/50 bare news badges
+#### Resolved: the 37/50 bare news badges were a captioning bug, not missing data
 
-`getPortfolioSymbols` fans out over `positions … is_open = true`, yet the news
-cards carry tickers absent from the portfolio's 69 positions. One SQL result
-decides whether the SPA or instruments owns it:
+I first assumed the news endpoint was not filtering by ticker and went looking for
+a SQL query to prove it. **No query was needed** — the bug was in two layers of
+code, and I found the second one only because the first fix changed nothing.
 
-```sql
-SELECT symbol, is_open, quantity, country, asset_type FROM positions
-WHERE portfolio_id = '47452a2a-0456-4512-9044-fa1c86ce5890'   -- IKE Beata
-  AND UPPER(symbol) IN ('MSFT','AAPL','META','QQQ','NVDA','AMZN','AVGO','RSP','IBM','CAT')
-ORDER BY symbol, is_open;
+`instruments.news_articles.symbols` is a **`text[]`**, because one article can
+cover several companies, and `getNewsForTicker` filters with
+`arrayContains(symbols, [ticker])` — so every row returned is *guaranteed* to
+contain the ticker that was asked for. Both layers then threw that away:
 
-SELECT DISTINCT symbol FROM positions
-WHERE portfolio_id = '47452a2a-0456-4512-9044-fa1c86ce5890' AND is_open = true
-ORDER BY symbol LIMIT 60;
-```
+| Layer | Was | Now |
+|---|---|---|
+| `instruments/src/adapters/translate.ts:1055` | `row.symbols[0] ?? fallbackTicker` | `fallbackTicker ?? row.symbols[0]` — `8a1e650` → `v1.0.84` |
+| `wallets/src/services/portfolioNews.ts:147` | `ticker: r.symbols[0]`, after `fetchTickerNews` had already **rebuilt** `symbols` from the response's single `ticker` | `ticker: r.requestedTicker`; `fetchTickerNews` stops discarding the article's real `symbols` — `a64d8ce` → `v1.1.103` |
 
-- present with `is_open = true` → the backend is right and the SPA's
-  `positionBySymbol` map is incomplete → fix in `PortfolioNewsTab.vue`;
-- absent → instruments' `/api/news/articles?ticker=` is not filtering, and the
-  backend cannot be fanning out for tickers it does not hold → fix in instruments.
+`getPortfolioNews` fans out one request per held symbol, so it already knew which
+holding each article was fetched for. The effect: a portfolio holding NVDA was
+shown cards captioned **MSFT, AAPL, META, QQQ** — companies it does not own — and
+`TickerBadge` then enriched from open positions, found no match, and degraded to a
+bare symbol. `PortfolioNewsTab.vue`'s comment that an unheld ticker is *"rare"*
+was measuring its own bug: **37 of 50**, and the real number was 0.
 
-Also worth fixing either way: the `PortfolioNewsTab.vue:19-21` comment asserts a
-behaviour that is measurably false, which is how this stayed hidden.
+Verified in PROD on IKE Beata: distinct tickers went from 25 (23 of them unheld)
+to **2, both held**; bare badges **37 → 0**; badges carrying a `(CC)` **13 → 50**.
+
+**Two honest caveats.**
+1. The instruments half is **not independently proven in PROD**. The admin System
+   page reports the Deployment's *desired* image, not the running pod, and the
+   plan already records an RWO logos-PVC multi-attach stall for this exact
+   service. The wallets fix masks the instruments half either way, so
+   "instruments v1.0.84 is serving" is an assumption, not a measurement.
+2. The fix landed in wallets *second*, after v1.0.84 produced byte-identical
+   output. Treating that version string as proof of rollout is what made me
+   briefly believe the fix had failed. A version string is not a working service.
 
 ---
 
