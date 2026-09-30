@@ -161,10 +161,16 @@ quotes — §63.5 is gated on reproducing the bad symbol's provider response.
 > headline to the stored chart point, which is the comparison a user is making
 > when they add the cards up.
 
-- [ ] `portfoliost-wallets`: **one writer per (portfolio, date)** — done by §76.4,
+- [x] `portfoliost-wallets`: **one writer per (portfolio, date)** — done by §76.4,
       and enforced rather than ordered: `computeSnapshotBatch` owns every date
       including today, and `snapshotPortfolioValue` no longer persists
       (`quotes.ts:481-580`).
+      > Verified against the source 2026-09-30: the only writers of
+      > `value_snapshots` are `backfill.ts:1021` (`_runBackfillCore`) and
+      > `:1071` (`recalcPortfolioHistory`); `snapshotPortfolioValue`
+      > (`quotes.ts:481-580`) returns a value and ends without an insert. The box
+      > disagreed with its own note, which is the drift this sweep has been
+      > removing everywhere else.
 - [x] `portfoliost-wallets`: headline `totalValue` and `value_snapshots` derive
   position value from the **same** price source, and never present cost as value.
   > Not satisfied by *sharing* `splitPortfolioValue` — the backfill has its own
@@ -172,11 +178,39 @@ quotes — §63.5 is gated on reproducing the bad symbol's provider response.
   > `backfill.test.ts:1102`. The intent (never a cost value, one answer) is met;
   > the mechanism (one function) is not, and §68's rule is explicit that the
   > mechanism is the point. Carried below as its own item.
-- [ ] **`splitPortfolioValue` is actually shared by the backfill.** Move
-      `backfill.ts:961-972` onto it so there is one arithmetic, not two that
-      currently agree. `computeSnapshotBatch` is synchronous-per-day and
-      `splitPortfolioValue` is async (`toBase` awaits a rate per row), so this
-      needs a batched/hoisted rate map rather than a naive call per day.
+- [x] **One composition rule for both valuation paths.** Wallets `f1b303e`:
+      `composePortfolioValue` in `valuation.ts`, called by `splitPortfolioValue`
+      and by `computeSnapshotBatch`.
+      > **The item as written below was not achievable, and the reason is worth
+      > keeping.** It said "make the backfill call `splitPortfolioValue`". It
+      > cannot: the live path receives a market value in each position's **own
+      > instrument currency** and converts it per row, while `computeSnapshotBatch`
+      > receives closes that `fetchPriceSeries` has **already converted into the
+      > portfolio's base** (§48.3). It has no instrument currency to convert and no
+      > market value per day, so collapsing the two would have meant re-deriving
+      > one path's inputs inside the other.
+      >
+      > **What was genuinely duplicated is everything *after* a per-row number
+      > exists**, and that is now one function: a held-but-unpriced row
+      > contributes 0 and is counted (§70), `totalValue` is the sum by
+      > construction (§68), and cash is added last and never clamped (§62 — a
+      > margin account nets negative). Three rules, written twice, free to drift.
+      > The backfill's version of the first was a bare `continue`, which produced
+      > the same number with no way to say why.
+      >
+      > Two things deliberately **not** done, commented at the call site:
+      > `splitPortfolioValue` is not imported into `backfill.ts` (an
+      > unused-looking import of the obvious function invites the wrong refactor),
+      > and the shared call's `unpricedPositions` is not used for the abort guard
+      > (§72.31 separated `unpricedLastDay` for exactly that reason — folding
+      > mid-window gaps into `isUnpriceable` made a healthy portfolio look
+      > unpriceable and would have destroyed bond-heavy history).
+      >
+      > 6 new tests state the rule directly, including that it does not round
+      > (§53.6 asserts 7dp agreement, and rounding in here broke it once). The
+      > existing `backfill.test.ts:1102` equivalence test is untouched and still
+      > passes — it is the end-to-end statement the unit tests cannot make.
+      > 506 green.
 - [x] `portfolios.current_value` is refreshed from positions + cash on recompute.
   > `backfill.ts:1036`, `:1119`, `:1194` call `syncCurrentValueFromSnapshots` after
   > the batch writes, and the twice-daily `snapshotsync` cron runs
@@ -221,10 +255,12 @@ quotes — §63.5 is gated on reproducing the bad symbol's provider response.
       substituted. Ticked so it stops reading as outstanding; the rationale is
       > the note, the state is the box.
 - [x] Tests: `npm run build`, full `vitest` green.
-      > 500 green, build clean.
-- [ ] Commit.
-      > The test commit is in (`08cb96b`); this box stays open because the item
-      > above it — sharing `splitPortfolioValue` — is real work in the same repo.
+      > 506 green, build clean.
+- [x] Commit.
+      > `08cb96b` (dead import, false comments, the headline-vs-chart tests) and
+      > `f1b303e` (`composePortfolioValue`). **§63.2 is now closed** — every box
+      > either shipped or is struck as unachievable-as-written, with the reason
+      > recorded. It can go to `plan-archive.md` on the next closeout sweep.
 
 ### 63.3 — Wallets: cash included in consolidated + per-portfolio performance series
 
