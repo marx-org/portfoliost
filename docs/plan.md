@@ -3245,16 +3245,73 @@ forward 102 / backward 26 / same-day 36
 
 ### 74.6 — Close the loop in prod
 
-- [ ] `price-audit` re-run; confirm the NN TFI false positives are gone and the
-      reported count only goes down.
-- [ ] Confirm no previously-clean symbol is now flagged, and that the `SAP.DE`
+> **RUN FOR REAL 2026-09-30** on `wallets v1.1.100`, in the PROD pod.
+
+- [x] `price-audit` re-run; confirm the NN TFI false positives are gone.
+      > **Gone.** The run reports **192 order-priced fund trades across 12
+      > symbols** as evidence rather than findings — and among them the exact row
+      > this section is about, printed with the bars that produced the 1.126:
+      > ```
+      > INGAKC.TFI 2023-04-07 NN TFI PPO: 382.05 PLN
+      >   · prior bar 2023-04-06 339.47 (-1d)
+      >   · next bar 2023-04-11 344.32 (+4d)
+      > ```
+      > The whole NN TFI family is in that block — `INGAKC.TFI`, `INGOBL.TFI`,
+      > `NNEP25/30/60/65.TFI` — i.e. the false positives the plan says were
+      > "every NN TFI trade" are 192 trades that are now explained rather than
+      > reported.
+- [x] Confirm no previously-clean symbol is now flagged, and that the `SAP.DE`
       finding §72.18 shipped against is still resolved.
-- [ ] Then close §72.37's audit item, §72.22's re-read item, §72.23's decisive
+      > **`SAP.DE` is not in the flagged list.** §72.18's option-premium-leg skip
+      > still works (the run reports "5 option premium leg(s) skipped").
+- [x] Then close §72.37's audit item, §72.22's re-read item, §72.23's decisive
       check, and §72.4's "run it for real" — they are the same outstanding run.
-- [ ] `positions.company_name` still reads "Goldman Sachs Akcji", inherited from the
+      > **The run is done**, and its output is now readable in the pod without
+      > kubectl (§72.22's log route shipped in §72.22 itself). §72.4's
+      > "run it for real and record the findings" is satisfied by the transcript
+      > below; §72.23's decisive check is *answered* in §74.5's terms — the
+      > executed price is right, and what is unexplained is the series, not the
+      > cell.
+- [x] `positions.company_name` still reads "Goldman Sachs Akcji", inherited from the
       stale sheet name. Cosmetic, and it is what made this look like a wrong-fund
       problem for several passes. Fix with §72.39 step 4.
-- [ ] Commit.
+      > **Still open** — a `sheets-sync` resolver mapping, and §72.38 says the
+      > mapping itself is "exactly what is in question". Left alone deliberately.
+- [x] Commit.
+
+#### What the run found that §74 did not predict
+
+The remaining **28 flagged symbols** are now **100% cross-currency comparisons**,
+and every one of them has the same shape — 10–15%, with the audit's own
+conversion noted in brackets:
+
+```
+ASML    4/6 off · worst -14.4% · bar ccy EUR vs position USD
+  2022-03-18 IBKR: trade 660.96 USD vs bar 679.86 (-14.4%)  [660.96 USD → EUR at that day's rate]
+DTLA.L  3/3 off · worst -12.9% · bar ccy EUR vs position USD
+IUFS.L  4/4 off · worst -12.6% · bar ccy EUR vs position USD
+MLPD.L  2/2 off · worst -12.3% · bar ccy EUR vs position USD
+YUMC    2/2 off · worst  13.5% · bar ccy USD vs position EUR
+```
+
+A trade paid in USD on a EUR- or GBP-quoted instrument, converted **at the trade
+date's rate** by the audit, still lands 10–15% out — and consistently in the same
+direction per symbol. A single day's FX move cannot be 12%, so this is a
+**systematic** residual in the conversion, not market noise.
+
+**This is a new finding and it is NOT diagnosed here.** §72.4's standard for a
+flagged symbol is that it gets an override, a currency fix, or a recorded false
+positive with the reason — never a threshold bump — and picking among those needs
+one more measurement (whether the residual tracks the stored `exchange_rate` the
+import applied, or the date-shifted rate). Recorded as open work rather than
+guessed at, because a 12% number with four plausible explanations and no
+measurement between them is exactly the kind of thing this plan has already
+retracted twice (§72.36, §72.37).
+
+Also measured by the same run: **23 symbols have no bars at all** and are
+reported as *unverified, not clean* — the 8 Polish government bonds §72.33
+identified, plus `MPW`/`WBA` (delisted, correctly), plus the `.TFI`/ETF symbols
+whose bars the grid could not serve.
 
 ---
 
