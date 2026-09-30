@@ -384,6 +384,61 @@ that appeared and re-appeared over the day.
     path vs backfill gap with identical inputs, i.e. §63.2's own subject, now
     isolated from §63.8. Fix this one; it is the reason a headline never matches
     its own cards.
+  - **2026-09-30 — the premise is already satisfied; the residual is freshness,
+    not two paths.** Checked before writing code, and the "two valuation paths"
+    framing does not survive contact with the source:
+    - **One arithmetic.** §68 already moved positions→value into the shared
+      `splitPortfolioValue`, which *both* `snapshotPortfolioValue` (live) and the
+      backfill use. `backfill.test.ts:835` asserts
+      `snapshotPortfolioValue equals computeSnapshotBatch for the same day`
+      (USD lot + PLN lot, base PLN, a legacy-`EUR`-denominated stored lot) — and
+      **it passes.** §63.2's stated goal is met and pinned by a test.
+    - **One writer per instant.** A recompute ends with `refreshQuotesUnlocked`
+      → `syncCurrentValueFromSnapshots` (`backfill.ts:1113-1119`), so the stored
+      column is written *by the live path*, not by a rival backfill. The live
+      quote is deliberately last.
+    - **So the card and the headline are one valuation taken at two different
+      times.** The card is `Number(p.currentValue)` — the stored column. The
+      headline is computed from positions on read. Nothing reconciles them
+      because nothing should: they were priced minutes or hours apart.
+    - **And that gap is a decision, already taken and documented.** `D58` removed
+      `await refreshQuotes(...)` from the portfolio-open read path on purpose —
+      "every portfolio open paid two instruments calls per open position … on a
+      page the user may open repeatedly, to move a number by a few percent"
+      (`portfolios.ts:860-872`). `current_value` therefore refreshes only on the
+      **13:00 / 17:20 crons**, on **transaction mutations**, and on **rebuilds**.
+      The same comment already applies §70's rule to the surrounding numbers:
+      *"label it, do not fabricate it."*
+  - **Consistent with §63.3's PROD measurement** (2026-09-30): stored card sum
+    1,060,929.73 vs live headline 1,065,780.10 = **+4,850.37**, spread over **6**
+    portfolios, with **4 at exactly 0.00**. A time gap predicts exactly that
+    shape — portfolios that did not move match perfectly; portfolios that moved
+    differ by roughly their move. It does not match a *logic* gap, which would
+    not leave four portfolios bit-exact.
+  - **Not yet proven, and this is the one thing worth proving before changing
+    code.** The discriminating test: recompute a portfolio (which re-prices the
+    stored column from the live path at that instant), then read the card and the
+    headline back to back. Time gap → delta **0.00**. Logic gap → a non-zero
+    delta that survives. I cannot run it: the PROD session expired and
+    `kubectl` is unreachable, and both the recompute trigger and the read need
+    one of them. **Blocked on the user** — see "Blocked on the user" above.
+  - **If the test confirms a time gap, the choice is a product one, not a bug
+    fix**, and it is the user's:
+    - **(a) Label.** Carry the snapshot's date onto the card so the two numbers
+      are reconcilable. Nearly free: `syncCurrentValueFromSnapshots` already
+      selects the row it orders by `desc(snapshotDate)` and **throws the date
+      away**; `portfolios` has no value-as-of column (`price_as_of` is on
+      positions). Needs one column + list-route field + card label. Consistent
+      with §70 and with D58's reasoning, but it *explains* the mismatch rather
+      than removing it.
+    - **(b) Make them match.** Price cards live on read — the thing D58 removed
+      for cost — or freeze the headline to the stored snapshot, which gives up
+      the live value the app exists to show. Neither is free, and (b) reverses a
+      deliberate decision.
+    - I lean **(a)**: the numbers legitimately are two instants, and a stale card
+      that says when it is stale is better than an expensive card that is
+      briefly fresher. But this changes what the user sees, so it is not mine to
+    decide unasked.
 
 ### 63.8 — Data-gap handling: fill/repair price history + surface incomplete backfills + gray-out during recompute (2026-09-27)
 
