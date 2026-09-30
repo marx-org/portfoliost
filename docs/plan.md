@@ -706,8 +706,36 @@ openst overflow rows.
     POST /recompute on IKE Marek + IKE Beata → `backfillStatus: complete`; snapshot series now sane
     (IKE Marek max £75,521 / latest 69,220 vs the pre-fix ~2.3M artifact; IKE Beata max £157,254 /
     latest 155,635; 1,796–1,800 daily snapshots each through 2026-09-25).
-- [ ] Add a sanity guard: an extreme quote-vs-last-close jump (≳10×) on the overflow write
+- [x] Add a sanity guard: an extreme quote-vs-last-close jump (≳10×) on the overflow write
   flags/logs instead of silently valuing 70×.
+  > **DONE 2026-09-30** (instruments `40fd821`, **v1.0.81** deployed, homelab
+  > `723bb43d0`). This landed in **instruments**, not openst: the guard belongs on
+  > the *write*, and `upsertOverflowBars` is the only place a 100x bar can enter
+  > `price_bars`. `classifyJump(prev, close)` refuses anything ≥10x or ≤0.1x and
+  > returns the jump with its ratio; the write is skipped, so the bar becomes a
+  > gap the existing gap-detection already reports.
+  > **Splits are exempt, and the threshold is 10x for that reason.** Only
+  > 1:10, 1:20, 10:1 and 20:1 land inside the band — every other factor is
+  > under 10x, so a 2x threshold would have to classify a 1:4 split as a defect.
+  > A jump with a known split factor is written and left for
+  > `checkSplitBoundary`.
+  > A refused bar sets a new `price_bar_metadata.fetch_status` of
+  > **`sanity_failed`**, not `ok`: the fetch half-succeeded and every downstream
+  > reader takes `ok` as "priced". `recentlyFailed()` now cools down on *any*
+  > non-`ok` status, so one bad symbol cannot re-fetch its whole history on every
+  > sweep. That also fixes a latent hole — a brand-new symbol with no metadata
+  > row previously bypassed the breaker entirely.
+  > **Verified in PROD against the deployed image** (instruments v1.0.81, via
+  > its own `dist/services/price-bars.js`), scratch symbol, deleted afterwards
+  > (0 rows left):
+  > ```
+  > 1) first write, no prior close:            {"written":1,"rejected":[]}
+  > 2) a 1.7% move:                            {"written":1,"rejected":[]}
+  > 3) the §63.5 pence overflow 8.34 -> 834:  {"written":0,"rejected":[{"d":"2026-01-04","ratio":100,"split":null}]}
+  > 4) a real 1:10 forward split 8.34 -> 0.834:{"written":1,"rejected":[]}
+  > ```
+  > And zero false positives on four live symbols (`SAP.DE`, `VRC.WA`, `AMZN`,
+  > `NTO.F` all returned their full series, nothing refused).
 - [x] Tests: openst suite green; fixed symbols' price_bars match the GBP quote.
 - [x] GATE: this step fixes the *data*; §63.1–63.4 fix the *pipeline*. "Chart == true value" is not
   achievable until this ships.
