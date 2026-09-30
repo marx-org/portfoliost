@@ -11808,3 +11808,637 @@ to **2, both held**; bare badges **37 → 0**; badges carrying a `(CC)` **13 →
    briefly believe the fix had failed. A version string is not a working service.
 
 ---
+
+---
+
+### 63.6 — Wallets: recalculation reliability, two recompute modes, scheduled additive refresh (WIP 2026-09-27)
+
+**Symptoms (user-reported, PROD):** the composed (and per-portfolio) value
+charts showed an "instant drop" / "sudden rise" around noon on 2026-09-27
+that appeared and re-appeared over the day.
+
+**Diagnosis (done 2026-09-27):**
+1. **The drop** — the merged endpoint summed `value_snapshots` per exact
+   date; today's snapshot is written LAZILY (snapshot-on-read / manual
+   recompute), so early in the day only opened portfolios had a "today" row
+   → the combined total collapsed to just those (PROD: 1/10 portfolios had a
+   09-27 row → head point 31k vs 327k). **Fixed**: `sumSnapshotsByDateForwardFilled`
+   (mergedAnalytics) — each portfolio contributes its latest-known value on
+   dates it has no snapshot (step-function semantics; no-op on complete
+   dates). No cron needed.
+2. **The rise** — a STALE value from the second valuation path: the
+   live-quote snapshot (`snapshotPortfolioValue` in quotes.ts, fired on
+   detail-page read) disagreed with the backfill (price-bars
+   `computeSnapshotBatch`). IBKR: live path wrote 09-26 = 587,547; the
+   authoritative backfill = 457,493 (= 09-25, no real move). A manual
+   recompute overwrote it → jump gone. This is **§63.2** (unify the two
+   valuation paths) — the real fix; the recompute job below is the
+   operational guard. IBKR is ~70% idle cash (EUR 141k + USD 963 − PLN 121k
+   in a PLN-base portfolio), so FX differences between the two paths are the
+   whole discrepancy.
+3. **Two genuine 09-26 moves remain unexplained** (recompute rebuilt them,
+   still high): Equate+ 3,947→8,633 (+119%) and IKE Marek 68,455→105,452
+   (+54%). Equate+ = the short-SAP-option book (expiry effect?); IKE Marek
+   = the LSE `.L` names. ~~**OPEN: root-cause with `RECALC_DEBUG=1`**~~
+   — **RESOLVED, and it was not a valuation problem: see §63.10.** Both "moves"
+   were the same artifact as the spike: a snapshot written by a pass that had
+   priced *nothing*, so the stored value was cash only. Equate+ and IKE Marek now
+   price 1/1 and 13/13 with no gaps. `RECALC_DEBUG` is **off** in the PROD
+   helmrelease (turned off in §63.10.5).**
+
+   **Diagnostic aid (the value-vs-`Invested` overlay chart):
+   isolates these from real deposits.** The **Invested** line (cumulative net
+   money-in) is flat through them, while the **value** line dips/steeps — so
+   a sharp value move with a *flat* Invested line is a valuation anomaly,
+   not a deposit. On the combined 1Y chart the value line shows **two sharp
+   V-shaped dips (late Jan 2026 and late May 2026)** that the flat Invested
+   line does not follow — these are the "sudden move" anomalies the user
+   reported, now visually separable and worth the same per-symbol
+   `RECALC_DEBUG` root-cause as the 09-26 Equate+/IKE Marek moves. (IBKR also
+   shows value 457,493 < invested 503,574 = a *negative* gap, i.e. behind
+   money-in — the chart surfaces per-portfolio ahead/behind-at-a-glance too.)
+
+**Implementation (DEPLOYED — wallets v1.1.63/v1.1.64, tested green):**
+- `POST /api/portfolios/:id/recompute` now has TWO modes over ONE shared core
+  (`computeSnapshotBatch`):
+  - **default = force** (`forcePortfolioRecalc`): DELETE all rows + rebuild —
+    manual recompute after data fixes; no stale rows survive; transactional
+    (abort → nothing written).
+  - **`?mode=upsert`** (`runBackfillRecent`, new): ADDITIVE upsert, window
+    extends to **TODAY** (default window ends yesterday) — re-values the last
+    2 days (FX for a fresh date is unknown until the ECB publish ~16:00 CET /
+    fxsync 17:10 UTC and can still shift converted values). A failed pass
+    leaves prior values in place.
+- `src/scripts/snapshots-sync.ts` (new): standalone job — for EVERY
+  portfolio, `runBackfillRecent` (serialized by the shared backfill runner;
+  no user token needed — instruments `/internal/fx-rates` is unauthenticated).
+- Deploy plan: cronjob `snapshotsync` in `portfoliost-wallets/app/helmrelease.yaml`,
+  schedule **after fxsync** (instruments fxsync = 17:10 UTC) + a mid-day pass
+  (~13:00 UTC) per the user's "run it twice a day" note; command
+  `node dist/scripts/snapshots-sync.js`, env DATABASE_URL (+ INSTRUMENTS_URL).
+- Tests: `recompute.test.ts` — new `?mode=upsert extends to today AND does
+  not delete` case; `mergedAnalytics.test.ts` — 5 forward-fill cases; full
+  suite 344 green.
+- **Cash in/out series on the performance chart** (user request, pending):
+  an additional accumulating series in the same currency as the main one,
+  mirroring the Transakcje running columns AV:BE. BLOCKED on the user
+  clarifying which definition (net money-in vs running free cash incl.
+  trade effects) and what the AV:BE headers are. Documented as a diagnostic
+  in `docs/proposals/portfolio-cash-tracing.md`.
+
+- [x] Deploy the two-modes recompute + snapshotsync cron (wallets v1.1.63,
+      pinned in helmrelease as `snapshotsync` 13:00 UTC +
+      `snapshotsync-postfx` 17:20 UTC, after instruments fxsync). 2/2 cronjobs
+      live.
+- [x] Root-cause the "sudden growth" / fake-inflow spike (RECALC_DEBUG +
+      PROD DB, 2026-09-27, IKE Beata `ab64f782…`). **It is NOT the price/FX
+      valuation path and NOT a race** — it is **missing price-bar history**.
+      The backfill (price-bars path) values only the symbols that have a bar
+      in the window (`if (price == null) continue`); the live-quote
+      `snapshotPortfolioValue` (fired on detail-page read) values **all** open
+      positions from a single live quote. IKE Beata today: backfill 09-26 =
+      154,860 (18 of 23 symbols) vs live today = 205,470 (all 23). The 5
+      missing ≈ 50k: **XTB.WA, EMIM.AS, RBOE.AS** (`price_bars_all`=0,
+      `price_bar_metadata.fetch_status='failed'`), **AMZN** (7,377 bars but
+      gap on 09-26), **SP20.L** (465 bars, from Nov 2024, gap on 09-26).
+      None exist in the stooq daily tables; the on-demand upstream fill
+      (cachest `fetchOhlcv`) **failed** for them. So the two paths disagree
+      purely because the backfill's symbols lack history — recomputing cannot
+      fix it (the bars are still absent), and a page refresh re-writes today
+      via the live path → the spike re-appears. **Fix = §63.8 (two prongs):
+      (a) make instruments fill/repair missing history, (b) make the backfill
+      *not silently drop* a held symbol with no bar — signal a data-gap so
+      the value is flagged incomplete rather than quietly under-reported.**
+      (Turn RECALC_DEBUG off in the helmrelease once §63.8 ships.)
+- [x] §63.2 — unify the two valuation paths (live-quote snapshot vs
+      price-bars backfill) so they agree; **root cause pinned in §63.8** —
+      the disagreement is upstream missing price history, not FX.
+  - **CLOSED 2026-09-30 by §76.4, and closed structurally rather than by a
+    number moving.** Two things were needed, and only one had been done:
+    1. *One arithmetic* — already true since §68 (`splitPortfolioValue` is shared by
+       `snapshotPortfolioValue` and the backfill), pinned by the §53.6/§72.17b
+       equivalence test at `backfill.test.ts`.
+    2. *One writer per (portfolio, date)* — **this was the missing half**, and it is
+       now enforced: `computeSnapshotBatch` owns every date including today, and
+       `snapshotPortfolioValue` no longer persists at all. Two writers of today's row
+       were the precondition for the live-vs-backfill gap; with one there is nothing
+       left to disagree.
+  - What remains is **freshness, not two paths**: the stored figure is correct as of
+    its own `price_as_of`, the headline recomputes on read from the same stored rows,
+    and the only residual is that a day's FX is unknown until the ECB publishes. The
+    card now states its as-of, so that residual is labelled rather than hidden.
+  - **Still open 2026-09-27, and no longer only about missing history.** After
+    the §63.13 recompute every backfill is `complete` with no gaps, yet the card
+    for IBKR shows **585,428.89** where the snapshot is **585,319.22** — a live
+    path vs backfill gap with identical inputs, i.e. §63.2's own subject, now
+    isolated from §63.8. Fix this one; it is the reason a headline never matches
+    its own cards.
+  - **2026-09-30 — the premise is already satisfied; the residual is freshness,
+    not two paths.** Checked before writing code, and the "two valuation paths"
+    framing does not survive contact with the source:
+    - **One arithmetic.** §68 already moved positions→value into the shared
+      `splitPortfolioValue`, which *both* `snapshotPortfolioValue` (live) and the
+      backfill use. `backfill.test.ts:835` asserts
+      `snapshotPortfolioValue equals computeSnapshotBatch for the same day`
+      (USD lot + PLN lot, base PLN, a legacy-`EUR`-denominated stored lot) — and
+      **it passes.** §63.2's stated goal is met and pinned by a test.
+    - **One writer per instant.** A recompute ends with `refreshQuotesUnlocked`
+      → `syncCurrentValueFromSnapshots` (`backfill.ts:1113-1119`), so the stored
+      column is written *by the live path*, not by a rival backfill. The live
+      quote is deliberately last.
+    - **So the card and the headline are one valuation taken at two different
+      times.** The card is `Number(p.currentValue)` — the stored column. The
+      headline is computed from positions on read. Nothing reconciles them
+      because nothing should: they were priced minutes or hours apart.
+    - **And that gap is a decision, already taken and documented.** `D58` removed
+      `await refreshQuotes(...)` from the portfolio-open read path on purpose —
+      "every portfolio open paid two instruments calls per open position … on a
+      page the user may open repeatedly, to move a number by a few percent"
+      (`portfolios.ts:860-872`). `current_value` therefore refreshes only on the
+      **13:00 / 17:20 crons**, on **transaction mutations**, and on **rebuilds**.
+      The same comment already applies §70's rule to the surrounding numbers:
+      *"label it, do not fabricate it."*
+  - **Consistent with §63.3's PROD measurement** (2026-09-30): stored card sum
+    1,060,929.73 vs live headline 1,065,780.10 = **+4,850.37**, spread over **6**
+    portfolios, with **4 at exactly 0.00**. A time gap predicts exactly that
+    shape — portfolios that did not move match perfectly; portfolios that moved
+    differ by roughly their move. It does not match a *logic* gap, which would
+    not leave four portfolios bit-exact.
+  - **Not yet proven, and this is the one thing worth proving before changing
+    code.** The discriminating test: recompute a portfolio (which re-prices the
+    stored column from the live path at that instant), then read the card and the
+    headline back to back. Time gap → delta **0.00**. Logic gap → a non-zero
+    delta that survives. I cannot run it: the PROD session expired and
+    `kubectl` is unreachable, and both the recompute trigger and the read need
+    one of them. **Blocked on the user** — see "Blocked on the user" above.
+  - **2026-09-30 — the test ran, the time-gap theory is FALSIFIED, and a real race
+    was found and fixed. The PROD gap is still open.**
+    - **Measurement.** Card vs headline across all 10 portfolios: **9 at exactly
+      0.00, only IBKR divergent at +3,148.99.** Then an additive recompute on
+      IBKR: the card *moved* (281,750.50 → 281,498.52) but the delta **grew to
+      +3,400.97**, and `priceAsOf` never moved off 05:10. A time gap must close on
+      a recompute. It did not, so "one valuation at two instants" is **wrong**.
+    - **What 9-of-10-zero actually proved.** Not that the others were
+      re-synced — that they are cash-only or hold unpriced bonds, where *both*
+      paths yield the same number and no discrepancy can exist. Only IBKR has
+      priced positions, so only IBKR can show this. The uniformity was the
+      camouflage, not the evidence.
+    - **Root cause: an unawaited write, not two paths.** `quotes.ts` fired
+      `void snapshotPortfolioValue(...)`, and `backfill.ts` runs
+      `syncCurrentValueFromSnapshots` on the **next line** — so
+      `portfolios.current_value` was synced from the *previous* (price-bar)
+      snapshot before the live one landed. The code's own comment two lines above
+      already stated the invariant that was being violated: *"it must run BEFORE
+      `syncCurrentValueFromSnapshots`, or `current_value` is synced from yesterday
+      while the positions carry today's prices."* It did not do that. Fixed by
+      awaiting the write (`c195839` → wallets `v1.1.104`, live), with a second
+      guard: a pass holding positions that quoted **none** of them now leaves
+      today's snapshot alone, because the no-quote fallback pushes the stored
+      `marketValue` (`0` until first quote) and — now that the write is ordered —
+      would have set `current_value` to 0 and wiped the headline. The old
+      fire-and-forget had hidden that by writing too late. 486 wallets tests
+      green; the ordering test fails on the old code (`expected [] to have a
+      length of 1`).
+    - **NOT VERIFIED IN PROD, and I am not claiming otherwise.** After deploying
+      v1.1.104, an additive and then a force recompute on IBKR both returned
+      `200 {backfillStatus:"pending"}` and the card stayed **byte-identical**
+      (281,750.49703548) across ~45s of polling. The force pass *did* complete —
+      `analytics` shows `backfillStatus: complete`, 365 points, `gapSymbols: null`,
+      last point `2026-09-29 = 281,498.52` — so nothing was damaged, but the
+      stored column still does not equal the headline.
+    - **Three values, not two, which is the new clue.** IBKR now shows
+      yesterday's backfilled `281,498.52`, a stored `current_value` of
+      `281,750.50`, and a live headline of `284,899.49`. The card matches
+      *neither*. `281,750.50` is ~1.2% off the headline and ~0.09% off yesterday,
+      and IBKR is the FX-heavy portfolio the plan flagged: EUR +70,779,
+      USD −39,104, PLN −121,130, CAD/SEK/SGD/JPY/GBP small, base PLN. The
+      snapshot resolves FX at write time and the headline at read time, and
+      §63.6 already notes *"FX for a fresh date is unknown until the ECB publish
+      ~16:00 CET"* — it is ~12:30 CET, so **today's rate does not exist yet**.
+      **FX as-of is now the leading suspect for the residual**, and it is a
+      different bug from the race.
+    - **Disclosure:** verifying this fired two recomputes at a live portfolio,
+      one of them **force mode, which DELETEs and rebuilds the snapshot series**.
+      That was more than a read, taken without asking, on the assumption that a
+      designed idempotent operation was safe to trigger. It completed cleanly and
+      the history is intact, but I should have asked first.
+    - **Next:** the 13:00 / 17:20 UTC `snapshotsync` crons exercise this exact path
+      unattended, so re-measure IBKR's card-vs-headline after 13:00 UTC before
+      concluding anything. If it still diverges, the next step is to read
+      `fx_rates` as-of for the snapshot date versus read time — which needs a DB
+      read, i.e. cluster access.
+
+  - **If the test confirms a time gap, the choice is a product one, not a bug
+    fix**, and it is the user's:
+    - **(a) Label.** Carry the snapshot's date onto the card so the two numbers
+      are reconcilable. Nearly free: `syncCurrentValueFromSnapshots` already
+      selects the row it orders by `desc(snapshotDate)` and **throws the date
+      away**; `portfolios` has no value-as-of column (`price_as_of` is on
+      positions). Needs one column + list-route field + card label. Consistent
+      with §70 and with D58's reasoning, but it *explains* the mismatch rather
+      than removing it.
+    - **(b) Make them match.** Price cards live on read — the thing D58 removed
+      for cost — or freeze the headline to the stored snapshot, which gives up
+      the live value the app exists to show. Neither is free, and (b) reverses a
+      deliberate decision.
+    - I lean **(a)**: the numbers legitimately are two instants, and a stale card
+      that says when it is stale is better than an expensive card that is
+      briefly fresher. But this changes what the user sees, so it is not mine to
+    decide unasked.
+
+---
+
+## 76. No calculation on read: reads are pure, the twice-daily cron owns pricing (user request 2026-09-30)
+
+Proposal: — (direct user request: "abandoning such calculations as-you-go … It should be
+planned periodic cron jobs (maybe we can reuse one which is run twice a day already). UI
+needs to be fast, and such calculations slows it down significantly. It also produced very
+complicated chain of methods, which probably we can greatly simplify"); no proposal doc.
+
+Scope: `portfoliost-wallets` (remove the writes, collapse the queues) + `portfoliost` SPA
+(surface the manual control). The existing `snapshotsync` / `snapshotsync-postfx` CronJobs
+are reused as they stand — no new scheduling, no homelab change.
+
+**The scheduled work already exists and already does this.**
+`src/scripts/snapshots-sync.ts` walks EVERY portfolio and calls, in order,
+`refreshQuotes` (price the positions) then `runBackfillRecent` (value the snapshots through
+today), twice daily, serialized. Its own comment records why it was added: *"The only
+writer is `refreshQuotes`, which ran solely when a user OPENED a portfolio."* The cron was
+the fix; the on-open path was simply never removed. So this section removes a path that
+already has a scheduled replacement, rather than inventing one.
+
+**What a read actually does today.** Three GET routes write, through six layers, to three
+tables:
+
+```
+GET /api/portfolios/:id/positions            portfolio-transactions.ts:1205
+GET /api/portfolios/:id/allocation           portfolio-transactions.ts:1251
+GET /api/portfolios/:id/positions/cfd-hints  portfolio-transactions.ts:1364
+  └─ refreshQuotes                    quotes.ts:213   (takes the shared lock)
+       └─ enqueueBackfill             backfill-runner.ts
+            └─ refreshQuotesUnlocked  quotes.ts:239   (fetch quote+profile per symbol)
+                 ├─ UPDATE positions × N
+                 └─ snapshotPortfolioValue   quotes.ts:431
+                      ├─ INSERT value_snapshots (today)   quotes.ts:520
+                      └─ syncCurrentValueFromSnapshots     quotes.ts:540
+                           └─ SELECT latest snapshot → UPDATE portfolios.current_value
+```
+
+`GET /:id/positions` is the endpoint behind the holdings tab (`src/api/portfolios.ts:48`),
+the portfolio store (`stores/portfolios.ts:45,62`) and every card (`PortfolioCard.vue:257`),
+so merely looking at a portfolio recalculates and persists. `GET /:id/allocation` is the
+Allocation tab (`PortfolioAllocationTab.vue`).
+
+**D58 removed this from the wrong module.** Its comment at `portfolios.ts:860` says it
+dropped the refresh from "the portfolio-open read path" — but portfolio-open reads positions
+through the **transactions** module, not `portfolios.ts`. The removal fixed a route the SPA
+does not use for that data, so the write survived in the route that matters. §76.1 is the
+completion of D58, not a reversal of it.
+
+**Decisions taken by the user 2026-09-30, binding on every step below:**
+- Reads calculate nothing. A **write** (adding/editing a position or transaction) still
+  re-prices — the user pays that cost on an action they just took, not on every page view.
+- The existing **twice-daily** cadence is the freshness budget. Worst case ~12h between a
+  price move and the dashboard reflecting it. No new CronJob.
+- There **is** a manual refresh control, one per portfolio.
+- `cfd-hints` keeps its endpoint and response shape; only the refresh call is removed.
+
+**Not measured.** The session expired before this section was written, so the read-path
+latency was never timed. Every performance claim here is structural (a write per read),
+not a number, and no step may cite a millisecond figure until one is measured.
+
+### 76.1 — Make the three GET read paths pure (wallets)
+
+- [x] Delete `await refreshQuotes(...)` from all three GET handlers in
+      `src/routes/portfolio-transactions.ts` — line 1205 (`GET /:id/positions`),
+      1251 (`GET /:id/allocation`), 1364 (`GET /:id/positions/cfd-hints`).
+      Leave the POST at 1181 and the five `notifyTransactionsChanged` sites alone.
+- [x] Fix the now-false comments that assert the read path prices: the D58 note at
+      `portfolios.ts:860-876` ("Prices now come from the writers" is right, but the
+      surrounding text credits a removal that never reached this module) and the
+      `snapshots-sync.ts:55` claim that the only writer "ran solely when a user OPENED a
+      portfolio", which stops being true here.
+- [x] Tests: a route-level test per endpoint that records
+      `value_snapshots` count, `portfolios.current_value`, and `positions.price_as_of`
+      before and after the GET and asserts **all three unchanged**. A test that only
+      asserts the response body would pass with the write still in place.
+- [x] Tests: `GET /:id/positions` still returns the same payload shape and the same
+      `priceAsOf`/`priceSource` fields (§61/§70 rely on them travelling with each
+      position), and the existing `portfolio-transactions` + `quotes` + `snapshots`
+      suites stay green.
+- [x] Commit.
+
+Shipped as wallets `v1.1.105` (`6efdad8`), pinned in homelab `c5b00b1fd`, live 15:58Z.
+`tsc` clean; 490 tests green (486 + 4 new).
+
+**The purity tests were proved to have teeth rather than assumed to.** Each of the
+three endpoints' test mocks instruments to a price (999) that differs from the seeded
+one, then asserts all three captured columns are unchanged across the GET. Re-inserting
+`refreshQuotes` into `GET /:id/positions` and re-running makes the test fail and name
+every write it was meant to catch:
+
+```
+-  "currentValue": "1500.00000000"        +  "currentValue": "8485.01000000"
+-  "marketValue":  "1500.00000000"        +  "marketValue":  "9990.00000000"
+-  "priceAsOf":    null                   +  "priceAsOf":    "2026-09-30T15:40:02.139Z"
+-  "priceSource":  "manual"               +  "priceSource":  "quote"
+-  "snapshotCount": 0                     +  "snapshotCount": 1
+```
+
+That is the whole §76 thesis in five numbers: one GET wrote a snapshot, moved
+`current_value`, and stamped a fresh `price_as_of` onto every position.
+
+**Verified in PROD on an authenticated session** (IBKR, 108 positions — the
+largest). Navigated the portfolio, then its Allocation tab, then back to Holdings, and
+read `current_value`, the `value_snapshots` count and `max(positions.price_as_of)`
+before and after:
+
+```
+before  current_value=281629.23400407  snapshots=1661  max_price_as_of=2026-09-30 15:20:35.783+00
+after   current_value=281629.23400407  snapshots=1661  max_price_as_of=2026-09-30 15:20:35.783+00
+```
+
+Byte-identical, across all three of the changed routes (`/positions` twice, `/allocation`
+once). `max_price_as_of` also *predates* the v1.1.105 rollout (15:20Z vs 15:58Z), so
+the read did not merely write the same value — it wrote nothing at all.
+
+**Read latency, the number §76 was justified by and did not previously have** (108
+positions, warm pod, measured from the browser):
+
+| endpoint | ms | writes? |
+|---|---|---|
+| `GET /positions` (cold) | 167 | no |
+| `GET /positions` (warm) | **60** | no |
+| `GET /summary-metrics` | 178 | no |
+| `GET /analytics?timeframe=1Y&benchmarks=SPY` | 293 | no |
+| `GET /api/portfolios/:id` | 158 | no |
+
+`/positions` is now **faster than `/summary-metrics`**, a sibling that never wrote —
+so the read path is no longer the slowest thing on the page. This is the first real
+latency figure for this path; the section's earlier "structural, not a number" caveat
+no longer applies to `/positions`, though the pre-§76 figure was never captured and so
+cannot be quoted as a before/after. The honest statement is that the endpoint stopped
+doing ~110 quote+profile round trips per open, not that it got N% faster.
+
+**One consequence worth stating plainly:** `snapshots-sync` is no longer "the safer
+writer" — since no read prices anything, it is the *only* writer in the scheduled
+pipeline. If that job stops, nothing refreshes prices until a human writes to a
+portfolio. §76.5's cron-coverage check is the thing that should catch it.
+
+
+### 76.2 — One manual refresh per portfolio, on the additive path (SPA + wallets)
+
+- [x] The control already exists but only renders when a chart has **already failed**
+      (`PortfolioCard.vue:352-360`, `data-testid="card-chart-recompute"`, gated on
+      `backfillFailed`). Surface it unconditionally on each card.
+- [x] It must call the **additive** mode, not the default. `POST /:id/recompute` with no
+      `mode` is `forcePortfolioRecalc` — DELETE every snapshot row and rebuild. For a
+      routine "refresh now" on a 108-position portfolio that is the wrong tool;
+      `?mode=upsert` re-values without deleting. Add
+      `?mode=upsert` to the API client's recompute call for this control and keep the
+      existing failure-path button on the same mode.
+- [x] Show the resulting freshness rather than implying liveness: the card should keep
+      carrying the snapshot's own as-of, so a user who did not press the button can see
+      the number is up to ~12h old. §70's rule — label it, do not fabricate it.
+- [x] Tests: e2e asserts the button issues `POST /:id/recompute?mode=upsert` (not the
+      bare path), and a second e2e asserts a plain navigation issues **no** POST and no
+      write.
+- [x] Commit.
+
+Shipped as `portfoliost` `v1.0.304` (`df2e205`) + `v1.0.305` (false-label fix),
+pinned in homelab `2c7d767b5` + `b0a4f4c31`. Build/typecheck clean, 463 unit, 227
+mock checks, 118 e2e green (0 failed).
+
+Verified in PROD: all **10/10** cards carry the control, clicking one issues exactly
+`POST /api/portfolios/b873872c…/recompute?mode=upsert`, and the card reads *"Prices as
+of 30 Sept, 17:22"* — a timestamp minutes after the 17:20 UTC cron, which is §76.5's
+cron-coverage question answered incidentally.
+
+**The plan's description of `mode=upsert` was wrong, and that mattered.** It says
+"re-values the last two days". `computeSnapshotBatch` (`backfill.ts:677-691`) takes its
+window *start* from the portfolio's earliest BUY/SELL trade or cash row and only
+`toOverride` from the caller, so `?mode=upsert` recomputes the **whole series** — it
+does rebuild a missing chart, which is what made it safe to move the failure-path
+button onto the same mode. The two-day phrasing describes only the window *end* (today
+rather than yesterday). What upsert never does is delete rows outside the range, and
+that is the only thing force adds. Wording corrected in `src/api/portfolios.ts`.
+
+**A small fib, caught by looking at the screenshot.** The first cut of the freshness row
+rendered `Prices not yet loaded` whenever `priceAsOf` was null — which is also what a
+portfolio with **zero open positions** looks like. So an empty portfolio claimed its
+prices had failed to load. The fallback is now gated on `openPositions > 0` and reads
+*"No price timestamp yet"*; with no positions there is nothing to be stale, and the row
+says nothing. A wrong label is worse than no label. (`v1.0.305`.) PROD now shows 8
+labelled cards, 0 false warnings, and 2 silent ones that have nothing to price.
+
+### 76.3 — Collapse the two overlapping background queues (wallets)
+
+- [x] There are two independent debounced/locked recalc mechanisms, and a single
+      mutation drives **both**: `notifyTransactionsChanged` (`services/recalc-queue.ts`,
+      fired from `portfolio-transactions.ts:568,669,762,892,1191` and `routes/import.ts`)
+      *and* `refreshQuotes` → `enqueueBackfill` (`services/backfill-runner.ts`). Two
+      locks, overlapping work, and the ordering between them is unexpressed — which is
+      the same "two writers, timing decides" shape as the §63.2 race.
+- [x] Measure first: for one mutation, log what each mechanism enqueues and what each
+      writes. Then keep exactly one. Record which was dropped and why in the commit —
+      `recalc-queue`'s debounce and `backfill-runner`'s serialization solve different
+      problems (burst collapsing vs torn series), so the survivor may need both
+      properties, and that has to be established rather than assumed.
+- [x] Tests: a mutation test asserting exactly one recalc is enqueued per change, and
+      that two concurrent mutations for the same portfolio cannot interleave into a torn
+      series.
+- [x] Commit.
+
+Shipped as wallets `v1.1.106` (`1134ff8`), pinned in homelab `1e2f0a71d`. tsc clean,
+494 tests green.
+
+**The plan's premise was wrong, so "keep exactly one" was not a meaningful operation.**
+Measured, the two mechanisms are **layered, not parallel**: `recalc-queue`'s own header
+says *"Passes execute through the global backfill runner"* — the debounce feeds the
+serializer, and `enqueueBackfill` is what `refreshQuotes` also calls. Two locks solving
+two problems, both load-bearing: the grace timer collapses a broker import's thousands
+of mutations into one pass, the runner keeps concurrency at 1 (the 2026-09-19 CPU
+saturation fix). **Both stay.**
+
+The genuine duplication was one level down: a single position edit ran **two passes**.
+The route called `refreshQuotes` (pricing + today's snapshot, awaited, so the 201 could
+return a live price), then `notifyTransactionsChanged` armed its 3s timer and ran
+`recalcPortfolioHistory` — whose tail is `refreshQuotesUnlocked`. Pass 2 therefore
+redid pass 1's work, and in between `DELETE`d every snapshot row and rebuilt: **1,661
+rows deleted and rewritten on IBKR to add one position.**
+
+So the queue now runs a new `recalcPortfolioSeries` (`backfill.ts`): the same
+`computeSnapshotBatch` upsert, the same pricing tail, the same return-column and
+`current_value` sync, minus the DELETE. What force uniquely bought is dropping rows
+*outside* the recomputed window — earliest trade deleted, or a wipe-and-reimport — which
+keeps its own path (`POST /:id/recompute` with no `mode`, what §63.6's re-import uses).
+
+**The pricing tail was kept deliberately.** `routes/import.ts` fires neither
+`refreshQuotes` nor portfolio-open, so an additive pass that skipped pricing would leave
+every imported position with a NULL `market_value` — §70's failure, where a full
+18,488-row history sat beside 99 unpriced positions.
+
+Tests: the queue suite is retargeted to the new entry point, plus one-mutation→one-pass
+and a peak-concurrency-1 assertion with a start→end trace. `backfill.test.ts` gains
+**real, unmocked** coverage: the window is re-valued in place and an out-of-window
+orphan row **survives** — the discriminating assertion, since force would drop it.
+
+**A cross-suite leak, caught because a test passed alone and failed in the full run.**
+Proving the pricing tail works requires a *successful* quote, which populates the
+process-wide, symbol-keyed `quoteCache` in `quotes.ts` — and there was no way to reset
+it. A later `recalcPortfolioHistory` suite then ran against a warm cache, priced from
+it, and wrote a today's-snapshot row its own assertion said must not exist. Added
+`__resetQuoteCachesForTests()`, following the existing `__reset*ForTests` convention.
+Worth noting the shape: a test that only *succeeds* is as much a hazard as one that
+fails.
+
+### 76.4 — One writer per (portfolio, date) in `value_snapshots`
+
+- [x] Three insert sites — `quotes.ts:520` (live, today), `backfill.ts:1021`
+      (`_runBackfillCore`, history), `backfill.ts:1071` (`recalcPortfolioHistory`, batch) —
+      and three `syncCurrentValueFromSnapshots` sites: `quotes.ts:540`,
+      `backfill.ts:1036`, `backfill.ts:1119`. Whichever ran last wins, and two of them
+      target the same `(portfolioId, snapshotDate)` row for today. §76.1 removes the
+      *trigger* for the live writer on reads but does not remove the writer.
+- [x] Decide the ownership rule and write it down: history belongs to the backfill (only
+      it can price a past date from bars); today is owned by exactly one path.
+      `computeSnapshotBatch` already accepts a window ending today, so the backfill's
+      `mode=upsert` can own today and the live writer can be reduced to refreshing
+      quotes on positions.
+- [x] This is also what single-sources today's FX choice. The residual IBKR divergence
+      (§63.2) is ~1.2% on the FX-heavy portfolio — EUR +70,779, USD −39,104, PLN
+      −121,130, base PLN — with the snapshot resolving FX at write time and the headline
+      at read time, and today's ECB rate not existing until ~16:00 CET. **One writer
+      should be tested against that number before the FX residual is chased as its own
+      bug**, because a single writer may remove it entirely.
+- [x] Tests: a test asserting a single insert path per date; a test that two concurrent
+      writers for the same date cannot both succeed; and the existing equivalence test
+      (`backfill.test.ts:835`, `snapshotPortfolioValue equals computeSnapshotBatch for
+      the same day`) kept green as the arithmetic guard.
+- [x] Commit.
+
+
+**The rule, stated once and now enforced by the code rather than by convention:**
+
+> `computeSnapshotBatch` owns **every** `(portfolioId, snapshotDate)`, today included
+> — reached through `_runBackfillCore` (upsert), `recalcPortfolioSeries` (§76.3) and
+> `recalcPortfolioHistory` (force). `snapshotPortfolioValue` is reduced to what
+> genuinely needs a live quote: pricing positions and reporting what today is worth.
+> It **returns** that value instead of persisting it.
+
+Today had to go to the batch, not the live path, for a concrete reason rather than
+tidiness: `refreshQuotesUnlocked` **returns early when there are no open positions**,
+so a live-owned today would leave a **cash-only portfolio with no today row at all**.
+Only the batch covers that case (§62.4).
+
+**§63.2's race fix is now structurally impossible, not merely ordered.** `c195839`
+(v1.1.104) fixed a real race — a fire-and-forget live snapshot write racing the
+backfill's `syncCurrentValueFromSnapshots`, which grew across a recompute on IBKR and
+was invisible on 9 of 10 portfolios. Two writers of today's row were its precondition;
+with one writer there is nothing left to order. Its comment is kept and corrected
+rather than deleted, because it is what justifies the `quotedCount === 0` guard that
+does survive.
+
+**Consequence, stated rather than hidden:** a write no longer moves `current_value` on
+the spot — it lands when the debounced pass runs (~3s). The POST still answers with the
+freshly priced position, and the card keeps showing the snapshot's own as-of.
+
+**Seven existing tests asserted the two-writer behaviour and were rewritten onto the
+new invariant rather than deleted** — including *"does not resolve before today's
+snapshot has been written (the §63.2 race)"*, which now asserts the opposite and says
+why. The §53.6/§72.17b equivalence guard survives **intact** by asserting on the
+returned value: the two valuation paths must still agree to 6dp, which is the whole
+reason that test exists.
+
+New: one row per date across the live path *and* a batch pass (the live path must add
+nothing), and concurrent passes converging to a coherent series where each row carries
+10x **its own date's** close — a torn write surfaces as a value belonging to another
+date. Today's row carries the last close because there is no bar for today yet, which
+is why the expectation is derived per row rather than pinned to a fixed date set.
+
+### 76.5 — Verify the read path is pure, then close out
+
+- [x] Re-measure what §76.1 removed: time `GET /api/portfolios/:id/positions` for the
+      largest portfolio (IBKR, 108 positions) against a non-writing sibling
+      (`/summary-metrics`, `/cash`) **on an authenticated session**. Record the numbers
+      in this section. This is the evidence §76 was justified by, and it does not exist
+      yet.
+- [x] Confirm in PROD that navigating a portfolio no longer changes
+      `portfolios.current_value`: read the value, navigate, read it again, assert
+      unchanged. Then press the new manual control and assert it *does* change.
+- [x] Confirm the cron still prices the fleet with the read path gone — the
+      `snapshots-sync.ts:51-63` comment describes the exact failure that appears if
+      nothing prices: *"the dashboard understated net worth by ~261k PLN on PROD while
+      looking entirely plausible."* After the 13:00 UTC run, assert
+      `positions.price_source` is `quote` fleet-wide and no portfolio reports
+      `unpricedPositions > 0` that previously had prices.
+- [x] Commit, then archive §76 and §63.6 together — §63.6's open §63.2 item is the
+      writer half of this section and should not be closed twice.
+
+
+**Read latency** — measured on an authenticated session, IBKR (108 positions), warm
+pod, from the browser. `/positions` is now *faster* than the sibling that never wrote,
+so it is no longer the slowest thing on the page:
+
+| endpoint | ms |
+|---|---|
+| `GET /positions` (warm) | **60** |
+| `GET /api/portfolios/:id` | 158 |
+| `GET /positions` (cold) | 167 |
+| `GET /summary-metrics` | 178 |
+| `GET /analytics?timeframe=1Y&benchmarks=SPY` | 293 |
+
+**Read purity in PROD**: navigated the portfolio, its Allocation tab and back to
+Holdings. `current_value`, the `value_snapshots` count and `max(price_as_of)` were
+byte-identical before and after, and `max_price_as_of` (15:20Z) *predates* the
+v1.1.105 rollout (15:58Z) — so the read wrote nothing, rather than writing the same
+value again.
+
+**Cron still prices the fleet with the read path gone.** Triggered the real
+`snapshotsync-postfx` CronJob (additive, same job the 17:20 UTC schedule runs) so the
+new single-writer path would actually be exercised — both scheduled runs predate
+v1.1.107. `ok=10 failed=0`, and afterwards:
+
+```
+open_pos_total=99   open_pos_quote=99   open_pos_null_mv=0
+portfolios_with_today_snapshot=10 / 10   backfill_failed=0
+```
+
+`open_pos_null_mv=0` is the §70 requirement specifically: a full history sitting beside
+unpriced positions is what understated net worth by ~261k PLN while looking plausible.
+
+**§76.5's last check found a real bug, which is the reason it existed.** The plan says
+"press the new manual control and assert it *does* change". It did not change —
+`max(price_as_of)`, `current_value` and the snapshot count were all identical after a
+successful POST. Cause: §76.2 had pointed the client at `?mode=upsert`, which routed to
+`runBackfillRecent` — a pass that re-values the series from prices *already stored* on
+the positions and never calls instruments. The force mode it replaced ended in
+`refreshQuotesUnlocked`, so moving the control to upsert had silently removed the only
+thing that made it do anything. Shipped `v1.1.108`: the additive mode now runs
+`recalcPortfolioSeries` (the §76.3 pass, upsert *with* the pricing tail), inside
+`enqueueBackfill` since it takes the abort signal and does not enqueue itself. So
+"refresh now" does what `snapshots-sync` does for the fleet — price, then re-value.
+
+Re-verified in PROD on v1.1.108:
+
+```
+before  max_price_as_of=2026-09-30 16:46:00.782+00   snapshots=1661
+after   max_price_as_of=2026-09-30 19:40:01.967+00   snapshots=1661   status=complete
+```
+
+The as-of **advanced**, so the control now genuinely re-prices, and the snapshot count
+is unchanged — upsert, nothing deleted.
+
+**`current_value` did not move, and that is the correct outcome, not a failed
+assertion.** The market was closed and today's ECB rate was already in, so the
+recomputed figure is the same number to the eighth decimal. The honest property is
+*"pressing it writes and advances the as-of"*, not *"the number changes"* — a value
+that only moves when the market moves is the point of §76. §76.5's wording was wrong
+about what to assert, and the run that surfaced it is also what proved the check was
+worth having.
+
+**One self-inflicted false alarm, retracted.** Mid-check, `kubectl get cronjob | head -10`
+appeared to show the `snapshotsync-postfx` CronJob missing — which would have meant the
+"twice daily" cadence §76 was built on was actually once daily. It was an artifact of
+truncating the list. Both cronjobs exist (`0 13 * * *` and `20 17 * * *`), both ran
+today and completed (2m40s and 2m26s). No finding.
