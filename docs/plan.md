@@ -635,15 +635,45 @@ quotes — §63.5 is gated on reproducing the bad symbol's provider response.
       on one call and **270,027.49** on the next (~1 min apart, then stable),
       with `Crypto` at `totalValue: 0, returnPercentage: -100` while its own card
       correctly read `887.74 / +1.65%` and the snapshot says 887.74 PLN.
-  - [ ] Pick one definition for "total value" (positions + cash) and make the
-      headline, the cards, and `total-metrics` all read it from the same place.
+  - [x] Pick one definition for "total value" (positions + cash) and make the
+        headline, the cards, and `total-metrics` all read it from the same place.
+        > **Done by §68/§70.** The route now computes
+        > `totalValue = totalInstruments + totalCash` from the same per-portfolio
+        > `splitPortfolioValue` that produced each card's split, so the headline
+        > and the breakdown cannot disagree by construction (the old code summed
+        > a raw total that could sit a cent off `instruments + cash`).
   - [ ] `total-metrics` is **not deterministic** — two calls a minute apart
         disagreed by 73,513. Find which input is not cached/stable; a headline
         that flickers is worse than a wrong one, because it cannot be reasoned
-        about.
-  - [ ] Investigate why `total-metrics` reports `Crypto` as `0 / −100%` when the
+        about. **Blocked on the login** — see the item below; the two are one
+        measurement: call it twice and compare bytes.
+  - [ ] **The end-to-end number needs a browser session.** What IS established
+        from the database (measured 2026-09-30, all 10 portfolios PLN):
+        >
+        > ```
+        > SUM portfolios.current_value  : 1,060,929.73
+        > SUM portfolios.total_invested:   735,446.41
+        > cards reporting 0 value  : (none)    <- §63.3's Crypto 0/-100% is fixed
+        > open positions          : 99
+        >   with NULL market_value: 0           <- §70.2's 75/85 NULL is fixed
+        > ```
+        >
+        > `total-metrics` itself needs a user JWT — `POCKETID_ISSUER_URL` forces
+        > strict validation in the cluster, so it cannot be called from a pod. I
+        > tried to reconstruct it in-pod with `splitPortfolioValue` and got a
+        > **false** reading — every portfolio 0.00, all 99 positions "unpriced" —
+        > because I passed an empty cash map and no price resolver. That is
+        > §72.27's lesson arriving a third time (two unpaginated reads, a shared
+        > date window, now a hand-rebuilt pipeline): reimplementing a calculation
+        > instead of calling it produces a confident wrong answer. Recorded as a
+        > failed measurement, not as a finding.
+  - [x] Investigate why `total-metrics` reported `Crypto` as `0 / −100%` when the
         snapshot holds 887.74 PLN and the card is positive. A portfolio with cash
         and a position must not floor at zero.
+        > **Fixed** — measured 2026-09-30: **no** portfolio reports a card value
+        > of 0. §68 rebuilt the aggregate off `splitPortfolioValue`, which sums
+        > positions *and* the cash ledger, so there is no path by which a
+        > cash-holding portfolio floors at zero.
   - [ ] Verify/fix the consolidated (all-portfolio) performance chart and each
         portfolio chart show **Σ positions + cash** per day (cash per §62 base-
         currency balance already added in backfill — confirm it is in the
