@@ -186,24 +186,45 @@ quotes — §63.5 is gated on reproducing the bad symbol's provider response.
   the single writer; a second writer on the quotes pass is the exact race §63.2
   was opened to remove. §76.4 supersedes this half. What it leaves behind is real
   and is item 4.
-- [ ] **Remove the dead import and the two comments in `quotes.ts` that assert a
+- [x] **Remove the dead import and the two comments in `quotes.ts` that assert a
       call chain which no longer exists** (`:20`, `:426`, `:437`). They are how
       plan-archive:11945-11948 came to be wrong: the archive cites this file, and
       this file now describes a chain that was deleted. A false comment about a
       writer is worse than no comment — it is what makes the next reader believe
       two writers exist.
-- [ ] Tests: a portfolio's headline `totalValue` equals the latest
+      > Done in wallets `08cb96b`. The comment now says the live quote writes
+      > nothing here, and names the three real `syncCurrentValueFromSnapshots`
+      > call sites so the next reader is not sent looking for a fourth.
+- [x] Tests: a portfolio's headline `totalValue` equals the latest
       `value_snapshots` row (positions + cash) when quotes are fresh.
-- [ ] Tests: an unpriced position contributes **nothing** and is counted in
+      > wallets `08cb96b`, 3 cases, 500 green. The load-bearing one is not the
+      > equality: it is that an unpriced position contributes **0** and lands in
+      > `unpricedPositions`, where the cost-basis answer would have been 9000.
+      > The third case is the half-priced portfolio — a symbol that quoted
+      > yesterday and lost its quote today must report the priced half and flag
+      > the rest, not silently complete.
+      >
+      > Two things the tests had to learn, both now in the file. `POST /positions`
+      > writes a BUY and a BUY is a **cash outflow** (`cashLedger.ts:61`), so a
+      > portfolio that deposited 1500 and bought 1000 holds 500 — my first draft
+      > asserted 2500 and appeared to catch a bug that does not exist. And an
+      > all-unpriced portfolio legitimately reads **negative** (−9000: the money
+      > went out, no instrument came back), which looks like a defect until you
+      > know the buy consumed the cash.
+- [x] Tests: an unpriced position contributes **nothing** and is counted in
       `unpricedPositions` — the §70 rule, asserted in the shape §63.2 asked for.
-      (`valuation.test.ts:46-100` covers the exclusion; the count and the
-      headline-level consequence are not asserted.)
+      > Same commit, second case. `valuation.test.ts:46-100` covers the exclusion
+      > at the function level; this pins it at the route, where the number a user
+      > reads is actually produced.
 - [x] ~~Fallback to the latest `price_bars` close when no quote exists.~~
       **Superseded by §70** — an unpriced position is reported unpriced, not
       substituted. Ticked so it stops reading as outstanding; the rationale is
-      the note, the state is the box.
-- [ ] Tests: `npm run build`, full `vitest` green.
+      > the note, the state is the box.
+- [x] Tests: `npm run build`, full `vitest` green.
+      > 500 green, build clean.
 - [ ] Commit.
+      > The test commit is in (`08cb96b`); this box stays open because the item
+      > above it — sharing `splitPortfolioValue` — is real work in the same repo.
 
 ### 63.3 — Wallets: cash included in consolidated + per-portfolio performance series
 
@@ -3292,3 +3313,209 @@ application was correct throughout.
 before blaming the fixture.* A clean tree is not a baseline, and "this spec is
 known flaky" is a conclusion, not a starting point. §67.1 recorded the
 flakiness, which made the wrong answer feel available and attractive.
+
+## 77. The session is the id_token, so it dies after 60 minutes (found 2026-09-30)
+
+User report: "when logged in, session is too short."
+
+**Diagnosis (verified against prod, not inferred).** The bearer token the SPA
+stores is Pocket-ID's **id_token**, and nothing refreshes it.
+`portfoliost-users-auth/src/routes/auth.ts:116` returns
+`access_token: tokenResponse.id_token`. Decoding the live token out of
+`localStorage["portfoliost_token"]` in the browser:
+
+    iss https://pocket-id.k.homylab.com
+    aud badb965e4e0be8e26f765f192418cc0c6b2f373f272f9d4886230d3203436e61  (PortfolioST)
+    iat 2026-09-30T21:03:15Z   exp 2026-09-30T22:03:15Z   -> lifetime 60 min
+
+Pocket-ID issues the id_token with the client's **access token** duration, so
+the session length is exactly `accessTokenDurationMinutes` on the
+`PocketIDOIDCClient` CR — live value **60**
+(`cluster/apps/networking/pocket-id-operator/app/portfoliost-oidc-client.yaml`).
+The same CR has `refreshTokenDurationMinutes: 43200` (30 d): Pocket-ID *does*
+issue a 30-day refresh token, `routes/auth.ts` throws it away, and the frontend
+never asks. `grep -rn "refresh_token\|grant_type" src/` in `portfoliost` →
+zero hits.
+
+**Two things that make this worse than "60 min".**
+
+1. No proactive expiry check. `isAuthenticated` is `Boolean(token)`
+   (`src/stores/auth.ts:13`), so an expired token still satisfies the guard at
+   `src/router/index.ts:265`. Confirmed live: an expired token yields
+   `401 {"error":"Unauthorized","message":"Invalid or expired token"}`, so you
+   are ejected mid-task rather than at a login screen.
+2. `prompt: "login"` is hardcoded at `src/auth/pkce.ts:65`, so every recovery
+   costs a full passkey ceremony.
+
+**Why not just raise `accessTokenDurationMinutes`.** It works — it is the field
+I measured the session from — but it buys the session with a long-lived,
+non-revocable credential, and it leaves the 30-day refresh token unused. The
+refresh grant already rotates the token with a fresh 30-day expiry
+(`createTokenFromRefreshToken` → `createRefreshToken`, `ExpiresAt: now + 30d`),
+which gives an indefinitely sliding session *and* keeps access tokens short.
+
+**Safety check that made this acceptable.** The refresh path had a known
+advisory — GHSA-w6p7-2fxx-4f44, refresh bypassed the disabled-user,
+authorization-revocation and group-restriction checks, so a disabled account
+kept refreshing forever. Fix commit `978ac87`;
+`compare/978ac87...v2.14.0` → `ahead_by: 280, behind_by: 0`, so the deployed
+v2.14.0 **contains** it. Long sessions therefore remain revocable by disabling
+the user or changing `portfoliost_admin` membership — the next refresh fails.
+
+**Design decisions (resolved).**
+
+- Refresh token lives **server-side** in `users_auth`, SHA-256 hashed, keyed by
+  the current id_token's `jti`. It never reaches the browser. `POST
+  /api/auth/refresh` takes the (possibly expired) id_token, verifies signature
+  **ignoring `exp`**, looks up the row, exchanges, returns a fresh id_token.
+  The bearer-token architecture is untouched, so `portfoliost-wallets`,
+  `-instruments` and `-admin` need no changes.
+- **`logout()` must delete the refresh row in the same change.** It is currently
+  a no-op (`routes/auth.ts:188` returns `{success:true}` with no end_session
+  call). Harmless while there is nothing to revoke; with a 30-day token it would
+  mean "log out" silently does not log out.
+- Keep `prompt=login`. With refresh working, manual logins are rare, so the
+  annoyance mostly disappears, and always showing the passkey is the
+  conservative default. Not part of this section.
+- No client secret is needed: `isPublic: true` + PKCE, and the helmrelease sets
+  only `POCKETID_CLIENT_ID`. users-auth already reaches the token endpoint at
+  `http://pocket-id.networking.svc.cluster.local:1411/api/oidc/token`.
+
+Scope spans three repos (`portfoliost`, `portfoliost-users-auth`,
+`portfoliost-contracts`); the contracts change is the mandatory schema for the
+new endpoint, per `AGENTS.md` API-client typing rules.
+
+---
+
+### 77.1 — contracts: declare the refresh endpoint
+
+- [ ] Add `POST /api/auth/refresh` to `contracts/openapi.yaml`: request body
+      `{ id_token: string }`, response `AuthResponse` (already
+      `required: [access_token, token_type, user]`, `expires_in: integer`).
+      Reusing `AuthResponse` keeps `AuthCallback.vue` and `LoginView.vue`
+      unchanged.
+- [ ] Document in the endpoint description that the supplied `id_token` may be
+      expired — expiry is deliberately not checked, signature is.
+- [ ] `npm run gen:types` in `../portfoliost-contracts/contracts/`, then copy to
+      `portfoliost-users-auth/src/generated/api-types.d.ts` and
+      `portfoliost/src/generated/api-types.d.ts` (both repos keep their own
+      copy; regenerate, never hand-edit).
+- [ ] Tests: `npm test` and `npm run lint` green in
+      `../portfoliost-contracts/contracts/`.
+- [ ] Commit.
+
+### 77.2 — users-auth: persist the refresh token at login
+
+- [ ] New drizzle table `refreshSessions` in `src/db/schema.ts` under the
+      existing `usersAuthSchema` (`users_auth`): `idTokenJti` (text, PK),
+      `userId`, `refreshTokenHash` (text), `expiresAt` (text), `createdAt`,
+      `updatedAt`. Model on `userPreferences` — all timestamps are `text`
+      ISO strings in this schema, not `timestamptz`.
+- [ ] `npm run db:generate` → new file under `drizzle/` alongside
+      `0000_baseline.sql`. Inspect the generated SQL: it must create in
+      `users_auth`, not the `drizzle_users_auth` migrations schema.
+- [ ] In `routes/auth.ts`, add the field to the
+      `PocketIDTokenResponse` interface (line 18-23) — `refresh_token` is
+      currently not even declared.
+- [ ] After a successful exchange in `POST /api/auth/token`, upsert the row
+      keyed by `idPayload.jti`, storing `sha256(refresh_token)` via
+      `node:crypto`. Return the id_token exactly as today, so the existing
+      browser payload is unchanged.
+- [ ] Tests: extend `src/routes/auth.test.ts`. Stub `fetch` to return a token
+      response containing `refresh_token` and `id_token` with a `jti`, then
+      assert a `users_auth.refresh_sessions` row exists, that
+      `refresh_token_hash !== refresh_token` (plaintext never persisted), and
+      that the HTTP response body still contains no `refresh_token` key.
+- [ ] Commit.
+
+### 77.3 — users-auth: the refresh endpoint
+
+- [ ] Add `refreshWithPocketID(refreshToken)` in `routes/auth.ts`, mirroring
+      `exchangeWithPocketID`: `grant_type=refresh_token`, plus `client_id` and
+      the same env vars (`POCKETID_TOKEN_URL`, `POCKETID_CLIENT_ID`). No
+      `client_secret`.
+- [ ] `POST /api/auth/refresh`: read `id_token` from the body → verify with
+      `jose.jwtVerify` against the Pocket-ID JWKS using
+      `clockTolerance: Number.MAX_SAFE_INTEGER` (or `jose` option
+      `ignoreExpiration`-equivalent) so an expired-but-valid token is accepted.
+      Read `sub`, `email`, `groups`, `jti` from the verified payload — from the
+      signature, never from the raw request body.
+- [ ] Look up the row by `jti`. On miss → `401` and delete nothing. On hit →
+      exchange, then update the row: new `jti` **as** the key (delete old,
+      insert new), new hash, new `expiresAt`. Rotation is required — Pocket-ID
+      deletes the consumed refresh token server-side, so reusing the old `jti`
+      must fail on the second call.
+- [ ] Return the same `AuthResponse` shape as `/token`, built from the *new*
+      id_token's claims so `groups` stays current.
+- [ ] Tests in `src/routes/auth.test.ts`, all with a stubbed `fetch` and a
+      locally generated RSA keypair served from a stubbed JWKS:
+      - expired-but-signed token + valid row → `200`, new `access_token`,
+        row re-keyed to the new `jti`;
+      - same token replayed a second time → `401` (rotation enforced);
+      - valid token with no row → `401`;
+      - tampered signature → `401`, and the row is **not** consumed;
+      - response contains no `refresh_token` key.
+- [ ] Commit.
+
+### 77.4 — users-auth: make logout actually revoke
+
+- [ ] `POST /api/auth/logout` (`routes/auth.ts:188`) currently returns
+      `{success:true}` and touches nothing. Read `id_token` from the body,
+      verify signature ignoring `exp` as in 77.3, and `DELETE` the
+      `refresh_sessions` row by `jti`. A missing row is still a `200` —
+      logout is idempotent.
+- [ ] Update `src/api/auth.ts` in `portfoliost` to pass the current token on
+      logout (see 77.5) — but land this commit in `portfoliost-users-auth` and
+      keep the body optional so the old client keeps working.
+- [ ] Tests: logout removes the row; a second logout is still `200`; after
+      logout, the pre-logout `id_token` can no longer be refreshed via 77.3's
+      endpoint (the row is gone).
+- [ ] Commit.
+
+### 77.5 — portfoliost frontend: proactive refresh + silent recovery
+
+- [ ] `src/api/auth.ts`: add `refresh(idToken)` calling `POST
+      /api/auth/refresh`, typed from the regenerated `api-types.d.ts`; change
+      `logout()` to send the current token.
+- [ ] `src/stores/auth.ts`: add `refreshToken()` that calls it, updates
+      `token`/`user`, and `setToken()`. Read the new expiry by decoding the
+      returned id_token's `exp` — do **not** trust `expires_in`, which
+      describes Pocket-ID's access token, not the id_token being returned.
+- [ ] Schedule the refresh from `src/App.vue`'s existing `onMounted`, at
+      `exp - 5min`, using a single `setTimeout` re-armed after each refresh.
+      Do not add a polling interval: one-shot re-armed on a timer keeps an idle
+      tab alive and avoids a request storm in a background tab.
+- [ ] In `src/api/client.ts` `request()`, on `ApiError` with `status === 401`,
+      attempt exactly one refresh, then replay the original request once. Guard
+      against infinite recursion with a per-request `retried` flag, and let a
+      failed refresh fall through to `logout()` + redirect to `login`.
+      This is what removes the mid-task ejection: the token is usually renewed
+      before it ever 401s, and if it does 401 the user never sees it.
+- [ ] Leave `prompt: "login"` at `src/auth/pkce.ts:65` alone (resolved above).
+- [ ] Tests: `src/api/client.spec.ts` — 401 → one refresh → replayed request
+      returns 200; a failing refresh does not retry the refresh itself; a second
+      401 after replay surfaces the error. `src/stores/auth.spec.ts` — the
+      timer is armed at `exp - 5min` and re-armed after a refresh.
+- [ ] `npm run build` (includes `vue-tsc --noEmit`), `npm run test`,
+      `npm run test:mock` green.
+- [ ] Commit.
+
+### 77.6 — verify on the real stack, then prod
+
+- [ ] `docker compose up -d --build`, `npm run test:mock`, `npm run test:e2e`
+      green (114 e2e per §75).
+- [ ] Manual: log in, confirm `id_token` lifetime is still 60 min in the browser
+      but `refresh_sessions` has a row in `users_auth`. Wait out the expiry and
+      confirm the SPA never shows a login screen and `localStorage
+      ["portfoliost_token"]` has a new `jti`. Log out and confirm the row is
+      gone and a pre-logout token no longer refreshes.
+- [ ] Release per the `homelab-deploy` skill: tag-bump
+      `portfoliost-users-auth` and `portfoliost` images, bump the pinned `tag:`
+      in their `helmrelease.yaml`, commit to homelab `main` (rebasing on the
+      deployed revision, never `reset --hard`), verify with
+      `kubectl rollout status -n pfire deploy/<app>`.
+- [ ] Leave `accessTokenDurationMinutes: 60` unchanged. If refresh proves flaky
+      in prod, the fallback is bumping it to `720` in
+      `portfoliost-oidc-client.yaml` — a one-line change that buys hours
+      without the refresh path working at all.
+- [ ] Closeout: archive this section.
