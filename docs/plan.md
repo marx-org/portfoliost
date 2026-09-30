@@ -1827,10 +1827,45 @@ that all produced plausible numbers instead of errors.
       > grid via their `EXPIRATION` sibling. Fixed and verified in prod in §72.7.**
       finding. It is a margin account, which is a plausible innocent explanation,
       but that is a hypothesis and has not been tested.
-- [ ] `MFC` is a **known false positive** in `valuation-audit`: a dual-listed
+- [x] `MFC` was a **known false positive** in `valuation-audit`: a dual-listed
       ticker bought on the other line. The rule cannot distinguish it from
       corruption, and leaving it as a permanent red line trains people to skim
       past real findings.
+      > **DONE 2026-09-30** (wallets `05bec46`, **v1.1.99** deployed, homelab
+      > `084812374`). §72.4's question was "narrow the rule, or record the
+      > exception" — the answer is **neither on its own**:
+      >
+      > *Narrowing* is impossible: a wrong symbol produces the identical
+      > signature (a stored value that no longer matches the live one), so no
+      > threshold, ratio or shape test separates "bought on the other listing"
+      > from "the resolver picked the wrong line". Any narrowing either eats
+      > real findings or guesses at provider conventions.
+      > *Suppressing* is worse than the disease: §71.6's complaint is that a
+      > permanent red line trains people to skim past the report, and deleting
+      > the evidence does not fix that — it removes the basis for ever
+      > challenging the rule.
+      >
+      > So `CROSS_LISTINGS` is a **curated, reasoned list** (each entry justified
+      > against the STORED TRANSACTION PRICES, never a threshold), the finding is
+      > still **emitted** with `classification` + `classificationReason`, and only
+      > `isDefect()` findings fail the run. 6 tests, including that the finding is
+      > not dropped, that `MFCX` does **not** inherit the pass, and that a reason
+      > shorter than 40 characters fails (an unexplained entry is a mistake).
+      >
+      > **Verified by running the real audit in PROD** (`node
+      > dist/scripts/valuation-audit.js` in the wallets pod). It now reports
+      > **exactly one finding**, and it is not MFC:
+      > ```
+      > [valuation-audit] UNFUNDED pf=XTB: 22 trades but no DEPOSIT/TRANSFER
+      > anywhere in the import, and the cash ledger bottoms out at -6.22. …
+      > [valuation-audit] 1 finding(s). Nothing was modified.
+      > ```
+      > That same run is the **first direct evidence that stored and live values
+      > now reconcile**: **zero** `reconciliation-gap` and **zero**
+      > `currency-mismatch` findings across all 10 portfolios at the 2% tolerance
+      > — the check §63.3's reconciliation has been chasing since the fact-check,
+      > run for real and clean. The one remaining finding is §72.32/§72.35's XTB
+      > data gap, which needs a row added to the user's sheet.
 - [ ] Pin `instruments` to the `f01e639` comment commit's release (a code comment
       that records a trap should not sit unpinned).
 
