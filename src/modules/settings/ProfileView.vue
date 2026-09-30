@@ -1,12 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue"
-import { useRouter } from "vue-router"
 import { useAuthStore } from "@/stores/auth"
 import { useThemeStore, type ThemePreference } from "@/stores/theme"
 import { changePassword, clearAllData, deleteAccount, getUserProfile, updateUserProfile } from "@/api/users"
 import type { UserProfile } from "@/api/users"
 
-const router = useRouter()
 const auth = useAuthStore()
 const theme = useThemeStore()
 
@@ -123,7 +121,6 @@ async function confirmDanger() {
     } else {
       await deleteAccount()
       await auth.logout()
-      router.push({ name: "login" })
       return
     }
     dangerDialog.value = null

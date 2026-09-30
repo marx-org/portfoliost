@@ -11,9 +11,10 @@ const theme = useThemeStore()
 
 const displayName = computed(() => auth.user?.email ?? "")
 
+// auth.logout() ends the Pocket-ID session via a top-level navigation, so
+// there is nothing to push afterwards.
 async function handleLogout() {
   await auth.logout()
-  router.push({ name: "login" })
 }
 
 const STORAGE_KEY = "sidebar-collapsed"

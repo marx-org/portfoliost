@@ -21,6 +21,16 @@ const router = createRouter({
       meta: { public: true },
     },
     {
+      // §77.4 — the OIDC client's `logoutCallbackUrls` advertises this path, so
+      // Pocket-ID redirects here after end-session. It has to be a real route:
+      // before this existed, completing a logout bounced the browser straight
+      // back into the dashboard.
+      path: "/logout",
+      name: "logout",
+      component: () => import("@/modules/auth/LogoutView.vue"),
+      meta: { public: true },
+    },
+    {
       path: "/public/portfolio/:shareId",
       name: "public-share",
       component: () => import("@/modules/settings/PublicPortfolioView.vue"),

@@ -1,5 +1,5 @@
 import { createPinia, setActivePinia } from "pinia"
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { useAuthStore } from "@/stores/auth"
 import * as authApi from "@/api/auth"
 import { NetworkError } from "@/api/client"
@@ -11,6 +11,7 @@ vi.mock("@/api/auth", () => ({
   fetchMe: vi.fn(),
   logout: vi.fn(),
   loginWithCode: vi.fn(),
+  buildEndSessionUrl: vi.fn((issuer: string) => `${issuer}/api/oidc/end-session`),
 }))
 
 const mocked = vi.mocked(authApi)
@@ -51,6 +52,13 @@ function makeMe(): AuthMe {
 describe("auth store", () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    localStorage.clear()
+    // Default: OIDC configured, like production. Individual tests override.
+    window.__OIDC_CONFIG__ = { issuerUrl: "https://pocket-id.test" }
+  })
+
+  afterEach(() => {
+    delete window.__OIDC_CONFIG__
   })
 
   it("starts unauthenticated without a stored token", () => {
@@ -94,6 +102,44 @@ describe("auth store", () => {
     expect(store.isAuthenticated).toBe(false)
     expect(store.user).toBeNull()
     expect(localStorage.getItem("portfoliost_token")).toBeNull()
+  })
+
+  it("sends the current token so the backend can revoke the refresh session (§77.4)", async () => {
+    mocked.logout.mockResolvedValue(undefined)
+    localStorage.setItem("portfoliost_token", "the-current-token")
+    const store = useAuthStore()
+    await store.logout()
+    expect(mocked.logout).toHaveBeenCalledWith("the-current-token")
+  })
+
+  it("ends the Pocket-ID session by navigating to end-session, not a router push (§77.4)", async () => {
+    mocked.logout.mockResolvedValue(undefined)
+    localStorage.setItem("portfoliost_token", "tok")
+    const assign = vi.fn()
+    vi.stubGlobal("location", { ...window.location, origin: "https://app.test", assign })
+
+    const store = useAuthStore()
+    await store.logout()
+
+    // A router push would leave Pocket-ID's cookie alive — the whole point is
+    // that ending the session needs a real navigation to its origin.
+    expect(assign).toHaveBeenCalledTimes(1)
+    expect(String(assign.mock.calls[0][0])).toContain("/api/oidc/end-session")
+    vi.unstubAllGlobals()
+  })
+
+  it("still clears local state when Pocket-ID is not configured (local dev)", async () => {
+    mocked.logout.mockResolvedValue(undefined)
+    localStorage.setItem("portfoliost_token", "tok")
+    const assign = vi.fn()
+    vi.stubGlobal("location", { ...window.location, origin: "http://localhost:8080", assign })
+
+    const store = useAuthStore()
+    await store.logout()
+
+    expect(store.isAuthenticated).toBe(false)
+    expect(assign).not.toHaveBeenCalled()
+    vi.unstubAllGlobals()
   })
 
   it("network error during login forces local logout of a stale session", async () => {

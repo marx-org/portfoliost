@@ -3,6 +3,7 @@ import { computed, ref } from "vue"
 import { clearToken, getToken, NetworkError, setToken } from "@/api/client"
 import * as authApi from "@/api/auth"
 import type { AuthUser } from "@/api/types"
+import { getOidcConfig } from "@/runtime-config"
 
 export const useAuthStore = defineStore("auth", () => {
   const token = ref<string | null>(getToken())
@@ -48,15 +49,28 @@ export const useAuthStore = defineStore("auth", () => {
     user.value = res.user
   }
 
+  /**
+   * Revoke server-side, then hand the browser to Pocket-ID's end-session.
+   *
+   * Falls back to a local-only logout if the network is unavailable — better a
+   * token cleared on this device than a spinner that never resolves. The
+   * refresh session then survives server-side, which is the one case where
+   * "logged out" is not final; it expires on its own within 30 days.
+   */
   async function logout(): Promise<void> {
+    const idToken = token.value
     try {
-      await authApi.logout()
+      await authApi.logout(idToken)
     } catch {
-      // ignore logout errors — we clear local state regardless
-    } finally {
-      token.value = null
-      user.value = null
-      clearToken()
+      // ignore — local state is cleared regardless
+    }
+    token.value = null
+    user.value = null
+    clearToken()
+
+    const { issuerUrl } = getOidcConfig()
+    if (issuerUrl) {
+      window.location.assign(authApi.buildEndSessionUrl(issuerUrl, idToken))
     }
   }
 
