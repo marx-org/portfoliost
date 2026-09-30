@@ -4141,65 +4141,74 @@ new endpoint, per `AGENTS.md` API-client typing rules.
 
 ### 77.1 — contracts: declare the refresh endpoint
 
-- [ ] Add `POST /api/auth/refresh` to `contracts/openapi.yaml`: request body
+- [x] Add `POST /api/auth/refresh` to `contracts/openapi.yaml`: request body
       `{ id_token: string }`, response `AuthResponse` (already
       `required: [access_token, token_type, user]`, `expires_in: integer`).
       Reusing `AuthResponse` keeps `AuthCallback.vue` and `LoginView.vue`
       unchanged.
-- [ ] Document in the endpoint description that the supplied `id_token` may be
+- [x] Document in the endpoint description that the supplied `id_token` may be
       expired — expiry is deliberately not checked, signature is.
-- [ ] `npm run gen:types` in `../portfoliost-contracts/contracts/`, then copy to
+- [x] `npm run gen:types` in `../portfoliost-contracts/contracts/`, then copy to
       `portfoliost-users-auth/src/generated/api-types.d.ts` and
       `portfoliost/src/generated/api-types.d.ts` (both repos keep their own
       copy; regenerate, never hand-edit).
-- [ ] Tests: `npm test` and `npm run lint` green in
+- [x] Tests: `npm test` and `npm run lint` green in
       `../portfoliost-contracts/contracts/`.
-- [ ] Commit.
+- [x] Commit.
 
 ### 77.2 — users-auth: persist the refresh token at login
 
-- [ ] New drizzle table `refreshSessions` in `src/db/schema.ts` under the
+- [x] New drizzle table `refreshSessions` in `src/db/schema.ts` under the
       existing `usersAuthSchema` (`users_auth`): `idTokenJti` (text, PK),
-      `userId`, `refreshTokenHash` (text), `expiresAt` (text), `createdAt`,
-      `updatedAt`. Model on `userPreferences` — all timestamps are `text`
-      ISO strings in this schema, not `timestamptz`.
-- [ ] `npm run db:generate` → new file under `drizzle/` alongside
+      `userId`, `refreshToken` (text), `createdAt`, `updatedAt` (text).
+      Model on `userPreferences` — all timestamps are `text` ISO strings in
+      this schema, not `timestamptz`.
+
+      **Correction (implemented):** the column is `refreshToken`, stored in the
+      clear, not a hash. The refresh grant must replay the value verbatim to
+      Pocket-ID, and a hash cannot be exchanged — the first cut stored
+      `sha256` and made the session unusable. Accepted on the grounds that
+      anyone able to read this database can already read the portfolios and
+      positions directly, so the token adds impersonation, not data exposure
+      beyond what such a reader already has. No `expiresAt`: the row's lifetime
+      is Pocket-ID's 30 days, and the server is the only thing that needs to
+      know about it.
+- [x] `npm run db:generate` → new file under `drizzle/` alongside
       `0000_baseline.sql`. Inspect the generated SQL: it must create in
       `users_auth`, not the `drizzle_users_auth` migrations schema.
-- [ ] In `routes/auth.ts`, add the field to the
+- [x] In `routes/auth.ts`, add the field to the
       `PocketIDTokenResponse` interface (line 18-23) — `refresh_token` is
       currently not even declared.
-- [ ] After a successful exchange in `POST /api/auth/token`, upsert the row
-      keyed by `idPayload.jti`, storing `sha256(refresh_token)` via
-      `node:crypto`. Return the id_token exactly as today, so the existing
-      browser payload is unchanged.
-- [ ] Tests: extend `src/routes/auth.test.ts`. Stub `fetch` to return a token
+- [x] After a successful exchange in `POST /api/auth/token`, upsert the row
+      keyed by `idPayload.jti`. Return the id_token exactly as today, so the
+      existing browser payload is unchanged.
+- [x] Tests: extend `src/routes/auth.test.ts`. Stub `fetch` to return a token
       response containing `refresh_token` and `id_token` with a `jti`, then
-      assert a `users_auth.refresh_sessions` row exists, that
-      `refresh_token_hash !== refresh_token` (plaintext never persisted), and
-      that the HTTP response body still contains no `refresh_token` key.
-- [ ] Commit.
+      assert a `users_auth.refresh_sessions` row exists and that the HTTP
+      response body still contains no `refresh_token` key — what must not leak
+      is the response, not the row.
+- [x] Commit.
 
 ### 77.3 — users-auth: the refresh endpoint
 
-- [ ] Add `refreshWithPocketID(refreshToken)` in `routes/auth.ts`, mirroring
+- [x] Add `refreshWithPocketID(refreshToken)` in `routes/auth.ts`, mirroring
       `exchangeWithPocketID`: `grant_type=refresh_token`, plus `client_id` and
       the same env vars (`POCKETID_TOKEN_URL`, `POCKETID_CLIENT_ID`). No
       `client_secret`.
-- [ ] `POST /api/auth/refresh`: read `id_token` from the body → verify with
+- [x] `POST /api/auth/refresh`: read `id_token` from the body → verify with
       `jose.jwtVerify` against the Pocket-ID JWKS using
       `clockTolerance: Number.MAX_SAFE_INTEGER` (or `jose` option
       `ignoreExpiration`-equivalent) so an expired-but-valid token is accepted.
       Read `sub`, `email`, `groups`, `jti` from the verified payload — from the
       signature, never from the raw request body.
-- [ ] Look up the row by `jti`. On miss → `401` and delete nothing. On hit →
+- [x] Look up the row by `jti`. On miss → `401` and delete nothing. On hit →
       exchange, then update the row: new `jti` **as** the key (delete old,
       insert new), new hash, new `expiresAt`. Rotation is required — Pocket-ID
       deletes the consumed refresh token server-side, so reusing the old `jti`
       must fail on the second call.
-- [ ] Return the same `AuthResponse` shape as `/token`, built from the *new*
+- [x] Return the same `AuthResponse` shape as `/token`, built from the *new*
       id_token's claims so `groups` stays current.
-- [ ] Tests in `src/routes/auth.test.ts`, all with a stubbed `fetch` and a
+- [x] Tests in `src/routes/auth.test.ts`, all with a stubbed `fetch` and a
       locally generated RSA keypair served from a stubbed JWKS:
       - expired-but-signed token + valid row → `200`, new `access_token`,
         row re-keyed to the new `jti`;
@@ -4207,25 +4216,25 @@ new endpoint, per `AGENTS.md` API-client typing rules.
       - valid token with no row → `401`;
       - tampered signature → `401`, and the row is **not** consumed;
       - response contains no `refresh_token` key.
-- [ ] Commit.
+- [x] Commit.
 
 ### 77.4 — logout actually revokes (all three parts)
 
 Gap 2 and gap 3 from the intro. This step is not optional: it is what stops
 "log out" from becoming a lie once the refresh row exists.
 
-- [ ] `POST /api/auth/logout` (`routes/auth.ts:188`) currently returns
+- [x] `POST /api/auth/logout` (`routes/auth.ts:188`) currently returns
       `{success:true}` and touches nothing. Read `id_token` from the body,
       verify signature ignoring `exp` as in 77.3, and `DELETE` the
       `refresh_sessions` row by `jti`. A missing row is still a `200` —
       logout is idempotent.
-- [ ] Land that half in `portfoliost-users-auth` first, keeping the body
+- [x] Land that half in `portfoliost-users-auth` first, keeping the body
       optional so the old client keeps working. Tests: logout removes the row;
       a second logout is still `200`; after logout, the pre-logout `id_token`
       can no longer be refreshed via 77.3's endpoint (the row is gone).
-- [ ] Frontend `src/api/auth.ts` `logout()` now sends the current token.
+- [x] Frontend `src/api/auth.ts` `logout()` now sends the current token.
       Commit.
-- [ ] **Verify PocketID's end-session behaviour before wiring it.** The endpoint
+- [x] **Verify PocketID's end-session behaviour before wiring it.** The endpoint
       is `GET /api/oidc/end-session` (from `/.well-known/openid-configuration`),
       taking `id_token_hint` and `post_logout_redirect_uri`. Do not code this
       from the spec — upstream issue #1390 / PR #1458 reports that refresh
@@ -4233,66 +4242,83 @@ Gap 2 and gap 3 from the intro. This step is not optional: it is what stops
       whether it clears the session cookie, and whether the 30-day refresh
       survives it. If it does survive, the row deletion above is the only thing
       that revokes, and that must be stated in the UI copy rather than implied.
-- [ ] `src/router/index.ts`: add the missing `/logout` route (public, no auth).
+- [x] `src/router/index.ts`: add the missing `/logout` route (public, no auth).
       Today `logoutCallbackUrls` advertises a URL that does not exist, and
       visiting it redirects into the dashboard while authenticated. The route
       clears `portfoliost_token` and renders the login view. Without this,
       enabling end-session signs the user out and immediately drops them back
       into the app.
-- [ ] `src/layout/SidebarNav.vue:15` and `src/modules/settings/ProfileView.vue:125`:
+- [x] `src/layout/SidebarNav.vue:15` and `src/modules/settings/ProfileView.vue:125`:
       logout becomes revoke → `window.location.assign(pocketIdEndSessionUrl)`
       rather than `router.push({name:"login"})`, since end_session must run as a
       top-level navigation to clear PocketID's cookie.
-- [ ] Tests: `/logout` clears the token and shows login; logout from the sidebar
+- [x] Tests: `/logout` clears the token and shows login; logout from the sidebar
       ends the PocketID session (assert the end-session URL is used, not a
       router push). e2e: log in → log out → `/api/auth/me` is 401 and a reload
       does not restore the session.
-- [ ] Commit.
+- [x] Commit.
 
 ### 77.5 — portfoliost frontend: refresh-on-401 with a single in-flight guard
 
 No timer (see intro). One event-driven path.
 
-- [ ] `src/api/auth.ts`: add `refresh(idToken)` calling `POST
+- [x] `src/api/auth.ts`: add `refresh(idToken)` calling `POST
       /api/auth/refresh`, typed from the regenerated `api-types.d.ts`.
-- [ ] `src/stores/auth.ts`: add `refreshSession()` that calls it, updates
+- [x] `src/stores/auth.ts`: add `refreshSession()` that calls it, updates
       `token`/`user`, and `setToken()`. Module-level `let inflight: Promise<void>
       | null` — if set, return it; otherwise create it and clear it in a
       `finally`. Every concurrent 401 awaits the same promise. **This is the part
       that breaks without it**: 15 parallel requests lapse together, the first
       refresh rotates the token, the other 14 find no row and fail.
-- [ ] `src/api/client.ts` `request()`: on `ApiError` with `status === 401`,
+- [x] `src/api/client.ts` `request()`: on `ApiError` with `status === 401`,
       await the single in-flight refresh, then replay the original request
       **once**. Guard with a per-request `retried` flag so the refresh call
       itself cannot recurse; a failed refresh falls through to `logout()` +
       redirect to `login`.
-- [ ] State the idempotency reasoning in a comment rather than leaving it
+- [x] State the idempotency reasoning in a comment rather than leaving it
       implicit: replay is safe because the 401 comes from `validateJwt` in
       middleware *before* any handler runs, so no side effect occurred on the
       first attempt. Add a test that a 401'd `POST` replays exactly once and
       the backend sees two requests but one committed effect.
-- [ ] Leave `prompt: "login"` at `src/auth/pkce.ts:65` alone (resolved above).
-- [ ] Tests in `src/api/client.spec.ts`:
+- [x] Leave `prompt: "login"` at `src/auth/pkce.ts:65` alone (resolved above).
+- [x] Tests in `src/api/client.spec.ts`:
       - 401 → one refresh → replayed request returns `200`;
       - 5 concurrent 401s trigger exactly **one** `/api/auth/refresh` call;
       - a failing refresh does not retry the refresh itself;
       - a second 401 after replay surfaces the error.
-- [ ] `npm run build` (includes `vue-tsc --noEmit`), `npm run test`,
+- [x] `npm run build` (includes `vue-tsc --noEmit`), `npm run test`,
       `npm run test:mock` green.
-- [ ] Commit.
+- [x] Commit.
 
 ### 77.6 — verify on the real stack, then prod
 
-- [ ] `docker compose up -d --build`, `npm run test:mock`, `npm run test:e2e`
-      green (114 e2e per §75).
-- [ ] Manual: log in, confirm `id_token` lifetime is still 60 min in the browser
-      but `refresh_sessions` has a row in `users_auth`. Wait out the expiry,
-      reload, and confirm the SPA never shows a login screen,
-      `localStorage["portfoliost_token"]` has a new `jti`, and the `jti` keyed
-      the row has moved with it. Confirm a page load right after expiry issues
-      exactly one `POST /api/auth/refresh`, not fifteen. Log out and confirm the
-      row is gone, a pre-logout token no longer refreshes, and PocketID's
-      session cookie is cleared.
+- [x] Automated suites on the compose stack: contracts `lint` + 16 tests,
+      users-auth `build` + 35 tests, frontend `build` (vue-tsc) + 476 unit +
+      230 mock, e2e **117 passed / 1 failed**.
+
+      The one e2e failure is `portfolios.spec.ts:149` (a `$500.00` total-cost
+      assertion in the transaction edit dialog). **Not caused by §77** — proven,
+      not assumed: checked out `bedd751` (pre-§77) in a `git worktree` and it
+      fails identically against the same stack. §77's diff touches only
+      `src/api/{auth,client}.ts`, `src/stores/auth.ts`, `src/router/index.ts`,
+      `src/main.ts`, `LogoutView.vue`, two call sites, the mock and two test
+      files — no portfolios, transactions, compose or nginx.
+
+- [ ] Fix the compose gateway, which 404s every wallets-routed path
+      (`/api/portfolios`, `/api/labels`) while the same paths return 200 direct
+      to `wallets` and via `:3000`. Cause: nginx caches upstream resolution at
+      startup and `wallets` was recreated, so the gateway proxied to a dead
+      address. `docker compose restart gateway` fixes it. Found while
+      verifying §77 — a pre-existing footgun worth its own note, and the
+      symptom is ~40 e2e failures that look like app bugs.
+- [ ] Manual, against prod: log in, confirm `id_token` lifetime is still 60
+      min but `refresh_sessions` has a row in `users_auth`. Wait out the
+      expiry, reload, confirm no login screen appears,
+      `localStorage["portfoliost_token"]` has a new `jti`, and the row moved
+      with it. Confirm a page load right after expiry issues exactly **one**
+      `POST /api/auth/refresh`, not fifteen. Log out: row gone, pre-logout
+      token no longer refreshes, Pocket-ID session cookie cleared, and
+      `/logout` lands on login rather than the dashboard.
 - [ ] Release per the `homelab-deploy` skill: tag-bump
       `portfoliost-users-auth` and `portfoliost` images, bump the pinned `tag:`
       in their `helmrelease.yaml`, commit to homelab `main` (rebasing on the
