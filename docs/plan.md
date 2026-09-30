@@ -3362,3 +3362,166 @@ application was correct throughout.
 before blaming the fixture.* A clean tree is not a baseline, and "this spec is
 known flaky" is a conclusion, not a starting point. §67.1 recorded the
 flakiness, which made the wrong answer feel available and attractive.
+
+---
+
+## 76. No calculation on read: reads are pure, the twice-daily cron owns pricing (user request 2026-09-30)
+
+Proposal: — (direct user request: "abandoning such calculations as-you-go … It should be
+planned periodic cron jobs (maybe we can reuse one which is run twice a day already). UI
+needs to be fast, and such calculations slows it down significantly. It also produced very
+complicated chain of methods, which probably we can greatly simplify"); no proposal doc.
+
+Scope: `portfoliost-wallets` (remove the writes, collapse the queues) + `portfoliost` SPA
+(surface the manual control). The existing `snapshotsync` / `snapshotsync-postfx` CronJobs
+are reused as they stand — no new scheduling, no homelab change.
+
+**The scheduled work already exists and already does this.**
+`src/scripts/snapshots-sync.ts` walks EVERY portfolio and calls, in order,
+`refreshQuotes` (price the positions) then `runBackfillRecent` (value the snapshots through
+today), twice daily, serialized. Its own comment records why it was added: *"The only
+writer is `refreshQuotes`, which ran solely when a user OPENED a portfolio."* The cron was
+the fix; the on-open path was simply never removed. So this section removes a path that
+already has a scheduled replacement, rather than inventing one.
+
+**What a read actually does today.** Three GET routes write, through six layers, to three
+tables:
+
+```
+GET /api/portfolios/:id/positions            portfolio-transactions.ts:1205
+GET /api/portfolios/:id/allocation           portfolio-transactions.ts:1251
+GET /api/portfolios/:id/positions/cfd-hints  portfolio-transactions.ts:1364
+  └─ refreshQuotes                    quotes.ts:213   (takes the shared lock)
+       └─ enqueueBackfill             backfill-runner.ts
+            └─ refreshQuotesUnlocked  quotes.ts:239   (fetch quote+profile per symbol)
+                 ├─ UPDATE positions × N
+                 └─ snapshotPortfolioValue   quotes.ts:431
+                      ├─ INSERT value_snapshots (today)   quotes.ts:520
+                      └─ syncCurrentValueFromSnapshots     quotes.ts:540
+                           └─ SELECT latest snapshot → UPDATE portfolios.current_value
+```
+
+`GET /:id/positions` is the endpoint behind the holdings tab (`src/api/portfolios.ts:48`),
+the portfolio store (`stores/portfolios.ts:45,62`) and every card (`PortfolioCard.vue:257`),
+so merely looking at a portfolio recalculates and persists. `GET /:id/allocation` is the
+Allocation tab (`PortfolioAllocationTab.vue`).
+
+**D58 removed this from the wrong module.** Its comment at `portfolios.ts:860` says it
+dropped the refresh from "the portfolio-open read path" — but portfolio-open reads positions
+through the **transactions** module, not `portfolios.ts`. The removal fixed a route the SPA
+does not use for that data, so the write survived in the route that matters. §76.1 is the
+completion of D58, not a reversal of it.
+
+**Decisions taken by the user 2026-09-30, binding on every step below:**
+- Reads calculate nothing. A **write** (adding/editing a position or transaction) still
+  re-prices — the user pays that cost on an action they just took, not on every page view.
+- The existing **twice-daily** cadence is the freshness budget. Worst case ~12h between a
+  price move and the dashboard reflecting it. No new CronJob.
+- There **is** a manual refresh control, one per portfolio.
+- `cfd-hints` keeps its endpoint and response shape; only the refresh call is removed.
+
+**Not measured.** The session expired before this section was written, so the read-path
+latency was never timed. Every performance claim here is structural (a write per read),
+not a number, and no step may cite a millisecond figure until one is measured.
+
+### 76.1 — Make the three GET read paths pure (wallets)
+
+- [ ] Delete `await refreshQuotes(...)` from all three GET handlers in
+      `src/routes/portfolio-transactions.ts` — line 1205 (`GET /:id/positions`),
+      1251 (`GET /:id/allocation`), 1364 (`GET /:id/positions/cfd-hints`).
+      Leave the POST at 1181 and the five `notifyTransactionsChanged` sites alone.
+- [ ] Fix the now-false comments that assert the read path prices: the D58 note at
+      `portfolios.ts:860-876` ("Prices now come from the writers" is right, but the
+      surrounding text credits a removal that never reached this module) and the
+      `snapshots-sync.ts:55` claim that the only writer "ran solely when a user OPENED a
+      portfolio", which stops being true here.
+- [ ] Tests: a route-level test per endpoint that records
+      `value_snapshots` count, `portfolios.current_value`, and `positions.price_as_of`
+      before and after the GET and asserts **all three unchanged**. A test that only
+      asserts the response body would pass with the write still in place.
+- [ ] Tests: `GET /:id/positions` still returns the same payload shape and the same
+      `priceAsOf`/`priceSource` fields (§61/§70 rely on them travelling with each
+      position), and the existing `portfolio-transactions` + `quotes` + `snapshots`
+      suites stay green.
+- [ ] Commit.
+
+### 76.2 — One manual refresh per portfolio, on the additive path (SPA + wallets)
+
+- [ ] The control already exists but only renders when a chart has **already failed**
+      (`PortfolioCard.vue:352-360`, `data-testid="card-chart-recompute"`, gated on
+      `backfillFailed`). Surface it unconditionally on each card.
+- [ ] It must call the **additive** mode, not the default. `POST /:id/recompute` with no
+      `mode` is `forcePortfolioRecalc` — DELETE every snapshot row and rebuild. For a
+      routine "refresh now" on a 108-position portfolio that is the wrong tool;
+      `?mode=upsert` re-values the last two days without deleting. Add
+      `?mode=upsert` to the API client's recompute call for this control and keep the
+      existing failure-path button on the same mode.
+- [ ] Show the resulting freshness rather than implying liveness: the card should keep
+      carrying the snapshot's own as-of, so a user who did not press the button can see
+      the number is up to ~12h old. §70's rule — label it, do not fabricate it.
+- [ ] Tests: e2e asserts the button issues `POST /:id/recompute?mode=upsert` (not the
+      bare path), and a second e2e asserts a plain navigation issues **no** POST and no
+      write.
+- [ ] Commit.
+
+### 76.3 — Collapse the two overlapping background queues (wallets)
+
+- [ ] There are two independent debounced/locked recalc mechanisms, and a single
+      mutation drives **both**: `notifyTransactionsChanged` (`services/recalc-queue.ts`,
+      fired from `portfolio-transactions.ts:568,669,762,892,1191` and `routes/import.ts`)
+      *and* `refreshQuotes` → `enqueueBackfill` (`services/backfill-runner.ts`). Two
+      locks, overlapping work, and the ordering between them is unexpressed — which is
+      the same "two writers, timing decides" shape as the §63.2 race.
+- [ ] Measure first: for one mutation, log what each mechanism enqueues and what each
+      writes. Then keep exactly one. Record which was dropped and why in the commit —
+      `recalc-queue`'s debounce and `backfill-runner`'s serialization solve different
+      problems (burst collapsing vs torn series), so the survivor may need both
+      properties, and that has to be established rather than assumed.
+- [ ] Tests: a mutation test asserting exactly one recalc is enqueued per change, and
+      that two concurrent mutations for the same portfolio cannot interleave into a torn
+      series.
+- [ ] Commit.
+
+### 76.4 — One writer per (portfolio, date) in `value_snapshots`
+
+- [ ] Three insert sites — `quotes.ts:520` (live, today), `backfill.ts:1021`
+      (`_runBackfillCore`, history), `backfill.ts:1071` (`recalcPortfolioHistory`, batch) —
+      and three `syncCurrentValueFromSnapshots` sites: `quotes.ts:540`,
+      `backfill.ts:1036`, `backfill.ts:1119`. Whichever ran last wins, and two of them
+      target the same `(portfolioId, snapshotDate)` row for today. §76.1 removes the
+      *trigger* for the live writer on reads but does not remove the writer.
+- [ ] Decide the ownership rule and write it down: history belongs to the backfill (only
+      it can price a past date from bars); today is owned by exactly one path.
+      `computeSnapshotBatch` already accepts a window ending today, so the backfill's
+      `mode=upsert` can own today and the live writer can be reduced to refreshing
+      quotes on positions.
+- [ ] This is also what single-sources today's FX choice. The residual IBKR divergence
+      (§63.2) is ~1.2% on the FX-heavy portfolio — EUR +70,779, USD −39,104, PLN
+      −121,130, base PLN — with the snapshot resolving FX at write time and the headline
+      at read time, and today's ECB rate not existing until ~16:00 CET. **One writer
+      should be tested against that number before the FX residual is chased as its own
+      bug**, because a single writer may remove it entirely.
+- [ ] Tests: a test asserting a single insert path per date; a test that two concurrent
+      writers for the same date cannot both succeed; and the existing equivalence test
+      (`backfill.test.ts:835`, `snapshotPortfolioValue equals computeSnapshotBatch for
+      the same day`) kept green as the arithmetic guard.
+- [ ] Commit.
+
+### 76.5 — Verify the read path is pure, then close out
+
+- [ ] Re-measure what §76.1 removed: time `GET /api/portfolios/:id/positions` for the
+      largest portfolio (IBKR, 108 positions) against a non-writing sibling
+      (`/summary-metrics`, `/cash`) **on an authenticated session**. Record the numbers
+      in this section. This is the evidence §76 was justified by, and it does not exist
+      yet.
+- [ ] Confirm in PROD that navigating a portfolio no longer changes
+      `portfolios.current_value`: read the value, navigate, read it again, assert
+      unchanged. Then press the new manual control and assert it *does* change.
+- [ ] Confirm the cron still prices the fleet with the read path gone — the
+      `snapshots-sync.ts:51-63` comment describes the exact failure that appears if
+      nothing prices: *"the dashboard understated net worth by ~261k PLN on PROD while
+      looking entirely plausible."* After the 13:00 UTC run, assert
+      `positions.price_source` is `quote` fleet-wide and no portfolio reports
+      `unpricedPositions > 0` that previously had prices.
+- [ ] Commit, then archive §76 and §63.6 together — §63.6's open §63.2 item is the
+      writer half of this section and should not be closed twice.
