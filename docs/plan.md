@@ -1981,24 +1981,41 @@ field alongside `fxFrom` would let callers decide per bar.
       response never said what it dropped. The old text claimed the SPA "renders
       an explicit caveat" for the window — the wallets grid was doing no such
       thing, which is how a base-currency price reached a portfolio total.
-- [x] Add `unconvertedDates` (or a count) to the `/price-bars` response so a
+- [ ] Add `unconvertedDates` (or a count) to the `/price-bars` response so a
       caller can see what was dropped instead of inferring it. Needs a contracts
       change + `npm run gen:types` in `portfoliost-contracts/contracts/`, then
       the SPA mocks in `mocks/` that assert the response shape.
-      > **The mocks half is now done, and it was the urgent half** — see the
-      > commit below. The contracts field is still open and is a smaller job than
-      > this item implied: `convertSeries` already returns `convertedMask`
-      > (`fx-convert.ts:60-71`) and the routes already slice through it
-      > (`instruments.ts:646-659`); the mask simply never leaves the service.
-      > Surfacing it is a response field on `PriceHistory` / `PriceBarSeries`
-      > (`openapi.yaml:603-618`, `:954-971`), a `gen:types` in three repos, and a
-      > field on the mock.
+      > **Spec half done (contracts `2a28d83`), mocks half done (`d75e13f`); the
+      > release + regen is what remains.** `unconvertedDates` is now on both
+      > `PriceHistory` and `PriceBarSeries`, declaring behaviour that already
+      > shipped — `convertSeries` returns `convertedMask` (`fx-convert.ts:60-71`)
+      > and both routes slice through it (`instruments.ts:646-659`); it simply
+      > never left the service.
       >
-      > **A related contract statement is now false and should be fixed in the
-      > same pass:** `openapi.yaml:618` and `:965` both say *"bars before it
-      > (`fxFrom`) are unconverted (native baseCurrency)"* — that is precisely
-      > the rule this section's own DONE note marks superseded. A caller reading
-      > the spec today would implement the defect.
+      > **The instruction is wrong about where `gen:types` runs.** There is no
+      > such script in `portfoliost-contracts/contracts/` — only `build`, `test`,
+      > `lint`. It lives in each **consumer**
+      > (`portfoliost-wallets/package.json`: `openapi-typescript
+      > node_modules/@marx2/contracts/openapi.yaml -o src/generated/api-types.d.ts`)
+      > and reads the **published** package, not the working copy. So the real
+      > sequence is: spec → release → `gen:types` in all three consumers →
+      > instrument routes emit the field → mock emits the field. Two of those
+      > five are done and the release is the gate — a gate on a registry, not on
+      > a decision.
+      >
+      > **A related contract statement was false and is now fixed in the same
+      > pass — that was the more urgent half.** `fxFrom` on both schemas said
+      > *"bars before it are unconverted (native baseCurrency)"*, which is
+      > precisely the rule this section's own DONE note marks superseded. A
+      > caller reading the spec would have reimplemented the defect §72.17 fixed
+      > in prod. Corrected to say an unconvertible bar is **absent**, and why.
+      >
+      > **Bookkeeping to fix before the next release:** the local contracts
+      > checkout sits at **1.6.52** with an unreleased `assetType` commit on top,
+      > while the `@marx2/contracts` every consumer installs resolves to
+      > **1.6.53**. The local repo is behind what is published, so a release cut
+      > from this checkout would omit whatever 1.6.53 added. Reconcile it before
+      > cutting, not after a confusing release.
 - [x] Re-check the other `?currency=` consumers now that the response is
       shorter than requested: wallets grid (covered), `buildBenchmarkSeries`,
       the SPA history/compare charts, and `mocks/`. A consumer that assumed a
