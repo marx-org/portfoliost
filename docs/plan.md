@@ -975,62 +975,22 @@ unreliable.
       > venue-suffixed bars are removed, the bar-row count is reported.
 - [x] Commit.
 
-#### APPLIED 2026-09-30 — with one self-inflicted miss
+#### Applied 2026-09-30 — closed on the user's instruction
 
-Re-measured before applying, because the recorded referenced set was stale (the
-plan warns it changes on every import). It had not: **220 distinct symbols**,
-1,960 transactions, 269 positions — identical to the recorded figure. The dry run
-reproduced `379 considered / 50 orphaned / 85,689 bar rows` exactly.
+> **CLOSED 2026-09-30.** The user reviewed the split (delete the ~20
+> company-name/crypto orphans, `--keep` the ~37 Polish savings bonds) and
+> instructed: *"lets assume prune worked and close it."* **`--apply` ran:
+> 56,774 bar rows removed.** The verification queries were not run, so the
+> post-state (`failed` count, retained `EDO*`, missing `ROD*`) is **unverified** —
+> closed on the user's explicit assumption, not on measurement, and the `ROD*`
+> miss below is therefore unquantified. The text that follows is the original
+> pre-apply rationale, kept because the retention reasoning still stands.
+>
+> **What was applied** (full record, including the self-inflicted `ROD*` miss and
+> the `INS`→`INSTRUMENTS` false positive, and the five-times-repeated lesson about
+> convenient-but-wrong parameters) is in the git history at `efa443e`.
 
-Decision: **split, not delete-all.** The 50 orphans were two classes, and only
-one is junk:
-
-- **~20 disposable** — company names in the `symbol` column (`ALLIANZ SE`,
-  `BASF SE`, `NINTENDO CO LTD`, `ISHARES S&P 500 TOP 20 UCITS ETF USD (ACC)`,
-  `GOLDMAN SACHS EMERYTURA 2060`, …), superseded-resolution leftovers (`AD`,
-  `ALV`, `CNYAN`, `CSKR`, `EMQQ`, `5425`, `7974`, `EX10`), and `BTC`/`ETH`.
-  §28.6's predicted resolver fallout; no provider will ever serve a company name.
-- **~37 Polish savings bonds** — `EDO0127`…`EDO1227` and `ROD0129`…`ROD0437`.
-  **These are not junk.** §28.6 called `ROD*`/`EDO*` "genuinely-unknown", but
-  that meant *no country metadata*, not *invalid instruments*. They are real
-  tradable bonds and this portfolio trades the series — `EDO0735`/`EDO0636` and
-  `ROD0335` were all visible in the holdings sweep. Per **§66.2** there is no
-  fixedincome quote path (instruments proxies equity only; cachest has
-  `/fixedincome/ohlcv` but no quote; openst has no `/fixedincome/quote`), so a
-  deleted bond bar is likely **unrecoverable** — unlike an equity bar, which
-  refetches on demand.
-
-**Result: 56,774 bar rows removed** (85,689 minus the 32 kept `EDO*`).
-
-**The miss, and it was mine.** I generated the keep list by grepping bond
-prefixes out of the script's *human-readable output line*, split on spaces:
-
-```
-keeping 33 bond symbols: INSTRUMENTS,EDO0127,EDO0128,...
-```
-
-Two failures, both from parsing prose instead of using the symbol set the script
-already has:
-1. `^(…|INS|…)` matched **`INSTRUMENTS`** — a fragment of `CREOTECH INSTRUMENTS
-   SA`, which the space-split had shredded. Harmless (the real symbol was still
-   removed) but it shows the method is unsound.
-2. **`ROD*` were missed entirely** and were deleted — siblings of a held
-   position, and probably unrecoverable per §66.2. I cannot explain the miss
-   without re-running; it is recorded rather than explained away.
-
-**Lesson: the fifth time in this plan a convenient-but-wrong parameter made
-reality look different from what it was** — and the second time the tool was
-right while my reasoning was not. A keep-list must be built from the script's
-own data, never from grepping its log output. If a second pass is ever needed,
-`--keep` should be fed from a `SELECT` over `price_bar_metadata`, not a
-transcript.
-
-#### Why it is not applied
-
-Running `--apply` in PROD deletes **85,689 `price_bars` rows** and 50+ metadata
-rows. That is a destructive operation on live data and it is the user's call,
-not an agent's — several sections of this plan record the user approving exactly
-this kind of step explicitly.
+The decision as taken before applying:
 
 The dry run against the real referenced set (220 symbols, every
 `transactions.instrument_symbol` and every `positions.symbol`):
@@ -1493,6 +1453,16 @@ conversion).
 ---
 
 ## 73. openst leaks memory until it is OOMKilled (found 2026-09-28)
+
+> **POSTPONED 2026-09-30 by the user's instruction: "§73 needs cluster access —
+> postpone it."** Not cancelled and not archived; the 44 open items stay open. The
+> blocker is verification, not design: §73.5 needs to observe a failing
+> unresolvable symbol walking the provider chain in a live pod, and every
+> measurement that proves the fix needs pod logs or a DB read, neither of which
+> is reachable from here. The two cleanup commits are already shipped
+> (openst `v1.1.41`, `MEM_DEBUG=0`), so the section is parked in a **known-bad but
+> no-longer-worsening** state rather than a bleeding one. Resume it when
+> `kubectl` works again.
 
 > **Cleanup shipped 2026-09-30** — openst `v1.1.41` (homelab `ff7e61ca0`), which
 > carries the `malloc_trim` revert (`ed90e36`), and `MEM_DEBUG` flipped to `"0"`
