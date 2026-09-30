@@ -1223,6 +1223,17 @@ Equate+ is the same mechanism: its value rose because SAP SE went from ~0 to
       10 portfolios so the 15,777 and the SAP SE value land on their proper
       dates. **User-approved**, deliberately deferred until after §69.2 so the
       backfill runs once over final data rather than twice.
+      > **Superseded as a manual step — §69.3 does this automatically now.** The
+      > import route re-backfills every portfolio it touched (`6015170`), and
+      > every pass rebuilds from the first trade because `computeSnapshotBatch`
+      > derives the window start rather than accepting one. So a wipe & re-import
+      > now places the 15,777 deposit and the SAP SE value on their proper dates
+      > with nobody pressing Recompute. **This still needs running once against
+      > PROD** — it is a data event, not a code one — and the 2026-09-27 snapshot
+      > rows that already absorbed the correction have to be rebuilt over, which
+      > means the *destructive* `forcePortfolioRecalc` (`portfolios.ts:1187`) or a
+      > `recalcPortfolioHistory`, not the additive pass. **Needs cluster access
+      > and the user's go-ahead**, since it rewrites PROD history.
 
 ### 69.3 — the systemic gap (still open)
 
@@ -1234,7 +1245,58 @@ future re-import. Options: have the import job call `forcePortfolioRecalc` /
 `runBackfill` for the portfolios whose rows changed, or record the earliest
 changed `transaction_date` and re-backfill from there.
 
-- [ ] Decide and implement.
+- [x] Decide and implement.
+      > **Done — and by the first of the two options, not the second.** Wallets
+      > `6015170` "fix(wallets): a bulk import re-backfills what it touched
+      > (§69.3)". `POST /api/import/transactions` tracks `affectedPortfolios`
+      > (`import.ts:500`) and calls `notifyTransactionsChanged` once per touched
+      > portfolio after the batches commit (`import.ts:638-640`), which lands in
+      > `recalc-queue.ts:64-66` → `enqueueBackfill(portfolioId, …recalcPortfolioSeries)`.
+      >
+      > Two details in that commit are the substance, and both are load-bearing:
+      > **the bulk route was the one that was missing** — the six single-transaction
+      > routes in `portfolio-transactions.ts` all called the hook, but the route
+      > *sheets-sync actually uses* did not, which is why a wipe & re-import left
+      > history unrebuilt. And it is **one notify per portfolio, not per row**:
+      > the queue holds one slot per portfolio and the runner is serialized, so
+      > ten portfolios cost ten sequential rebuilds (~2 min measured) where a
+      > per-row notify would thrash that queue for nothing.
+      >
+      > §76.3 then changed the pass from destructive `recalcPortfolioHistory` to
+      > the **additive** `recalcPortfolioSeries`, which is the right variant for
+      > this: a bulk import changes history, it does not invalidate it.
+- [ ] **The second option was never needed, and that is worth knowing rather than
+      assuming.** `computeSnapshotBatch` has no `fromOverride` — the window start
+      is always `min(BUY/SELL executedAt)`, falling back to the earliest cash row
+      (`backfill.ts:691-717`). So **every pass already re-values the whole history
+      from the first trade**, not just the last two days. The cliff this section
+      was opened for is therefore structurally impossible: a backdated row cannot
+      land on "the next snapshot written" because there is no next-snapshot-only
+      path left in the write flow.
+      > **So a "re-backfill from date X" capability would be a performance
+      > optimisation, not a correctness fix** — it would shorten each import's
+      > rebuild, at the cost of a threaded `fromOverride` through
+      > `computeSnapshotBatch` → `_runBackfillCore` → `recalcPortfolioSeries` /
+      > `recalcPortfolioHistory`, a query param on the recompute route
+      > (`portfolios.ts:1146-1190`, which currently declares none in the contract
+      > — `openapi.yaml:3501-3519`), and a contracts bump. Do not build it as a
+      > correctness fix; if it is wanted, it should be costed against the measured
+      > ~2 min per 10 portfolios, which is not currently a problem.
+- [ ] **One real gap the implementation leaves, and it is in reporting not in
+      behaviour.** The import response cannot say what it changed:
+      `ImportTransactionsResponse` (`openapi.yaml:2111-2127`) is
+      `{inserted, skipped, errors, syncRun}`, `SyncRun` carries three counters and
+      no portfolio ids, no dates, and `sync_runs` has no date columns
+      (`schema.ts:32-52`). `affectedPortfolios` is computed inside the handler and
+      **discarded**. So the operator gets `[import] §69.3: re-backfill queued for
+      N touched portfolio/plfolios` on stderr and nothing queryable afterwards —
+      which is the same defect §72.22 found in the price audit, where the feature's
+      entire value is its output and the output did not persist.
+      > If this is picked up: return `affectedPortfolios` (ids + row counts) from
+      > the import route, add it to the contract, regenerate, and mirror it in
+      > sheets-sync's hand-written `ImportTransactionsResponse`
+      > (`wallets-api-client.ts:149-154`) — the two repos are version-coupled.
+      > **Not urgent:** the rebuild does happen, which is the correctness half.
 
 ---
 
