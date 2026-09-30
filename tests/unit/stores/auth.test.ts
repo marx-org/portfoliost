@@ -131,6 +131,7 @@ describe("auth store", () => {
   it("still clears local state when Pocket-ID is not configured (local dev)", async () => {
     mocked.logout.mockResolvedValue(undefined)
     localStorage.setItem("portfoliost_token", "tok")
+    window.__OIDC_CONFIG__ = { issuerUrl: "" }
     const assign = vi.fn()
     vi.stubGlobal("location", { ...window.location, origin: "http://localhost:8080", assign })
 
