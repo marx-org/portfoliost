@@ -2180,14 +2180,30 @@ and the shape is unchanged.
       which are the same thing with numbers attached.
 - [ ] Then reconsider the limit downward once the curve is flat — 2Gi is
       headroom for bursts, not a target to keep.
-      > **Now actionable, with a number.** The steady-state per-symbol cost
-      > converges to ~1.3 MiB and the burst peak is ~5.4 MiB per concurrent
-      > walk. At `UPSTREAM_MAX_INFLIGHT = 8` that is a peak of roughly 45 MiB
-      > over a ~380 MiB floor — **so 700 MiB was never the right ceiling either,
-      > and 2 Gi is far more than the measurement needs.** The number to set
-      > comes from (1): bound the width first, then set the limit from the
-      > measured floor + peak rather than from the number that stopped an
-      > OOMKill.
+      > **CORRECTION, and it is against my own measurement from two
+      > paragraphs up.** I wrote that "2 Gi is far more than the measurement
+      > needs". That is wrong, and the way it is wrong is instructive: my
+      > per-symbol figures came from batches that *started* at different RSS, so
+      > "0.0 MiB per symbol" and "+84.5 MiB for 16 symbols" are not comparable
+      > numbers — the second was measuring the first run's high-water being
+      > established, and the third was measuring it being reused.
+      >
+      > openst **already** bounds the width: `UPSTREAM_MAX_INFLIGHT = 8`
+      > (`src/main.py:81`), a semaphore introduced for the 2026-09-20 OOM and
+      > still there. So option (1) above is **not available as a new change** —
+      > the bound exists; what changed in §63.9 is how much work cachest asks it
+      > to have in flight, and the honest statement is that the burst *width* is
+      > capped and the *cost per walk* is what sets the peak.
+      >
+      > **What this means for the limit, stated with the confidence I actually
+      > have:** 2 Gi is not obviously over-provisioned. floor ~380 MiB plus the
+      > peak of up to 8 concurrent provider walks is in the same order of
+      > magnitude as the 700 MiB that killed both pods, which is the whole
+      > reason 2 Gi stopped the bleeding. Lowering it again needs one clean
+      > experiment this session did not get to: **measure a single cold walk
+      > from a freshly-started pod**, so the per-walk peak is a number rather
+      > than a difference between two already-elevated baselines. Until that
+      > exists, leave the limit alone.
 - [ ] Add an alert on `container_memory_working_set_bytes` growth rate, so the
       next leak is caught by a trend rather than by an OOMKill.
       > **Now clearly worth having, and for a different reason than §73
