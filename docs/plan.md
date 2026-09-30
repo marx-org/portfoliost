@@ -13,6 +13,58 @@ also still has `[ ]` work; fully finished steps are archived)
 
 ---
 
+## Where this stands (2026-09-30)
+
+**Shipped and verified in PROD this session** — each with its own commit, its own
+release, and evidence taken from the running service rather than from the test:
+
+| § | what | how it was verified |
+|---|---|---|
+| 60 | Research "Go back" returns to the origin page | 5 e2e + `v1.0.285` rolled out; browser pass blocked on the login |
+| 61 | `TickerBadge` at every ticker surface (11 steps, 4 repos) | 461 unit · 227 mock · 114 e2e · live profile/peers return the new fields · parity measured on `app.example-service.ai` |
+| 63.5 | Extreme-jump guard on the overflow write | the deployed image refuses a 100× bar, passes a real 1:10 split, 0 false positives on 4 live symbols |
+| 63.11 | Edge auth for browser traffic | `cachest` + `openst` 302 to oauth2-proxy; a live `snapshotsync` Job then ran `ok=10 failed=0` |
+| 63.14 | `formatCurrency`'s USD default | already removed by §66.2; the two named cases are now tests |
+| 63.15 | Prune orphaned price bars | 25 unit; dry run in PROD against the real referenced set (`--apply` needs the user) |
+| 70 | `cashBreakdown` weight guard | already done by §70.5; now pinned against the exact IBKR shape (old formula: 333% / −233%) |
+| 71.6 | `MFC` cross-listing | classified, still reported; a real PROD audit now prints **1** finding, and it is not MFC |
+| 72.4 / 72.22 | price-audit run for real | 1191 trades, 28 flagged, `SAP.DE` clear, findings recorded in §74.6 |
+| 72.24 | `fx_rates` history | 30 currencies × 7103 rows, 1999-01-04 → today; the one empty day is Good Friday |
+| 72.36 | EUR absent from `fx_rates` | deliberate — `base=EUR` means a EUR row is 1 by definition; now pinned by 4 tests |
+| 74.1–74.6 | Order-priced fund audit | 13 new tests; PROD run shows the 192 fund trades explained with evidence, `SAP.DE` still clear |
+| 75.4 | A latent e2e race §61 exposed | fixed in the test, 114 e2e green |
+
+**Three things this session established that are worth more than the code:**
+
+1. **Stored and live values now reconcile.** A real `valuation-audit` run in PROD
+   reports **0** `reconciliation-gap` and **0** `currency-mismatch` findings
+   across all 10 portfolios. That is the check §63.3 has been chasing since the
+   fact-check, run for real and clean.
+2. **The `1.126` is finished.** It was never a fund class, a share class or a
+   provider gap — it was the audit comparing an order-priced fund trade against
+   the wrong day's bar. §74 closed it, and §74.4's measurement then *refused* to
+   produce a window constant, which is the more useful outcome: a guess would
+   have hidden genuine mismatches.
+3. **Two plan items were answered by a code comment, not by code.** EUR's
+   absence from `fx_rates` and `formatCurrency`'s "USD" default were both
+   deliberate and both already fixed. Both are now pinned by tests, because a
+   test is the durable form of a comment for anyone who has DB access and not
+   source access.
+
+**Blocked on the user** (cannot be self-served):
+
+- **Pocket-ID login** for the PROD *browser* pass of §60.4 and §61.11. Every
+  surface is proven in the compose stack and the payloads are proven against the
+  running service; what is missing is a visual confirmation in a signed-in tab.
+- **`price_bars --apply`** deletes 85,689 rows in PROD. Tool shipped, dry-run
+  measured, the decision is the user's.
+- **Sheet rows**: §65's Gotówka reconciliation, §72.35's XTB opening deposit
+  (`Wpłata 2716,60 PLN` — the exact row is specified in that section). Both are
+  data the user owns.
+- **§72.35 bond pricing** — the user already decided to accept the partial sum.
+
+---
+
 ## 60. Research "Go back" returns to the origin page (user request)
 
 Proposal: — (direct user request; no proposal doc).
