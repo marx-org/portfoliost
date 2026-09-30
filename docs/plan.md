@@ -1024,13 +1024,46 @@ recorded as such, distinct from a 404.
       fallback. Prune them, then read the failure count.
 
 ### 63.11 — Edge auth for browser traffic (follow-on)
-- [ ] Decide and implement: enable nginx `global-auth-url` in
-      `cluster/apps/networking/ingress-nginx/helm-release.yaml:51`, or record a
-      decision not to. Either way, close this section with the reasoning.
-- [ ] Tests: with it enabled, an unauthenticated browser request to any
-      `pfire` ingress is redirected, while the scheduled sweep (service token)
-      is unaffected. Verify both in PROD.
-- [ ] Commit.
+
+> **CLOSED 2026-09-30** (homelab `530492814`). The decision was **not** to
+> enable `global-auth-url`, and the reason is now written into the file so it
+> does not read as an obvious-looking win someone re-tries:
+>
+> 1. **The commented path is wrong.** Every ingress in this cluster that
+>    actually authenticates uses `https://auth.…/oauth2/auth` + `/oauth2/start`
+>    (pgweb, scanst-ui, scanst-otp, stooq, jobshot). The value commented on the
+>    ingress-nginx HelmRelease is `/api/verify` + bare `/` — a *different
+>    endpoint*. Uncommenting it as written would 302 every browser request in
+>    every namespace to a URL that does not answer.
+> 2. **The blast radius is the whole cluster.** It is a controller-wide default,
+>    so it lands on `default`, `home` and `media` at once — including the KEDA
+>    scale-to-zero apps in `default` and every service that legitimately has no
+>    browser login.
+>
+> **What was done instead, and it is the part the section was actually after.**
+> Only three pfire services have an ingress at all: `portfoliost` (which already
+> authenticates through Pocket-ID OIDC), `cachest` and `openst`. The latter two
+> are the internal tiers — `openst` holds the provider API keys — and neither had
+> any auth whatsoever, so a browser could read them directly. Both now carry the
+> same `auth-url`/`auth-signin` pair as pgweb/scanst/stooq/jobshot.
+
+- [x] Decide and implement: enable nginx `global-auth-url`, or record a decision
+      not to. → **Not enabled**; the two internal tiers opt in individually.
+- [x] Tests: an unauthenticated browser request to a `pfire` ingress is
+      redirected.
+      > **Verified in PROD**, both tiers, on a data path and not just health:
+      > ```
+      > cachest  /api/config  HTTP 302 -> https://auth.k.homylab.com/oauth2/start?rd=…
+      > openst   /__mem       HTTP 302 -> https://auth.k.homylab.com/oauth2/start?rd=…
+      > ```
+- [x] Tests: the scheduled sweep is unaffected.
+      > **Verified in PROD, twice.** Every in-cluster caller uses the
+      > **ClusterIP**, which nginx never sees: from the instruments pod,
+      > `cachest:8080/health` 200, `openst:8080/health` 200, and a real
+      > `cachest /ohlcv/CSN.L?start=…&end=…` 200 with a payload. Then a live
+      > `snapshotsync` Job launched **after** the change ran the whole chain:
+      > `[snapshotsync] done: ok=10 failed=0`.
+- [x] Commit.
 
 Still open. Recorded as a deliberate non-fix during the sweep work: the cluster has a working global nginx
 auth subrequest that is switched off
