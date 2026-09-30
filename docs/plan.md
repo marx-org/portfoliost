@@ -1777,11 +1777,24 @@ symptom, so the upstream question is the first task.
       price/no-price portfolio.
 - [x] Then re-run the single backfill and assert Σ cards == Total tile — the §63.3
       reconciliation, still unproven after all of §66–§69.
-- [ ] Separately: the §68 `cashBreakdown` weight formula divides by a net total
+- [x] Separately: the §68 `cashBreakdown` weight formula divided by a net total
       that can approach zero (EUR +64,898 against USD −45,434 in IBKR), producing
       weights from −398% to +648%. The user confirms the sign split is real — IBKR
       converts currency repeatedly without registering it in the sheet — so the fix
       is a guard on the denominator, not a change to the data.
+      > **Already done by §70.5**, and the reasoning in the code is the right
+      > one: the weight is a share of **GROSS** exposure (`Σ|converted|`), which
+      > is well defined whatever the signs do and always sums to 100%, while the
+      > signed `balance` is still reported unchanged. A guard on the net would
+      > have had to invent a fallback for "net ≈ 0" and every fallback is
+      > arbitrary; a change of denominator is not.
+      > **Now pinned by two tests** (`469` green) against the exact IBKR shape.
+      > They assert the signed balances survive, every weight lands in `[0,100]`,
+      > and the weights sum to 100 — under the old net denominator this fixture
+      > printed **333% and −233%**. The second test covers the zero-cash case
+      > (weight `0`, never `NaN`).
+      > One thing the test had to learn: the sign of a cash row lives on
+      > `amount`, not on `type` — a `WITHDRAWAL` row is stored negative.
 
 ## 71. A currency is a label that multiplies a number (2026-09-28)
 
