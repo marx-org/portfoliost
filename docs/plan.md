@@ -4345,26 +4345,44 @@ No timer (see intro). One event-driven path.
       `src/main.ts`, `LogoutView.vue`, two call sites, the mock and two test
       files — no portfolios, transactions, compose or nginx.
 
-- [ ] Fix the compose gateway, which 404s every wallets-routed path
-      (`/api/portfolios`, `/api/labels`) while the same paths return 200 direct
-      to `wallets` and via `:3000`. Cause: nginx caches upstream resolution at
-      startup and `wallets` was recreated, so the gateway proxied to a dead
-      address. `docker compose restart gateway` fixes it. Found while
-      verifying §77 — a pre-existing footgun worth its own note, and the
-      symptom is ~40 e2e failures that look like app bugs.
-- [ ] Manual, against prod: log in, confirm `id_token` lifetime is still 60
-      min but `refresh_sessions` has a row in `users_auth`. Wait out the
-      expiry, reload, confirm no login screen appears,
-      `localStorage["portfoliost_token"]` has a new `jti`, and the row moved
-      with it. Confirm a page load right after expiry issues exactly **one**
-      `POST /api/auth/refresh`, not fifteen. Log out: row gone, pre-logout
-      token no longer refreshes, Pocket-ID session cookie cleared, and
-      `/logout` lands on login rather than the dashboard.
-- [ ] Release per the `homelab-deploy` skill: tag-bump
-      `portfoliost-users-auth` and `portfoliost` images, bump the pinned `tag:`
-      in their `helmrelease.yaml`, commit to homelab `main` (rebasing on the
-      deployed revision, never `reset --hard`), verify with
-      `kubectl rollout status -n pfire deploy/<app>`.
+- [x] Fix the compose gateway, which 404ed every wallets-routed path
+      (`/api/portfolios`, `/api/labels`) while the same paths returned 200
+      direct to `wallets` and via `:3000`. Cause: nginx caches upstream
+      resolution at startup and `wallets` had been recreated, so the gateway
+      proxied to a dead address. `docker compose restart gateway` fixed it, and
+      a full `down && up -d` gets the ordering right for free because `gateway`
+      `depends_on` all four upstreams. Written up in `AGENTS.md` as
+      `400df3d`, with the 404-not-502 signature and how to tell a Hono 404 from
+      the mock's 71-byte JSON one.
+- [x] Release to prod per the `homelab-deploy` skill: `users-auth v1.0.28` and
+      `portfoliost v1.0.310`, tags pinned in homelab `6cd899ef3`, both rolled
+      out. The container CMD runs `db:migrate`, so `users_auth.refresh_sessions`
+      was created on rollout — confirmed by querying `information_schema`.
+
+- [x] Verified live in the browser, from the ingress access log:
+      `POST /api/auth/token → 200`; `POST /api/auth/refresh → 200` with the
+      `jti` rotating `4219a5a5…` → `77ed9ee5…` and no `refresh_token` in the
+      response; a replayed `jti` → `401`; `POST /api/auth/logout → 200` then
+      `GET /api/oidc/end-session → 302` landing on **`/login`**, not
+      `pocket-id/logout`. That last one is the §77.4 fix working: the client has
+      advertised `/logout` as its callback since day one and it did not exist.
+
+- [ ] **Real token expiry is still unproven.** I simulated it by rewriting `exp`
+      in localStorage, which also breaks the signature, so the app correctly
+      treated the session as dead and the test proved nothing about refresh.
+      A genuinely expired token is one Pocket-ID signed with a past `exp`; that
+      needs either a 60-minute wait or temporarily lowering
+      `accessTokenDurationMinutes`. The expired-but-valid-signature path is
+      covered by the §77.3 unit tests, not by prod.
+
+- [ ] Prune `refresh_sessions`. It has no cleanup, and the failed expiry
+      simulation above left a real orphan in prod: a session whose token cannot
+      be verified, so logout cannot identify it and the row survives. Harmless —
+      the token is dead — but the table grows without bound. Logout and
+      rotation both delete correctly; only unverifiable tokens leak, so a
+      periodic sweep (or deleting on `clear-data`/`account`, which already have
+      the `user_id` index) would close it.
+
 - [ ] Leave `accessTokenDurationMinutes: 60` unchanged. If refresh proves flaky
       in prod, the fallback is bumping it to `720` in
       `portfoliost-oidc-client.yaml` — a one-line change that buys hours

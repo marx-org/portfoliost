@@ -1,6 +1,6 @@
 # Proposal: Auth Implementation — OIDC + PKCE with PocketID
 
-**Status**: Implemented (session refresh pending — see §77 of `../plan.md`)
+**Status**: Implemented (incl. session refresh and real logout — §77)
 **Date**: 2026-08-18 · **Revised**: 2026-09-30
 
 ## Problem
@@ -204,14 +204,16 @@ there is no separate knob for it. Two consequences:
    `prompt=login` then forces a full passkey ceremony to recover.
 
 The fix (refresh-token rotation, `users_auth.refresh_sessions` keyed by the
-id_token's `jti`, refresh-on-401 with a single in-flight mutex) is specified in
-§77 of `../plan.md`. It deliberately keeps `accessTokenDurationMinutes` at 60 —
+id_token's `jti`, refresh-on-401 behind a single in-flight guard) shipped in
+§77 and is live in prod. It deliberately keeps `accessTokenDurationMinutes` at
+60 —
 the goal is a long session from a short, revocable access token, not a
 long-lived credential.
 
 ## Logout
 
-**Current state — logout does not fully log out.** Three separate gaps:
+**History — logout did not fully log out.** Three gaps, all shipped-fixed in
+§77:
 
 1. `POST /api/auth/logout` is a no-op: it returns `{success:true}` without
    calling PocketID's end-session and without revoking anything.
@@ -222,11 +224,11 @@ long-lived credential.
    exists** in the SPA router. Visiting that URL today redirects into the
    dashboard and leaves you authenticated.
 
-Gap 3 is currently harmless because end-session is never called, but it must be
-fixed *before* end-session is wired, or signing out will bounce the browser to
-a URL that lands back in the app.
+Gap 3 was harmless only because end-session was never called. Wiring
+end-session without adding the route would have signed the user out and
+immediately dropped them back into the app — so the two had to ship together.
 
-Planned behaviour (spec in §77 of `../plan.md`):
+Behaviour as shipped (and verified in prod):
 
 ```
 Logout button → POST /api/auth/logout { id_token }
@@ -336,9 +338,9 @@ implemented by users-auth — they remain on the mock for local dev only.
 - **PKCE in SPA**: the code verifier is stored in `localStorage` to survive the
   redirect. It is single-use and cleared on callback.
 - **JWT expiry**: the frontend does not check expiry — it relies on 401s from
-  the backend. This is acceptable *once* refresh-on-401 exists; today it is the
-  cause of the mid-task ejection described in **Session Lifetime**.
-- **Token refresh**: planned, see §77 of `../plan.md`.
+  the backend. With §77 shipped this is now handled: a 401 triggers one shared
+  refresh and a single replay, so the ejection no longer surfaces.
+- **Token refresh**: shipped in §77 and verified in prod.
 - **Concurrent 401s**: a dashboard load fires ~15 parallel API requests (10 of
   them per-portfolio analytics). Refresh-on-401 therefore needs a single
   in-flight refresh — otherwise rotation invalidates the token for all but the
