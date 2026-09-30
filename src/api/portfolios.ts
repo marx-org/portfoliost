@@ -150,8 +150,26 @@ export async function getPortfolioAnalytics(
 }
 
 /** Force-rebuild the portfolio's value-snapshot history (full delete+rebuild). */
+/**
+ * §76.2 — additive re-value, NOT the default force mode.
+ *
+ * `POST /:id/recompute` with no `mode` is `forcePortfolioRecalc`: it DELETEs every
+ * snapshot row and rebuilds. That is the right tool after a data fix (or a
+ * wipe-and-reimport, where days that no longer carry value must go) and the wrong
+ * one for a "refresh now" the user can press at any time — if it fails midway, the
+ * history it deleted is gone.
+ *
+ * `?mode=upsert` re-runs `computeSnapshotBatch` and writes over the top, never
+ * deleting. Note the window: it runs from the portfolio's earliest BUY/SELL trade
+ * (or cash row) through *today*, so this is a full recompute of the series, not a
+ * two-day patch — it does rebuild a chart that is missing. What it does not do is
+ * remove rows outside that range, which is the only thing force adds.
+ *
+ * The bare endpoint still exists and still means force; §63.6's wipe-and-reimport
+ * tooling depends on it. Only this client-side control moves to the safe mode.
+ */
 export async function recomputePortfolio(id: string): Promise<components["schemas"]["BackfillRecomputeResponse"]> {
-  return http.post<components["schemas"]["BackfillRecomputeResponse"]>(`/api/portfolios/${id}/recompute`)
+  return http.post<components["schemas"]["BackfillRecomputeResponse"]>(`/api/portfolios/${id}/recompute?mode=upsert`)
 }
 
 export async function getPortfolioTransactions(

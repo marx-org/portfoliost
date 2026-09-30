@@ -132,19 +132,51 @@ async function loadChart() {
   }
 }
 
+/**
+ * §76.2 — the manual refresh. `recomputePortfolio` now issues `?mode=upsert`
+ * (additive: recomputes the whole series over the top, never deletes) rather than
+ * the bare endpoint's destructive force rebuild — see the note in
+ * src/api/portfolios.ts. Since §76.1 a read no longer re-prices, so the twice-daily
+ * cron owns freshness and this is the only way a user can ask for it sooner; it
+ * must never be able to delete history.
+ */
 async function handleRecompute() {
   if (recomputeBusy.value) return
   recomputeBusy.value = true
   backfillFailed.value = false
+  notice.value = "Refreshing prices…"
   try {
     await recomputePortfolio(props.portfolio.id)
+    notice.value = "Refresh requested"
     await loadChart()
   } catch {
     // network error — stay failed; the user can retry
+    notice.value = null
   } finally {
     recomputeBusy.value = false
   }
 }
+
+/**
+ * §76.2 — the price as-of this card's number actually reflects. Since §76.1 no
+ * read re-prices, so this can be up to ~12h old (the cron runs 13:00 and 17:20
+ * UTC), and it is the only honest signal the user has that the figure is not
+ * live. §70's rule: label it, do not fabricate it. The OLDEST contributing price
+ * is used upstream deliberately — the portfolio is only as fresh as its stalest
+ * holding, so this is a floor, not an average.
+ */
+const priceAsOfLabel = computed<string | null>(() => {
+  const raw = props.freshness?.priceAsOf
+  if (!raw) return null
+  const d = new Date(raw)
+  if (Number.isNaN(d.getTime())) return null
+  return d.toLocaleString(undefined, {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+})
 
 async function changeTimeframe(tf: PortfolioAnalyticsTimeframe) {
   timeframe.value = tf
@@ -277,7 +309,7 @@ async function exportPositions(format: "csv" | "xml" | "json") {
 </script>
 
 <template>
-  <div class="card flex cursor-pointer flex-col p-5 transition-shadow hover:shadow-md" @click="goToDetail">
+  <div class="card flex cursor-pointer flex-col p-5 transition-shadow hover:shadow-md" data-testid="portfolio-card" @click="goToDetail">
     <div class="flex items-center justify-between gap-2">
       <div>
         <router-link
@@ -397,6 +429,35 @@ async function exportPositions(format: "csv" | "xml" | "json") {
     <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
       {{ portfolio.metrics?.openPositions ?? 0 }} open positions &middot; {{ formatNumber(portfolio.metrics?.unrealizedGainLoss) }} unrealized
     </p>
+
+    <!-- §76.2 — freshness row + the manual refresh, on EVERY card.
+         The button used to exist only inside the chart's "unavailable" branch,
+         so it appeared only after a backfill had already failed. Reads no longer
+         re-price (§76.1), which means the cron owns freshness and the user needs
+         a way to ask for it sooner. `priceAsOfLabel` is the oldest contributing
+         price, so it can be ~12h old — shown rather than implied, because a
+         number that silently looks live is exactly what §76 removed the cost of
+         hiding. -->
+    <div class="mt-2 flex items-center justify-between gap-2" @click.stop>
+      <span
+        v-if="priceAsOfLabel"
+        class="text-xs text-slate-400 dark:text-slate-500"
+        data-testid="card-price-as-of"
+      >
+        Prices as of {{ priceAsOfLabel }}
+      </span>
+      <span v-else class="text-xs text-slate-400 dark:text-slate-500">Prices not yet loaded</span>
+      <button
+        type="button"
+        class="btn-ghost shrink-0 px-2 py-1 text-xs"
+        data-testid="card-refresh"
+        :disabled="recomputeBusy"
+        :title="'Re-value this portfolio now (additive — nothing is deleted). The scheduled sync does the same twice a day.'"
+        @click="handleRecompute"
+      >
+        {{ recomputeBusy ? "Refreshing…" : "Refresh" }}
+      </button>
+    </div>
 
     <!-- §62.8 — Cash group (example-service parity): balance line + per-currency hint. -->
     <!-- §70.2 — this card's value excludes anything unpriced, so say so rather
