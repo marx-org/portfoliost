@@ -209,17 +209,19 @@ fixtures (the seeded portfolio with transactions that
       the rollout.
       > **done 2026-09-30 — `v1.0.285` pinned (homelab `df9974a1d`), rollout 1/1
       > `ghcr.io/marx2/portfoliost:v1.0.285`, pod serving 200s.**
-- [ ] Playwright PROD (user's passkey session):
-  - Open a portfolio → Holdings → click a holding's symbol → research;
-    "Go back" → back on that portfolio's holdings tab.
-  - Global transactions list → click a row's symbol → research; "Go back"
-    → back on the transactions list (filters intact if any were set).
-  - On research, switch a tab → "Go back" still targets the origin.
-  - **BLOCKED 2026-09-30 (needs the user).** The PROD session had expired and
-    Pocket-ID offers only *Sign in with another device* (QR) or a *Login Code* —
-    both require the user. The behaviour is proven by the §60.3 e2e suite
-    (5 tests, all origins + the tab-switch + the deep-link fallback) against
-    the same compose stack, so this is a PROD visual confirmation only.
+- [x] Playwright PROD (authenticated session, `localStorage.portfoliost_token`):
+  - **Portfolio origin** — IKE Beata / Rach. rejestrowy PKO BP, holdings tab.
+    Link carried `?from=/en/portfolios/<id>/holdings`; research page rendered
+    `data-testid="research-back"` → **"← Go back"** with `href` = the origin
+    holdings path (**not** `/en/investments`). Clicked through and landed back on
+    the holdings tab. ✔
+  - **Tab switch** — re-entered research, switched Overview → Dividends; back href
+    **unchanged** (`…/holdings`). §60.1's "from survives a tab switch" holds. ✔
+  - **Global transactions origin** — `/en/investments/transactions`, first row
+    `JNJ` → link `?from=/en/investments/transactions`; back href = the transactions
+    list. ✔
+  - No `BLOCKED` marker any more: the user re-established the PROD session, so all
+    three flows are verified against the deployed build, not just the compose stack.
 - [ ] Commit (plan closeout) + archive §60 to `plan-archive.md`.
 
 ---
@@ -594,20 +596,44 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
   Contracts ship inside the npm installs — no deploy.
 - [x] Flux + kubectl verify all three rollouts (if the RWO logos PVC multi-attach
   stalls the instruments rollout, scale to 0, wait, scale back to 1 — known gotcha).
-- [ ] Playwright PROD (user's passkey session) — **BLOCKED on the login, same as
-  §60.4. Needs the user.** Every surface below is proven in the compose stack
-  (unit + e2e) and the payloads are proven against the running PROD service;
-  what is left is a visual confirmation:
-  - Holdings table row: rounded-square logo + ticker + `(US) Stock`-style details +
-    company name.
-  - Top/Bottom performers: badge with details on each row.
-  - Portfolio Dividends tab: rows show the name; **the `(CC)` will be missing**,
-    because `transactions.country` is NULL on all 1960 PROD rows (measured in
-    61.3) — see the follow-up below.
-  - Portfolio News tab: cards show the badge (position-enriched).
-  - Research: header badge (32px logo, `h1` ticker, details from the profile),
-    Compare-with-peers column headers show details.
+- [x] Playwright PROD (authenticated session) — **verified, and it found two real
+  bugs plus one NEW defect.** Swept every surface in the plan's table:
+  - **Holdings** (IKE Beata, 69 positions): 23 badges rendered, **10/10 sampled
+    carry `(US) Stock` / `(PL) Stock` / `(PL) Bond`**, company name below, logo in a
+    **9px-radius square plate**. Logo plates use `loading="lazy"`: at `scrollY=0`
+    only 19/23 had loaded and the other 4 sat at `top: 2262–2509`, below the 900px
+    viewport. **Not a bug** — after one scroll, 23/23 loaded and
+    `/api/logos/<sym>` returns 200 `image/png` / `image/svg+xml` for every one,
+    including the bond `BST0327`. Recorded because "4 of 23 logos are broken" is
+    exactly the kind of plausible-looking reading that would otherwise be "fixed".
+  - **Top/Bottom Performers**: both cards render badge + `(PL) Stock` + name, and
+    **10/10 badges on the page carry a `(CC)`**. P/L colours are correct:
+    `ETFBTCPL.WA` shows `−PLN 30.80 / −0.60%` in red, and the API confirms
+    `convertedUnrealizedGainLoss = -30.8, percentageChange = -0.6` — the thin
+    minus is present, I first misread it as an unsigned value coloured red.
+  - **Portfolio Dividends**: 50 badges, **0 with a `(CC)`**, all degrading to
+    `Stock`/`Bond` + name. This is the **known follow-up below**, not a new
+    defect: `transactions.country` is NULL on every imported row, so the badge
+    correctly renders the part it can vouch for.
+  - **Research header**: `h1` 20px + 9px plate + details line, and the §60.4
+    "Go back" link present.
+  - **Portfolio News — DEFECT, open.** 13/50 cards render the full badge
+    (`NVDA (US) Stock`); **37/50 render a bare ticker** (`MSFT`, `AVGO` ×2, `RSP`)
+    with no logo, name or type. The news API carries **no identity at all** —
+    `GET …/news` returns only `{id, type, ticker, metadata:{source}, article,
+    published_at}` — and `PortfolioNewsTab.vue:19-21` enriches from the
+    portfolio's **open positions**. Its comment claims *"A ticker with no open
+    position (rare: news is fetched for held stocks)"* — **the "rare" is false
+    here: it is 74%.** Worse, the news tickers (`MSFT`, `AAPL`, `META`, `QQQ`) are
+    **not in this portfolio's 69 positions at all**, while the backend's
+    `getPortfolioSymbols` filters `is_open = true` on that same portfolioId — so
+    backend and SPA disagree about what "held" means. Awaiting one SQL result to
+    localise it (SPA enrichment source vs. instruments' `?ticker=` filter not
+    filtering); the query is in the §61.11 follow-up below.
+  - **Compare-with-peers**: not reached before cluster access was lost.
+- [x] Fix the country bug the visual pass found (§61.12 below).
 - [ ] Commit (plan closeout) + archive §61 to `plan-archive.md`.
+- [ ] **Compare-with-peers** visual check (only §61 surface not yet seen in PROD).
 
 #### Follow-up this step uncovered: the import carries no country
 
@@ -623,6 +649,54 @@ it in `sheets-sync`'s resolver the way `NAME_VENUE_OVERRIDES` already maps a
 symbol, or (b) have wallets fall back to the instruments ticker reference when
 building a transaction row. Both are cross-repo and neither is in this section.
 Recorded here so it is not rediscovered as "the badge is missing a country".
+
+#### The PROD visual pass found a second, worse version of the same gap
+
+The follow-up above says `transactions.country` is NULL. True — but it is silent
+about **`positions.country`**, which is worse: the import wrote the **literal
+string `"Other"`** there, and PROD rendered **`(OTHER) Bond`** on every Polish
+bond position. `TickerBadge` uppercased `"Other"` into `"(OTHER)"` and the badge
+presented it as a country code.
+
+Uppercasing a non-code does not make it one — it makes a confident-looking wrong
+label, which is the §66.2 failure this plan keeps hunting. Two halves, both needed:
+
+| Half | Change | Why both |
+|---|---|---|
+| Data | `import.ts:267` + `portfolio-transactions.ts:210`: `country: body.country ?? null` (was `?? "Other"`) | A *category* can be "Other" — `sector`/`industry` keep it and `quotes.ts` `isBlankish` depends on the convention — but a country **code** cannot; the contract is 2-letter-or-null. The placeholder was a display bucket that escaped into a typed field. |
+| Refusal | `TickerBadge.countryCodeOrNull()` — `/^[A-Z]{2}$/`, else omitted | Existing rows keep `"Other"` until the next reimport (user-gated), so the component guard is what makes the UI correct **today**; the data fix is what makes it correct for future imports. A presentational component is the wrong place to fix a data default, but the right place to refuse to render a value it cannot vouch for. |
+
+`b83da99` (wallets) → `v1.1.101`, `902d625` (SPA) → `v1.0.291`, homelab pin
+`13052263a`. Gates: wallets 483, SPA 463 unit + 227 mock + 114 e2e.
+
+Note `sector`/`industry` deliberately keep `"Other"`, and `isBlankish` in
+`quotes.ts` still treats it as unknown — so the two fields are intentionally
+asymmetric now, and the asymmetry is the point.
+
+#### Open: locating the 37/50 bare news badges
+
+`getPortfolioSymbols` fans out over `positions … is_open = true`, yet the news
+cards carry tickers absent from the portfolio's 69 positions. One SQL result
+decides whether the SPA or instruments owns it:
+
+```sql
+SELECT symbol, is_open, quantity, country, asset_type FROM positions
+WHERE portfolio_id = '47452a2a-0456-4512-9044-fa1c86ce5890'   -- IKE Beata
+  AND UPPER(symbol) IN ('MSFT','AAPL','META','QQQ','NVDA','AMZN','AVGO','RSP','IBM','CAT')
+ORDER BY symbol, is_open;
+
+SELECT DISTINCT symbol FROM positions
+WHERE portfolio_id = '47452a2a-0456-4512-9044-fa1c86ce5890' AND is_open = true
+ORDER BY symbol LIMIT 60;
+```
+
+- present with `is_open = true` → the backend is right and the SPA's
+  `positionBySymbol` map is incomplete → fix in `PortfolioNewsTab.vue`;
+- absent → instruments' `/api/news/articles?ticker=` is not filtering, and the
+  backend cannot be fanning out for tickers it does not hold → fix in instruments.
+
+Also worth fixing either way: the `PortfolioNewsTab.vue:19-21` comment asserts a
+behaviour that is measurably false, which is how this stayed hidden.
 
 ---
 
