@@ -2066,6 +2066,12 @@ field alongside `fxFrom` would let callers decide per bar.
       > **1.6.53**. The local repo is behind what is published, so a release cut
       > from this checkout would omit whatever 1.6.53 added. Reconcile it before
       > cutting, not after a confusing release.
+      >
+      > **This release also unblocks §72.21's remaining half**, which the plan had
+      > listed as independent. Surfacing the FX-coverage boundary on
+      > `GET /:id/analytics` needs to say *why* a bar is absent, and only
+      > instruments knows that — so the same field serves both. **One release, two
+      > items.**
 - [x] Re-check the other `?currency=` consumers now that the response is
       shorter than requested: wallets grid (covered), `buildBenchmarkSeries`,
       the SPA history/compare charts, and `mocks/`. A consumer that assumed a
@@ -2529,27 +2535,34 @@ coverage rather than of the portfolios.
       load-bearing: it is what removes these steps).
 - [ ] Make the coverage boundary visible rather than leaving it to look like a
       market move — the same job `gapSymbols` does for missing bars, extended to FX.
-      > **Still open, and structurally blind at exactly the point it needs to
-      > report.** There is no FX-coverage reporting anywhere: grep for
-      > `coverage`/`boundary` across `backfill.ts` and the analytics route returns
-      > nothing, `GET /:id/analytics` emits only `gapSymbols`
-      > (`routes/portfolios.ts:1314-1334`), and no field in `openapi.yaml` says
-      > "N bars were dropped for want of an FX rate".
+      > **Half done (wallets `1211777`), and the measurement it needed is now
+      > proven rather than argued.** `fxCoverageHoles` is computed against
+      > `series.dates` — what instruments actually returned — *before*
+      > `buildPriceMap` runs, because that is the only point where the difference
+      > exists. Measured afterwards it would be structurally incapable of being
+      > non-zero for the scattered case.
       >
-      > **The gap scan cannot see the case that matters.** The scan tests
-      > `prices.has(day)` (`backfill.ts:943-948`), but `buildPriceMap` sets
-      > **every** day from the first surviving bar onward by carry-forward
-      > (`:388-395`). So:
-      > - a **prefix** hole is caught — the day is absent from the map — and is
-      >   reported as `gapSymbols`, indistinguishable from a missing price bar;
-      > - a **scattered mid-window** FX hole, which is what §72.17's damage
-      >   actually looked like (`fx-convert.ts:44-45`), is silently carried
-      >   forward at the last converted close and is **never reported at all**.
+      > The blind spot is now demonstrated, not suspected. With a hole on 07-02 and
+      > bars either side, the new test asserts **both** halves:
+      > `fxCoverageHoles.get("AAA") === ["2026-07-02"]` **and**
+      > `gapSymbols === []`. That second assertion is the point — a prefix hole
+      > always reached `gapSymbols` and looked like a symbol with no history; a
+      > scattered one never did, and §72.17's damage was that shape.
       >
-      > So the fix is not a new field on the response; it is a **hole count taken
-      > before `buildPriceMap` erases the evidence**. Anything added downstream of
-      > the carry-forward would report a number that is structurally incapable of
-      > being non-zero for the scattered case.
+      > **It is a count, deliberately not a diagnosis, and that limit is in the
+      > type.** At this layer "no bar returned" and "bar dropped for want of an FX
+      > rate" are the same absence. `unconvertedDates` (§72.10) is what separates
+      > them; the field is now on wallets' local `PriceBarSeries` but arrives
+      > `null` until the contracts release, so the reason is genuinely unavailable
+      > today. Recording the count without the cause is the honest half — a
+      > plausible-looking cause for a number that does not have one is how §72.36
+      > happened.
+      >
+      > **Remaining half:** surface `fxCoverageHoles` on `GET /:id/analytics` and
+      > persist it alongside `gapSymbols` (`persistGapSymbols`, `backfill.ts:652`),
+      > so it survives the pod and is queryable. **Blocked on the same contracts
+      > release as §72.10** — the two items are not independent, which the plan did
+      > not previously record. One release unblocks both.
 - [x] **IKE Marek: the number moved between measurements** — reported as 176.4% @
       > **§72.28 — it was a bond sale, not measurement noise**
       2025-05-02, then re-measured as +1.4% on the same series with no recompute in
