@@ -11923,6 +11923,22 @@ that appeared and re-appeared over the day.
        `snapshotPortfolioValue` no longer persists at all. Two writers of today's row
        were the precondition for the live-vs-backfill gap; with one there is nothing
        left to disagree.
+
+    > **CORRECTION 2026-09-30 — claim 1 above is false against the source**, and
+    > §63.2 is back in `plan.md` because of it. `backfill.ts` imports nothing from
+    > `valuation.js`; `computeSnapshotBatch` does not call `splitPortfolioValue` and
+    > computes its own `totalValue += qty * price` at `backfill.ts:961` plus
+    > `cashDay` at `:972`. The two paths **agree** — that part is real and pinned by
+    > `backfill.test.ts:1102` — but they agree because of a test, not because there
+    > is one function. "Shared" and "equivalent" are different claims and this
+    > section recorded the first while evidencing the second. §68's own rule, quoted
+    > at plan.md:1191, is that *drift is what happens when two code paths answer the
+    > same question*; a test detects drift after the fact, it does not prevent it.
+    >
+    > A related claim at 11945-11948 below is also false and is corrected in place
+    > there: `quotes.ts:20` imports `syncCurrentValueFromSnapshots` but never calls
+    > it, so the "recompute ends with `refreshQuotesUnlocked` →
+    > `syncCurrentValueFromSnapshots`" chain describes a call that was deleted.
   - What remains is **freshness, not two paths**: the stored figure is correct as of
     its own `price_as_of`, the headline recomputes on read from the same stored rows,
     and the only residual is that a day's FX is unknown until the ECB publishes. The
@@ -11946,6 +11962,17 @@ that appeared and re-appeared over the day.
       → `syncCurrentValueFromSnapshots` (`backfill.ts:1113-1119`), so the stored
       column is written *by the live path*, not by a rival backfill. The live
       quote is deliberately last.
+      > **CORRECTION 2026-09-30.** "Written by the live path" is wrong. The chain
+      > does run — `backfill.ts:1113` calls `refreshQuotesUnlocked` and `:1119`
+      > calls `syncCurrentValueFromSnapshots` — but the row it syncs is the one
+      > `computeSnapshotBatch` wrote **from price bars**, not from the quote.
+      > §76.4 made the batch the sole writer of `value_snapshots`
+      > (`snapshotPortfolioValue` no longer persists), so there is no live-path
+      > writer left to describe. The conclusion drawn from this bullet — that the
+      > card and the headline are one valuation taken at two times — still holds
+      > and is now *more* true: both read the batch's row, and the residual is the
+      > quote-vs-close difference plus FX freshness. The mechanism claimed to
+      > produce it is not there.
     - **So the card and the headline are one valuation taken at two different
       times.** The card is `Number(p.currentValue)` — the stored column. The
       headline is computed from positions on read. Nothing reconciles them

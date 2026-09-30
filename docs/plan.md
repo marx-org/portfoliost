@@ -106,17 +106,102 @@ quotes — §63.5 is gated on reproducing the bad symbol's provider response.
 
 ### 63.2 — Wallets: one live valuation path for headline + charts (single source of truth)
 
-- [ ] `portfoliost-wallets`: headline total-metrics `totalValue` and
-  `value_snapshots` both derive position value from the **same** live price
-  source (quote service / cached live price), not `price_bars` for one and
-  `positions.market_value`-fallback for the other. When no live price, use the
-  latest `price_bars` close (not `avgCostBasis`) and mark `priceSource`.
-- [ ] `portfolios.current_value` is refreshed from the live value (positions +
-  cash) on the quotes pass and on recompute — so headline = chart last point
-  (± cash timing) after a recompute.
-- [ ] Tests: a portfolio's headline totalValue equals the latest snapshot value
-  (positions + cash) when quotes are fresh; fallback-to-close (not cost) is
-  asserted when no quote.
+> **Re-verified against the source 2026-09-30, and NOT closable as written.** The
+> last commit (`c39c414`) says "§63.2 closed by a single writer" and plan-archive
+> §76.4 says the same, so this section sat here looking finished. Checking it
+> against the code found **the closure rests on two claims that are no longer
+> true**, and a third that was never implemented. Recording them here rather than
+> ticking five boxes is the point: a section closed by a commit message is not the
+> same as a section closed by the code.
+>
+> **What actually holds.**
+> - *One writer per (portfolio, date)* — **true and enforced.** `snapshotPortfolioValue`
+>   (`quotes.ts:481-580`) no longer persists; the only writers of `value_snapshots`
+>   are `backfill.ts:1021` and `backfill.ts:1071`.
+> - *No cost presented as value* — **true.** `splitPortfolioValue` drops a
+>   `marketValue == null` row and increments `unpricedPositions`
+>   (`valuation.ts:81-88`), with the §70 comment stating the rule. `avgCostBasis`
+>   is still selected on the `total-metrics` query (`portfolios.ts:296`) but is
+>   never used as a value fallback; its only remaining use is the unrealized-PnL
+>   denominator in `/summary-metrics` (`portfolios.ts:1065-1067`).
+> - *`priceSource` marked* — **true** (`portfolios.ts:359`, `dominPriceSource`).
+> - *The two paths agree* — **true, and pinned** by `backfill.test.ts:1102`
+>   ("snapshotPortfolioValue equals computeSnapshotBatch for the same day").
+>
+> **What does not hold.**
+> 1. **"The same live price source" is equivalence by test, not shared code.**
+>    plan-archive:11918-11920 says `splitPortfolioValue` "is shared by
+>    `snapshotPortfolioValue` and the backfill". It is not: `backfill.ts` imports
+>    nothing from `valuation.js` and computes its own `totalValue += qty * price`
+>    inline at `backfill.ts:961` plus `cashDay` at `:972`. The two agree today and
+>    §68's own rule — *"drift is what happens when two code paths answer the same
+>    question"* — says a test is the only thing standing between them and a future
+>    edit to either. This is the same rule §63.2 was written to enforce, so the
+>    item is not satisfied by having reached the right answer.
+> 2. **`current_value` is not refreshed on the quotes pass — the archive says it
+>    is.** `quotes.ts:20` still *imports* `syncCurrentValueFromSnapshots`, but the
+>    only other occurrences in the file are two comments (`quotes.ts:426`, `:437`)
+>    describing a call that no longer exists. `current_value` is now written only
+>    from `backfill.ts:1036`, `:1119`, `:1194`. plan-archive:11945-11948 claims a
+>    recompute "ends with `refreshQuotesUnlocked` → `syncCurrentValueFromSnapshots`";
+>    the chain runs, but it syncs the row the **batch** wrote from bars, not the
+>    live quote. The column is refreshed on recompute and on the cron; it is not
+>    refreshed on the quotes pass.
+> 3. **"Fallback to the latest `price_bars` close" was never built, and the code
+>    says so on purpose.** `quotes.ts:357-374` pushes `p.marketValue ?? "0"` with
+>    `priceSource = "fallback"`; nothing fetches a bar close. §70 decided the
+>    opposite of this item — an unpriced position contributes **nothing** and is
+>    *counted*, because "a missing price must be visible, not plausible". So this
+>    half of §63.2 is superseded by §70, not outstanding.
+>
+> **Also missing, and the one thing here that is a genuine test gap:** no test
+> asserts `/total-metrics` `totalValue` equals the latest `value_snapshots` row.
+> What exists is `portfolio-transactions.test.ts:1943` (headline = Σ rows) and
+> `backfill.test.ts:1102` (path-vs-path equivalence) — neither compares the
+> headline to the stored chart point, which is the comparison a user is making
+> when they add the cards up.
+
+- [ ] `portfoliost-wallets`: **one writer per (portfolio, date)** — done by §76.4,
+      and enforced rather than ordered: `computeSnapshotBatch` owns every date
+      including today, and `snapshotPortfolioValue` no longer persists
+      (`quotes.ts:481-580`).
+- [x] `portfoliost-wallets`: headline `totalValue` and `value_snapshots` derive
+  position value from the **same** price source, and never present cost as value.
+  > Not satisfied by *sharing* `splitPortfolioValue` — the backfill has its own
+  > arithmetic (`backfill.ts:961`) and the two are held in agreement only by
+  > `backfill.test.ts:1102`. The intent (never a cost value, one answer) is met;
+  > the mechanism (one function) is not, and §68's rule is explicit that the
+  > mechanism is the point. Carried below as its own item.
+- [ ] **`splitPortfolioValue` is actually shared by the backfill.** Move
+      `backfill.ts:961-972` onto it so there is one arithmetic, not two that
+      currently agree. `computeSnapshotBatch` is synchronous-per-day and
+      `splitPortfolioValue` is async (`toBase` awaits a rate per row), so this
+      needs a batched/hoisted rate map rather than a naive call per day.
+- [x] `portfolios.current_value` is refreshed from positions + cash on recompute.
+  > `backfill.ts:1036`, `:1119`, `:1194` call `syncCurrentValueFromSnapshots` after
+  > the batch writes, and the twice-daily `snapshotsync` cron runs
+  > `runBackfillRecent`, so the column tracks the newest snapshot on both paths.
+- [x] ~~`current_value` is refreshed on the quotes pass too.~~ **Withdrawn, and the
+  archive corrected.** §76.1 made reads calculate nothing and §76.4 made the batch
+  the single writer; a second writer on the quotes pass is the exact race §63.2
+  was opened to remove. §76.4 supersedes this half. What it leaves behind is real
+  and is item 4.
+- [ ] **Remove the dead import and the two comments in `quotes.ts` that assert a
+      call chain which no longer exists** (`:20`, `:426`, `:437`). They are how
+      plan-archive:11945-11948 came to be wrong: the archive cites this file, and
+      this file now describes a chain that was deleted. A false comment about a
+      writer is worse than no comment — it is what makes the next reader believe
+      two writers exist.
+- [ ] Tests: a portfolio's headline `totalValue` equals the latest
+      `value_snapshots` row (positions + cash) when quotes are fresh.
+- [ ] Tests: an unpriced position contributes **nothing** and is counted in
+      `unpricedPositions` — the §70 rule, asserted in the shape §63.2 asked for.
+      (`valuation.test.ts:46-100` covers the exclusion; the count and the
+      headline-level consequence are not asserted.)
+- [x] ~~Fallback to the latest `price_bars` close when no quote exists.~~
+      **Superseded by §70** — an unpriced position is reported unpriced, not
+      substituted. Ticked so it stops reading as outstanding; the rationale is
+      the note, the state is the box.
 - [ ] Tests: `npm run build`, full `vitest` green.
 - [ ] Commit.
 
@@ -1008,7 +1093,10 @@ base currency that means something to the user.
       zero.
 - [x] Tests: `total-metrics.baseCurrency` is a real base; headline == Σ cards;
       no portfolio in the breakdown reports 0 while holding a position.
-- [ ] Commit.
+- [x] Commit.
+      > `1d1dd65` "feat(spa): the Display-currency selector IS the base-currency
+      > preference (§67.1)". The commit landed; this box was simply never ticked
+      > because the step that followed it (§68) absorbed the closeout.
 
 #### Pre-existing e2e failures found while verifying (not caused by §67.2)
 
@@ -1823,9 +1911,26 @@ the trade **settled** in — and recorded it as the currency the instrument
       crypto only: a dash in a stock ticker (`BRK-B`) is left null, because
       reading one there would be a guess — unknown beats wrong, the rule that
       made `CRI.WA` return null rather than CAD.
-- [ ] Release `@marx2/contracts`, regenerate types in wallets (`npm run gen:types`),
+- [x] Release `@marx2/contracts`, regenerate types in wallets (`npm run gen:types`),
       then drop the two local shims: the `ImportPortfolioTxWithListing` widening
       in `transakcje-mapper.ts` and the note in the wallets commit.
+      > **The premise behind this item was wrong, which is why it stayed open.**
+      > Both halves it named were already satisfied: `listingCurrency` is in
+      > `openapi.yaml:2078-2088` (commit `a2097cb`), it is in wallets'
+      > generated types (`import.ts:116` validates it from there), and the
+      > *published* package resolves to **1.6.53**, whose `openapi.yaml` carries
+      > the field. Nothing needed releasing or regenerating.
+      >
+      > The shim existed for a reason the plan never named: **sheets-sync does not
+      > depend on `@marx2/contracts` at all.** Its `ImportPortfolioTx` is a
+      > hand-written interface (`wallets-api-client.ts:62-98`), so the field was
+      > genuinely missing *there* — but regenerating types in a package the repo
+      > does not use could never have fixed it, which is why the item sat open
+      > across sessions while looking like a release chore.
+      >
+      > Done: the field added to the local interface, the
+      > `ImportPortfolioTxWithListing` widening deleted, and the comment that
+      > asserted "not yet in the published @marx2/contracts" removed. 157 green.
 
 **Why the pair's quote currency is a parse, not a guess** — worth stating because
 it is the same code path that produced the bug in the other direction. "BTC-USD"
@@ -2642,10 +2747,17 @@ offending code is the comparison policy in `price-audit.ts`, not any data.
 - [x] §72.36 retracted; row 604 must NOT be edited
 - [x] `1.126` explained: an audit comparison against the wrong date for an
       order-priced fund, not a fund class and not bad data
-- [ ] **Audit fix:** for fund/accumulation instruments (`*.TFI`, PPO/PPI) the
+- [x] **Audit fix:** for fund/accumulation instruments (`*.TFI`, PPO/PPI) the
       executed price belongs to the valuation date, so compare against a date window
       rather than the exact `executed_at` bar — or skip the strict ratio and report
       the pair as order-priced. Until then every NN TFI trade is a false positive.
+      > **§74.2/§74.3 shipped exactly this**, and the PROD run in §74.6 confirms
+      > it: 192 order-priced fund trades across 12 symbols are now *evidence* rather
+      > than findings, including the exact row this item is about. `isOrderPriced`
+      > keys on `asset_type === 'FUND'` (`price-audit.ts:121`) and
+      > `pickOrderPricedBar` searches ±`ORDER_PRICED_WINDOW_DAYS` = 21 in **both**
+      > directions (`price-audit.ts:209-212`). This box stayed open because §74 was
+      > written as a new section rather than as the completion of §72.37.
 - [ ] **Still open, and genuinely open:** `INGAKC.TFI` does not reproduce the
       executed NAVs — 351.93 on the 2023-04-13 valuation date against 382.05 paid,
       and 819.44 today against the sheet's own `aktualny kurs` 876,94. Either the
@@ -2773,7 +2885,8 @@ NN TFI trade is a false positive, and a correct one for the wrong reason.
 - [ ] Step 2 — openst provider for the identified class, tier order
 - [ ] Step 3 — `ticker_reference` entry for the class + sweep the other `.TFI` rows
 - [ ] Step 4 — `positions.company_name` off the stale sheet name
-- [ ] Audit: date window / order-priced exemption for fund trades
+- [x] Audit: date window / order-priced exemption for fund trades
+      > §74.3, verified in the §74.6 PROD run.
 
 ## 74. `price-audit` compares order-priced fund trades against the wrong day's bar (2026-09-29)
 
@@ -2929,12 +3042,27 @@ forward 102 / backward 26 / same-day 36
       series from the one orders execute against, or that manually-maintained column
       is stale. Until this is answered, do not assume the symbol mapping is correct
       and do not treat §74.3 as fixing valuation — it fixes the *audit*.
-- [ ] **Why is `EUR` absent from `instruments.fx_rates`** while 20+ other currencies
+      > **§72.39 step 1 owns this one**, and it is the same two lookups: ING01's
+      > published NAV for 2026-08-19 and 2023-04-13. Restated here as a second
+      > checkbox it would drift from §72.38's copy and from §72.6's, which is how
+      > this question survived three contradictory retractions. Do the work under
+      > §72.39 and tick it there.
+- [x] **Why is `EUR` absent from `instruments.fx_rates`** while 20+ other currencies
       are stored directly with history to 1999-01-04? EUR→PLN resolves, so it is
       cross-derived and not broken — but EUR is the most-used transaction currency
       in this dataset, and it is the one currency not stored. Establish whether
       that is deliberate (PLN base + a deliberately reduced currency set) or an
       oversight in the FX importer's currency list.
+      > **This is §72.36's question, already answered and pinned** — the answer
+      > is *deliberate*, and re-asking it here is what let a settled item sit open
+      > for a session. `TRACKED_CURRENCIES` (`fx-import.ts:10-14`) lists 30
+      > currencies and no EUR, because `importHistory` and `syncDaily` both fetch
+      > with `base=EUR`: a stored row means "1 EUR = N ccy", so a EUR row would be
+      > the constant 1. Pinned by four tests in `fx-import.test.ts:94-130`, one of
+      > which asserts the *semantics* (no EUR row is ever written, and PLN lands
+      > at ~4.3, not ~0.23) so a future change of base cannot pass silently.
+      > Commit `9ad8d28`. The lesson: a question answered in one section and
+      > restated in another is two items, and the second one drifts.
 
 ### 74.6 — Close the loop in prod
 
