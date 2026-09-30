@@ -3634,28 +3634,67 @@ fails.
 
 ### 76.4 — One writer per (portfolio, date) in `value_snapshots`
 
-- [ ] Three insert sites — `quotes.ts:520` (live, today), `backfill.ts:1021`
+- [x] Three insert sites — `quotes.ts:520` (live, today), `backfill.ts:1021`
       (`_runBackfillCore`, history), `backfill.ts:1071` (`recalcPortfolioHistory`, batch) —
       and three `syncCurrentValueFromSnapshots` sites: `quotes.ts:540`,
       `backfill.ts:1036`, `backfill.ts:1119`. Whichever ran last wins, and two of them
       target the same `(portfolioId, snapshotDate)` row for today. §76.1 removes the
       *trigger* for the live writer on reads but does not remove the writer.
-- [ ] Decide the ownership rule and write it down: history belongs to the backfill (only
+- [x] Decide the ownership rule and write it down: history belongs to the backfill (only
       it can price a past date from bars); today is owned by exactly one path.
       `computeSnapshotBatch` already accepts a window ending today, so the backfill's
       `mode=upsert` can own today and the live writer can be reduced to refreshing
       quotes on positions.
-- [ ] This is also what single-sources today's FX choice. The residual IBKR divergence
+- [x] This is also what single-sources today's FX choice. The residual IBKR divergence
       (§63.2) is ~1.2% on the FX-heavy portfolio — EUR +70,779, USD −39,104, PLN
       −121,130, base PLN — with the snapshot resolving FX at write time and the headline
       at read time, and today's ECB rate not existing until ~16:00 CET. **One writer
       should be tested against that number before the FX residual is chased as its own
       bug**, because a single writer may remove it entirely.
-- [ ] Tests: a test asserting a single insert path per date; a test that two concurrent
+- [x] Tests: a test asserting a single insert path per date; a test that two concurrent
       writers for the same date cannot both succeed; and the existing equivalence test
       (`backfill.test.ts:835`, `snapshotPortfolioValue equals computeSnapshotBatch for
       the same day`) kept green as the arithmetic guard.
-- [ ] Commit.
+- [x] Commit.
+
+
+**The rule, stated once and now enforced by the code rather than by convention:**
+
+> `computeSnapshotBatch` owns **every** `(portfolioId, snapshotDate)`, today included
+> — reached through `_runBackfillCore` (upsert), `recalcPortfolioSeries` (§76.3) and
+> `recalcPortfolioHistory` (force). `snapshotPortfolioValue` is reduced to what
+> genuinely needs a live quote: pricing positions and reporting what today is worth.
+> It **returns** that value instead of persisting it.
+
+Today had to go to the batch, not the live path, for a concrete reason rather than
+tidiness: `refreshQuotesUnlocked` **returns early when there are no open positions**,
+so a live-owned today would leave a **cash-only portfolio with no today row at all**.
+Only the batch covers that case (§62.4).
+
+**§63.2's race fix is now structurally impossible, not merely ordered.** `c195839`
+(v1.1.104) fixed a real race — a fire-and-forget live snapshot write racing the
+backfill's `syncCurrentValueFromSnapshots`, which grew across a recompute on IBKR and
+was invisible on 9 of 10 portfolios. Two writers of today's row were its precondition;
+with one writer there is nothing left to order. Its comment is kept and corrected
+rather than deleted, because it is what justifies the `quotedCount === 0` guard that
+does survive.
+
+**Consequence, stated rather than hidden:** a write no longer moves `current_value` on
+the spot — it lands when the debounced pass runs (~3s). The POST still answers with the
+freshly priced position, and the card keeps showing the snapshot's own as-of.
+
+**Seven existing tests asserted the two-writer behaviour and were rewritten onto the
+new invariant rather than deleted** — including *"does not resolve before today's
+snapshot has been written (the §63.2 race)"*, which now asserts the opposite and says
+why. The §53.6/§72.17b equivalence guard survives **intact** by asserting on the
+returned value: the two valuation paths must still agree to 6dp, which is the whole
+reason that test exists.
+
+New: one row per date across the live path *and* a batch pass (the live path must add
+nothing), and concurrent passes converging to a coherent series where each row carries
+10x **its own date's** close — a torn write surfaces as a value belonging to another
+date. Today's row carries the last close because there is no bar for today yet, which
+is why the expectation is derived per row rather than pinned to a fixed date set.
 
 ### 76.5 — Verify the read path is pure, then close out
 
