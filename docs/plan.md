@@ -2650,8 +2650,25 @@ in step with the instruments HelmRelease, like `WALLETS_IMAGE`.
 - [x] Recompute the affected portfolios afterwards and confirm the IBKR /
       > **IBKR and IKE Beata recomputed; steps unchanged, so not FX coverage**
       IKE Beata steps are gone or much reduced.
-- [ ] Confirm `fx_rates` row count and earliest date per currency afterwards — the
+- [x] Confirm `fx_rates` row count and earliest date per currency afterwards — the
       number to watch is the EARLIEST date, since the whole point is history.
+      > **Measured 2026-09-30.** FX history is complete:
+      > ```
+      > currencies 30 · total rows 209,092 · earliest 1999-01-04 · latest 2026-09-29
+      > 2022-02-11  30 currencies      <- was the §72.17 gap
+      > 2022-02-14  30 currencies
+      > 2022-06-13  30 currencies
+      > 2023-04-13  30 currencies
+      > 2023-04-07   0 currencies      <- Good Friday. A holiday, not a gap.
+      > ```
+      > The one empty day is **2023-04-07 — the very date §74 is about** — and it
+      > is empty because the ECB published no reference rate on Good Friday.
+      > Worth stating plainly, because "0 rows for 2023-04-07" is exactly the kind
+      > of fact that gets filed as a coverage gap and sends someone off to fix
+      > something that is correct. It is also a tidy closure of §72.17: the reason
+      > the 1.126 investigation ran so long is that the flagged trade landed on the
+      > one date in the dataset with no bar *and* no FX rate *and* a two-day
+      > market closure.
 - [x] If the steps survive, the boundary is not FX coverage and §72.21's hypothesis
       > **that is exactly what happened; became §72.26**
       is wrong; the next suspect is a symbol whose bars simply start then.
