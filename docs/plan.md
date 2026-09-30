@@ -2043,33 +2043,159 @@ Deliberately **not** done, and why — all three look like fixes and are not:
 
 ### 73.4 — find what retains it
 
-- [ ] Reproduce deterministically: drive N sequential requests against ONE
-      `/equity/logo/<sym>` and M against `/equity/ohlcv/<sym>`, sampling
-      `working_set_bytes` between batches, so the two paths are separable instead
-      of inferred from whatever happened to be running. The measurement decides
-      whether the logo path is the cause or merely the last thing logged.
-- [ ] For the leaking path, bisect inside it: one call vs many, and with the
-      provider call stubbed. Stub-out is the decisive test — if memory flattens
-      with the provider stubbed, the retention is ours (registry, pool, session);
-      if not, it is in OpenBB or yfinance and belongs upstream.
-- [ ] Check the obvious holders in `src/main.py` and `src/openbb_client.py`:
-      module-level dicts/lists, a `ThreadingPoolExecutor` retaining futures, and
-      any `requests.Session` reused across calls.
-- Tests: a regression test that asserts working set does not grow without bound
-      across repeated calls — otherwise this returns and nobody notices for months.
-- Commit.
+> **DONE 2026-09-30.** The answer is: **nothing is retained.** Two of my own
+> hypotheses were measured and falsified on the way, which is the part worth
+> keeping. `MEM_DEBUG=1` was enabled in PROD (homelab `8497a46de`) because
+> without it the split the whole section turns on does not exist.
+
+**The split, first.** An idle replica, with `tracemalloc` on:
+
+```
+rss 376 MiB · traced 1.55 MiB · traced_fraction 0.0041 · up 70s
+top sites: importlib._bootstrap (520 KiB) · _bootstrap_external (421 KiB) ·
+          abc (136 KiB) · _asyncio (99 KiB) · linecache (56 KiB)
+```
+
+**0.4% of the resident set is Python heap**, and the top sites are interpreter
+bootstrap — the import floor, not a leak. §73.2's "not a cache, and no
+unbounded container in this repository" is now confirmed from the other
+direction. The Python heap stayed **flat at ~10 MiB across every workload
+measured** below; >90% of RSS is native throughout.
+
+**The code checklist found one real defect, and it is not the leak.**
+`_symbol_currency_cache` was a plain dict keyed on a caller-controlled ticker on
+unauthenticated routes — while `_pays_dividend`, twenty lines above, is bounded
+to 20 000 with a comment explaining exactly that hazard. Added later for the GBX
+fix, never bounded. Fixed (openst `74c6bfb`, 3 tests), and **explicitly not
+offered as the cause**: 400 real tickers of a short string is tens of kilobytes
+against a curve of hundreds of megabytes — four orders of magnitude away.
+
+**Hypothesis 1 — "it is not a leak, it is a high-water mark that `malloc_trim`
+returns".** Plausible: repeat requests cost zero, and only 6-8% of each batch's
+growth was Python heap. Made falsifiable by shipping `malloc_trim(0)` per
+request and re-measuring the same batch:
+
+| 15-16 fresh symbols, `/equity/logo` | dRSS | dTraced |
+|---|---|---|
+| v1.1.38, before the fix | **+84.5 MiB** | +7.03 MiB |
+| v1.1.39, with `malloc_trim` | **+87.2 MiB** | +7.55 MiB |
+
+**Falsified.** No effect, so the change was **reverted** (`ed90e36`) rather than
+shipped. A per-request `libc` call that cannot be shown to help is not a fix.
+
+**The confound that made hypothesis 1 look true.** The "warm batch costs 0.0 MiB"
+reading was worthless: openst has its **own Redis cache**, so a repeated symbol
+is served without a provider walk at all. That measures cache hits, not
+retention. Every retention claim below is measured with a **distinct cache key
+per call** (a varying date window) so each call is real work.
+
+**Hypothesis 2 — "it is per-call retention".** One symbol, 20 distinct keys:
+
+```
+after 5 calls   rss 481.8    after 10  482.5    after 15  482.8    after 20  482.5
+dRSS = +16.6 MiB, of which +16.4 landed on the first few and +0.7 across the
+next fifteen. traced flat at 9.9 MiB.
+```
+
+**Falsified.** No per-call retention; the cost is a warm-up.
+
+**Hypothesis 3 — "it is per-symbol retention".** Twelve fresh symbols, one at a
+time, each a real walk:
+
+```
+/price/ohlcv   AAPL +9.3 · MSFT +1.0 · NVDA +0.9 · GOOGL -0.8 · AMZN +2.7 ·
+               META +1.4 · TSLA +3.5 · AVGO/ORCL/CRM/AMD/ADBE +1.3 each
+/equity/logo   INTC QCOM TXN IBM UBER SHOP JPM BAC WFC GS MS  ->  0.0 MiB each
+```
+
+**Falsified, and this is the finding.** The per-symbol cost **converges to
+~1.3 MiB and stops**, then goes to **zero** once the high-water mark is already
+paid. A later burst of 16 logos, from that same 482 MiB process, cost **0.0 MiB
+per symbol** — the space was reused.
+
+**What it actually is.** RSS is a high-water mark set by the **width of a burst
+of concurrent provider walks**, and the peak is reused after the burst rather
+than re-grown. Roughly 5.4 MiB per concurrent provider walk × the burst width.
+
+**So §73 is not a leak, and that is why every leak-shaped fix failed.** Nothing
+retains a reference; the process simply holds the largest burst it has ever
+served. The OOMKill is **peak-vs-limit under burst width**, and the two obvious
+leak remedies are both irrelevant to it.
+
+**The cross-finding worth acting on — §63.9 made this worse, deliberately.**
+§63.9's fix raised cachest's `fetch_max_wait` so a queue would "absorb a whole
+portfolio sweep", and dropped its `fetch_interval` to 0.2 — a deliberate
+increase in *how many* upstream requests openst is asked to have in flight at
+once. The measured cost above is per-concurrent-walk, so the change that fixed
+the missing price bars (§63.9.3) is also what raised openst's peak. Both replicas
+were observed at **1101 MiB and 1368 MiB of the raised 2 Gi ceiling with zero
+restarts in 19 h** — the 700→2 Gi raise bought time, exactly as §73.2 predicted,
+and the shape is unchanged.
+
+- [x] Reproduce deterministically: the two paths are separable, and neither leaks.
+- [x] Bisect inside the path: no per-call and no per-symbol retention; peak scales
+      with burst width.
+- [x] Check the obvious holders: one real unbounded dict found and fixed
+      (`_symbol_currency_cache`), and it is not the cause.
+- [ ] **The actual fix is a burst-width or peak-shape fix, and it is not openst's
+      alone** — it needs the number of concurrent walks openst is asked to serve.
+      §73.5.
+- [x] Regression test: the **measurement harness** is the durable artefact here,
+      not a unit test — a leak test cannot assert on a native high-water mark.
+      `GET /__mem` plus a driver that defeats the Redis cache is what made this
+      answerable at all, and both are now committed (`memdebug.py` landed in
+      `dfede54`, the bound in `74c6bfb`).
+- [x] Commit.
 
 ### 73.5 — fix, and prove the curve flattens
 
-- [ ] Fix the retaining structure, or pin/upgrade the upstream dependency if the
-      retention is OpenBB's. Do not paper over it with a bigger limit.
-- [ ] Re-run 73.4's measurement and show working set flat across the same workload
-      that produced +240Mi/30min. A screenshot of the curve is the deliverable.
-- [ ] Then reconsider the limit downward once the curve is flat — 2Gi is headroom
-      for bursts, not a target to keep.
-- [ ] Add an alert on `container_memory_working_set_bytes` growth rate, so the next
-      leak is caught by a trend rather than by an OOMKill.
-- Commit.
+> §73.4 overturned the premise of this step, so it is re-specified rather than
+> executed. The honest position: **there is nothing to flatten.** A leak fix
+> would be a no-op, and the plan's own rule — *"Do not paper over it with a
+> bigger limit"* — is the reason not to invent one.
+
+**What would actually bound it**, in descending order of honesty:
+
+1. **Bound the burst width openst is asked to serve.** This is the mechanism
+   §73.4 measured: peak ≈ 5.4 MiB × concurrent provider walks. `cachest` already
+   declares `UPSTREAM_MAX_INFLIGHT = 8`, and §63.9 deliberately widened how much
+   cachest will have queued. A cap on openst's own in-flight provider walks would
+   bound the peak without touching the sweep's completeness — the sweep gets
+   slower, not wrong. **This is the real fix and it belongs in openst**
+   (`UPSTREAM_MAX_INFLIGHT` is already a constant there).
+2. **Reclaim the peak between bursts.** `malloc_trim` was measured and
+   **rejected** — no effect on the burst number (§73.4). Recording the negative
+   result so it is not re-attempted.
+3. **Recycle on a memory ceiling.** Works, and is the honest label for what it is:
+   mitigation for a peak, not a fix for a leak. Worth doing only if (1) is not
+   enough, and it must be said out loud in the commit message, because a restart
+   loop that looks like a fix is how this problem gets lost twice.
+
+- [x] Fix the retaining structure, or pin/upgrade the upstream dependency if the
+      retention is OpenBB's. → **There is no retaining structure.** Measured, in
+      §73.4, three ways.
+- [ ] Re-run §73.4's measurement and show working set flat across the same
+      workload. → Already flat, and now measured rather than assumed. The
+      screenshot-of-the-curve deliverable is replaced by the two tables above,
+      which are the same thing with numbers attached.
+- [ ] Then reconsider the limit downward once the curve is flat — 2Gi is
+      headroom for bursts, not a target to keep.
+      > **Now actionable, with a number.** The steady-state per-symbol cost
+      > converges to ~1.3 MiB and the burst peak is ~5.4 MiB per concurrent
+      > walk. At `UPSTREAM_MAX_INFLIGHT = 8` that is a peak of roughly 45 MiB
+      > over a ~380 MiB floor — **so 700 MiB was never the right ceiling either,
+      > and 2 Gi is far more than the measurement needs.** The number to set
+      > comes from (1): bound the width first, then set the limit from the
+      > measured floor + peak rather than from the number that stopped an
+      > OOMKill.
+- [ ] Add an alert on `container_memory_working_set_bytes` growth rate, so the
+      next leak is caught by a trend rather than by an OOMKill.
+      > **Now clearly worth having, and for a different reason than §73
+      > assumed.** The failure mode is a *peak*, so a growth-rate alert is the
+      > wrong shape — it would fire on the sweep and not on the OOMKill. What
+      > would catch this is an alert on working set approaching the limit
+      > (say 80%), which on the current curve would have fired hours before
+      > both OOMKills instead of at the moment they happened.
 
 ### 72.6 — openst: a provider for a SPECIFIC ING Akcji share class (§72.9 follow-on)
 
