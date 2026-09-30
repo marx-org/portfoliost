@@ -2088,6 +2088,26 @@ conversion).
 
 ## 73. openst leaks memory until it is OOMKilled (found 2026-09-28)
 
+> **Cleanup shipped 2026-09-30** — openst `v1.1.41` (homelab `ff7e61ca0`), which
+> carries the `malloc_trim` revert (`ed90e36`), and `MEM_DEBUG` flipped to `"0"`
+> since the diagnosis it was switched on for is finished. PROD had been running
+> the experimental `malloc_trim` build as `v1.1.39` the whole time; it was never
+> more than a promise, because the memory split said `traced_fraction 0.0041`, so
+> the growth is not JS heap and trimming it could not have helped.
+>
+> **Verified without kubectl**, via the admin System page (`/en/admin/system`),
+> which lists the *running* image tag for every service — a better rollout check
+> than `kubectl get deploy` when the API is unreachable, and the only channel that
+> survived here. It reported `openst → v1.1.41` once Flux reconciled. Then a
+> functional check, because a version string is not a working service:
+> `summary-metrics.priceAsOf` advanced to `06:08:37Z` — *after* the rollout — with
+> `priceSource: "quote"`, `unpricedPositions: 0`, and real prices (AMZN 246.67,
+> PLW.WA 241.5, ELT.WA 61.15), so the quote path still flows through the new pod.
+>
+> Neither of those two steps changes §73.5, which is the actual fix: an
+> unresolvable symbol must fail *before* walking every provider in the chain.
+> That is still unimplemented and this cleanup does not claim it.
+
 Found while deploying §72: both openst replicas were killed mid-investigation and
 the ceiling turned out to be the visible symptom of an unbounded one. Deliberately
 **deferred** until after the reimport and the price audit, because the reimport is
