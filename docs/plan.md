@@ -721,11 +721,12 @@ Verified in PROD on IKE Beata: distinct tickers went from 25 (23 of them unheld)
 to **2, both held**; bare badges **37 → 0**; badges carrying a `(CC)` **13 → 50**.
 
 **Two honest caveats.**
-1. The instruments half is **not independently proven in PROD**. The admin System
-   page reports the Deployment's *desired* image, not the running pod, and the
-   plan already records an RWO logos-PVC multi-attach stall for this exact
-   service. The wallets fix masks the instruments half either way, so
-   "instruments v1.0.84 is serving" is an assumption, not a measurement.
+1. ~~The instruments half is not independently proven.~~ **Withdrawn.** I had
+   flagged this as an assumption on the grounds that the admin System page shows
+   the Deployment's *desired* image, not the running pod. `kubectl get pods` says
+   otherwise: `portfoliost-instruments-747cd65fb-9m6tz` is on **v1.0.84** with
+   `READY=true`. The stall I was worried about did not happen, and the plan's RWO
+   logos-PVC note is a risk, not a certainty. **Both halves are live.**
 2. The fix landed in wallets *second*, after v1.0.84 produced byte-identical
    output. Treating that version string as proof of rollout is what made me
    briefly believe the fix had failed. A version string is not a working service.
