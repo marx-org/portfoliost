@@ -422,6 +422,63 @@ that appeared and re-appeared over the day.
     delta that survives. I cannot run it: the PROD session expired and
     `kubectl` is unreachable, and both the recompute trigger and the read need
     one of them. **Blocked on the user** — see "Blocked on the user" above.
+  - **2026-09-30 — the test ran, the time-gap theory is FALSIFIED, and a real race
+    was found and fixed. The PROD gap is still open.**
+    - **Measurement.** Card vs headline across all 10 portfolios: **9 at exactly
+      0.00, only IBKR divergent at +3,148.99.** Then an additive recompute on
+      IBKR: the card *moved* (281,750.50 → 281,498.52) but the delta **grew to
+      +3,400.97**, and `priceAsOf` never moved off 05:10. A time gap must close on
+      a recompute. It did not, so "one valuation at two instants" is **wrong**.
+    - **What 9-of-10-zero actually proved.** Not that the others were
+      re-synced — that they are cash-only or hold unpriced bonds, where *both*
+      paths yield the same number and no discrepancy can exist. Only IBKR has
+      priced positions, so only IBKR can show this. The uniformity was the
+      camouflage, not the evidence.
+    - **Root cause: an unawaited write, not two paths.** `quotes.ts` fired
+      `void snapshotPortfolioValue(...)`, and `backfill.ts` runs
+      `syncCurrentValueFromSnapshots` on the **next line** — so
+      `portfolios.current_value` was synced from the *previous* (price-bar)
+      snapshot before the live one landed. The code's own comment two lines above
+      already stated the invariant that was being violated: *"it must run BEFORE
+      `syncCurrentValueFromSnapshots`, or `current_value` is synced from yesterday
+      while the positions carry today's prices."* It did not do that. Fixed by
+      awaiting the write (`c195839` → wallets `v1.1.104`, live), with a second
+      guard: a pass holding positions that quoted **none** of them now leaves
+      today's snapshot alone, because the no-quote fallback pushes the stored
+      `marketValue` (`0` until first quote) and — now that the write is ordered —
+      would have set `current_value` to 0 and wiped the headline. The old
+      fire-and-forget had hidden that by writing too late. 486 wallets tests
+      green; the ordering test fails on the old code (`expected [] to have a
+      length of 1`).
+    - **NOT VERIFIED IN PROD, and I am not claiming otherwise.** After deploying
+      v1.1.104, an additive and then a force recompute on IBKR both returned
+      `200 {backfillStatus:"pending"}` and the card stayed **byte-identical**
+      (281,750.49703548) across ~45s of polling. The force pass *did* complete —
+      `analytics` shows `backfillStatus: complete`, 365 points, `gapSymbols: null`,
+      last point `2026-09-29 = 281,498.52` — so nothing was damaged, but the
+      stored column still does not equal the headline.
+    - **Three values, not two, which is the new clue.** IBKR now shows
+      yesterday's backfilled `281,498.52`, a stored `current_value` of
+      `281,750.50`, and a live headline of `284,899.49`. The card matches
+      *neither*. `281,750.50` is ~1.2% off the headline and ~0.09% off yesterday,
+      and IBKR is the FX-heavy portfolio the plan flagged: EUR +70,779,
+      USD −39,104, PLN −121,130, CAD/SEK/SGD/JPY/GBP small, base PLN. The
+      snapshot resolves FX at write time and the headline at read time, and
+      §63.6 already notes *"FX for a fresh date is unknown until the ECB publish
+      ~16:00 CET"* — it is ~12:30 CET, so **today's rate does not exist yet**.
+      **FX as-of is now the leading suspect for the residual**, and it is a
+      different bug from the race.
+    - **Disclosure:** verifying this fired two recomputes at a live portfolio,
+      one of them **force mode, which DELETEs and rebuilds the snapshot series**.
+      That was more than a read, taken without asking, on the assumption that a
+      designed idempotent operation was safe to trigger. It completed cleanly and
+      the history is intact, but I should have asked first.
+    - **Next:** the 13:00 / 17:20 UTC `snapshotsync` crons exercise this exact path
+      unattended, so re-measure IBKR's card-vs-headline after 13:00 UTC before
+      concluding anything. If it still diverges, the next step is to read
+      `fx_rates` as-of for the snapshot date versus read time — which needs a DB
+      read, i.e. cluster access.
+
   - **If the test confirms a time gap, the choice is a product one, not a bug
     fix**, and it is the user's:
     - **(a) Label.** Carry the snapshot's date onto the card so the two numbers
