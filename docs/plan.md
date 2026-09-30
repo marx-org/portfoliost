@@ -3467,42 +3467,76 @@ NN TFI trade is a false positive, and a correct one for the wrong reason.
       > 1.12703 against class A, and identifies **W (1.13996)** as the only
       > category that can produce it. See the long note in §72.38's copy of this
       > step, which owns the measurement. The two date-matched W readings remain.
-- [ ] Step 1b — the two **date-matched W readings** that step 1 implies and did not
-      itself supply: W's NAV on **2026-08-19** and **2023-04-13**, against paid
-      896.00 / 382.05.
-      > This is the last thing standing between "W is the best-supported class" and
-      > "W is the class", and it is a **page-scraping** job, not a code one. The
-      > analizy.pl fund page serves only the current value — the `?period=` parameter
-      > is ignored, I checked — so the history has to come from the chart endpoint
-      > behind it, or from a second site that publishes a NAV history (bankier.pl
-      > served a single date for ING01 too).
+- [x] Step 1b — the two **date-matched W readings**. §72.39 step 1's own framing
+      was that the class was an *inference* from a ratio measured across 41 days,
+      and that two date-matched readings would settle it.
+      > **Settled — by a better source than the one the step assumed, and the
+      > answer is not "W, approximately".**
       >
-      > **Why it matters enough to be its own box:** step 2 is a provider build in
-      > the planner contract's six-stage provider-tier order, and the whole reason
-      > the plan insists on that order is that each stage is cheap to abandon. A
-      > 1.15% residual measured across **41 days** could be entirely the date gap —
-      > the ratio drifts ~1.2%/yr — or it could be the wrong category. Two lookups
-      > distinguish those, and a provider written against the wrong class would be
-      > the expensive way to be wrong, which is the failure §72.6 records twice.
-- [ ] Step 2 — openst provider for the identified class, tier order
-      > **Now buildable, and the measurement is what unblocked it** — analizy.pl
-      > publishes W's NAV daily, so the "no series exists" branch is ruled out.
-      > Gated on the two date-matched W readings above: the class is an inference
-      > until then, and a provider written against an inferred class would be the
-      > expensive way to be wrong, which is the exact failure §72.6 records.
+      > The step said this was a page-scraping job because analizy.pl serves only
+      > the current value. True of analizy.pl — but **`GMSAKW.TFI` is already
+      > served by our own provider chain** (biznesradar), which is both the number
+      > and a far better source than a scraped page: it is the same series the
+      > valuation would consume. Probing it against the five stored trade prices,
+      > each on its own valuation date:
+      >
+      > | date | paid | GMSAKW.TFI | paid/W | paid/A (our bar) |
+      > |---|---|---|---|---|
+      > | 2023-04-13 | 382.05 | **382.05** | 1.0000 | 1.0856 |
+      > | 2023-08-09 | 432.49 | **432.49** | 1.0000 | 1.0899 |
+      > | 2024-06-13 | 515.13 | **515.13** | 1.0000 | 1.1032 |
+      > | 2025-05-13 | 643.28 | **643.28** | 1.0000 | 1.1176 |
+      > | 2026-08-19 | 896.00 | 904.80 | 0.9903 | 1.1270 |
+      >
+      > **Four of five are identical to the cent.** That is not a ratio match
+      > within a drift assumption; it is the executed price. The fifth is 0.97%
+      > below W, which is a per-trade artefact, not a class question.
+      >
+      > The right-hand column is the whole `1.126` investigation: our symbol was
+      > **category A**, the broker executes against **W**, and the gap *grew* over
+      > time because the two carry different fees. §72.38's "the ratio grows, so
+      > it is two series" was right; it just never asked the one question that
+      > would have settled it — **does our own provider already serve the other
+      > one?**
+- [x] Step 2 — ~~openst provider for the identified class, tier order~~
+      **NOT NEEDED. There is no provider to build.** `GMSAKW.TFI` is served by the
+      existing chain — 1,829 bars, 2019-06-10 → 2026-09-29, `stale: false`.
+      §72.6, §72.16, §72.20, §72.23, §72.38 and §72.39 all specified a six-stage
+      provider-tier build against the premise that **no series existed** for the
+      class the broker executes against. That premise was never tested — it was
+      inferred from a ratio — and it was false.
+      > Ticked so it stops reading as the next thing to do. The planner contract's
+      > provider-tier order exists so a provider is built against evidence rather
+      > than a guess; the evidence here was a *symbol that already exists*, so the
+      > order has nothing to sequence.
+      >
+      > **Shipped instead (sheets-sync `a29dbe3`):** the override for the sheet's
+      > stale `"goldman sachs akcji"` now resolves to `GMSAKW.TFI`. One string.
+      > 158 green. **Not deployed** — it re-prices the holding, so it needs a
+      > reimport and the user's go-ahead.
 - [ ] Step 3 — `ticker_reference` entry for the class + sweep the other `.TFI` rows
-      > The entry must record the **class**, and `INGAKC.TFI` alone is not enough —
-      > the whole finding is that one ticker is being read as a category it does not
-      > name. Until step 1b lands, write nothing: a `ticker_reference` entry is
-      > exactly the kind of durable claim that gets trusted long after the
-      > measurement behind it is forgotten.
+      > The sweep is now the valuable half, and it is **wider than ING Akcji**:
+      > every `.TFI` row in the sheet was mapped by *old fund name* and never
+      > checked against the class the broker trades, which is precisely the defect
+      > this found. `ticker_reference` knows zero `.TFI` symbols, so nothing
+      > cross-checks any of them.
+      >
+      > The right check is the one that worked here and costs nothing: **take each
+      > stored trade price and ask the provider's series for the same date.** Four
+      > of five matched to the cent; a mismatch is a wrong symbol, immediately. That
+      > is a far stronger signal than a ratio against a category table, and it needs
+      > no new provider and no scraping.
 - [ ] Step 4 — `positions.company_name` off the stale sheet name
-      > A `sheets-sync` resolver mapping, and deliberately last. §72.38 is right
-      > that the symbol mapping is itself in question, so renaming the display
-      > before the class is confirmed would assert an answer the data does not give.
-      > It is also the cheapest item here and the one that keeps causing
-      > misdiagnosis — a stale brand is what made this look like a wrong-fund
-      > problem for three sections.
+      > A `sheets-sync` resolver mapping. Now unblocked in the sense that matters:
+      > the class is confirmed, so the symbol is no longer in question — which was
+      > the only reason this was deliberately left until last. **Cheapest item here
+      > and the one that keeps causing misdiagnosis**: a stale brand is what made
+      > this look like a wrong-fund problem for three sections.
+- [x] Audit: date window / order-priced exemption for fund trades
+      > §74.3, verified in the §74.6 PROD run. Note this was needed *because* the
+      > symbol was wrong: the audit compared order-priced fund trades against
+      > category A's bars, and the 10% tolerance happened to be wide enough that
+      > only the gap, not the class, showed up as a finding.
 - [x] Audit: date window / order-priced exemption for fund trades
       > §74.3, verified in the §74.6 PROD run.
 - [ ] **The sheet's `aktualny kurs` column is wrong and is its own finding.** It
