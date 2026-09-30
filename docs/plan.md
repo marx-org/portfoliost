@@ -1903,14 +1903,33 @@ conversion).
 
 ### 72.4 — run it after the wipe-&-reimport, and triage what it finds
 
-- [ ] Run the job for real against PROD and record the findings in this section.
+> **Run 2026-09-30** (wallets v1.1.100, in the PROD pod). The findings and the
+> triage live in **§74.6**, which is where the run was actually made — this
+> section's four items map onto it.
+
+- [x] Run the job for real against PROD and record the findings.
+      > §74.6 has the full transcript: 1191 trades / 219 symbols, **28 flagged**,
+      > 23 unverifiable, 192 order-priced explained.
 - [ ] Every flagged symbol gets one of: a `NAME_VENUE_OVERRIDES` entry (validated
       against its stored trades, as `SRT3.DE` was), a currency fix, or a recorded
       false positive with the reason — never a silent threshold bump.
-- [ ] Decide whether the `MFC` false positive from §71.6 is fixed by narrowing
+      > **Partly done, partly open, and the split is honest.** The **fund** family
+      > is closed: §74 classified all 192 with evidence instead of a threshold
+      > bump. The remaining 28 are **all one new class** — a 10-15% residual on a
+      > *converted* cross-currency comparison — and they are NOT triaged, because
+      > triage needs one more measurement (does the residual track the stored
+      > `exchange_rate` or the date-shifted rate?). Naming the class is the
+      > triage; picking a fix without the measurement is the thing §72.36/§72.37
+      > retracted twice.
+- [x] Decide whether the `MFC` false positive from §71.6 is fixed by narrowing
       the rule or by recording the exception.
+      > **Neither — classified instead**, §71.6. Recorded, still reported, and
+      > excluded from the exit code.
 - [ ] Re-run and assert the flagged count only goes down.
-- Commit.
+      > **Cannot be asserted yet**: this is the first run since the log route
+      > shipped (§72.22), so there is no prior count in the same place to compare.
+      > The next run gives the baseline. Recorded rather than claimed.
+- [x] Commit.
 
 ### 72.5 — close out §71.6
 
@@ -2516,8 +2535,13 @@ Two ways to close it, and the first is the right one:
 - [x] Persist per-symbol verdicts so two runs can be compared; a symbol that was
       > **persistReport writes to admin.job_run.details**
       flagged and is now clean is exactly the signal §72.17b/§72.18 should produce.
-- [ ] Re-read this run's actual findings once a log route exists, and confirm
+- [x] Re-read this run's actual findings once a log route exists, and confirm
       SAP.DE no longer appears.
+      > **Done 2026-09-30**, run in the PROD pod on wallets v1.1.100. The full
+      > findings are in §74.6. **`SAP.DE` does not appear** — §72.18's
+      > option-premium-leg skip still holds (the run reports "5 option premium
+      > leg(s) skipped"). What did appear is a new, uniform class of
+      > cross-currency residual, recorded in §74.6 and left open.
 
 ### 72.23 — §72.16 CLOSED: there is no second series and no second class. It is the data.
 
