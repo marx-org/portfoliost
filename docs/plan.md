@@ -3498,22 +3498,63 @@ NN TFI trade is a false positive, and a correct one for the wrong reason.
       > it is two series" was right; it just never asked the one question that
       > would have settled it — **does our own provider already serve the other
       > one?**
-- [x] Step 2 — ~~openst provider for the identified class, tier order~~
-      **NOT NEEDED. There is no provider to build.** `GMSAKW.TFI` is served by the
-      existing chain — 1,829 bars, 2019-06-10 → 2026-09-29, `stale: false`.
-      §72.6, §72.16, §72.20, §72.23, §72.38 and §72.39 all specified a six-stage
-      provider-tier build against the premise that **no series existed** for the
-      class the broker executes against. That premise was never tested — it was
-      inferred from a ratio — and it was false.
-      > Ticked so it stops reading as the next thing to do. The planner contract's
-      > provider-tier order exists so a provider is built against evidence rather
-      > than a guess; the evidence here was a *symbol that already exists*, so the
-      > order has nothing to sequence.
+- [ ] Step 2 — ~~openst provider for the identified class~~ / point the import at
+      the class W series. **The class is identified; the series is not currently
+      servable, so this is blocked on availability, not on identification.**
+      > **Two questions were conflated here, and the second is the one that
+      > matters.** Which series does the broker execute against? — **answered, and
+      > answered well**: `GMSAKW.TFI` reproduces four of five stored executed
+      > prices to the cent (§72.39 step 1b's table). Can our provider *serve* that
+      > series? — **not answered, and right now the answer is no.**
       >
-      > **Shipped instead (sheets-sync `a29dbe3`):** the override for the sheet's
-      > stale `"goldman sachs akcji"` now resolves to `GMSAKW.TFI`. One string.
-      > 158 green. **Not deployed** — it re-prices the holding, so it needs a
-      > reimport and the user's go-ahead.
+      > Measured in PROD, three runs in a row:
+      >
+      > ```
+      > GMSAKW.TFI  200  bars=0  stale=true   225ms
+      > INGAKC.TFI  200  bars=20 stale=false  154ms
+      > ```
+      >
+      > A `GS`-prefixed ticker is exactly the shape a provider carries
+      > **historically** and drops going forward, and that is what this looks like.
+      > The failure is also silent: `200 OK` with zero bars and `stale=true`, so a
+      > mapping pointed here would leave the holding **unpriced** rather than 8.4%
+      > low, and nothing would say so.
+      >
+      > **How this was nearly shipped wrong, because it is the plan's own error
+      > again.** The compose stack returned `GMSAKW.TFI` with 1,829 bars to
+      > 2026-09-29 and I read that as the provider serving it. It was **seeded
+      > fixture data** — compose now times out for *both* symbols, which is what
+      > fixture-only data looks like when asked something it was not built to
+      > answer. A fixture was treated as evidence of availability. That is the same
+      > class of mistake §72.33 records (a convenient parameter making data look
+      > like something it isn't) and it was made while documenting that rule.
+      >
+      > **Reverted** (sheets-sync `77434fd`; the mapping `a29dbe3` is undone, 157
+      > green, nothing deployed). The evidence for *which* series is kept; the
+      > mapping is not, because it cannot be justified by evidence about the fund
+      > alone.
+      >
+      > **What unblocks this** — in order, cheapest first:
+      > 1. Establish whether `GMSAKW.TFI` is *dead* or merely *degraded*: ask
+      >    openst directly what it serves for that symbol, and whether a different
+      >    spelling resolves (`GMSAKW.TFI` vs a GS-era variant). A provider holding
+      >    history but not quoting it is a different problem from one that dropped
+      >    the instrument.
+      > 2. If it is dead, the real work is a **provider that serves W's current
+      >    NAV** — which is the six-stage build after all, now with the correct
+      >    target known. The earlier conclusion that "no provider is needed" was
+      >    about *identification* and I let it stand for *availability*.
+      > 3. Until then the holding stays on category A, priced ~8.4% low and
+      >    drifting ~1.8%/yr. That is a known, quantified error — which is a
+      >    different and much better position than a silent zero.
+      >
+      > **The generalisable lesson, and it is the second time today:** a
+      > verification answers only the question it asked. "Four prices match to the
+      > cent" establishes identity and says nothing about availability; "1,829 bars
+      > in the fixture" establishes nothing at all. Both checks had to be run, and
+      > the cheap one — *is it quoted today?* — is the one that would have caught
+      > this, and it takes 200ms.
+
 - [x] Step 3 — sweep the other `.TFI` rows. **Run against PROD 2026-09-30, and
       exactly one symbol was wrong — the one already fixed.**
       > **The sweep was worth more than the fix, because it produced a
