@@ -630,10 +630,18 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
     backend and SPA disagree about what "held" means. Awaiting one SQL result to
     localise it (SPA enrichment source vs. instruments' `?ticker=` filter not
     filtering); the query is in the §61.11 follow-up below.
-  - **Compare-with-peers**: not reached before cluster access was lost.
+  - **Compare-with-peers — cannot be verified, and not because of §61.** The tab
+    renders "No positions to compare." with **0 badges**, and the deployed endpoint
+    is a hardcoded stub: `GET /api/portfolios/:id/compare` → `200
+    {"portfolios":[],"timeframe":"1Y"}`, with **no `items` key** for
+    `PortfolioCompareTab.vue:18` to read (`portfolios.ts:1395`). The whole feature
+    is unimplemented, so §61's compare badge is written and unit-tested but
+    unreachable. **Not a §61 defect** — closing the visual check means implementing
+    the endpoint, which is a new section, not a §61 closeout.
 - [x] Fix the country bug the visual pass found (§61.12 below).
 - [ ] Commit (plan closeout) + archive §61 to `plan-archive.md`.
-- [ ] **Compare-with-peers** visual check (only §61 surface not yet seen in PROD).
+- [x] **Compare-with-peers** — closed as *not verifiable*, see the note above. It
+      needs the `/compare` endpoint implemented first; not a §61 loose end.
 
 #### Follow-up this step uncovered: the import carries no country
 
@@ -652,26 +660,39 @@ Recorded here so it is not rediscovered as "the badge is missing a country".
 
 #### The PROD visual pass found a second, worse version of the same gap
 
-The follow-up above says `transactions.country` is NULL. True — but it is silent
-about **`positions.country`**, which is worse: the import wrote the **literal
-string `"Other"`** there, and PROD rendered **`(OTHER) Bond`** on every Polish
-bond position. `TickerBadge` uppercased `"Other"` into `"(OTHER)"` and the badge
-presented it as a country code.
+**`(OTHER) Bond` is a §28 residual, not a new defect — I got this wrong first.**
 
-Uppercasing a non-code does not make it one — it makes a confident-looking wrong
-label, which is the §66.2 failure this plan keeps hunting. Two halves, both needed:
+The PROD visual pass rendered `(OTHER) Bond` on the Polish bond positions and I
+read that as a fresh bug: the import "writes a bad default", and `null` would be
+better. Both halves of that are wrong, and `plan-archive.md` §28 says so.
 
-| Half | Change | Why both |
-|---|---|---|
-| Data | `import.ts:267` + `portfolio-transactions.ts:210`: `country: body.country ?? null` (was `?? "Other"`) | A *category* can be "Other" — `sector`/`industry` keep it and `quotes.ts` `isBlankish` depends on the convention — but a country **code** cannot; the contract is 2-letter-or-null. The placeholder was a display bucket that escaped into a typed field. |
-| Refusal | `TickerBadge.countryCodeOrNull()` — `/^[A-Z]{2}$/`, else omitted | Existing rows keep `"Other"` until the next reimport (user-gated), so the component guard is what makes the UI correct **today**; the data fix is what makes it correct for future imports. A presentational component is the wrong place to fix a data default, but the right place to refuse to render a value it cannot vouch for. |
+- **§28.5 chose `"Other"` on purpose** — "when `tx.country` is provided use it and
+  its `countryCode`, **else keep the current `"Other"` fallback**". It is a
+  *sentinel*, and `quotes.ts` `missesEnrichment` consumes it: enrichment fills
+  country when the stored value is `null`, empty, **or `"Other"`** (`value ?? ""`,
+  so all three are safe). Imported positions self-heal on the next quotes pass.
+- **§28.6 already measured this exact residual** after the real re-import: 215/265
+  positions carried a country, and the 50 that did not were *"only genuinely-unknown
+  assets"* — the list literally reads **Polish retail savings bonds (`ROD*`/`EDO*`)**
+  and **Catalyst codes (`ARH`/`BST`/`INS`/`KIN`/`KRI`/`NVA`/`VOX`)**. `EDO0735`,
+  `ROD0335` and `BST0327` are on it. §66.2 adds that `country='Other'` is
+  *"correlated, not causal — the causal gap is the equity-only quote path"*.
 
-`b83da99` (wallets) → `v1.1.101`, `902d625` (SPA) → `v1.0.291`, homelab pin
-`13052263a`. Gates: wallets 483, SPA 463 unit + 227 mock + 114 e2e.
+So those bonds have **no country to heal from**; changing the import default would
+have changed the label and nothing else, while overriding a documented decision.
+`b83da99` is reverted by `aa47888` (483 tests green). Lesson recorded because the
+archive was one grep away and I did not grep it first.
 
-Note `sector`/`industry` deliberately keep `"Other"`, and `isBlankish` in
-`quotes.ts` still treats it as unknown — so the two fields are intentionally
-asymmetric now, and the asymmetry is the point.
+**What is genuinely right is the refusal, not the data change.** `TickerBadge`
+now runs `countryCodeOrNull()` (`/^[A-Z]{2}$/`) and omits anything else, so the
+residual renders as `Bond` instead of `(OTHER) Bond` while the sentinel pipeline
+and its self-heal stay exactly as §28 built them. `902d625` → `v1.0.291`, verified
+live in PROD. A presentational component cannot fix a data default, but it can
+refuse to print a value it cannot vouch for.
+
+The real fix for those 50 rows is the one §28.6/§66.2 already identified — a
+country source for bonds/funds/crypto. Cross-repo, out of scope, and not to be
+slipped in here.
 
 #### Open: locating the 37/50 bare news badges
 
