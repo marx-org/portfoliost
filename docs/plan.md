@@ -3694,6 +3694,43 @@ kept refreshing forever. Fix commit `978ac87`;
 v2.14.0 **contains** it. Long sessions therefore remain revocable by disabling
 the user or changing `portfoliost_admin` membership — the next refresh fails.
 
+**This was a conscious deferral, not an oversight.**
+`docs/proposals/auth-oidc-pkce-pocketid.md` says so in as many words: *"Token
+refresh: Not implemented initially. If the JWT expires, the user must
+re-authenticate via PocketID. Can be added later with a refresh token flow."*
+§77 closes that. The same proposal's *Risks* section also claims *"The frontend
+doesn't check expiry — it relies on 401 responses from the backend. This is
+fine."* That is the sentence that hid the mid-task ejection until now.
+
+**`offline_access` is a non-issue — verified, not assumed.** PocketID advertises
+`offline_access` in `scopes_supported` and `src/auth/pkce.ts:61` does not
+request it, which looked like it would mean no refresh token is ever issued.
+Reading PocketID's own sqlite (`pocket-id.db` on the `pocket-id-data` PVC,
+copied read-only) settles it:
+
+    oauth2_sessions, kind='refresh_token', client=PortfolioST: 223 rows, all active
+      newest: expires_in = 30.0d      (RefreshTokenLifespan = 30 * 24h, provider.go:39)
+      oldest: expires_in = -0.6d, still active=1   (never used; no cleanup)
+
+223 unused 30-day refresh tokens — one per login since this shipped, every one
+discarded by `routes/auth.ts`. They are issued **without** `offline_access`, so
+no scope change is needed. Incidentally this also confirms the sliding window,
+and shows expired rows are never cleaned up (a slow leak, harmless).
+
+**Logout does not log out — three separate gaps**, all invisible today because
+the session is only 60 min:
+
+1. `POST /api/auth/logout` (`routes/auth.ts:188-190`) is literally
+   `return c.json({ success: true })` — no end_session, no revocation.
+2. PocketID's session cookie is never cleared, so the OIDC session survives.
+   Only the hardcoded `prompt=login` hides it.
+3. The OIDC client advertises `logoutCallbackUrls:
+   https://portfoliost.${SECRET_DOMAIN}/logout`, but **no `/logout` route
+   exists** — `grep -c logout src/router/index.ts` → `0`. Verified in prod:
+   visiting `/logout` redirects to `/en/investments`, still authenticated.
+   Harmless only because end_session is never called; it must be fixed *before*
+   it is, or signing out bounces the browser back into the app.
+
 **Design decisions (resolved).**
 
 - Refresh token lives **server-side** in `users_auth`, SHA-256 hashed, keyed by
@@ -3702,16 +3739,39 @@ the user or changing `portfoliost_admin` membership — the next refresh fails.
   **ignoring `exp`**, looks up the row, exchanges, returns a fresh id_token.
   The bearer-token architecture is untouched, so `portfoliost-wallets`,
   `-instruments` and `-admin` need no changes.
-- **`logout()` must delete the refresh row in the same change.** It is currently
-  a no-op (`routes/auth.ts:188` returns `{success:true}` with no end_session
-  call). Harmless while there is nothing to revoke; with a 30-day token it would
-  mean "log out" silently does not log out.
+- **`logout()` must delete the refresh row in the same change**, and must be
+  extended to end the PocketID session and receive its callback. With a 30-day
+  refresh token, a logout that only forgets the local token is not a logout.
+- **No proactive refresh timer. Refresh-on-401 only.** A timer is a scheduler
+  whose only job is to avoid a code path — that is backwards. It would need
+  re-arming, cleanup, `exp` parsing, and would be at the mercy of background-tab
+  throttling, all to avoid one extra round-trip. "Keeping the risky code rare"
+  does not justify it either: close the laptop overnight and the token has
+  expired, so the 401 path runs on the first request tomorrow regardless. The
+  401 path is event-driven; the timer is scheduled. Cheaper and simpler.
+- **A single in-flight refresh is mandatory** — this is correctness, not
+  complexity. Measured on prod: one dashboard load fires **15 parallel API
+  calls**, 10 of them per-portfolio `analytics`. If all 15 lapse at once and
+  each calls refresh independently, rotation invalidates the token after the
+  first, so 14 requests fail and the session looks broken. One shared in-flight
+  promise, awaited by every concurrent 401, is the minimum that makes this safe.
 - Keep `prompt=login`. With refresh working, manual logins are rare, so the
   annoyance mostly disappears, and always showing the passkey is the
   conservative default. Not part of this section.
 - No client secret is needed: `isPublic: true` + PKCE, and the helmrelease sets
   only `POCKETID_CLIENT_ID`. users-auth already reaches the token endpoint at
   `http://pocket-id.networking.svc.cluster.local:1411/api/oidc/token`.
+
+**Out of scope: nginx edge auth.** ingress-nginx has no native JWT validation,
+and PocketID cannot be an `auth-url` target — tested, `/api/oidc/userinfo`
+returns `401` for our token because it wants an *access* token and we ship the
+`id_token*; `introspect` needs `client_secret_basic` and the client is public;
+`authorize` is a redirect flow. The only viable path is the dormant
+`GET /internal/verify` on users-auth (`src/index.ts:34`, never wired). Even then
+it would not replace app-side validation — the SPA sends the same
+`Authorization` header — so it is defence-in-depth on top, adds a hop per
+request, and needs `/login` + `/auth/callback` exempted or it locks you out.
+It does not lengthen the session. Belongs in its own section, later.
 
 Scope spans three repos (`portfoliost`, `portfoliost-users-auth`,
 `portfoliost-contracts`); the contracts change is the mandatory schema for the
@@ -3789,45 +3849,74 @@ new endpoint, per `AGENTS.md` API-client typing rules.
       - response contains no `refresh_token` key.
 - [ ] Commit.
 
-### 77.4 — users-auth: make logout actually revoke
+### 77.4 — logout actually revokes (all three parts)
+
+Gap 2 and gap 3 from the intro. This step is not optional: it is what stops
+"log out" from becoming a lie once the refresh row exists.
 
 - [ ] `POST /api/auth/logout` (`routes/auth.ts:188`) currently returns
       `{success:true}` and touches nothing. Read `id_token` from the body,
       verify signature ignoring `exp` as in 77.3, and `DELETE` the
       `refresh_sessions` row by `jti`. A missing row is still a `200` —
       logout is idempotent.
-- [ ] Update `src/api/auth.ts` in `portfoliost` to pass the current token on
-      logout (see 77.5) — but land this commit in `portfoliost-users-auth` and
-      keep the body optional so the old client keeps working.
-- [ ] Tests: logout removes the row; a second logout is still `200`; after
-      logout, the pre-logout `id_token` can no longer be refreshed via 77.3's
-      endpoint (the row is gone).
+- [ ] Land that half in `portfoliost-users-auth` first, keeping the body
+      optional so the old client keeps working. Tests: logout removes the row;
+      a second logout is still `200`; after logout, the pre-logout `id_token`
+      can no longer be refreshed via 77.3's endpoint (the row is gone).
+- [ ] Frontend `src/api/auth.ts` `logout()` now sends the current token.
+      Commit.
+- [ ] **Verify PocketID's end-session behaviour before wiring it.** The endpoint
+      is `GET /api/oidc/end-session` (from `/.well-known/openid-configuration`),
+      taking `id_token_hint` and `post_logout_redirect_uri`. Do not code this
+      from the spec — upstream issue #1390 / PR #1458 reports that refresh
+      tokens are *not* deleted on end-session, so confirm against v2.14.0
+      whether it clears the session cookie, and whether the 30-day refresh
+      survives it. If it does survive, the row deletion above is the only thing
+      that revokes, and that must be stated in the UI copy rather than implied.
+- [ ] `src/router/index.ts`: add the missing `/logout` route (public, no auth).
+      Today `logoutCallbackUrls` advertises a URL that does not exist, and
+      visiting it redirects into the dashboard while authenticated. The route
+      clears `portfoliost_token` and renders the login view. Without this,
+      enabling end-session signs the user out and immediately drops them back
+      into the app.
+- [ ] `src/layout/SidebarNav.vue:15` and `src/modules/settings/ProfileView.vue:125`:
+      logout becomes revoke → `window.location.assign(pocketIdEndSessionUrl)`
+      rather than `router.push({name:"login"})`, since end_session must run as a
+      top-level navigation to clear PocketID's cookie.
+- [ ] Tests: `/logout` clears the token and shows login; logout from the sidebar
+      ends the PocketID session (assert the end-session URL is used, not a
+      router push). e2e: log in → log out → `/api/auth/me` is 401 and a reload
+      does not restore the session.
 - [ ] Commit.
 
-### 77.5 — portfoliost frontend: proactive refresh + silent recovery
+### 77.5 — portfoliost frontend: refresh-on-401 with a single in-flight guard
+
+No timer (see intro). One event-driven path.
 
 - [ ] `src/api/auth.ts`: add `refresh(idToken)` calling `POST
-      /api/auth/refresh`, typed from the regenerated `api-types.d.ts`; change
-      `logout()` to send the current token.
-- [ ] `src/stores/auth.ts`: add `refreshToken()` that calls it, updates
-      `token`/`user`, and `setToken()`. Read the new expiry by decoding the
-      returned id_token's `exp` — do **not** trust `expires_in`, which
-      describes Pocket-ID's access token, not the id_token being returned.
-- [ ] Schedule the refresh from `src/App.vue`'s existing `onMounted`, at
-      `exp - 5min`, using a single `setTimeout` re-armed after each refresh.
-      Do not add a polling interval: one-shot re-armed on a timer keeps an idle
-      tab alive and avoids a request storm in a background tab.
-- [ ] In `src/api/client.ts` `request()`, on `ApiError` with `status === 401`,
-      attempt exactly one refresh, then replay the original request once. Guard
-      against infinite recursion with a per-request `retried` flag, and let a
-      failed refresh fall through to `logout()` + redirect to `login`.
-      This is what removes the mid-task ejection: the token is usually renewed
-      before it ever 401s, and if it does 401 the user never sees it.
+      /api/auth/refresh`, typed from the regenerated `api-types.d.ts`.
+- [ ] `src/stores/auth.ts`: add `refreshSession()` that calls it, updates
+      `token`/`user`, and `setToken()`. Module-level `let inflight: Promise<void>
+      | null` — if set, return it; otherwise create it and clear it in a
+      `finally`. Every concurrent 401 awaits the same promise. **This is the part
+      that breaks without it**: 15 parallel requests lapse together, the first
+      refresh rotates the token, the other 14 find no row and fail.
+- [ ] `src/api/client.ts` `request()`: on `ApiError` with `status === 401`,
+      await the single in-flight refresh, then replay the original request
+      **once**. Guard with a per-request `retried` flag so the refresh call
+      itself cannot recurse; a failed refresh falls through to `logout()` +
+      redirect to `login`.
+- [ ] State the idempotency reasoning in a comment rather than leaving it
+      implicit: replay is safe because the 401 comes from `validateJwt` in
+      middleware *before* any handler runs, so no side effect occurred on the
+      first attempt. Add a test that a 401'd `POST` replays exactly once and
+      the backend sees two requests but one committed effect.
 - [ ] Leave `prompt: "login"` at `src/auth/pkce.ts:65` alone (resolved above).
-- [ ] Tests: `src/api/client.spec.ts` — 401 → one refresh → replayed request
-      returns 200; a failing refresh does not retry the refresh itself; a second
-      401 after replay surfaces the error. `src/stores/auth.spec.ts` — the
-      timer is armed at `exp - 5min` and re-armed after a refresh.
+- [ ] Tests in `src/api/client.spec.ts`:
+      - 401 → one refresh → replayed request returns `200`;
+      - 5 concurrent 401s trigger exactly **one** `/api/auth/refresh` call;
+      - a failing refresh does not retry the refresh itself;
+      - a second 401 after replay surfaces the error.
 - [ ] `npm run build` (includes `vue-tsc --noEmit`), `npm run test`,
       `npm run test:mock` green.
 - [ ] Commit.
@@ -3837,10 +3926,13 @@ new endpoint, per `AGENTS.md` API-client typing rules.
 - [ ] `docker compose up -d --build`, `npm run test:mock`, `npm run test:e2e`
       green (114 e2e per §75).
 - [ ] Manual: log in, confirm `id_token` lifetime is still 60 min in the browser
-      but `refresh_sessions` has a row in `users_auth`. Wait out the expiry and
-      confirm the SPA never shows a login screen and `localStorage
-      ["portfoliost_token"]` has a new `jti`. Log out and confirm the row is
-      gone and a pre-logout token no longer refreshes.
+      but `refresh_sessions` has a row in `users_auth`. Wait out the expiry,
+      reload, and confirm the SPA never shows a login screen,
+      `localStorage["portfoliost_token"]` has a new `jti`, and the `jti` keyed
+      the row has moved with it. Confirm a page load right after expiry issues
+      exactly one `POST /api/auth/refresh`, not fifteen. Log out and confirm the
+      row is gone, a pre-logout token no longer refreshes, and PocketID's
+      session cookie is cleared.
 - [ ] Release per the `homelab-deploy` skill: tag-bump
       `portfoliost-users-auth` and `portfoliost` images, bump the pinned `tag:`
       in their `helmrelease.yaml`, commit to homelab `main` (rebasing on the
