@@ -3449,24 +3449,54 @@ not a number, and no step may cite a millisecond figure until one is measured.
 
 ### 76.1 — Make the three GET read paths pure (wallets)
 
-- [ ] Delete `await refreshQuotes(...)` from all three GET handlers in
+- [x] Delete `await refreshQuotes(...)` from all three GET handlers in
       `src/routes/portfolio-transactions.ts` — line 1205 (`GET /:id/positions`),
       1251 (`GET /:id/allocation`), 1364 (`GET /:id/positions/cfd-hints`).
       Leave the POST at 1181 and the five `notifyTransactionsChanged` sites alone.
-- [ ] Fix the now-false comments that assert the read path prices: the D58 note at
+- [x] Fix the now-false comments that assert the read path prices: the D58 note at
       `portfolios.ts:860-876` ("Prices now come from the writers" is right, but the
       surrounding text credits a removal that never reached this module) and the
       `snapshots-sync.ts:55` claim that the only writer "ran solely when a user OPENED a
       portfolio", which stops being true here.
-- [ ] Tests: a route-level test per endpoint that records
+- [x] Tests: a route-level test per endpoint that records
       `value_snapshots` count, `portfolios.current_value`, and `positions.price_as_of`
       before and after the GET and asserts **all three unchanged**. A test that only
       asserts the response body would pass with the write still in place.
-- [ ] Tests: `GET /:id/positions` still returns the same payload shape and the same
+- [x] Tests: `GET /:id/positions` still returns the same payload shape and the same
       `priceAsOf`/`priceSource` fields (§61/§70 rely on them travelling with each
       position), and the existing `portfolio-transactions` + `quotes` + `snapshots`
       suites stay green.
-- [ ] Commit.
+- [x] Commit.
+
+Shipped as wallets `v1.1.105` (`6efdad8`), pinned in homelab `c5b00b1fd`, live 15:58Z.
+`tsc` clean; 490 tests green (486 + 4 new).
+
+**The purity tests were proved to have teeth rather than assumed to.** Each of the
+three endpoints' test mocks instruments to a price (999) that differs from the seeded
+one, then asserts all three captured columns are unchanged across the GET. Re-inserting
+`refreshQuotes` into `GET /:id/positions` and re-running makes the test fail and name
+every write it was meant to catch:
+
+```
+-  "currentValue": "1500.00000000"        +  "currentValue": "8485.01000000"
+-  "marketValue":  "1500.00000000"        +  "marketValue":  "9990.00000000"
+-  "priceAsOf":    null                   +  "priceAsOf":    "2026-09-30T15:40:02.139Z"
+-  "priceSource":  "manual"               +  "priceSource":  "quote"
+-  "snapshotCount": 0                     +  "snapshotCount": 1
+```
+
+That is the whole §76 thesis in five numbers: one GET wrote a snapshot, moved
+`current_value`, and stamped a fresh `price_as_of` onto every position.
+
+**Not yet verified in PROD.** `INSTRUMENTS_SERVICE_TOKEN` authenticates the cron to
+instruments, not a caller to wallets, so the live read check needs a user JWT. It is
+deferred to §76.5's session rather than run as a separate login.
+
+**One consequence worth stating plainly:** `snapshots-sync` is no longer "the safer
+writer" — since no read prices anything, it is the *only* writer in the scheduled
+pipeline. If that job stops, nothing refreshes prices until a human writes to a
+portfolio. §76.5's cron-coverage check is the thing that should catch it.
+
 
 ### 76.2 — One manual refresh per portfolio, on the additive path (SPA + wallets)
 
