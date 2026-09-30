@@ -446,7 +446,13 @@ async function exportPositions(format: "csv" | "xml" | "json") {
       >
         Prices as of {{ priceAsOfLabel }}
       </span>
-      <span v-else class="text-xs text-slate-400 dark:text-slate-500">Prices not yet loaded</span>
+      <span
+        v-else-if="(portfolio.metrics?.openPositions ?? 0) > 0"
+        class="text-xs text-amber-600 dark:text-amber-400"
+        data-testid="card-price-as-of-missing"
+      >
+        No price timestamp yet
+      </span>
       <button
         type="button"
         class="btn-ghost shrink-0 px-2 py-1 text-xs"
