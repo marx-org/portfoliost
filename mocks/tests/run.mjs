@@ -89,9 +89,26 @@ async function main() {
   const logoutLogin = await request("/auth/login", { method: "POST", body: { email: EMAIL, password: PASSWORD } })
   const logoutToken = logoutLogin.json.access_token
   const logoutRes = await request("/auth/logout", { method: "POST", token: logoutToken })
-  check("auth.logout returns 204", logoutRes.status === 204, `got ${logoutRes.status}`)
+  // 200 + {success:true}, matching portfoliost-users-auth. The spec previously
+  // said 204 and only the mock agreed with it.
+  check(
+    "auth.logout returns 200",
+    logoutRes.status === 200 && logoutRes.json?.success === true,
+    `got ${logoutRes.status}`
+  )
   const afterLogout = await request("/auth/me", { token: logoutToken })
   check("auth.logout invalidates session", afterLogout.status === 401, `got ${afterLogout.status}`)
+
+  const refreshLogin = await request("/auth/login", { method: "POST", body: { email: EMAIL, password: PASSWORD } })
+  const refreshToken = refreshLogin.json.access_token
+  const refreshRes = await request("/auth/refresh", { method: "POST", body: { id_token: refreshToken } })
+  check(
+    "auth.refresh renews a live session (§77.5)",
+    refreshRes.status === 200 && !!refreshRes.json.access_token,
+    `got ${refreshRes.status}`
+  )
+  const badRefresh = await request("/auth/refresh", { method: "POST", body: { id_token: "nope" } })
+  check("auth.refresh rejects an unknown session", badRefresh.status === 401, `got ${badRefresh.status}`)
 
   // ── Users ───────────────────────────────────────────────────
   const profile = await request("/users/profile", { token })
