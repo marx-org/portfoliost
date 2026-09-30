@@ -31,6 +31,24 @@ export function formatAssetType(t: string | null | undefined): string {
 }
 
 /**
+ * A 2-letter country code, or `null` when the value is not one.
+ *
+ * **This check is not pedantry, and it was added because PROD rendered
+ * `(OTHER) Bond` on the Polish bond positions.** The import writes the literal
+ * placeholder `"Other"` into `transactions.country` / `positions.country` when
+ * the sheet has no country, so "whatever is in the column" is not the same
+ * thing as "a country code". Uppercasing a non-code does not make it one — it
+ * makes a confident-looking wrong label, which is the exact failure §66.2 exists
+ * to prevent. The wallet for that is a caller-side `?? "Other"`, and a presentational
+ * component is the wrong place to fix a data default — but it is the right place
+ * to refuse to render a value it cannot vouch for.
+ */
+export function countryCodeOrNull(value: string | null | undefined): string | null {
+  const t = typeof value === "string" ? value.trim().toUpperCase() : ""
+  return /^[A-Z]{2}$/.test(t) ? t : null
+}
+
+/**
  * The `(PL) Stock` details line. `null` when there is nothing to say, so a
  * caller can omit the line entirely rather than render an empty one.
  */
@@ -38,7 +56,7 @@ export function tickerDetails(
   countryCode?: string | null,
   assetType?: string | null,
 ): string | null {
-  const cc = (countryCode ?? "").trim().toUpperCase()
+  const cc = countryCodeOrNull(countryCode) ?? ""
   const kind = formatAssetType(assetType)
   const parts = [cc ? `(${cc})` : "", kind ? kind : ""].filter(Boolean)
   return parts.length ? parts.join(" ") : null

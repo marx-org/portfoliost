@@ -1,6 +1,6 @@
 import { mount } from "@vue/test-utils"
 import { describe, expect, it } from "vitest"
-import TickerBadge, { formatAssetType, tickerDetails } from "@/components/TickerBadge.vue"
+import TickerBadge, { countryCodeOrNull, formatAssetType, tickerDetails } from "@/components/TickerBadge.vue"
 
 const mountBadge = (props: Record<string, unknown>) =>
   mount(TickerBadge, { props: props as never })
@@ -38,6 +38,23 @@ describe("TickerBadge (§61.1)", () => {
 
   it("uppercases the country code", () => {
     expect(mountBadge({ symbol: "SAP", countryCode: "pl" }).get('[data-testid="ticker-badge-details"]').text()).toBe("(PL)")
+  })
+
+  // Found by the PROD browser pass: the import writes the literal "Other" into
+  // `country` when the sheet has none, and the badge rendered `(OTHER) Bond` —
+  // a confident-looking label for a value that is not a country code.
+  it("refuses to render a country that is not a 2-letter code (§61 PROD)", () => {
+    for (const bogus of ["Other", "OTHER", "unknown", "N/A", "-", "PLN", "Poland", "12", ""]) {
+      expect(countryCodeOrNull(bogus), `${bogus} should not pass as a country`).toBeNull()
+      expect(tickerDetails(bogus, "BOND")).toBe("Bond")
+    }
+  })
+
+  it("still renders a real code, and still omits the part it cannot vouch for", () => {
+    expect(countryCodeOrNull("pl")).toBe("PL")
+    expect(countryCodeOrNull(" us ")).toBe("US")
+    expect(tickerDetails("PL", "BOND")).toBe("(PL) Bond")
+    expect(tickerDetails("Other", null)).toBeNull()
   })
 
   it("swaps the logo class with size", () => {
