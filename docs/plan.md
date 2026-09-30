@@ -3621,15 +3621,61 @@ NN TFI trade is a false positive, and a correct one for the wrong reason.
             > because `openbb_client.py` will need no session handling. Responses
             > are `cache-control: no-cache, private` — the source caches nothing for
             > us, so the cachest TTL in stage 4 is ours to choose.
-      - [ ] Fetch **one request per symbol**, save the raw response to
+      - [x] Fetch **one request per symbol**, save the raw response to
             `openst/tests/fixtures/`, and inspect its structure before writing a
             client. Do not assume a field name: the `.TFI` price field has already
             been the wrong shape twice.
-            > **The structure is now known** (above), so the remaining work is the
-            > capture itself: one request per code in the curated table, saved
-            > verbatim. Raw bytes, not re-serialised JSON — the shape has been
-            > wrong twice already.
-      - [ ] Fixtures must cover **at least one date before and one after** any
+            > **DONE** — `openst/tests/fixtures/analizy/`, 7 raw responses
+            > (`35233cf`). Raw bytes, not re-serialised.
+            >
+            > **The code table, resolved by sweeping the range rather than
+            > guessing** — every guessed code 404'd, which is the plan's own
+            > recurring error in a new dress, so the `ING01`–`ING99` range was
+            > enumerated instead. **All six held symbols map:**
+            >
+            > | stored | code | label | pts | from |
+            > |---|---|---|---|---|
+            > | `INGAKC.TFI` | `ING01` | ING Akcji | 7,201 | 1998-03-09 |
+            > | *(class W)* | `ING01W` | ING Akcji W | 1,845 | 2019-06-10 |
+            > | `INGOBL.TFI` | `ING04` | ING Obligacji | 6,955 | 1999-02-24 |
+            > | `NNEP25.TFI` | `ING81` | ING Emerytura 2025 | 1,725 | 2019-11-29 |
+            > | `NNEP30.TFI` | `ING82` | ING Emerytura 2030 | 1,725 | 2019-11-29 |
+            > | `NNEP60.TFI` | `ING88` | ING Emerytura 2060 | 1,722 | 2019-12-04 |
+            > | `NNEP65.TFI` | `ING92` | ING Emerytura 2065 | 1,418 | 2021-02-17 |
+            >
+            > `INGOBL.TFI` was the only ambiguous one (four "obligacje" candidates).
+            > It resolves on an **exact name match** — the sheet's folded name is
+            > `"nn obligaji"`-family `"nn obligacji"` (`instrument-resolver.ts:499`)
+            > and `ING04` is literally "ING Obligacji" — and is confirmed
+            > numerically below.
+            > **Coverage verified against PROD, and it holds — but not by the
+            > margin I first assumed.** Every stored `.TFI` trade falls inside its
+            > category's window:
+            >
+            > | symbol | code | trades | earliest trade | window opens | headroom |
+            > |---|---|---|---|---|---|
+            > | `INGAKC.TFI` | `ING01` | 79 | 2020-02-14 | 1998-03-09 | decades |
+            > | `INGOBL.TFI` | `ING04` | 2 | 2020-03-12 | 1999-02-24 | decades |
+            > | `NNEP25.TFI` | `ING81` | 2 | 2020-03-25 | 2019-11-29 | 4 months |
+            > | **`NNEP30.TFI`** | `ING82` | 5 | **2019-12-16** | 2019-11-29 | **17 days** |
+            > | `NNEP60.TFI` | `ING88` | 20 | 2020-04-09 | 2019-12-04 | 4 months |
+            > | `NNEP65.TFI` | `ING92` | 66 | 2021-09-01 | 2021-02-17 | 6 months |
+            > | *(class W)* | `ING01W` | — | — | 2019-06-10 | — |
+            >
+            > **Two consequences worth carrying.** First, no data is lost by routing
+            > these codes at the new provider — checked, not assumed. Second,
+            > **`NNEP30.TFI` is the fragile one**: its first trade is 17 days inside
+            > the window, so if analizy.pl ever trims `ING82`'s start, that trade
+            > loses its bar. It is also the only symbol where a "plausible" window
+            > assumption would break, which is why the boundary is per-category and
+            > not a constant.
+            >
+            > Note this **corrects a guess in the previous paragraph of this box**:
+            > "the earliest stored trade is 2023-04-13" was wrong — that is the
+            > earliest trade for *W*, not for the family. `INGAKC.TFI` reaches back
+            > to 2020-02-14. Recorded because the plan has a documented habit of
+            > letting one convenient date stand in for a whole set.
+      - [x] Fixtures must cover **at least one date before and one after** any
             boundary the source applies, and the two dates already proven
             (`2023-04-13` → 382.05, `2026-08-19` → 904.80) must be reproducible
             from the fixture. Those are the two measurements the whole
@@ -3661,13 +3707,26 @@ NN TFI trade is a false positive, and a correct one for the wrong reason.
             > `1.08559` vs §72.38's 1.0856; 2024-06-13 `1.10316` vs 1.1032;
             > 2025-05-13 `1.11760` vs 1.1176; 2026-09-29 `1.13991` vs 1.13996).
             >
-            > **Coverage is sufficient for this dataset:** the earliest stored
-            > trade is 2023-04-13, four years inside W's window. Nothing we need is
-            > unreachable.
-      - [ ] Tests: none yet — config-only stage. Gate is "the fixture contains the
+            > **The "date before the boundary" half of this box is vacuous, and
+            > that is a finding rather than a shortfall.** The source holds *no*
+            > data before a category's inception, so no fixture can contain an
+            > earlier date — the requirement is satisfied by establishing that the
+            > boundary **is** the inception, which the W/A parity measurement above
+            > does. "After" is trivially covered (every fixture runs to 2026-09-29,
+            > the source's last valuation).
+      - [x] Tests: none yet — config-only stage. Gate is "the fixture contains the
             two proven dates".
-            > Gate now checkable in one assertion each, since the source is fixed:
-            > `ING01W` → 382.05 on 2023-04-13 and 904.80 on 2026-08-19.
+            > **GATE PASSED** — `ING01W.json` yields **382.05** on 2023-04-13 and
+            > **904.80** on 2026-08-19, read back from the committed fixture bytes
+            > (openst `35233cf`), not from a live response. `ING01.json`
+            > independently reproduces our *current* class-A bars (351.93, 795.02),
+            > which is a useful cross-check: the same endpoint serves both
+            > categories, so the class difference is a property of the source and
+            > not of our pipeline.
+            >
+            > No test file exists yet by design — stage 2 owns the first one. The
+            > fixtures are committed but unreferenced until then, so the openst
+            > suite cannot regress from this stage.
       > **Scope note carried into stage 2 — the code is a curated lookup, not a
       > transform.** The endpoint is already keyed per category, which is what
       > makes B the natural shape, but the code is **not derivable** from a `.TFI`
