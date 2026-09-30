@@ -2931,7 +2931,23 @@ Also worth recording from this pass, both about `INGAKC.TFI`:
 - [x] §72.19 / §72.20 / §72.6 / §72.16 provider chain: closed, premise falsified
 - [ ] Correct row 604's price to the real 2023-04-07 NAV and re-import, then confirm
       the audit finding clears
-- [ ] Why is EUR absent from `fx_rates` while every other currency is stored?
+- [x] Why is EUR absent from `fx_rates` while every other currency is stored?
+      > **By design, and the answer was a code comment the whole time.** Both
+      > `importHistory` and `syncDaily` fetch with **`base=EUR`**, so every stored
+      > row means *"1 EUR = N &lt;currency&gt;"* and a EUR row is 1 by definition
+      > — frankfurter returns none, and adding EUR to `TRACKED_CURRENCIES` would
+      > fetch a constant. EUR→PLN is cross-derived at read time, which is exactly
+      > why it "works, so it is not broken" (§72.36's own words).
+      > Measured in PROD 2026-09-30: **31 currencies, 7103 rows each, from
+      > 1999-01-04 to 2026-09-29, and no EUR among them** (BRL/INR/CNY start
+      > 2000-01-13, BGN stops at 2025-12-31 — euro adoption, not an importer
+      > bug).
+      > **Now pinned by 4 tests** (instruments `9ad8d28`, 411 green), because a
+      > test is the durable form of a comment: the person asking this had DB
+      > access and not source access, which is the only reason the question
+      > survived three sections. One of them asserts the *semantics*, not just
+      > the list — the written rows really are `1 EUR = N`, so PLN lands at ~4.3
+      > and not ~0.23, so a future change to the base cannot pass silently.
 
 ### 72.37 — §72.36's conclusion was WRONG. Retracted, with the error named
 
