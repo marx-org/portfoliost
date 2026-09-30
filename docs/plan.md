@@ -3498,62 +3498,114 @@ NN TFI trade is a false positive, and a correct one for the wrong reason.
       > it is two series" was right; it just never asked the one question that
       > would have settled it — **does our own provider already serve the other
       > one?**
-- [ ] Step 2 — ~~openst provider for the identified class~~ / point the import at
-      the class W series. **The class is identified; the series is not currently
-      servable, so this is blocked on availability, not on identification.**
-      > **Two questions were conflated here, and the second is the one that
-      > matters.** Which series does the broker execute against? — **answered, and
-      > answered well**: `GMSAKW.TFI` reproduces four of five stored executed
-      > prices to the cent (§72.39 step 1b's table). Can our provider *serve* that
-      > series? — **not answered, and right now the answer is no.**
-      >
-      > Measured in PROD, three runs in a row:
+- [ ] Step 2 — **build the openst provider for ING Akcji category W**, in the
+      planner contract's provider-tier order. Confirmed necessary; the target is
+      known exactly.
+      > **What is settled, and what was conflated.** *Which* series the broker
+      > executes against — settled, and settled well: `GMSAKW.TFI` reproduces four
+      > of five stored executed prices **to the cent** (step 1b's table). *Whether
+      > our chain can serve it* — answered **no**:
       >
       > ```
-      > GMSAKW.TFI  200  bars=0  stale=true   225ms
+      > GMSAKW.TFI  200  bars=0  stale=true   225ms   (3/3 runs)
       > INGAKC.TFI  200  bars=20 stale=false  154ms
       > ```
       >
-      > A `GS`-prefixed ticker is exactly the shape a provider carries
-      > **historically** and drops going forward, and that is what this looks like.
-      > The failure is also silent: `200 OK` with zero bars and `stale=true`, so a
-      > mapping pointed here would leave the holding **unpriced** rather than 8.4%
-      > low, and nothing would say so.
+      > A `GS`-prefixed ticker is the shape a provider carries historically and
+      > drops going forward, and the failure is **silent** — `200 OK`, zero bars,
+      > `stale: true`. So this is a real provider build, not a symbol mapping, and
+      > the earlier "no provider needed" conclusion was about *identification* and
+      > should not have been read as *availability*.
       >
-      > **How this was nearly shipped wrong, because it is the plan's own error
-      > again.** The compose stack returned `GMSAKW.TFI` with 1,829 bars to
-      > 2026-09-29 and I read that as the provider serving it. It was **seeded
-      > fixture data** — compose now times out for *both* symbols, which is what
-      > fixture-only data looks like when asked something it was not built to
-      > answer. A fixture was treated as evidence of availability. That is the same
-      > class of mistake §72.33 records (a convenient parameter making data look
-      > like something it isn't) and it was made while documenting that rule.
+      > **Do not re-verify availability.** It was checked; the answer is no. Do not
+      > re-run the compose stack either: it returns seeded fixture data for
+      > `GMSAKW.TFI` (1,829 bars to 2026-09-29) that the real providers do not
+      > serve, and reading that as evidence is how the mapping nearly shipped.
+      > **REVERTED** (`77434fd` undoes `a29dbe3`; 157 green, nothing deployed).
       >
-      > **Reverted** (sheets-sync `77434fd`; the mapping `a29dbe3` is undone, 157
-      > green, nothing deployed). The evidence for *which* series is kept; the
-      > mapping is not, because it cannot be justified by evidence about the fund
-      > alone.
+      > **Scope decision needed before step 1 — do not guess it.** Two shapes, and
+      > they are very different builds:
       >
-      > **What unblocks this** — in order, cheapest first:
-      > 1. Establish whether `GMSAKW.TFI` is *dead* or merely *degraded*: ask
-      >    openst directly what it serves for that symbol, and whether a different
-      >    spelling resolves (`GMSAKW.TFI` vs a GS-era variant). A provider holding
-      >    history but not quoting it is a different problem from one that dropped
-      >    the instrument.
-      > 2. If it is dead, the real work is a **provider that serves W's current
-      >    NAV** — which is the six-stage build after all, now with the correct
-      >    target known. The earlier conclusion that "no provider is needed" was
-      >    about *identification* and I let it stand for *availability*.
-      > 3. Until then the holding stays on category A, priced ~8.4% low and
-      >    drifting ~1.8%/yr. That is a known, quantified error — which is a
-      >    different and much better position than a silent zero.
+      > | | shape | fits | cost |
+      > |---|---|---|---|
+      > | **A** | one provider for *this* fund's category W, keyed on `GMSAKW.TFI` | one holding, fixes the 8.4% | small, and leaves the family unaddressed |
+      > | **B** | a provider for **Polish fund categories**, keyed on `(fund, category)` | the whole `.TFI` family (12 fund symbols, 192 trades) | larger, and `ticker_reference` would need the category recorded first |
       >
-      > **The generalisable lesson, and it is the second time today:** a
-      > verification answers only the question it asked. "Four prices match to the
-      > cent" establishes identity and says nothing about availability; "1,829 bars
-      > in the fixture" establishes nothing at all. Both checks had to be run, and
-      > the cheap one — *is it quoted today?* — is the one that would have caught
-      > this, and it takes 200ms.
+      > Step 3's finding argues for B — every `.TFI` row was mapped by *old fund
+      > name* and never checked against the category the broker trades, which is
+      > exactly how this defect survived six sections. But B needs a decision, and
+      > **the user was asked and had not answered when this session ended.**
+
+      **Stage 1 — fixture capture (manual fetch, no automation).**
+      - [ ] Establish the **NAV source** for W. Not yet chosen, and not guessable:
+            analizy.pl publishes it (931.03 on 2026-09-29, 933.94 on 2026-09-25 —
+            both matching the `GMSAKW.TFI` series exactly) but renders
+            server-side and the chart feed was not located;
+            `notowania.pb.pl` serves fund quotes with history. Confirm which one
+            also serves **history** and not just the current value — that
+            distinction is what killed the first attempt at this step.
+      - [ ] Fetch **one request per symbol**, save the raw response to
+            `openst/tests/fixtures/`, and inspect its structure before writing a
+            client. Do not assume a field name: the `.TFI` price field has already
+            been the wrong shape twice.
+      - [ ] Fixtures must cover **at least one date before and one after** any
+            boundary the source applies, and the two dates already proven
+            (`2023-04-13` → 382.05, `2026-08-19` → 904.80) must be reproducible
+            from the fixture. Those are the two measurements the whole
+            investigation rests on; a provider that cannot reproduce them is wrong
+            however clean its tests look.
+      - [ ] Tests: none yet — config-only stage. Gate is "the fixture contains the
+            two proven dates".
+
+      **Stage 2 — openst client extension, mocked I/O.**
+      - [ ] Add the fetcher to `openst/src/openbb_client.py` (the file §63.5's
+            pence fix lives in — that is the precedent for a provider-side
+            normalisation) and a route in `openst/src/main.py`.
+      - [ ] Unit tests against the stage-1 fixtures, with `fetch` mocked. Must
+            assert the **currency is PLN** explicitly: every category here is PLN,
+            and a provider that returns a bare number with no currency is the
+            mistake `ticker_reference`'s empty `yahoo_suffix` already caused once.
+      - [ ] Full openst docker-compose suite green (the 111-test stage is the
+            documented gate in `openst/CLAUDE.md`).
+      - [ ] Tests: a fixture-driven unit test plus the existing suite.
+
+      **Stage 3 — openst standalone smoke.**
+      - [ ] `docker compose up -d`, one `curl` per symbol, and confirm the Redis
+            cache **HITs** on the second identical call.
+      - [ ] Verify the response reproduces 382.05 for 2023-04-13 from the running
+            service, not from the fixture.
+      - [ ] Tests: config/smoke only — justified by the fixture tests in stage 2.
+
+      **Stage 4 — cachest route.**
+      - [ ] New route in `cachest/config.yaml` with an appropriate TTL. Add the
+            `test_real_config_has_<route>_route` test the planner contract
+            requires; full cachest suite green.
+      - [ ] **Never swap stage 3 and 4** — openst is smoke-verified before cachest
+            adapts, precisely so an untested plugin is never wrapped.
+
+      **Stage 5 — `portfoliost-instruments` adapter.**
+      - [ ] `fetchXxx` in `src/adapters/cachest.ts`, translation to the
+            `PriceBarSeries` contract shape, handler wiring.
+      - [ ] `providerSymbol()` mapping so `GMSAKW.TFI` routes here, and a decision
+            recorded about whether the *stored* symbol becomes `GMSAKW.TFI`
+            (sheets-sync, which is the step that actually re-prices the holding)
+            or the adapter translates it.
+      - [ ] Unit tests against the contract shape.
+      - [ ] **Also close the silent-failure shape found in step 2:** the route must
+            not return `200` with zero bars for a symbol it cannot serve. Stage 2's
+            measurement showed `200 / bars=0 / stale=true` is what a dead provider
+            looks like, and that is how the reverted mapping would have shipped
+            unnoticed. If the new provider can fail, it must be distinguishable
+            from "no history".
+
+      **Stage 6 — full compose stack.**
+      - [ ] `docker compose up -d redis openst cachest instruments`, curl through
+            cachest, `npm run test:stack` green.
+      - [ ] Then the change that actually moves the user's numbers: sheets-sync
+            `NAME_VENUE_OVERRIDES["goldman sachs akcji"]` → the W series
+            (`a29dbe3` did this and was reverted; re-apply only once stage 6
+            proves the series is served). **Needs the user's go-ahead** — it
+            re-prices the holding.
 
 - [x] Step 3 — sweep the other `.TFI` rows. **Run against PROD 2026-09-30, and
       exactly one symbol was wrong — the one already fixed.**
@@ -3615,9 +3667,9 @@ NN TFI trade is a false positive, and a correct one for the wrong reason.
       > §74.3, verified in the §74.6 PROD run. Note this was needed *because* the
       > symbol was wrong: the audit compared order-priced fund trades against
       > category A's bars, and the 10% tolerance happened to be wide enough that
-      > only the gap, not the class, showed up as a finding.
-- [x] Audit: date window / order-priced exemption for fund trades
-      > §74.3, verified in the §74.6 PROD run.
+      > only the gap, not the class, showed up as a finding. So the audit fix and
+      > this provider are **complementary, not alternatives** — the exemption stops
+      > the valuation-date false positive, and neither of them corrects the class.
 - [ ] **The sheet's `aktualny kurs` column is wrong and is its own finding.** It
       reads `876,94` against a class-A bar of 819.44 and a class-W reading of
       931.03 — 7% above *both*, so it is neither category. It is a hand-maintained
