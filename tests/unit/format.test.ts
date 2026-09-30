@@ -47,6 +47,22 @@ describe("format", () => {
     expect(formatAmount(NaN, "USD")).toBe("—")
   })
 
+  // §63.14 — the two cases the plan names, spelled out against the reported
+  // bug (PortfolioCard rendering a PLN amount with a `$`). `Intl` under
+  // `en-US` renders PLN as the code rather than `zł`; the `zł` glyph is the
+  // currency registry's `symbol` (see `useCurrenciesStore`). What matters here
+  // is that the label is PLN and never a dollar sign.
+  it("§63.14: a PLN amount renders as PLN, never as $", () => {
+    expect(formatCurrency(119250, "PLN")).toBe("PLN\u00A0119,250.00")
+    expect(formatCurrency(119250, "PLN")).not.toContain("$")
+  })
+
+  it("§63.14: a null-currency amount renders with no currency symbol at all", () => {
+    expect(formatCurrency(119250, null)).toBe("119,250.00")
+    expect(formatCurrency(119250, null)).not.toContain("$")
+    expect(formatCurrency(119250, undefined)).toBe("119,250.00")
+  })
+
   it("formats percents", () => {
     expect(formatPercent(12.13)).toBe("12.13%")
     expect(formatPercent(3.36, 2, true)).toBe("+3.36%")

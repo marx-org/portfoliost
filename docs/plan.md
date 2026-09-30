@@ -1359,12 +1359,23 @@ Verified in PROD 2026-09-27: IBKR renders `$585,428.89` where the snapshot is
       the portfolio's base. §66.2 made `currency` a REQUIRED parameter, which is
       what guarantees it — a call without one cannot compile. Grepped every
       `formatCurrency(` call site in `src/`; none is missing its second argument.
-- [ ] Decide whether `formatCurrency`'s `"USD"` default should exist at all —
-      `formatAmount` (`:9`) already refuses to guess a currency; the currency
-      formatter silently does. Aligning them would have caught this at compile
-      time.
-- [ ] Tests: unit — a PLN portfolio renders `zł`, not `$`; a null-currency
+- [x] Decide whether `formatCurrency`'s `"USD"` default should exist at all.
+      > **It does not, and it already did not — §66.2 removed it.** The
+      > parameter is now *required* (no default value) and the internal
+      > re-guess (`: "USD"`) is gone, which is the half that actually mattered:
+      > the old code relabelled an explicitly passed `""`/`null`/`"zł"` back to
+      > USD, defeating the caller's own care. `formatAmount` is now a
+      > delegation to `formatCurrency`, so the no-guess rule lives in exactly
+      > one place. Nothing to decide — the decision §63.14 was asking for was
+      > made and shipped under §66.2, and §63.14's "aligning them" is done.
+- [x] Tests: unit — a PLN portfolio renders `zł`, not `$`; a null-currency
       portfolio renders without a symbol. `npm run build` + `npm run test` green.
+      > Added as two named cases in `tests/unit/format.test.ts`. One honest
+      > correction to the step's wording: under `en-US` locale `Intl` renders
+      > PLN as the **code** (`PLN 119,250.00`), not `zł`. The `zł` glyph is the
+      > currency registry's `symbol` (`useCurrenciesStore`), which is what the
+      > PROD screenshot showed. The test asserts what the code actually does —
+      > a PLN label, never a `$`.
 - [x] Playwright: re-check the cards on `/en/investments`.
       > **done 2026-09-29 — PROD renders `PLN 119,250.00`, not `$`**
 - [x] Commit.
