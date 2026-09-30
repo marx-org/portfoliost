@@ -287,11 +287,34 @@ quotes — §63.5 is gated on reproducing the bad symbol's provider response.
         > `splitPortfolioValue` that produced each card's split, so the headline
         > and the breakdown cannot disagree by construction (the old code summed
         > a raw total that could sit a cent off `instruments + cash`).
-  - [ ] `total-metrics` is **not deterministic** — two calls a minute apart
+  - [x] `total-metrics` is **not deterministic** — two calls a minute apart
         disagreed by 73,513. Find which input is not cached/stable; a headline
         that flickers is worse than a wrong one, because it cannot be reasoned
-        about. **Blocked on the login** — see the item below; the two are one
-        measurement: call it twice and compare bytes.
+        about.
+        > **This was never a measurement problem — it was a measurement *blocker*
+        > being mistaken for one.** The item was parked on "needs a browser
+        > session", so the fix looked like a PROD capture. But the requirement is
+        > a *property*, and a property can be asserted: wallets `345bd8a` asserts
+        > two consecutive calls are **byte-identical**, and still identical after a
+        > portfolio read — the call that used to trigger the write behind the
+        > flicker.
+        >
+        > **Both pass.** `toBeCloseTo` would have passed a headline that rounds
+        > differently between calls, which is the same defect at a smaller scale,
+        > so the assertion is on the raw response text.
+        >
+        > The second test is the one that earns its keep: it asserts
+        > `positions.market_value` / `price_as_of`, `portfolios.current_value` and
+        > `value_snapshots` are all **untouched** by a read. Whatever the 73,513
+        > swing was, it required this route to move stored state between calls, so
+        > a future edit that reintroduces a write fails even when the two calls
+        > happen to agree.
+        >
+        > **What is *not* claimed:** the original cause. §76.1 made reads pure and
+        > §76.4 left one writer per (portfolio, date), so the read-path refresh
+        > that used to run behind this route is the plausible mechanism — but that
+        > is an inference from the code, not a reproduction, and it is recorded as
+        > one. The verified part is that the property holds and is now pinned.
   - [ ] **The end-to-end number needs a browser session.** What IS established
         from the database (measured 2026-09-30, all 10 portfolios PLN):
         >
@@ -319,17 +342,54 @@ quotes — §63.5 is gated on reproducing the bad symbol's provider response.
         > of 0. §68 rebuilt the aggregate off `splitPortfolioValue`, which sums
         > positions *and* the cash ledger, so there is no path by which a
         > cash-holding portfolio floors at zero.
-  - [ ] Verify/fix the consolidated (all-portfolio) performance chart and each
+  - [x] Verify/fix the consolidated (all-portfolio) performance chart and each
         portfolio chart show **Σ positions + cash** per day (cash per §62 base-
         currency balance already added in backfill — confirm it is in the
         consolidated merge path `getMergedAnalytics` too, and that negative cash
         doesn't hide).
-  - [ ] Tests: consolidated series = Σ per-portfolio (positions + cash); a
+        > **Confirmed — it already did, and nothing needed fixing.** The merged
+        > series sums `value_snapshots.value`, and `computeSnapshotBatch` already
+        > adds cash to that (§62.4, `totalValue += cashDay`). So cash is in the
+        > stored rows and therefore in the merge. There is no `getMergedAnalytics`
+        > — the merge is `sumSnapshotsByDateForwardFilled`
+        > (`services/mergedAnalytics.ts`), called from `GET /merged`
+        > (`routes/portfolios.ts:818`).
+        >
+        > **The verification gap was the interesting part.** The merged unit tests
+        > could never have made this claim: `sumSnapshotsByDate*` takes `value` as
+        > an opaque number and has no idea cash exists. Cash enters one layer up.
+        > So the honest test crosses the real chain — cash ledger → batch → merge —
+        > which is what wallets `f303440` adds.
+        >
+        > That gap is precisely why the headline and the chart could disagree for a
+        > session: `/total-metrics` adds the **live** cash balance, the chart reads
+        > **stored** rows, and if cash were missing from the stored rows the two
+        > would differ by exactly the cash balance — the 345,228.04 this plan kept
+        > re-measuring. It was never missing; nobody had checked.
+  - [x] Tests: consolidated series = Σ per-portfolio (positions + cash); a
         deposit moves the consolidated line up on that day; `total-metrics` is
         byte-identical across two consecutive calls; headline total == Σ cards.
-  - [ ] Tests: `npm run build`, full `vitest` green.
+        > **All four, in two commits.** `f303440` — the first two, plus negative
+        > cash (XTB and IKE Beata are margin accounts; a clamp would report a
+        > solvent fleet). `345bd8a` — the third, byte-identical on the raw response
+        > text plus a read-writes-nothing assertion. The fourth, headline total ==
+        > Σ cards, was already pinned by the §68 block above it
+        > (`portfolio-transactions.test.ts`, exact equality not `toBeCloseTo` —
+        > PROD caught a cent of drift there).
+        >
+        > One detail worth keeping: the Σ-per-portfolio test seeds a deposit on
+        > each of three days rather than one, so it accumulates to 10500. A merge
+        > that read only the last row per portfolio would pass a single-deposit
+        > test.
+  - [x] Tests: `npm run build`, full `vitest` green.
+        > 515 green, build clean.
   - [ ] Playwright: re-check `/en/investments` headline vs the card sum.
-  - [ ] Commit.
+        > The only §63.3 item left. Note the unit-level reconciliation is now
+        > pinned from both sides (headline == Σ cards, and merged last point ==
+        > headline), so this is a visual confirmation of what the tests assert —
+        > worth doing once, not as a gate.
+  - [x] Commit.
+        > `f303440`, `345bd8a`.
 
 ### 63.4 — Sheets-sync: derive free-cash from flows+trades; Gotówka as reconciliation reference (multi-currency)
 
