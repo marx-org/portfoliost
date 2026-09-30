@@ -3488,9 +3488,37 @@ every write it was meant to catch:
 That is the whole §76 thesis in five numbers: one GET wrote a snapshot, moved
 `current_value`, and stamped a fresh `price_as_of` onto every position.
 
-**Not yet verified in PROD.** `INSTRUMENTS_SERVICE_TOKEN` authenticates the cron to
-instruments, not a caller to wallets, so the live read check needs a user JWT. It is
-deferred to §76.5's session rather than run as a separate login.
+**Verified in PROD on an authenticated session** (IBKR, 108 positions — the
+largest). Navigated the portfolio, then its Allocation tab, then back to Holdings, and
+read `current_value`, the `value_snapshots` count and `max(positions.price_as_of)`
+before and after:
+
+```
+before  current_value=281629.23400407  snapshots=1661  max_price_as_of=2026-09-30 15:20:35.783+00
+after   current_value=281629.23400407  snapshots=1661  max_price_as_of=2026-09-30 15:20:35.783+00
+```
+
+Byte-identical, across all three of the changed routes (`/positions` twice, `/allocation`
+once). `max_price_as_of` also *predates* the v1.1.105 rollout (15:20Z vs 15:58Z), so
+the read did not merely write the same value — it wrote nothing at all.
+
+**Read latency, the number §76 was justified by and did not previously have** (108
+positions, warm pod, measured from the browser):
+
+| endpoint | ms | writes? |
+|---|---|---|
+| `GET /positions` (cold) | 167 | no |
+| `GET /positions` (warm) | **60** | no |
+| `GET /summary-metrics` | 178 | no |
+| `GET /analytics?timeframe=1Y&benchmarks=SPY` | 293 | no |
+| `GET /api/portfolios/:id` | 158 | no |
+
+`/positions` is now **faster than `/summary-metrics`**, a sibling that never wrote —
+so the read path is no longer the slowest thing on the page. This is the first real
+latency figure for this path; the section's earlier "structural, not a number" caveat
+no longer applies to `/positions`, though the pre-§76 figure was never captured and so
+cannot be quoted as a before/after. The honest statement is that the endpoint stopped
+doing ~110 quote+profile round trips per open, not that it got N% faster.
 
 **One consequence worth stating plainly:** `snapshots-sync` is no longer "the safer
 writer" — since no read prices anything, it is the *only* writer in the scheduled
