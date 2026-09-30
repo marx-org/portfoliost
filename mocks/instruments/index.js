@@ -1,7 +1,7 @@
 import { requireAuth } from "../lib/auth.js"
 import { loadJson, loadRaw, loadResearch, loadUniverse, normalize, researchSymbols } from "../lib/data.js"
 import { logoPath } from "../lib/data.js"
-import { convertSeriesAs, targetCurrencyParam } from "../lib/demo-fx.js"
+import { convertSeriesAs, dropUnconvertible, targetCurrencyParam } from "../lib/demo-fx.js"
 
 function noPriceQuoteFor(symbol) {
   const quote = noPriceFixture().quotes?.[normalize(symbol)]
@@ -121,17 +121,25 @@ function historyFor(symbol, resolution, compare, targetCcy) {
   // sourcing signal rides along (null currency = unknown, never a USD guess).
   const h = { ...base, symbol, currency: ci.currency, currencySource: ci.currencySource, baseCurrency: ci.currency, fxFrom: null }
   const dates = (base.timestamps || []).map((t) => new Date(t * 1000).toISOString().slice(0, 10))
-  // Plan §48.5 — ?currency= converts closes against the demo FX schedule
-  // (floor semantics; mirrors the real instruments service).
+  // Plan §48.5 — ?currency= converts closes against the demo FX schedule.
+  // §72.17 — a bar the schedule cannot convert is DROPPED, not passed through
+  // in the base currency. All four OHLC arrays share one mask (they are the
+  // same series), so one conversion drives all of them, exactly as the real
+  // route does with a single `convertedMask`.
   if (targetCcy && ci.currency && targetCcy !== ci.currency) {
     const cc = convertSeriesAs(dates, base.closePrices || [], ci.currency, targetCcy)
-    const ch = convertSeriesAs(dates, base.highPrices || [], ci.currency, targetCcy)
-    const cl = convertSeriesAs(dates, base.lowPrices || [], ci.currency, targetCcy)
-    const co = convertSeriesAs(dates, base.openPrices || [], ci.currency, targetCcy)
-    h.closePrices = cc.converted
-    h.highPrices = ch.converted
-    h.lowPrices = cl.converted
-    h.openPrices = co.converted
+    const kept = dropUnconvertible(cc, {
+      dates,
+      closePrices: cc.converted,
+      highPrices: base.highPrices || [],
+      lowPrices: base.lowPrices || [],
+      openPrices: base.openPrices || [],
+    })
+    h.closePrices = kept.closePrices
+    h.highPrices = kept.highPrices
+    h.lowPrices = kept.lowPrices
+    h.openPrices = kept.openPrices
+    h.timestamps = kept.dates.map((d) => Math.floor(new Date(`${d}T00:00:00Z`).getTime() / 1000))
     h.currency = targetCcy
     h.fxFrom = cc.fxFrom
   }
@@ -147,10 +155,16 @@ function historyFor(symbol, resolution, compare, targetCcy) {
   })
   const benchCurrency = targetCcy && ci.currency && targetCcy !== ci.currency ? targetCcy : "USD"
   let benchPrices = bench
+  let benchTimestamps = base.timestamps
   if (benchCurrency !== "USD") {
-    benchPrices = convertSeriesAs(dates, bench, "USD", benchCurrency).converted
+    // §72.17 — same rule for the benchmark leg: drop what cannot be converted
+    // rather than label a base-currency number with the target's symbol.
+    const bc = convertSeriesAs(dates, bench, "USD", benchCurrency)
+    const kept = dropUnconvertible(bc, { dates, closePrices: bc.converted })
+    benchPrices = kept.closePrices
+    benchTimestamps = kept.dates.map((d) => Math.floor(new Date(`${d}T00:00:00Z`).getTime() / 1000))
   }
-  h.compare = { name: compare === "qqq" ? "Invesco QQQ" : compare === "iwm" ? "iShares Russell 2000" : "S&P 500 (proxy)", closePrices: benchPrices, timestamps: base.timestamps, currency: benchCurrency }
+  h.compare = { name: compare === "qqq" ? "Invesco QQQ" : compare === "iwm" ? "iShares Russell 2000" : "S&P 500 (proxy)", closePrices: benchPrices, timestamps: benchTimestamps, currency: benchCurrency }
   return h
 }
 
@@ -227,15 +241,20 @@ export function register(app) {
     }
     const dates = (base.timestamps || []).map((t) => new Date(t * 1000).toISOString().slice(0, 10))
     let closes = base.closePrices || []
+    let keptDates = dates
     let currency = ci.currency
     let fxFrom = null
     if (target.value && ci.currency && target.value !== ci.currency) {
       const cc = convertSeriesAs(dates, closes, ci.currency, target.value)
-      closes = cc.converted
+      // §72.17 — drop the bars the schedule cannot convert. The response stays
+      // labelled `target.value` because every number in it IS in that currency.
+      const kept = dropUnconvertible(cc, { dates, closes: cc.converted })
+      closes = kept.closes
+      keptDates = kept.dates
       currency = target.value
       fxFrom = cc.fxFrom
     }
-    ctx.res.json({ symbol, timeframe: "daily", stale: false, currency, baseCurrency: ci.currency, fxFrom, dates, closes })
+    ctx.res.json({ symbol, timeframe: "daily", stale: false, currency, baseCurrency: ci.currency, fxFrom, dates: keptDates, closes })
   })
 
   app.get("/api/instruments/:symbol/fundamentals", (ctx) => {

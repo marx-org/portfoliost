@@ -34,28 +34,62 @@ const series = [{ date: DEMO_FX_DATE, rates: DEMO_RATES }]
 export const DEMO_FX_DAYS = 30
 
 /**
- * Convert a parallel price array against the demo schedule. Bars before the
- * schedule start (or without a quotable pair) stay in the base currency —
- * the same floor semantics as the real instruments service (plan §48.2).
+ * Convert a parallel price array against the demo schedule.
+ *
+ * §72.17 — **an unconvertible bar is DROPPED, not passed through in the source
+ * currency.** This mock used to return the base-currency value for any bar
+ * before the schedule floor while still labelling the response with the target
+ * currency, which is precisely the defect §72.17 fixed in the real service: it
+ * is how Crypto read 85 PLN one day and ~400 the next. Returning a
+ * `convertedMask` instead — the same shape the real `convertSeries` returns
+ * (`instruments/src/services/fx-convert.ts:60-71`) — lets every caller filter
+ * the way the real routes do (`instruments/src/routes/instruments.ts:646-659`).
+ *
  * `fxFrom` = first converted bar date (null when nothing converted).
  */
 export function convertSeriesAs(dates, prices, baseCcy, targetCcy) {
-  const out = prices.slice()
   const last = dates[dates.length - 1]
-  if (!last || !baseCcy || !targetCcy) return { converted: out, fxFrom: null }
+  if (!last || !baseCcy || !targetCcy) {
+    return { converted: prices.slice(), convertedMask: prices.map(() => true), fxFrom: null }
+  }
   const from = new Date(new Date(`${last}T00:00:00Z`).getTime() - (DEMO_FX_DAYS - 1) * 86_400_000)
     .toISOString()
     .slice(0, 10)
+  const converted = prices.slice()
+  const convertedMask = prices.map(() => false)
   let fxFrom = null
   for (let i = 0; i < prices.length; i++) {
     if (dates[i] < from) continue
     const c = convert(prices[i], baseCcy, targetCcy, DEMO_RATES)
     if (c !== undefined) {
-      out[i] = c
+      converted[i] = c
+      convertedMask[i] = true
       if (fxFrom === null) fxFrom = dates[i]
     }
   }
-  return { converted: out, fxFrom }
+  return { converted, convertedMask, fxFrom }
+}
+
+/**
+ * §72.17 — drop every unconvertible bar from a set of parallel arrays, so the
+ * response really is in `targetCcy`. Mirrors what the real routes do with
+ * `convertedMask` (`instruments/src/routes/instruments.ts:646-659`); kept here
+ * so no mock caller can reintroduce the defect by forgetting.
+ *
+ * `cc` supplies only the mask — the VALUES come from `arrays`, because a
+ * converted OHLC response has four different arrays and one shared mask.
+ * `dates` is passed inside `arrays` like everything else, so every returned
+ * array is index-aligned with every other by construction.
+ */
+export function dropUnconvertible(cc, arrays) {
+  const keys = Object.keys(arrays)
+  const out = {}
+  for (const key of keys) out[key] = []
+  for (let i = 0; i < cc.convertedMask.length; i++) {
+    if (!cc.convertedMask[i]) continue
+    for (const key of keys) out[key].push(arrays[key][i])
+  }
+  return out
 }
 
 /** Plan §48.5 — ?currency= validation mirroring the real instruments service:

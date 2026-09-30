@@ -189,23 +189,56 @@ async function main() {
 
   // §48.5 — the price endpoints honor ?currency= against the deterministic
   // demo schedule (DEMO_FX_DAYS days flat at DEMO_RATES, ending at the
-  // series' last date): converted tail, unconverted head, fxFrom floor.
+  // series' last date).
+  // §72.17 — a bar the schedule cannot convert is DROPPED. The response is
+  // labelled with the target currency, so every number in it must BE in that
+  // currency. These assertions used to require the converted series to be the
+  // same LENGTH as the native one and to keep the pre-window bar in base —
+  // which is the defect §72.17 fixed in the real service, so the mock was the
+  // last live copy of it and would have passed if instruments regressed.
   const sntNative = await request("/instruments/SNT.WA/price-bars", { token })
   const sntUsd = await request("/instruments/SNT.WA/price-bars?currency=USD", { token })
   check(
     "instruments.currency price-bars ?currency=USD shape",
-    sntUsd.status === 200 && sntUsd.json.currency === "USD" && sntUsd.json.baseCurrency === "PLN" && typeof sntUsd.json.fxFrom === "string" && sntUsd.json.closes.length === sntNative.json.closes.length,
+    sntUsd.status === 200 && sntUsd.json.currency === "USD" && sntUsd.json.baseCurrency === "PLN" && typeof sntUsd.json.fxFrom === "string" && sntUsd.json.dates.length === sntUsd.json.closes.length,
     `got ${sntUsd.status} ${JSON.stringify(sntUsd.json && { currency: sntUsd.json.currency, baseCurrency: sntUsd.json.baseCurrency, fxFrom: sntUsd.json.fxFrom })}`,
   )
   if (sntUsd.status === 200 && sntNative.status === 200) {
-    const dates = sntNative.json.dates
-    const from = new Date(new Date(`${dates[dates.length - 1]}T00:00:00Z`).getTime() - (DEMO_FX_DAYS - 1) * 86_400_000).toISOString().slice(0, 10)
-    const fxFromExpected = dates.find((d) => d >= from) ?? null
-    check("instruments.currency price-bars fxFrom = first converted bar", sntUsd.json.fxFrom === fxFromExpected, `got ${sntUsd.json.fxFrom} want ${fxFromExpected}`)
-    const last = dates.length - 1
+    const nativeDates = sntNative.json.dates
     const rate = DEMO_RATES.USD / DEMO_RATES.PLN
-    check("instruments.currency price-bars last close converted", Math.abs(sntUsd.json.closes[last] - sntNative.json.closes[last] * rate) < 1e-6, `got ${sntUsd.json.closes[last]} want ${sntNative.json.closes[last] * rate}`)
-    check("instruments.currency price-bars pre-window bar stays native", sntUsd.json.closes[0] === sntNative.json.closes[0], `got ${sntUsd.json.closes[0]} want ${sntNative.json.closes[0]}`)
+    // §72.17 — strictly shorter: the pre-schedule bars are absent, not native.
+    check(
+      "instruments.currency converted series drops the pre-schedule bars",
+      sntUsd.json.closes.length < sntNative.json.closes.length,
+      `converted ${sntUsd.json.closes.length} vs native ${sntNative.json.closes.length}`,
+    )
+    // The invariant that matters: EVERY returned bar is the native close for the
+    // SAME date times the rate, matched by date. Indexing by position would
+    // pass while the series was misaligned, which is the bug the §72.17
+    // join produced (closes: [98986, 99330, 21190, ...] under currency "PLN").
+    const nativeByDate = new Map(nativeDates.map((d, i) => [d, sntNative.json.closes[i]]))
+    const rateOk = sntUsd.json.dates.every((d, i) => {
+      const n = nativeByDate.get(d)
+      return n !== undefined && Math.abs(sntUsd.json.closes[i] - n * rate) < 1e-6
+    })
+    check(
+      "instruments.currency every converted bar = native close (by date) x rate",
+      rateOk && sntUsd.json.dates.length > 0,
+      `first ${JSON.stringify(sntUsd.json.dates[0])} → ${sntUsd.json.closes[0]}, native ${nativeByDate.get(sntUsd.json.dates[0])}`,
+    )
+    // fxFrom is the first row of the RESPONSE, since the response now starts at
+    // the first convertible bar.
+    check(
+      "instruments.currency fxFrom = first row of the converted response",
+      sntUsd.json.fxFrom === sntUsd.json.dates[0],
+      `got ${sntUsd.json.fxFrom} want ${sntUsd.json.dates[0]}`,
+    )
+    // And the dropped bars really are the earliest ones, not a scatter.
+    check(
+      "instruments.currency the dropped bars are a prefix of the native series",
+      sntUsd.json.dates[0] > nativeDates[0],
+      `converted starts ${sntUsd.json.dates[0]}, native starts ${nativeDates[0]}`,
+    )
   }
   const sntSame = await request("/instruments/SNT.WA/price-bars?currency=PLN", { token })
   check(
