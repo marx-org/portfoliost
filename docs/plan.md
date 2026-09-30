@@ -3490,3 +3490,41 @@ mid-backfill portfolio blanks the whole dashboard series) and the
 `E2E …`-named portfolios that tests leave behind with a single snapshot. Both
 are wallets-side design questions, not fixture bugs; recorded here so they are
 not rediscovered from scratch.
+
+### 75.4 — A latent e2e race that §61 exposed (found 2026-09-30)
+
+**Recorded because I nearly got this backwards, and the wrong answer was the
+one I was about to write down.**
+
+After §61's final `test:e2e`, one test failed:
+`portfolios.spec.ts:226 edit position opens a transaction list editor with rows
+and add row` — expected 2 `tbody tr`, got 3.
+
+My first move was to call it the `portfolios.spec.ts` flakiness §67.1 already
+documents. Then I checked, and found my "baseline" run was not a baseline:
+`git stash -u` had **nothing to stash** (the tree was already clean, everything
+committed), so I had re-run my own commits and concluded "reproduces on the
+unmodified tree". Checked out the real pre-session commit `e85a241` instead:
+**18/18 green**, so it *was* mine. Nearly filed a pre-existing-flake note over a
+regression.
+
+**The cause.** The dialog renders its `Loading...` row *inside the same
+`<tbody>`* as the real rows. The test counted `tbody tr` to get `rowsBefore`,
+and the assertion immediately above it —
+`expect(dialog.getByRole("columnheader", { name: "Total Cost" })).toBeVisible()`
+— is on the `<thead>`, which is always visible and waits for nothing. It looked
+like a readiness check and was not one. So `rowsBefore` could be the placeholder.
+
+**Why §61 exposed it and not a bug in §61.** §61.9's `TickerBadge` adds one
+`/api/logos/…` image request inside each form dialog, which shifted the dialog's
+first paint far enough for the count to land before the body loaded. The
+application was correct throughout.
+
+**Fixed in the test, not by widening anything** — an explicit
+`await expect(dialog.getByText("Loading...")).toHaveCount(0)` before counting.
+114 e2e green afterwards.
+
+**The lesson, which is the reason this is in the plan:** *verify the baseline
+before blaming the fixture.* A clean tree is not a baseline, and "this spec is
+known flaky" is a conclusion, not a starting point. §67.1 recorded the
+flakiness, which made the wrong answer feel available and attractive.

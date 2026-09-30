@@ -237,6 +237,13 @@ test("edit position opens a transaction list editor with rows and add row", asyn
   await expect(dialog.getByRole("heading", { name: "Add Transaction" })).toBeVisible()
   await expect(dialog.getByRole("columnheader", { name: "Total Cost" })).toBeVisible()
 
+  // The dialog renders its "Loading..." row INSIDE the same <tbody> as the real
+  // rows, so counting before the body has loaded counts the placeholder. The
+  // columnheader assertion above is on the <thead>, which is always visible and
+  // therefore does not wait for anything — it looked like a readiness check and
+  // was not one. Wait for the placeholder explicitly.
+  await expect(dialog.getByText("Loading...")).toHaveCount(0, { timeout: 15000 })
+
   const rowsBefore = await dialog.locator("tbody tr").count()
   await dialog.getByLabel("Quantity").last().fill("3")
   await dialog.getByLabel("Price per share").last().fill("500")
