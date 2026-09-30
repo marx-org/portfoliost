@@ -2161,6 +2161,27 @@ Target from the audit is `1.126 × 819.44 =` **922.63 PLN**. The nearest categor
 **W at 933.94 (1.1397×)** — 11.31 PLN away, 1.22% off in ratio, outside any
 tolerance that would make it a match. K is 45.7 the other way.
 
+> **CORRECTION 2026-09-30 — the dismissal above is wrong, and it is wrong for a
+> reason this plan has now hit four times.** "1.22% off, outside any tolerance"
+> was measured by comparing a ratio derived from **2026-08-19** against W read on
+> **2026-09-25** — 68 days apart — for a quantity this very section had measured
+> as *growing* at ~1.2%/yr. A ratio that moves 1.2%/yr cannot be compared across
+> 68 days to two decimal places and called a non-match; the comparison's own
+> uncertainty is the size of the gap it was declaring significant. It is the
+> parameter that made the match look absent, exactly like §72.27's unpaginated
+> reads, §72.33's shared date window and §74.4's every-bar histogram.
+>
+> Re-measured date-aligned (2026-09-29, both from published NAV):
+> W/A = 931.03 / 816.76 = **1.13996**, against a target of **1.12703** on
+> 2026-08-19 — 1.15% apart over 41 days, in the direction the drift predicts.
+> And W is not merely the closest: it is the **only** category that can be 1.0856
+> in 2023-04 *and* 1.1270 in 2026-08, since K is below the 2026 target today and
+> S is above it and would have to fall. Full working in §72.38's copy of step 1.
+>
+> What survives from the original conclusion: the *method* was right — measure all
+> nine categories rather than guess one — and it is what made the identification
+> possible. Only the tolerance judgement was unsound.
+
 **So the 1.126x factor is not any of the nine current categories.** That does not
 overturn the user's statement that the transactions are in a different class; it
 sharpens *what* that class is. The sheet says **"Goldman Sachs Akcji"** — the
@@ -2841,6 +2862,61 @@ provider is the right fix. Restored as open.**
       wrong class; if ING01 ≈ 795/352 then orders execute against a class with no
       series at all. This is the check that settles it, and §72.6's version of it was
       left open far too long.
+      > **Answered 2026-09-30 — and it does not say what the step expected.**
+      > Measured three published readings, two of them independent of each other:
+      >
+      > | what | date | value | source |
+      > |---|---|---|---|
+      > | our bar (`INGAKC.TFI`) | 2026-09-25 | **819.44** | provider |
+      > | ING01 category **A** | 2026-09-25 | **819.44** | analizy.pl |
+      > | ING01 category **A** | 2026-09-29 | **816.76** | bankier.pl (Analizy Online) |
+      > | ING01 category **W** | 2026-09-29 | **931.03** | analizy.pl |
+      >
+      > The first two rows are the same number to the cent, so **our bar IS class
+      > A** — established, not assumed. The third row confirms the series from a
+      > second source.
+      >
+      > So the target is `896.00 / 795.02` = **1.12703** on 2026-08-19, and class
+      > W is `931.03 / 816.76` = **1.13996** on 2026-09-29. **1.15% apart, 41 days
+      > apart.**
+      >
+      > **This reverses §72.20, which dismissed W.** It called the 1.22% gap
+      > "outside any tolerance that would make it a match" — and it compared a
+      > ratio derived from **2026-08-19** against a category measured on
+      > **2026-09-25**, 68 days later, for a ratio the plan had itself measured
+      > growing at ~1.2%/yr. That is the plan's own recurring error in a new guise:
+      > a convenient parameter (one date) making a match look absent. Same shape as
+      > §72.27's unpaginated reads, §72.33's shared date window and §74.4's
+      > every-bar-instead-of-best-bar histogram.
+      >
+      > **W is the only candidate that can fit, and it is forced rather than
+      > merely closest.** From §72.20's own table the nine categories sit at
+      > I 1.0039 · A 1.0000 · U 1.0509 · K 1.0702 · **W 1.1397** · S 1.1654 ·
+      > T 1.2953 · F 1.3016 · E 1.5329, and the observed ratio must be **1.0856
+      > in 2023-04 rising to 1.1270 in 2026-08**. Only W brackets that trajectory:
+      > - **W** needs +3.8% over 3.4y (1.1%/yr) and is already there — it is the
+      >   only category on the correct side of the 2026 target *and* moving at the
+      >   right rate.
+      > - **K** (1.0702) sits *below* the 2026 target today and would have to
+      >   accelerate to +5.3%, twice the observed rate.
+      > - **S** (1.1654) sits *above* it and would have to **fall** 3.5% over
+      >   3.4 years. No fee-driven category does that.
+      > - Everything else is further away still.
+      >
+      > **Consequence, and it is the useful part: step 2 is buildable.** The
+      > question step 1 was asked to answer was whether a *published* series
+      > exists for the class the broker executes against. One does — analizy.pl
+      > carries W's NAV daily, verified at 931.03 for 2026-09-29. So the "class
+      > with no series at all" branch is ruled out, and an openst provider has
+      > something to fetch.
+      >
+      > **What is NOT yet closed, stated plainly.** 1.15% is not zero. To call W
+      > confirmed rather than best-supported I still want **W's NAV on 2026-08-19
+      > and 2023-04-13** — the two date-matched readings. The analizy.pl fund page
+      > serves only the current value (the `?period=` parameter is ignored; I
+      > checked), so the history has to come from the chart endpoint behind it.
+      > Until then: treat W as the identified class for planning, and do not let a
+      > provider be written against a symbol whose class is still an inference.
 - [ ] Build the openst provider for that class, in the planner contract's provider-tier
       order: fixture → plugin with mocked I/O → openst smoke → cachest route →
       instruments adapter → compose.
@@ -2902,8 +2978,18 @@ series problem for several passes.
 resolved, the audit needs a date window or an order-priced exemption — otherwise every
 NN TFI trade is a false positive, and a correct one for the wrong reason.
 
-- [ ] Step 1 — ING01 published NAV for 2026-08-19 and 2023-04-13
+- [x] Step 1 — ING01 published NAV for 2026-08-19 and 2023-04-13
+      > Class **A** confirmed to the cent (819.44 = 819.44 on 2026-09-25) and from a
+      > second source (816.76 on 2026-09-29, bankier.pl). That makes the target
+      > 1.12703 against class A, and identifies **W (1.13996)** as the only
+      > category that can produce it. See the long note in §72.38's copy of this
+      > step, which owns the measurement. The two date-matched W readings remain.
 - [ ] Step 2 — openst provider for the identified class, tier order
+      > **Now buildable, and the measurement is what unblocked it** — analizy.pl
+      > publishes W's NAV daily, so the "no series exists" branch is ruled out.
+      > Gated on the two date-matched W readings above: the class is an inference
+      > until then, and a provider written against an inferred class would be the
+      > expensive way to be wrong, which is the exact failure §72.6 records.
 - [ ] Step 3 — `ticker_reference` entry for the class + sweep the other `.TFI` rows
 - [ ] Step 4 — `positions.company_name` off the stale sheet name
 - [x] Audit: date window / order-priced exemption for fund trades
@@ -3063,6 +3149,18 @@ forward 102 / backward 26 / same-day 36
       series from the one orders execute against, or that manually-maintained column
       is stale. Until this is answered, do not assume the symbol mapping is correct
       and do not treat §74.3 as fixing valuation — it fixes the *audit*.
+      > **Half answered, and the first half is settled.** The provider's bar is
+      > **category A, to the cent** — 819.44 on 2026-09-25 against analizy.pl's
+      > 819.44, and 816.76 on 2026-09-29 from bankier.pl. So the TFI feed is *not*
+      > an unknown series; it is a known one, and it is not the one the broker
+      > executes against. The broker is ~12.7% above class A and the gap grows
+      > ~1.2%/yr, which is category **W**'s signature (1.13996 on 2026-09-29).
+      >
+      > The open half is the `aktualny kurs` **876,94**: that column is 7% above
+      > even class W today (931.03), so it is not class A and not class W. It is
+      > a hand-maintained sheet column and it is simply wrong, which is a different
+      > finding from "the feed is the wrong class" and should be reported as one.
+      > **§72.39 step 1 owns the measurement.**
       > **§72.39 step 1 owns this one**, and it is the same two lookups: ING01's
       > published NAV for 2026-08-19 and 2023-04-13. Restated here as a second
       > checkbox it would drift from §72.38's copy and from §72.6's, which is how
