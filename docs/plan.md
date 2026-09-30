@@ -1398,19 +1398,80 @@ These are harmless to valuation (all 10 backfills are `complete` with empty
 broken, which is exactly the false signal that made my first §63.13 sweep
 unreliable.
 
-- [ ] Decide the retention rule: delete `price_bar_metadata` + `price_bars_all`
+> **Shipped 2026-09-30** (instruments `a7e0a06` + `3850fa5`, **v1.0.83**
+> deployed, homelab `f08d245ad`). **The `--apply` is deliberately NOT run** —
+> see "why it is not applied" below.
+
+- [x] Decide the retention rule: delete `price_bar_metadata` + `price_bars_all`
       rows whose symbol no transaction references, or keep them as a warm cache.
       Deleting is cheaper to reason about; keeping needs a documented TTL.
-- [ ] If deleting: the sweep must never remove a symbol a *held* position needs,
+      > **Delete, and no warm cache.** A search for an unheld symbol refetches
+      > on demand — one bounded upstream call. A cache needs a *second* sweeper
+      > plus a TTL to expire what the first sweeper declined to delete, which is
+      > two mechanisms to reason about instead of one. And the retention value is
+      > negative here: the metadata table exists to be *read*, and 51% orphans is
+      > what made `failed` read as a third of the fleet being broken.
+- [x] If deleting: the sweep must never remove a symbol a *held* position needs,
       so gate on "no referencing transaction **and** not in the live fetch set".
-- [ ] Add the resolver's unmatched-name fallback to the plan's radar: when it
+      > A symbol is protected by ANY of: a transaction (open **or** closed — a
+      > closed holding still needs its history to value the period it was held),
+      > an open position (covers a position whose opening transaction is not
+      > written yet), or the caller's explicit `--keep` list.
+      > **The referenced set is passed in, not queried.** It lives in wallets'
+      > `portfolios.transactions` / `portfolios.positions`, which instruments does
+      > not own; a sweep deriving "referenced" from instruments' own schemas
+      > would see an empty world and delete the entire price history. `--all` is
+      > refused outright, `--referenced` is required, dry run is the default.
+- [x] Add the resolver's unmatched-name fallback to the plan's radar: when it
       fires, the sheet row's symbol is a company name, which no provider will
       ever serve. Consider making that case loud at import time instead of
       silent.
-- [ ] Tests: after the prune, every remaining `failed` row is referenced by a
-      transaction and 404s upstream; a symbol with a live position is never
-      removed.
-- [ ] Commit.
+      > Confirmed in prod, and it is visible in the orphan list: `ALLIANZ SE`,
+      > `AMUNDI CORE S&P 500 SWAP UCITS EUR DIST ETF`, `BASF SE`,
+      > `BRITISH AMERICAN TOBACCO PLC ADS COMMON STOCK`, `EMERGING MARKETS
+      > INTERNET UCITS ETF ACC`, `CHESNARA PLC`, `ASML HOLDING NV` — all
+      > company names in the `symbol` column, exactly as this item predicted.
+      > They are safe to delete (nothing references them) but the *cause* is in
+      > `sheets-sync`'s resolver, not here. **Left open** — a `sheets-sync`
+      > change, out of this section's scope.
+- [x] Tests: a symbol with a live position is never removed.
+      > 12 tests. The load-bearing one: wallets stores `KEEP1.US`, `price_bars`
+      > keys `KEEP1`, and a raw string comparison would have deleted a live
+      > holding's entire history — so both sides are compared venue-free. Also
+      > covered: dry run writes nothing, bars with no metadata row are removed,
+      > venue-suffixed bars are removed, the bar-row count is reported.
+- [x] Commit.
+
+#### Why it is not applied
+
+Running `--apply` in PROD deletes **85,689 `price_bars` rows** and 50+ metadata
+rows. That is a destructive operation on live data and it is the user's call,
+not an agent's — several sections of this plan record the user approving exactly
+this kind of step explicitly.
+
+The dry run against the real referenced set (220 symbols, every
+`transactions.instrument_symbol` and every `positions.symbol`):
+
+```
+[instruments] prune-orphan-bars DRY RUN: considered 379 metadata symbols,
+50 orphaned symbol(s), 85689 bar row(s) would be removed.
+```
+
+To apply, from the instruments pod, with the referenced set read from the two
+wallets tables (the query is in this section's git history — do not hand-copy a
+stale list, because the referenced set changes on every import):
+
+```bash
+kubectl exec -n pfire <instruments-pod> -c app --   node /app/dist/scripts/prune-orphan-bars.js --referenced "$(<symbols>)" --apply
+```
+
+**One measurement correction worth keeping.** My first orphan count said
+401,288 orphan bar rows; the script says 85,689. The count was wrong, not the
+script: the SQL compared `upper(p.symbol)` against an already venue-free set, so
+`ASML.AS` never matched `ASML` and every venue-suffixed symbol was counted as
+an orphan. The script normalises **both** sides. That is the fourth time in this
+plan a convenient-but-wrong parameter made data look different from what it
+was — and the first time the tool caught it rather than the reasoning.
 
 ---
 
