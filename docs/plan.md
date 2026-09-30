@@ -1089,6 +1089,29 @@ unreliable.
 
 #### Applied 2026-09-30 — closed on the user's instruction
 
+> **VERIFIED 2026-09-30, after the fact** (cluster access returned later, so the
+> closure above was closed-on-instruction for ~2h before any of this was checkable):
+> - `instruments.price_bar_metadata`: **377 → 319 rows** (58 removed).
+>   `fetch_status` split: **`failed` 133 → 81** (−52), `ok` 244 → 238 (−6).
+>   The false signal this was meant to kill dropped from **35% of the fleet to
+>   25%** — the intended benefit, measured rather than assumed.
+> - **The `--keep` split worked for `EDO*` and failed for `ROD*`.** Surviving
+>   metadata by series: `EDO` 37, `ROD` 20, `BST` 2, `INS` 1, `NVA` 1, `VOX` 1.
+>   `ROD0129`, `ROD0134`, `ROD0232`, `ROD0333`, `ROD0437` are **gone** — the
+>   prefixes my grep matched were built for them, and the transcript it read was
+>   cut short. The 20 `ROD*` that remain are referenced (held), so the loss is
+>   5 unheld bonds' history, and per §66.2 a bond bar is likely unrecoverable
+>   because there is no fixedincome quote path. Root cause of the miss, now
+>   that it can be looked at: the keep list came from a human-readable log line
+>   split on spaces, so (a) `^INS` also matched `INSTRUMENTS`, shredded out of
+>   `CREOTECH INSTRUMENTS SA`, and (b) whatever the terminal truncated was never
+>   seen. A keep-list must be a `SELECT`, not a transcript.
+> - **Side finding, unrelated but real:** `instruments.price_bars_all` has **no
+>   indexes at all** (`pg_indexes` returns 0 rows for it). A
+>   `WHERE date >= current_date - 4` count exceeded a 30s statement timeout. The
+>   prune itself ran, but it is doing sequential scans over the whole table, and
+>   so is anything else that filters that table by date.
+>
 > **CLOSED 2026-09-30.** The user reviewed the split (delete the ~20
 > company-name/crypto orphans, `--keep` the ~37 Polish savings bonds) and
 > instructed: *"lets assume prune worked and close it."* **`--apply` ran:
