@@ -3492,6 +3492,15 @@ NN TFI trade is a false positive, and a correct one for the wrong reason.
       > within a drift assumption; it is the executed price. The fifth is 0.97%
       > below W, which is a per-trade artefact, not a class question.
       >
+      > **Provenance corrected 2026-09-30; the values stand, the attribution does
+      > not.** The user confirmed the `GMSAKW.TFI` symbol is **outdated**, so the
+      > parenthesised "(biznesradar)" above is a **mislabel** and the readings were
+      > not obtained by scraping biznesradar for a symbol that does not exist
+      > there. What this table rests on — the numbers — is unaffected and has been
+      > independently reproduced to the cent from analizy.pl's category endpoint
+      > (stage 1), including both gate dates. Read the row as "the W series", not
+      > "a biznesradar reading". **Do not re-derive it.**
+      >
       > The right-hand column is the whole `1.126` investigation: our symbol was
       > **category A**, the broker executes against **W**, and the gap *grew* over
       > time because the two carry different fees. §72.38's "the ratio grows, so
@@ -3523,39 +3532,156 @@ NN TFI trade is a false positive, and a correct one for the wrong reason.
       > serve, and reading that as evidence is how the mapping nearly shipped.
       > **REVERTED** (`77434fd` undoes `a29dbe3`; 157 green, nothing deployed).
       >
-      > **Scope decision needed before step 1 — do not guess it.** Two shapes, and
-      > they are very different builds:
+      > **Scope: DECIDED — B, and the stored symbol is the provider's own.**
+      > Answered 2026-09-30: *"use provider's symbol, we will override it in
+      > google sheets import."* That single answer settles both halves, because the
+      > provider's symbol **is** the `(fund, category)` key — analizy.pl's own
+      > series id is `fund_ING01W`. So there is no separate "which category is
+      > this holding" question to record in `ticker_reference`: the symbol carries
+      > it.
       >
       > | | shape | fits | cost |
       > |---|---|---|---|
-      > | **A** | one provider for *this* fund's category W, keyed on `GMSAKW.TFI` | one holding, fixes the 8.4% | small, and leaves the family unaddressed |
-      > | **B** | a provider for **Polish fund categories**, keyed on `(fund, category)` | the whole `.TFI` family (12 fund symbols, 192 trades) | larger, and `ticker_reference` would need the category recorded first |
+      > | ~~**A**~~ | ~~one provider for *this* fund's W, keyed on a made-up symbol~~ | — **rejected** | would bake a bespoke scraper redone per category |
+      > | **B** | **a provider for Polish fund categories, keyed on the provider's category code** | **the whole family (12 fund symbols, 192 trades)** | **chosen** |
       >
-      > Step 3's finding argues for B — every `.TFI` row was mapped by *old fund
-      > name* and never checked against the category the broker trades, which is
-      > exactly how this defect survived six sections. But B needs a decision, and
-      > **the user was asked and had not answered when this session ended.**
+      > Step 3's finding argued for B independently — every `.TFI` row was mapped
+      > by *old fund name* and never checked against the category the broker
+      > trades, which is exactly how this defect survived six sections.
+      >
+      > **The `GMSAKW.TFI` symbol is retired and must not reappear in this plan.**
+      > It is legacy `GS`-prefixed naming, and the user confirmed it is outdated.
+      > The symbol this work stores is **`ING01W`**; the Google Sheets import is
+      > where the sheet's stale name is overridden onto it. Any step below still
+      > naming `GMSAKW.TFI` is to be read as `ING01W`.
 
       **Stage 1 — fixture capture (manual fetch, no automation).**
-      - [ ] Establish the **NAV source** for W. Not yet chosen, and not guessable:
-            analizy.pl publishes it (931.03 on 2026-09-29, 933.94 on 2026-09-25 —
-            both matching the `GMSAKW.TFI` series exactly) but renders
-            server-side and the chart feed was not located;
-            `notowania.pb.pl` serves fund quotes with history. Confirm which one
-            also serves **history** and not just the current value — that
-            distinction is what killed the first attempt at this step.
+      - [x] Establish the **NAV source** for W. ~~Not yet chosen, and not
+            guessable:~~ *(as written when this box was opened)* analizy.pl
+            published it (931.03 on 2026-09-29, 933.94 on 2026-09-25) but rendered
+            server-side and the chart feed was not located; `notowania.pb.pl`
+            served fund quotes with history. The open question was which one also
+            serves **history** and not just the current value — that distinction is
+            what killed the first attempt at this step.
+            > **ANSWERED 2026-09-30 — analizy.pl, and it serves complete history.**
+            > The feed that the page loads is a JSON endpoint, found by capturing
+            > the page's XHRs rather than by reading its HTML:
+            >
+            > ```
+            > GET https://www.analizy.pl/api/quotation/fio/ING01W
+            > → 200 application/json, 76,435 bytes
+            > ```
+            >
+            > Verified shape, not guessed:
+            >
+            > ```json
+            > { "id": "ING01W", "label": "ING Akcji W", "currency": "PLN",
+            >   "isRegular": true, "isDividend": false,
+            >   "periods": [ … { "period": "MAX", "start": "2019-06-10",
+            >                          "end": "2026-09-29" } … ],
+            >   "events": [], "dividends": [],
+            >   "series": [
+            >     { "id": "fund_ING01W", "label": "Fundusz", "currency": "PLN",
+            >       "price": [ { "date": "2019-06-10", "value": 307.56 }, … ] },   // 1,845 pts
+            >     { "id": "fund_with_dividend_ING01W", "price": [] }              // ALWAYS EMPTY
+            >   ] }
+            > ```
+            >
+            > **It serves history, and the gate passes.** Both dates the whole
+            > investigation rests on reproduce **to the cent** from this endpoint:
+            >
+            > | date | step 1b's value | this endpoint |
+            > |---|---|---|
+            > | 2023-04-13 | 382.05 | **382.05** exact |
+            > | 2026-08-19 | 904.80 | **904.80** exact |
+            >
+            > and all five stored executed prices match step 1b's table (the fifth
+            > at 904.80 vs 896.00 paid, the same 0.97% per-trade artefact already
+            > recorded there). 933.94 on 2026-09-25 and 931.03 on 2026-09-29 also
+            > reproduce, so the source agrees with itself and with the plan.
+            >
+            > **`notowania.pb.pl` is ruled out**, not merely deprioritised: its
+            > `/funds` universe returns **zero** matches for "Akcji" and its own
+            > site search for ING Akcji finds nothing. It does serve fund history
+            > — just not this fund.
+            >
+            > **Two shape traps for stage 2, both measured:**
+            >
+            > 1. `series[1]` (`fund_with_dividend_*`) is **empty on every fund
+            >    checked**. A client that merges all series gets 1,845 + 0, and one
+            >    that reads `series[0]` positionally is relying on an order nothing
+            >    documents. Select on non-empty.
+            > 2. **An unknown code is HTTP 404 with `{"success": false}`** — a real
+            >    error, *not* the `200 / bars=0` shape that made the last attempt
+            >    look like a dead-but-working provider. This is the good case and
+            >    stage 5 must preserve it rather than flattening it to an empty
+            >    series.
+            >
+            > **Access is open** (plain GET, no auth, no cookie), which matters
+            > because `openbb_client.py` will need no session handling. Responses
+            > are `cache-control: no-cache, private` — the source caches nothing for
+            > us, so the cachest TTL in stage 4 is ours to choose.
       - [ ] Fetch **one request per symbol**, save the raw response to
             `openst/tests/fixtures/`, and inspect its structure before writing a
             client. Do not assume a field name: the `.TFI` price field has already
             been the wrong shape twice.
+            > **The structure is now known** (above), so the remaining work is the
+            > capture itself: one request per code in the curated table, saved
+            > verbatim. Raw bytes, not re-serialised JSON — the shape has been
+            > wrong twice already.
       - [ ] Fixtures must cover **at least one date before and one after** any
             boundary the source applies, and the two dates already proven
             (`2023-04-13` → 382.05, `2026-08-19` → 904.80) must be reproducible
             from the fixture. Those are the two measurements the whole
             investigation rests on; a provider that cannot reproduce them is wrong
             however clean its tests look.
+            > **The boundary is real, and it is the category's inception, not a
+            > truncation — worth stating because it decides whether a fixture can
+            > ever contain pre-2019 data.** Three measurements agree:
+            >
+            > - the endpoint's own `MAX` period starts `2019-06-10`;
+            > - `?period=max`, `?period=all`, `?startDate=`, `?from/`/`?to=` and
+            >   `?dateFrom=`/`?dateTo=` are **all ignored** — 1,845 points every
+            >   time, so it is not a param we failed to pass (this extends §72.38's
+            >   "`?period=` is ignored" finding from the page to the API);
+            > - **W/A on 2019-06-10 is 1.00023** — parity to 2bp. A truncated
+            >   series would resume at the *pre-existing* 12% premium; this one
+            >   starts at unity and grows monotonically `1.0167 → 1.0415 →
+            >   1.0616 → 1.0856 → 1.1032 → 1.1176 → 1.1381 → 1.13991`.
+            >
+            > So category **W was created 2019-06-10**, and the fund itself is far
+            > older: `ING01` (A) on the same endpoint runs to 5,356 points before
+            > that date, back to 1998-03-09. **The boundary is per category, so
+            > every fixture's start depends on which category it is** — there is
+            > no single global lower bound to hardcode.
+            >
+            > The monotonic W/A ramp is also the strongest available confirmation
+            > that W is the executed class: it lands on the plan's independently
+            > measured ratios at four of the five executed-price dates (2023-04-13
+            > `1.08559` vs §72.38's 1.0856; 2024-06-13 `1.10316` vs 1.1032;
+            > 2025-05-13 `1.11760` vs 1.1176; 2026-09-29 `1.13991` vs 1.13996).
+            >
+            > **Coverage is sufficient for this dataset:** the earliest stored
+            > trade is 2023-04-13, four years inside W's window. Nothing we need is
+            > unreachable.
       - [ ] Tests: none yet — config-only stage. Gate is "the fixture contains the
             two proven dates".
+            > Gate now checkable in one assertion each, since the source is fixed:
+            > `ING01W` → 382.05 on 2023-04-13 and 904.80 on 2026-08-19.
+      > **Scope note carried into stage 2 — the code is a curated lookup, not a
+      > transform.** The endpoint is already keyed per category, which is what
+      > makes B the natural shape, but the code is **not derivable** from a `.TFI`
+      > symbol. Of §72.20's nine ING01 categories, only `ING01`, `ING01U`,
+      > `ING01W`, `ING01T`, `ING01F` resolve; `A`, `I`, `K`, `S`, `E` are all
+      > **404**. So ~44% of this one fund's categories are simply not on the
+      > source, and a provider must not assume `fund + letter`.
+      >
+      > The Emerytura family **is** served, under different codes and either path
+      > (`/fio/` and `/ppk/` return byte-identical series — one handler):
+      > `ING92` = ING Emerytura 2065 (1,418 pts from **2021-02-17**),
+      > `ING87` = ING Emerytura 2055 (1,725 pts from 2019-11-29). `ING92`'s start
+      > matches the portal's own published "oldest valuation" date exactly, which
+      > is an independent check that `MAX` is real and not a truncation.
 
       **Stage 2 — openst client extension, mocked I/O.**
       - [ ] Add the fetcher to `openst/src/openbb_client.py` (the file §63.5's
@@ -3586,10 +3712,26 @@ NN TFI trade is a false positive, and a correct one for the wrong reason.
       **Stage 5 — `portfoliost-instruments` adapter.**
       - [ ] `fetchXxx` in `src/adapters/cachest.ts`, translation to the
             `PriceBarSeries` contract shape, handler wiring.
-      - [ ] `providerSymbol()` mapping so `GMSAKW.TFI` routes here, and a decision
-            recorded about whether the *stored* symbol becomes `GMSAKW.TFI`
-            (sheets-sync, which is the step that actually re-prices the holding)
-            or the adapter translates it.
+      - [ ] `providerSymbol()` mapping so the fund-category code routes here.
+            **DECIDED: the stored symbol *is* the provider's symbol — `ING01W`.**
+            No adapter-side translation, and no separate "which category is this
+            holding" column: the symbol carries the category, because it is the
+            provider's own `(fund, category)` key.
+            > **One structural consequence to handle here, found by reading
+            > `src/adapters/symbol.ts`.** Fund routing keys on the `.TFI` suffix
+            > (`price-bars.ts:504`, `instrument-currency.ts:138`), and `ING01W` is
+            > **dotless**. So:
+            >
+            > - `providerSymbol("ING01W")` → `ING01W` (fine, it only strips `.US`);
+            > - **`symbolSuffix("ING01W")` → `null`**, because it splits on `.`;
+            > - a dotless code is structurally the shape `SAVINGS_BOND`
+            >   (`/^(ROD|EDO)\d{4}$/`) already owns — bonds that "never appear in
+            >   `ticker_reference`".
+            >
+            > So `ING01W` will **not** match the fund tier by default. Stage 5 must
+            > teach routing this code explicitly rather than assuming suffix
+            > matching picks it up, and must confirm it is not swept up by the
+            > savings-bond branch.
       - [ ] Unit tests against the contract shape.
       - [ ] **Also close the silent-failure shape found in step 2:** the route must
             not return `200` with zero bars for a symbol it cannot serve. Stage 2's
@@ -3597,15 +3739,32 @@ NN TFI trade is a false positive, and a correct one for the wrong reason.
             looks like, and that is how the reverted mapping would have shipped
             unnoticed. If the new provider can fail, it must be distinguishable
             from "no history".
+            > **The new source makes this cheap, so the requirement is specific:**
+            > an unresolved category code is **HTTP 404** upstream, not an empty
+            > series. Propagate that as an error. The two cases must not collapse:
+            > "this code does not exist" (404) vs "this code has no history in the
+            > requested window" (200, legitimately zero bars) vs "the provider is
+            > dead" (the shape from step 2). Only the third is silent today.
 
       **Stage 6 — full compose stack.**
       - [ ] `docker compose up -d redis openst cachest instruments`, curl through
             cachest, `npm run test:stack` green.
+            > Smoke must prove **three** W readings, not a `200` — the plan's own
+            > recurring error is confirming availability from a status code alone.
+            > Through the running stack: 382.05 on 2023-04-13, 904.80 on 2026-08-19,
+            > and 931.03 on 2026-09-29. The first two are the gate; the third
+            > proves the *current* quote is the same series, which is what makes the
+            > valuation correct rather than just historically consistent.
       - [ ] Then the change that actually moves the user's numbers: sheets-sync
-            `NAME_VENUE_OVERRIDES["goldman sachs akcji"]` → the W series
+            `NAME_VENUE_OVERRIDES["goldman sachs akcji"]` → `ING01W`
             (`a29dbe3` did this and was reverted; re-apply only once stage 6
             proves the series is served). **Needs the user's go-ahead** — it
             re-prices the holding.
+            > This is the "override it in google sheets import" half of the user's
+            > decision, and the override is the whole point: the sheet keeps
+            > carrying the stale Goldman Sachs name, and the import is the one
+            > place that already translates sheet names into symbols. The stored
+            > symbol becomes `ING01W`; the sheet's name never becomes one.
 
 - [x] Step 3 — sweep the other `.TFI` rows. **Run against PROD 2026-09-30, and
       exactly one symbol was wrong — the one already fixed.**
