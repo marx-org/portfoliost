@@ -171,3 +171,61 @@ export function usePortfolioFreshness() {
   })
 }
 
+/**
+ * §63.3 — the per-portfolio value a card must render, taken from the SAME
+ * `/total-metrics` breakdown the headline is summed from.
+ *
+ * **Why the card cannot keep reading `portfolio.currentValue`.** That column is
+ * written by the backfill from `value_snapshots` (bars), while the headline is
+ * computed live from `positions.market_value` (quotes). They are two different
+ * price sources for one number, so adding up the cards could never equal the
+ * headline — measured in PROD 2026-10-01, the ten cards summed to 1,094,279.02
+ * against a headline of 1,096,223.87, a 1,944.85 PLN gap on four portfolios
+ * (IKE Marek +514.63, IBKR −2,698.17, IKE Beata +26.43, Equate+ +212.26). The
+ * other six agreed only because they hold ≤1 instrument, where the two sources
+ * happen to coincide.
+ *
+ * The breakdown row is the headline's own input, so rendering it makes the sum
+ * reconcile *by construction* rather than by coincidence — which is what §68
+ * intended and what the §63.3 unit test could not see, because the test seeds
+ * both paths from the same number.
+ *
+ * `null` for a portfolio means "the breakdown has no row for it" (e.g. the
+ * aggregate failed to resolve a base currency and returned an empty breakdown).
+ * The card then falls back to the stored column rather than rendering nothing:
+ * a stale number is better than no number, as long as it is not passed off as
+ * the reconciled one.
+ */
+export interface PortfolioCardValue {
+  /** The whole account in the AGGREGATE base currency, not the portfolio's own. */
+  totalValue: number
+  instrumentsValue: number
+  cashValue: number
+  totalInvested: number
+  returnPercentage: number
+}
+
+export function usePortfolioValues() {
+  const store = usePortfolioStore()
+  return computed(() => {
+    const map = new Map<string, PortfolioCardValue>()
+    for (const row of store.totalMetrics?.portfolioBreakdown ?? []) {
+      // §68.4 — the backend's own rule: return = (total − invested) / invested,
+      // and 0 rather than a division by zero when nothing was put in. Derived here
+      // for the same reason the aggregate derives it: two independent figures for
+      // one ratio drift, and `returnPercentage` is optional in the contract, so
+      // reading it alone would leave the card blank on a response that omits it.
+      const invested = row.totalInvested
+      const gain = row.totalValue - invested
+      map.set(row.id, {
+        totalValue: row.totalValue,
+        instrumentsValue: row.instrumentsValue,
+        cashValue: row.cashValue,
+        totalInvested: invested,
+        returnPercentage: row.returnPercentage ?? (invested > 0 ? (gain / invested) * 100 : 0),
+      })
+    }
+    return map
+  })
+}
+

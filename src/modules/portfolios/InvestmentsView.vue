@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watchEffect } from "vue"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
 import { useDisplayConversion } from "@/composables/useDisplayConversion"
-import { usePortfolioFreshness } from "@/stores/portfolios"
+import { usePortfolioFreshness, usePortfolioValues } from "@/stores/portfolios"
 import { useCurrenciesStore } from "@/stores/currencies"
 import { storeToRefs } from "pinia"
 import { formatCurrency, formatPercent, formatSignedCurrency } from "@/utils/format"
@@ -147,6 +147,12 @@ const derived = computed(() => {
 })
 
 const freshnessById = usePortfolioFreshness()
+// §63.3 — each card renders its Value/Invested/Return from the SAME breakdown row
+// the headline is summed from, so Σ cards == headline by construction. The cards
+// previously read `portfolio.currentValue` (backfill bars) against a headline read
+// from live quotes, which is one number with two sources; PROD measured a
+// 1,944.85 PLN disagreement across the ten cards on 2026-10-01.
+const valuesById = usePortfolioValues()
 
 const strategies = [
   { value: "GROWTH", label: "Growth" },
@@ -407,7 +413,7 @@ async function submitCreate() {
       </div>
 
       <div v-if="store.portfolios.length" class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <PortfolioCard v-for="p in store.portfolios" :key="p.id" :portfolio="p" :freshness="freshnessById.get(p.id)" @add-position="openAddPosition(p.id)" />
+        <PortfolioCard v-for="p in store.portfolios" :key="p.id" :portfolio="p" :freshness="freshnessById.get(p.id)" :value="valuesById.get(p.id)" @add-position="openAddPosition(p.id)" />
       </div>
       <p v-else-if="!error" class="text-sm text-slate-500 dark:text-slate-400">No investment portfolios yet.</p>
 

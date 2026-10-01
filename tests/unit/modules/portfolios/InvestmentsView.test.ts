@@ -402,3 +402,98 @@ it("badges a card whose portfolio has unpriced positions, once metrics arrive", 
   expect(notes[0].text()).toContain("3 positions unpriced")
 })
 
+/**
+ * §63.3 — the reconciliation this section was opened for, asserted on the
+ * rendered cards: Σ card Values == the headline.
+ *
+ * The fixture is the PROD shape that broke it (measured 2026-10-01): the
+ * portfolio list carries a STORED `currentValue` written from backfill bars,
+ * while the aggregate breakdown carries the LIVE value the headline sums. The
+ * two differ — here 1,200 stored against 1,096.23 live — so a card rendering
+ * the stored column cannot reconcile, and neither can a test that seeds both
+ * paths from one number. That is why §63.3's old unit test passed while the
+ * page did not add up.
+ */
+describe("§63.3: the cards sum to the headline", () => {
+  const num = (w: ReturnType<typeof mountView>, id: string) =>
+    Number(w.get(`[data-testid="${id}"]`).text().replace(/[^0-9.-]/g, ""))
+
+  it("renders each card from the aggregate breakdown, not the stored column", async () => {
+    // Stored `currentValue` 1200 (bars) vs live breakdown 1096.23 (quotes) —
+    // the exact disagreement that made Σ cards 1,944.85 PLN short in PROD.
+    // Base USD so the display conversion is 1:1 and this test is about which
+    // number the card reads, not about FX (§66.3 covers the conversion).
+    const pfs = await summary()
+    // `cash` is what makes the card render its instruments/cash split at all, and
+    // PROD carries it on every card — without it the split is not in the DOM.
+    mocked.getPortfolios.mockResolvedValue([
+      { ...pfs[0], cash: { total: 96.23, baseCurrency: "USD", balances: [{ currency: "USD", balance: 96.23 }] } },
+    ] as never)
+    mocked.getPortfolioTotalMetrics.mockResolvedValue({
+      instrumentsValue: 1000, cashValue: 96.23, totalValue: 1096.23, totalInvested: 1000,
+      baseCurrency: "USD", cashBreakdown: [],
+      unpricedPositions: 0,
+      portfolioBreakdown: [
+        { id: pfs[0].id, name: pfs[0].name, instrumentsValue: 1000, cashValue: 96.23,
+          totalValue: 1096.23, totalInvested: 1000, returnPercentage: 9.62,
+          unpricedPositions: 0, priceAsOf: null, priceSource: "quote" },
+      ],
+    } as never)
+    const w = mountView()
+    await flushPromises()
+
+    expect(num(w, "card-value")).toBe(1096.23)
+    expect(num(w, "card-invested")).toBe(1000)
+    expect(num(w, "card-instruments-value")).toBe(1000)
+    // the load-bearing assertion: the card and the headline are the same number
+    expect(num(w, "card-value")).toBe(num(w, "tile-total-value"))
+  })
+
+  it("keeps Σ cards equal to the headline across several portfolios", async () => {
+    // The PROD shape at fleet scale: some portfolios disagree, some agree. A
+    // one-card fixture would pass against a fix that only worked when the
+    // breakdown happened to hold a single row.
+    const base = await summary()
+    const rows = [
+      { id: "p1", name: "First", stored: 1200, live: 1096.23 },
+      { id: "p2", name: "Second", stored: 500, live: 498.11 },
+      { id: "p3", name: "Third", stored: 300, live: 300 },
+    ]
+    mocked.getPortfolios.mockResolvedValue(
+      rows.map((r) => ({ ...base[0], id: r.id, name: r.name, currentValue: r.stored })),
+    )
+    const breakdown = rows.map((r) => ({
+      id: r.id, name: r.name, instrumentsValue: r.live, cashValue: 0,
+      totalValue: r.live, totalInvested: 1000, returnPercentage: 0,
+      unpricedPositions: 0, priceAsOf: null, priceSource: "quote",
+    }))
+    const total = breakdown.reduce((s, r) => s + r.totalValue, 0)
+    mocked.getPortfolioTotalMetrics.mockResolvedValue({
+      instrumentsValue: total, cashValue: 0, totalValue: total, totalInvested: 3000,
+      baseCurrency: "USD", cashBreakdown: [], unpricedPositions: 0,
+      portfolioBreakdown: breakdown,
+    } as never)
+    const w = mountView()
+    await flushPromises()
+
+    const cards = w.findAll('[data-testid="card-value"]').map((el) => Number(el.text().replace(/[^0-9.-]/g, "")))
+    expect(cards.length).toBe(3)
+    expect(cards.reduce((s, v) => s + v, 0)).toBeCloseTo(num(w, "tile-total-value"), 2)
+  })
+
+  it("falls back to the stored figures when the breakdown has no row for the card", async () => {
+    // `total-metrics` returns an empty breakdown when it cannot resolve an honest
+    // aggregate base. The card must still show a number — stale but visible —
+    // rather than an em dash that reads as "this portfolio is worth nothing".
+    const pfs = await summary()
+    mocked.getPortfolios.mockResolvedValue(pfs)
+    mocked.getPortfolioTotalMetrics.mockResolvedValue({
+      instrumentsValue: 0, cashValue: 0, totalValue: 0, totalInvested: 0,
+      baseCurrency: null, cashBreakdown: [], portfolioBreakdown: [],
+    } as never)
+    const w = mountView()
+    await flushPromises()
+    expect(num(w, "card-value")).toBe(1200)
+  })
+})
+

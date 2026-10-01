@@ -12,33 +12,71 @@ const props = defineProps<{
   portfolio: PortfoliosSummaries[number]
   /** §70.2 — completeness/freshness, joined from the aggregate breakdown. */
   freshness?: { unpriced: number; priceAsOf: string | null; fallback: boolean }
+  /**
+   * §63.3 — this portfolio's row of the aggregate `/total-metrics` breakdown, the
+   * same rows the headline is summed from. The card's Value/Invested/Return and
+   * its instruments/cash split read THIS, not `portfolio.currentValue`.
+   *
+   * The stored column is a different price source (backfill bars) than the
+   * headline (live quotes), so rendering it made Σ cards disagree with the
+   * headline by 1,944.85 PLN in PROD on 2026-10-01. Omitted → the card falls
+   * back to the stored figures, which is stale but visible, rather than blank.
+   */
+  value?: {
+    totalValue: number
+    instrumentsValue: number
+    cashValue: number
+    totalInvested: number
+    returnPercentage: number
+  } | null
 }>()
 const emit = defineEmits<{ (e: "add-position"): void }>()
 
 const store = usePortfolioStore()
 const router = useRouter()
 
-// §66.3 — `currentValue` / `totalInvested` are denominated in the portfolio's own
-// baseCurrency (the contract has always carried it — the SPA simply was not
-// reading it, so it rendered PLN amounts with a `$`). Convert into the user's
-// display currency exactly like the headline does, so the cards and the headline
-// are computed the same way and their sum can reconcile (§63.3).
-const { convert, displayCurrencyOr } = useDisplayConversion(() => props.portfolio.baseCurrency)
+// §66.3 — the amounts are converted into the user's display currency exactly
+// like the headline does, so the cards and the headline are computed the same
+// way and their sum can reconcile (§63.3).
+//
+// The SOURCE currency follows the figure actually being rendered: the breakdown
+// row is denominated in the aggregate base (`totalMetrics.baseCurrency`), the
+// stored fallback in the portfolio's own base. Converting a breakdown row with
+// the portfolio's rate would be wrong on every fleet that is not single-currency
+// — and would be wrong by exactly the cross-rate.
+const { convert, displayCurrencyOr } = useDisplayConversion(() =>
+  props.value ? (store.totalMetrics?.baseCurrency ?? props.portfolio.baseCurrency) : props.portfolio.baseCurrency,
+)
 
 /**
- * §68.4 — the instruments component of this portfolio's value, in the portfolio's
- * base currency. `currentValue` INCLUDES cash (§68) and `cash.total` is that cash,
- * so instruments = currentValue − cash. Subtraction rather than a second figure
- * from the API is deliberate: the two fields are denominated in the same base, so
- * the difference is exact, and it cannot fall out of sync with the Cash line
- * printed right above it. Null cash means no cash figure, so the whole of
- * currentValue is instruments.
+ * §63.3 — the reconciled figures for this card.
+ *
+ * `value` (the aggregate breakdown row) wins whenever it is present, because it
+ * is the row the headline sums. The fallback reproduces the old behaviour from
+ * `portfolio.currentValue`, which INCLUDES cash (§68), so instruments is its
+ * difference against the cash balance rather than a second request.
  */
-const instrumentsValue = computed<number | null>(() => {
+const cardValue = computed(() => {
+  const v = props.value
+  if (v) {
+    return {
+      totalValue: v.totalValue,
+      instrumentsValue: v.instrumentsValue,
+      cashValue: v.cashValue,
+      totalInvested: v.totalInvested,
+      returnPercentage: v.returnPercentage,
+    }
+  }
   const current = props.portfolio.currentValue
   if (current == null) return null
   const cash = props.portfolio.cash?.total
-  return Number(current) - (cash == null ? 0 : Number(cash))
+  return {
+    totalValue: Number(current),
+    instrumentsValue: Number(current) - (cash == null ? 0 : Number(cash)),
+    cashValue: cash == null ? 0 : Number(cash),
+    totalInvested: Number(props.portfolio.totalInvested ?? 0),
+    returnPercentage: Number(props.portfolio.metrics?.totalReturn ?? 0),
+  }
 })
 
 const timeframes: Array<{ value: PortfolioAnalyticsTimeframe; label: string }> = [
@@ -132,6 +170,7 @@ async function loadChart() {
   }
 }
 
+
 /**
  * §76.2 — the manual refresh. `recomputePortfolio` now issues `?mode=upsert`
  * (additive: recomputes the whole series over the top, never deletes) rather than
@@ -222,8 +261,8 @@ const chartKey = computed(
 
 defineExpose({ chartKey })
 
-function returnClass(p: PortfoliosSummaries[number]): string {
-  return (p.metrics?.totalReturn ?? 0) >= 0 ? "text-green-600" : "text-red-600"
+function returnClassFor(returnPercentage: number | undefined | null): string {
+  return (returnPercentage ?? 0) >= 0 ? "text-green-600" : "text-red-600"
 }
 
 function goToDetail() {
@@ -415,15 +454,15 @@ async function exportPositions(format: "csv" | "xml" | "json") {
     <div class="mt-4 grid grid-cols-3 gap-2 text-sm">
       <div>
         <p class="text-xs text-slate-500 dark:text-slate-400">Value</p>
-        <p class="font-medium tabular-nums">{{ formatCurrency(convert(portfolio.currentValue), displayCurrencyOr()) }}</p>
+        <p class="font-medium tabular-nums" data-testid="card-value">{{ formatCurrency(convert(cardValue?.totalValue), displayCurrencyOr()) }}</p>
       </div>
       <div>
         <p class="text-xs text-slate-500 dark:text-slate-400">Invested</p>
-        <p class="font-medium tabular-nums">{{ formatCurrency(convert(portfolio.totalInvested), displayCurrencyOr()) }}</p>
+        <p class="font-medium tabular-nums" data-testid="card-invested">{{ formatCurrency(convert(cardValue?.totalInvested), displayCurrencyOr()) }}</p>
       </div>
       <div>
         <p class="text-xs text-slate-500 dark:text-slate-400">Return</p>
-        <p class="font-medium tabular-nums" :class="returnClass(portfolio)">{{ formatPercent(portfolio.metrics?.totalReturn) }}</p>
+        <p class="font-medium tabular-nums" data-testid="card-return" :class="returnClassFor(cardValue?.returnPercentage)">{{ formatPercent(cardValue?.returnPercentage) }}</p>
       </div>
     </div>
     <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
@@ -492,14 +531,14 @@ async function exportPositions(format: "csv" | "xml" | "json") {
         </router-link>
       </div>
       <!-- §68.4 — the cash/instruments split lives HERE, inside the existing Cash
-           group, rather than as a fifth number in the top row. `currentValue`
-           includes cash and `cash.total` is the cash balance, both in the
-           portfolio's base currency, so the instruments component is their
-           difference and needs no second request. -->
+           group, rather than as a fifth number in the top row. §63.3 — both
+           components now come from the aggregate breakdown row, so the split is
+           the same pair of numbers the headline sums and cannot drift from the
+           Value printed above it. -->
       <div class="mt-1.5 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
         <span>Instruments</span>
         <span class="tabular-nums" data-testid="card-instruments-value">
-          {{ formatCurrency(convert(instrumentsValue), displayCurrencyOr()) }}
+          {{ formatCurrency(convert(cardValue?.instrumentsValue), displayCurrencyOr()) }}
         </span>
       </div>
       <div class="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
