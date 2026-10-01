@@ -4471,3 +4471,124 @@ application was correct throughout.
 before blaming the fixture.* A clean tree is not a baseline, and "this spec is
 known flaky" is a conclusion, not a starting point. §67.1 recorded the
 flakiness, which made the wrong answer feel available and attractive.
+
+## 78. Funds are served but not discoverable — no search path exists for them (2026-10-01)
+
+Raised after §72.39 stages 1–6 were done and proven. The provider work is
+complete: `ING01W` is served, cached and routed, and the three gate readings
+reproduce through the whole tier. **None of that makes a fund findable.** The
+search path was never in scope and is entirely absent.
+
+**The gap, measured rather than assumed:**
+
+| layer | what exists | funds? |
+|---|---|---|
+| openst | `/equity/search`, `/crypto/search`, `/fixedincome/search` | **no fund route** |
+| cachest | proxies all three | **no fund route** |
+| instruments | `searchTickerReference` → `ticker_reference` | **0 fund rows** (PROD) |
+| SPA | `InstrumentSearchModal` → `/api/instruments/search` | returns nothing for any fund |
+
+### 78.1 — Two precedents exist, and funds need both halves of one dataset
+
+The trap is assuming bonds are searchable the way stocks are. They are not, and
+the two mechanisms are different:
+
+- **Corp bonds** are rows in `ticker_reference` (`WSE::{SYMBOL}`, 941 of them),
+  written by `corp-bond-catalogue-sync.ts` from cachest `/corp-bond/catalogue`.
+  They are searchable *because they are table rows*.
+- **Savings bonds (ROD/EDO) are not in `ticker_reference` at all** — PROD returns
+  0 rows with `asset_type='bond'`. They are searchable because
+  `src/routes/instruments.ts:293` merges an **additive `bondSearchLeg`** that
+  calls openst `/fixedincome/search`.
+
+So there are two routes to searchability: a table row, or a provider leg. Funds
+should get **one dataset that yields both** — because the same rows also settle
+the routing question §72.39 stage 5 had to answer with a hardcoded `Set`.
+
+**Which is why this section also deletes `FUND_CATEGORY_CODES`.** Stage 5's
+membership-gated list exists only because `upstreamFor()` is pure and cannot ask
+the database what a symbol's venue is. If the catalogue lands in
+`ticker_reference`, the tier is readable from those rows' `exchange` column and
+the `Set` — provider knowledge sitting in a service module — becomes deletable.
+Decision taken: **delete it, derive the tier from data.**
+
+### 78.2 — The catalogue source is the hard part, and it is not a listing page
+
+The bond catalogue scrapes one server-rendered listing. **analizy.pl has no
+equivalent**, verified 2026-10-01:
+
+- `fundusze-inwestycyjne-otwarte/notowania` renders **11** fund links; the page
+  claims ~400 funds.
+- `?strona=`, `?page=`, `?p=` are **all ignored** — 11 links for every value.
+- The table is JS-rendered. The only fund endpoints in `fundCatalogAsync.js` are
+  `/api/fund-observed/` and `/api/fund-in-wallet/` — the observation UI, not a
+  catalogue.
+- Site search (`/wyszukiwarka`, `/szukaj`) is **404**.
+
+So a catalogue scrape is not available and this is **not** a "find the right
+listing page" problem.
+
+**What does work is enumeration by code sweep**, because the codes are cheap to
+probe — one JSON GET each, no auth, and a miss is a clean `404`. Proven twice:
+`ING01`–`ING99` returned every ING category (that sweep is how `ING81`/`82`/`88`
+were found), and a 20-prefix × 2-probe discovery pass resolved
+`ING01 PZU01 PZU50 AXA01 ARK01 ARK50 PCS50 QRS01 SKR01 VIG01`.
+
+**The sweep is bounded and that is a stated limit, not a hidden one:** the prefix
+list is *data* in the repo, and each prefix is probed `01`–`99`. It is blind to
+managers outside the listed prefixes, and it is a refresh job, not a per-request
+call. Sweeping every plausible 3-letter prefix × 99 would be ~100k requests and
+is not proposed.
+
+### 78.3 — Steps, in the planner contract's provider-tier order
+
+- [ ] **Step 1 — catalogue capture.** Manual sweep, one request per code, raw
+      responses saved to `openst/tests/fixtures/analizy/catalogue/`. No
+      automation beyond the loop. Emit the catalogue as CSV in the shape
+      `/corp-bond/catalogue` already serves, so the consumer is precedented.
+      Gate: the catalogue contains the 7 codes §72.39 verified, each with its
+      label, currency and first/last valuation. Tests: none yet — config-only.
+      Record the prefix list as data, with the discovery evidence above.
+- [ ] **Step 2 — openst routes.** `GET /fund/catalogue` (CSV) and
+      `GET /fund/search/{query}`, both over the captured catalogue. Unit tests
+      with the HTTP fetch mocked; must assert a search hit and a clean miss
+      distinctly, and that currency is carried through. Full openst compose suite
+      green (416 + 104 + 53 + 21 today).
+- [ ] **Step 3 — openst standalone smoke.** `docker compose up -d`, curl
+      `/fund/catalogue` and a search, confirm the Redis cache **HITs** on the
+      second identical call. Tests: smoke only, justified by step 2.
+- [ ] **Step 4 — cachest routes.** Both routes in `config.yaml` with TTLs matching
+      their openst peers (a catalogue is slow-moving; a search is per-query), plus
+      `test_real_config_has_fund_catalogue_route` and
+      `test_real_config_has_fund_search_route`. Full cachest suite green (211).
+      Never swap 3 and 4.
+- [ ] **Step 5 — instruments: the part that earns its keep.**
+      - [ ] `fund-category-catalogue-sync.ts`, modelled directly on
+            `corp-bond-catalogue-sync.ts`: fetch the CSV from cachest, upsert
+            `ANALIZY::{CODE}` rows with `asset_type='fund'` and
+            `exchange='ANALIZY'`, with the same `MIN_EXPECTED_ROWS` guard against
+            a truncated scrape.
+      - [ ] **Delete `FUND_CATEGORY_CODES` and `isFundCategory`** from
+            `src/adapters/symbol.ts`, and the `assetTypeForSymbol` early-return.
+            `ING01W` then classifies as `fund` the ordinary way — by table row.
+      - [ ] Derive the price tier from the row's `exchange === 'ANALIZY'`, so
+            `upstreamFor` gains a `tier` parameter instead of provider
+            knowledge. **`.TFI` funds keep the biznesradar route** — `NNEP65`
+            reproduces 34 of 66 trades to the cent there, and `NNEP30`'s first
+            trade sits 17 days inside `ING82`'s window.
+      - [ ] `fundSearchLeg` merged additively alongside `bondSearchLeg`, so the
+            catalogue is searchable *and* the corpus is reachable for symbols
+            absent from the table.
+      - [ ] Tests: the 941 corp bonds still resolve to `corp_bond`; a `.TFI` fund
+            still routes to biznesradar; an `ANALIZY::` row routes to the category
+            route; search returns a fund and a corp bond for overlapping queries.
+- [ ] **Step 6 — full stack + the UI.** `docker compose up -d`, curl through
+            cachest, `npm run test:stack` green, then confirm in
+            `InstrumentSearchModal` that typing `ING01W` / `Akcji` returns the
+            fund and renders as a fund. The SPA needs no change if the response
+            shape is unchanged — verify, do not assume.
+
+**What this section does not do.** It does not add fund categories to the
+`aktualny kurs` sheet column (§72.39's stale-data finding), does not touch
+§72.39 step 4 (`positions.company_name`), and does not re-open the sheet. It is
+strictly: make funds findable, and get the routing knowledge out of code.
