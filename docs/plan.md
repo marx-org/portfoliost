@@ -3466,6 +3466,14 @@ archive.
       > Until (3) is observed, the §72.37/§74.6 audit findings should be treated
       > as **still open** rather than fixed — the exemption is the only thing
       > currently holding them down.
+      >
+      > **UNBLOCKED 2026-10-01.** The provider tier is deployed and proven in PROD
+      > (§78 step 6's deploy note): openst v1.1.43 serves the W series, and
+      > `ING01W` resolves in PROD's `ticker_reference` as `fund` /
+      > `fund_category` — 872 bars, with 382.05 / 904.80 / 931.03. The prerequisite
+      > that made this unsafe earlier, no `ANALYZY` row and therefore
+      > `ING01W → stock → equity walk → 200 / bars=0`, no longer applies. Go
+      > ahead with the Wipe & Reimport; the four checks above still stand.
 
 ## 74. `price-audit` compares order-priced fund trades against the wrong day's bar (2026-09-29)
 
@@ -4105,6 +4113,57 @@ is not proposed.
       > hand in the compose stack it is a one-liner, but PROD has no
       > `ANALYZY` rows until a job exists — and until it does, `ING01W` resolves
       > to nothing and the W bars are unreachable.
+      >
+      > ### Deployed 2026-10-01 — and the last box was not a formality
+      >
+      > `d2d16c7d1` (images) + `e7eb171a0` (the fix below). Images:
+      > openst **v1.1.43**, cachest **v1.0.48**, instruments **v1.0.86**,
+      > sheets-sync **v1.0.31**. All four CI runs green — cachest's first run
+      > failed on a `files.pythonhosted.org` read timeout while `pip install`ing,
+      > not on code or tests, and a `--failed` rerun passed.
+      >
+      > **The tag bump alone did nothing, and this is worth keeping.** cachest's
+      > config is generated into a ConfigMap from
+      > `cluster/apps/pfire/cachest/app/config/config.yaml` — **a separate copy in
+      > the homelab repo** — mounted over `/app/config.yaml`. So a route added to
+      > `cachest/config.yaml` is invisible to the cluster until it is added here
+      > too. Verified rather than assumed: `ghcr.io/marx2/cachest:v1.0.48` *does*
+      > contain all three routes, while the mounted ConfigMap had none and every
+      > fund request 404'd.
+      >
+      > **It surfaced loudly, which is the point.** The first
+      > `fundcategorysync` Job failed with
+      > `fund catalogue fetch failed: HTTP 404 for http://cachest:8080/fund/catalogue`
+      > rather than syncing an empty catalogue — the 404 passthrough and the
+      > row-count gate doing exactly the job they were built for. Had the sync
+      > degraded to a warning, PROD would now hold zero `ANALYZY` rows and the
+      > symptom would be `200 / bars=0` at the instruments tier.
+      >
+      > **Pre-existing drift found and deliberately NOT fixed:** the two config
+      > copies have already diverged. The cluster copy is **missing
+      > `OPENST_CRYPTO_SEARCH` and `OPENST_CRYPTO_PROFILE`** — so crypto search is
+      > not proxied in PROD at all — and carries an `OPENST_PRICE_HISTORY` the
+      > repo copy lacks. That predates this work; changing it is a separate
+      > decision with its own blast radius, so it is flagged rather than absorbed.
+      > Verified zero field mismatches on the three routes added.
+      >
+      > **Now proven in PROD**, tier resolution run inside the live instruments pod:
+      >
+      > | symbol | assetType | tier | |
+      > |---|---|---|---|
+      > | `ING01W` | fund | **fund_category** | the class-W symbol |
+      > | `ING01` / `ING01U` / `ING04` / `ING92` | fund | fund_category | siblings |
+      > | `INGAKC.TFI` / `NNEP65.TFI` / `NNEP30.TFI` | null→stock | **standard** | biznesradar, unchanged |
+      > | `ABE0227` | **corp_bond** | standard | the dotless-bond collision is clear |
+      > | `ROD1033` | bond | standard | savings bond still wins its branch |
+      >
+      > And bars through the tier: **`ING01W` → 872 rows, 382.05 / 904.80 / 931.03**;
+      > `NNEP65.TFI` → 42 rows on `standard`, still biznesradar. `ticker_reference`
+      > holds **734 `ANALYZY`/`fund` rows** with `ING01W → aliases ING01`.
+      >
+      > **The PROD Wipe & Reimport is now unblocked** — the prerequisite that made
+      > it unsafe earlier (no `ANALYZY` row ⇒ `ING01W` ⇒ stock ⇒ equity walk ⇒
+      > `200 / bars=0`) no longer applies.
 
 **What this section does not do.** It does not add fund categories to the
 `aktualny kurs` sheet column (§72.39's stale-data finding), does not touch
