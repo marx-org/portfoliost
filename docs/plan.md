@@ -3755,11 +3755,67 @@ NN TFI trade is a false positive, and a correct one for the wrong reason.
       - [ ] Tests: a fixture-driven unit test plus the existing suite.
 
       **Stage 3 — openst standalone smoke.**
-      - [ ] `docker compose up -d`, one `curl` per symbol, and confirm the Redis
+      - [x] `docker compose up -d`, one `curl` per symbol, and confirm the Redis
             cache **HITs** on the second identical call.
-      - [ ] Verify the response reproduces 382.05 for 2023-04-13 from the running
+      - [x] Verify the response reproduces 382.05 for 2023-04-13 from the running
             service, not from the fixture.
-      - [ ] Tests: config/smoke only — justified by the fixture tests in stage 2.
+            > **PASSED — against the running service, not the fixture.**
+            > `610bf60` built and `docker compose up -d` brought the app up on
+            > **:8099** (8080 is the portfoliost gateway's; a local port override
+            > was used rather than disturbing that stack). Healthy in 4 s.
+            >
+            > **The gate, read live:**
+            >
+            > | date | expected | live response |
+            > |---|---|---|
+            > | 2023-04-13 | 382.05 | **382.05** |
+            > | 2026-08-19 | 904.80 | **904.80** |
+            > | 2026-09-29 | 931.03 | **931.03** |
+            >
+            > The third reading is included deliberately: the first two prove the
+            > history, the third proves the *current* quote is the same series,
+            > which is what makes the valuation correct rather than merely
+            > historically consistent.
+            >
+            > **Redis HIT confirmed, and confirmed to be Redis** — 176 ms → 16 ms
+            > on an identical call, byte-identical payloads
+            > (`sha256=a4ea7283…`), and the key is genuinely in Redis with a live
+            > TTL: `fund_category_history:ING01W:2019-06-10:2026-12-31`, TTL
+            > 86391 s.
+            >
+            > **One curl per code — all seven serve:**
+            >
+            > | code | http | points | first | last |
+            > |---|---|---|---|---|
+            > | `ING01` | 200 | 6,737\* | 2000-01-03 | 2026-09-29 |
+            > | `ING01W` | 200 | 1,845 | 2019-06-10 | 2026-09-29 |
+            > | `ING04` | 200 | 6,737\* | 2000-01-03 | 2026-09-29 |
+            > | `ING81` | 200 | 1,725 | 2019-11-29 | 2026-09-29 |
+            > | `ING82` | 200 | 1,725 | 2019-11-29 | 2026-09-29 |
+            > | `ING88` | 200 | 1,722 | 2019-12-04 | 2026-09-29 |
+            > | `ING92` | 200 | 1,418 | 2021-02-17 | 2026-09-29 |
+            >
+            > \* clamped by the requested `start=2000-01-01`, not by the source —
+            > the fixtures hold 7,201 and 6,955 respectively.
+            >
+            > **The three outcomes stay apart under load**, which is the property
+            > stage 5 depends on:
+            >
+            > ```
+            > GET /fund/history/ING01A  → 404 {"detail":"No fund category ING01A"}
+            > GET /fund/history/NNEP65  → 404 {"detail":"No fund category NNEP65"}
+            > GET /fund/history/ZZZZZ9  → 404 {"detail":"No fund category ZZZZZ9"}
+            > GET /fund/history/ING01W?start=2018-01-01&end=2018-12-31 → 200 []
+            > ```
+            >
+            > **`NNEP65` returning 404 is the load-bearing one.** A caller who
+            > passes the `.TFI` symbol instead of the provider's code gets a loud
+            > 404, not a silent empty series — which is precisely the mistake that
+            > nearly shipped a broken mapping before. Negative caching holds too
+            > (404 → 4 ms), and the app logged each miss with no traceback.
+            >
+            > Nothing to commit: this stage is smoke only, justified by stage 2's
+            > 37 fixture-driven tests. The stack was torn down afterwards.
 
       **Stage 4 — cachest route.**
       - [ ] New route in `cachest/config.yaml` with an appropriate TTL. Add the
