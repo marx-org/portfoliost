@@ -2542,12 +2542,53 @@ known-unknown amount**, and §72.31's `gapSymbols` is the only thing marking it.
 
 - [ ] **Decide: find a source that carries them, or accept the partial sum and
       make the UI say so**
-      > Both are defensible and the cost differs by an order of magnitude. A paid
-      > Polish bond feed is a subscription; labelling costs one UI change and I
-      > can do it in an afternoon. **My recommendation is label first, hunt never** —
-      > the bonds were all sold, so the only thing at stake is historical accuracy
-      > in a window you already know is thin, and `gapSymbols` already reports it.
-      > Say which and I will build it.
+      > **DECIDED 2026-10-01: accept and label. And the hunt is not merely
+      > deprioritised — it is impossible, which the tickers prove.**
+      >
+      > Measured the set rather than assuming it: **8 of 221 distinct held symbols
+      > have zero bars, and all 8 are bonds**, all `fetch_status=failed_permanent`,
+      > all `HTTP 404 upstream`:
+      >
+      > ```
+      > ARH0324  ARH0722  BST0922  INS0922  KIN1025  KRI0322  NVA0624  VOX0224
+      > ```
+      >
+      > They are Polish **government** retail bonds (Ministry of Finance,
+      > `obligacje skarbowe`; the series names are the retail issuance codes), and
+      > **the four-digit suffix is the maturity** — `ARH0722` = July 2022,
+      > `VOX0224` = Feb 2024, `KIN1025` = Oct 2025. **All eight have matured**;
+      > the latest was Oct 2025.
+      >
+      > **The control that settles it.** One near-identical bond still trades and
+      > has a full history:
+      >
+      > | symbol | maturity | bars | status |
+      > |---|---|---|---|
+      > | `BST0327` | Mar 2027 — alive | **427** (2022-03-24 → 2026-09-28) | `ok` |
+      > | `BST0922` | Sep 2022 — matured | **0** | `failed_permanent` |
+      > | `INS0922` | Sep 2022 — matured | **0** | `failed_permanent` |
+      >
+      > Same naming convention, same asset class, same feed. `BST0327` works
+      > because it has not matured; `BST0922` has nothing even though it traded
+      > across 2021–22, overlapping `BST0327`'s window. **The feed serves live
+      > instruments and discards matured ones entirely, history included.** So the
+      > tickers are not wrong and there is no alternate symbol to find — there is
+      > simply no history to buy.
+      >
+      > **This also corrects an option I offered earlier.** I suggested the
+      > provider might know these under a different ticker and that fixing the
+      > mapping was nearly free. That was wrong, and the control above is what
+      > caught it. Recorded rather than quietly dropped, because the same
+      > reasoning would otherwise be re-proposed for the next delisted instrument.
+      >
+      > **One consequence that makes this cheap rather than merely acceptable:**
+      > these bonds matured and were **redeemed**, so cost basis ≈ redemption
+      > value. Carrying them at cost (`unpricedValue`, §78.5) is not a rough
+      > stand-in for this set — it is close to correct, and the history is
+      > slightly understated rather than wrong.
+      >
+      > **Remaining on this item: the UI.** §78.5 has the number on the wire and
+      > verified in PROD; nothing renders it yet.
 
 ### 78.4 — Add a CI job that runs the test suite, across all five repos
 
