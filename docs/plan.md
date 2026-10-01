@@ -4011,13 +4011,35 @@ is not proposed.
 
 ### 78.3 — Steps, in the planner contract's provider-tier order
 
-- [ ] **Step 1 — catalogue capture.** Manual sweep, one request per code, raw
-      responses saved to `openst/tests/fixtures/analizy/catalogue/`. No
-      automation beyond the loop. Emit the catalogue as CSV in the shape
-      `/corp-bond/catalogue` already serves, so the consumer is precedented.
-      Gate: the catalogue contains the 7 codes §72.39 verified, each with its
-      label, currency and first/last valuation. Tests: none yet — config-only.
-      Record the prefix list as data, with the discovery evidence above.
+- [x] **Step 1 — catalogue capture.** Manual sweep, one request per code, raw
+      > **DONE** — `openst 3793e68`. **734 categories** across the 8 resolved TFI
+      > prefixes: 259 funds and **475 lettered unit categories**, CSV in the
+      > `/corp-bond/catalogue` shape. Gate PASS — the 7 codes §72.39 verified are
+      > all present with label, currency and first/last valuation; all 734 are PLN
+      > and run to 2026-09-29.
+      >
+      > **It took two passes, and the first failed the gate** — the finding worth
+      > keeping. A numeric sweep of `<prefix><01..120>` returned 259 funds and
+      > **missed `ING01W`**, because a category is the fund code *plus a letter*.
+      > Numeric-only would have dropped 65% of the corpus and, worse, looked
+      > complete: `ING01W` is the symbol the whole class-W build exists for, so its
+      > absence would not have been obvious.
+      >
+      > The second pass probes `<code><letter>` for eleven letters — §72.20's nine
+      > ING01 categories plus `P` (`ING04P`) and `B` (`VIG04B`). That bound is
+      > recorded as a **limit of the catalogue, not a completeness claim**: a
+      > category on a letter outside the set is absent. It is data in the sweep, so
+      > the set widens without a code change. All 26 letters would be ~6.7k
+      > requests.
+      >
+      > Per-fund detail pages were rejected for a concrete reason: they *do* list
+      > all sibling categories in one request, but the slug is mandatory (404
+      > without it) and not derivable — `VIG04B`'s label is "VIG / C-QUADRAT Akcji
+      > B" while its slug is `vig-c-quadrat-akcji`.
+      >
+      > Prefixes were **discovered, not guessed**: 60 candidates probed, exactly 8
+      > resolve. `MAX_NUM` is 120 because `SKR110` is real. Sweeps paced at
+      > 0.25–0.3s, matching the corp-bond job's own spacing.
 - [x] **Step 2 — openst routes.** `GET /fund/catalogue` (CSV) and
       `GET /fund/search/{query}`, both over the captured catalogue.
       > **DONE** — `3747f0c`, **31 new tests**, full compose suite green
@@ -4081,11 +4103,48 @@ is not proposed.
       >
       > Stack torn down afterwards. No test file added: smoke only, justified by
       > step 2's 31 tests.
-- [ ] **Step 4 — cachest routes.** Both routes in `config.yaml` with TTLs matching
+- [x] **Step 4 — cachest routes.** Both routes in `config.yaml` with TTLs matching
       their openst peers (a catalogue is slow-moving; a search is per-query), plus
       `test_real_config_has_fund_catalogue_route` and
       `test_real_config_has_fund_search_route`. Full cachest suite green (211).
       Never swap 3 and 4.
+      > **DONE** — `cachest c50e01b`, **218 tests green** (was 211).
+      >
+      > TTLs follow their peers by the same reasoning rather than by copying
+      > numbers: the catalogue mirrors `OPENST_CORP_BOND_CATALOGUE` (43200) and the
+      > search mirrors `OPENST_BOND_SEARCH` (3600) rather than
+      > `OPENST_CRYPTO_SEARCH` (604800) — a 7d TTL fits a universe that changes
+      > rarely, but inheriting it would leave a newly-listed fund unfindable for a
+      > week.
+      >
+      > Both keep light 0.2s spacing and are deliberately **not** in the §63.9.1
+      > scraper set: that 0.5s spacing is for routes proxying an upstream scrape,
+      > and these read a local snapshot.
+      >
+      > `test_fund_search_and_fund_history_do_not_collide` checks
+      > `/fund/search/{query}` against `/fund/history/{code}` explicitly. They are
+      > two-segment siblings, and a key-space collision would serve search hits as
+      > price bars — the right shape for the wrong thing.
+      >
+      > ### The deployment trap this step hides
+      >
+      > **The config bump alone does nothing in the cluster.** cachest's config is
+      > generated into a ConfigMap from
+      > `cluster/apps/pfire/cachest/app/config/config.yaml` — **a separate copy in
+      > the homelab repo** — mounted over `/app/config.yaml`. A route added to
+      > `cachest/config.yaml` is invisible until it is added there too
+      > (`homelab e7eb171a0`; URLs use the in-cluster FQDN, and the two copies were
+      > verified field-by-field with zero mismatches on the new routes).
+      >
+      > It surfaced loudly: the first `fundcategorysync` Job **failed** with
+      > `HTTP 404 for .../fund/catalogue` rather than syncing an empty catalogue.
+      > A silent degradation would have left PROD with zero `ANALYZY` rows and
+      > `200 / bars=0` at the instruments tier.
+      >
+      > **Pre-existing drift found and deliberately not fixed:** the cluster copy
+      > is missing `OPENST_CRYPTO_SEARCH` and `OPENST_CRYPTO_PROFILE` — so crypto
+      > search is not proxied in PROD at all — and carries an `OPENST_PRICE_HISTORY`
+      > the repo copy lacks. That predates this work and has its own blast radius.
 - [x] **Step 5 — instruments: the part that earns its keep.**
       > **DONE** — `207b981`, tsc clean, **447 tests green** (was 431).
       >
