@@ -1026,8 +1026,50 @@ regression — but I have not proved that, and "could not reproduce" is not
 (they drive a single-flight queue with fake timers) and the new price-audit
 option-leg set, both of which depend on ordering.
 
-- [ ] Re-run the full suite in CI and check whether it ever goes red; if it does,
+- [x] Re-run the full suite in CI and check whether it ever goes red; if it does,
       capture the name rather than re-running until green.
+      > **Answered, and the answer is that it has never gone red because no CI has
+      > ever run the suite.** Checked across all five repos, not just wallets:
+      >
+      > ```
+      > portfoliost            docker-image.yml, docker-image-mock.yml   no test step
+      > portfoliost-instruments docker-image.yml                          no test step
+      > portfoliost-wallets    docker-image.yml                          no test step
+      > portfoliost-admin      docker-image.yml                          no test step
+      > portfoliost-sheets-sync docker-image.yml                          no test step
+      > ```
+      >
+      > Every workflow is *release + build + push*, and the Dockerfile runs
+      > `npm run build` (tsc) but **not** `npm test`. Wallets' entire CI history
+      > contains exactly two workflow names — "Docker Image CI" and "Dependabot
+      > Updates" — so this is not a recently-removed job. The only non-green runs
+      > anywhere are 4 Dependabot dependency-update PRs, which is a different
+      > pipeline entirely.
+      >
+      > **So the premise of this box is false.** The original flake was seen in a
+      > local `vitest` run, in a shell pipeline (the process note above), and the
+      > "has since run 7× clean" evidence is also local. There was never a CI
+      > signal to watch, which is why "could not reproduce" stayed open for so
+      > long — the thing it was waiting on did not exist.
+      >
+      > **And the risk it was watching for is the kind only CI would catch**, so
+      > this is not closed as harmless. §72.13's diagnosis was explicitly a
+      > contention failure: `creates a portfolio tagged with externalSource` hit
+      > **5012ms against vitest's 5000ms default** "under a full-suite run,
+      > contending with the other 28 files", and passed standalone in 23s. That is
+      > the canonical full-suite-only flake, and no full suite runs anywhere but
+      > on this machine. Tracked as its own open item below rather than left to
+      > be rediscovered.
+- [ ] **Add a CI job that runs `npm test` (and `npm run test:mock` where the repo
+      has one) on every PR, for all five repos** — the gap this section found. It
+      is a new piece of work, not a continuation of the box above, and it is the
+      only thing that makes "did it go red?" answerable rather than unaskable.
+      > **Not started, deliberately.** Adding it is a decision about gating PRs on
+      > a suite that has only ever run locally: the first red run would block
+      > merges for work that is unrelated to it, and the five repos differ in
+      > what they run (instruments has no mocks; sheets-sync has no SPA suite).
+      > That is a plan-sized choice, not something to smuggle in under a
+      > monitoring box. Recorded so the gap is tracked rather than remembered.
 - [x] Deploy §72.18 with the next wallets release and re-run the audit, to
       confirm SAP.DE stops being reported.
 
