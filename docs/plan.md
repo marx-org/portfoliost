@@ -459,38 +459,78 @@ conversion).
       > direction from what a rate error would give. So the residual is not a rate
       > error at all.
       >
-      > ### What it actually is: the stored `currency` is mislabelled
+      > ### What it actually is: `instruments` reports the ISSUER's home currency, not the LISTING's
       >
-      > **Comparing the trade RAW — no conversion at all — collapses 18 of the 21
-      > cross-currency symbols from 11–288% down to under 3%:**
+      > **CORRECTION, 2026-10-01, later the same day: the paragraph below is WRONG and
+      > is replaced by this one. I wrote that `transactions.currency` was mislabelled.
+      > It is not — the transaction rows are correct and the instrument metadata is
+      > wrong.** Recorded rather than edited away, because the wrong version is the
+      > plausible one and would be re-derived from the same JSON.
+      >
+      > The stored rows agree with themselves and with the sheet:
       >
       > ```
-      > symbol     pair        n   dev WITH conversion   dev RAW
-      > XNAS.L     USD>GBP     5        24.3%            0.25%
-      > EMQQ.L     USD>GBP     4        24.9%            0.96%
-      > IUCD.L     USD>GBP     3        25.1%            0.94%
-      > R2US.L     USD>GBP     4        25.0%            0.70%
-      > SMH.L      USD>GBP     2        23.4%            1.34%
-      > MFC        USD>CAD    10        43.6%            0.97%
-      > DLR        USD>CAD     3        38.9%            2.53%
-      > DCC.L      GBP>EUR     5        16.9%            0.54%
-      > ASML       USD>EUR     4        11.4%            1.49%
-      > MLPD.L     USD>EUR     2        11.9%            0.41%
+      > sym      portfolio  date        ccy  iccy  rate  rsrc     price    amt      cprice
+      > ASML     IBKR       2022-03-18  USD  USD  4.27  manual  660.96   67.95   2822.30
+      > MFC      IBKR       2022-11-21  USD  USD  4.60  manual   17.50  245.00    80.50
+      > DCC.L    IKE Marek  2022-12-28  GBP  GBP  5.31  manual   40.86  367.74   216.97
       > ```
       >
-      > Five independent XNAS.L trades each matching the GBP bar to 0.25% is not
-      > coincidence. **The stored `price` is already in the instrument's trading
-      > currency while `transactions.currency` says otherwise**, so the audit
-      > faithfully converts a number that was never in the labelled currency — and
-      > the conversion *creates* the entire residual.
+      > `currency` == `instrument_currency` on every row, `converted_price` is exactly
+      > `price x exchange_rate`, and the rate is PLN — all self-consistent, and `MFC`
+      > at `17.50 USD` is what Manulife actually traded at on the NYSE that day.
       >
-      > **So the class is a currency fix, which is one of this box's three allowed
-      > outcomes** — and it is §72.8/§72.12's subject ("the payment currency was
-      > being stored as the instrument's"), which those sections declared complete.
-      > Either the fix did not cover the cross-currency import case or these rows
-      > predate it. **Not yet pinned to a line of code**, and the fix is not
-      > written: what is proven here is the classification and the proof, not the
-      > remedy.
+      > **The instruments side is what is crossed:**
+      >
+      > ```
+      > symbol    exchange   currency   bar @ 2022-11-21
+      > ASML      NMS        EUR        580.29
+      > MFC       NYQ        CAD         17.29     ← trade was 17.50 USD ✓ same number
+      > SHOP      NMS        CAD         35.21
+      > DCC.L     LSE        EUR         43.60
+      > ```
+      >
+      > The **exchange is right** (NMS/NYQ/LSE — US and UK venues) and the **currency
+      > is the issuer's home listing** (Euronext for ASML, Toronto for MFC and SHOP).
+      > So a USD bar is labelled EUR and a USD bar is labelled CAD, and every consumer
+      > that trusts the declared currency converts a correct number into a wrong one.
+      >
+      > ### The mechanism, pinned to code
+      >
+      > `resolveCurrency(db, routeSymbol, providerCurrency)`
+      > (`instrument-currency.ts:229`) **is never given the exchange**, and
+      > `resolveInstrumentCurrency` ends with:
+      >
+      > ```
+      > const codes = new Set(candidates.map(r => currencyForCountry(r.countryCode)))
+      > return codes.size === 1 ? [...codes][0] : null      // :201
+      > ```
+      >
+      > For a venue-free ticker on a cross-listed company the candidates disagree —
+      > `MFC` matches NYSE (USD) and TSX (CAD) — so the guard correctly returns
+      > **`null`**. `resolveCurrency` then takes its documented fallback:
+      >
+      > ```
+      > if (provider) { … return { currency: provider, currencySource: "provider" } }
+      > ```
+      >
+      > and the provider's declaration is the **primary** listing's currency. **The
+      > ambiguity guard is working; the fallback is what lies.** And the §71 branch
+      > that would have answered correctly — "the VENUE is known, return the venue's
+      > own currency" — can never run, because no caller passes the exchange in.
+      >
+      > **The fix is identified and small: pass the resolved `exchange` into
+      > `resolveCurrency`**, so a venue that is already known resolves as a fact
+      > instead of falling through to the issuer's home market. It is NOT written
+      > here: there are ten call sites, several compute `exchange` and the provider
+      > currency from one object, and ordering them wrongly would resolve currency
+      > from an exchange chosen *for* the currency.
+      >
+      > **This is `NAME_VENUE_OVERRIDES`-shaped but it is not an override** — an
+      > override would pin 30 symbols; the defect is that a known venue is ignored.
+      > Fixing it should collapse most of the 21 cross-currency symbols at once,
+      > which is also the precondition for §72.4's "flagged count only goes down"
+      > becoming assertable.
       >
       > ### The three that do NOT reconcile raw are real and need their own look
       >
