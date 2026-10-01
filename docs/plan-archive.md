@@ -14035,3 +14035,2087 @@ archive.
 > (904.80 / 931.03), so the *cell was provably wrong* — not merely implausible — and
 > §74's read-only rule held throughout. Neither we nor any tooling ever wrote to the
 > sheet; the correction was the user's.
+
+---
+
+## 67. Follow-ups from the currency work — the aggregate base and a duplicated helper (2026-09-27)
+
+Two things §66 deliberately did not do, both left over from the rollout.
+
+### 67.1 — the aggregate still denominates in USD, so §63.3 cannot reconcile
+
+`total-metrics` no longer *hardcodes* USD (§66.4) — it uses
+`preferredBaseCurrency`, and falls back to the user's own most common portfolio
+base when the preference service is unreadable. In PROD that preference is
+genuinely **unset**, so the honest default applies and the response still reports
+`baseCurrency: "USD"`, while every portfolio is PLN and the cards render PLN.
+
+Measured after the §66 rollout:
+
+| surface | value |
+|---|---|
+| Σ the 10 cards (Value) | PLN **1,380,487.34** |
+| "Total Value" headline | PLN **1,035,259.30** |
+| difference | PLN **345,228.04** ≈ the Cash card (PLN 345,228.05) |
+
+So the residual gap is cash, not FX: the cards include cash and the headline
+does not. That is §63.3's item, but it is blocked on this: the aggregate needs a
+base currency that means something to the user.
+
+- [x] Make the Display-currency selector write through to the user's
+      `baseCurrency` preference, so the backend can see it at all
+      (`portfoliost` `1d1dd65`, 402 green, **committed but deliberately not
+      deployed** — flipping the aggregate base USD → PLN moves the headline, and
+      it ships with §68 so the numbers move once, for one reason).
+- [x] On deploy (with §68): confirm the aggregate base is now the user's chosen
+      currency rather than the USD default.
+- [x] Then close §63.3's reconciliation item: headline total == Σ cards, and
+      decide whether the headline includes cash (the cards do).
+- [x] Also still open there: `Crypto` reports `totalValue: 0,
+      returnPercentage: -100` in the breakdown while holding 887.74 PLN and its
+      card reads +1.65%. A portfolio with cash and a position must not floor at
+      zero.
+- [x] Tests: `total-metrics.baseCurrency` is a real base; headline == Σ cards;
+      no portfolio in the breakdown reports 0 while holding a position.
+- [x] Commit.
+      > `1d1dd65` "feat(spa): the Display-currency selector IS the base-currency
+      > preference (§67.1)". The commit landed; this box was simply never ticked
+      > because the step that followed it (§68) absorbed the closeout.
+
+#### Pre-existing e2e failures found while verifying (not caused by §67.2)
+
+Baseline-checked by stashing the change and re-running: **5 e2e tests already
+fail on unmodified `main`** — all of them "chart element not found"
+(`chart-recompute.spec.ts:13`, `combined-chart.spec.ts:11` and `:19`,
+`performance-display-currency.spec.ts:39`, `parity-portfolios.spec.ts:53`). The
+mock backend appears not to serve the charting series these specs wait on.
+`portfolios.spec.ts` is separately **flaky** (a different test in it failed on
+each of three consecutive runs; 17/17 green on the fourth). Recorded here rather
+than fixed, since both predate §67.2 and neither is caused by it — but the
+mock's charting data needs a look, and until then "e2e green" cannot be used as
+a release gate for chart work.
+
+---
+
+## 70. "Total value" is wrong: cost is being reported as market value (2026-09-28)
+
+Found while closing §69, and it outranks everything still open. Reported by the
+user from the dashboard; the cause is measured, not inferred.
+
+### 70.1 — the symptom
+
+The ten cards sum to **PLN 1,057,924**; the headline says **PLN 797,190**. The
+aggregate is the smaller of the two, which is the opposite of a rounding or FX
+artefact.
+
+### 70.2 — the cause
+
+**75 of 85 open positions have `positions.market_value` NULL** (PROD, measured):
+
+| portfolio | null / open | stored `market_value` | Σ cost | card | live |
+|---|---|---|---|---|---|
+| IBKR | 35/35 | — | 55,665.33 | 283,973.35 | 235,433.41 |
+| Rach. rejestrowy PKO BP | 23/23 | — | 36,500.00 | 56,451.80 | 45,000.00 |
+| IKE Marek | 13/13 | — | 25,814.13 | 91,072.72 | 65,867.46 |
+| Obligacje PKO SA Beata | 2/2 | — | 115,000.00 | 119,240 | **115,000** |
+| NN TFI PPK | 1/1 | — | 76,337.99 | 123,722.33 | **76,337.99** |
+| Equate+ | 1/1 | — | 913.01 | 3,946.55 | 3,991.49 |
+| NN TFI PPO | 0/1 | 173,445.64 | 96,440.71 | 173,445.64 | 96,440.71 |
+| IKE Beata | 0/23 | 154,825.70 | 115,037.32 | 205,208.09 | 154,308.64 |
+
+`services/valuation.ts` `splitPortfolioValue`:
+
+```ts
+const mv = p.marketValue != null ? Number(p.marketValue) : Number(p.quantity ?? 0) * Number(p.averageCostBasis ?? 0)
+```
+
+The fallback is the position's COST, and it is then reported as market value.
+Obligacje's live instruments equal its cost to the złoty (115,000) and NN TFI
+PPK's equal theirs exactly (76,337.99) — PLN funds with no reason to sit on cost.
+For a fund that has grown from ~456 to ~820 per unit, reporting 96k instead of
+173k understates net worth by 77k on that holding alone, and every derived
+figure (return, gain/loss, the §68 headline, the card) inherits it.
+
+### 70.3 — and the mirror-image defect in the snapshot path
+
+Equate+ is the opposite: its card holds 3,946.55 = **cash only, zero instruments**,
+while the live path sees 3,991.49 of SAP SE. The backfill resolved no price at
+all there. So the card can omit a holding the headline counts, and neither
+number is trustworthy alone. This asymmetry is why §63.3's reconciliation has
+never closed.
+
+### 70.4 — what is proven, and what is not
+
+Proven: the fallback exists in code, and it is being taken (two portfolios equal
+their cost exactly). NOT yet proven: **why** `market_value` is NULL for 75
+positions. `refreshQuotes` is the only writer of that column and apparently does
+not reach these symbols; unverified. Fixing the aggregate first would treat the
+symptom, so the upstream question is the first task.
+
+- [x] Find why `positions.market_value` is NULL for 75/85 — which writer should
+      populate it, and why it is not reaching IBKR / Rach / IKE Marek / Obligacje
+      / NN TFI PPK / Equate+.
+- [x] Make both paths resolve market value identically, from prices. One
+      function, one answer (the §68 lesson: drift is what happens when two code
+      paths answer the same question).
+- [x] **Never present cost as value.** With no price, render unresolved per
+      §66.2 rather than silently substituting cost. A missing price must be
+      visible, not plausible. → unpriced positions contribute NOTHING and are
+      counted; the routes log them and the SPA states them.
+- [x] Decide the contract: does `instrumentsValue` require a resolved price, and
+      is a partially-priced portfolio reported at all or flagged? → **Flagged, not
+      hidden.** A partial portfolio is reported with `unpricedPositions` and a
+      visible note, rather than suppressed or silently completed. Suppressing it
+      would make a broken pipeline look like an empty portfolio.
+- [x] Tests: a position with NULL `market_value` and no resolvable price must NOT
+      contribute its cost basis; both paths agree to the cent on a mixed
+      price/no-price portfolio.
+- [x] Then re-run the single backfill and assert Σ cards == Total tile — the §63.3
+      reconciliation, still unproven after all of §66–§69.
+- [x] Separately: the §68 `cashBreakdown` weight formula divided by a net total
+      that can approach zero (EUR +64,898 against USD −45,434 in IBKR), producing
+      weights from −398% to +648%. The user confirms the sign split is real — IBKR
+      converts currency repeatedly without registering it in the sheet — so the fix
+      is a guard on the denominator, not a change to the data.
+      > **Already done by §70.5**, and the reasoning in the code is the right
+      > one: the weight is a share of **GROSS** exposure (`Σ|converted|`), which
+      > is well defined whatever the signs do and always sums to 100%, while the
+      > signed `balance` is still reported unchanged. A guard on the net would
+      > have had to invent a fallback for "net ≈ 0" and every fallback is
+      > arbitrary; a change of denominator is not.
+      > **Now pinned by two tests** (`469` green) against the exact IBKR shape.
+      > They assert the signed balances survive, every weight lands in `[0,100]`,
+      > and the weights sum to 100 — under the old net denominator this fixture
+      > printed **333% and −233%**. The second test covers the zero-cash case
+      > (weight `0`, never `NaN`).
+      > One thing the test had to learn: the sign of a cash row lives on
+      > `amount`, not on `type` — a `WITHDRAWAL` row is stored negative.
+
+---
+
+## 71. A currency is a label that multiplies a number (2026-09-28)
+
+Shipped. Recorded here because §71 is stamped in the code of three repos
+(`portfoliost-instruments`, `portfoliost-wallets`, `portfoliost-sheets-sync`)
+and the numbering must not be reused. Ready to archive to `plan-archive.md`.
+
+Started as a follow-on from §70: the user asked to carry old prices forward,
+recalculate when a close arrives, and *flag serious problems* rather than invent
+a value. The investigation of "why is the chart wrong" turned up four defects
+that all produced plausible numbers instead of errors.
+
+### 71.6 — the data patch, and what is still open
+
+- [x] `CRI.WA` CAD → **PLN**, `SRT.F` GBP → **EUR** (one transaction, 2 rows;
+      `MFC` deliberately untouched — CAD is correct, its trades are USD only
+      because the US variant was bought).
+- [x] `recalcPortfolioHistory` on IKE Marek. It rebuilds through *yesterday* and
+      deletes first, so it dropped the corrupt `09-28` row rather than rewriting
+      it with fallback prices. Series ends `91,072.72`, invested flat `54,548`,
+      and IKE Marek's reconciliation finding closed.
+- [x] `SRT.F` vs `SRT3.DE`: **two share classes ~25% apart**, not two lines of
+      one stock. The stored trades split 2–1, and FIFO leaves the surviving lot
+      as the one `SRT3.DE` reproduces within 0.8% while `SRT.F` misses by 16.4%.
+      Bare `SRT` in the reference is **SRT Marine Systems plc** (LSE), an
+      unrelated company. Override added to `NAME_VENUE_OVERRIDES`; `sheets-sync`
+      v1.0.28 (`7c0290d`).
+- [x] **`Equate+` +118.7%** (stored 3,947.57 vs live 8,635.30). Not a currency
+      > **§72.14 — root-caused: option premium legs entering the historical quantity
+      > grid via their `EXPIRATION` sibling. Fixed and verified in prod in §72.7.**
+      finding. It is a margin account, which is a plausible innocent explanation,
+      but that is a hypothesis and has not been tested.
+- [x] `MFC` was a **known false positive** in `valuation-audit`: a dual-listed
+      ticker bought on the other line. The rule cannot distinguish it from
+      corruption, and leaving it as a permanent red line trains people to skim
+      past real findings.
+      > **DONE 2026-09-30** (wallets `05bec46`, **v1.1.99** deployed, homelab
+      > `084812374`). §72.4's question was "narrow the rule, or record the
+      > exception" — the answer is **neither on its own**:
+      >
+      > *Narrowing* is impossible: a wrong symbol produces the identical
+      > signature (a stored value that no longer matches the live one), so no
+      > threshold, ratio or shape test separates "bought on the other listing"
+      > from "the resolver picked the wrong line". Any narrowing either eats
+      > real findings or guesses at provider conventions.
+      > *Suppressing* is worse than the disease: §71.6's complaint is that a
+      > permanent red line trains people to skim past the report, and deleting
+      > the evidence does not fix that — it removes the basis for ever
+      > challenging the rule.
+      >
+      > So `CROSS_LISTINGS` is a **curated, reasoned list** (each entry justified
+      > against the STORED TRANSACTION PRICES, never a threshold), the finding is
+      > still **emitted** with `classification` + `classificationReason`, and only
+      > `isDefect()` findings fail the run. 6 tests, including that the finding is
+      > not dropped, that `MFCX` does **not** inherit the pass, and that a reason
+      > shorter than 40 characters fails (an unexplained entry is a mistake).
+      >
+      > **Verified by running the real audit in PROD** (`node
+      > dist/scripts/valuation-audit.js` in the wallets pod). It now reports
+      > **exactly one finding**, and it is not MFC:
+      > ```
+      > [valuation-audit] UNFUNDED pf=XTB: 22 trades but no DEPOSIT/TRANSFER
+      > anywhere in the import, and the cash ledger bottoms out at -6.22. …
+      > [valuation-audit] 1 finding(s). Nothing was modified.
+      > ```
+      > That same run is the **first direct evidence that stored and live values
+      > now reconcile**: **zero** `reconciliation-gap` and **zero**
+      > `currency-mismatch` findings across all 10 portfolios at the 2% tolerance
+      > — the check §63.3's reconciliation has been chasing since the fact-check,
+      > run for real and clean. The one remaining finding is §72.32/§72.35's XTB
+      > data gap, which needs a row added to the user's sheet.
+- [x] Pin `instruments` to the `f01e639` comment commit's release (a code comment
+      that records a trap should not sit unpinned).
+      > **Already pinned, and the trap is live in the source, not reverted.**
+      > `homelab/cluster/apps/pfire/portfoliost-instruments/app/helmrelease.yaml:50`
+      > pins **v1.0.84**; `f01e639` is tagged v1.0.77 and is an ancestor of the
+      > commit v1.0.84 was built from, so the comment ships. The trap it warns
+      > about is still live: `price-bars.ts:504-519`, where
+      > `const baseCcy = resolvedBase ?? declared` is the line a future edit could
+      > invert.
+      > **Repo path worth fixing:** the live repo is `~/prv/homelab/homelab/`, not
+      > `~/prv/pfire/homelab/` — the latter is an empty skeleton with no
+      > `cluster/apps/pfire/`. An audit pointed at the wrong path would have
+      > concluded this pin did not exist.
+
+---
+
+## 74. `price-audit` compares order-priced fund trades against the wrong day's bar (2026-09-29)
+
+Promoted out of §72.36, which reached a conclusion and was then retracted (§72.37);
+what survived is a real defect in the audit itself, and it deserves a main section
+rather than a footnote on a wrong theory.
+
+A PPO/PPI fund order is priced at the **NAV of the valuation date**, not the order
+date. The broker's own detail for the flagged row says so in its field names:
+
+```
+Data zlecenia:  07.04.2023   (Good Friday — the market was shut)
+Data wyceny:   13.04.2023
+Cena Jednostki Uczestnictwa z dnia wyceny: 382,05 PLN
+Wartość rejestru po transakcji: 40 264,92 PLN = 105,391757 × 382,05
+```
+
+`price-audit.ts:119` `pickBar()` takes the exact day, else the most recent **prior**
+close within `MAX_CARRY_DAYS` (7). For 2023-04-07 that is 2023-04-06 = 339.47, so
+the audit computes `382.05 / 339.47 = 1.1254`, exceeds `DEFAULT_TOLERANCE` (0.1), and
+reports a mismatch on a trade that reconciled exactly. Carrying *backward* is right
+for an exchange-traded holiday; it is wrong for a fund order priced forward.
+
+This is the `1.126` that §72.19 and §72.20 chased across nine ING Akcji categories
+before §72.23 kept deferring the check. It was never a fund class, a share class, or
+a provider gap. The number is an artefact of the comparison, and every NN TFI trade
+in the dataset is a false positive of the same shape.
+
+The price is correct. **Row 604 of the sheet must not be edited** — two earlier
+sections said to, and both were wrong.
+
+Repos touched: `portfoliost-wallets` only. No provider-tier ordering: this changes
+how the audit reads bars it already has, not how any bar is fetched.
+
+---
+
+### 74.1 — Pin the defect with a failing test before changing anything
+
+> **DONE 2026-09-30** (`f838a71`, wallets **v1.1.100** deployed, homelab
+> `8cbc9563f`). 13 new tests in `price-audit.test.ts`, 483 green.
+
+- [x] `price-audit.test.ts`: a fund trade dated on a non-trading day whose
+      executed price matches a **later** bar must not be reported as a mismatch.
+      The test asserts the defect first, in the audit's own terms:
+      `pickBar` returns `2023-04-06 = 339.47`, and
+      `382.05 / 339.47 = 1.1254` — over the 10% tolerance. Then it asserts the
+      rule: `deviation === null`, `unreconciled === 0`, `orderPriced === 1`.
+- [x] The same trade against a **prior** bar (the current behaviour) is kept as a
+      control, so the fix cannot be satisfied by simply widening every tolerance.
+      → A `SAP.DE` **STOCK** trade at the identical numbers is still reported at
+      +12.5%. Also a mixed-symbol test: one +50% STOCK trade is flagged while a
+      +50% FUND trade on the same symbol is not.
+- [x] Tests: `npx vitest run src/scripts/price-audit.test.ts`.
+      > **13 tests, and one of them earned its keep immediately.** I first
+      > expected `orderPricedNext` to be the bar the price *matches*
+      > (`2023-04-13 = 382.05`). It is the **nearest** bar on each side
+      > (`2023-04-10 = 340.2`). The test was wrong and the code was right:
+      > the audit reports the local range and must **not** claim to know the
+      > valuation date — that is §74.5's open question, and asserting it here
+      > would have been the audit inventing an answer.
+
+### 74.2 — Decide how an order-priced instrument is identified
+
+> **Answered by measurement, which is what the step demanded.** The column is
+> populated:
+>
+> ```
+> asset_type over the whole fleet:
+>   STOCK 1644 · FUND 194 · BOND 107 · OPTION 10 · CRYPTO 5      (no <null> at all)
+> asset_type on *.TFI transactions: FUND 174   (of 174)
+> positions.asset_type for *.TFI:   FUND 6
+> ```
+
+- [x] `price-audit.ts` selects `t.asset_type`; `TradeRow` carries it, so the rule
+      has something to key on rather than inferring from the symbol.
+- [x] **Open question, answered:** `asset_type` **is** `FUND` for every one of
+      the 174 `*.TFI` BUY/SELL rows, and for 1960/1960 rows overall. So the rule
+      is `isOrderPriced(row) => asset_type === 'FUND'`.
+- [x] The `*.TFI` ticker-shape fallback is **not written**, and the reason is
+      worth recording: a fallback that is never exercised is a rule nobody can
+      tell is dead, and a ticker-shape rule is a claim about provider naming
+      conventions dressed up as a classification. A test asserts an unpopulated
+      `asset_type` is *not* treated as order-priced, so the day the column does
+      go sparse the audit stays strict rather than silently going quiet.
+
+### 74.3 — Compare against the valuation-date window, not `executed_at`
+
+- [x] Add `pickOrderPricedBar(bars, date, windowDays)`: the nearest bar within
+      ±`windowDays` in **either** direction, each with its signed offset.
+- [x] Keep `pickBar()` unchanged for exchange-traded instruments. Two functions,
+      one per pricing model, chosen by §74.2 — not one widened tolerance.
+      → Asserted directly: `pickBar(new Map([["2023-04-06", 339.47]]),
+      "2023-04-07")` still returns `{ close: 339.47, carriedDays: 1 }`, and still
+      refuses a bar that is only *after* the trade.
+- [x] The window is a new constant alongside `MAX_CARRY_DAYS`. **It is not a
+      tolerance**, and that is the design decision §74.4 forced: see 74.4.
+- [x] Report the pair as `order-priced` with its date offset, so a human can see
+      *why* a bar was chosen rather than being handed a ratio with no provenance.
+      → A dedicated report block prints, per trade, the executed price and both
+      bracketing bars with their offsets.
+
+### 74.4 — Measure the window instead of guessing it
+
+> **Measured 2026-09-30. The measurement REFUSES to produce a number, and that
+> is the finding.** PROD, every `*.TFI` BUY/SELL, best-matching bar in ±21 days:
+
+```
+trades: 174 · best bar reconciles within 10%: 164
+signed offset:  min -21   p50 3   p90 19   p95 21   max 21
+forward 102 / backward 26 / same-day 36
+```
+
+> **So an order-priced trade is not deviation-judged at all**, and
+> `ORDER_PRICED_WINDOW_DAYS` is an **evidence radius** (21 days) for printing the
+> bracketing bars — not a reconciliation window. Three reasons, in order:
+>
+> 1. **The offsets reach the edge of the search.** 13 trades sit at exactly +21
+>    and several at −21/−20. A pile-up at the boundary means the true offsets
+>    extend beyond it, so the distribution is not bounded where I measured it.
+> 2. **A constant would be a guess about a distribution that is not there.** 21
+>    silences the false positives; anything wider starts pairing a trade with an
+>    unrelated price. The plan's own bar — *"a window that silences the false
+>    positives but also hides a genuine mismatch is worse than the defect"* —
+>    is a statement that this shape of fix is not available here.
+> 3. **"Order-priced" is a fact, not a guess.** A PPO/PPI order is priced at the
+>    valuation date's NAV; the broker's detail says so in its field names
+>    ("Data zlecenia" / "Data wyceny" / "Cena Jednostki Uczestnictwa z dnia
+>    wyceny"). Saying so is a statement about the instrument. A ±N window is a
+>    statement about a calendar we have not pinned down.
+
+> **A measurement I got wrong first, because it is the same mistake the plan
+> warns about three times.** The first version took *every* candidate bar rather
+> than the best one per trade. A fund's NAV is smooth, so many nearby bars match
+> within 10% and the histogram came out flat across the entire ±21 range
+> (4259 rows, uniform) — a clean-looking, completely meaningless answer. Same
+> shape as §72.27's two unpaginated reads and §72.33's shared date window:
+> **a convenient parameter made absent data look present.**
+
+- [x] In prod, for every `*.TFI` BUY/SELL, find the nearest bar to `executed_at`
+      and record the signed day offset.
+- [x] Record the measurement in this step, including the outliers and how many
+      trades fall outside the chosen window.
+      → Recorded above. Outliers: **10 of 174** do not reconcile to any bar
+      within ±21 days at the 10% tolerance. Those are *not* silenced — they are
+      simply not order-priced trades, and if they were misclassified the
+      bracketing bars would make it obvious.
+
+### 74.5 — The two facts that are still genuinely unresolved
+
+- [x] **`INGAKC.TFI` reproduces neither price the broker quotes.** 351.93 on the
+      2023-04-13 valuation date against 382.05 paid; 819.44 on 2026-09-25 against
+      the sheet's own `aktualny kurs` of 876,94. Either the TFI feed is a different
+      series from the one orders execute against, or that manually-maintained column
+      is stale. Until this is answered, do not assume the symbol mapping is correct
+      and do not treat §74.3 as fixing valuation — it fixes the *audit*.
+      > **Half answered, and the first half is settled.** The provider's bar is
+      > **category A, to the cent** — 819.44 on 2026-09-25 against analizy.pl's
+      > 819.44, and 816.76 on 2026-09-29 from bankier.pl. So the TFI feed is *not*
+      > an unknown series; it is a known one, and it is not the one the broker
+      > executes against. The broker is ~12.7% above class A and the gap grows
+      > ~1.2%/yr, which is category **W**'s signature (1.13996 on 2026-09-29).
+      >
+      > The open half is the `aktualny kurs` **876,94**: that column is 7% above
+      > even class W today (931.03), so it is not class A and not class W. It is
+      > a hand-maintained sheet column and it is simply wrong, which is a different
+      > finding from "the feed is the wrong class" and should be reported as one.
+      > **§72.39 owns this one**, in step 1 (done: class A, to the cent) and step 1b
+      > (the two date-matched W readings, still to do). Restating it here as a second
+      > checkbox is what let it drift from §72.38's copy and §72.6's — the same
+      > question in six sections is how it survived three contradictory retractions.
+      > §72.39 step 4 also carries the `aktualny kurs` fix itself, so nothing is
+      > tracked in two places.
+- [x] **Why is `EUR` absent from `instruments.fx_rates`** while 20+ other currencies
+      are stored directly with history to 1999-01-04? EUR→PLN resolves, so it is
+      cross-derived and not broken — but EUR is the most-used transaction currency
+      in this dataset, and it is the one currency not stored. Establish whether
+      that is deliberate (PLN base + a deliberately reduced currency set) or an
+      oversight in the FX importer's currency list.
+      > **This is §72.36's question, already answered and pinned** — the answer
+      > is *deliberate*, and re-asking it here is what let a settled item sit open
+      > for a session. `TRACKED_CURRENCIES` (`fx-import.ts:10-14`) lists 30
+      > currencies and no EUR, because `importHistory` and `syncDaily` both fetch
+      > with `base=EUR`: a stored row means "1 EUR = N ccy", so a EUR row would be
+      > the constant 1. Pinned by four tests in `fx-import.test.ts:94-130`, one of
+      > which asserts the *semantics* (no EUR row is ever written, and PLN lands
+      > at ~4.3, not ~0.23) so a future change of base cannot pass silently.
+      > Commit `9ad8d28`. The lesson: a question answered in one section and
+      > restated in another is two items, and the second one drifts.
+
+### 74.6 — Close the loop in prod
+
+> **RUN FOR REAL 2026-09-30** on `wallets v1.1.100`, in the PROD pod.
+
+- [x] `price-audit` re-run; confirm the NN TFI false positives are gone.
+      > **Gone.** The run reports **192 order-priced fund trades across 12
+      > symbols** as evidence rather than findings — and among them the exact row
+      > this section is about, printed with the bars that produced the 1.126:
+      > ```
+      > INGAKC.TFI 2023-04-07 NN TFI PPO: 382.05 PLN
+      >   · prior bar 2023-04-06 339.47 (-1d)
+      >   · next bar 2023-04-11 344.32 (+4d)
+      > ```
+      > The whole NN TFI family is in that block — `INGAKC.TFI`, `INGOBL.TFI`,
+      > `NNEP25/30/60/65.TFI` — i.e. the false positives the plan says were
+      > "every NN TFI trade" are 192 trades that are now explained rather than
+      > reported.
+- [x] Confirm no previously-clean symbol is now flagged, and that the `SAP.DE`
+      finding §72.18 shipped against is still resolved.
+      > **`SAP.DE` is not in the flagged list.** §72.18's option-premium-leg skip
+      > still works (the run reports "5 option premium leg(s) skipped").
+- [x] Then close §72.37's audit item, §72.22's re-read item, §72.23's decisive
+      check, and §72.4's "run it for real" — they are the same outstanding run.
+      > **The run is done**, and its output is now readable in the pod without
+      > kubectl (§72.22's log route shipped in §72.22 itself). §72.4's
+      > "run it for real and record the findings" is satisfied by the transcript
+      > below; §72.23's decisive check is *answered* in §74.5's terms — the
+      > executed price is right, and what is unexplained is the series, not the
+      > cell.
+- [x] `positions.company_name` still reads "Goldman Sachs Akcji", inherited from the
+      stale sheet name. Cosmetic, and it is what made this look like a wrong-fund
+      problem for several passes. Fix with §72.39 step 4.
+      > **Still open** — a `sheets-sync` resolver mapping, and §72.38 says the
+      > mapping itself is "exactly what is in question". Left alone deliberately.
+- [x] Commit.
+
+#### What the run found that §74 did not predict
+
+The remaining **28 flagged symbols** are now **100% cross-currency comparisons**,
+and every one of them has the same shape — 10–15%, with the audit's own
+conversion noted in brackets:
+
+```
+ASML    4/6 off · worst -14.4% · bar ccy EUR vs position USD
+  2022-03-18 IBKR: trade 660.96 USD vs bar 679.86 (-14.4%)  [660.96 USD → EUR at that day's rate]
+DTLA.L  3/3 off · worst -12.9% · bar ccy EUR vs position USD
+IUFS.L  4/4 off · worst -12.6% · bar ccy EUR vs position USD
+MLPD.L  2/2 off · worst -12.3% · bar ccy EUR vs position USD
+YUMC    2/2 off · worst  13.5% · bar ccy USD vs position EUR
+```
+
+A trade paid in USD on a EUR- or GBP-quoted instrument, converted **at the trade
+date's rate** by the audit, still lands 10–15% out — and consistently in the same
+direction per symbol. A single day's FX move cannot be 12%, so this is a
+**systematic** residual in the conversion, not market noise.
+
+**This is a new finding and it is NOT diagnosed here.** §72.4's standard for a
+flagged symbol is that it gets an override, a currency fix, or a recorded false
+positive with the reason — never a threshold bump — and picking among those needs
+one more measurement (whether the residual tracks the stored `exchange_rate` the
+import applied, or the date-shifted rate). Recorded as open work rather than
+guessed at, because a 12% number with four plausible explanations and no
+measurement between them is exactly the kind of thing this plan has already
+retracted twice (§72.36, §72.37).
+
+Also measured by the same run: **23 symbols have no bars at all** and are
+reported as *unverified, not clean* — the 8 Polish government bonds §72.33
+identified, plus `MPW`/`WBA` (delisted, correctly), plus the `.TFI`/ETF symbols
+whose bars the grid could not serve.
+
+---
+
+## 75. Six chart e2e specs fail: the seed's `value_snapshots` insert has been a no-op since §46.4 (found 2026-09-29)
+
+Proposal: — (found while running §57's gate; no proposal doc).
+
+`npm run test:e2e` fails 6 specs, all of them charts, and all of them for one
+reason. Reproduced identically on a clean tree (stash + rebuild + full run), so
+it is **not** a §57 regression — but it is a red suite and it gets fixed here
+rather than written off.
+
+The six: `chart-currency.spec.ts:135`, `chart-recompute.spec.ts:13`,
+`combined-chart.spec.ts:11` and `:19`, `parity-portfolios.spec.ts:53`,
+`performance-display-currency.spec.ts:39`.
+
+### 75.1 — The cause, measured
+
+`mocks/db-seed/portfolios.mjs:127` inserts the seeded value snapshots through
+
+```js
+for (const s of snapshots.length ? [] : []) {
+```
+
+which iterates an empty array — **zero rows are ever inserted**. `seededSnapshots()`
+sits right above it, generating 48 rows, and the completion log printed
+`48 snapshots` (the *generated* count, not the inserted one), so the no-op was
+invisible in the seed output. `git log -S` dates the line to `68de01c`
+(2026-09-21, §46.4) — it has never worked.
+
+Measured on the compose stack: `portfolios.value_snapshots` holds **1** row for
+the seeded Top10 portfolio, dated today, written by an e2e test's recompute —
+not by the seed. And wallets answers
+
+```
+GET /api/portfolios/3cb589d8…/analytics?timeframe=ALL
+  → {"backfillStatus":"pending","performance":{"timeSeries":[], …}}
+```
+
+`portfolios.ts:740–746` marks a portfolio pending when it has `< 2` snapshots
+**and** `hasBackfillableHistory()`; a pending portfolio makes the whole
+`/api/portfolios/merged` response an empty series (`portfolios.ts:767–779`), so
+the combined chart block never renders (`InvestmentsView.vue:373` is
+`v-if`'d on a non-empty `timeSeries`).
+
+**Why it passed before and broke now.** §72.7 (wallets, 2026-09-28) removed the
+`runBackfill` that these GET routes used to fire — deliberately, because a GET
+was mutating state and was downgrading queued recalcs. That call was papering
+over the broken seed: loading the dashboard used to backfill Top10 and populate
+the snapshots, so the charts worked. With the GET-side self-healing gone, the
+fixture is the only thing that can supply the series, and it supplies nothing.
+`performance-display-currency.spec.ts:66` ("Top10 has a populated 1Y series")
+was already the regression guard; it had nothing to assert against.
+
+Not a gateway problem, though it looks like one: the same request against the
+example-service mock on `:4010` returns 11 points, but `/api/portfolios*` is routed to
+the real `wallets` service (gateway `default.conf`) — and wallets is the service
+with the empty series.
+
+The six are **not** all this one cause. Five are. `chart-currency.spec.ts:135`
+is a stale test: once the series existed it got past the empty chart and failed
+on `usd.closes[native.length - 1]` = `undefined`. That one is §75.3.
+
+### 75.2 — Fix the fixture, and make it impossible to no-op again
+
+- [x] `mocks/db-seed/portfolios.mjs`: insert what `seededSnapshots()` produced —
+  the `for…of` iterates `snapshots`. Snapshot columns stay
+  `(portfolio_id, snapshot_date, value, invested, net_flow)`.
+- [x] Anchor the window to **today** instead of the hardcoded
+  `2026-08-01…2026-09-18`: 48 daily rows ending today (49 inserted, measured
+  `2026-08-12…2026-09-29`). The hardcoded window was already 11 days stale when
+  found, and it silently expires out of the `1Y` timeframe the specs query —
+  the same class of rot `reset-mock-state.sh` already calls out for
+  `pricebars-sim`. The seeded transactions stay at `2026-08-02`; a snapshot
+  history that starts after the funding date is consistent, and it is what makes
+  `n >= 2` resolve `complete`.
+- [x] Log the **inserted** row count with its date range, not the generated one,
+  and throw if `snapshots.length === 0` — a fixture that silently seeds nothing
+  must not be able to report success again.
+- [x] Tests: `docker compose build mock-db-seed` first — **`reset-mock-state.sh`
+  does not build it**, and `docker compose run --rm mock-db-seed` silently reuses
+  the old image, so the first attempt after this fix still seeded zero rows. Then
+  `bash scripts/reset-mock-state.sh`, then
+  `SELECT count(*) … FROM portfolios.value_snapshots` = 49, and
+  `combined-chart` / `chart-recompute` / `parity-portfolios` /
+  `performance-display-currency` green.
+- [x] Full gate: `npm run build`, `npm run test` (431), `npm run test:mock` (227),
+  `npm run test:e2e` — **106 passed, 0 failed, 1 skipped**: the first fully green
+  e2e run of this stack.
+- [x] Commit; then continue §57.2.
+
+### 75.3 — `chart-currency.spec.ts:135` asserted a response shape §72.17 deleted
+
+- [x] The test indexed both series at one index
+  (`usd.closes[native.length - 1]`), expected an unconverted head
+  (`firstConverted > 0`) and expected the §48.5a caveat line to render.
+  Measured on the same window: native `?from=2015-09-29&to=2026-09-29` →
+  **5664** bars; the same window plus `&currency=USD` → **44**. `undefined` in,
+  `NaN` out.
+- [x] The service is right; the test is stale. `conversionJoinSql`
+  (`portfoliost-instruments/src/services/price-bars.ts:152`) filters on
+  `hasRates`: *"§72.17 — when a conversion was actually asked for, a bar that
+  cannot be converted is dropped rather than passed through in the source
+  currency."* plan-archive §72.10 is titled "a converted series must not contain
+  another currency". The SPA already matches — `windowStartIso` is the first
+  **visible** bar, so with nothing unconverted left `fxCaveat()` returns null and
+  no caveat renders (verified live: the string is absent from the page). Making
+  the service emit an unconverted head again would reintroduce the defect §72.17
+  closed.
+- [x] Test rewritten to the current contract: the converted series is a strict
+  subset of the native dates; **every** returned bar equals the native close for
+  the same date × `DEMO_FX.USD / DEMO_FX.PLN` (matched by date, not index — the
+  arrays differ in length and `price_bars_all` can carry two sources per date);
+  `fxFrom` is the first row of the response; the first converted date is later
+  than the first native date; and the "earlier bars in …" caveat is absent.
+
+**Not in scope:** the `merged` route's all-or-nothing pending rule (one
+mid-backfill portfolio blanks the whole dashboard series) and the
+`E2E …`-named portfolios that tests leave behind with a single snapshot. Both
+are wallets-side design questions, not fixture bugs; recorded here so they are
+not rediscovered from scratch.
+
+### 75.4 — A latent e2e race that §61 exposed (found 2026-09-30)
+
+**Recorded because I nearly got this backwards, and the wrong answer was the
+one I was about to write down.**
+
+After §61's final `test:e2e`, one test failed:
+`portfolios.spec.ts:226 edit position opens a transaction list editor with rows
+and add row` — expected 2 `tbody tr`, got 3.
+
+My first move was to call it the `portfolios.spec.ts` flakiness §67.1 already
+documents. Then I checked, and found my "baseline" run was not a baseline:
+`git stash -u` had **nothing to stash** (the tree was already clean, everything
+committed), so I had re-run my own commits and concluded "reproduces on the
+unmodified tree". Checked out the real pre-session commit `e85a241` instead:
+**18/18 green**, so it *was* mine. Nearly filed a pre-existing-flake note over a
+regression.
+
+**The cause.** The dialog renders its `Loading...` row *inside the same
+`<tbody>`* as the real rows. The test counted `tbody tr` to get `rowsBefore`,
+and the assertion immediately above it —
+`expect(dialog.getByRole("columnheader", { name: "Total Cost" })).toBeVisible()`
+— is on the `<thead>`, which is always visible and waits for nothing. It looked
+like a readiness check and was not one. So `rowsBefore` could be the placeholder.
+
+**Why §61 exposed it and not a bug in §61.** §61.9's `TickerBadge` adds one
+`/api/logos/…` image request inside each form dialog, which shifted the dialog's
+first paint far enough for the count to land before the body loaded. The
+application was correct throughout.
+
+**Fixed in the test, not by widening anything** — an explicit
+`await expect(dialog.getByText("Loading...")).toHaveCount(0)` before counting.
+114 e2e green afterwards.
+
+**The lesson, which is the reason this is in the plan:** *verify the baseline
+before blaming the fixture.* A clean tree is not a baseline, and "this spec is
+known flaky" is a conclusion, not a starting point. §67.1 recorded the
+flakiness, which made the wrong answer feel available and attractive.
+
+---
+
+---
+
+## 68. Cash as a first-class citizen in the headline: Cash / Instruments / Total / Invested (2026-09-27)
+
+Follows §66 (never guess a currency) and unblocks §63.3, whose reconciliation item
+has been open since the fact-check. The four headline figures the user asked for:
+
+- **Cash value** — the cash balance
+- **Instruments Value** — positions only
+- **Total Value** — cash + instruments (**confirmed by the user**: cash is a
+  first-class citizen, so Total includes it)
+- **Total Invested** — the value of cash inflow / outflow / **transfer**
+  (confirmed by the user: transfers are part of the definition, not excluded)
+
+### 68.1 — What the numbers are today, measured (not inferred)
+
+PROD, 2026-09-27, all 10 portfolios PLN:
+
+| figure | PLN | where it comes from |
+|---|---|---|
+| Σ `portfolio.currentValue` | **1,380,487** | **includes cash** — Crypto's 887.74 value *is* its 887.74 cash; Rach. rej. 47,956 positions + 8,500 cash = 56,456 |
+| Σ cash | **345,228** | `totalCash` = 90,046.10 in the aggregate base (USD) |
+| headline "Total Value" | **1,035,259** | 1,380,487 − 345,228 → **today's headline is really Instruments Value** |
+| Σ `totalInvested` | 1,040,416 | net external flow |
+
+So the ambiguity is precise: **`total-metrics.totalValue` excludes cash while
+`portfolio.currentValue` includes it.** The cards and the headline are summing
+different things, which is the whole of §63.3's 345,228.04 discrepancy — the
+figure is exactly the Cash card (PLN 345,228.05).
+
+`totalCash` and `cashBreakdown` already exist on the response (`openapi.yaml`
+`PortfolioTotalMetrics`) and are correct. `instrumentsValue` does not exist
+anywhere, and there is no per-portfolio cash/instruments split on the card either.
+
+### Design decisions (resolved 2026-09-27)
+
+- **Total includes cash, everywhere** — tiles *and* the chart value line. There is
+  no longer a question of whether the headline includes cash; the only remaining
+  freedom is how prominently the cash *component* is shown (its own tile and its
+  own series), which is a display choice, not a definitional one.
+- **Total Invested includes transfers** — verified that
+  `externalCashInvested` already sums every cash row with no type filter, so no
+  code change is needed; only the description and the per-portfolio caveat in
+  §68.2.
+
+---
+
+---
+
+## Session summaries and blockers (removed from plan.md 2026-10-01)
+
+These are records of shipped work, not pending steps, so they do not belong
+in the live plan. Kept here for the operational notes, which are not
+recoverable from the sections themselves.
+
+## Where this stands (2026-09-30)
+
+**Shipped and verified in PROD this session** — each with its own commit, its own
+release, and evidence taken from the running service rather than from the test:
+
+| § | what | how it was verified |
+|---|---|---|
+| 60 | Research "Go back" returns to the origin page | 5 e2e, then **verified in PROD**: all three origins round-trip and `from` survives a tab switch |
+| 61 | `TickerBadge` at every ticker surface (11 steps, 4 repos) | 463 unit · 227 mock · 114 e2e · live profile/peers return the new fields · parity on `app.example-service.ai` · **every surface swept in PROD**, which found 2 bugs now fixed (`(OTHER) Bond`, 37/50 bare news cards) |
+| 63.5 | Extreme-jump guard on the overflow write | the deployed image refuses a 100× bar, passes a real 1:10 split, 0 false positives on 4 live symbols |
+| 63.11 | Edge auth for browser traffic | `cachest` + `openst` 302 to oauth2-proxy; a live `snapshotsync` Job then ran `ok=10 failed=0` |
+| 63.14 | `formatCurrency`'s USD default | already removed by §66.2; the two named cases are now tests |
+| 63.15 | Prune orphaned price bars | 25 unit; dry run in PROD against the real referenced set (`--apply` needs the user) |
+| 70 | `cashBreakdown` weight guard | already done by §70.5; now pinned against the exact IBKR shape (old formula: 333% / −233%) |
+| 71.6 | `MFC` cross-listing | classified, still reported; a real PROD audit now prints **1** finding, and it is not MFC |
+| 72.4 / 72.22 | price-audit run for real | 1191 trades, 28 flagged, `SAP.DE` clear, findings recorded in §74.6 |
+| 72.24 | `fx_rates` history | 30 currencies × 7103 rows, 1999-01-04 → today; the one empty day is Good Friday |
+| 72.36 | EUR absent from `fx_rates` | deliberate — `base=EUR` means a EUR row is 1 by definition; now pinned by 4 tests |
+| 74.1–74.6 | Order-priced fund audit | 13 new tests; PROD run shows the 192 fund trades explained with evidence, `SAP.DE` still clear |
+| 75.4 | A latent e2e race §61 exposed | fixed in the test, 114 e2e green |
+
+**Three things this session established that are worth more than the code:**
+
+1. **Stored and live values now reconcile.** A real `valuation-audit` run in PROD
+   reports **0** `reconciliation-gap` and **0** `currency-mismatch` findings
+   across all 10 portfolios. That is the check §63.3 has been chasing since the
+   fact-check, run for real and clean.
+2. **The `1.126` is finished.** It was never a fund class, a share class or a
+   provider gap — it was the audit comparing an order-priced fund trade against
+   the wrong day's bar. §74 closed it, and §74.4's measurement then *refused* to
+   produce a window constant, which is the more useful outcome: a guess would
+   have hidden genuine mismatches.
+3. **Two plan items were answered by a code comment, not by code.** EUR's
+   absence from `fx_rates` and `formatCurrency`'s "USD" default were both
+   deliberate and both already fixed. Both are now pinned by tests, because a
+   test is the durable form of a comment for anyone who has DB access and not
+   source access.
+
+**Blocked on the user** (cannot be self-served):
+
+- **`price_bars --apply`** deletes 85,689 rows in PROD. Tool shipped, dry-run
+  measured, the decision is the user's.
+- **Sheet rows**: §65's Gotówka reconciliation, §72.35's XTB opening deposit
+  (`Wpłata 2716,60 PLN` — the exact row is specified in that section). Both are
+  data the user owns.
+- **§72.35 bond pricing** — the user already decided to accept the partial sum.
+
+**No longer blocked** — the Pocket-ID login item is gone. The user re-established
+the session on 2026-09-30, so §60.4 and §61.11 were both verified in a signed-in
+PROD tab and both sections are now archived. Two operational notes from doing it:
+
+- A **401 or a guard redirect silently destroys the session** — `/en/admin/*`
+  bounced to `/login` and wiped `localStorage.portfoliost_token` twice. Reach
+  `/en/admin/*` via the nav link, not a direct URL, and re-check the token before
+  concluding anything about a surface.
+- The admin **System** page (`/en/admin/system`) lists the *running* image tag per
+  service, which is a usable rollout check when the k8s API is unreachable — and
+  is how openst `v1.1.41`, instruments `v1.0.84` and wallets `v1.1.103` were
+  confirmed. It reports the Deployment's desired image, so treat it as a hint and
+  confirm with a **functional** check (a fresh `priceAsOf`, a changed response)
+  before calling anything verified.
+
+---
+
+---
+
+---
+
+## 63. Portfolio value correctness: unified live valuation, recompute reliability, cash-included charts (user request 2026-09-25)
+
+Post-§62 PROD verification exposed that portfolio **value** is computed by
+two divergent, both-wrong paths, and that the recompute button silently no-ops:
+
+- **Chart / analytics** = `value_snapshots.value` = Σ qty × `price_bars.close`
+  (+ cash). Openst history quotes are 10–70× off for several held symbols
+  (CSN.L £363 vs £5 cost, RIO.L £7 199, BYG.L £820, SAP.DE cost basis €1.16 vs
+  quote €184) → IKE Marek snapshot 2 300 732 vs true ~100k.
+- **Headline "Total Value"** = Σ `positions.market_value`, which is **stale/0**
+  (no live quote at last import) → falls back to `qty × avgCostBasis` → reads
+  ~755k (cheap).
+- **Recompute** `POST /api/portfolios/:id/recompute` is fire-and-forget with
+  `.catch(() => undefined)` — it fails silently (no logs, no value change).
+
+User spec (2026-09-25): cash = uninvested (free) cash per the **Gotówka sheet**
+(traces free cash on brokerage accounts), multi-currency; Gotówka is a
+*reference*, the same values must also be **derivable from inflows/outflows
++ transactions**; a funded buy (AU=1) is one inflow + immediate buy; the
+performance/consolidated charts must show **positions + cash** over time.
+
+Rules: one step = one commit; step `[x]` only after its tests pass (unit +
+docker-compose level). Provider tier first (openst/cachest) for the bad
+quotes — §63.5 is gated on reproducing the bad symbol's provider response.
+
+---
+
+### 63.2 — Wallets: one live valuation path for headline + charts (single source of truth)
+
+> **Re-verified against the source 2026-09-30, and NOT closable as written.** The
+> last commit (`c39c414`) says "§63.2 closed by a single writer" and plan-archive
+> §76.4 says the same, so this section sat here looking finished. Checking it
+> against the code found **the closure rests on two claims that are no longer
+> true**, and a third that was never implemented. Recording them here rather than
+> ticking five boxes is the point: a section closed by a commit message is not the
+> same as a section closed by the code.
+>
+> **What actually holds.**
+> - *One writer per (portfolio, date)* — **true and enforced.** `snapshotPortfolioValue`
+>   (`quotes.ts:481-580`) no longer persists; the only writers of `value_snapshots`
+>   are `backfill.ts:1021` and `backfill.ts:1071`.
+> - *No cost presented as value* — **true.** `splitPortfolioValue` drops a
+>   `marketValue == null` row and increments `unpricedPositions`
+>   (`valuation.ts:81-88`), with the §70 comment stating the rule. `avgCostBasis`
+>   is still selected on the `total-metrics` query (`portfolios.ts:296`) but is
+>   never used as a value fallback; its only remaining use is the unrealized-PnL
+>   denominator in `/summary-metrics` (`portfolios.ts:1065-1067`).
+> - *`priceSource` marked* — **true** (`portfolios.ts:359`, `dominPriceSource`).
+> - *The two paths agree* — **true, and pinned** by `backfill.test.ts:1102`
+>   ("snapshotPortfolioValue equals computeSnapshotBatch for the same day").
+>
+> **What does not hold.**
+> 1. **"The same live price source" is equivalence by test, not shared code.**
+>    plan-archive:11918-11920 says `splitPortfolioValue` "is shared by
+>    `snapshotPortfolioValue` and the backfill". It is not: `backfill.ts` imports
+>    nothing from `valuation.js` and computes its own `totalValue += qty * price`
+>    inline at `backfill.ts:961` plus `cashDay` at `:972`. The two agree today and
+>    §68's own rule — *"drift is what happens when two code paths answer the same
+>    question"* — says a test is the only thing standing between them and a future
+>    edit to either. This is the same rule §63.2 was written to enforce, so the
+>    item is not satisfied by having reached the right answer.
+> 2. **`current_value` is not refreshed on the quotes pass — the archive says it
+>    is.** `quotes.ts:20` still *imports* `syncCurrentValueFromSnapshots`, but the
+>    only other occurrences in the file are two comments (`quotes.ts:426`, `:437`)
+>    describing a call that no longer exists. `current_value` is now written only
+>    from `backfill.ts:1036`, `:1119`, `:1194`. plan-archive:11945-11948 claims a
+>    recompute "ends with `refreshQuotesUnlocked` → `syncCurrentValueFromSnapshots`";
+>    the chain runs, but it syncs the row the **batch** wrote from bars, not the
+>    live quote. The column is refreshed on recompute and on the cron; it is not
+>    refreshed on the quotes pass.
+> 3. **"Fallback to the latest `price_bars` close" was never built, and the code
+>    says so on purpose.** `quotes.ts:357-374` pushes `p.marketValue ?? "0"` with
+>    `priceSource = "fallback"`; nothing fetches a bar close. §70 decided the
+>    opposite of this item — an unpriced position contributes **nothing** and is
+>    *counted*, because "a missing price must be visible, not plausible". So this
+>    half of §63.2 is superseded by §70, not outstanding.
+>
+> **Also missing, and the one thing here that is a genuine test gap:** no test
+> asserts `/total-metrics` `totalValue` equals the latest `value_snapshots` row.
+> What exists is `portfolio-transactions.test.ts:1943` (headline = Σ rows) and
+> `backfill.test.ts:1102` (path-vs-path equivalence) — neither compares the
+> headline to the stored chart point, which is the comparison a user is making
+> when they add the cards up.
+
+- [x] `portfoliost-wallets`: **one writer per (portfolio, date)** — done by §76.4,
+      and enforced rather than ordered: `computeSnapshotBatch` owns every date
+      including today, and `snapshotPortfolioValue` no longer persists
+      (`quotes.ts:481-580`).
+      > Verified against the source 2026-09-30: the only writers of
+      > `value_snapshots` are `backfill.ts:1021` (`_runBackfillCore`) and
+      > `:1071` (`recalcPortfolioHistory`); `snapshotPortfolioValue`
+      > (`quotes.ts:481-580`) returns a value and ends without an insert. The box
+      > disagreed with its own note, which is the drift this sweep has been
+      > removing everywhere else.
+- [x] `portfoliost-wallets`: headline `totalValue` and `value_snapshots` derive
+  position value from the **same** price source, and never present cost as value.
+  > Not satisfied by *sharing* `splitPortfolioValue` — the backfill has its own
+  > arithmetic (`backfill.ts:961`) and the two are held in agreement only by
+  > `backfill.test.ts:1102`. The intent (never a cost value, one answer) is met;
+  > the mechanism (one function) is not, and §68's rule is explicit that the
+  > mechanism is the point. Carried below as its own item.
+- [x] **One composition rule for both valuation paths.** Wallets `f1b303e`:
+      `composePortfolioValue` in `valuation.ts`, called by `splitPortfolioValue`
+      and by `computeSnapshotBatch`.
+      > **The item as written below was not achievable, and the reason is worth
+      > keeping.** It said "make the backfill call `splitPortfolioValue`". It
+      > cannot: the live path receives a market value in each position's **own
+      > instrument currency** and converts it per row, while `computeSnapshotBatch`
+      > receives closes that `fetchPriceSeries` has **already converted into the
+      > portfolio's base** (§48.3). It has no instrument currency to convert and no
+      > market value per day, so collapsing the two would have meant re-deriving
+      > one path's inputs inside the other.
+      >
+      > **What was genuinely duplicated is everything *after* a per-row number
+      > exists**, and that is now one function: a held-but-unpriced row
+      > contributes 0 and is counted (§70), `totalValue` is the sum by
+      > construction (§68), and cash is added last and never clamped (§62 — a
+      > margin account nets negative). Three rules, written twice, free to drift.
+      > The backfill's version of the first was a bare `continue`, which produced
+      > the same number with no way to say why.
+      >
+      > Two things deliberately **not** done, commented at the call site:
+      > `splitPortfolioValue` is not imported into `backfill.ts` (an
+      > unused-looking import of the obvious function invites the wrong refactor),
+      > and the shared call's `unpricedPositions` is not used for the abort guard
+      > (§72.31 separated `unpricedLastDay` for exactly that reason — folding
+      > mid-window gaps into `isUnpriceable` made a healthy portfolio look
+      > unpriceable and would have destroyed bond-heavy history).
+      >
+      > 6 new tests state the rule directly, including that it does not round
+      > (§53.6 asserts 7dp agreement, and rounding in here broke it once). The
+      > existing `backfill.test.ts:1102` equivalence test is untouched and still
+      > passes — it is the end-to-end statement the unit tests cannot make.
+      > 506 green.
+- [x] `portfolios.current_value` is refreshed from positions + cash on recompute.
+  > `backfill.ts:1036`, `:1119`, `:1194` call `syncCurrentValueFromSnapshots` after
+  > the batch writes, and the twice-daily `snapshotsync` cron runs
+  > `runBackfillRecent`, so the column tracks the newest snapshot on both paths.
+- [x] ~~`current_value` is refreshed on the quotes pass too.~~ **Withdrawn, and the
+  archive corrected.** §76.1 made reads calculate nothing and §76.4 made the batch
+  the single writer; a second writer on the quotes pass is the exact race §63.2
+  was opened to remove. §76.4 supersedes this half. What it leaves behind is real
+  and is item 4.
+- [x] **Remove the dead import and the two comments in `quotes.ts` that assert a
+      call chain which no longer exists** (`:20`, `:426`, `:437`). They are how
+      plan-archive:11945-11948 came to be wrong: the archive cites this file, and
+      this file now describes a chain that was deleted. A false comment about a
+      writer is worse than no comment — it is what makes the next reader believe
+      two writers exist.
+      > Done in wallets `08cb96b`. The comment now says the live quote writes
+      > nothing here, and names the three real `syncCurrentValueFromSnapshots`
+      > call sites so the next reader is not sent looking for a fourth.
+- [x] Tests: a portfolio's headline `totalValue` equals the latest
+      `value_snapshots` row (positions + cash) when quotes are fresh.
+      > wallets `08cb96b`, 3 cases, 500 green. The load-bearing one is not the
+      > equality: it is that an unpriced position contributes **0** and lands in
+      > `unpricedPositions`, where the cost-basis answer would have been 9000.
+      > The third case is the half-priced portfolio — a symbol that quoted
+      > yesterday and lost its quote today must report the priced half and flag
+      > the rest, not silently complete.
+      >
+      > Two things the tests had to learn, both now in the file. `POST /positions`
+      > writes a BUY and a BUY is a **cash outflow** (`cashLedger.ts:61`), so a
+      > portfolio that deposited 1500 and bought 1000 holds 500 — my first draft
+      > asserted 2500 and appeared to catch a bug that does not exist. And an
+      > all-unpriced portfolio legitimately reads **negative** (−9000: the money
+      > went out, no instrument came back), which looks like a defect until you
+      > know the buy consumed the cash.
+- [x] Tests: an unpriced position contributes **nothing** and is counted in
+      `unpricedPositions` — the §70 rule, asserted in the shape §63.2 asked for.
+      > Same commit, second case. `valuation.test.ts:46-100` covers the exclusion
+      > at the function level; this pins it at the route, where the number a user
+      > reads is actually produced.
+- [x] ~~Fallback to the latest `price_bars` close when no quote exists.~~
+      **Superseded by §70** — an unpriced position is reported unpriced, not
+      substituted. Ticked so it stops reading as outstanding; the rationale is
+      > the note, the state is the box.
+- [x] Tests: `npm run build`, full `vitest` green.
+      > 506 green, build clean.
+- [x] Commit.
+      > `08cb96b` (dead import, false comments, the headline-vs-chart tests) and
+      > `f1b303e` (`composePortfolioValue`). **§63.2 is now closed** — every box
+      > either shipped or is struck as unachievable-as-written, with the reason
+      > recorded. It can go to `plan-archive.md` on the next closeout sweep.
+
+### 63.3 — Wallets: cash included in consolidated + per-portfolio performance series
+
+- [x] **Verified broken 2026-09-27 — three headline numbers that do not
+      reconcile.** The per-portfolio *cards* include cash; the page *headline*
+      does not, and the API's `total-metrics` reports a third figure in a
+      different currency. Measured in PROD:
+
+      | surface | value |
+      |---|---|
+      | Σ the 10 portfolio cards | PLN **1,380,487.34** |
+      | less the Cash card (PLN 345,228.05) | PLN 1,035,259.29 |
+      | "Total Value" headline | PLN **1,035,259.30** ✓ |
+
+      So the headline is positions-only while the cards are positions + cash.
+      Separately `/api/portfolios/total-metrics` returned `totalValue` **196,514.50**
+      on one call and **270,027.49** on the next (~1 min apart, then stable),
+      with `Crypto` at `totalValue: 0, returnPercentage: -100` while its own card
+      correctly read `887.74 / +1.65%` and the snapshot says 887.74 PLN.
+  - [x] Pick one definition for "total value" (positions + cash) and make the
+        headline, the cards, and `total-metrics` all read it from the same place.
+        > **Done by §68/§70.** The route now computes
+        > `totalValue = totalInstruments + totalCash` from the same per-portfolio
+        > `splitPortfolioValue` that produced each card's split, so the headline
+        > and the breakdown cannot disagree by construction (the old code summed
+        > a raw total that could sit a cent off `instruments + cash`).
+  - [x] `total-metrics` is **not deterministic** — two calls a minute apart
+        disagreed by 73,513. Find which input is not cached/stable; a headline
+        that flickers is worse than a wrong one, because it cannot be reasoned
+        about.
+        > **This was never a measurement problem — it was a measurement *blocker*
+        > being mistaken for one.** The item was parked on "needs a browser
+        > session", so the fix looked like a PROD capture. But the requirement is
+        > a *property*, and a property can be asserted: wallets `345bd8a` asserts
+        > two consecutive calls are **byte-identical**, and still identical after a
+        > portfolio read — the call that used to trigger the write behind the
+        > flicker.
+        >
+        > **Both pass.** `toBeCloseTo` would have passed a headline that rounds
+        > differently between calls, which is the same defect at a smaller scale,
+        > so the assertion is on the raw response text.
+        >
+        > The second test is the one that earns its keep: it asserts
+        > `positions.market_value` / `price_as_of`, `portfolios.current_value` and
+        > `value_snapshots` are all **untouched** by a read. Whatever the 73,513
+        > swing was, it required this route to move stored state between calls, so
+        > a future edit that reintroduces a write fails even when the two calls
+        > happen to agree.
+        >
+        > **What is *not* claimed:** the original cause. §76.1 made reads pure and
+        > §76.4 left one writer per (portfolio, date), so the read-path refresh
+        > that used to run behind this route is the plausible mechanism — but that
+        > is an inference from the code, not a reproduction, and it is recorded as
+        > one. The verified part is that the property holds and is now pinned.
+  - [x] **The end-to-end number needs a browser session.** What IS established
+        from the database (measured 2026-09-30, all 10 portfolios PLN):
+        >
+        > ```
+        > SUM portfolios.current_value  : 1,060,929.73
+        > SUM portfolios.total_invested:   735,446.41
+        > cards reporting 0 value  : (none)    <- §63.3's Crypto 0/-100% is fixed
+        > open positions          : 99
+        >   with NULL market_value: 0           <- §70.2's 75/85 NULL is fixed
+        > ```
+        >
+        > `total-metrics` itself needs a user JWT — `POCKETID_ISSUER_URL` forces
+        > strict validation in the cluster, so it cannot be called from a pod. I
+        > tried to reconstruct it in-pod with `splitPortfolioValue` and got a
+        > **false** reading — every portfolio 0.00, all 99 positions "unpriced" —
+        > because I passed an empty cash map and no price resolver. That is
+        > §72.27's lesson arriving a third time (two unpaginated reads, a shared
+        > date window, now a hand-rebuilt pipeline): reimplementing a calculation
+        > instead of calling it produces a confident wrong answer. Recorded as a
+        > failed measurement, not as a finding.
+        >
+        > **Answered in a signed-in PROD tab 2026-10-01, and the answer was not
+        > the one the box expected.** It called `/total-metrics` with the user's
+        > token and got a *fourth* number: the headline reconciled with its own
+        > breakdown to **0.00**, but neither reconciled with the ten cards, which
+        > summed to 1,094,279.02 against a 1,096,223.87 headline — **−1,944.85
+        > PLN**. All of it on four portfolios (IKE Marek +514.63, IBKR −2,698.17,
+        > IKE Beata +26.43, Equate+ +212.26); the other six agreed only because
+        > they hold ≤1 instrument, where a bar close and a live quote coincide.
+        >
+        > **Cause, and it is §63.2's rule breaking a third time.** The card read
+        > `portfolio.currentValue` — stored, written by the backfill from
+        > `price_bars` — while the headline read `/total-metrics`, computed live
+        > from `positions.market_value`. One number, two price sources. §63.2 was
+        > opened to make "one live valuation path for headline + cards" true and
+        > was closed on a *unit* test that seeds both paths from the same value,
+        > which proves the UI renders what it is given and not that the two
+        > givens agree. The browser was the only thing that could catch it.
+        >
+        > Fixed in SPA `e85ada1`: each card renders its own
+        > `portfolioBreakdown` row — the rows the headline is summed from — so
+        > they reconcile by construction. Verified in PROD on the deployed
+        > v1.0.318: **Σ the 10 cards = the headline, difference 0.00**, while the
+        > stored column still differs by the same ~1.9k, which is what makes it a
+        > real check rather than a coincidence.
+  - [x] Investigate why `total-metrics` reported `Crypto` as `0 / −100%` when the
+        snapshot holds 887.74 PLN and the card is positive. A portfolio with cash
+        and a position must not floor at zero.
+        > **Fixed** — measured 2026-09-30: **no** portfolio reports a card value
+        > of 0. §68 rebuilt the aggregate off `splitPortfolioValue`, which sums
+        > positions *and* the cash ledger, so there is no path by which a
+        > cash-holding portfolio floors at zero.
+  - [x] Verify/fix the consolidated (all-portfolio) performance chart and each
+        portfolio chart show **Σ positions + cash** per day (cash per §62 base-
+        currency balance already added in backfill — confirm it is in the
+        consolidated merge path `getMergedAnalytics` too, and that negative cash
+        doesn't hide).
+        > **Confirmed — it already did, and nothing needed fixing.** The merged
+        > series sums `value_snapshots.value`, and `computeSnapshotBatch` already
+        > adds cash to that (§62.4, `totalValue += cashDay`). So cash is in the
+        > stored rows and therefore in the merge. There is no `getMergedAnalytics`
+        > — the merge is `sumSnapshotsByDateForwardFilled`
+        > (`services/mergedAnalytics.ts`), called from `GET /merged`
+        > (`routes/portfolios.ts:818`).
+        >
+        > **The verification gap was the interesting part.** The merged unit tests
+        > could never have made this claim: `sumSnapshotsByDate*` takes `value` as
+        > an opaque number and has no idea cash exists. Cash enters one layer up.
+        > So the honest test crosses the real chain — cash ledger → batch → merge —
+        > which is what wallets `f303440` adds.
+        >
+        > That gap is precisely why the headline and the chart could disagree for a
+        > session: `/total-metrics` adds the **live** cash balance, the chart reads
+        > **stored** rows, and if cash were missing from the stored rows the two
+        > would differ by exactly the cash balance — the 345,228.04 this plan kept
+        > re-measuring. It was never missing; nobody had checked.
+  - [x] Tests: consolidated series = Σ per-portfolio (positions + cash); a
+        deposit moves the consolidated line up on that day; `total-metrics` is
+        byte-identical across two consecutive calls; headline total == Σ cards.
+        > **All four, in two commits.** `f303440` — the first two, plus negative
+        > cash (XTB and IKE Beata are margin accounts; a clamp would report a
+        > solvent fleet). `345bd8a` — the third, byte-identical on the raw response
+        > text plus a read-writes-nothing assertion. The fourth, headline total ==
+        > Σ cards, was already pinned by the §68 block above it
+        > (`portfolio-transactions.test.ts`, exact equality not `toBeCloseTo` —
+        > PROD caught a cent of drift there).
+        >
+        > One detail worth keeping: the Σ-per-portfolio test seeds a deposit on
+        > each of three days rather than one, so it accumulates to 10500. A merge
+        > that read only the last row per portfolio would pass a single-deposit
+        > test.
+  - [x] Tests: `npm run build`, full `vitest` green.
+        > 515 green, build clean.
+  - [x] Playwright: re-check `/en/investments` headline vs the card sum.
+        > **Done 2026-10-01, and it was not a confirmation — it found the defect
+        > this section has been chasing since the fact-check.** The note above
+        > called it "a visual confirmation of what the tests assert, worth doing
+        > once, not as a gate". That was the wrong call, and the reason is worth
+        > recording: the unit test it referred to *could not* assert what it
+        > claimed, because it seeded the card and the headline from one number.
+        > The browser compares two numbers that were never the same.
+        >
+        > Read off the deployed SPA in a signed-in PROD tab (v1.0.318), summing
+        > the rendered `[data-testid="card-value"]` against the rendered
+        > `tile-total-value`:
+        >
+        > ```
+        > cards rendered : 10
+        > Σ cards        : PLN 1,097,128.03
+        > headline       : PLN 1,097,128.03
+        > difference     :        0.00        <- was −1,944.85
+        > ```
+        >
+        > The same call against the *stored* column still returns 1,094,279.02,
+        > which is what makes the 0.00 a real result rather than a coincidence:
+        > the two sources still disagree, and the page now sums the one the
+        > headline is made of.
+        >
+        > **A second defect surfaced in the same pass, from a field this section
+        > also owns.** The amber "Value excludes N positions without price
+        > history" banner was firing on four portfolios and three of them were
+        > lying: Crypto (1), IKE Beata (7) and IKE Marek (6) had *every* flagged
+        > symbol already closed, so their current values were complete. Those
+        > cards now read "N earlier positions had no price history — those chart
+        > points are partial. Today's value is complete." There is no amber
+        > warning left in PROD, and that is correct: an independent SQL check
+        > (against the carried-forward price map, not the exact-date test §63.9
+        > warns about) shows **0** open positions without a price on the last day
+        > in all ten portfolios.
+        >
+        > That is `heldGapSymbols`, split out of the window-wide `gapSymbols`:
+        > contracts v1.6.55, wallets v1.1.110, SPA `94ba8f5`. Migration 0010
+        > applied in PROD and every `held_gap_symbols` is NULL, which is the
+        > honest reading of the data above rather than a column nobody filled.
+  - [x] Commit.
+        > `f303440`, `345bd8a`, and for the two defects the Playwright pass
+        > found: SPA `e85ada1` + `94ba8f5`, wallets `b7fa6c5`, contracts
+        > `8bb416a`, homelab `d7bc71fcb`. **§63.3 is now closed** — every box
+        > either shipped, was superseded, or was answered by a measurement that
+        > found something new.
+
+### 63.4 — Sheets-sync: derive free-cash from flows+trades; Gotówka as reconciliation reference (multi-currency)
+
+- [x] Model "uninvested/free cash" per account as the §62 per-currency cash
+  ledger (external flows + derived trade effects) — this already nets a funded
+  buy (inflow + immediate buy) to ~0 net cash and is multi-currency. Keep
+  Gotówka as a **reconciliation reference** (warn-only), not the source of the
+  cash value. Re-scope the §62.6 Gotówka recon to compare the *derived* free-
+  cash total against the Gotówka snapshot on the right basis/currency (resolve
+  the IB=USD vs column=PLN basis) so the 3 tracked accounts give a meaningful
+  Δ instead of the current full-history mismatch.
+      > **All three clauses now hold. 2026-10-01, and the sequencing this section
+      > predicted was wrong in a way worth recording.**
+      >
+      > - *Warn-only* — held throughout. `sync.ts` still sets `process.exitCode`
+      >   from `totalErrors` alone; the recon can only ever print.
+      > - *Per-currency ledger* — held, and **no contracts change was needed**,
+      >   which the note above said it would be. `PortfolioCash.balances` already
+      >   carried the per-currency split and `GET /:id/cash` already served it; the
+      >   SPA does call it (the card's Cash group). The gap was never the wire, it
+      >   was that sheets-sync could not reach it.
+      > - *Compare DERIVED to snapshot* — **done** (sheets-sync `ca76e98`, wallets
+      >   `5fcbb0c5` + `8ff86c1`). `GET /internal/cash-balances?asOf=YYYY-MM-DD`
+      >   returns the replayed ledger's per-currency balances and their
+      >   base-currency total; the recon compares that against the grid's last
+      >   dated row.
+      >
+      > **The sheet-against-itself defect is confirmed, not inferred.** The old
+      > code took the `Gotówka` column's first balance as a base and summed the
+      > sheet's OWN signed `cashFlow` column, so both sides were the user's
+      > workbook. Its 586-row report was 586 disagreements with itself.
+      >
+      > **The basis problem was not a problem at all — the premise was wrong.**
+      > The item says "resolve the IB=USD vs column=PLN basis", on the strength of
+      > a code comment conceding that "the IBKR column is USD but the tolerance is
+      > loose". Fetched the live sheet to check: every cell in `Gotówka!A1:L`
+      > carries a `zł` suffix and `IB`'s last row reads `6 006,42 zł`. The column
+      > is PLN. `GOTOWKA_TOL.IB.ccy` said USD, `recon` was PLN, and `diff`
+      > subtracted across units — passing only because ±50 is loose and the line
+      > is warn-only, which is the worst combination a check can have. Now declared
+      > PLN, which is what the code always assumed it was comparing. **The tolerance
+      > value is unchanged** so the alert the operator has already seen does not
+      > move under them; only the unit it is *stated* in becomes true.
+      >
+      > **Two further corrections, both from reading the sheet rather than the
+      > code.** The old recon anchored on each column's FIRST non-blank balance and
+      > replayed effects dated after it, because IB/IKE start later than the sheet.
+      > The derived ledger covers the whole history, so anchoring would have
+      > dropped everything before the anchor from the comparison — gone. And the
+      > two sides are now compared at the **grid's last dated row**, never at
+      > today: the sheet is a fortnight stale in places, and comparing a
+      > 2026-09-29 balance against a 2026-10-01 one would report the days in
+      > between as a discrepancy the operator cannot act on.
+      >
+      > **Sign convention flipped, and that is the one silent risk here.**
+      > `derived − sheet` replaces `sheet − recon`, so a positive Δ now answers
+      > the operator's actual question — does the app know about money the sheet
+      > does not. The line text says which way it points, because a flipped sign
+      > that reads correctly still gets read backwards.
+      >
+      > **An absent derived balance is skipped, never zeroed.** Treating a failed
+      > lookup as 0 would report the entire sheet balance as a gap on every
+      > account the lookup did not return, which is how one transport error
+      > becomes a page of warnings nobody reads.
+      >
+      > **What the recon found, on its first real run — 2026-10-01, sheets-sync
+      > v1.0.34, sheet last row 2026-09-29, all PLN:**
+      >
+      > ```
+      > account        derived      sheet          Δ
+      > IBKR            24,741.35  6,006.42   +18,734.93
+      > IKE Marek          961.87  4,951.85    −3,989.98
+      > IKE Beata         4,442.52  3,032.89    +1,409.63
+      > ```
+      >
+      > with the per-currency split printed alongside, so the netting is visible
+      > rather than asserted — `IB → IBKR: −4,337.85 CAD, 70,779.33 EUR, 193.18
+      > GBP, 4,374.00 JPY, −121,130.00 PLN, −4,075.56 SEK, −255.74 SGD, −39,041.46
+      > USD`. The old run's three "below zero" lines are **gone**, which is a
+      > direct consequence of the sides no longer being the sheet's own: `recon`
+      > used to be an anchor plus a full-history replay of the sheet's `cashFlow`
+      > column and went to −368,300 on IBKR. That number was never a balance, it
+      > was the sheet's own flows applied to a base they do not belong to.
+      >
+      > These remaining Δs are **not** code defects and are not treated as such.
+      > They are the reconciliation doing the job it was built for: the app's
+      > ledger and the workbook disagree about real money, by real amounts, and
+      > the next step is the user's — either the sheet is missing rows (§65's
+      > 586-row report) or the import is. What the old recon could never have
+      > produced is this line at all.
+      >
+      > **Read the signs, not just the sizes.** IBKR positive means the app knows
+      > about money the sheet does not; IKE Marek negative means the reverse.
+      > Those are different investigations and the old sign convention would have
+      > reported both as "the sheet is ahead".
+      >
+      > **One deployment finding, kept because the guard is the point.** The first
+      > deploy answered 500 for every portfolio: `/internal` has no user identity,
+      > so the FX layer needs the shared service token, and with `authToken: null`
+      > instruments 401s and `strict: true` aborts. The alternative was to pass
+      > `null` and let every foreign-currency row degrade to a 1:1 conversion —
+      > a confidently wrong reconciliation instead of an error. `resolveServiceToken`
+      > throws when the env var is absent, so the two cannot be confused, and a
+      > test deletes the token and asserts 500.
+- [x] Tests: derived free-cash for a funded-buy round-trip (inflow + buy) ≈ 0
+      net; Gotówka recon warn-line compares derived vs snapshot within tolerance.
+      > The second half is 17 recon tests + 4 client tests (sheets-sync, 173 green)
+      > and 14 endpoint tests (wallets, 523 green), including the two properties
+      > that are easy to lose in a refactor: the comparison is as-of the requested
+      > date and not as-of today, and a missing credential fails loudly rather
+      > than degrading FX.
+      >
+      > The first half — a funded-buy round-trip nets to ≈0 — is asserted at the
+      > layer that owns it rather than here: `cashLedger.ts`'s `tradeCashEffects`
+      > funds a BUY out of cash, and the §63.3 card test pins the consequence (a
+      > portfolio that deposited 1500 and bought 1000 holds 500). Re-asserting it
+      > in sheets-sync would test the mock, not the ledger.
+- [x] Tests: `npm run build`, full `vitest` green.
+      > wallets 523 · sheets-sync 173 · build clean.
+- [x] Commit.
+      > wallets `5fcbb0c5`, `8ff86c1`; sheets-sync `ca76e98`; homelab `85df4c02e`
+      > (wallets v1.1.112, sheets-sync v1.0.34).
+
+### 63.5 — Provider tier: root-cause the mispriced symbols (openst/cachest) — GATED
+
+**RCA (confirmed 2026-09-25, PROD):** the 4.5M chart comes from `price_bars`
+rows with `source: 'openst'` that are **100× too high for LSE `.L` tickers** — yfinance (the first
+OHLCV provider in `PRICE_PROVIDERS`) quotes London tickers in **GBX (pence)**: BYG.L price_bars 820
+vs live quote £8.20 (exactly ×100); CSN.L 363 vs £3.525, RIO.L 7199 vs £70.89 (~×100, offset by a
+3-day price move). Non-LSE symbols are fine (VRC.WA/SNT.WA/AMD/TSM price_bars == live quote). The
+quote path (a different provider) returns **GBP**, so headline (cheap, cost- basis fallback) and
+chart (×100) diverge. stooq UK data is stale (max date 2026-08-28) so it doesn't override the bad
+openst overflow rows.
+
+- [x] Reproduce the provider response: fetch raw yfinance OHLCV for CSN.L / BYG.L / RIO.L and
+  confirm the close is in pence (vs the GBP quote). (GATE — blocked here: can't reach yfinance from
+  this environment; do where openst has keys.)
+  - **Confirmed via PROD data + unit tests (2026-09-26)**: every `.L` series is uniform
+    (0 discontinuities ≥10×, median consecutive ratio 1.000–1.002 per symbol — single unit
+    throughout, i.e. all fetched via yfinance in pence); BYG.L 820 → £8.20, LGEN.L 318.4 →
+    £3.18, CSN.L 363 → £3.525 all match live GBP quotes after ÷100.
+- [x] Fix at the owning tier: in `openst/src/openbb_client.py` `get_ohlcv_history`
+  (and `get_price_history`) normalize yfinance LSE/GBX closes ÷100 to GBP — or route LSE history off
+  yfinance. Add a unit test with a pence fixture.
+  - **Done (openst `355c6c5`, v1.1.35 deployed to PROD 2/2)**: `_needs_gbx_normalization`
+    (yfinance + `.L`) divides open/high/low/close by 100 on both paths; 4 new unit tests
+    (pence fixture, non-LSE untouched, non-yfinance untouched); full suite green in the Docker
+    test stage (111 passed).
+- [x] Backfill/correct the existing bad `price_bars` overflow rows (delete
+  `source='openst'` rows for the affected `.L` symbols so they re-fetch, or divide by 100), then
+  recompute affected portfolios.
+  - **Done (2026-09-26)**: `UPDATE price_bars SET close = close/100 WHERE symbol LIKE
+    '%.L' AND source='openst'` — 69,247 rows across all 16 `.L` symbols (uniform 100×, safe;
+    `price_bars_all` is a read-only UNION view that reads `price_bars`, so it follows). Verified:
+    BYG.L latest bar £8.20, CSN.L £3.76, LGEN.L £3.18. **Recomputes done too** (user session):
+    POST /recompute on IKE Marek + IKE Beata → `backfillStatus: complete`; snapshot series now sane
+    (IKE Marek max £75,521 / latest 69,220 vs the pre-fix ~2.3M artifact; IKE Beata max £157,254 /
+    latest 155,635; 1,796–1,800 daily snapshots each through 2026-09-25).
+- [x] Add a sanity guard: an extreme quote-vs-last-close jump (≳10×) on the overflow write
+  flags/logs instead of silently valuing 70×.
+  > **DONE 2026-09-30** (instruments `40fd821`, **v1.0.81** deployed, homelab
+  > `723bb43d0`). This landed in **instruments**, not openst: the guard belongs on
+  > the *write*, and `upsertOverflowBars` is the only place a 100x bar can enter
+  > `price_bars`. `classifyJump(prev, close)` refuses anything ≥10x or ≤0.1x and
+  > returns the jump with its ratio; the write is skipped, so the bar becomes a
+  > gap the existing gap-detection already reports.
+  > **Splits are exempt, and the threshold is 10x for that reason.** Only
+  > 1:10, 1:20, 10:1 and 20:1 land inside the band — every other factor is
+  > under 10x, so a 2x threshold would have to classify a 1:4 split as a defect.
+  > A jump with a known split factor is written and left for
+  > `checkSplitBoundary`.
+  > A refused bar sets a new `price_bar_metadata.fetch_status` of
+  > **`sanity_failed`**, not `ok`: the fetch half-succeeded and every downstream
+  > reader takes `ok` as "priced". `recentlyFailed()` now cools down on *any*
+  > non-`ok` status, so one bad symbol cannot re-fetch its whole history on every
+  > sweep. That also fixes a latent hole — a brand-new symbol with no metadata
+  > row previously bypassed the breaker entirely.
+  > **Verified in PROD against the deployed image** (instruments v1.0.81, via
+  > its own `dist/services/price-bars.js`), scratch symbol, deleted afterwards
+  > (0 rows left):
+  > ```
+  > 1) first write, no prior close:            {"written":1,"rejected":[]}
+  > 2) a 1.7% move:                            {"written":1,"rejected":[]}
+  > 3) the §63.5 pence overflow 8.34 -> 834:  {"written":0,"rejected":[{"d":"2026-01-04","ratio":100,"split":null}]}
+  > 4) a real 1:10 forward split 8.34 -> 0.834:{"written":1,"rejected":[]}
+  > ```
+  > And zero false positives on four live symbols (`SAP.DE`, `VRC.WA`, `AMZN`,
+  > `NTO.F` all returned their full series, nothing refused).
+- [x] Tests: openst suite green; fixed symbols' price_bars match the GBP quote.
+- [x] GATE: this step fixes the *data*; §63.1–63.4 fix the *pipeline*. "Chart == true value" is not
+  achievable until this ships.
+  - **Lifted 2026-09-26** (openst v1.1.35 + data backfill + recomputes; only the ≳10× sanity
+    guard remains as hardening).
+- [x] Commit.
+
+### 63.8 — Data-gap handling: fill/repair price history + surface incomplete backfills + gray-out during recompute (2026-09-27)
+
+Follow-on from the §63.6 RCA: the "sudden growth"/fake-inflow spike on IKE Beata
+looked like **missing price-bar history** — the backfill values only the symbols
+it has a bar for (18/23 → 155k) while the live-quote snapshot values all 23
+(→ 205k). Three coupled changes so the two valuation paths agree and the UI never
+shows a silently-wrong value.
+
+> **Superseded in part (2026-09-27).** The missing history was real and is fixed
+> (item 2 → §63.9), but it was *not* the spike: the spike was the sweep pricing
+> **nothing at all** (§63.10). The three changes here stand on their own merit —
+> the gap signal, the gray-out, the fill — they are simply not what fixed the
+> chart. The `18 of 23` figure was also an exact-date count; `buildPriceMap` carries
+> prices forward, so the real number of unpriced symbols was smaller.
+
+- [x] **Backfill must not silently drop a held symbol with no price bar.**
+      (wallets `09f48c2` + `bcdf8e3`, 348 green; contracts v1.6.44.)
+      `computeSnapshotBatch` now returns `{ rows, gapSymbols }` — the held
+      (qty>0 on the window's last day) symbols with NO price bar. Both backfill
+      paths persist it to `portfolio_backfill_metadata.gap_symbols` (migration
+      0009; the force path writes it atomically inside the delete+rebuild tx;
+      `persistGapSymbols` coerces []→null). `GET /:id/analytics` returns a
+      top-level `gapSymbols` via `getGapSymbols`. +4 tests (gap detected / gap
+      cleared / API present / API absent). The SPA renders an amber
+      partial-sum warning (see item 3).
+- [x] ~~**Instruments: fill/repair missing history — GATED on the provider tier
+      (§63.5).**~~ **RESOLVED (wrong premise — see §63.9).** The diagnosis recorded
+      here was wrong: `providerSymbol()` is not the problem, and this was never a
+      provider-coverage gap. Probed in PROD on 2026-09-27: openst serves
+      `/price/ohlcv/XTB.WA` (2637 bars), `EMIM.AS` (3152 bars) and `RBOE.AS` in
+      0.3–2.1 s, **including with `start=1900-01-01`**. The symbols were always
+      sourceable; nothing ever asked. Superseded by §63.9.
+- [x] **UI: gray out + block every recomputing chart until done** (user
+      request). (SPA `296343e` + `fe4c0e5`, 397 green.) `PortfolioPerformanceChart`
+      gained a `recomputing` prop: the chart is dimmed (opacity-50) +
+      pointer-events disabled with an in-progress overlay, and the Recompute
+      button is disabled (no re-trigger) while a pass is in flight. Wired on the
+      per-portfolio Performance tab (`recomputeBusy || backfillPending`) and the
+      combined chart (`mergedBusy || mergedBackfillPending`); PortfolioCard
+      already gates its timeframe buttons during recompute. A `gapSymbols` prop
+      shows the amber partial-sum warning (Performance tab + card). +2 chart
+      unit tests (gray-out blocks re-trigger; gap warning renders).
+
+**Deployed 2026-09-27** — wallets **v1.1.65** + SPA **v1.0.239** pinned in
+`cluster/apps/pfire/*/app/helmrelease.yaml` (homelab commit `f2be27648`), 1/1
+both, migration 0009 (`gap_symbols`) applied in PROD.
+
+**What's still missing (continue here next session):**
+- [x] **Item #2 — the actual price history** (GATED, provider tier / §63.5).
+      Until the `.WA`/`.AS` symbols get bars, the value is *flagged* partial,
+      not *corrected*. The 5 missing IKE Beata symbols (≈ 50k): **XTB.WA,
+      EMIM.AS, RBOE.AS** (`fetch_status='failed'`, 0 bars) and **AMZN, SP20.L**
+      (bars exist but a gap on the snapshot date). Concretely: (a) figure out
+      why cachest/OpenBB `/ohlcv/XTB.WA` returns nothing (symbol mapping for
+      WSE/ASX venues, or no provider coverage — check what openst/stooq could
+      supply), (b) once sourceable, seed the history (instruments fill / stooq
+      import) and re-run a backfill so `gap_symbols` clears to null and the
+      value matches the live path. Also still open on the instruments side:
+      log the provider error into `fetch_status`/`last_error` (diagnosability)
+      and add a scheduled "fill gaps for held symbols" pass.
+      > **RESOLVED 2026-10-01, and the two halves of it have different answers.**
+      > The five named symbols are all priced — §63.9's cachest limiter fix and
+      > its gap-fill healed them, and a recompute of all ten portfolios today
+      > cleared `AMZN` and `SP20.L` too. What is *not* fixed is the standing
+      > work this item also asked for: `fetch_status`/`last_error`
+      > diagnosability and a scheduled "fill gaps for held symbols" pass.
+      >
+      > **The measurement that matters, and it is not "gap_symbols is empty".**
+      > `gap_symbols` is window-wide and *should* be non-empty — IKE Beata still
+      > lists 7 symbols it held in 2022 with no bars, which is real and worth
+      > keeping. The question this item actually asks is whether *today's* value
+      > is short, and the answer is no, verified independently in SQL against the
+      > **carried-forward** price map rather than the exact-date test:
+      >
+      > ```
+      > portfolio                     open   held with no price on the last day
+      > IBKR                            35   0
+      > IKE Beata                      23   0
+      > IKE Marek                      13   0
+      > Rach. rejestrowy PKO BP        23   0
+      > ...all ten portfolios              0
+      > ```
+      >
+      > The exact-date version of that query reports 32/35 for IBKR and looks
+      > alarming; it is §63.9's warning arriving again — `buildPriceMap` carries
+      > prices forward, so a symbol with a 09-30 close *is* valued on 10-01. Two
+      > of the three checks in this plan's history have now been wrong for that
+      > same reason, which is worth more as a note than as a fix.
+- [x] **Confirm in UI** (needs a fresh PROD login — Playwright session closed
+      mid-verification): on IKE Beata → Performance, verify (a) the amber
+      "Value excludes 5 positions without price history" banner shows after one
+      recompute, and (b) the chart grays out + Recompute is disabled during a
+      Recompute and re-renders fresh when done.
+      > **Both halves verified in a signed-in PROD tab 2026-10-01 (SPA v1.0.318),
+      > and (a) came back false — which is the finding.** Read off the rendered
+      > DOM on IKE Beata → Performance, 1802 points, `backfillStatus: complete`:
+      >
+      > ```
+      > wrapper class (idle)   : "relative transition-opacity duration-300"
+      > wrapper class (in flight): "relative transition-opacity duration-300
+      >                            pointer-events-none select-none opacity-50"
+      > overlay (in flight)    : "Recomputing — please wait…"
+      > Recompute disabled     : true in flight → false again, ~2 s
+      > ```
+      >
+      > So (b) is exactly as designed and holds. (a) is not, and could not be:
+      > the banner said "Value excludes 7 positions without price history" about
+      > a value that was complete, because all 7 had been sold. Fixed as
+      > `heldGapSymbols` (contracts v1.6.55, wallets `b7fa6c5`, SPA `94ba8f5`);
+      > the same page now reads "Earlier in this period, 7 positions were held
+      > with no price history — those points are partial sums. The latest value
+      > is complete." The count is still 7, the claim is now true.
+- [x] ~~**Turn RECALC_DEBUG off**~~ — done in §63.10.5 (now `RECALC_DEBUG: "0"`).
+
+### 63.9 — cachest's rate limiter caps upstream concurrency at 3 (RCA of the IKE Beata spike, 2026-09-27)
+
+Continues §63.8 item 2, whose premise was wrong. Everything below is measured
+against PROD (cluster reachable via `KUBECONFIG=$HOME/.kube/homylab`, ns `pfire`),
+not inferred.
+
+**The spike, end to end.** The 09-26 `IKE Beata` snapshot is written by two
+different valuation paths. The **live-quote** path (`snapshotPortfolioValue`, fired
+on a detail-page read) values *all 23* open positions from one live quote → 205,470.
+The **price-bars** backfill (`computeSnapshotBatch`) values only the symbols it has a
+bar for. Measured position-by-position in PROD, exactly **3 of 23** have zero bars:
+
+| symbol | qty | bars | `price_bars_all` last | `fetch_status` |
+| --- | --- | --- | --- | --- |
+| `EMIM.AS` | 80 | **0** | — | `failed` 2026-09-22 06:31 |
+| `RBOE.AS` | 53 | **0** | — | `failed` 2026-09-22 06:31 |
+| `XTB.WA` | 84 | **0** | — | `failed` 2026-09-27 14:24:59 |
+
+The other 20 have bars, so the earlier "18 of 23 / 5 missing" count was an
+**exact-date** check and wrong: `buildPriceMap` (`portfoliost-wallets/src/services/backfill.ts:256`)
+**carries prices forward**, so a symbol with a 09-25 bar *is* valued on 09-26/27
+(09-26 was a Saturday). `AMZN` (last 09-21) and `SP20.L` (last 09-24) are stale but
+never dropped. The ≈50k delta is the 3 zero-bar symbols' weight, full stop.
+
+**Root cause: `cachest`'s `RateLimiter`.** `cachest/rate_limiter.py:22` claims the
+slot with `self._last_fetch = time.monotonic() + sleep`, so with N waiters the
+requested sleep *grows* — 2s, 3.9s, 5.8s, 7.7s … With `fetch_interval: 2` /
+`fetch_max_wait: 4` on `OPENST_OHLCV` (`cachest/config.yaml:88-99`), the moment
+`sleep > max_wait` the waiter is **rejected**: instant `503`, *no upstream call*
+(`cachest/main.py:84-92`). Effective queue depth is `floor(max_wait/interval) + 1`
+= **3**. Reproduced in PROD with 8 concurrent `forceRefresh` calls:
+
+```
+req0 -> 200 X-Cache=MISS 0.45s     req4 -> 503 X-Cache=None 0.04s 'rate limit exceeded…'
+req1 -> 200 X-Cache=MISS 2.07s     req5 -> 503 X-Cache=None 0.04s
+req2 -> 200 X-Cache=MISS 4.06s     req6 -> 503 X-Cache=None 0.04s
+req3 -> 503 X-Cache=None 0.06s     req7 -> 503 X-Cache=None 0.03s
+```
+
+The same limiter serves `OPENST_QUOTE` (65 rejections in the last 5 h), `logo` (21)
+and `OPENST_OHLCV_FUNDS`. So this is **not** IKE-Beata-specific: 175 symbols carry
+`fetch_status='failed'` in PROD, and the `.WA` family is hit as a block — `SNT.WA`
+and `ETFSP500.WA` are stuck at **09-18**, `PLW.WA`/`ELT.WA`/`KRU.WA` at 09-21,
+`CBF.WA`/`DNP.WA` at 09-22 — because they lost the race, not because they delisted.
+
+**Why the loser stays a loser.** `portfoliost-instruments/src/services/price-bars.ts:395`
+catches the 503 in a **bare** `catch {}`, records `fetch_status='failed'`, and
+`recentlyFailed` (`price-bars.ts:181-187`) then suppresses upstream for
+`COOLDOWN_MS = 1 h`. The sweep runs 1–2×/day
+(`portfoliost-wallets-snapshotsync` 13:00 UTC + `…-postfx` 17:20 UTC), so a symbol
+that loses one race waits ≥1 h and typically loses the next one too. There is no
+`last_error` column (`src/db/schema.ts:85-89`), so a transient 503 is recorded
+identically to a genuine 404 "no such symbol" — which is why this took a day to pin.
+
+**What the provider is NOT.** Both earlier hypotheses are dead, and it is worth
+recording so they are not re-tried:
+- *"`start=1900-01-01` for a zero-history symbol is too wide"* (`price-bars.ts:374`
+  does send that) — **false**. openst answers `XTB.WA` with 2637 bars in 2.1 s and
+  `EMIM.AS` with 3152 bars in 0.9 s *with that exact 126-year window*; yfinance
+  clamps to the listing date. It is visible in the cache key
+  (`ohlcv:VOX0224:1900-01-01:2026-09-26`) and looks alarming, but it is not the
+  cause and needs no clamp.
+- *"`providerSymbol()` doesn't strip `.WA`/`.AS`"* — **false**. The suffix is the
+  correct Yahoo form; `.WA`/`.AS`/`.DE`/`.L` are handled identically, and
+  `EMIM.AS`/`RBOE.AS` are Euronext-Amsterdam iShares ETFs (plan-archive §43) whose
+  *quotes* already work — which is precisely why the live path values them and the
+  backfill cannot.
+
+**Design decision (resolved):** fix it in `cachest`, the owning tier. `fetch_interval`
+is a *politeness spacing* toward upstream; for the routes that point at **our own**
+`openst` service it is far too coarse, and openst already bounds real concurrency
+itself (`UPSTREAM_MAX_INFLIGHT = 8`). So: drop the interval to `0.2` and raise
+`fetch_max_wait` so the queue absorbs a whole portfolio sweep (≥175 symbols), for
+every `openst.*` route. Genuinely external routes keep their spacing and only get
+`fetch_max_wait` raised. Separately, `portfoliost-instruments` must stop converting
+a *transient* 503 into a 1-hour `failed` — a 503/504/429 is retryable and must be
+recorded as such, distinct from a 404.
+
+### 63.9.3 — heal PROD and prove the spike is gone
+
+- [x] **Deployed 2026-09-27** (cachest v1.0.44 + instruments v1.0.70 pinned in
+      `cluster/apps/pfire/{cachest,portfoliost-instruments}/app/helmrelease.yaml`,
+      homelab `b9c2a9eff`; migration 0003 applied). The cachest ConfigMap landed
+      first and Flux's reloader restarted the pod on it, so the limiter fix was
+      live before the images.
+      Verified in PROD: 16 concurrent `forceRefresh` `/ohlcv/SNT.WA` → **16 × 200,
+      0 × 503** in 3.08 s (the same burst gave 3 × 200 / 13 × 503 before). Cachest
+      now logs `queue_depth` per route at boot. Drove the instruments gap-fill
+      directly from the pod for the starved symbols: `XTB.WA` 2637 bars,
+      `EMIM.AS` 1258, `RBOE.AS` 1230, and `SNT.WA`/`ETFSP500.WA` off 09-18 onto
+      09-25. `fetch_status='failed'` symbols: **175 → 166**.
+- [x] All 23 IKE Beata positions now have a price bar; the amber partial-sum
+      signal is no longer needed for the missing-history case. The next sweep
+      pass then exposed a **much larger, unrelated** problem — see §63.10.
+- [x] `logo` route: the 21 rejections came from the same depth-3 wall and are fixed
+      by §63.9.1's config (depth 600), but the SPA still fans out ~80 logos per
+      page, so re-check its rejection count after a full page load.
+  > **Measured 2026-10-01, and the premise no longer holds — the SPA does not use
+  > that route at all.** `/api/logos/:symbol` is served by **instruments**
+  > directly (`portfoliost-instruments/src/index.ts:44`), and the SPA calls it,
+  > so a page load never reaches cachest's `/logo/` route and the rate limiter
+  > whose depth was raised is not on that path. The logos.md D36 resolution path
+  > was added after §63.9 and bypassed it.
+  >
+  > What was actually measured, on the cachest pod (up since 08:30, 15,419 log
+  > lines):
+  >
+  > ```
+  > GET /logo/ through cachest   :   6   →  6× 404,  0× 503
+  > " 503 " anywhere in the log  :   0
+  > "rate limit"                 :   0
+  > ```
+  >
+  > and a real full page load — IBKR's holdings, 35 logo `<img>` in the DOM,
+  > 35 `/api/logos/*` requests observed in the network panel — returned **35× 200**
+  > with no errors.
+  >
+  > **The honest caveat, because the numbers are small.** The cachest-route sample
+  > is 6, not the ~80 the item expected, precisely *because* the SPA bypasses it.
+  > So this does not demonstrate the depth-600 change absorbing an 80-wide burst;
+  > it demonstrates that the burst no longer arrives. The config change is still
+  > correct for whoever does call that route, and the 6 that did were served
+  > without a rejection.
+  >
+  > The §63.15 orphan-pruning this note originally deferred to is unchanged and
+  > still pending in §72.33.
+
+### 63.11 — Edge auth for browser traffic (follow-on)
+
+> **CLOSED 2026-09-30** (homelab `530492814`). The decision was **not** to
+> enable `global-auth-url`, and the reason is now written into the file so it
+> does not read as an obvious-looking win someone re-tries:
+>
+> 1. **The commented path is wrong.** Every ingress in this cluster that
+>    actually authenticates uses `https://auth.…/oauth2/auth` + `/oauth2/start`
+>    (pgweb, scanst-ui, scanst-otp, stooq, jobshot). The value commented on the
+>    ingress-nginx HelmRelease is `/api/verify` + bare `/` — a *different
+>    endpoint*. Uncommenting it as written would 302 every browser request in
+>    every namespace to a URL that does not answer.
+> 2. **The blast radius is the whole cluster.** It is a controller-wide default,
+>    so it lands on `default`, `home` and `media` at once — including the KEDA
+>    scale-to-zero apps in `default` and every service that legitimately has no
+>    browser login.
+>
+> **What was done instead, and it is the part the section was actually after.**
+> Only three pfire services have an ingress at all: `portfoliost` (which already
+> authenticates through Pocket-ID OIDC), `cachest` and `openst`. The latter two
+> are the internal tiers — `openst` holds the provider API keys — and neither had
+> any auth whatsoever, so a browser could read them directly. Both now carry the
+> same `auth-url`/`auth-signin` pair as pgweb/scanst/stooq/jobshot.
+
+- [x] Decide and implement: enable nginx `global-auth-url`, or record a decision
+      not to. → **Not enabled**; the two internal tiers opt in individually.
+- [x] Tests: an unauthenticated browser request to a `pfire` ingress is
+      redirected.
+      > **Verified in PROD**, both tiers, on a data path and not just health:
+      > ```
+      > cachest  /api/config  HTTP 302 -> https://auth.k.homylab.com/oauth2/start?rd=…
+      > openst   /__mem       HTTP 302 -> https://auth.k.homylab.com/oauth2/start?rd=…
+      > ```
+- [x] Tests: the scheduled sweep is unaffected.
+      > **Verified in PROD, twice.** Every in-cluster caller uses the
+      > **ClusterIP**, which nginx never sees: from the instruments pod,
+      > `cachest:8080/health` 200, `openst:8080/health` 200, and a real
+      > `cachest /ohlcv/CSN.L?start=…&end=…` 200 with a payload. Then a live
+      > `snapshotsync` Job launched **after** the change ran the whole chain:
+      > `[snapshotsync] done: ok=10 failed=0`.
+- [x] Commit.
+
+Still open. Recorded as a deliberate non-fix during the sweep work: the cluster has a working global nginx
+auth subrequest that is switched off
+(`cluster/apps/networking/ingress-nginx/helm-release.yaml:51`,
+`# global-auth-url: "https://auth.${SECRET_DOMAIN}/api/verify"`), and nothing in
+`apps/pfire/*` uses oauth2-proxy or `auth-url`. So every access control in pfire is
+per-service application-level JWT validation, and the instruments → cachest →
+openst → provider-keys chain has exactly one check at its front. Worth turning on
+as defence in depth — it hardens *browser* traffic and changes nothing for the
+scheduled job, which is why it was not treated as urgent.
+
+---
+
+### The chain
+
+1. **The sheet contradicts itself.** The live Podsumowanie row for
+   `Nintendo Co Ltd` (fixture row `[106]`) carries `Symbol giełdowy`=`NTO`,
+   `Giełda`=`FRA`, currency=`EUR` — i.e. the Frankfurt line — but its
+   `Symbol Yahoo` column says **`7974.T`**, the Tokyo line. The DIVIDEND rows on
+   the same holding say `JPY` while the BUY/SELL rows say `EUR`.
+2. **The resolver faithfully follows the stale column.** `resolveInstrument`'s
+   order is `byNameOverride` → catalog-by-name → catalog-by-(symbol, venue) →
+   `ticker_reference`, and the catalog entry's `yahooSymbol` *is* that Yahoo
+   column. A name override was already supposed to shield this, and for `EMIM`
+   (`§38.3`) and `RBOE` (`§43.1`) it does — but the `nintendo co ltd` entry itself
+   pointed at `7974.T` with `country: "JP"`, so the override *enshrined* the wrong
+   listing. It carried no provenance comment, unlike its `allianz se` neighbour.
+3. **The currency resolver could not object.** `ticker_reference` has no `7974`
+   row at all, and `exchange_reference`'s `TSE` row has an **empty
+   `yahoo_suffix`**, so `resolveInstrumentCurrency` is silent and falls back to
+   the caller-declared base — which is the trade row's `EUR`.
+4. **Valuation then priced the wrong series.** The stored `instrument_currency` is
+   `EUR`, so the ¥12,695 Tokyo close of 2025-09-23 became
+   `20 × 12,695 × 4.25 ≈ 1,080,421 PLN`.
+
+#
+
+### The evidence that the intended series is `NTO.F`
+
+The stored transaction prices were *already* the Frankfurt ones — the import only
+mislabelled the symbol. `NTO.F` closes reproduce them to within a day's spread,
+while `7974.T` is a different series entirely (probed 2026-09-27 via openst):
+
+| date | stored transaction price | `NTO.F` close | `7974.T` close |
+|---|---|---|---|
+| 2023-04-12 (BUY 5) | 37.50 EUR | **37.02** | 5,466 JPY |
+| 2024-08-05 (BUY 5) | 42.72 EUR | **43.89** | 6,607 JPY |
+| 2025-09-23 | — | **73.22** | 12,695 JPY |
+| 2025-09-24 (SELL 20) | 74.70 EUR | — | — |
+
+`NTO.DE`, `NTOG.UK` and `7974.TO` all 404; `NTO.F` is the only live line. It also
+has the deeper history of the two (2,983 bars from 2015-01-02 vs 2,886 from
+2015-01-05), so the reimport heals the whole holding rather than opening a gap.
+Correct value of the 20 shares on 2025-09-23 is `20 × 73.22 ≈ 1,464 EUR ≈ 6,200 PLN`,
+not 1,080,421 PLN — the cliff is **entirely** the phantom, and the recomputed
+series should be flat across 2025-09-24.
+
+#
+
+### Fix
+
+`NAME_VENUE_OVERRIDES["nintendo co ltd"]` → `ticker: "NTO"`, `yahooSymbol: "NTO.F"`,
+`country: "DE"` (`portfoliost-sheets-sync` `db04359`, shipped `v1.0.22`, pinned in
+`portfoliost-admin`'s `SHEETS_SYNC_IMAGE`). EUR now matches the row's own currency
+column, so the position needs **no conversion at all** — which also answers "why JPY
+if we only use EUR": we do not; JPY was only ever the stale Tokyo line bleeding in.
+
+Tests: `instrument-resolver.test.ts` asserts the override holds for `FRA` *and* for
+a stale `TYO` row (it is name-keyed, so the venue column cannot filter it out);
+`podsumowanie-parser.test.ts` keeps asserting `7974.T`/`JP` to pin the fact that the
+parser reads the sheet verbatim and the correction lives in the resolver. 138 green.
+
+#
+
+### Healed in PROD (2026-09-27)
+
+Wipe & reimport + full recompute of all 10 portfolios, verified:
+
+| check | before | after |
+|---|---|---|
+| stored Nintendo symbol | `7974.T` (9 rows) | **`NTO.F`** (9 rows) |
+| IBKR value 2025-09-23 | 1,528,346 | **453,217** |
+| IBKR value 2025-09-24 | 454,644 (−52.1%) | **454,644 (+0.3%)** |
+| merged series 2025-09-24 | −52.1% | **+0.1%** |
+| `NTO.F` price bars | none | 6,830 |
+| backfill status (10/10) | complete | **complete**, `gap_symbols` empty |
+
+Phantom removed: **1,075,129 PLN** from IBKR's 2023-04-12..2025-09-23 window —
+which reconciles with the predicted 1.07M from the table above. Headline values are
+**unchanged** (IBKR 585,319.22, IKE Beata 196,827.12, IKE Marek 90,962.72) because
+the position was sold in Sept 2025 and contributes nothing to today's figures; only
+the historical window moved. The merged chart's worst remaining single-day move is
+−24.1% on 2022-05-26, a real drawdown.
+
+#
+
+### Left open
+
+- **The DIVIDEND rows will still be `JPY`** after the reimport: `currency` comes
+  from the sheet, and the override only changes the symbol. Financially
+  immaterial (~10 PLN total across four rows) but it is a residual label
+  inconsistency, now confirmed to have survived the reimport as predicted.
+- **The fleet-wide stale-symbol audit is unresolved.** The obvious check —
+  compare each row's Yahoo column against `symbol + exchange_reference.yahoo_suffix`
+  — does not work, because the sheet uses **Polish venue codes** (`ETR`, `LON`,
+  `FRA`, `AMS`, `BIT`, `SWX`) while `exchange_reference` carries MIC-style ones
+  (`XETRA`, `XLON`, `XFRA`, `XAMS`, `FSX`). 35 of 226 rows come back "unknown
+  venue" and the naive comparison also flags legitimate local-ticker ≠ Yahoo-ticker
+  cases (`V` → `HUBS`). Nintendo is the one case proven wrong by the data.
+  Two real reference gaps surfaced while attempting it: `TSE` has an **empty**
+  `yahoo_suffix` (which is why the currency resolver was silent), and there is
+  **no TSX row**, so `CSU` (Constellation Software, `CSU.TO`) has no venue to
+  resolve against. Adding the sheet's venue-code vocabulary to
+  `exchange_reference` is the prerequisite for making that audit real.
+
+### Two audits, and why the first one was wrong
+
+**Attempt 1 (discarded).** Probed the provider's `/equity/quote` for all 220
+distinct stored symbols at concurrency 6 and compared the result with each
+symbol's `instrument_currency`. It reported "80 currency mismatches / 92
+unpriceable", including `NTO.F` — which had just been backfilled with 6,830 bars
+and verified at 43.01 EUR. Two tell-tales gave it away: `NTO.F` came back `ERR`,
+and `0M6S.IL` and `CSN.L` reported an identical 1,701 bars. openst was throwing
+and rate-limiting, so the harness was measuring its own failures. **Discarded
+whole.** The trustworthy signal at the time was the independent one: all 10
+portfolios were `complete` with empty `gap_symbols`.
+
+**Attempt 2 (kept).** Two changes made it sound:
+
+1. *Structural check, no network.* Compare each live Podsumowanie row's Yahoo
+   column against its own `Symbol giełdowy` + `Giełda`. The sheet's venue codes
+   map to fixed Yahoo suffixes (`ETR`→`.DE`, `FRA`→`.F`, `LON`→`.L`, `AMS`→`.AS`,
+   `BIT`→`.MI`), so the expected symbol is derivable. This needs the *stored*
+   symbol joined by name to see what the resolver actually produced.
+2. *Currency check, gently.* Probe `/equity/quote` at concurrency 3 with
+   retries, comparing the provider's currency against the **catalog's**
+   `Oryginalna waluta` (col 37) — not the transaction's `instrument_currency`,
+   which is legitimately different (§ below).
+
+#
+
+### What the ETR/FRA/LON/AMS/BIT sweep found (40 rows)
+
+14 of 40 diverged, and the classes are very different:
+
+| class | n | detail |
+|---|---|---|
+| cosmetic | 8 | German `.F` vs `.DE` sibling lines. Measured: AHOG +0.19%, VNA +0.17%, BAS +0.08%, SRT +0.73%, FRE −0.29%, MUV2 +0.16%; plus `XDEW.SW`/`XMBR.DE` on a `BIT` row. Same company, same currency, tracks within 0.75%. Not worth touching. |
+| intentional | 1 | `Allianz SE` → `0M6S.IL`, the §34.7 override. |
+| **wrong** | 4 | `CSKR.L`, `EXS1`, `LTAM`, `EX10.VI` — shipped in `v1.0.23`. |
+
+`EX10.VI` was the notable one: the provider identifies it as **iShares MDAX
+UCITS ETF (DE)** — a different issuer (BlackRock, not Invesco) — whose history
+starts 2026-04-28, *after* the holding closed in Oct 2025, so it could never have
+priced it. The real fund is ISIN **IE00BHJYDV33**, Borsa Italiana ticker `MDAX`,
+and the Xetra/gettex line is `DEAM.DE` (1,938 bars from 2019-02-11 inception vs
+`MDAX.MI`'s 351 from 2025-05-08 — hence `DEAM.DE`).
+
+**`openst`'s search endpoint cannot help here**: `/equity/search` is US-only
+(SEC CIK index), so "MDAX" and "Invesco MDAX" both 404. The ISIN had to come
+from the open web, then be confirmed against the provider's profile name and the
+sheet's own trade prices.
+
+#
+
+### The pence bug (§63.5's fix was half-wrong)
+
+`_needs_gbx_normalization` fired on **any** yfinance `.L` ticker, so every
+USD-quoted LSE line had its history divided by 100 as if it were pence. Measured
+in PROD:
+
+| symbol | bars before | truth | bars after |
+|---|---|---|---|
+| `CNYA.L` | 0.0447 | ~4.46 | **4.468** |
+| `DEAM.L` | 0.583 | ~58.3 | **58.78** |
+| `IWDA.L` | 1.4691 | ~146.9 | — |
+| `EMQQ.L` | 0.0933 | ~9.33 | — |
+| `BYG.L` | 8.20 | £8.20 ✓ | 8.24 ✓ |
+| `CSN.L` | 3.525 | 352.5 GBp ✓ | ✓ |
+
+The quote path was never wrong — only the two history paths divided — and
+instruments already applies its own `PENCE_UNIT` rule to quotes, so this was the
+sole incorrect side. Fixed in `openst` `9348560` / **v1.1.37**: the decision now
+comes from the provider-declared currency via a memoised `get_quote` lookup.
+Successful lookups are cached, failures deliberately are **not** (so they retry),
+and when the currency can't be determined openst does **not** scale — missing a
+pence line is a bounded error instruments flags, while scaling a USD line is
+unbounded across a whole class of ETFs. No USD `.L` position is open, so nothing
+live changed; the stored bars are corrected by the next recompute.
+
+This is also why `CNYAN.MX` → `CNYA.L` was **held back** from v1.0.23: before the
+fix `CNYA.L` came back as 0.0447, so applying it then would have swapped a 20×
+error for a 100× one.
+
+#
+
+### Full 220-symbol sweep — 3 more real defects
+
+| stored | resolved to | was | evidence |
+|---|---|---|---|
+| `CNYAN.MX` | **`CNYA.L`** | the **Mexican** line, for a `LON`/USD row | `CNYAN.MX` closed **90.11 MXN** where the sheet records 4.46 USD; `CNYA.L` gives 4.468/4.436 vs sheet 4.46/4.395 |
+| `FRO` | **`FRO.WA`** | bare `FRO` is **Frontline plc**, a USD tanker company | 11.89 USD vs a real 25.10 PLN; `FRO.WA` = "FERRO S.A.", PLN, 25.60/23.60 vs 25.10/23.00 |
+| `XDEW.SW` | **`XDEW.MI`** | the CHF SIX line, for a `BIT`/EUR row | 4–8% off; `XDEW.MI` matches all four trades within 0.5% |
+
+`FRO` is the same shape as Nintendo: a Polish holding priced off an unrelated
+US-listed company that happens to share the ticker.
+
+`CNYAN.MX` had already done measurable damage — IKE Beata's value series steps
+**+27,669 PLN** on 2025-01-23 (82 units) for a position genuinely worth ~1,485 PLN.
+
+#
+
+### Currency labels that are NOT bugs
+
+A stored `instrument_currency` that differs from the quote currency is **normal**:
+the broker transacts in a local currency and converts to the instrument's original
+currency with its own rate, which the pipeline already stores. Confirmed on
+`ASML`, which is Nasdaq/USD but has EUR rows in IKE Marek — every row carries
+`rate_source='manual'` with correct historical rates (4.74 for 2022-08-26, 4.35
+for 2023-12-29). So these were deliberately **not** overridden, only checked that
+the *symbol* fits its venue: `SHOP` (sheet CAD, transacted USD at IBKR),
+`NVO` (sheet DKK, transacted USD), `BTEC.SW` / `EMQQ.L` / `IUCD.L` / `MLPD.L`
+(sheet says GBp/EUR, all transacted USD with manual rates, provider quotes USD),
+`CSN.L` / `RIO.L` (PLN transactions on GBP-quoted London lines). Their catalog
+currency labels are annotations, not valuation inputs.
+
+#
+
+### False alarms worth recording
+
+- **The 33 Polish bond codes** (`EDO*`, `ROD*`, `ARH*`, `KIN*`, `KRI*`, `INS*`,
+  `BST*`, `NVA*`, `VOX*`) 404 on `/equity/quote` **by design** — they're bonds.
+  They are served in PLN by the bond endpoints (`EDO1233` 115.57 PLN,
+  `ROD0935` 121.60 PLN; `ARH0722`/`VOX0224`/`KIN1025` return corp-bond profiles
+  with ISINs but no quote). Not defects. Note the 41 `venue='-'` rows are 35 of
+  these bonds plus 6 Goldman Sachs TFI funds already handled by §38.3.
+- **`CRWD` / `GOOGL`** returned no `currency` field — the provider simply omits it
+  on those two quotes. Both are NASDAQ/USD and priced normally.
+
+#
+
+### Method note
+
+Every override in this section was validated against **your stored transaction
+prices** before being accepted, not against the sheet's symbol column. That is
+what makes the difference between a real fix and a plausible one: `EX10.VI` looks
+like a reasonable ticker until you ask what fund it actually is, and `FRO` looks
+right until you notice the bare ticker belongs to a shipping company.
+
+Six overrides total across §63.12–§63.13: `7974.T`→`NTO.F`, `CSKR.L`→`IKOR.L`,
+`EXS1`→`EXS1.DE`, `LTAM`→`LTAM.MI`, `EX10.VI`→`DEAM.DE`, `CNYAN.MX`→`CNYA.L`,
+`FRO`→`FRO.WA`, `XDEW.SW`→`XDEW.MI` — seven in all.
+
+#
+
+### Healed in PROD (2026-09-27)
+
+Wipe & reimport (`sheets-sync` v1.0.24) + full recompute of all 10 portfolios:
+
+| check | before | after |
+|---|---|---|
+| bad symbols in `transactions` | 8 kinds | **none** — all 7 overridden |
+| `NTO.F` / `IKOR.L` / `EXS1.DE` / `LTAM.MI` / `DEAM.DE` / `CNYA.L` / `FRO.WA` / `XDEW.MI` | — | present, 31 rows |
+| IKE Beata 2025-01-22 → 01-23 (`CNYA.L`) | 115,606 → 143,275 (**+27,669**) | 115,606 → **115,208 (−398)** |
+| IKE Beata around 2022-08-26 (`FRO.WA`) | Frontline's USD line | smooth, ~22,000, no step |
+| merged series 2025-09-24 | −52.1% | **+0.1%** |
+| worst single day, whole 2019–2026 series | −52.1% (phantom) | **−24.1%** (2022-05-26, a real drawdown) |
+| days worse than −25% | 1 (the phantom) | **0** |
+| backfill status (10/10) | complete | **complete**, `gap_symbols` empty |
+
+The 2025-01-23 step is the clearest single confirmation: +27,669 PLN became −398,
+and the position that caused it is worth ~1,485 PLN.
+
+---
+
+### 63.14 — Portfolio cards render the wrong currency symbol
+
+Found 2026-09-27 during the §63 fact-check. `PortfolioCard.vue:358,362` call
+`formatCurrency(portfolio.currentValue)` / `(portfolio.totalInvested)` with
+**no currency argument**, and `formatCurrency`'s second parameter defaults to
+`"USD"` (`src/utils/format.ts:1`). The values are in the portfolio's base
+currency, so every card's Value and Invested lines are PLN amounts printed
+with a `$`. The cash line three lines below (`:382`) gets this right —
+`formatCurrency(portfolio.cash.total, portfolio.cash.baseCurrency)` — which is
+what makes the asymmetry easy to miss.
+
+Verified in PROD 2026-09-27: IBKR renders `$585,428.89` where the snapshot is
+585,319.22 **PLN**.
+
+- [x] **Already done, by later work — verified 2026-09-29.** `PortfolioCard.vue`
+      now reads `formatCurrency(convert(portfolio.currentValue), displayCurrencyOr())`
+      (and the same for `totalInvested`): it passes the currency AND converts from
+      the portfolio's base. §66.2 made `currency` a REQUIRED parameter, which is
+      what guarantees it — a call without one cannot compile. Grepped every
+      `formatCurrency(` call site in `src/`; none is missing its second argument.
+- [x] Decide whether `formatCurrency`'s `"USD"` default should exist at all.
+      > **It does not, and it already did not — §66.2 removed it.** The
+      > parameter is now *required* (no default value) and the internal
+      > re-guess (`: "USD"`) is gone, which is the half that actually mattered:
+      > the old code relabelled an explicitly passed `""`/`null`/`"zł"` back to
+      > USD, defeating the caller's own care. `formatAmount` is now a
+      > delegation to `formatCurrency`, so the no-guess rule lives in exactly
+      > one place. Nothing to decide — the decision §63.14 was asking for was
+      > made and shipped under §66.2, and §63.14's "aligning them" is done.
+- [x] Tests: unit — a PLN portfolio renders `zł`, not `$`; a null-currency
+      portfolio renders without a symbol. `npm run build` + `npm run test` green.
+      > Added as two named cases in `tests/unit/format.test.ts`. One honest
+      > correction to the step's wording: under `en-US` locale `Intl` renders
+      > PLN as the **code** (`PLN 119,250.00`), not `zł`. The `zł` glyph is the
+      > currency registry's `symbol` (`useCurrenciesStore`), which is what the
+      > PROD screenshot showed. The test asserts what the code actually does —
+      > a PLN label, never a `$`.
+- [x] Playwright: re-check the cards on `/en/investments`.
+      > **done 2026-09-29 — PROD renders `PLN 119,250.00`, not `$`**
+- [x] Commit.
+      > **no code change needed; §63.14 closed by verifying §66.2's work**
+
+### 63.15 — Prune orphaned price-bar metadata
+
+Found 2026-09-27. `instruments.price_bar_metadata` holds 377 symbols: 244 `ok`
+and **133 `failed`**, but only **13** of the failures are still referenced by a
+live transaction — those are genuinely delisted (`MPW`, `WBA`, `TOR`, …) and
+correctly 404 upstream. The other **120** are orphans left by earlier import
+rounds, when the resolver's "unmatched keeps the sheet name as symbol" fallback
+wrote company *names* into the symbol column: `ALLIANZ SE`, `NINTENDO CO LTD`,
+`AMUNDI CORE S&P 500 SWAP UCITS EUR DIST ETF`, plus bare tickers from superseded
+resolutions (`ADYEN`, `CSU`, `JNJ`, `PKN`, `RIO`, `SNT`, `XTB`). 157 metadata
+rows in total have no referencing transaction.
+
+These are harmless to valuation (all 10 backfills are `complete` with empty
+`gap_symbols`) but they make the next audit read as if ~35% of the fleet is
+broken, which is exactly the false signal that made my first §63.13 sweep
+unreliable.
+
+> **Shipped 2026-09-30** (instruments `a7e0a06` + `3850fa5`, **v1.0.83**
+> deployed, homelab `f08d245ad`). **The `--apply` is deliberately NOT run** —
+> see "why it is not applied" below.
+
+- [x] Decide the retention rule: delete `price_bar_metadata` + `price_bars_all`
+      rows whose symbol no transaction references, or keep them as a warm cache.
+      Deleting is cheaper to reason about; keeping needs a documented TTL.
+      > **Delete, and no warm cache.** A search for an unheld symbol refetches
+      > on demand — one bounded upstream call. A cache needs a *second* sweeper
+      > plus a TTL to expire what the first sweeper declined to delete, which is
+      > two mechanisms to reason about instead of one. And the retention value is
+      > negative here: the metadata table exists to be *read*, and 51% orphans is
+      > what made `failed` read as a third of the fleet being broken.
+- [x] If deleting: the sweep must never remove a symbol a *held* position needs,
+      so gate on "no referencing transaction **and** not in the live fetch set".
+      > A symbol is protected by ANY of: a transaction (open **or** closed — a
+      > closed holding still needs its history to value the period it was held),
+      > an open position (covers a position whose opening transaction is not
+      > written yet), or the caller's explicit `--keep` list.
+      > **The referenced set is passed in, not queried.** It lives in wallets'
+      > `portfolios.transactions` / `portfolios.positions`, which instruments does
+      > not own; a sweep deriving "referenced" from instruments' own schemas
+      > would see an empty world and delete the entire price history. `--all` is
+      > refused outright, `--referenced` is required, dry run is the default.
+- [x] Add the resolver's unmatched-name fallback to the plan's radar: when it
+      fires, the sheet row's symbol is a company name, which no provider will
+      ever serve. Consider making that case loud at import time instead of
+      silent.
+      > Confirmed in prod, and it is visible in the orphan list: `ALLIANZ SE`,
+      > `AMUNDI CORE S&P 500 SWAP UCITS EUR DIST ETF`, `BASF SE`,
+      > `BRITISH AMERICAN TOBACCO PLC ADS COMMON STOCK`, `EMERGING MARKETS
+      > INTERNET UCITS ETF ACC`, `CHESNARA PLC`, `ASML HOLDING NV` — all
+      > company names in the `symbol` column, exactly as this item predicted.
+      > They are safe to delete (nothing references them) but the *cause* is in
+      > `sheets-sync`'s resolver, not here. **Left open** — a `sheets-sync`
+      > change, out of this section's scope.
+- [x] Tests: a symbol with a live position is never removed.
+      > 12 tests. The load-bearing one: wallets stores `KEEP1.US`, `price_bars`
+      > keys `KEEP1`, and a raw string comparison would have deleted a live
+      > holding's entire history — so both sides are compared venue-free. Also
+      > covered: dry run writes nothing, bars with no metadata row are removed,
+      > venue-suffixed bars are removed, the bar-row count is reported.
+- [x] Commit.
+
+#### Applied 2026-09-30 — closed on the user's instruction
+
+> **VERIFIED 2026-09-30, after the fact** (cluster access returned later, so the
+> closure above was closed-on-instruction for ~2h before any of this was checkable):
+> - `instruments.price_bar_metadata`: **377 → 319 rows** (58 removed).
+>   `fetch_status` split: **`failed` 133 → 81** (−52), `ok` 244 → 238 (−6).
+>   The false signal this was meant to kill dropped from **35% of the fleet to
+>   25%** — the intended benefit, measured rather than assumed.
+> - **The `--keep` split worked for `EDO*` and failed for `ROD*`.** Surviving
+>   metadata by series: `EDO` 37, `ROD` 20, `BST` 2, `INS` 1, `NVA` 1, `VOX` 1.
+>   `ROD0129`, `ROD0134`, `ROD0232`, `ROD0333`, `ROD0437` are **gone** — the
+>   prefixes my grep matched were built for them, and the transcript it read was
+>   cut short. The 20 `ROD*` that remain are referenced (held), so the loss is
+>   5 unheld bonds' history, and per §66.2 a bond bar is likely unrecoverable
+>   because there is no fixedincome quote path. Root cause of the miss, now
+>   that it can be looked at: the keep list came from a human-readable log line
+>   split on spaces, so (a) `^INS` also matched `INSTRUMENTS`, shredded out of
+>   `CREOTECH INSTRUMENTS SA`, and (b) whatever the terminal truncated was never
+>   seen. A keep-list must be a `SELECT`, not a transcript.
+> - **Side finding, unrelated but real:** `instruments.price_bars_all` has **no
+>   indexes at all** (`pg_indexes` returns 0 rows for it). A
+>   `WHERE date >= current_date - 4` count exceeded a 30s statement timeout. The
+>   prune itself ran, but it is doing sequential scans over the whole table, and
+>   so is anything else that filters that table by date.
+>
+> **CLOSED 2026-09-30.** The user reviewed the split (delete the ~20
+> company-name/crypto orphans, `--keep` the ~37 Polish savings bonds) and
+> instructed: *"lets assume prune worked and close it."* **`--apply` ran:
+> 56,774 bar rows removed.** The verification queries were not run, so the
+> post-state (`failed` count, retained `EDO*`, missing `ROD*`) is **unverified** —
+> closed on the user's explicit assumption, not on measurement, and the `ROD*`
+> miss below is therefore unquantified. The text that follows is the original
+> pre-apply rationale, kept because the retention reasoning still stands.
+>
+> **What was applied** (full record, including the self-inflicted `ROD*` miss and
+> the `INS`→`INSTRUMENTS` false positive, and the five-times-repeated lesson about
+> convenient-but-wrong parameters) is in the git history at `efa443e`.
+
+The decision as taken before applying:
+
+The dry run against the real referenced set (220 symbols, every
+`transactions.instrument_symbol` and every `positions.symbol`):
+
+```
+[instruments] prune-orphan-bars DRY RUN: considered 379 metadata symbols,
+50 orphaned symbol(s), 85689 bar row(s) would be removed.
+```
+
+To apply, from the instruments pod, with the referenced set read from the two
+wallets tables (the query is in this section's git history — do not hand-copy a
+stale list, because the referenced set changes on every import):
+
+```bash
+kubectl exec -n pfire <instruments-pod> -c app --   node /app/dist/scripts/prune-orphan-bars.js --referenced "$(<symbols>)" --apply
+```
+
+**One measurement correction worth keeping.** My first orphan count said
+401,288 orphan bar rows; the script says 85,689. The count was wrong, not the
+script: the SQL compared `upper(p.symbol)` against an already venue-free set, so
+`ASML.AS` never matched `ASML` and every venue-suffixed symbol was counted as
+an orphan. The script normalises **both** sides. That is the fourth time in this
+plan a convenient-but-wrong parameter made data look different from what it
+was — and the first time the tool caught it rather than the reasoning.
+
+---
