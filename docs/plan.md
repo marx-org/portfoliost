@@ -4029,31 +4029,82 @@ is not proposed.
       `test_real_config_has_fund_catalogue_route` and
       `test_real_config_has_fund_search_route`. Full cachest suite green (211).
       Never swap 3 and 4.
-- [ ] **Step 5 — instruments: the part that earns its keep.**
-      - [ ] `fund-category-catalogue-sync.ts`, modelled directly on
-            `corp-bond-catalogue-sync.ts`: fetch the CSV from cachest, upsert
-            `ANALIZY::{CODE}` rows with `asset_type='fund'` and
-            `exchange='ANALIZY'`, with the same `MIN_EXPECTED_ROWS` guard against
-            a truncated scrape.
-      - [ ] **Delete `FUND_CATEGORY_CODES` and `isFundCategory`** from
-            `src/adapters/symbol.ts`, and the `assetTypeForSymbol` early-return.
-            `ING01W` then classifies as `fund` the ordinary way — by table row.
-      - [ ] Derive the price tier from the row's `exchange === 'ANALIZY'`, so
-            `upstreamFor` gains a `tier` parameter instead of provider
-            knowledge. **`.TFI` funds keep the biznesradar route** — `NNEP65`
-            reproduces 34 of 66 trades to the cent there, and `NNEP30`'s first
-            trade sits 17 days inside `ING82`'s window.
-      - [ ] `fundSearchLeg` merged additively alongside `bondSearchLeg`, so the
-            catalogue is searchable *and* the corpus is reachable for symbols
-            absent from the table.
-      - [ ] Tests: the 941 corp bonds still resolve to `corp_bond`; a `.TFI` fund
-            still routes to biznesradar; an `ANALIZY::` row routes to the category
-            route; search returns a fund and a corp bond for overlapping queries.
-- [ ] **Step 6 — full stack + the UI.** `docker compose up -d`, curl through
-            cachest, `npm run test:stack` green, then confirm in
-            `InstrumentSearchModal` that typing `ING01W` / `Akcji` returns the
-            fund and renders as a fund. The SPA needs no change if the response
-            shape is unchanged — verify, do not assume.
+- [x] **Step 5 — instruments: the part that earns its keep.**
+      > **DONE** — `207b981`, tsc clean, **447 tests green** (was 431).
+      >
+      > **`FUND_CATEGORY_CODES` and `isFundCategory` are deleted**, along with the
+      > `assetTypeForSymbol` early return that went with them. Both the asset class
+      > and the price tier now come from **one catalogue row**: the sync writes
+      > `ANALIZY::{CODE}` with `asset_type=fund`, `assetTypeForSymbol` finds it
+      > like any other instrument, and `priceTierForSymbol` reads the venue column.
+      > Two sources of truth for one fact became one, and the routing code carries
+      > no provider knowledge.
+      >
+      > `upstreamFor` gains a `tier` argument rather than sniffing symbols, because
+      > it is pure and cannot query the database — the caller resolves the tier and
+      > passes it down. It **defaults to `standard`**, so a `.TFI` fund cannot be
+      > diverted by an omitted argument, and the tier is **ignored for non-fund
+      > asset classes**, so a mislabelled row cannot move a crypto pair or a bond
+      > onto the fund feed. Both pinned.
+      >
+      > `fund-category-catalogue-sync.ts` mirrors `corp-bond-catalogue-sync.ts`:
+      > fetch, count, refuse a truncated body, upsert. **The row floor is 400 of
+      > 734 (~54%), matching the corp-bond gate's 53%.** My first draft used 200,
+      > which would have accepted a 300-row truncation and silently dropped 400
+      > funds from search — writing the boundary test is what caught it, so the
+      > floor is now probed behaviourally (500 syncs; 150/12/0 refuse).
+      >
+      > `fundSearchLeg` is additive beside `bondSearchLeg`. The catalogue reaches
+      > search through the reference table as well; the leg exists for rows the
+      > table has not caught up with, not to replace it.
+      >
+      > Tests worth naming: a dotless corp bond (`ABE0227`) stays `standard`
+      > despite the exact shape of a category; `ING01W` is `standard` without a
+      > catalogue row and `fund_category` with one; a category code on the
+      > `standard` tier goes to biznesradar; and the §72.39 test asserting the
+      > deleted early return is **replaced** with the data-driven expectation.
+- [x] **Step 6 — full stack + the UI.** `docker compose up -d`, curl through
+      cachest, `npm run test:stack` green, then confirm in
+      `InstrumentSearchModal` that typing `ING01W` / `Akcji` returns the
+      fund and renders as a fund. The SPA needs no change if the response
+      shape is unchanged — verify, do not assume.
+      > **PASSED, including the UI.** Stack rebuilt, gateway restarted per
+      > AGENTS.md (openst/cachest/instruments were all recreated).
+      >
+      > | check | result |
+      > |---|---|
+      > | `/fund/catalogue` via cachest | 200, **734 rows**, `ANALIZY::ING01W` present |
+      > | `/fund/search/ING01W` via cachest | 200, 1 hit |
+      > | `/fund/search/nosuchfund` via cachest | 404 |
+      > | W price bars through the tier | **382.05 / 904.80 / 931.03** — no regression |
+      > | `.TFI` funds still on biznesradar | `NNEP65.TFI` 18,172 b, `INGAKC.TFI` 18,920 b |
+      > | `test:stack` | **32/32** |
+      > | `test:mock` | **230** |
+      >
+      > **The sync ran and is the load-bearing part:** `upserted 734 fund rows into
+      > ticker_reference`, and the local table now holds 734 `ANALYZY`/`fund` rows
+      > with `ING01W → aliases ING01`. Without that row `ING01W` classifies as
+      > `null`, i.e. stock — so the tier, the asset class and search all depend on
+      > this job having run.
+      >
+      > **In the browser** (`localhost:3000`, mock IdP login, Add Position →
+      > search): `ING01W` renders as **`ING01W (PL) Fund ING Akcji W`**, and
+      > `emerytura` returns the families across all four managers — `AXA24`–`AXA40`,
+      > `ING81`–`ING98`, `PCS74`–`PCS96`, `SKR117`–`SKR119` — **each alongside its
+      > own `B` category** (`SKR117B`, `SKR118B`, `SKR119B`), which is the
+      > category/parent relationship working end to end.
+      >
+      > **No SPA change was needed, and that is verified rather than assumed:**
+      > `InstrumentSearchModal` applies no type filter, and `TickerBadge` already
+      > maps `FUND` → "Fund". The pre-existing `.TFI` symbols (`NNEP25.TFI`,
+      > `NNEP30.TFI`, `NNEP60.TFI`, `NNEP65.TFI`) still appear in the same results,
+      > so both worlds coexist rather than one replacing the other.
+      >
+      > **Still owed before this is true in PROD:** the catalogue sync needs a
+      > scheduled job there, exactly as `corp-bond-catalogue-sync` has one. Run by
+      > hand in the compose stack it is a one-liner, but PROD has no
+      > `ANALYZY` rows until a job exists — and until it does, `ING01W` resolves
+      > to nothing and the W bars are unreachable.
 
 **What this section does not do.** It does not add fund categories to the
 `aktualny kurs` sheet column (§72.39's stale-data finding), does not touch
