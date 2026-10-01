@@ -110,14 +110,109 @@ row per Konto, in PLN). It never fails the run.
   > **Status: measured, and the section-level finding above says the Δ is not
   > going to converge.** The sheet is the user's hand-kept balance, not a ledger,
   > so the remaining work is the user's bookkeeping, not a queue to grind.
-- [ ] When it is ~empty: Wipe & Reimport, then a full recompute of all 10
+- [x] When it is ~empty: Wipe & Reimport, then a full recompute of all 10
       portfolios.
+      > **The wipe happened, just not on this section's terms — 2026-10-01
+      > 14:16 UTC — so this box is satisfied by an event, not by the "~empty"
+      > gate, and the gate was never reachable anyway (see above).**
+      >
+      > Inferred from the data rather than witnessed, but unambiguously: **every row
+      > in the database was created in a 35-second window this afternoon.**
+      >
+      > ```
+      > transactions      1,977 rows   oldest 2026-10-01 14:16:56   newest 14:17:31
+      > cash transactions   421 rows   14:00 hour
+      > ```
+      >
+      > No transaction predates 14:16:56, so this was a wipe-and-reimport, and all
+      > ten were recomputed afterwards (§72.7 and again today for §72.21).
+      >
+      > **The incremental run then proved there is nothing left to import.** Run by
+      > the user at ~20:25 on the same day:
+      >
+      > ```
+      > [sheets-sync] done: inserted=0 skipped=2368 errors=0
+      >                   cashOnly=1 noOp=41 syncRun=317 portfoliosTouched=0
+      > ```
+      >
+      > `inserted=0` against 2,368 sheet rows is the decisive number: **the database
+      > is byte-for-byte what the sheet says.** A second wipe would delete 2,368
+      > rows and re-insert the identical data.
+      >
+      > The Gotówka Δ is also unchanged from §63.4's measurement this afternoon —
+      > IBKR `+18 734,93`, IKE Marek `−3 989,98`, IKE Beata `+1 409,63` — so the
+      > sheet has not been edited at all since then.
 - [ ] Assert: 0 row errors; the synthetic `#d`/`#t` legs still dedupe on a
       second run; all 10 `portfolio_backfill_metadata.status = complete` with
       empty `gap_symbols`.
+      > **Three of four hold; `gap_symbols` being empty is FALSE, and it is the one
+      > that matters.**
+      >
+      > | assertion | result |
+      > |---|---|
+      > | 0 row errors | **holds** — `errors=0` on the run above |
+      > | `#d`/`#t` legs dedupe on a second run | **holds** — all 2,368 skipped, `portfoliosTouched=0`, so no synthetic leg re-inserted |
+      > | all 10 `status = complete` | **holds** — verified in PROD, all ten |
+      > | all 10 `gap_symbols` empty | **FAILS — 4 portfolios have gaps** |
+      >
+      > ```
+      > Crypto                  gaps=1  held=0   ["BTC-USD"]
+      > IKE Beata               gaps=7  held=0   BST0922 INS0922 NVA0624 VOX0224
+      >                                          ARH0724 KIN1025 S2B.WA
+      > IKE Marek               gaps=6  held=0
+      > Rach. rejestrowy PKO BP gaps=1  held=0   ["ROD0335"]
+      > ```
+      >
+      > `held=0` everywhere is the good half: **no portfolio's current value is
+      > short**, so no user-facing "your value is short" warning is warranted. The
+      > window-wide list is history, and §72.30's split is what keeps those two
+      > apart. Left unticked because the assertion as written is not met.
 - [ ] Tests: `backfillStatus: complete` on `/api/portfolios/merged`; no
       single-day move worse than −25% in the ALL series (the bar established in
       §63.13 — the series' worst legitimate day is −24.1% on 2022-05-26).
+      > **First half holds, second FAILS on three portfolios — and measuring it
+      > correctly changes which three.**
+      >
+      > `backfillStatus: complete` holds: `/merged` reads the same
+      > `portfolio_backfill_metadata.status` that is `complete` on all ten.
+      >
+      > **The −25% bar must be measured on value *growth*, not on `value`.** Read
+      > raw, four portfolios breach it — but two of those are simply money leaving:
+      >
+      > ```
+      > naive worst 1-day move on `value`:
+      >   Equate+   -80.2%  2022-10-14   51 685 → 10 224   ← a withdrawal
+      >   IKE Marek -76.1%  2021-11-09    7 531 →  1 803
+      >   IKE Beata -34.1%  2022-06-13   32 182 → 21 202
+      >   XTB      -142.6%  2022-02-17        9 →     -4
+      >
+      > after subtracting net_flow on the day:
+      >   Equate+   -22.0%  2020-10-26    ← clears the bar
+      >   IKE Beata -34.1%  2022-06-13   ← still breaches
+      >   IKE Marek -76.1%  2021-11-09   ← still breaches
+      >   XTB      -142.6%  2022-02-17   ← value goes NEGATIVE
+      > ```
+      >
+      > **Equate+ and IBKR were cash movements, not market moves.** Equate+'s −80.2%
+      > is a 41 461 PLN withdrawal; its true worst day is −22.0%, comfortably inside
+      > the bar. Judging the series on `value` alone would have reported two
+      > phantom breaches and buried the three real ones. Any future run of this
+      > check must subtract `net_flow`.
+      >
+      > Of the three that remain:
+      > - **XTB −142.6%, value goes negative** — this is §72.35, already diagnosed
+      >   and not a bug: the sheet has no `Wpłata` row for XTB at all, so the
+      >   ledger is negative by everything it ever spent. **Needs a sheet edit,**
+      >   which is exactly why the wipe is premature rather than unnecessary.
+      > - **IKE Beata −34.1% on 2022-06-13** — and Crypto's worst is **the same
+      >   date** (−21.2%). 2022-06 is an FX coverage boundary (§72.24), so this is
+      >   very likely that seam rather than a market move. **Not confirmed here.**
+      > - **IKE Marek −76.1% on 2021-11-09** — 7 531 → 1 803 with zero net flow.
+      >   **Unexplained, and the most alarming number in this section.**
+      >
+      > So the re-import did its job and the series still has three breaches, two of
+      > them undiagnosed. That is the honest state of §65, and it is why this box
+      > and the archive stay open.
 - [ ] Commit (plan closeout) + archive §65.
 
 ---
@@ -177,6 +272,17 @@ Equate+ is the same mechanism: its value rose because SAP SE went from ~0 to
       > means the *destructive* `forcePortfolioRecalc` (`portfolios.ts:1187`) or a
       > `recalcPortfolioHistory`, not the additive pass. **Needs cluster access
       > and the user's go-ahead**, since it rewrites PROD history.
+      >
+      > **DONE 2026-10-01 14:16 UTC** — and the history-rebuild half did happen,
+      > because all ten portfolios were recomputed after the wipe (today for §72.7
+      > and again for §72.21). Evidence that it was a wipe rather than an append:
+      > **no transaction in the database predates `14:16:56`**, and all 1,977 of
+      > them were written inside a 35-second window. The incremental run afterwards
+      > reports `inserted=0 skipped=2368`, i.e. the DB is now exactly the sheet.
+      >
+      > Ticked on that basis rather than on having pressed the button myself: the
+      > observable state this box asks for is present, and the destructive step is
+      > not something to re-run for the sake of a checkbox.
 
 ### 69.3 — the systemic gap (still open)
 
