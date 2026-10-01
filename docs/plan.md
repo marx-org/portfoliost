@@ -3961,14 +3961,69 @@ is not proposed.
       Gate: the catalogue contains the 7 codes §72.39 verified, each with its
       label, currency and first/last valuation. Tests: none yet — config-only.
       Record the prefix list as data, with the discovery evidence above.
-- [ ] **Step 2 — openst routes.** `GET /fund/catalogue` (CSV) and
-      `GET /fund/search/{query}`, both over the captured catalogue. Unit tests
-      with the HTTP fetch mocked; must assert a search hit and a clean miss
-      distinctly, and that currency is carried through. Full openst compose suite
-      green (416 + 104 + 53 + 21 today).
-- [ ] **Step 3 — openst standalone smoke.** `docker compose up -d`, curl
+- [x] **Step 2 — openst routes.** `GET /fund/catalogue` (CSV) and
+      `GET /fund/search/{query}`, both over the captured catalogue.
+      > **DONE** — `3747f0c`, **31 new tests**, full compose suite green
+      > **447 + 104 + 53 + 21**.
+      >
+      > **The catalogue is a snapshot, not a scrape, and that is the one way this
+      > route differs from `/corp-bond/catalogue`.** That one reads a single
+      > server-rendered page; this corpus is 734 codes across two enumeration
+      > passes (~960 requests), so a request-path scrape is impossible. A refresh
+      > job rewrites `data/fund-catalogue.csv` and the route serves the file.
+      >
+      > **A missing or empty snapshot is a 503, never an empty CSV.** An empty
+      > catalogue would make every fund unsearchable and every fund code a 404 —
+      > indistinguishable from "this source has no funds", the silent shape this
+      > work exists to avoid. A search **miss** is likewise 404, never an empty
+      > 200. Both asserted.
+      >
+      > Search matches code, alias **or** name, substring and case-insensitive,
+      > so the class-W symbol is reachable without knowing its code: `ING01`
+      > returns `ING01W` alongside its siblings, and `akcji` finds it by name. The
+      > tickerref CSV carries the bare fund code in `aliases` for the same reason.
+      >
+      > Two details pinned by tests because they are easy to get wrong:
+      > `_base_fund_code` strips **exactly one** trailing letter (`SKR117B` is a
+      > category, `SKR120` is a fund — "strip trailing alpha" would fold
+      > `SKR117B` onto `SKR117` and lose it); and categories outnumber funds
+      > (475 vs 259), so "the row count looks right" is **not** evidence the
+      > lettered codes were captured.
+- [x] **Step 3 — openst standalone smoke.** `docker compose up -d`, curl
       `/fund/catalogue` and a search, confirm the Redis cache **HITs** on the
-      second identical call. Tests: smoke only, justified by step 2.
+      second identical call.
+      > **PASSED.** Stack rebuilt, healthy in 7 s.
+      >
+      > | check | result |
+      > |---|---|
+      > | `/fund/catalogue` | 200, **734 rows**, 60,586 b, tickerref header |
+      > | `ANALIZY::ING01W` in the served CSV | present, `aliases=ING01` |
+      > | `/fund/search/ING01W` | 200, 1 hit — ING Akcji W |
+      > | `/fund/search/ING01` | 200, 5 hits (fund + F/T/U/W) |
+      > | `/fund/search/akcji` | 200, 50 hits |
+      > | `/fund/search/emerytura` | 200, 36 hits |
+      > | `/fund/search/nosuchfund` | **404** (negative-cached) |
+      >
+      > **Redis HIT confirmed, and confirmed to be Redis.** After deleting only the
+      > fund keys: catalogue 15.8 ms → 4.7 ms → 5.2 ms; search 7.2 ms → 4.5 ms;
+      > the 404 6.5 ms → 4.3 ms. Keys are genuinely in Redis — `fund_catalogue`
+      > (TTL 86378) plus one `fund_search:*` per query including the
+      > negative-cached miss.
+      >
+      > **Regression check:** the §72.39 W route still returns 382.05 / 904.80 /
+      > 931.03 after the catalogue work.
+      >
+      > **One real defect the smoke caught, which the unit tests could not:** the
+      > snapshot was missing from the runtime image, so `/fund/catalogue` returned
+      > **503** in the container while every test passed — the Dockerfile copies
+      > `src/`, `tests/`, `migrations/` and `plugins/` but not `data/`. Fixed by
+      > adding `COPY data/ ./data/`. Worth recording because a green suite proved
+      > nothing here: the failure was purely packaging, and only a real container
+      > could surface it. The 503 behaved exactly as designed, naming the missing
+      > path instead of serving an empty catalogue.
+      >
+      > Stack torn down afterwards. No test file added: smoke only, justified by
+      > step 2's 31 tests.
 - [ ] **Step 4 — cachest routes.** Both routes in `config.yaml` with TTLs matching
       their openst peers (a catalogue is slow-moving; a search is per-query), plus
       `test_real_config_has_fund_catalogue_route` and
