@@ -125,15 +125,22 @@ const unpricedAmount = computed(() =>
   unpriced.value ? `up to ${formatCurrency(unpriced.value.peak, props.currency)}` : "",
 )
 const gapMessage = computed(() => {
+  // §78.5 — the amount and the count describe DIFFERENT windows and never share
+  // a sentence. `gapSymbols` is window-wide by design (§72.30); the series here
+  // is timeframe-filtered. On IKE Beata, 1Y reports 7 gap symbols with 0 of them
+  // held in the visible window, while ALL reports the same 7 with 1,016 of 1,801
+  // days withheld. "7 positions, up to 10,465 PLN" would assert a count about a
+  // period the amount does not describe.
   if (heldGapCount.value > 0) {
     const n = heldGapCount.value
     const amt = unpricedAmount.value
-    return `Value excludes ${n} position${n === 1 ? "" : "s"} with no price history yet${amt ? ` (${amt})` : ""} — total is a partial sum.`
+    return `Value excludes ${n} position${n === 1 ? "" : "s"} with no price history yet${amt ? ` — ${amt} withheld` : ""}. Total is a partial sum.`
   }
   if (historyGapCount.value > 0) {
-    const n = historyGapCount.value
     const amt = unpricedAmount.value
-    return `Earlier in this period, ${n} position${n === 1 ? " was" : "s were"} held with no price history${amt ? ` — ${amt} of the value line is missing for those days` : ""}. Those points are partial sums; the latest value is complete.`
+    if (amt) return `${amt} of this chart is missing — those points are partial sums. The latest value is complete.`
+    const n = historyGapCount.value
+    return `Earlier in this period, ${n} position${n === 1 ? " was" : "s were"} held with no price history — those points are partial sums. The latest value is complete.`
   }
   return ""
 })

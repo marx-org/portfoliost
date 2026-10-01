@@ -286,7 +286,10 @@ describe("PortfolioPerformanceChart (§78.5 — unpricedValue)", () => {
     const warn = w.find('[data-testid="portfolio-chart-gap-warning"]').text()
     expect(warn).toMatch(/up to\s*PLN\s*10,465\.38/i)
     expect(warn).not.toMatch(/20,930/)
-    expect(warn).toMatch(/earlier in this period/i)
+    // §78.5: the amount path does NOT also claim a count — see the "count and
+    // amount stay separate" block below for the measurement behind that.
+    expect(warn).toMatch(/missing/i)
+    expect(warn).toMatch(/latest value is complete/i)
   })
 
   it("says nothing about an amount when unpricedValue is ABSENT, not zero", async () => {
@@ -321,5 +324,56 @@ describe("PortfolioPerformanceChart (§78.5 — unpricedValue)", () => {
       global: { stubs: { apexchart: true } },
     })
     expect(w.find('[data-testid="portfolio-chart-gap-warning"]').exists()).toBe(false)
+  })
+})
+
+/**
+ * §78.5 — the count and the amount must not be merged into one sentence.
+ *
+ * Measured on IKE Beata against the real endpoint:
+ *   1Y  → gapSymbols 7, days with unpricedValue 0  (none held in the window)
+ *   ALL → gapSymbols 7, days with unpricedValue 1016, peak 10,465.38
+ *
+ * `gapSymbols` is window-wide by design (§72.30) and the series is
+ * timeframe-filtered, so "7 positions, up to 10,465 PLN" asserts a count
+ * about a period the amount does not describe — and in 1Y, about a window
+ * in which none of the 7 were held at all.
+ */
+describe("PortfolioPerformanceChart (§78.5 — count and amount stay separate)", () => {
+  const withAmount = [
+    { date: "2022-06-12", value: 32182, unpricedValue: 0 },
+    { date: "2022-06-13", value: 21201, unpricedValue: 10465.38 },
+  ]
+
+  it("uses the amount alone when the visible window withheld some", async () => {
+    const w = mount(PortfolioPerformanceChart, {
+      props: {
+        timeSeries: withAmount,
+        gapSymbols: ["BST0922", "INS0922", "NVA0624", "VOX0224", "ARH0324", "KIN1025", "S2B.WA"],
+        heldGapSymbols: null,
+        currency: "PLN",
+      },
+      global: { stubs: { apexchart: true } },
+    })
+    const warn = w.find('[data-testid="portfolio-chart-gap-warning"]').text()
+    expect(warn).toMatch(/up to\s*PLN\s*10,465\.38/i)
+    expect(warn).not.toMatch(/7 position/i)
+  })
+
+  it("falls back to the count when the window withheld nothing", async () => {
+    // The 1Y case: seven window-wide gap symbols, none of them in this window.
+    // The count is then the only claim available, and it is the pre-existing one.
+    const w = mount(PortfolioPerformanceChart, {
+      props: {
+        timeSeries: [{ date: "2025-10-01", value: 500, unpricedValue: 0 }],
+        gapSymbols: ["BST0922", "INS0922", "NVA0624", "VOX0224", "ARH0324", "KIN1025", "S2B.WA"],
+        heldGapSymbols: null,
+        currency: "PLN",
+      },
+      global: { stubs: { apexchart: true } },
+    })
+    const warn = w.find('[data-testid="portfolio-chart-gap-warning"]').text()
+    expect(warn).toMatch(/7 positions were held/i)
+    expect(warn).not.toMatch(/up to/i)
   })
 })

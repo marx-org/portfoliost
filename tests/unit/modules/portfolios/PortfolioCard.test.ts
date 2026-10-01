@@ -255,7 +255,7 @@ describe("§78.5: the card's gap notice names the amount", () => {
     vi.clearAllMocks()
   })
 
-  it("puts the peak in the history note, and it is the peak not the sum", async () => {
+  it("leads with the PEAK when the visible window has withheld value", async () => {
     mockedPortfolios.getPortfolioAnalytics.mockResolvedValue(
       analyticsWithGaps(["BST0922", "INS0922"], null, [32182, 21201], [0, 10465.38]),
     )
@@ -263,6 +263,11 @@ describe("§78.5: the card's gap notice names the amount", () => {
     const note = w.find('[data-testid="card-chart-history-gap-note"]').text()
     expect(note).toMatch(/up to\s*PLN\s*10,465\.38/i)
     expect(note).toMatch(/today's value is complete/i)
+    // 78.5: the count and the amount describe DIFFERENT windows, so the count
+    // is dropped rather than merged. `gapSymbols` is window-wide (7, ever) while
+    // the series here is timeframe-filtered - on 1Y none of those 7 were held in
+    // the visible window, so "7 positions, up to 10,465 PLN" would be false.
+    expect(note).not.toMatch(/2 earlier positions/)
   })
 
   it("puts the peak in the urgent banner when the gap is still held", async () => {

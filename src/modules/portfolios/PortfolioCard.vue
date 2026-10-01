@@ -518,10 +518,30 @@ async function exportPositions(format: "csv" | "xml" | "json") {
            have both, and dropping the history note just because an urgent one is
            already on screen hides a real gap for the sake of tidiness. -->
       <p v-if="heldChartGap && heldChartGap.length" class="mt-1 text-xs font-medium text-amber-600 dark:text-amber-400" data-testid="card-chart-gap-warning">
-        Value excludes {{ heldChartGap.length }} position{{ heldChartGap.length === 1 ? "" : "s" }} without price history<span v-if="unpricedAmountLabel"> ({{ unpricedAmountLabel }})</span>.
+        Value excludes {{ heldChartGap.length }} position{{ heldChartGap.length === 1 ? "" : "s" }} without price history<span v-if="unpricedAmountLabel"> &mdash; {{ unpricedAmountLabel }} withheld</span>.
       </p>
       <p v-if="historyChartGap && historyChartGap.length" class="mt-1 text-xs text-slate-500 dark:text-slate-400" data-testid="card-chart-history-gap-note">
-        {{ historyChartGap.length }} earlier position{{ historyChartGap.length === 1 ? "" : "s" }} had no price history<span v-if="unpricedAmountLabel"> &mdash; {{ unpricedAmountLabel }} of the chart is missing for those days</span> &mdash; those chart points are partial. Today's value is complete.
+        <!--
+          §78.5 — the AMOUNT and the COUNT are two claims about two different
+          windows, so they never share a sentence.
+
+          `gapSymbols` is WINDOW-WIDE by design (§72.30: the whole backfill
+          window, so a position held in 2022 and sold since still counts). The
+          series here is TIMEFRAME-FILTERED. Measured on IKE Beata:
+            1Y  → count 7, and 0 of them were held in the visible window
+            ALL → count 7, and 1016 of 1801 days withheld, peak 10,465.38
+          So pairing them — "7 positions, up to 10,465 PLN" — asserts a count
+          about a period the amount does not describe, and in 1Y asserts a count
+          about a window in which none of them were held. The amount is the
+          window-accurate half and leads when present; the count is the fallback
+          and keeps its original wording.
+        -->
+        <template v-if="unpricedAmountLabel">
+          {{ unpricedAmountLabel }} of this chart is missing &mdash; those points are partial. Today's value is complete.
+        </template>
+        <template v-else>
+          {{ historyChartGap.length }} earlier position{{ historyChartGap.length === 1 ? "" : "s" }} had no price history &mdash; those chart points are partial. Today's value is complete.
+        </template>
       </p>
     </div>
 
