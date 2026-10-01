@@ -351,14 +351,67 @@ conversion).
       > `exchange_rate` or the date-shifted rate?). Naming the class is the
       > triage; picking a fix without the measurement is the thing §72.36/§72.37
       > retracted twice.
+      >
+      > **§74.6's characterisation of those 28 was wrong, and the 2026-10-01 run is
+      > what shows it.** They are not "100% cross-currency, all 10–15%". The
+      > current 30 split into at least **three** classes, and the largest is
+      > neither cross-currency nor 10–15%:
+      >
+      > ```
+      > NVDA   6/12 off · worst 1517.0% · bar USD vs position USD   ← same currency
+      > CRWD   3/3  off · worst  302.3% · bar USD vs position USD   ← same currency
+      > OXLC   2/2  off · worst  -79.8% · bar USD vs position USD
+      > ADBE   1/8  off · worst   47.5% · bar USD vs position USD
+      > ```
+      >
+      > **These are stock splits, and the arithmetic is exact enough to call it.**
+      > `CRWD` on 2023-06-06: trade `153.5` against bar `38.26` = **4.012x**, and
+      > CrowdStrike split 4:1 in Dec 2024, so `38.26 x 4 = 153.04`. `NVDA`: five of
+      > its six flagged trades land at **9.75–10.17x**, and NVDA split 10:1 in June
+      > 2024, so `26.453 x 10 = 264.53` against a `257.97` trade. **The bars are
+      > split-adjusted and the stored trades are raw.** That is a real, mechanical
+      > class and it is *classifiable* the way the NN TFI family was — which is
+      > what this item asks for. It is not done here.
+      >
+      > One caveat that does **not** fit that class, recorded rather than folded in:
+      > `NVDA` 2022-05-11 is **16.2x**, not ~10x. The bar is not the culprit —
+      > its neighbours run 16.2–20.3 all month, correctly split-adjusted — so the
+      > stored **trade price 268.91** is wrong; NVDA traded near 171 that day. A
+      > bad stored price is a different defect from a split basis and needs a
+      > different fix.
 - [x] Decide whether the `MFC` false positive from §71.6 is fixed by narrowing
       the rule or by recording the exception.
       > **Neither — classified instead**, §71.6. Recorded, still reported, and
       > excluded from the exit code.
 - [ ] Re-run and assert the flagged count only goes down.
-      > **Cannot be asserted yet**: this is the first run since the log route
-      > shipped (§72.22), so there is no prior count in the same place to compare.
-      > The next run gives the baseline. Recorded rather than claimed.
+      > **Re-run 2026-10-01: it went UP, 28 → 30.** Recorded rather than framed as
+      > a pass, because "only goes down" is an assertion about *regressions* and a
+      > count that rises is the assertion failing.
+      >
+      > The first run of the day also said 31, which is worth recording precisely
+      > because it was wrong: that run used the drifted v1.1.95 pin, and on
+      > v1.1.114 the same database gives 30. **Both 31 and 30 were "the" flagged
+      > count** and only one was measured by current code.
+      >
+      > **The deeper problem is that this item is not yet measurable against a live
+      > database, and the reason is not a rounding detail.** The *unverified* set
+      > churns between runs on the same code:
+      >
+      > ```
+      > v1.1.95 job run:  11 unverified · CNYA.L FLAGGED (12.3%)
+      > v1.1.114 job run: 23 unverified · CNYA.L unverified (no bars)
+      > ```
+      >
+      > Twelve symbols gained bars and `CNYA.L` lost them between two runs hours
+      > apart, while instruments was still backfilling. A symbol is counted as
+      > clean when it reconciles and as *unverified* when it has no bars — so a
+      > symbol flipping between those two states changes the flagged count without
+      > any trade, bar value or code changing. **Until the bar set is stable, "the
+      > flagged count only goes down" measures fixture churn, not quality.** Making
+      > it assertable needs a pinned fixture (or a bar-coverage precondition, e.g.
+      > every symbol's bar count recorded with the run and the comparison refused
+      > when it changes). Left open and stated plainly rather than ticked on a
+      > number that moved for the wrong reason.
 - [x] Commit.
 
 ### 72.5 — close out §71.6
@@ -1196,8 +1249,41 @@ coincides with a transaction; that check is the next step and it is mechanical.
       > **§72.26-72.28 — IBKR a TRANSFER of 2215.03 EUR, IKE Beata a 17766 PLN deposit, Equate+ clean, IKE Marek the bond case**
       against that day's transactions. A jump with a trade is real; one without is
       still a bug, and the symbol and currency for that date name it.
-- [ ] Re-run the price audit (§72.18 shipped but the audit has not been re-run) and
+- [x] Re-run the price audit (§72.18 shipped but the audit has not been re-run) and
       confirm SAP.DE stops being reported.
+      > **Done 2026-10-01** through the admin job, and it took three runs to get a
+      > trustworthy one — the reason is the headline, not a footnote.
+      >
+      > **The job had been auditing stale code.** The audit script lives in the
+      > wallets image, and the `WALLETS_IMAGE` pin that selects it sat at
+      > **v1.1.95 while wallets ran v1.1.114**. §72 put that pin there "so the two
+      > images cannot drift" and then nothing checked that they hadn't. The tell
+      > was in the output rather than the version: the first run printed **no
+      > order-priced block at all**, and hand-running the same script against the
+      > same database on v1.1.114 yields **194 order-priced trades across 12
+      > symbols** — the exact block §74.6 relied on to demonstrate the NN TFI
+      > false positives were *explained*. A missing block read as a change in the
+      > data when it was a change in the binary, and the flagged count still
+      > looked authoritative while being 19 releases out of date. Pin corrected to
+      > v1.1.114 and the run repeated.
+      >
+      > **`SAP.DE` does not appear** — 0 occurrences in the log. §72.18's
+      > option-premium-leg skip still holds ("5 option premium leg(s) skipped").
+      > That is this item's question, answered.
+      >
+      > The trustworthy run, against the §74.6 baseline:
+      >
+      > | | §74.6 (2026-09-30) | now (2026-10-01) |
+      > |---|---|---|
+      > | trades / symbols | 1191 / 219 | 1195 / 219 |
+      > | order-priced | 192 / 12 symbols | **194 / 12 symbols** |
+      > | no bars (unverified) | 23 | **23** |
+      > | flagged | 28 | **30** |
+      >
+      > **`SAP.DE` clear and the baseline reproduced** — the structure matches
+      > §74.6, which is the first evidence that these two runs are comparable at
+      > all. The flagged count went **up by 2**, which is §72.4's problem and is
+      > recorded there, not smoothed over here.
 
 ### 72.20 — §72.16 measured: the 1.126x is NOT an ING Akcji category. It is not A either.
 
