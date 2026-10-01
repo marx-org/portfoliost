@@ -3917,24 +3917,68 @@ NN TFI trade is a false positive, and a correct one for the wrong reason.
             > loud error, which is precisely the mistake that nearly shipped.
 
       **Stage 6 — full compose stack.**
-      - [ ] `docker compose up -d redis openst cachest instruments`, curl through
+      - [x] `docker compose up -d --build`, curl through
             cachest, `npm run test:stack` green.
-            > Smoke must prove **three** W readings, not a `200` — the plan's own
-            > recurring error is confirming availability from a status code alone.
-            > Through the running stack: 382.05 on 2023-04-13, 904.80 on 2026-08-19,
-            > and 931.03 on 2026-09-29. The first two are the gate; the third
-            > proves the *current* quote is the same series, which is what makes the
-            > valuation correct rather than just historically consistent.
+            > **PASSED end to end.** Stack rebuilt from the three repos changed
+            > (openst `610bf60`, cachest `147258f`, instruments `75aadce`).
+            >
+            > **All three W readings through the provider tier**, which is the
+            > point of this stage — a `200` proves nothing on its own:
+            >
+            > | date | expected | via cachest | |
+            > |---|---|---|---|
+            > | 2023-04-13 | 382.05 | **382.05** | PASS (22 ms) |
+            > | 2026-08-19 | 904.80 | **904.80** | PASS (147 ms) |
+            > | 2026-09-29 | 931.03 | **931.03** | PASS (196 ms) |
+            >
+            > **The 404 survives both hops:** `/fund/history/NNEP65` → HTTP 404
+            > through cachest, so the distinguishability stage 2 and 5 built is not
+            > flattened by the caching tier.
+            >
+            > Suites, all green: `test:stack` **32/32**, `test:mock` **230**,
+            > SPA `vitest` **476** (65 files), `npm run build` (incl. `vue-tsc`).
+            >
+            > One detour worth recording: the first gateway probe 404'd and looked
+            > like AGENTS.md's stale-upstream-IP symptom. It was **my own wrong
+            > path** — the gateway serves `/api/instruments/*`, not
+            > `/instruments/health`; `/api/health` legitimately belongs to
+            > example-service-mock. A `docker compose restart gateway` had already been done
+            > per AGENTS.md, and direct-to-service was 200 throughout. Recorded
+            > because "restart the gateway" is reflex enough to misdiagnose a
+            > non-DNS 404 as DNS.
       - [ ] Then the change that actually moves the user's numbers: sheets-sync
             `NAME_VENUE_OVERRIDES["goldman sachs akcji"]` → `ING01W`
             (`a29dbe3` did this and was reverted; re-apply only once stage 6
             proves the series is served). **Needs the user's go-ahead** — it
             re-prices the holding.
-            > This is the "override it in google sheets import" half of the user's
-            > decision, and the override is the whole point: the sheet keeps
-            > carrying the stale Goldman Sachs name, and the import is the one
-            > place that already translates sheet names into symbols. The stored
-            > symbol becomes `ING01W`; the sheet's name never becomes one.
+            > **Stage 6 has now proven the series is served**, so the gate this box
+            > names is met. **But the change is larger than "re-prices the
+            > holding", and the user should approve it knowing that.**
+            >
+            > `transakcje-mapper.ts:280` sets `instrumentSymbol` from the resolved
+            > instrument **on every transaction row**. So the override is not a
+            > surgical symbol tweak on the position — **a re-import rewrites the
+            > symbol on all 79 historical `INGAKC.TFI` trades too.**
+            >
+            > That turns out to be the *right* outcome rather than a hazard, and it
+            > is worth seeing why before deciding. `price-audit.ts:427` keys on
+            > **`t.instrument_symbol`** — the transaction's own symbol. So:
+            >
+            > - leave history on `INGAKC.TFI` and the audit keeps comparing executed
+            >   W-priced trades against **class-A** bars → ratio ~1.127 → the §72.37
+            >   false positives persist, and the §74.6 order-priced window papers
+            >   over them for the wrong reason;
+            > - re-import onto `ING01W` and the audit compares them against **W**
+            >   bars → ratio **1.0000**, four of five to the cent.
+            >
+            > So this change fixes the audit findings **by correcting the data**
+            > instead of widening a tolerance — which is the outcome §72.37 and
+            > §74.6 were both reaching for and neither could achieve. It also
+            > means the audit and this provider are **complementary, not
+            > alternatives**, as the audit box already records.
+            >
+            > Still gated on the user: it rewrites history and re-prices the
+            > holding, and in PROD it is a `Wipe & Reimport`.
 
 - [x] Step 3 — sweep the other `.TFI` rows. **Run against PROD 2026-09-30, and
       exactly one symbol was wrong — the one already fixed.**
