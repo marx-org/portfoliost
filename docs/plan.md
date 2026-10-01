@@ -3435,6 +3435,14 @@ archive.
       §72.36 used as "evidence" that the feed was the wrong fund (§72.37: *I never
       ran that query*). Record it as **stale sheet data**, separately from the class
       question, so the next reader does not treat it as a third data point.
+      >
+      > **CONFIRMED as a real defect 2026-10-01, and it has now reached stored
+      > data.** The PROD reimport wrote a trade executed at **1084.10** on
+      > 2026-09-18, against W's 921.19 that day — 17.7% high, and above W's
+      > all-time maximum of 941.42, so unreachable on this series rather than a
+      > calendar effect. This is the column reaching a transaction. The **user is
+      > cross-checking the sheet value**; not edited here, per §74's read-only
+      > rule. Detail in the reimport box below.
       > It is also the reason the sheet is worth re-reading before any of steps 2–4:
       > a hand-maintained price column that has drifted 7% is a reason to distrust
       > the sheet's other manual columns in the same block, and §72.36 already found
