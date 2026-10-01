@@ -215,15 +215,60 @@ row per Konto, in PLN). It never fails the run.
       >   and not a bug: the sheet has no `Wpłata` row for XTB at all, so the
       >   ledger is negative by everything it ever spent. **Needs a sheet edit,**
       >   which is exactly why the wipe is premature rather than unnecessary.
-      > - **IKE Beata −34.1% on 2022-06-13** — and Crypto's worst is **the same
+      > - ~~**IKE Beata −34.1% on 2022-06-13** — and Crypto's worst is **the same
       >   date** (−21.2%). 2022-06 is an FX coverage boundary (§72.24), so this is
-      >   very likely that seam rather than a market move. **Not confirmed here.**
-      > - **IKE Marek −76.1% on 2021-11-09** — 7 531 → 1 803 with zero net flow.
-      >   **Unexplained, and the most alarming number in this section.**
+      >   very likely that seam rather than a market move. **Not confirmed here.**~~
+      > - ~~**IKE Marek −76.1% on 2021-11-09** — 7 531 → 1 803 with zero net flow.
+      >   **Unexplained, and the most alarming number in this section.**~~
       >
-      > So the re-import did its job and the series still has three breaches, two of
-      > them undiagnosed. That is the honest state of §65, and it is why this box
-      > and the archive stay open.
+      > **BOTH OF THOSE DIAGNOSES ARE WRONG, and the real cause is neither the FX
+      > seam nor anything unexplained.** Checked against the transactions on each
+      > day:
+      >
+      > ```
+      > IKE Marek  2021-11-09   BUY INS0922  26 @ 102.05   =  2 653,30
+      >                          BUY VOX0224   3 @ 1021,45  =  3 064,35
+      >                                                     ---------
+      >                          bought                              5 717,65
+      >            value  7 531,21 → 1 802,70        dropped          5 728,51
+      >
+      > IKE Beata  2022-06-13   BUY BST0922  26 @ 100.27   =  2 607,02
+      >                          BUY INS0922  26 @ 102.10   =  2 654,60
+      >                          BUY NVA0624   2 @ 1036,39  =  2 072,78
+      >                          BUY VOX0224   3 @ 1043,66  =  3 130,98
+      >                                                     ---------
+      >                          bought                             10 465,38
+      >            value 32 182,33 → 21 201,69       dropped         10 980,64
+      > ```
+      >
+      > **The value falls by exactly the amount bought.** And every one of those
+      > symbols is in that portfolio's `gapSymbols` — `INS0922`, `VOX0224`,
+      > `BST0922`, `NVA0624` are all §72.31's unpriceable bonds.
+      >
+      > **So the mechanism is: buying a bond we cannot price subtracts the purchase
+      > amount from the portfolio and never adds it back.** The cash leg leaves, the
+      > position leg cannot be valued, and the series records that as a one-day loss
+      > followed by a permanent undervaluation. It is not a market move, not an FX
+      > seam, and not unexplained — but it is *indistinguishable from all three* in
+      > the stored series, because nothing carries the reason.
+      >
+      > **The 2022-06-13 coincidence with Crypto's worst is a red herring.** Two
+      > portfolios bought unpriceable bonds the same day; that is what the shared
+      > date means, and I read it as an FX boundary because the date happened to sit
+      > on one. IKE Beata's `BST0327` is in `gapSymbols` too, which is why its
+      > worst symbol count is 7 against IKE Marek's 6.
+      >
+      > **This is now the highest-value thing left that is mine to do:** make an
+      > unpriceable purchase stop looking like a loss. `gapSymbols` names the
+      > symbol, but the snapshot carries no cost basis for the unpriced leg, so the
+      > UI cannot say "this drop is 10 465 PLN of bonds we have no price for" and
+      > shows a −34% day instead. Until that exists, **§65.1's −25% bar cannot
+      > pass** — not because the bar is wrong, but because a correct bar is
+      > unreachable while an unpriceable buy is rendered as a loss.
+      >
+      > So the re-import did its job and the series still has three breaches: one
+      > needs a sheet edit (§78.1), and two are this. That is the honest state of
+      > §65, and it is why this box and the archive stay open.
 - [ ] Commit (plan closeout) + archive §65.
 
 ---
