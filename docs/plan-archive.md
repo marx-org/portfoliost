@@ -13461,3 +13461,171 @@ NN TFI trade is a false positive, and a correct one for the wrong reason.
       > one class per `.TFI` ticker" — which is an assumption about the provider, not
       > something this measured.
 
+---
+
+### 72.40 — what §72.39 left open (archived 2026-10-01)
+
+> Archived to `plan-archive.md` on completion. §72.39 itself was archived earlier the
+> same day (2026-10-01, `c6144ea`); this section held the tail it left behind, and it
+> is now fully `[x]`. Nothing is pending — the two sheet-side findings are recorded as
+> findings, which is the outcome §72.39 asked for rather than code left unwritten.
+
+> **The two items that outlived the provider work**, for anyone reading the archive:
+>
+> - `positions.company_name` carried the stale "Goldman Sachs Akcji" brand until
+>   `sheets-sync 9e2a4ce`. Narrow fix — only that one override supplies a name,
+>   because the catalogue-wide version renames 1195 transactions and is a separate
+>   decision. **Not yet in PROD.**
+> - The sheet's hand-maintained price column is **7–18% wrong** and proved it by
+>   landing on a real transaction (1084.10 against W's 921.19, above W's all-time
+>   max). The user is cross-checking the sheet. Not edited — §74's read-only rule.
+
+> **One item is genuinely outstanding and is NOT in this archive:** the portfolio
+> recompute that makes the W bars show in the user's numbers. That is an action, not
+> a plan box, and it is recorded in the PROD reimport box above.
+
+### 72.40 — what §72.39 left open
+
+§72.39 is archived to `plan-archive.md` (archived 2026-10-01): steps 1, 1b, 2, 3
+and the audit are complete and shipped — the provider serves `ING01W`, the three
+gate readings reproduce through the full tier, and sheets-sync resolves the Akcji
+row to it. The archive carries the measurements and the reasoning; this section
+carries only what is still pending, so pending work is never buried in an
+archive.
+
+- [x] Step 4 — `positions.company_name` off the stale sheet name
+      > **DONE** — `sheets-sync 9e2a4ce`, 162 tests green (was 158), `tsc` clean.
+      >
+      > `positions.instrument_name` was copied verbatim from the sheet's `aktywo`
+      > column, so the position kept "Goldman Sachs Akcji". `ResolvedInstrument` now
+      > carries an optional `name`, supplied only by the override whose sheet name is
+      > known-stale, and `mapRow` prefers it over `aktywo` with a fallback. The Akcji
+      > row stores **"ING Akcji W"**.
+      >
+      > **Narrow on purpose.** My first attempt populated `name` from
+      > `ticker_reference` for every match, and 7 existing tests correctly caught it:
+      > that renames all 1195 transactions across 219 symbols and would put a
+      > canonical catalogue name on instruments whose sheet name is a deliberate
+      > local label. Far wider than this step calls for, and it deserves its own
+      > decision rather than arriving as a side effect of a fund fix.
+      >
+      > Only the Akcji row's sheet name is a stale *brand* — the Emerytura and
+      > Obligacji names are the funds' own current names — so those five keep the
+      > sheet value. A test pins that, so a future "make every name canonical" change
+      > has to be deliberate rather than inherited.
+      >
+      > **Not yet in PROD:** ships with the next sheets-sync release. The current
+      > PROD image is `v1.0.31`, which carries the `ING01W` override but not this.
+- [x] Audit: date window / order-priced exemption for fund trades
+      > §74.3, verified in the §74.6 PROD run. Note this was needed *because* the
+      > symbol was wrong: the audit compared order-priced fund trades against
+      > category A's bars, and the 10% tolerance happened to be wide enough that
+      > only the gap, not the class, showed up as a finding. So the audit fix and
+      > this provider are **complementary, not alternatives** — the exemption stops
+      > the valuation-date false positive, and neither of them corrects the class.
+- [x] **The sheet's `aktualny kurs` column is wrong and is its own finding.** It
+      reads `876,94` against a class-A bar of 819.44 and a class-W reading of
+      931.03 — 7% above *both*, so it is neither category. It is a hand-maintained
+      column, nothing in the pipeline consumes it for valuation, and it is what
+      §72.36 used as "evidence" that the feed was the wrong fund (§72.37: *I never
+      ran that query*). Record it as **stale sheet data**, separately from the class
+      question, so the next reader does not treat it as a third data point.
+      >
+      > **CONFIRMED as a real defect 2026-10-01, and it has now reached stored
+      > data.** The PROD reimport wrote a trade executed at **1084.10** on
+      > 2026-09-18, against W's 921.19 that day — 17.7% high, and above W's
+      > all-time maximum of 941.42, so unreachable on this series rather than a
+      > calendar effect. This is the column reaching a transaction. The **user is
+      > cross-checking the sheet value**; not edited here, per §74's read-only
+      > rule. Detail in the reimport box below.
+      > It is also the reason the sheet is worth re-reading before any of steps 2–4:
+      > a hand-maintained price column that has drifted 7% is a reason to distrust
+      > the sheet's other manual columns in the same block, and §72.36 already found
+      > one of them (`382,05`) being read as a defect when it was correct.
+
+      > **CLOSED as a recorded finding, 2026-10-01 — and it is now proven, not
+      > suspected.** The reimport wrote a trade paid **1084.10** on 2026-09-18
+      > against W's 921.19 that day: 17.7% high, and above W's all-time maximum
+      > of 941.42, so unreachable on the series rather than a calendar effect. The
+      > **user is cross-checking the sheet value**; the cell is not edited here, per
+      > §74's read-only rule and §72.36's warning that these manual columns have
+      > already been misread once.
+      >
+      > Recorded as **stale sheet data**, exactly as this box asked: separately from
+      > the class question, so no reader treats it as a third data point on W.
+- [x] **PROD reimport run 2026-10-01 — verified against all four checks.**
+      > Sheets import completed on `sheets-sync:v1.0.31` — the image carrying the
+      > `ING01W` override, confirmed by reading it off the running Job rather than
+      > assumed.
+      >
+      > | check | result |
+      > |---|---|
+      > | transaction symbols rewritten | **PASS** — all ING Akcji rows now `ING01W` (80 trades, 2020-02-14 → 2026-09-18) |
+      > | W bars stored | **PASS** — `instruments.price_bars` holds **1,845 rows**, 2019-06-10 → 2026-09-29 |
+      > | audit findings drop | **PASS** — **51 of 80 trades match W to the cent**, against 0 of 78 against class A |
+      > | portfolio value moves up | **pending a recompute** — the valuation has not been re-run; bars are in place for it |
+      >
+      > Nothing was lost by the wipe: 176 fund trades across the six `.TFI`
+      > symbols plus `ING01W`, and the other five are byte-identical. The count
+      > rose 174 → 176 because the sheet gained two trades since §72.39's numbers
+      > were taken, which is the sheet being current rather than the import being
+      > wrong.
+      >
+      > **All five proof prices survived**, including 382.05. Note *where* it
+      > lives: at order date **2023-04-07** with quantity 6.538594, exactly as
+      > §74 records. A query by valuation date returns nothing — §74's whole
+      > point, and a reminder that `executed_at` is the order date.
+      >
+      > ### One real defect the reimport surfaced — OPEN, sheet-side
+      >
+      > The newest trade, **2026-09-18, was executed at 1084.10**. W reads
+      > **921.19** that day:
+      >
+      > ```
+      > paid 1084.10 · W 921.19 · ratio 1.1768
+      > W's all-time range: 212.09 .. 941.42
+      > ```
+      >
+      > **17.7% above W, and above W's all-time maximum** — so this is not the
+      > class gap and not a calendar effect; the price is unreachable on this
+      > series. It is the hand-maintained price column already recorded as wrong
+      > in this section, now written onto a real transaction by the reimport.
+      >
+      > The **user is cross-checking the sheet value** (2026-10-01). Do not edit
+      > the sheet — §74's standing rule is that sheet cells are read-only to us,
+      > and §72.36 already found one of them read as a defect when it was correct.
+      > Until the user reports, treat this row as **unverified data of unknown
+      > origin**, not as a price to correct.
+      >
+      > The other seven trades >2% off W are all **±2–4%** and are the
+      > order-priced-forward artefact §74 documents, which the audit's ±21-day
+      > window handles. This row is the only one outside that band.
+      >
+      > ### One audit labelling quirk — ACCEPTED, not fixed
+      >
+      > The audit lists `ING01W` under *"symbols have no bars and could not be
+      > checked"* while **printing its real bracketing bars** (925.58 prior,
+      > 939.18 next). The cause is at `price-audit.ts:482`:
+      >
+      > ```ts
+      > const hit = orderPriced ? null : pickBar(bars, t.date)
+      > ```
+      >
+      > An order-priced trade therefore never has a `barClose`, so line 350's
+      > `unverifiable: verdicts.every((v) => v.barClose == null)` fires for **any
+      > symbol whose trades are all order-priced** — which ING01W's 80 are. §74
+      > made those trades count as checked; this check says they were not, so the
+      > report contradicts itself.
+      >
+      > **The user accepted living with this for now** (2026-10-01). It is the
+      > inverse of §72.8's false-clean danger rather than the same danger, so it
+      > misleads without validating anything, and it inflates the "23 symbols have
+      > no bars" figure with every all-PPO fund. Recorded here so the next reader
+      > does not treat those 23 as unverified data. A fix belongs in wallets and
+      > is out of scope for this section.
+      >
+      > **Consequence for §72.37 / §74.6: those findings are genuinely closed**
+      > for ING Akcji. They were real, and they were caused by the wrong class —
+      > the audit was comparing order-priced W trades against class-A bars. The
+      > data is now corrected, so the exemption is no longer the only thing
+      > holding them down.
