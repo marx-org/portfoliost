@@ -790,7 +790,54 @@ Grand total across all portfolios: 868,765,449.05 PLN over 18,497 snapshots.
 
 - [x] Deploy §72.14 and recompute all ten portfolios
 - [x] Confirm the spike is gone and history is a curve
-- [ ] §72.15 (below): reconcile the residual −0.5% last-day FX seam
+- [x] §72.15 (below): reconcile the residual −0.5% last-day FX seam
+      > **Closed 2026-10-01: there is no seam left to reconcile, and the −0.5% no
+      > longer describes anything.** Three separate things were being called one
+      > problem, so they are separated.
+      >
+      > **1. The two writers are structurally gone.** §72.12 serialised them;
+      > §76.4 removed one. Verified in the current source, not from the plan's
+      > word: `snapshotPortfolioValue` (`quotes.ts:489`) now ends at
+      > `return { … }` with no `value_snapshots` write at all — it is a pure
+      > calculator. Every insert into `value_snapshots` (`backfill.ts:1173`,
+      > `:1223`) consumes `computeSnapshotBatch`'s output, so there is **one
+      > producer with two call sites**, not two producers. A seam needs two
+      > answers to one question; there is now one.
+      >
+      > **2. Today's FX is published, so the freshness residual is currently
+      > zero.** The archive's own reclassification calls the remainder "freshness,
+      > not two paths" — a day's FX is unknown until the ECB publishes. Checked
+      > rather than assumed: `fx_rates` has a complete `2026-10-01` row for every
+      > currency in play (`PLN=4.3735`, `USD=1.1298`, …), so nothing on the last
+      > day is running on a stale rate.
+      >
+      > **3. The last-day move decomposes cleanly, and what is left is
+      > composition.** Equate+ 2026-09-30 → 2026-10-01, measured:
+      >
+      > ```
+      > SAP.DE            185.66 → 182.62 EUR   -1.637%
+      > EUR→PLN           4.369  → 4.3735       +0.103%
+      > ⇒ SAP.DE in PLN                       -1.536%
+      > Equate+ snapshot 17720.36 → 17512.63   -1.172%
+      > ```
+      >
+      > The 0.36pp between those two last lines is **the portfolio not being 100%
+      > SAP.DE** — cash and bonds dilute an equity move. That is arithmetic, not
+      > a discontinuity, and it is the kind of −0.5% the old section read as a
+      > seam.
+      >
+      > **The number cannot be reproduced, and that is the honest limit here.**
+      > Equate+ was `8,587.39` on 2026-09-28 when the −0.5% was measured; it is
+      > `17,614.81` now, after the §65/§69 wipe-and-reimports moved the whole
+      > series. So this closes on the *mechanism* being absent, not on the figure
+      > being explained away.
+      >
+      > **Also corrected here: the cross-reference is dangling.** "(below)" points
+      > at a `### 72.15` that does not exist in this file. The `§72.15` that does
+      > exist is in `plan-archive.md:9934` and is a *different* item — "grid checks
+      > the bar's own currency", closed 2026-09-30 at `v1.1.92`. Two items have
+      > been sharing one number, which is how this box came to describe a seam
+      > nobody was maintaining.
 
 ### 72.10 — §72.17: a converted series must not contain another currency
 
