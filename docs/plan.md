@@ -269,6 +269,63 @@ row per Konto, in PLN). It never fails the run.
       > So the re-import did its job and the series still has three breaches: one
       > needs a sheet edit (§78.1), and two are this. That is the honest state of
       > §65, and it is why this box and the archive stay open.
+      >
+      > ---
+      >
+      > ## §78.5 — SHIPPED: `unpriced_value`, the amount `value` withholds
+      >
+      > **§78.3's chosen answer was "accept the partial sum and make the UI say so",
+      > and saying so turned out to need a number rather than a symbol.** Contracts
+      > `d568d1c` (**v1.6.58**), wallets `22432dc` (**v1.1.117**), homelab
+      > `b736aa74`. Migration `0012_unpriced_value`.
+      >
+      > **What it is:** every `value_snapshots` row now carries the base-currency
+      > **cost** of positions held that day that have no price. `value` has always
+      > excluded them — a held-but-unpriced row contributes 0 — so this column is
+      > the only place the withheld amount exists at all. Read back on
+      > `GET /:id/analytics` as `timeSeries[].unpricedValue`.
+      >
+      > **Cost basis is replayed from the transaction legs, not read from
+      > `positions.average_cost_basis`.** That column is populated only for
+      > positions that exist today, and every one of these bonds was closed years
+      > ago — so it is null precisely where the history needs it. The replay is the
+      > existing `qtyMaps` accumulator with a second map beside it.
+      >
+      > **Verified in PROD, and the arithmetic is exact:**
+      >
+      > ```
+      > IKE Marek   2021-11-08  value  7 531.21   unpriced  8 230.08
+      >             2021-11-09  value  1 802.70   unpriced 13 947.73   Δ 5 717.65
+      >                          └─ dropped 5 728.51      └─ bought 5 717.65
+      >
+      > IKE Beata   2022-06-12  value 32 182.33   unpriced         0.00
+      >             2022-06-13  value 21 201.69   unpriced 10 465.38   Δ 10 465.38
+      >                          └─ dropped 10 980.64     └─ bought 10 465.38
+      > ```
+      >
+      > **The drop and the purchase are the same number to within normal price
+      > movement** (10.86 and 515.26 respectively). That closes the diagnosis:
+      > the −76.1% and the −34.1% were never market moves, and there is now a
+      > field that says so on the exact day.
+      >
+      > **The scale is worse than the two jumps suggested.** IKE Beata carried an
+      > unpriced position on **1 016 of its 1 801 days**; IKE Marek on 264, peaking
+      > at 13 947,73 on the very day of its worst step. So the chart has been
+      > showing an understated series for more than half of IKE Beata's history,
+      > with nothing on it to say so until now.
+      >
+      > **Still to do on this item:** the SPA does not render the field yet. The
+      > data is on the wire and correct; what is missing is the visual — shade the
+      > affected range on the chart, or a note that the series excludes unpriced
+      > holdings. Until then this is a number a developer can read and a user
+      > cannot, which is the same failure in a different place. Not ticked, because
+      > §78.3 asked for the UI to say so and the UI does not yet.
+      >
+      > One deliberate sharp edge: the column is `NOT NULL DEFAULT 0`, which is
+      > **wrong for pre-migration rows**, so the route passes the value straight
+      > through and the contract says absent means "not measured". Coercing absent
+      > to 0 would claim "nothing withheld" for exactly the rows that most need
+      > the warning. The eight portfolios not yet recomputed are in that state.
 - [ ] Commit (plan closeout) + archive §65.
 
 ---
