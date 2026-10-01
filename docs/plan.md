@@ -3825,13 +3825,22 @@ NN TFI trade is a false positive, and a correct one for the wrong reason.
             adapts, precisely so an untested plugin is never wrapped.
 
       **Stage 5 — `portfoliost-instruments` adapter.**
-      - [ ] `fetchXxx` in `src/adapters/cachest.ts`, translation to the
+      - [x] `fetchXxx` in `src/adapters/cachest.ts`, translation to the
             `PriceBarSeries` contract shape, handler wiring.
-      - [ ] `providerSymbol()` mapping so the fund-category code routes here.
+            > **DONE** — `fetchFundCategoryHistory()` (`cachest.ts`) plus routing in
+            > `price-bars.ts` `upstreamFor()` and `assetTypeForSymbol()`
+            > (`tickerref-queries.ts`). **`75aadce`**, `tsc` clean, **431 tests
+            > green** (was 415, +16).
+            >
+            > No shape translation was needed: the route returns the same
+            > `{date, close}` rows the existing fund route already produces, so the
+            > contract translation is the identity. Recorded because "no
+            > translation" is a finding, not an omission.
+      - [x] `providerSymbol()` mapping so the fund-category code routes here.
             **DECIDED: the stored symbol *is* the provider's symbol — `ING01W`.**
             No adapter-side translation, and no separate "which category is this
             holding" column: the symbol carries the category, because it is the
-            provider's own `(fund, category)` key.
+            > provider's own `(fund, category)` key.
             > **One structural consequence to handle here, found by reading
             > `src/adapters/symbol.ts`.** Fund routing keys on the `.TFI` suffix
             > (`price-bars.ts:504`, `instrument-currency.ts:138`), and `ING01W` is
@@ -3847,19 +3856,65 @@ NN TFI trade is a false positive, and a correct one for the wrong reason.
             > teach routing this code explicitly rather than assuming suffix
             > matching picks it up, and must confirm it is not swept up by the
             > savings-bond branch.
-      - [ ] Unit tests against the contract shape.
-      - [ ] **Also close the silent-failure shape found in step 2:** the route must
+            >
+            > ### The recogniser is membership-gated, and the plan's assumption was wrong
+            >
+            > The stage above assumed dotlessness was a usable discriminator. **It is
+            > not**, and three measurements against PROD killed every shape-based
+            > option:
+            >
+            > | attempt | result |
+            > |---|---|
+            > | `fund + letter` transform | impossible — of ING01's nine categories only `ING01/U/W/T/F` resolve; `A/I/K/S/E` are 404 |
+            > | "dotless ⇒ category" | **all 941 `corp_bond` rows are dotless** (`ABE0227` = 3 letters + 4 digits) |
+            > | digit-count window | `ticker_reference` holds **35,894 symbols with 0–8 digits** (`A`, `ZTM25`, `ZOR1142`, `BE01725053`) |
+            >
+            > Any regex broad enough to admit `SKR110` also admits a bond. The
+            > failure modes are lopsided, which settles the design: **wrongly
+            > admitting** a code reroutes a working bond, while **wrongly omitting**
+            > one falls through to the equity walk and returns `200 / bars=0` —
+            > the silent shape that nearly shipped a broken mapping before. So
+            > `FUND_CATEGORY_CODES` is an explicit `Set` in `symbol.ts`, and an
+            > entry is added only after the source resolves it.
+            >
+            > **Two pre-existing findings, recorded because they change the shape of
+            > the code:**
+            >
+            > 1. **`ticker_reference` has zero fund rows and there is no `.TFI`
+            >    special case.** So `.TFI` funds resolved to `"stock"` and reached
+            >    the right URL *only because the `stock` and `fund` branches were
+            >    identical for them* — the `fund` case in `upstreamFor` was
+            >    effectively dead. It is live now, and the two cases are no longer
+            >    interchangeable. Any future divergence in those branches would
+            >    have silently changed every fund's price source.
+            > 2. **`.TFI` funds are explicitly NOT diverted.** `NNEP65` reproduces
+            >    34 of 66 trades to the cent through the existing route, and
+            >    `NNEP30`'s first trade sits 17 days inside `ING82`'s window, so
+            >    diverting it could silently lose a bar. Pinned by a test.
+      - [x] Unit tests against the contract shape.
+      - [x] **Also close the silent-failure shape found in step 2:** the route must
             not return `200` with zero bars for a symbol it cannot serve. Stage 2's
-            measurement showed `200 / bars=0 / stale=true` is what a dead provider
-            looks like, and that is how the reverted mapping would have shipped
-            unnoticed. If the new provider can fail, it must be distinguishable
-            from "no history".
+            > measurement showed `200 / bars=0 / stale=true` is what a dead provider
+            > looks like, and that is how the reverted mapping would have shipped
+            > unnoticed. If the new provider can fail, it must be distinguishable
+            > from "no history".
             > **The new source makes this cheap, so the requirement is specific:**
             > an unresolved category code is **HTTP 404** upstream, not an empty
             > series. Propagate that as an error. The two cases must not collapse:
             > "this code does not exist" (404) vs "this code has no history in the
             > requested window" (200, legitimately zero bars) vs "the provider is
             > dead" (the shape from step 2). Only the third is silent today.
+            >
+            > **Closed and tested on both legs.** openst raises
+            > `UnknownFundCategory` (stage 2); cachest already passed a 404 through
+            > without caching it, needing no change (stage 4); and the adapter's
+            > `fetchJson` turns it into `UpstreamError` **carrying its status**
+            > rather than an empty array — asserted directly, so "cannot serve"
+            > cannot silently become "no history".
+            >
+            > Live proof from stage 3: `GET /fund/history/NNEP65` → **404**. A caller
+            > who passes the `.TFI` symbol instead of the provider's code gets a
+            > loud error, which is precisely the mistake that nearly shipped.
 
       **Stage 6 — full compose stack.**
       - [ ] `docker compose up -d redis openst cachest instruments`, curl through
