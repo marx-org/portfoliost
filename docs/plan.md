@@ -778,10 +778,61 @@ field alongside `fxFrom` would let callers decide per bar.
       response never said what it dropped. The old text claimed the SPA "renders
       an explicit caveat" for the window — the wallets grid was doing no such
       thing, which is how a base-currency price reached a portfolio total.
-- [ ] Add `unconvertedDates` (or a count) to the `/price-bars` response so a
+- [x] Add `unconvertedDates` (or a count) to the `/price-bars` response so a
       caller can see what was dropped instead of inferring it. Needs a contracts
       change + `npm run gen:types` in `portfoliost-contracts/contracts/`, then
       the SPA mocks in `mocks/` that assert the response shape.
+      > **Closed 2026-10-01 (instruments `dbccab4`, mock `e6caea2`, v1.0.89).**
+      > The box listed the state accurately: the spec and the consumer types had
+      > shipped, and **the route had never emitted the field** — so a caller was
+      > still inferring what §72.17 dropped. Both routes now do.
+      >
+      > The absent/empty distinction the contract spells out is the part worth
+      > keeping: **absent** when no conversion was applied, **[]** when one was and
+      > nothing was dropped. Collapsing them leaves a caller unable to tell "never
+      > converted" from "converted and lost nothing", which is the entire reason
+      > the field exists.
+      >
+      > **The two routes needed different mechanisms, and the second one is where
+      > the interesting bug was.** `/history` has `convertedMask` in hand and
+      > filters it directly. `/price-bars` converts in SQL and its query *filters
+      > the unconvertible rows out* (`and (hasRates)`), so it structurally cannot
+      > report what it removed — hence a separate `unconvertedDatesForWindow`
+      > query. Adding a flag column to the main query and filtering in TS would
+      > have shipped and mapped every dropped row through the route to learn a
+      > count.
+      >
+      > That query keys on `series.baseCurrency`, **not** the `?baseCurrency=`
+      > override. My first version used `declaredBase`, which is null on the
+      > ordinary path where the instrument's own currency resolves locally — so it
+      > would have reported nothing on exactly the requests that converted. The
+      > test caught it, not a re-read.
+      >
+      > **Verified in PROD on the deployed v1.0.89**, through the gateway, six
+      > calls:
+      >
+      > ```
+      > SNT.WA  price-bars  no currency  →  unconvertedDates ABSENT   (35 rows)
+      > SNT.WA  price-bars  PLN (native)→  unconvertedDates ABSENT   (35 rows)
+      > SNT.WA  price-bars  USD         →  []                       (35 rows)
+      > VRC.WA  price-bars  PLN (native)→  unconvertedDates ABSENT   (79 rows)
+      > BTC-USD history     no currency  →  unconvertedDates ABSENT
+      > BTC-USD history     PLN         →  1,202 dates dropped
+      > ```
+      >
+      > **The BTC-USD number is the one that justifies the field.** `fx_rates`
+      > has no BTC leg before 2015-10, so every bar from 2015-10-03 onward in the
+      > returned window was being dropped and the caller had no way to know. 1,202
+      > dates, silently absent, is precisely the fact the field exists to state.
+      >
+      > **One thing found while verifying, and NOT this item's business:**
+      > `/history?from=2022-01-01&to=2022-12-31` returns **2,817 rows** (and
+      > 4,019 without `?currency=`), so the route is not honouring the requested
+      > window. That is pre-existing and unrelated — the field faithfully describes
+      > whatever the route produced, with and without a conversion — but it is a
+      > real defect in its own right and is not recorded here.
+      >
+      > 460 instruments · 235 mock (was 230) · SPA build clean.
       > **Spec half done (contracts `2a28d83`), mocks half done (`d75e13f`); the
       > release + regen is what remains.** `unconvertedDates` is now on both
       > `PriceHistory` and `PriceBarSeries`, declaring behaviour that already
