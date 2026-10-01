@@ -431,9 +431,90 @@ conversion).
 - [ ] Every flagged symbol gets one of: a `NAME_VENUE_OVERRIDES` entry (validated
       against its stored trades, as `SRT3.DE` was), a currency fix, or a recorded
       false positive with the reason — never a silent threshold bump.
-      > **Partly done, partly open, and the split is honest.** The **fund** family
-      > is closed: §74 classified all 192 with evidence instead of a threshold
-      > bump. The remaining 28 are **all one new class** — a 10-15% residual on a
+      > **The measurement this box was deferring is DONE, and it falsifies
+      > §74.6's characterisation of the flagged set on both counts.**
+      >
+      > §74.6 recorded the remaining flagged symbols as "100% cross-currency
+      > comparisons, and every one of them has the same shape — 10–15%". Both
+      > halves are wrong, and the 2026-10-01 run's 30 flagged symbols say so:
+      >
+      > - **10 of the 30 are same-currency**, where FX cannot explain them at all:
+      >   `CSN.L` `NVDA` `CRWD` `CAST.ST` `OXLC` `ADBE` `MBR.WA` `BATS.L`
+      >   `BYG.L` `SRT3.DE`.
+      > - The cross-currency residuals run **11% to 288%**, not 10–15%.
+      >
+      > ### The three hypotheses this box named, all tested, all rejected
+      >
+      > §72.4 said triage "needs one more measurement (does the residual track the
+      > stored `exchange_rate` or the date-shifted rate?)". Run against the audit's
+      > own JSON and `fx_rates`, per symbol, mean absolute deviation:
+      >
+      > | hypothesis | symbols it explains |
+      > |---|---|
+      > | H1 — the market rate for the pair (`\|1/r−1\|`) | **0 of 21** |
+      > | H2 — the stored import `exchange_rate` | **0 of 21** |
+      > | H3 — stored-vs-market drift | **1 of 21** |
+      >
+      > The H1 deltas were a systematic 9–17pp, not noise, and in the *opposite*
+      > direction from what a rate error would give. So the residual is not a rate
+      > error at all.
+      >
+      > ### What it actually is: the stored `currency` is mislabelled
+      >
+      > **Comparing the trade RAW — no conversion at all — collapses 18 of the 21
+      > cross-currency symbols from 11–288% down to under 3%:**
+      >
+      > ```
+      > symbol     pair        n   dev WITH conversion   dev RAW
+      > XNAS.L     USD>GBP     5        24.3%            0.25%
+      > EMQQ.L     USD>GBP     4        24.9%            0.96%
+      > IUCD.L     USD>GBP     3        25.1%            0.94%
+      > R2US.L     USD>GBP     4        25.0%            0.70%
+      > SMH.L      USD>GBP     2        23.4%            1.34%
+      > MFC        USD>CAD    10        43.6%            0.97%
+      > DLR        USD>CAD     3        38.9%            2.53%
+      > DCC.L      GBP>EUR     5        16.9%            0.54%
+      > ASML       USD>EUR     4        11.4%            1.49%
+      > MLPD.L     USD>EUR     2        11.9%            0.41%
+      > ```
+      >
+      > Five independent XNAS.L trades each matching the GBP bar to 0.25% is not
+      > coincidence. **The stored `price` is already in the instrument's trading
+      > currency while `transactions.currency` says otherwise**, so the audit
+      > faithfully converts a number that was never in the labelled currency — and
+      > the conversion *creates* the entire residual.
+      >
+      > **So the class is a currency fix, which is one of this box's three allowed
+      > outcomes** — and it is §72.8/§72.12's subject ("the payment currency was
+      > being stored as the instrument's"), which those sections declared complete.
+      > Either the fix did not cover the cross-currency import case or these rows
+      > predate it. **Not yet pinned to a line of code**, and the fix is not
+      > written: what is proven here is the classification and the proof, not the
+      > remedy.
+      >
+      > ### The three that do NOT reconcile raw are real and need their own look
+      >
+      > ```
+      > BTC-USD  PLN>USD  2 trades   raw 161.91%   ← genuinely cross-currency
+      > ETH-USD  EUR>USD  1 trade    raw  15.96%   ← genuinely cross-currency
+      > CSN.L    PLN>GBP  1 trade    raw 477.28%   ← one odd trade
+      > ```
+      >
+      > ### And the same-currency 10 are not FX at all
+      >
+      > `NVDA` (1002%) and `CRWD` (300%) are **stock splits** — 10:1 and 4:1, bars
+      > split-adjusted against raw trades, confirmed earlier. `OXLC` (−79.5%),
+      > `CAST.ST` (+22.1%), `CSN.L`, `BATS.L`, `BYG.L`, `SRT3.DE`, `MBR.WA` (−33.9%),
+      > `ADBE` are **genuine price discrepancies** with no mechanical explanation
+      > found, and they are the residue that would remain after the currency fix
+      > lands.
+      >
+      > **Left unticked, deliberately.** This box asks for every flagged symbol to
+      > get a disposition, and 10 of 30 are still without one. But the deferred
+      > measurement is now done and three of the four classes are *proved* rather
+      > than guessed, which is what the box said was missing — and picking a remedy
+      > for the currency class without pinning the code that writes the label is
+      > exactly the move §72.36/§72.37 retracted twice.
       > *converted* cross-currency comparison — and they are NOT triaged, because
       > triage needs one more measurement (does the residual track the stored
       > `exchange_rate` or the date-shifted rate?). Naming the class is the
@@ -467,6 +548,14 @@ conversion).
       > stored **trade price 268.91** is wrong; NVDA traded near 171 that day. A
       > bad stored price is a different defect from a split basis and needs a
       > different fix.
+      >
+      > **Superseded in part by the classification above, in the right direction.**
+      > The three-hypothesis test showed FX explains none of the 21 cross-currency
+      > symbols, and that **10 of the 30 are same-currency** — so §74.6's
+      > "100% cross-currency" was wrong. The splits above are the *same-currency*
+      > class, which is why they were never an FX story, and the measurement that
+      > proves the currency-mislabelling class is the raw-comparison table a few
+      > lines up: 18 of 21 reconcile below 3% with no conversion at all.
 - [x] Decide whether the `MFC` false positive from §71.6 is fixed by narrowing
       the rule or by recording the exception.
       > **Neither — classified instead**, §71.6. Recorded, still reported, and
