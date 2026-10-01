@@ -11,6 +11,11 @@ the RCA they refer to is preserved there in full.
 Legend: `[ ]` pending · `[x]` done (a `[x]` only ever appears in a step that
 also still has `[ ]` work; fully finished steps are archived)
 
+**Start at [§78 — Everything that needs YOU](#78-everything-that-needs-you-2026-10-01).**
+It is the only section whose items block other work, and the only one I cannot
+progress on my own: three spreadsheet edits and two decisions. Everything else
+here is mine to pick up.
+
 ---
 
 ## 65. Gotówka reconciliation: the sheet is missing cash rows (2026-09-27)
@@ -167,6 +172,12 @@ row per Konto, in PLN). It never fails the run.
       > short**, so no user-facing "your value is short" warning is warranted. The
       > window-wide list is history, and §72.30's split is what keeps those two
       > apart. Left unticked because the assertion as written is not met.
+      >
+      > **The gap_symbols half is not bookkeeping and is not moving to §78** — six
+      > of those symbols are the §78.3 bonds 404ing upstream, which is a data
+      > decision, and the rest are delisted (MPW/WBA) or the `.TFI` funds. So this
+      > assertion cannot close until §78.3 is decided, and it will keep failing for
+      > as long as that answer is "accept the partial sum".
 - [ ] Tests: `backfillStatus: complete` on `/api/portfolios/merged`; no
       single-day move worse than −25% in the ALL series (the bar established in
       §63.13 — the series' worst legitimate day is −24.1% on 2022-05-26).
@@ -214,196 +225,6 @@ row per Konto, in PLN). It never fails the run.
       > them undiagnosed. That is the honest state of §65, and it is why this box
       > and the archive stay open.
 - [ ] Commit (plan closeout) + archive §65.
-
----
-
-## 69. The sudden raise in return: a backdated deposit, a duplicate cash row, and a backfill that only looks 2 days back (2026-09-28)
-
-Found by the §68.5 PROD verification, not by a test. Three separate defects, one
-visible symptom.
-
-### 69.1 — the symptom, and the proof
-
-Three portfolios showed a step on **2026-09-27** with `net_flow = 0.00`:
-
-| portfolio | 09-26 value | 09-27 value | Δ | Δ invested |
-|---|---|---|---|---|
-| IKE Marek | 90,962.72 | 107,059.39 | +16,096.67 (+17.7%) | **+15,777.00** |
-| IKE Beata | 196,827.12 | 205,628.21 | +8,801.09 (+4.5%) | **+15,777.00** |
-| Equate+ | 3,946.55 | 8,632.99 | +4,686.44 (+118.7%) | 0 |
-
-The identical `+15,777.00` in two unrelated accounts is the whole diagnosis: one
-omitted deposit, in both. `/api/portfolios/:id/cash/transactions` closes it exactly —
-
-- IKE Beata `DEPOSIT 15,777 PLN` dated **2021-10-25**
-- IKE Marek `DEPOSIT 15,777 PLN` dated **2021-10-18**
-
-| | Σ deposits | 09-26 invested | 09-27 invested |
-|---|---|---|---|
-| IKE Beata | **132,099** | 116,322 = 132,099 − 15,777 | **132,099** |
-| IKE Marek | **54,548** | 38,771 = 54,548 − 15,777 | **54,548** |
-
-The 2026-09-27 21:14 re-import inserted it (all 100 cash rows in the system carry
-that timestamp, and every one is backdated). `externalCashInvested` replays the
-whole ledger, so cumulative invested rose — but the `snapshotsync` cronjob only
-re-values **the last two days**, so the entire five-year correction was stamped
-onto the next snapshot written. The data is now *more* correct; the presentation
-is what is broken.
-
-Equate+ is the same mechanism: its value rose because SAP SE went from ~0 to
-4,684 PLN of instruments value once the ticker fix landed. `invested` unmoved.
-
-**The data was right; the history was never recomputed behind it.**
-
-- [x] Diagnose (§69.1).
-- [x] **§69.2 importer dedup** — see below.
-- [ ] Re-import (wipe & reimport) with the dedup, then ONE full backfill of all
-      10 portfolios so the 15,777 and the SAP SE value land on their proper
-      dates. **User-approved**, deliberately deferred until after §69.2 so the
-      backfill runs once over final data rather than twice.
-      > **Superseded as a manual step — §69.3 does this automatically now.** The
-      > import route re-backfills every portfolio it touched (`6015170`), and
-      > every pass rebuilds from the first trade because `computeSnapshotBatch`
-      > derives the window start rather than accepting one. So a wipe & re-import
-      > now places the 15,777 deposit and the SAP SE value on their proper dates
-      > with nobody pressing Recompute. **This still needs running once against
-      > PROD** — it is a data event, not a code one — and the 2026-09-27 snapshot
-      > rows that already absorbed the correction have to be rebuilt over, which
-      > means the *destructive* `forcePortfolioRecalc` (`portfolios.ts:1187`) or a
-      > `recalcPortfolioHistory`, not the additive pass. **Needs cluster access
-      > and the user's go-ahead**, since it rewrites PROD history.
-      >
-      > **DONE 2026-10-01 14:16 UTC** — and the history-rebuild half did happen,
-      > because all ten portfolios were recomputed after the wipe (today for §72.7
-      > and again for §72.21). Evidence that it was a wipe rather than an append:
-      > **no transaction in the database predates `14:16:56`**, and all 1,977 of
-      > them were written inside a 35-second window. The incremental run afterwards
-      > reports `inserted=0 skipped=2368`, i.e. the DB is now exactly the sheet.
-      >
-      > Ticked on that basis rather than on having pressed the button myself: the
-      > observable state this box asks for is present, and the destructive step is
-      > not something to re-run for the sake of a checkbox.
-
-### 69.3 — the systemic gap (still open)
-
-**An import that adds backdated rows must trigger a full re-backfill for the
-portfolios it touched.** Today the only automatic revaluation is the twice-daily
-`snapshotsync`, which re-values the last two days, so *any* historical correction
-lands as a visible cliff on the next snapshot written. This will recur on every
-future re-import. Options: have the import job call `forcePortfolioRecalc` /
-`runBackfill` for the portfolios whose rows changed, or record the earliest
-changed `transaction_date` and re-backfill from there.
-
-- [x] Decide and implement.
-      > **Done — and by the first of the two options, not the second.** Wallets
-      > `6015170` "fix(wallets): a bulk import re-backfills what it touched
-      > (§69.3)". `POST /api/import/transactions` tracks `affectedPortfolios`
-      > (`import.ts:500`) and calls `notifyTransactionsChanged` once per touched
-      > portfolio after the batches commit (`import.ts:638-640`), which lands in
-      > `recalc-queue.ts:64-66` → `enqueueBackfill(portfolioId, …recalcPortfolioSeries)`.
-      >
-      > Two details in that commit are the substance, and both are load-bearing:
-      > **the bulk route was the one that was missing** — the six single-transaction
-      > routes in `portfolio-transactions.ts` all called the hook, but the route
-      > *sheets-sync actually uses* did not, which is why a wipe & re-import left
-      > history unrebuilt. And it is **one notify per portfolio, not per row**:
-      > the queue holds one slot per portfolio and the runner is serialized, so
-      > ten portfolios cost ten sequential rebuilds (~2 min measured) where a
-      > per-row notify would thrash that queue for nothing.
-      >
-      > §76.3 then changed the pass from destructive `recalcPortfolioHistory` to
-      > the **additive** `recalcPortfolioSeries`, which is the right variant for
-      > this: a bulk import changes history, it does not invalidate it.
-- [x] **The second option was never needed, and that is worth knowing rather than
-      assuming.** `computeSnapshotBatch` has no `fromOverride` — the window start
-      is always `min(BUY/SELL executedAt)`, falling back to the earliest cash row
-      (`backfill.ts:691-717`). So **every pass already re-values the whole history
-      from the first trade**, not just the last two days. The cliff this section
-      was opened for is therefore structurally impossible: a backdated row cannot
-      land on "the next snapshot written" because there is no next-snapshot-only
-      path left in the write flow.
-      > **Verified against the source 2026-10-01 and confirmed** — `backfill.ts`
-      > has no `fromOverride` parameter and `recalcPortfolioSeries` (the additive
-      > pass §69.3's implementation enqueues) re-derives the window start per
-      > call, so a re-import does place a backdated row on its proper date. The
-      > PROD evidence agrees: a wipe & re-import ran on 2026-10-01 at 16:18 and
-      > every portfolio's `portfolio_backfill_metadata.status` came back
-      > `complete` with `held_gap_symbols` populated, which only a pass that
-      > actually walked the history could write.
-      >
-      > **So a "re-backfill from date X" capability would be a performance
-      > optimisation, not a correctness fix** — it would shorten each import's
-      > rebuild, at the cost of a threaded `fromOverride` through
-      > `computeSnapshotBatch` → `_runBackfillCore` → `recalcPortfolioSeries` /
-      > `recalcPortfolioHistory`, a query param on the recompute route
-      > (`portfolios.ts:1146-1190`, which currently declares none in the contract
-      > — `openapi.yaml:3501-3519`), and a contracts bump. Do not build it as a
-      > correctness fix; if it is wanted, it should be costed against the measured
-      > ~2 min per 10 portfolios, which is not currently a problem.
-- [x] **One real gap the implementation leaves, and it is in reporting not in
-      behaviour.** The import response cannot say what it changed:
-      `ImportTransactionsResponse` (`openapi.yaml:2111-2127`) is
-      `{inserted, skipped, errors, syncRun}`, `SyncRun` carries three counters and
-      no portfolio ids, no dates, and `sync_runs` has no date columns
-      (`schema.ts:32-52`). `affectedPortfolios` is computed inside the handler and
-      **discarded**. So the operator gets `[import] §69.3: re-backfill queued for
-      N touched portfolio/plfolios` on stderr and nothing queryable afterwards —
-      which is the same defect §72.22 found in the price audit, where the feature's
-      entire value is its output and the output did not persist.
-      > **Fixed — and the measurement turned up something worse than the reporting
-      > gap, which is why this took a while.**
-      >
-      > Reading the code to add the field, the line above it was wrong:
-      > `affectedPortfolios.add(portfolio.id)` sat immediately after the portfolio
-      > resolved and **before** the two idempotency early-returns. So a row that
-      > merely *named* a portfolio marked it touched even when the row deduped to
-      > skipped. Every row of a re-run names a portfolio, so **every re-run
-      > rebuilt everything.**
-      >
-      > Measured in PROD, 2026-10-01. Sync run 317 (sheets-sync v1.0.34, the very
-      > run I had triggered to measure the §63.4 recon):
-      >
-      > ```
-      > inserted_wtx=0  inserted_ptx=0  skipped=48
-      > → 10 full portfolio rebuilds, 16:14:16 → 16:15:46
-      > ```
-      >
-      > Three minutes of database work to change nothing. **And that is the
-      > expected case, not an edge case** — "Run Sync" on an unchanged sheet is
-      > routine, and the Gotówka sheet is a fortnight stale in places, so most
-      > runs insert nothing. The box above budgets "~2 min per 10 portfolios"
-      > without noticing the cost was *unconditional*.
-      >
-      > **Both halves fixed together** (wallets `e3bdc5e`, sheets-sync `1eb6ff6`,
-      > contracts v1.6.56, homelab `114b73c26`). The set is now keyed on an
-      > actual insert, and the response carries `affectedPortfolios` (id, name,
-      > `rowCount`) plus `backfillQueued`. `rowCount` counts rows **inserted**, not
-      > submitted — stated in the contract because an all-skipped batch reporting
-      > 2,368 would make idempotency look like work.
-      >
-      > **Verified in PROD on the deployed pair**, same no-op, same sheet:
-      >
-      > ```
-      >                                   v1.0.34        v1.0.35
-      > inserted / skipped               0 / 48        0 / 2368
-      > portfolios touched               10            0
-      > backfills queued                 10 (~3 min)   0
-      > reported                         a stderr count  portfoliosTouched=0
-      > ```
-      >
-      > Five tests, **two of which fail against the original ordering** — verified
-      > by putting the `add` back at its old position, which is worth recording
-      > because my first attempt at that check landed *after* the early-returns
-      > and passed against the bug it was supposed to catch. A regression test
-      > that does not fail on the regression is worse than none.
-      >
-      > The no-op test asserts on `portfolio_backfill_metadata.startedAt`, not
-      > only on the response: the notify is fire-and-forget, so the response cannot
-      > prove whether a rebuild was actually queued, and a handler could report
-      > `backfillQueued: false` while still notifying on every row.
-      >
-      > The naming is deliberate and the rename is why the field exists — an
-      > operator reading this wants "IKE Beata", not a uuid.
 
 ---
 
@@ -1170,12 +991,8 @@ option-leg set, both of which depend on ordering.
       has one) on every PR, for all five repos** — the gap this section found. It
       is a new piece of work, not a continuation of the box above, and it is the
       only thing that makes "did it go red?" answerable rather than unaskable.
-      > **Not started, deliberately.** Adding it is a decision about gating PRs on
-      > a suite that has only ever run locally: the first red run would block
-      > merges for work that is unrelated to it, and the five repos differ in
-      > what they run (instruments has no mocks; sheets-sync has no SPA suite).
-      > That is a plan-sized choice, not something to smuggle in under a
-      > monitoring box. Recorded so the gap is tracked rather than remembered.
+      > **Moved to §78.4.** It is a judgement call about gating merges on a suite
+      > that has only ever run locally, which is yours to make rather than mine.
 - [x] Deploy §72.18 with the next wallets release and re-run the audit, to
       confirm SAP.DE stops being reported.
 
@@ -2011,6 +1828,10 @@ sum instead of being stamped `complete`.
       Either find a source that carries them, or accept the partial sum and make the
       UI say so. Until then these portfolios' pre-sale history is understated by a
       known-unknown amount.
+      > **Moved to §78.3** — it is a decision (hunt a paid feed vs label the gap),
+      > not a task, and the recommendation is there: label first, hunt never.
+      > Note it also blocks §65.1's `gap_symbols` assertion, because six of the
+      > eleven unpriceable symbols are these bonds.
 - [ ] Propagate the window-wide gap into the UI: `GET /:id/analytics` can flag the
       value as partial, but "partial on which days" is not currently represented.
       > **Half of this is already shipped — the item reads as if nothing
@@ -2071,6 +1892,9 @@ The registry manifest appeared ~40s later. Worth checking
 - [x] unfunded-portfolio finding, 4 tests, deployed v1.1.97, verified against prod
 - [ ] XTB: add the opening deposit to the source sheet and re-import. Until then its
       value history is offset and its TWR/MWR is meaningless.
+      > **Moved to §78.1**, which carries the exact row: every column value, the
+      > `2716,60` derivation, and the `wpłata/wypłata = 1` AU-flag trap that aborts
+      > the entire import if you get it wrong.
 - [ ] The bond gap (§72.31) and this check are both "the import is incomplete" and
       both were invisible. Consider one import-completeness report rather than two
       checks living in different places.
@@ -2218,6 +2042,9 @@ fill in; filling it alone would fund nothing and, on a `Wpłata` row, break the 
 - [x] XTB root cause located in the source sheet, exact row specified
 - [ ] Add the `Wpłata` row above, re-import, confirm the unfunded-portfolio finding
       clears and `invested` stops being 0
+      > **Moved to §78.1** — this and the XTB box above are the same single row,
+      > recorded twice. §78.1 has the column table, the arithmetic, and the AU-flag
+      > warning.
 
 ### 72.36 — §72.23 DECISIVE CHECK DONE: the 1.126 factor was one wrong cell
 
@@ -2512,3 +2339,133 @@ provider is the right fix. Restored as open.**
       > **§72.39 step 4.** A `sheets-sync` resolver mapping, deliberately left until
       > the class is confirmed — §72.38 is right that the symbol mapping is itself
       > what is in question.
+
+---
+
+## 78. Everything that needs YOU (2026-10-01)
+
+Consolidated from the places it was scattered. Four items, all of them actions
+only the portfolio owner can take — three are edits to the source spreadsheet, one
+is a decision. Nothing here is a queue I can grind through, and each one blocks
+work that is otherwise ready.
+
+**Everything below this line needs no `--wipe`.** The wipe ran today at 14:16 UTC
+and the incremental import reports `inserted=0 skipped=2368`, so the database is
+already exactly what the sheet says. Adding rows and re-running the *incremental*
+sync is sufficient: §69.3 re-backfills every portfolio the import touched, from
+the first trade, with nobody pressing Recompute.
+
+Admin → Jobs → "Sync sheet" (the incremental one, **not** "Wipe & Reimport").
+
+### 78.1 — XTB: add one `Wpłata` row. Until then its history is offset.
+
+XTB's value series goes **negative** — `9.49 → −4.04` on 2022-02-17, a −142.6%
+single-day "move" that is the worst in the system. §72.35 read the sheet
+in-cluster and proved the import is not at fault: the funding row does not exist.
+`Typ` counts per Konto show XTB with `Kupno=5 Sprzedaż=5 Div=12` and **no
+`Wpłata` and no `Wypłata` at all**, and the `Gotówka` sheet has no XTB column
+either, so the funding was never recorded anywhere.
+
+One row, dated **on or before 2022-02-11**:
+
+| column | value |
+|---|---|
+| `Typ` | `Wpłata` |
+| `Aktywo` | `Gotówka XTB` |
+| `Ilość transakcyjna` | `2716,60` |
+| `Cena transakcyjna jednostki (PLN)` | `1,00 zł` |
+| `Wartość transakcji (PLN)` | `2 716,60 zł` |
+| `Waluta transakcji` / `Kurs waluty transakcji` | `PLN` / `1,00 zł` |
+| `Konto` | `XTB` |
+| `wpłata/wypłata` | `1` |
+
+**2 716,60 PLN is exact**: the sum of XTB's five buys (568,20 + 396,97 + 446,74 +
+434,75 + 869,94) against 2 957,88 PLN of sales — a real +241,28 PLN realised,
+which the ledger currently reports as −56,50.
+
+**`wpłata/wypłata` must be `1`.** Despite the name the importer reads that column
+as the **AU flag**, and `parseRow` *throws* on a `Wpłata`/`Wypłata` row whose AU
+flag is 0 — the whole import aborts. So a plausible-looking `0` there costs you
+every row in the sheet, not just this one.
+
+- [ ] Add the row above, re-import, confirm the unfunded-portfolio finding clears
+      and `invested` stops being 0
+      > **Then:** I re-measure XTB's worst single-day move (flow-adjusted) and
+      > re-run §65.1's −25% bar across all ten.
+- [ ] Decide whether XTB's `Gotówka` column should exist at all
+      > Not blocking. The recon (§63.4) derives cash from the ledger, so the row
+      > above is sufficient; a `Gotówka XTB` column would only make the recon
+      > cross-checkable for this one account.
+
+### 78.2 — IBKR / IKE Marek / IKE Beata: the Transakcje rows are missing, not Gotówka
+
+§63.4 replaced the old per-day report with one comparable number per account, and
+that is where this stands (measured today, unchanged since this afternoon):
+
+| account | derived | sheet's last row | Δ | direction |
+|---|---|---|---|---|
+| IBKR | 24 741,35 | 6 006,42 | **+18 734,93** | app knows money the sheet does not |
+| IKE Beata | 4 442,52 | 3 032,89 | **+1 409,63** | same |
+| IKE Marek | 961,87 | 4 951,85 | **−3 989,98** | **reverse** — the sheet has ~4k the app does not |
+
+**This is two different problems wearing one number, which is why it cannot be
+closed by watching a figure approach zero.** IBKR and IKE Beata are missing
+`Transakcje` inflow/outflow rows. IKE Marek is the opposite: the sheet's balance
+runs ~4k *ahead* of what the ledger can explain, so something is recorded there
+that the app never saw.
+
+Note the old report's numbers were meaningless — it reported `recon =
+−368,300.77` on IBKR, which was never a balance but the sheet's own `cashFlow`
+column replayed onto a `Gotówka` anchor the flows do not belong to, summed over
+full history. A check reporting a figure about itself.
+
+- [ ] Add the missing Transakcje rows for IBKR and IKE Beata
+      > **Then:** I re-run the dry sync and confirm both deltas fall toward zero.
+- [ ] **IKE Marek is the one to look at first** — a *negative* Δ means the sheet
+      records money the app has no record of. That is not a missing row; it is a
+      row whose `Typ`/`Aktywo` the importer does not read as a deposit. Give me
+      the Gotówka series for that account and I will find which row it is rather
+      than you hunting for it.
+      > This is the single most useful thing in this section: it is the one item
+      > where I can do the work once you hand me the numbers.
+
+### 78.3 — Six PL government bonds 404 upstream. Decide: hunt, or accept and label.
+
+Six PL bonds (`BST0322`-style SKMs) return 404 from every configured provider.
+The price-audit lists 11 more that "have no bars" — mostly these plus MPW/WBA
+(delisted, correctly) and the `.TFI` funds.
+
+Until this is decided, **these portfolios' pre-sale history is understated by a
+known-unknown amount**, and §72.31's `gapSymbols` is the only thing marking it.
+
+- [ ] **Decide: find a source that carries them, or accept the partial sum and
+      make the UI say so**
+      > Both are defensible and the cost differs by an order of magnitude. A paid
+      > Polish bond feed is a subscription; labelling costs one UI change and I
+      > can do it in an afternoon. **My recommendation is label first, hunt never** —
+      > the bonds were all sold, so the only thing at stake is historical accuracy
+      > in a window you already know is thin, and `gapSymbols` already reports it.
+      > Say which and I will build it.
+
+### 78.4 — Add a CI job that runs the test suite, across all five repos
+
+Not a spreadsheet item, but it is yours to decide and it is the only open item
+that needs a judgement rather than data.
+
+**No CI in any of the five repos runs `npm test`.** Every workflow is release +
+build + push; the Dockerfile runs `npm run build` (tsc) but not the suite.
+Wallets' entire CI history has two workflow names. So the suite has only ever run
+on this machine.
+
+- [ ] **Add `npm test` (and `npm run test:mock` where the repo has one) on every
+      PR, for all five repos**
+      > The reason this is yours: the first red run will block merges for work
+      > unrelated to it, and the five repos differ in what they run. That is a
+      > trade-off you are better placed to judge than I am.
+      >
+      > **What it would have caught, to size the bet:** §72.13's flake was
+      > `creates a portfolio tagged with externalSource` at **5012ms against
+      > vitest's 5000ms default** — a full-suite contention failure that passes
+      > standalone in 23s. That is the canonical failure CI exists for, and the
+      > reason "could not reproduce" sat open for a day. There is currently no
+      > full-suite run anywhere but locally.

@@ -16119,3 +16119,194 @@ plan a convenient-but-wrong parameter made data look different from what it
 was — and the first time the tool caught it rather than the reasoning.
 
 ---
+---
+
+<!-- archived 2026-10-01: §69 complete, all boxes ticked -->
+
+## 69. The sudden raise in return: a backdated deposit, a duplicate cash row, and a backfill that only looks 2 days back (2026-09-28)
+
+Found by the §68.5 PROD verification, not by a test. Three separate defects, one
+visible symptom.
+
+### 69.1 — the symptom, and the proof
+
+Three portfolios showed a step on **2026-09-27** with `net_flow = 0.00`:
+
+| portfolio | 09-26 value | 09-27 value | Δ | Δ invested |
+|---|---|---|---|---|
+| IKE Marek | 90,962.72 | 107,059.39 | +16,096.67 (+17.7%) | **+15,777.00** |
+| IKE Beata | 196,827.12 | 205,628.21 | +8,801.09 (+4.5%) | **+15,777.00** |
+| Equate+ | 3,946.55 | 8,632.99 | +4,686.44 (+118.7%) | 0 |
+
+The identical `+15,777.00` in two unrelated accounts is the whole diagnosis: one
+omitted deposit, in both. `/api/portfolios/:id/cash/transactions` closes it exactly —
+
+- IKE Beata `DEPOSIT 15,777 PLN` dated **2021-10-25**
+- IKE Marek `DEPOSIT 15,777 PLN` dated **2021-10-18**
+
+| | Σ deposits | 09-26 invested | 09-27 invested |
+|---|---|---|---|
+| IKE Beata | **132,099** | 116,322 = 132,099 − 15,777 | **132,099** |
+| IKE Marek | **54,548** | 38,771 = 54,548 − 15,777 | **54,548** |
+
+The 2026-09-27 21:14 re-import inserted it (all 100 cash rows in the system carry
+that timestamp, and every one is backdated). `externalCashInvested` replays the
+whole ledger, so cumulative invested rose — but the `snapshotsync` cronjob only
+re-values **the last two days**, so the entire five-year correction was stamped
+onto the next snapshot written. The data is now *more* correct; the presentation
+is what is broken.
+
+Equate+ is the same mechanism: its value rose because SAP SE went from ~0 to
+4,684 PLN of instruments value once the ticker fix landed. `invested` unmoved.
+
+**The data was right; the history was never recomputed behind it.**
+
+- [x] Diagnose (§69.1).
+- [x] **§69.2 importer dedup** — see below.
+- [x] Re-import (wipe & reimport) with the dedup, then ONE full backfill of all
+      10 portfolios so the 15,777 and the SAP SE value land on their proper
+      dates. **User-approved**, deliberately deferred until after §69.2 so the
+      backfill runs once over final data rather than twice.
+      > **Superseded as a manual step — §69.3 does this automatically now.** The
+      > import route re-backfills every portfolio it touched (`6015170`), and
+      > every pass rebuilds from the first trade because `computeSnapshotBatch`
+      > derives the window start rather than accepting one. So a wipe & re-import
+      > now places the 15,777 deposit and the SAP SE value on their proper dates
+      > with nobody pressing Recompute. **This still needs running once against
+      > PROD** — it is a data event, not a code one — and the 2026-09-27 snapshot
+      > rows that already absorbed the correction have to be rebuilt over, which
+      > means the *destructive* `forcePortfolioRecalc` (`portfolios.ts:1187`) or a
+      > `recalcPortfolioHistory`, not the additive pass. **Needs cluster access
+      > and the user's go-ahead**, since it rewrites PROD history.
+      >
+      > **DONE 2026-10-01 14:16 UTC** — and the history-rebuild half did happen,
+      > because all ten portfolios were recomputed after the wipe (today for §72.7
+      > and again for §72.21). Evidence that it was a wipe rather than an append:
+      > **no transaction in the database predates `14:16:56`**, and all 1,977 of
+      > them were written inside a 35-second window. The incremental run afterwards
+      > reports `inserted=0 skipped=2368`, i.e. the DB is now exactly the sheet.
+      >
+      > Ticked on that basis rather than on having pressed the button myself: the
+      > observable state this box asks for is present, and the destructive step is
+      > not something to re-run for the sake of a checkbox.
+
+### 69.3 — the systemic gap (still open)
+
+**An import that adds backdated rows must trigger a full re-backfill for the
+portfolios it touched.** Today the only automatic revaluation is the twice-daily
+`snapshotsync`, which re-values the last two days, so *any* historical correction
+lands as a visible cliff on the next snapshot written. This will recur on every
+future re-import. Options: have the import job call `forcePortfolioRecalc` /
+`runBackfill` for the portfolios whose rows changed, or record the earliest
+changed `transaction_date` and re-backfill from there.
+
+- [x] Decide and implement.
+      > **Done — and by the first of the two options, not the second.** Wallets
+      > `6015170` "fix(wallets): a bulk import re-backfills what it touched
+      > (§69.3)". `POST /api/import/transactions` tracks `affectedPortfolios`
+      > (`import.ts:500`) and calls `notifyTransactionsChanged` once per touched
+      > portfolio after the batches commit (`import.ts:638-640`), which lands in
+      > `recalc-queue.ts:64-66` → `enqueueBackfill(portfolioId, …recalcPortfolioSeries)`.
+      >
+      > Two details in that commit are the substance, and both are load-bearing:
+      > **the bulk route was the one that was missing** — the six single-transaction
+      > routes in `portfolio-transactions.ts` all called the hook, but the route
+      > *sheets-sync actually uses* did not, which is why a wipe & re-import left
+      > history unrebuilt. And it is **one notify per portfolio, not per row**:
+      > the queue holds one slot per portfolio and the runner is serialized, so
+      > ten portfolios cost ten sequential rebuilds (~2 min measured) where a
+      > per-row notify would thrash that queue for nothing.
+      >
+      > §76.3 then changed the pass from destructive `recalcPortfolioHistory` to
+      > the **additive** `recalcPortfolioSeries`, which is the right variant for
+      > this: a bulk import changes history, it does not invalidate it.
+- [x] **The second option was never needed, and that is worth knowing rather than
+      assuming.** `computeSnapshotBatch` has no `fromOverride` — the window start
+      is always `min(BUY/SELL executedAt)`, falling back to the earliest cash row
+      (`backfill.ts:691-717`). So **every pass already re-values the whole history
+      from the first trade**, not just the last two days. The cliff this section
+      was opened for is therefore structurally impossible: a backdated row cannot
+      land on "the next snapshot written" because there is no next-snapshot-only
+      path left in the write flow.
+      > **Verified against the source 2026-10-01 and confirmed** — `backfill.ts`
+      > has no `fromOverride` parameter and `recalcPortfolioSeries` (the additive
+      > pass §69.3's implementation enqueues) re-derives the window start per
+      > call, so a re-import does place a backdated row on its proper date. The
+      > PROD evidence agrees: a wipe & re-import ran on 2026-10-01 at 16:18 and
+      > every portfolio's `portfolio_backfill_metadata.status` came back
+      > `complete` with `held_gap_symbols` populated, which only a pass that
+      > actually walked the history could write.
+      >
+      > **So a "re-backfill from date X" capability would be a performance
+      > optimisation, not a correctness fix** — it would shorten each import's
+      > rebuild, at the cost of a threaded `fromOverride` through
+      > `computeSnapshotBatch` → `_runBackfillCore` → `recalcPortfolioSeries` /
+      > `recalcPortfolioHistory`, a query param on the recompute route
+      > (`portfolios.ts:1146-1190`, which currently declares none in the contract
+      > — `openapi.yaml:3501-3519`), and a contracts bump. Do not build it as a
+      > correctness fix; if it is wanted, it should be costed against the measured
+      > ~2 min per 10 portfolios, which is not currently a problem.
+- [x] **One real gap the implementation leaves, and it is in reporting not in
+      behaviour.** The import response cannot say what it changed:
+      `ImportTransactionsResponse` (`openapi.yaml:2111-2127`) is
+      `{inserted, skipped, errors, syncRun}`, `SyncRun` carries three counters and
+      no portfolio ids, no dates, and `sync_runs` has no date columns
+      (`schema.ts:32-52`). `affectedPortfolios` is computed inside the handler and
+      **discarded**. So the operator gets `[import] §69.3: re-backfill queued for
+      N touched portfolio/plfolios` on stderr and nothing queryable afterwards —
+      which is the same defect §72.22 found in the price audit, where the feature's
+      entire value is its output and the output did not persist.
+      > **Fixed — and the measurement turned up something worse than the reporting
+      > gap, which is why this took a while.**
+      >
+      > Reading the code to add the field, the line above it was wrong:
+      > `affectedPortfolios.add(portfolio.id)` sat immediately after the portfolio
+      > resolved and **before** the two idempotency early-returns. So a row that
+      > merely *named* a portfolio marked it touched even when the row deduped to
+      > skipped. Every row of a re-run names a portfolio, so **every re-run
+      > rebuilt everything.**
+      >
+      > Measured in PROD, 2026-10-01. Sync run 317 (sheets-sync v1.0.34, the very
+      > run I had triggered to measure the §63.4 recon):
+      >
+      > ```
+      > inserted_wtx=0  inserted_ptx=0  skipped=48
+      > → 10 full portfolio rebuilds, 16:14:16 → 16:15:46
+      > ```
+      >
+      > Three minutes of database work to change nothing. **And that is the
+      > expected case, not an edge case** — "Run Sync" on an unchanged sheet is
+      > routine, and the Gotówka sheet is a fortnight stale in places, so most
+      > runs insert nothing. The box above budgets "~2 min per 10 portfolios"
+      > without noticing the cost was *unconditional*.
+      >
+      > **Both halves fixed together** (wallets `e3bdc5e`, sheets-sync `1eb6ff6`,
+      > contracts v1.6.56, homelab `114b73c26`). The set is now keyed on an
+      > actual insert, and the response carries `affectedPortfolios` (id, name,
+      > `rowCount`) plus `backfillQueued`. `rowCount` counts rows **inserted**, not
+      > submitted — stated in the contract because an all-skipped batch reporting
+      > 2,368 would make idempotency look like work.
+      >
+      > **Verified in PROD on the deployed pair**, same no-op, same sheet:
+      >
+      > ```
+      >                                   v1.0.34        v1.0.35
+      > inserted / skipped               0 / 48        0 / 2368
+      > portfolios touched               10            0
+      > backfills queued                 10 (~3 min)   0
+      > reported                         a stderr count  portfoliosTouched=0
+      > ```
+      >
+      > Five tests, **two of which fail against the original ordering** — verified
+      > by putting the `add` back at its old position, which is worth recording
+      > because my first attempt at that check landed *after* the early-returns
+      > and passed against the bug it was supposed to catch. A regression test
+      > that does not fail on the regression is worse than none.
+      >
+      > The no-op test asserts on `portfolio_backfill_metadata.startedAt`, not
+      > only on the response: the notify is fire-and-forget, so the response cannot
+      > prove whether a rebuild was actually queued, and a handler could report
+      > `backfillQueued: false` while still notifying on every row.
+      >
+      > The naming is deliberate and the rename is why the field exists — an
+      > operator reading this wants "IKE Beata", not a uuid.
