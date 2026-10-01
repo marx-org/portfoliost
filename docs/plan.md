@@ -208,7 +208,7 @@ changed `transaction_date` and re-backfill from there.
       > §76.3 then changed the pass from destructive `recalcPortfolioHistory` to
       > the **additive** `recalcPortfolioSeries`, which is the right variant for
       > this: a bulk import changes history, it does not invalidate it.
-- [ ] **The second option was never needed, and that is worth knowing rather than
+- [x] **The second option was never needed, and that is worth knowing rather than
       assuming.** `computeSnapshotBatch` has no `fromOverride` — the window start
       is always `min(BUY/SELL executedAt)`, falling back to the earliest cash row
       (`backfill.ts:691-717`). So **every pass already re-values the whole history
@@ -216,6 +216,15 @@ changed `transaction_date` and re-backfill from there.
       was opened for is therefore structurally impossible: a backdated row cannot
       land on "the next snapshot written" because there is no next-snapshot-only
       path left in the write flow.
+      > **Verified against the source 2026-10-01 and confirmed** — `backfill.ts`
+      > has no `fromOverride` parameter and `recalcPortfolioSeries` (the additive
+      > pass §69.3's implementation enqueues) re-derives the window start per
+      > call, so a re-import does place a backdated row on its proper date. The
+      > PROD evidence agrees: a wipe & re-import ran on 2026-10-01 at 16:18 and
+      > every portfolio's `portfolio_backfill_metadata.status` came back
+      > `complete` with `held_gap_symbols` populated, which only a pass that
+      > actually walked the history could write.
+      >
       > **So a "re-backfill from date X" capability would be a performance
       > optimisation, not a correctness fix** — it would shorten each import's
       > rebuild, at the cost of a threaded `fromOverride` through
@@ -225,7 +234,7 @@ changed `transaction_date` and re-backfill from there.
       > — `openapi.yaml:3501-3519`), and a contracts bump. Do not build it as a
       > correctness fix; if it is wanted, it should be costed against the measured
       > ~2 min per 10 portfolios, which is not currently a problem.
-- [ ] **One real gap the implementation leaves, and it is in reporting not in
+- [x] **One real gap the implementation leaves, and it is in reporting not in
       behaviour.** The import response cannot say what it changed:
       `ImportTransactionsResponse` (`openapi.yaml:2111-2127`) is
       `{inserted, skipped, errors, syncRun}`, `SyncRun` carries three counters and
@@ -235,11 +244,60 @@ changed `transaction_date` and re-backfill from there.
       N touched portfolio/plfolios` on stderr and nothing queryable afterwards —
       which is the same defect §72.22 found in the price audit, where the feature's
       entire value is its output and the output did not persist.
-      > If this is picked up: return `affectedPortfolios` (ids + row counts) from
-      > the import route, add it to the contract, regenerate, and mirror it in
-      > sheets-sync's hand-written `ImportTransactionsResponse`
-      > (`wallets-api-client.ts:149-154`) — the two repos are version-coupled.
-      > **Not urgent:** the rebuild does happen, which is the correctness half.
+      > **Fixed — and the measurement turned up something worse than the reporting
+      > gap, which is why this took a while.**
+      >
+      > Reading the code to add the field, the line above it was wrong:
+      > `affectedPortfolios.add(portfolio.id)` sat immediately after the portfolio
+      > resolved and **before** the two idempotency early-returns. So a row that
+      > merely *named* a portfolio marked it touched even when the row deduped to
+      > skipped. Every row of a re-run names a portfolio, so **every re-run
+      > rebuilt everything.**
+      >
+      > Measured in PROD, 2026-10-01. Sync run 317 (sheets-sync v1.0.34, the very
+      > run I had triggered to measure the §63.4 recon):
+      >
+      > ```
+      > inserted_wtx=0  inserted_ptx=0  skipped=48
+      > → 10 full portfolio rebuilds, 16:14:16 → 16:15:46
+      > ```
+      >
+      > Three minutes of database work to change nothing. **And that is the
+      > expected case, not an edge case** — "Run Sync" on an unchanged sheet is
+      > routine, and the Gotówka sheet is a fortnight stale in places, so most
+      > runs insert nothing. The box above budgets "~2 min per 10 portfolios"
+      > without noticing the cost was *unconditional*.
+      >
+      > **Both halves fixed together** (wallets `e3bdc5e`, sheets-sync `1eb6ff6`,
+      > contracts v1.6.56, homelab `114b73c26`). The set is now keyed on an
+      > actual insert, and the response carries `affectedPortfolios` (id, name,
+      > `rowCount`) plus `backfillQueued`. `rowCount` counts rows **inserted**, not
+      > submitted — stated in the contract because an all-skipped batch reporting
+      > 2,368 would make idempotency look like work.
+      >
+      > **Verified in PROD on the deployed pair**, same no-op, same sheet:
+      >
+      > ```
+      >                                   v1.0.34        v1.0.35
+      > inserted / skipped               0 / 48        0 / 2368
+      > portfolios touched               10            0
+      > backfills queued                 10 (~3 min)   0
+      > reported                         a stderr count  portfoliosTouched=0
+      > ```
+      >
+      > Five tests, **two of which fail against the original ordering** — verified
+      > by putting the `add` back at its old position, which is worth recording
+      > because my first attempt at that check landed *after* the early-returns
+      > and passed against the bug it was supposed to catch. A regression test
+      > that does not fail on the regression is worse than none.
+      >
+      > The no-op test asserts on `portfolio_backfill_metadata.startedAt`, not
+      > only on the response: the notify is fire-and-forget, so the response cannot
+      > prove whether a rebuild was actually queued, and a handler could report
+      > `backfillQueued: false` while still notifying on every row.
+      >
+      > The naming is deliberate and the rename is why the field exists — an
+      > operator reading this wants "IKE Beata", not a uuid.
 
 ---
 
