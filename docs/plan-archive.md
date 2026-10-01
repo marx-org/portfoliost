@@ -13634,3 +13634,404 @@ archive.
       > the audit was comparing order-priced W trades against class-A bars. The
       > data is now corrected, so the exemption is no longer the only thing
       > holding them down.
+
+> ## 78. Funds are served but not discoverable — no search path exists for them (2026-10-01)
+>
+> Raised after §72.39 stages 1–6 were done and proven. The provider work is
+> complete: `ING01W` is served, cached and routed, and the three gate readings
+> reproduce through the whole tier. **None of that makes a fund findable.** The
+> search path was never in scope and is entirely absent.
+>
+> **The gap, measured rather than assumed:**
+>
+> | layer | what exists | funds? |
+> |---|---|---|
+> | openst | `/equity/search`, `/crypto/search`, `/fixedincome/search` | **no fund route** |
+> | cachest | proxies all three | **no fund route** |
+> | instruments | `searchTickerReference` → `ticker_reference` | **0 fund rows** (PROD) |
+> | SPA | `InstrumentSearchModal` → `/api/instruments/search` | returns nothing for any fund |
+>
+> ### 78.1 — Two precedents exist, and funds need both halves of one dataset
+>
+> The trap is assuming bonds are searchable the way stocks are. They are not, and
+> the two mechanisms are different:
+>
+> - **Corp bonds** are rows in `ticker_reference` (`WSE::{SYMBOL}`, 941 of them),
+>   written by `corp-bond-catalogue-sync.ts` from cachest `/corp-bond/catalogue`.
+>   They are searchable *because they are table rows*.
+> - **Savings bonds (ROD/EDO) are not in `ticker_reference` at all** — PROD returns
+>   0 rows with `asset_type='bond'`. They are searchable because
+>   `src/routes/instruments.ts:293` merges an **additive `bondSearchLeg`** that
+>   calls openst `/fixedincome/search`.
+>
+> So there are two routes to searchability: a table row, or a provider leg. Funds
+> should get **one dataset that yields both** — because the same rows also settle
+> the routing question §72.39 stage 5 had to answer with a hardcoded `Set`.
+>
+> **Which is why this section also deletes `FUND_CATEGORY_CODES`.** Stage 5's
+> membership-gated list exists only because `upstreamFor()` is pure and cannot ask
+> the database what a symbol's venue is. If the catalogue lands in
+> `ticker_reference`, the tier is readable from those rows' `exchange` column and
+> the `Set` — provider knowledge sitting in a service module — becomes deletable.
+> Decision taken: **delete it, derive the tier from data.**
+>
+> ### 78.2 — The catalogue source is the hard part, and it is not a listing page
+>
+> The bond catalogue scrapes one server-rendered listing. **analizy.pl has no
+> equivalent**, verified 2026-10-01:
+>
+> - `fundusze-inwestycyjne-otwarte/notowania` renders **11** fund links; the page
+>   claims ~400 funds.
+> - `?strona=`, `?page=`, `?p=` are **all ignored** — 11 links for every value.
+> - The table is JS-rendered. The only fund endpoints in `fundCatalogAsync.js` are
+>   `/api/fund-observed/` and `/api/fund-in-wallet/` — the observation UI, not a
+>   catalogue.
+> - Site search (`/wyszukiwarka`, `/szukaj`) is **404**.
+>
+> So a catalogue scrape is not available and this is **not** a "find the right
+> listing page" problem.
+>
+> **What does work is enumeration by code sweep**, because the codes are cheap to
+> probe — one JSON GET each, no auth, and a miss is a clean `404`. Proven twice:
+> `ING01`–`ING99` returned every ING category (that sweep is how `ING81`/`82`/`88`
+> were found), and a 20-prefix × 2-probe discovery pass resolved
+> `ING01 PZU01 PZU50 AXA01 ARK01 ARK50 PCS50 QRS01 SKR01 VIG01`.
+>
+> **The sweep is bounded and that is a stated limit, not a hidden one:** the prefix
+> list is *data* in the repo, and each prefix is probed `01`–`99`. It is blind to
+> managers outside the listed prefixes, and it is a refresh job, not a per-request
+> call. Sweeping every plausible 3-letter prefix × 99 would be ~100k requests and
+> is not proposed.
+>
+> ### 78.3 — Steps, in the planner contract's provider-tier order
+>
+> - [x] **Step 1 — catalogue capture.** Manual sweep, one request per code, raw
+>       > **DONE** — `openst 3793e68`. **734 categories** across the 8 resolved TFI
+>       > prefixes: 259 funds and **475 lettered unit categories**, CSV in the
+>       > `/corp-bond/catalogue` shape. Gate PASS — the 7 codes §72.39 verified are
+>       > all present with label, currency and first/last valuation; all 734 are PLN
+>       > and run to 2026-09-29.
+>       >
+>       > **It took two passes, and the first failed the gate** — the finding worth
+>       > keeping. A numeric sweep of `<prefix><01..120>` returned 259 funds and
+>       > **missed `ING01W`**, because a category is the fund code *plus a letter*.
+>       > Numeric-only would have dropped 65% of the corpus and, worse, looked
+>       > complete: `ING01W` is the symbol the whole class-W build exists for, so its
+>       > absence would not have been obvious.
+>       >
+>       > The second pass probes `<code><letter>` for eleven letters — §72.20's nine
+>       > ING01 categories plus `P` (`ING04P`) and `B` (`VIG04B`). That bound is
+>       > recorded as a **limit of the catalogue, not a completeness claim**: a
+>       > category on a letter outside the set is absent. It is data in the sweep, so
+>       > the set widens without a code change. All 26 letters would be ~6.7k
+>       > requests.
+>       >
+>       > Per-fund detail pages were rejected for a concrete reason: they *do* list
+>       > all sibling categories in one request, but the slug is mandatory (404
+>       > without it) and not derivable — `VIG04B`'s label is "VIG / C-QUADRAT Akcji
+>       > B" while its slug is `vig-c-quadrat-akcji`.
+>       >
+>       > Prefixes were **discovered, not guessed**: 60 candidates probed, exactly 8
+>       > resolve. `MAX_NUM` is 120 because `SKR110` is real. Sweeps paced at
+>       > 0.25–0.3s, matching the corp-bond job's own spacing.
+> - [x] **Step 2 — openst routes.** `GET /fund/catalogue` (CSV) and
+>       `GET /fund/search/{query}`, both over the captured catalogue.
+>       > **DONE** — `3747f0c`, **31 new tests**, full compose suite green
+>       > **447 + 104 + 53 + 21**.
+>       >
+>       > **The catalogue is a snapshot, not a scrape, and that is the one way this
+>       > route differs from `/corp-bond/catalogue`.** That one reads a single
+>       > server-rendered page; this corpus is 734 codes across two enumeration
+>       > passes (~960 requests), so a request-path scrape is impossible. A refresh
+>       > job rewrites `data/fund-catalogue.csv` and the route serves the file.
+>       >
+>       > **A missing or empty snapshot is a 503, never an empty CSV.** An empty
+>       > catalogue would make every fund unsearchable and every fund code a 404 —
+>       > indistinguishable from "this source has no funds", the silent shape this
+>       > work exists to avoid. A search **miss** is likewise 404, never an empty
+>       > 200. Both asserted.
+>       >
+>       > Search matches code, alias **or** name, substring and case-insensitive,
+>       > so the class-W symbol is reachable without knowing its code: `ING01`
+>       > returns `ING01W` alongside its siblings, and `akcji` finds it by name. The
+>       > tickerref CSV carries the bare fund code in `aliases` for the same reason.
+>       >
+>       > Two details pinned by tests because they are easy to get wrong:
+>       > `_base_fund_code` strips **exactly one** trailing letter (`SKR117B` is a
+>       > category, `SKR120` is a fund — "strip trailing alpha" would fold
+>       > `SKR117B` onto `SKR117` and lose it); and categories outnumber funds
+>       > (475 vs 259), so "the row count looks right" is **not** evidence the
+>       > lettered codes were captured.
+> - [x] **Step 3 — openst standalone smoke.** `docker compose up -d`, curl
+>       `/fund/catalogue` and a search, confirm the Redis cache **HITs** on the
+>       second identical call.
+>       > **PASSED.** Stack rebuilt, healthy in 7 s.
+>       >
+>       > | check | result |
+>       > |---|---|
+>       > | `/fund/catalogue` | 200, **734 rows**, 60,586 b, tickerref header |
+>       > | `ANALIZY::ING01W` in the served CSV | present, `aliases=ING01` |
+>       > | `/fund/search/ING01W` | 200, 1 hit — ING Akcji W |
+>       > | `/fund/search/ING01` | 200, 5 hits (fund + F/T/U/W) |
+>       > | `/fund/search/akcji` | 200, 50 hits |
+>       > | `/fund/search/emerytura` | 200, 36 hits |
+>       > | `/fund/search/nosuchfund` | **404** (negative-cached) |
+>       >
+>       > **Redis HIT confirmed, and confirmed to be Redis.** After deleting only the
+>       > fund keys: catalogue 15.8 ms → 4.7 ms → 5.2 ms; search 7.2 ms → 4.5 ms;
+>       > the 404 6.5 ms → 4.3 ms. Keys are genuinely in Redis — `fund_catalogue`
+>       > (TTL 86378) plus one `fund_search:*` per query including the
+>       > negative-cached miss.
+>       >
+>       > **Regression check:** the §72.39 W route still returns 382.05 / 904.80 /
+>       > 931.03 after the catalogue work.
+>       >
+>       > **One real defect the smoke caught, which the unit tests could not:** the
+>       > snapshot was missing from the runtime image, so `/fund/catalogue` returned
+>       > **503** in the container while every test passed — the Dockerfile copies
+>       > `src/`, `tests/`, `migrations/` and `plugins/` but not `data/`. Fixed by
+>       > adding `COPY data/ ./data/`. Worth recording because a green suite proved
+>       > nothing here: the failure was purely packaging, and only a real container
+>       > could surface it. The 503 behaved exactly as designed, naming the missing
+>       > path instead of serving an empty catalogue.
+>       >
+>       > Stack torn down afterwards. No test file added: smoke only, justified by
+>       > step 2's 31 tests.
+> - [x] **Step 4 — cachest routes.** Both routes in `config.yaml` with TTLs matching
+>       their openst peers (a catalogue is slow-moving; a search is per-query), plus
+>       `test_real_config_has_fund_catalogue_route` and
+>       `test_real_config_has_fund_search_route`. Full cachest suite green (211).
+>       Never swap 3 and 4.
+>       > **DONE** — `cachest c50e01b`, **218 tests green** (was 211).
+>       >
+>       > TTLs follow their peers by the same reasoning rather than by copying
+>       > numbers: the catalogue mirrors `OPENST_CORP_BOND_CATALOGUE` (43200) and the
+>       > search mirrors `OPENST_BOND_SEARCH` (3600) rather than
+>       > `OPENST_CRYPTO_SEARCH` (604800) — a 7d TTL fits a universe that changes
+>       > rarely, but inheriting it would leave a newly-listed fund unfindable for a
+>       > week.
+>       >
+>       > Both keep light 0.2s spacing and are deliberately **not** in the §63.9.1
+>       > scraper set: that 0.5s spacing is for routes proxying an upstream scrape,
+>       > and these read a local snapshot.
+>       >
+>       > `test_fund_search_and_fund_history_do_not_collide` checks
+>       > `/fund/search/{query}` against `/fund/history/{code}` explicitly. They are
+>       > two-segment siblings, and a key-space collision would serve search hits as
+>       > price bars — the right shape for the wrong thing.
+>       >
+>       > ### The deployment trap this step hides
+>       >
+>       > **The config bump alone does nothing in the cluster.** cachest's config is
+>       > generated into a ConfigMap from
+>       > `cluster/apps/pfire/cachest/app/config/config.yaml` — **a separate copy in
+>       > the homelab repo** — mounted over `/app/config.yaml`. A route added to
+>       > `cachest/config.yaml` is invisible until it is added there too
+>       > (`homelab e7eb171a0`; URLs use the in-cluster FQDN, and the two copies were
+>       > verified field-by-field with zero mismatches on the new routes).
+>       >
+>       > It surfaced loudly: the first `fundcategorysync` Job **failed** with
+>       > `HTTP 404 for .../fund/catalogue` rather than syncing an empty catalogue.
+>       > A silent degradation would have left PROD with zero `ANALYZY` rows and
+>       > `200 / bars=0` at the instruments tier.
+>       >
+>       > **Pre-existing drift found and deliberately not fixed:** the cluster copy
+>       > is missing `OPENST_CRYPTO_SEARCH` and `OPENST_CRYPTO_PROFILE` — so crypto
+>       > search is not proxied in PROD at all — and carries an `OPENST_PRICE_HISTORY`
+>       > the repo copy lacks. That predates this work and has its own blast radius.
+> - [x] **Step 5 — instruments: the part that earns its keep.**
+>       > **DONE** — `207b981`, tsc clean, **447 tests green** (was 431).
+>       >
+>       > **`FUND_CATEGORY_CODES` and `isFundCategory` are deleted**, along with the
+>       > `assetTypeForSymbol` early return that went with them. Both the asset class
+>       > and the price tier now come from **one catalogue row**: the sync writes
+>       > `ANALIZY::{CODE}` with `asset_type=fund`, `assetTypeForSymbol` finds it
+>       > like any other instrument, and `priceTierForSymbol` reads the venue column.
+>       > Two sources of truth for one fact became one, and the routing code carries
+>       > no provider knowledge.
+>       >
+>       > `upstreamFor` gains a `tier` argument rather than sniffing symbols, because
+>       > it is pure and cannot query the database — the caller resolves the tier and
+>       > passes it down. It **defaults to `standard`**, so a `.TFI` fund cannot be
+>       > diverted by an omitted argument, and the tier is **ignored for non-fund
+>       > asset classes**, so a mislabelled row cannot move a crypto pair or a bond
+>       > onto the fund feed. Both pinned.
+>       >
+>       > `fund-category-catalogue-sync.ts` mirrors `corp-bond-catalogue-sync.ts`:
+>       > fetch, count, refuse a truncated body, upsert. **The row floor is 400 of
+>       > 734 (~54%), matching the corp-bond gate's 53%.** My first draft used 200,
+>       > which would have accepted a 300-row truncation and silently dropped 400
+>       > funds from search — writing the boundary test is what caught it, so the
+>       > floor is now probed behaviourally (500 syncs; 150/12/0 refuse).
+>       >
+>       > `fundSearchLeg` is additive beside `bondSearchLeg`. The catalogue reaches
+>       > search through the reference table as well; the leg exists for rows the
+>       > table has not caught up with, not to replace it.
+>       >
+>       > Tests worth naming: a dotless corp bond (`ABE0227`) stays `standard`
+>       > despite the exact shape of a category; `ING01W` is `standard` without a
+>       > catalogue row and `fund_category` with one; a category code on the
+>       > `standard` tier goes to biznesradar; and the §72.39 test asserting the
+>       > deleted early return is **replaced** with the data-driven expectation.
+> - [x] **Step 6 — full stack + the UI.** `docker compose up -d`, curl through
+>       cachest, `npm run test:stack` green, then confirm in
+>       `InstrumentSearchModal` that typing `ING01W` / `Akcji` returns the
+>       fund and renders as a fund. The SPA needs no change if the response
+>       shape is unchanged — verify, do not assume.
+>       > **PASSED, including the UI.** Stack rebuilt, gateway restarted per
+>       > AGENTS.md (openst/cachest/instruments were all recreated).
+>       >
+>       > | check | result |
+>       > |---|---|
+>       > | `/fund/catalogue` via cachest | 200, **734 rows**, `ANALIZY::ING01W` present |
+>       > | `/fund/search/ING01W` via cachest | 200, 1 hit |
+>       > | `/fund/search/nosuchfund` via cachest | 404 |
+>       > | W price bars through the tier | **382.05 / 904.80 / 931.03** — no regression |
+>       > | `.TFI` funds still on biznesradar | `NNEP65.TFI` 18,172 b, `INGAKC.TFI` 18,920 b |
+>       > | `test:stack` | **32/32** |
+>       > | `test:mock` | **230** |
+>       >
+>       > **The sync ran and is the load-bearing part:** `upserted 734 fund rows into
+>       > ticker_reference`, and the local table now holds 734 `ANALYZY`/`fund` rows
+>       > with `ING01W → aliases ING01`. Without that row `ING01W` classifies as
+>       > `null`, i.e. stock — so the tier, the asset class and search all depend on
+>       > this job having run.
+>       >
+>       > **In the browser** (`localhost:3000`, mock IdP login, Add Position →
+>       > search): `ING01W` renders as **`ING01W (PL) Fund ING Akcji W`**, and
+>       > `emerytura` returns the families across all four managers — `AXA24`–`AXA40`,
+>       > `ING81`–`ING98`, `PCS74`–`PCS96`, `SKR117`–`SKR119` — **each alongside its
+>       > own `B` category** (`SKR117B`, `SKR118B`, `SKR119B`), which is the
+>       > category/parent relationship working end to end.
+>       >
+>       > **No SPA change was needed, and that is verified rather than assumed:**
+>       > `InstrumentSearchModal` applies no type filter, and `TickerBadge` already
+>       > maps `FUND` → "Fund". The pre-existing `.TFI` symbols (`NNEP25.TFI`,
+>       > `NNEP30.TFI`, `NNEP60.TFI`, `NNEP65.TFI`) still appear in the same results,
+>       > so both worlds coexist rather than one replacing the other.
+>       >
+>       > **Still owed before this is true in PROD:** the catalogue sync needs a
+>       > scheduled job there, exactly as `corp-bond-catalogue-sync` has one. Run by
+>       > hand in the compose stack it is a one-liner, but PROD has no
+>       > `ANALYZY` rows until a job exists — and until it does, `ING01W` resolves
+>       > to nothing and the W bars are unreachable.
+>       >
+>       > ### Deployed 2026-10-01 — and the last box was not a formality
+>       >
+>       > `d2d16c7d1` (images) + `e7eb171a0` (the fix below). Images:
+>       > openst **v1.1.43**, cachest **v1.0.48**, instruments **v1.0.86**,
+>       > sheets-sync **v1.0.31**. All four CI runs green — cachest's first run
+>       > failed on a `files.pythonhosted.org` read timeout while `pip install`ing,
+>       > not on code or tests, and a `--failed` rerun passed.
+>       >
+>       > **The tag bump alone did nothing, and this is worth keeping.** cachest's
+>       > config is generated into a ConfigMap from
+>       > `cluster/apps/pfire/cachest/app/config/config.yaml` — **a separate copy in
+>       > the homelab repo** — mounted over `/app/config.yaml`. So a route added to
+>       > `cachest/config.yaml` is invisible to the cluster until it is added here
+>       > too. Verified rather than assumed: `ghcr.io/marx2/cachest:v1.0.48` *does*
+>       > contain all three routes, while the mounted ConfigMap had none and every
+>       > fund request 404'd.
+>       >
+>       > **It surfaced loudly, which is the point.** The first
+>       > `fundcategorysync` Job failed with
+>       > `fund catalogue fetch failed: HTTP 404 for http://cachest:8080/fund/catalogue`
+>       > rather than syncing an empty catalogue — the 404 passthrough and the
+>       > row-count gate doing exactly the job they were built for. Had the sync
+>       > degraded to a warning, PROD would now hold zero `ANALYZY` rows and the
+>       > symptom would be `200 / bars=0` at the instruments tier.
+>       >
+>       > **Pre-existing drift found and deliberately NOT fixed:** the two config
+>       > copies have already diverged. The cluster copy is **missing
+>       > `OPENST_CRYPTO_SEARCH` and `OPENST_CRYPTO_PROFILE`** — so crypto search is
+>       > not proxied in PROD at all — and carries an `OPENST_PRICE_HISTORY` the
+>       > repo copy lacks. That predates this work; changing it is a separate
+>       > decision with its own blast radius, so it is flagged rather than absorbed.
+>       > Verified zero field mismatches on the three routes added.
+>       >
+>       > **Now proven in PROD**, tier resolution run inside the live instruments pod:
+>       >
+>       > | symbol | assetType | tier | |
+>       > |---|---|---|---|
+>       > | `ING01W` | fund | **fund_category** | the class-W symbol |
+>       > | `ING01` / `ING01U` / `ING04` / `ING92` | fund | fund_category | siblings |
+>       > | `INGAKC.TFI` / `NNEP65.TFI` / `NNEP30.TFI` | null→stock | **standard** | biznesradar, unchanged |
+>       > | `ABE0227` | **corp_bond** | standard | the dotless-bond collision is clear |
+>       > | `ROD1033` | bond | standard | savings bond still wins its branch |
+>       >
+>       > And bars through the tier: **`ING01W` → 872 rows, 382.05 / 904.80 / 931.03**;
+>       > `NNEP65.TFI` → 42 rows on `standard`, still biznesradar. `ticker_reference`
+>       > holds **734 `ANALYZY`/`fund` rows** with `ING01W → aliases ING01`.
+>       >
+>       > **The PROD Wipe & Reimport is now unblocked** — the prerequisite that made
+>       > it unsafe earlier (no `ANALYZY` row ⇒ `ING01W` ⇒ stock ⇒ equity walk ⇒
+>       > `200 / bars=0`) no longer applies.
+>
+> **What this section does not do.** It does not add fund categories to the
+> `aktualny kurs` sheet column (§72.39's stale-data finding), does not touch
+> §72.39 step 4 (`positions.company_name`), and does not re-open the sheet. It is
+> strictly: make funds findable, and get the routing knowledge out of code.
+>
+> ### 78.4 — The quote path did not exist, and deploying it surfaced 13 days of release damage
+>
+> Added after §78's steps shipped. Two things happened that the section above did
+> not anticipate, and both are worth more than the code.
+>
+> **The quote path was missing, not just the search path.** §78 made funds
+> *discoverable*; it never made them *priceable*. The distinction cost real work:
+> `price-bars.ts` resolves history, but a position is priced from a **quote**
+> (`refreshQuotes` → `fetchQuoteByAssetClass` → `current_price`), which had no
+> `fund_category` branch at all. A fund position therefore resolved no quote and
+> stayed `market_value IS NULL` — excluded from portfolio totals — while §72.39's
+> history work looked finished. This was found only because the user's question
+> ("will the *recompute* refresh it?") did not match my claim that a recompute would
+> fix it; recompute re-derives from *stored* prices and can never fetch one.
+>
+> So `fetchQuoteByAssetClass` got a `fund_category` branch that maps
+> `ticker_reference` row → provider code (`ING01W`, the stored category, **not**
+> `GMSAKW.TFI`), calls openst `/fund/history`, and returns the **latest** bar as
+> the quote. §78's data-driven tier (`priceTierForSymbol`) then settles routing
+> from the row rather than the hardcoded `Set`. Verified in the PROD pod: `ING01W`
+> 931.03, `ING01` 816.76, `NNEP65.TFI` 19.81 — the ~12.7% class difference, from the
+> live process.
+>
+> **Deploying it exposed pre-existing damage, not new damage.** `wallets` had been
+> un-upgradeable since **2026-09-18** — 13 days, three stale references from one
+> `app → portfoliost-wallets` rename, each invisible until the previous was cleared:
+>
+> 1. `controllers.app` (`controller:`/`ports:`) — rejected by app-template@5.1.0's schema;
+> 2. `serviceMonitor.app` against an empty `values.service` — *"No enabled Service found with this identifier"*;
+> 3. a comma-separated `schedule` — k3s v1.36.2 rejects it: `expected exactly 5 fields, found 10`.
+>
+> Any wallets deploy in that window would have failed, **including this one**. Same
+> shape as §78's cachest config drift: a stale copy of a value nothing reads,
+> sitting between the repo and the cluster. Removed the job block, added
+> `values.service.app`, and the release went `Ready=True` on revision v150 for the
+> first time in 13 days.
+>
+> **The two snapshotsync CronJobs stayed two.** Consolidating them is correct and
+> would make `concurrencyPolicy: Forbid` actually guard both windows (it never did
+> — a slow morning pass could still be running when the evening one started, both
+> writing prices for one portfolio), but the comma-separated schedule is what this
+> cluster rejects. Shipped as **one CronJob at one window** (11:00 UTC). The cost is
+> real and is recorded in the manifest: the post-FX pass after the 17:10 CEST
+> fxsync settles the ECB rate is gone, so day-end converted values settle the next
+> morning. Both jobs were briefly absent entirely — that was only ever to unblock
+> the release, and since §76.1 made `snapshots-sync` the **only** writer of
+> `positions.market_value`, their absence is a price-staleness risk, not a
+> cosmetic detail.
+>
+> **Verified PROD close-out** (`instruments` v1.0.87, `sheets-sync` v1.0.33,
+> `openst` v1.1.43, `cachest` v1.0.48):
+>
+> | | |
+> |---|---|
+> | Wipe & Reimport | 80 `ING01W` trades; **51/80 exact to the cent** (was 0/78 vs class A) |
+> | 1,845 W bars stored | `ING01W` position `current_price` **931.03**, `price_source` `quote`, value 198,019.07 |
+> | names | all six funds show current ING names; 0 stale brands |
+> | `actualni kurs` finding (§72.40) | **closed** — user corrected the sheet to 921.19, ratio vs W **1.0000** (was 1.1768), `average_cost_basis` re-derived 459.44 → 458.53, quantity 1.176847 confirmed authoritative |
+>
+> The gate rail worked as designed: W's nearest bars bracket the disputed 1084.10
+> (904.80 / 931.03), so the *cell was provably wrong* — not merely implausible — and
+> §74's read-only rule held throughout. Neither we nor any tooling ever wrote to the
+> sheet; the correction was the user's.
