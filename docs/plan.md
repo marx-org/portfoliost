@@ -326,6 +326,65 @@ row per Konto, in PLN). It never fails the run.
       > through and the contract says absent means "not measured". Coercing absent
       > to 0 would claim "nothing withheld" for exactly the rows that most need
       > the warning. The eight portfolios not yet recomputed are in that state.
+      >
+      > ---
+      >
+      > ## §78.5 — UI DONE, and two defects found by looking at the deployed page
+      >
+      > **SPA `6afc3be` (v1.0.337), verified in PROD on both views.** The note now
+      > reads, on IKE Beata with the ALL timeframe:
+      >
+      > ```
+      > up to PLN 10,465.38 of this chart is missing — those points are partial.
+      > Today's value is complete.
+      > ```
+      >
+      > and on the **1Y** view it correctly falls back to the count instead,
+      > because 1Y contains none of the withheld days.
+      >
+      > **Both defects below were found by reading the rendered page, not by a
+      > test.** The code was type-clean and the suite green at every point in
+      > between, which is the argument for doing this at all.
+      >
+      > **1. The card has its own copy of the message, and I only changed the
+      > chart.** `PortfolioCard` renders its own sparkline and its own copy of the
+      > sentence. The first release shipped the amount to `PortfolioPerformanceChart`
+      > and the cards still said "7 earlier positions". Two implementations of one
+      > sentence — and the wording had already drifted once before this.
+      >
+      > **2. I merged a window-wide count with a window-scoped amount, which was
+      > worse than either alone.** The first attempt read:
+      >
+      > ```
+      > 7 earlier positions had no price history — up to 10,465 PLN of the chart
+      > is missing for those days
+      > ```
+      >
+      > `gapSymbols` is WINDOW-WIDE by design (§72.30 — the whole backfill window,
+      > so a position held in 2022 and sold since still counts) while the series is
+      > TIMEFRAME-FILTERED. Measured on IKE Beata against the live endpoint:
+      >
+      > ```
+      > 1Y  → gapSymbols 7, days with unpricedValue 0
+      > ALL → gapSymbols 7, days with unpricedValue 1016, peak 10,465.38
+      > ```
+      >
+      > So in the 1Y view that sentence claimed **seven positions for a window in
+      > which none of them were held** — a repeat of exactly the §72.30 defect this
+      > message was split to remove, reintroduced one field later. **The amount is
+      > the window-accurate half and now leads alone; the count keeps its original
+      > wording as the fallback. They never share a sentence.** Two tests pin that
+      > in both components.
+      >
+      > **The card annotates in `portfolio.baseCurrency`, not the display
+      > currency** — its sparkline is raw `timeSeries[].value` with no rate, so
+      > annotating it in the headline's currency would put a differently-denominated
+      > number on the chart it describes.
+      >
+      > **Not ticked as a §78 box:** the amount is on the wire, persisted, and
+      > rendered, but the *shading* of the affected range is still not done, and
+      > §78.3's wording was "make the UI say so" rather than "draw a band". The
+      > note says so; the note is what shipped.
 - [ ] Commit (plan closeout) + archive §65.
 
 ---
@@ -2588,7 +2647,10 @@ known-unknown amount**, and §72.31's `gapSymbols` is the only thing marking it.
       > slightly understated rather than wrong.
       >
       > **Remaining on this item: the UI.** §78.5 has the number on the wire and
-      > verified in PROD; nothing renders it yet.
+      > verified in PROD; nothing rendered it yet.
+      >
+      > **Done — SPA v1.0.337.** See §78.5's closeout for what it reads and for
+      > two defects that only the deployed page exposed.
 
 ### 78.4 — Add a CI job that runs the test suite, across all five repos
 
