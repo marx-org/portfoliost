@@ -241,3 +241,85 @@ describe("PortfolioPerformanceChart (§41.1)", () => {
     expect(warn.text()).not.toMatch(/value excludes/i)
   })
 })
+/**
+ * §78.5 — the warning has to carry the AMOUNT, not only the count.
+ *
+ * "7 positions" is bookkeeping; "up to 10,465.32 PLN of the value line is
+ * missing" is the size of the problem. PROD is the reason: IKE Beata held an
+ * unpriceable position on 1,016 of 1,801 days, peaking at 10,465.38, and the
+ * chart showed a −34.1% day for it with nothing to explain it.
+ */
+describe("PortfolioPerformanceChart (§78.5 — unpricedValue)", () => {
+  const series = (peak: number) => [
+    { date: "2022-06-12", value: 32182, unpricedValue: 0 },
+    { date: "2022-06-13", value: 21201, unpricedValue: peak },
+    { date: "2022-06-14", value: 21104, unpricedValue: peak },
+  ]
+
+  it("names the amount alongside the count on a held gap", async () => {
+    const w = mount(PortfolioPerformanceChart, {
+      props: {
+        timeSeries: series(10465.38),
+        gapSymbols: ["BST0922"],
+        heldGapSymbols: ["BST0922"],
+        currency: "PLN",
+      },
+      global: { stubs: { apexchart: true } },
+    })
+    const warn = w.find('[data-testid="portfolio-chart-gap-warning"]').text()
+    expect(warn).toMatch(/up to\s*PLN\s*10,465\.38/i)
+  })
+
+  it("reports the PEAK, not the sum, and says which days are affected", async () => {
+    // 10,465.38 held for two days sums to 20,930.76 and would double-count the
+    // same money by its holding period. The peak is what a single day was short
+    // by, which is comparable to the drop it explains.
+    const w = mount(PortfolioPerformanceChart, {
+      props: {
+        timeSeries: series(10465.38),
+        gapSymbols: ["BST0922"],
+        heldGapSymbols: null,
+        currency: "PLN",
+      },
+      global: { stubs: { apexchart: true } },
+    })
+    const warn = w.find('[data-testid="portfolio-chart-gap-warning"]').text()
+    expect(warn).toMatch(/up to\s*PLN\s*10,465\.38/i)
+    expect(warn).not.toMatch(/20,930/)
+    expect(warn).toMatch(/earlier in this period/i)
+  })
+
+  it("says nothing about an amount when unpricedValue is ABSENT, not zero", async () => {
+    // A row written before the column existed omits the field. Reading that as
+    // "nothing withheld" would understate exactly the series that need it, so
+    // the count-only wording is used and no amount is invented.
+    const w = mount(PortfolioPerformanceChart, {
+      props: {
+        timeSeries: [{ date: "2022-06-12", value: 32182 }, { date: "2022-06-13", value: 21201 }],
+        gapSymbols: ["BST0922"],
+        heldGapSymbols: null,
+        currency: "PLN",
+      },
+      global: { stubs: { apexchart: true } },
+    })
+    const warn = w.find('[data-testid="portfolio-chart-gap-warning"]').text()
+    expect(warn).toMatch(/held with no price history/i)
+    expect(warn).not.toMatch(/up to/i)
+  })
+
+  it("no gapSymbols means no warning even when unpricedValue is positive", async () => {
+    // Belt and braces: the amount annotates an existing gap report, it never
+    // invents one. A stale unpricedValue with no gapSymbols would otherwise
+    // warn about a series the scan says is complete.
+    const w = mount(PortfolioPerformanceChart, {
+      props: {
+        timeSeries: series(10465.38),
+        gapSymbols: null,
+        heldGapSymbols: null,
+        currency: "PLN",
+      },
+      global: { stubs: { apexchart: true } },
+    })
+    expect(w.find('[data-testid="portfolio-chart-gap-warning"]').exists()).toBe(false)
+  })
+})

@@ -269,6 +269,11 @@ const chartSeries = computed(() => {
     ...p,
     value: (p.value ?? 0) * rate,
     invested: p.invested != null ? p.invested * rate : null,
+    // §78.5 — the withheld amount is in the same currency as `value`, so it has
+    // to be scaled by the same display rate. Spreading `...p` carries the raw
+    // number through, and leaving it unscaled would print the gap in PLN inside
+    // a USD view — a warning whose units contradict the axis beside it.
+    unpricedValue: p.unpricedValue != null ? p.unpricedValue * rate : null,
   }))
 })
 

@@ -14,6 +14,10 @@ interface PerformancePoint {
   /** Cumulative net money-in (same currency as `value`). When present, drawn
    * as a second "Invested" line so value − invested = profit at a glance. */
   invested?: number | null
+  /** §78.5 — base-currency cost of positions held on this day that have no
+   * price, so `value` does not include them. Absent = not measured (a row
+   * written before the column existed), which is NOT the same as 0. */
+  unpricedValue?: number | null
   cumulativeTwr?: number | null
   cumulativeMwr?: number | null
   cumulativeSimple?: number | null
@@ -83,14 +87,53 @@ const historyGapCount = computed(() => {
   const all = props.gapSymbols?.length ?? 0
   return Math.max(0, all - heldGapCount.value)
 })
+/**
+ * §78.5 — how much money the value line is NOT drawing, and over what span.
+ *
+ * `gapSymbols` names the symbols and `heldGapSymbols` says whether TODAY is
+ * short. Neither says **how much**, which is the part a user can act on: "7
+ * positions" is a bookkeeping detail, "up to 10,465 PLN is missing from this
+ * curve" is the size of the problem.
+ *
+ * The peak is reported rather than the sum on purpose. These positions are held
+ * for months, so a sum would multiply the same money by its holding period and
+ * report a number no one can reconcile against the chart. The peak is what any
+ * single day of the line was short by, which is comparable to the drop it
+ * explains.
+ *
+ * Absent `unpricedValue` is NOT zero. A row written before the column existed
+ * omits the field, and reading that as "nothing withheld" would understate the
+ * problem on exactly the series that need the warning — so it is treated as
+ * unknown and simply not mentioned.
+ */
+const unpriced = computed(() => {
+  const affected = props.timeSeries.filter(
+    (p): p is PerformancePoint & { unpricedValue: number } =>
+      typeof p.unpricedValue === "number" && p.unpricedValue > 0,
+  )
+  if (affected.length === 0) return null
+  const peak = affected.reduce((a, b) => (b.unpricedValue > a.unpricedValue ? b : a))
+  return {
+    peak: peak.unpricedValue,
+    first: affected[0].date ?? null,
+    last: affected[affected.length - 1].date ?? null,
+    days: affected.length,
+  }
+})
+/** "up to 10,465.32 PLN" — the amount, in the portfolio's own currency. */
+const unpricedAmount = computed(() =>
+  unpriced.value ? `up to ${formatCurrency(unpriced.value.peak, props.currency)}` : "",
+)
 const gapMessage = computed(() => {
   if (heldGapCount.value > 0) {
     const n = heldGapCount.value
-    return `Value excludes ${n} position${n === 1 ? "" : "s"} with no price history yet — total is a partial sum.`
+    const amt = unpricedAmount.value
+    return `Value excludes ${n} position${n === 1 ? "" : "s"} with no price history yet${amt ? ` (${amt})` : ""} — total is a partial sum.`
   }
   if (historyGapCount.value > 0) {
     const n = historyGapCount.value
-    return `Earlier in this period, ${n} position${n === 1 ? " was" : "s were"} held with no price history — those points are partial sums. The latest value is complete.`
+    const amt = unpricedAmount.value
+    return `Earlier in this period, ${n} position${n === 1 ? " was" : "s were"} held with no price history${amt ? ` — ${amt} of the value line is missing for those days` : ""}. Those points are partial sums; the latest value is complete.`
   }
   return ""
 })

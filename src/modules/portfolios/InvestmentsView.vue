@@ -100,6 +100,9 @@ const mergedChartSeries = computed(() => {
     ...p,
     value: (p.value ?? 0) * rate,
     invested: p.invested != null ? p.invested * rate : null,
+    // §78.5 — same rate as `value`, for the same reason: an unscaled amount
+    // would be a warning in the wrong currency sitting next to a converted axis.
+    unpricedValue: p.unpricedValue != null ? p.unpricedValue * rate : null,
   }))
 })
 
