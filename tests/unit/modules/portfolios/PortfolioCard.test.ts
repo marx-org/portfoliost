@@ -41,6 +41,19 @@ const analytics = (values: number[], backfillStatus: "pending" | "complete" | "f
     performance: { timeSeries: values.map((v) => ({ date: "2026-01-01", value: v })) },
   }) as never
 
+/** §72.30 — a response carrying the two gap lists separately. */
+const analyticsWithGaps = (
+  gapSymbols: string[] | null,
+  heldGapSymbols: string[] | null,
+  values: number[] = [100, 110],
+) =>
+  ({
+    backfillStatus: "complete",
+    gapSymbols,
+    heldGapSymbols,
+    performance: { timeSeries: values.map((v) => ({ date: "2026-01-01", value: v })) },
+  }) as never
+
 async function mountCard() {
   const pinia = createPinia()
   setActivePinia(pinia)
@@ -150,5 +163,68 @@ describe("PortfolioCard sparkline (§53.3)", () => {
     expect(opts.dataLabels.enabled).toBe(false)
     expect(opts.tooltip.enabled).toBe(false)
     expect(opts.xaxis.labels.show).toBe(false)
+  })
+})
+
+/**
+ * §72.30 — the card's gap notice must describe the value the card is showing.
+ *
+ * PROD, 2026-10-01: three of the four portfolios carrying a gap warning had every
+ * flagged symbol already CLOSED, and the card said "Value excludes 7 positions
+ * without price history" about a value that was counting them in full. The gap is
+ * real — it is the stored history that is partial — but the claim about the
+ * current number was not, and a warning that is wrong about the figure next to it
+ * is worse than none.
+ */
+describe("§72.30: the card's gap notice matches the claim it can support", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it("says the value is short only for symbols still held", async () => {
+    mockedPortfolios.getPortfolioAnalytics.mockResolvedValue(
+      analyticsWithGaps(["BST0922", "INS0922", "VOX0224"], null),
+    )
+    const w = await mountCard()
+
+    // NOT the amber "value is short" banner …
+    expect(w.find('[data-testid="card-chart-gap-warning"]').exists()).toBe(false)
+    // … a quieter note about the history, which still reports the gap
+    const note = w.find('[data-testid="card-chart-history-gap-note"]')
+    expect(note.exists()).toBe(true)
+    expect(note.text()).toContain("3 earlier positions")
+    expect(note.text()).toMatch(/today's value is complete/i)
+  })
+
+  it("keeps the urgent banner when a gap symbol is still held", async () => {
+    mockedPortfolios.getPortfolioAnalytics.mockResolvedValue(
+      analyticsWithGaps(["SOLD", "ROD0335"], ["ROD0335"]),
+    )
+    const w = await mountCard()
+
+    const warn = w.find('[data-testid="card-chart-gap-warning"]')
+    expect(warn.exists()).toBe(true)
+    // scoped to the one still held — not the 2 in the window-wide list
+    expect(warn.text()).toContain("Value excludes 1 position")
+    expect(warn.text()).not.toContain("2 positions")
+    // and the history note does not double-report the same symbol
+    expect(w.find('[data-testid="card-chart-history-gap-note"]').text()).toContain("1 earlier position")
+  })
+
+  it("shows nothing at all when every held symbol is priced", async () => {
+    mockedPortfolios.getPortfolioAnalytics.mockResolvedValue(analyticsWithGaps(null, null))
+    const w = await mountCard()
+    expect(w.find('[data-testid="card-chart-gap-warning"]').exists()).toBe(false)
+    expect(w.find('[data-testid="card-chart-history-gap-note"]').exists()).toBe(false)
+  })
+
+  it("treats a legacy response (no heldGapSymbols) as history, never as a short value", async () => {
+    // A backend without the split sends `gapSymbols` only. Reading it as "held"
+    // would reproduce the exact PROD false warning, so the card degrades to the
+    // history note until the next backfill on a current backend fills it in.
+    mockedPortfolios.getPortfolioAnalytics.mockResolvedValue(analyticsWithGaps(["OLD"], null))
+    const w = await mountCard()
+    expect(w.find('[data-testid="card-chart-gap-warning"]').exists()).toBe(false)
+    expect(w.find('[data-testid="card-chart-history-gap-note"]').text()).toContain("1 earlier position")
   })
 })

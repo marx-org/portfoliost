@@ -3257,6 +3257,8 @@ export interface components {
                 returnPercent?: number;
             }[];
             gapSymbols?: string[] | null;
+            /** @description gapSymbols still held on the window's last day. Non-empty ⇒ the latest stored value excludes them. Empty while `gapSymbols` is non-empty ⇒ the history is a partial sum but the current value is complete, and the UI must say that instead of "value is short". */
+            heldGapSymbols?: string[] | null;
         };
         PortfolioSnapshot: {
             allocation?: {

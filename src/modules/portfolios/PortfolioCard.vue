@@ -99,7 +99,14 @@ const backfillPending = ref(false)
 const backfillFailed = ref(false)
 const recomputeBusy = ref(false)
 // §63.8 — held symbols the last backfill had no price bar for → value is partial
-const chartGap = ref<string[] | null>(null)
+// §72.30 — TWO lists, because the window-wide one cannot support the claim the
+// card was making. `heldChartGap` still held ⇒ today's value really is short.
+// `historyChartGap` = sold-since ⇒ only earlier points are partial. PROD
+// (2026-10-01) showed the cost of conflating them: three of four flagged
+// portfolios had every flagged symbol already closed, and the card told the user
+// its value excluded positions it was in fact counting in full.
+const heldChartGap = ref<string[] | null>(null)
+const historyChartGap = ref<string[] | null>(null)
 
 const showRename = ref(false)
 const renameName = ref(props.portfolio.name)
@@ -146,7 +153,7 @@ function startPolling() {
     try {
       const analytics = await getPortfolioAnalytics(props.portfolio.id, timeframe.value)
       series.value = (analytics.performance?.timeSeries ?? []).map((p) => p.value ?? 0)
-      chartGap.value = analytics.gapSymbols ?? null
+      applyGapSymbols(analytics)
       applyBackfillStatus(analytics.backfillStatus)
     } catch { stopPolling() }
   }, 5000)
@@ -161,7 +168,7 @@ async function loadChart() {
   try {
     const analytics = await getPortfolioAnalytics(props.portfolio.id, timeframe.value)
     series.value = (analytics.performance?.timeSeries ?? []).map((p) => p.value ?? 0)
-    chartGap.value = analytics.gapSymbols ?? null
+    applyGapSymbols(analytics)
     applyBackfillStatus(analytics.backfillStatus)
   } catch {
     chartError.value = true
@@ -170,6 +177,27 @@ async function loadChart() {
   }
 }
 
+/**
+ * §72.30 — split the response's two gap lists into the two claims the card makes.
+ *
+ * `heldGapSymbols` is the subset still held, so it is what "this value excludes
+ * N positions" is allowed to refer to. Everything else in `gapSymbols` is a
+ * position that has since been sold: the history it sat in is a partial sum, the
+ * current value is not.
+ *
+ * A response with only the legacy `gapSymbols` (a backend that has not shipped
+ * the split) has no `heldGapSymbols`, so the held list is empty and the whole
+ * list reads as history — the safe direction, because it never claims a
+ * complete value is short. The next backfill on a current backend fills it in.
+ */
+function applyGapSymbols(analytics: { gapSymbols?: string[] | null; heldGapSymbols?: string[] | null }) {
+  const all = analytics.gapSymbols ?? []
+  const held = analytics.heldGapSymbols ?? []
+  heldChartGap.value = held.length ? held : null
+  const heldSet = new Set(held)
+  const history = all.filter((s) => !heldSet.has(s))
+  historyChartGap.value = history.length ? history : null
+}
 
 /**
  * §76.2 — the manual refresh. `recomputePortfolio` now issues `?mode=upsert`
@@ -445,9 +473,17 @@ async function exportPositions(format: "csv" | "xml" | "json") {
       <p v-if="backfillPending" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
         Historical data is loading, chart will update in a moment.
       </p>
-      <!-- §63.8 — value is a partial sum when some held positions lack price history -->
-      <p v-if="chartGap && chartGap.length" class="mt-1 text-xs font-medium text-amber-600 dark:text-amber-400" data-testid="card-chart-gap-warning">
-        Value excludes {{ chartGap.length }} position{{ chartGap.length === 1 ? "" : "s" }} without price history.
+      <!-- §63.8 — the LATEST value is a partial sum when a held position has no
+           price history. §72.30 — this is stated only for symbols still held;
+           a sold-since gap makes the HISTORY partial, not the value on the card.
+           The two are independent `v-if`s, not an else-chain: a portfolio can
+           have both, and dropping the history note just because an urgent one is
+           already on screen hides a real gap for the sake of tidiness. -->
+      <p v-if="heldChartGap && heldChartGap.length" class="mt-1 text-xs font-medium text-amber-600 dark:text-amber-400" data-testid="card-chart-gap-warning">
+        Value excludes {{ heldChartGap.length }} position{{ heldChartGap.length === 1 ? "" : "s" }} without price history.
+      </p>
+      <p v-if="historyChartGap && historyChartGap.length" class="mt-1 text-xs text-slate-500 dark:text-slate-400" data-testid="card-chart-history-gap-note">
+        {{ historyChartGap.length }} earlier position{{ historyChartGap.length === 1 ? "" : "s" }} had no price history &mdash; those chart points are partial. Today's value is complete.
       </p>
     </div>
 

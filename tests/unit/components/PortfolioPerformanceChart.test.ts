@@ -176,10 +176,68 @@ describe("PortfolioPerformanceChart (§41.1)", () => {
     })
     expect(w.find('[data-testid="portfolio-chart-gap-warning"]').exists()).toBe(false)
 
-    await w.setProps({ gapSymbols: ["XTB.WA", "AMZN"] })
+    await w.setProps({ gapSymbols: ["XTB.WA", "AMZN"], heldGapSymbols: ["XTB.WA", "AMZN"] })
     const warn = w.find('[data-testid="portfolio-chart-gap-warning"]')
     expect(warn.exists()).toBe(true)
     expect(warn.text()).toMatch(/2 positions?/)
     expect(warn.text()).toMatch(/no price history/i)
+  })
+
+  /**
+   * §72.30 — a window-wide gap is not a claim about the LATEST value.
+   *
+   * This is the PROD defect, in the exact shape it had on 2026-10-01: IKE Beata's
+   * response carried 7 gap symbols, every one of them a position already sold, and
+   * the chart said "Value excludes 7 positions … total is a partial sum" about a
+   * value that was complete. The history is genuinely partial and must still be
+   * reported — silently dropping it would lose the signal §72.30 widened the scan
+   * to produce — but it may not be phrased as a defect in the number on screen.
+   */
+  it("§72.30 — a sold-since gap warns about the HISTORY, not the current value", async () => {
+    const w = mount(PortfolioPerformanceChart, {
+      props: {
+        timeSeries: [ts("2026-07-01", 500)],
+        gapSymbols: ["BST0922", "INS0922", "NVA0624"],
+        heldGapSymbols: null,
+      },
+      global: { stubs: { apexchart: true } },
+    })
+    const warn = w.find('[data-testid="portfolio-chart-gap-warning"]')
+    expect(warn.exists()).toBe(true)
+    // names the history, and states plainly that the latest value is complete
+    expect(warn.text()).toMatch(/earlier in this period/i)
+    expect(warn.text()).toMatch(/3 positions?/)
+    expect(warn.text()).toMatch(/latest value is complete/i)
+    // and, load-bearing: it does NOT claim the value is short
+    expect(warn.text()).not.toMatch(/value excludes/i)
+    expect(warn.text()).not.toMatch(/partial sum\.$/i)
+  })
+
+  it("§72.30 — a mixed response warns about the value only for the still-held part", async () => {
+    const w = mount(PortfolioPerformanceChart, {
+      props: {
+        timeSeries: [ts("2026-07-01", 500)],
+        gapSymbols: ["SOLD", "HELD"],
+        heldGapSymbols: ["HELD"],
+      },
+      global: { stubs: { apexchart: true } },
+    })
+    const warn = w.find('[data-testid="portfolio-chart-gap-warning"]')
+    // the urgent claim, scoped to the one symbol that still affects the value
+    expect(warn.text()).toMatch(/value excludes 1 position/i)
+    expect(warn.text()).not.toMatch(/2 positions/i)
+  })
+
+  it("§72.30 — a legacy response with no heldGapSymbols never claims a complete value is short", async () => {
+    // A backend that has not shipped the split sends `gapSymbols` only. Reading
+    // it as "held" would reproduce the false warning exactly; the safe direction
+    // is to report it as history and let the next backfill fill in the subset.
+    const w = mount(PortfolioPerformanceChart, {
+      props: { timeSeries: [ts("2026-07-01", 500)], gapSymbols: ["OLD"] },
+      global: { stubs: { apexchart: true } },
+    })
+    const warn = w.find('[data-testid="portfolio-chart-gap-warning"]')
+    expect(warn.text()).toMatch(/earlier in this period/i)
+    expect(warn.text()).not.toMatch(/value excludes/i)
   })
 })

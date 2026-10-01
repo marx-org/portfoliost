@@ -41,8 +41,18 @@ const props = withDefaults(
     /** §63.8 — held symbols the last backfill had no price bar for. Non-empty →
      * the value series is a partial sum; a warning chip is shown. */
     gapSymbols?: string[] | null
+    /** §72.30 — the subset of `gapSymbols` STILL HELD on the window's last day.
+     * Non-empty means the LATEST point on this chart is itself short, which is
+     * the claim the warning makes about the number in front of the user.
+     *
+     * `gapSymbols` on its own is window-wide and cannot carry that claim: PROD
+     * on 2026-10-01 rendered "Value excludes 7 positions without price history"
+     * for IKE Beata, whose 7 flagged symbols had all been sold — the current
+     * point was complete. A warning that is wrong about the number next to it is
+     * worse than silence, because it is believed. */
+    heldGapSymbols?: string[] | null
   }>(),
-  { benchmarks: () => [], currency: "USD", color: "#16a34a", backfillPending: false, loading: false, height: 300, recomputing: false, gapSymbols: null },
+  { benchmarks: () => [], currency: "USD", color: "#3b82f6", backfillPending: false, loading: false, height: 300, recomputing: false, gapSymbols: null, heldGapSymbols: null },
 )
 
 const emit = defineEmits<{ recompute: [] }>()
@@ -55,14 +65,35 @@ const toPoint = (p: PerformancePoint): [number, number] => [new Date(p.date ?? "
 const hasInvested = computed(() => props.timeSeries.some((p) => p.invested != null))
 const INVESTED_COLOR = "#0ea5e9"
 
-// §63.8 — value is a partial sum when some held symbols had no price bar.
-const gapCount = computed(() => (props.gapSymbols?.length ?? 0))
-const gapMessage = computed(() =>
-  gapCount.value > 0
-    ? `Value excludes ${gapCount.value} position${gapCount.value === 1 ? "" : "s"} with no price history yet — total is a partial sum.`
-    : "",
-)
-
+// §63.8 / §72.30 — TWO different claims, and the component says the one that is
+// true of the point it is drawing.
+//
+//   - `heldGapSymbols` non-empty → the LATEST point excludes them. "Value is a
+//     partial sum" is accurate and urgent.
+//   - `gapSymbols` non-empty but `heldGapSymbols` empty → the gaps are all in
+//     earlier history (positions since sold). Today's number is complete; the
+//     CHART's past is not. Saying "value excludes N positions" here was the PROD
+//     defect — it warned about a value that was not short.
+//
+// The history case is still reported, never dropped: a curve with holes is worth
+// knowing about, and §72.30 widened the window-wide scan precisely to catch it.
+// It just is not allowed to impersonate a defect in today's number.
+const heldGapCount = computed(() => props.heldGapSymbols?.length ?? 0)
+const historyGapCount = computed(() => {
+  const all = props.gapSymbols?.length ?? 0
+  return Math.max(0, all - heldGapCount.value)
+})
+const gapMessage = computed(() => {
+  if (heldGapCount.value > 0) {
+    const n = heldGapCount.value
+    return `Value excludes ${n} position${n === 1 ? "" : "s"} with no price history yet — total is a partial sum.`
+  }
+  if (historyGapCount.value > 0) {
+    const n = historyGapCount.value
+    return `Earlier in this period, ${n} position${n === 1 ? " was" : "s were"} held with no price history — those points are partial sums. The latest value is complete.`
+  }
+  return ""
+})
 // Config-only options (no `series`). The object is memoised by
 // (currency, colour, benchmark names) so a data swap that keeps the same
 // configuration reuses the identical `options` reference (vue3-apexcharts
