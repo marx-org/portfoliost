@@ -13478,7 +13478,12 @@ NN TFI trade is a false positive, and a correct one for the wrong reason.
 >   decision. **Not yet in PROD.**
 > - The sheet's hand-maintained price column is **7–18% wrong** and proved it by
 >   landing on a real transaction (1084.10 against W's 921.19, above W's all-time
->   max). The user is cross-checking the sheet. Not edited — §74's read-only rule.
+>   max). **RESOLVED 2026-10-01.** The user checked the sheet, corrected the cell
+>   to 921.19, and reimported: the trade now reads 921.19 (ratio vs W **1.0000**,
+>   was 1.1768), `average_cost_basis` re-derived 459.44 → 458.53, and the row's
+>   quantity 1.176847 was confirmed correct — it was never derived from the bad
+>   price, which was the one thing that could have made the fix inconsistent. We
+>   never edited the sheet, per §74's read-only rule.
 
 > **One item is genuinely outstanding and is NOT in this archive:** the portfolio
 > recompute that makes the W bars show in the user's numbers. That is an action, not
