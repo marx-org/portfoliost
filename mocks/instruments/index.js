@@ -142,6 +142,11 @@ function historyFor(symbol, resolution, compare, targetCcy) {
     h.timestamps = kept.dates.map((d) => Math.floor(new Date(`${d}T00:00:00Z`).getTime() / 1000))
     h.currency = targetCcy
     h.fxFrom = cc.fxFrom
+    // §72.10 — the dates §72.17 dropped, so a caller can tell a short series from
+    // a truncated one. Absent when no conversion was asked for; present (possibly
+    // empty) when one was. `fxFrom` alone cannot express this — the holes are
+    // scattered as well as prefixed.
+    h.unconvertedDates = cc.convertedMask.flatMap((ok, i) => (ok ? [] : [dates[i]]))
   }
   if (!compare) return h
   const prices = base.closePrices
@@ -244,6 +249,7 @@ export function register(app) {
     let keptDates = dates
     let currency = ci.currency
     let fxFrom = null
+    let unconvertedDates
     if (target.value && ci.currency && target.value !== ci.currency) {
       const cc = convertSeriesAs(dates, closes, ci.currency, target.value)
       // §72.17 — drop the bars the schedule cannot convert. The response stays
@@ -253,8 +259,10 @@ export function register(app) {
       keptDates = kept.dates
       currency = target.value
       fxFrom = cc.fxFrom
+      // §72.10 — and say which dates went, same declaration as /history.
+      unconvertedDates = cc.convertedMask.flatMap((ok, i) => (ok ? [] : [dates[i]]))
     }
-    ctx.res.json({ symbol, timeframe: "daily", stale: false, currency, baseCurrency: ci.currency, fxFrom, dates: keptDates, closes })
+    ctx.res.json({ symbol, timeframe: "daily", stale: false, currency, baseCurrency: ci.currency, fxFrom, ...(unconvertedDates ? { unconvertedDates } : {}), dates: keptDates, closes })
   })
 
   app.get("/api/instruments/:symbol/fundamentals", (ctx) => {

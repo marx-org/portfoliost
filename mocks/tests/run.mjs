@@ -256,12 +256,49 @@ async function main() {
       sntUsd.json.dates[0] > nativeDates[0],
       `converted starts ${sntUsd.json.dates[0]}, native starts ${nativeDates[0]}`,
     )
+    // §72.10 — and the response SAYS which dates went, rather than leaving the
+    // caller to infer it from a short series. `fxFrom` cannot carry this: it is
+    // the first converted date, so a hole later in the window is invisible to it.
+    const droppedNative = nativeDates.filter((d) => !sntUsd.json.dates.includes(d))
+    check(
+      "instruments.currency unconvertedDates names exactly the dates it dropped",
+      Array.isArray(sntUsd.json.unconvertedDates) &&
+        sntUsd.json.unconvertedDates.length === droppedNative.length &&
+        sntUsd.json.unconvertedDates.every((d, i) => d === droppedNative[i]),
+      `got ${JSON.stringify(sntUsd.json.unconvertedDates)} want ${JSON.stringify(droppedNative)}`,
+    )
+    check(
+      "instruments.currency unconvertedDates and the returned series are disjoint",
+      Array.isArray(sntUsd.json.unconvertedDates) &&
+        sntUsd.json.unconvertedDates.every((d) => !sntUsd.json.dates.includes(d)),
+      `dropped ${JSON.stringify(sntUsd.json.unconvertedDates)} overlaps the series`,
+    )
   }
   const sntSame = await request("/instruments/SNT.WA/price-bars?currency=PLN", { token })
   check(
     "instruments.currency price-bars same-currency short-circuit",
     sntSame.status === 200 && sntSame.json.currency === "PLN" && sntSame.json.baseCurrency === "PLN" && sntSame.json.fxFrom === null && JSON.stringify(sntSame.json.closes) === JSON.stringify(sntNative.json.closes),
     `got ${sntSame.status} fxFrom=${sntSame.json && sntSame.json.fxFrom}`,
+  )
+  // §72.10 — "no conversion applied" must be ABSENT, not []. Collapsing the two
+  // leaves a caller unable to tell "never converted" from "converted, lost
+  // nothing", which is the distinction the field exists for.
+  check(
+    "instruments.currency unconvertedDates absent when no conversion was applied",
+    sntSame.json && sntSame.json.unconvertedDates === undefined,
+    `got ${JSON.stringify(sntSame.json && sntSame.json.unconvertedDates)}`,
+  )
+  const sntPlain = await request("/instruments/SNT.WA/price-bars", { token })
+  check(
+    "instruments.currency unconvertedDates absent with no ?currency= at all",
+    sntPlain.status === 200 && sntPlain.json.unconvertedDates === undefined,
+    `got ${sntPlain.status} ${JSON.stringify(sntPlain.json && sntPlain.json.unconvertedDates)}`,
+  )
+  const sntHistNoCcy = await request("/instruments/SNT.WA/history?resolution=daily", { token })
+  check(
+    "instruments.currency unconvertedDates absent on /history with no ?currency=",
+    sntHistNoCcy.status === 200 && sntHistNoCcy.json.unconvertedDates === undefined,
+    `got ${sntHistNoCcy.status} ${JSON.stringify(sntHistNoCcy.json && sntHistNoCcy.json.unconvertedDates)}`,
   )
   const sntBtc = await request("/instruments/SNT.WA/price-bars?currency=BTC", { token })
   check("instruments.currency price-bars unsupported target → 400", sntBtc.status === 400, `got ${sntBtc.status}`)
