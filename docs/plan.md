@@ -1506,36 +1506,59 @@ coverage rather than of the portfolios.
 - [x] **Backfill `fx_rates` further back** (already a §72.17 follow-up, now
       > **§72.24 — backfill ran**
       load-bearing: it is what removes these steps).
-- [ ] Make the coverage boundary visible rather than leaving it to look like a
+- [x] Make the coverage boundary visible rather than leaving it to look like a
       market move — the same job `gapSymbols` does for missing bars, extended to FX.
-      > **Half done (wallets `1211777`), and the measurement it needed is now
-      > proven rather than argued.** `fxCoverageHoles` is computed against
-      > `series.dates` — what instruments actually returned — *before*
-      > `buildPriceMap` runs, because that is the only point where the difference
-      > exists. Measured afterwards it would be structurally incapable of being
-      > non-zero for the scattered case.
+      > **CLOSED 2026-10-01 — the whole item, not just the half that was blocked.**
+      > Contracts `45117d2` (**v1.6.57**), wallets `bc2e71f` (**v1.1.115**),
+      > homelab `7130c07e3`. The §72.10 release unblocked it, and the remaining
+      > half — persist and surface — is now done and **verified on PROD**.
       >
-      > The blind spot is now demonstrated, not suspected. With a hole on 07-02 and
-      > bars either side, the new test asserts **both** halves:
-      > `fxCoverageHoles.get("AAA") === ["2026-07-02"]` **and**
-      > `gapSymbols === []`. That second assertion is the point — a prefix hole
-      > always reached `gapSymbols` and looked like a symbol with no history; a
-      > scattered one never did, and §72.17's damage was that shape.
+      > **What shipped.** `fxCoverageHoles` on `portfolio_backfill_metadata`
+      > (migration `0011_fx_coverage_holes`, jsonb), written by both backfill
+      > call sites, read by `getGapSymbols`, returned on `GET /:id/analytics`.
       >
-      > **It is a count, deliberately not a diagnosis, and that limit is in the
-      > type.** At this layer "no bar returned" and "bar dropped for want of an FX
-      > rate" are the same absence. `unconvertedDates` (§72.10) is what separates
-      > them; the field is now on wallets' local `PriceBarSeries` but arrives
-      > `null` until the contracts release, so the reason is genuinely unavailable
-      > today. Recording the count without the cause is the honest half — a
-      > plausible-looking cause for a number that does not have one is how §72.36
-      > happened.
+      > **Counts, not dates, and the reason is worth keeping.** The dates exist in
+      > `batch.fxCoverageHoles` and can run to thousands over a wide window. What a
+      > UI states is "SAP.DE is missing 12 held days", so that is what is stored;
+      > the per-day detail stays where it belongs, on the price-bar series as
+      > `unconvertedDates`. Still **not a diagnosis**, and the limit is in the type:
+      > at the valuation layer "instruments had no history" and "instruments dropped
+      > the bar for want of an FX rate" are one absence.
       >
-      > **Remaining half:** surface `fxCoverageHoles` on `GET /:id/analytics` and
-      > persist it alongside `gapSymbols` (`persistGapSymbols`, `backfill.ts:652`),
-      > so it survives the pod and is queryable. **Blocked on the same contracts
-      > release as §72.10** — the two items are not independent, which the plan did
-      > not previously record. One release unblocks both.
+      > **jsonb, not a second `text[]`,** because the useful part is the count. A
+      > symbol appearing in both this and `gapSymbols` means something different by
+      > each, so deduping them into one list would have destroyed the distinction.
+      >
+      > **`persistGapSymbols` distinguishes `undefined` from `null`/`{}`,** and that
+      > is load-bearing rather than pedantic: `undefined` means "this caller does
+      > not measure it" and leaves any stored value alone, while `null`/`{}` is a
+      > positive "measured, none". Without it a partial caller would silently erase
+      > a real finding — the same failure mode that split `heldGapSymbols` off in
+      > the first place. Pinned by a test that writes `{AAA: 3}`, re-persists
+      > without the argument, and asserts it survives.
+      >
+      > **Verified in PROD on v1.1.115**, through the gateway, three portfolios:
+      >
+      > ```
+      > Crypto    gapSymbols ["BTC-USD"]  heldGapSymbols null
+      >           fxCoverageHoles {"BTC-USD": 507, "ETH-USD": 232}   ← real
+      > Equate+   gapSymbols null  heldGapSymbols null  fxCoverageHoles null
+      > IBKR      gapSymbols null  heldGapSymbols null  fxCoverageHoles null
+      > ```
+      >
+      > **Crypto is the demonstration this item needed.** `BTC-USD` is *already* a
+      > `gapSymbol` — it has no bars at all — and `ETH-USD` was not flagged by
+      > either existing field. So of the 507 + 232 held days with no bar, **every
+      > single one was invisible before this change**: the crypto series carried
+      > forward across them and the UI rendered the steps as returns. That is
+      > §72.17's damage shape, still present in PROD until this afternoon, found by
+      > a field built to look for it.
+      >
+      > A null on the other nine portfolios is a real "measured, clean" only for
+      > those already recomputed since the deploy; rows written before migration
+      > 0011 read null as "not measured", which is why the column is null-for-
+      > unknown rather than `{}` — a consumer must not be able to read an
+      > unmeasured row as a clean one. 533 wallets green (was 527).
 - [x] **IKE Marek: the number moved between measurements** — reported as 176.4% @
       > **§72.28 — it was a bond sale, not measurement noise**
       2025-05-02, then re-measured as +1.4% on the same series with no recompute in
