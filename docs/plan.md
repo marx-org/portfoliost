@@ -1559,6 +1559,71 @@ coverage rather than of the portfolios.
       > 0011 read null as "not measured", which is why the column is null-for-
       > unknown rather than `{}` — a consumer must not be able to read an
       > unmeasured row as a clean one. 533 wallets green (was 527).
+      >
+      > ---
+      >
+      > ## CORRECTION, same day — the first deployed version was measuring the calendar
+      >
+      > **v1.1.115 shipped this field wrong, and the numbers were so large that
+      > the right reaction was to measure rather than explain.** After the
+      > recompute it reported Equate+ at **820 missing days for one symbol** and
+      > IBKR across **108 symbols**.
+      >
+      > The cause is one line: `days` is `calendarDays` — **every calendar day** —
+      > and the missing set was compared against `series.dates` directly. A week has
+      > five trading days. Measured on SAP.DE over its full range:
+      >
+      > ```
+      > 2015-10-01 .. 2026-10-01   4,019 calendar days, 2,797 bars → 1,222 "holes"
+      >   of which Saturdays and Sundays .......... 1,148   (94%)
+      >   of which weekdays ....................... 74
+      > ```
+      >
+      > **And the 74 settle it.** They are Dec 24, Dec 31, Jan 1, Good Friday,
+      > Easter Monday, Whit Monday, Oct 3 — the German holiday list, in order, year
+      > by year. So the field was reporting *the exchange calendar*, not anything
+      > about coverage. A metric whose findings are 94% the definition of the day
+      > is not a metric, and 820 is large enough to have buried any real signal.
+      >
+      > **Fixed in v1.1.116** (`95344ad`, homelab `02ad73bd5`): `isMarketClosure`
+      > excludes weekends, and excludes a day whose nearest bar is more than 7 days
+      > away **on either side** (which removes holiday spans). A **prefix** absence
+      > is still counted — no bar before it at all means "started later" or "FX
+      > coverage began late", not knowable here, and `gapSymbols` reports the same
+      > shape, so quietly reclassifying it would have hidden one of the two causes.
+      >
+      > **After the fix, PROD, all ten recomputed:**
+      >
+      > ```
+      > Crypto                  2 syms   34 days   BTC-USD:24  ETH-USD:10
+      > Equate+                 1 sym    48 days   SAP.DE:48
+      > IBKR                   93 syms 1815 days   MA:58  TSM:58  MSFT:58  QCOM:58
+      > IKE Beata              52 syms 1406 days   BST0327:419  DOM.WA:54
+      > IKE Marek              37 syms  678 days   ASML:53  CSN.L:38
+      > NN TFI PPK / PPO        4 / 2    102 / 68
+      > Rach. rejestrowy PKO BP 1 sym    16 days   ROD0335:16
+      > XTB                     2 sym    13 days   PSEC:12
+      > Obligacje PKO SA Beata 0 syms     0 days
+      > ```
+      >
+      > **And the honest verdict, which is not "shipped and working".** Weekend
+      > noise is gone, and every remaining number is now dominated by **exchange
+      > holidays**: IBKR's 58 days for a long-held US name is ~9.7/year, which is
+      > the US market holiday count. So the field currently reports, for most
+      > symbols, "the number of holidays in the holding period" — a true statement
+      > and close to useless as a coverage signal. It is the *same* failure as the
+      > 820 weekends, three orders smaller.
+      >
+      > **What it actually takes to make this field worth having is a trading
+      > calendar.** `days` has no calendar in it, nothing here can invent one, and
+      > a single-day holiday is structurally indistinguishable from a single-day
+      > coverage hole. Until instruments exposes per-venue sessions (or the batch
+      > joins against a reference calendar), this is a correctly-shaped field
+      > carrying a known quantity of noise, and the counts above should be read
+      > that way. Recorded here rather than in a fresh box because it is the same
+      > item and pretending it were new would hide that the item's value is still
+      > unproven. Two tests pin the fix — one per exclusion — plus the boundary day
+      > that is still counted. 535 green.
 - [x] **IKE Marek: the number moved between measurements** — reported as 176.4% @
       > **§72.28 — it was a bond sale, not measurement noise**
       2025-05-02, then re-measured as +1.4% on the same series with no recompute in
