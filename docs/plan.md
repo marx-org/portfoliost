@@ -34,10 +34,82 @@ row per Konto, in PLN). It never fails the run.
     IKE Beata 139) — user is adding them to the sheet step by step; re-run the
     comparison as they land, then wipe & reimport when ~empty.
 
+> **The success criterion is unreachable, and the measurement says why. Read this
+> before spending anything else on the section.**
+>
+> §65 closes "when the sheet stops disagreeing with the import". Measured
+> 2026-10-01 against both live sheets, **the Gotówka column is not a cash
+> ledger — it is a periodically-updated balance**, and the import's ledger is
+> per-transaction and complete. IKE Marek, 2021-10-29 → 2026-09-29:
+>
+> ```
+> year     Gotówka movements    Σ Gotówka |  Transakcje cash rows    Σ cashFlow |        Δ
+> 2021                1    −7 465,86 |                   9    −31 441,95 | +23 976,09
+> 2022               28     2 115,42 |                  67    −34 973,22 | +37 088,64
+> 2023               39    12 182,38 |                  52    −27 273,37 | +39 455,75
+> 2024               39    −9 966,83 |                  66    −10 400,51 |    +433,68
+> 2025               29    −3 846,85 |                  51     −7 489,96 |  +3 643,11
+> 2026               17     4 391,98 |                  16      4 089,49 |    +302,49
+> TOTAL              153    −2 589,76 |                 261   −107 489,52 | +104 899,76
+> ```
+>
+> **153 balance movements against 261 cash events.** A column that skips ~40% of
+> the account's movements cannot be the ledger it is being compared against, and
+> this plan's own 2026-09-26 RCA already said so in a form nobody acted on:
+> *"matched dates: IKE Marek 2/71"* — 2 of 71. That number was the finding. The
+> 586-row report it produced, and every Δ since, has been measured against a
+> sampled balance.
+>
+> **So "the Gotówka column is the source of truth" cannot mean what the section
+> takes it to mean.** It can mean the user maintains it by hand and trusts it —
+> which is compatible with it being a checkpoint rather than a ledger. What it
+> cannot mean is "it records every movement", because it demonstrably does not.
+>
+> **What this rules out:** making the Δ converge to 0. That would mean bending a
+> correct per-transaction ledger to match a column that skips 108 movements, and
+> the only way to do it is to invent cash the user never recorded. The §65.1
+> items below are therefore *not* a queue of work to grind down.
+>
+> **What it does not rule out:** the wipe & reimport and the recompute are still
+> worth running on their own merits (§69.1 wants the same destructive pass for a
+> different reason), and the derived-vs-sheet line is still the right thing to
+> print — it just answers "is my hand-kept balance still current?", which is a
+> real question, not "did the import lose money?".
+
 ### 65.1 — Re-run the comparison as the rows land, then wipe & reimport
 
-- [ ] Re-run the `Gotówka` recon (Admin → Jobs → dry sync, no `--wipe`) and
+- [x] Re-run the `Gotówka` recon (Admin → Jobs → dry sync, no `--wipe`) and
       confirm the report is shrinking toward empty.
+  > **Re-run 2026-10-01 on sheets-sync v1.0.34, and the question it asks is now
+  > a different one — so "shrinking toward empty" is not the right measure.**
+  >
+  > §63.4 replaced what this recon computes, so there is no longer a 586-row
+  > per-day report to watch shrink. There is one comparable number per account —
+  > derived minus the sheet's last row — and the item's premise was that it would
+  > trend to zero as the user adds rows. Measured:
+  >
+  > ```
+  > account        derived      sheet          Δ
+  > IBKR            24,741.35  6,006.42   +18,734.93
+  > IKE Marek          961.87  4,951.85    −3,989.98
+  > IKE Beata         4,442.52  3,032.89    +1,409.63
+  > ```
+  >
+  > **It is not one number per account either, and the signs differ, which is the
+  > finding.** IBKR positive: the app's ledger knows about money the sheet does
+  > not. IKE Marek negative: the reverse — the sheet has ~4k the app does not.
+  > Those are two different problems and this item treats them as one, so it
+  > cannot be closed by watching a single figure approach zero.
+  >
+  > **The one genuinely new result is that the old report's numbers were
+  > meaningless.** The previous run reported `recon = −368,300.77` on IBKR and
+  > three "below zero" warnings. That was never a balance: it was the sheet's own
+  > `cashFlow` column replayed onto a `Gotówka` anchor the flows do not belong to,
+  > summed over full history. It is a check reporting a figure about itself.
+  >
+  > **Status: measured, and the section-level finding above says the Δ is not
+  > going to converge.** The sheet is the user's hand-kept balance, not a ledger,
+  > so the remaining work is the user's bookkeeping, not a queue to grind.
 - [ ] When it is ~empty: Wipe & Reimport, then a full recompute of all 10
       portfolios.
 - [ ] Assert: 0 row errors; the synthetic `#d`/`#t` legs still dedupe on a
