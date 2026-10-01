@@ -30,6 +30,10 @@ const PORTFOLIO = {
   name: "Test PF",
   strategy: "GROWTH",
   description: null,
+  // Every real portfolio has one, and §78.5's amount is denominated in it —
+  // without it `formatCurrency` correctly falls back to a bare number, which
+  // would make the currency assertion untestable rather than wrong.
+  baseCurrency: "PLN",
   currentValue: 100,
   totalInvested: 100,
   metrics: { totalReturn: 0, openPositions: 1, unrealizedGainLoss: 0 },
@@ -46,12 +50,21 @@ const analyticsWithGaps = (
   gapSymbols: string[] | null,
   heldGapSymbols: string[] | null,
   values: number[] = [100, 110],
+  unpricedValues?: number[] | null,
 ) =>
   ({
     backfillStatus: "complete",
     gapSymbols,
     heldGapSymbols,
-    performance: { timeSeries: values.map((v) => ({ date: "2026-01-01", value: v })) },
+    performance: {
+      timeSeries: values.map((v, i) => ({
+        date: "2026-01-01",
+        value: v,
+        // Omitted entirely when the caller does not pass it, which is what a
+        // pre-§78.5 backend looks like — see the "absent is not zero" test.
+        ...(unpricedValues ? { unpricedValue: unpricedValues[i] } : {}),
+      })),
+    },
   }) as never
 
 async function mountCard() {
@@ -226,5 +239,59 @@ describe("§72.30: the card's gap notice matches the claim it can support", () =
     const w = await mountCard()
     expect(w.find('[data-testid="card-chart-gap-warning"]').exists()).toBe(false)
     expect(w.find('[data-testid="card-chart-history-gap-note"]').text()).toContain("1 earlier position")
+  })
+})
+
+/**
+ * §78.5 — the card's notice has to name the amount too, not only the count.
+ *
+ * The card and `PortfolioPerformanceChart` each carry their own copy of this
+ * message, which is how the wording had already drifted once before: shipping
+ * the amount to the chart alone left the card saying "7 earlier positions" while
+ * the chart said "up to 10,465.32 PLN", on the same portfolio. Both now say it.
+ */
+describe("§78.5: the card's gap notice names the amount", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it("puts the peak in the history note, and it is the peak not the sum", async () => {
+    mockedPortfolios.getPortfolioAnalytics.mockResolvedValue(
+      analyticsWithGaps(["BST0922", "INS0922"], null, [32182, 21201], [0, 10465.38]),
+    )
+    const w = await mountCard()
+    const note = w.find('[data-testid="card-chart-history-gap-note"]').text()
+    expect(note).toMatch(/up to\s*PLN\s*10,465\.38/i)
+    expect(note).toMatch(/today's value is complete/i)
+  })
+
+  it("puts the peak in the urgent banner when the gap is still held", async () => {
+    mockedPortfolios.getPortfolioAnalytics.mockResolvedValue(
+      analyticsWithGaps(["ROD0335"], ["ROD0335"], [100, 110], [16, 16]),
+    )
+    const w = await mountCard()
+    const warn = w.find('[data-testid="card-chart-gap-warning"]').text()
+    expect(warn).toContain("Value excludes 1 position")
+    expect(warn).toMatch(/up to\s*PLN\s*16\.00/i)
+  })
+
+  it("says no amount at all when unpricedValue is absent — unknown, not zero", async () => {
+    // A backend before §78.5 omits the field. Rendering "up to PLN 0.00" would
+    // tell the user nothing is missing about a series that is short by 10,465.
+    mockedPortfolios.getPortfolioAnalytics.mockResolvedValue(
+      analyticsWithGaps(["BST0922"], null, [100, 110], null),
+    )
+    const w = await mountCard()
+    const note = w.find('[data-testid="card-chart-history-gap-note"]').text()
+    expect(note).toContain("1 earlier position")
+    expect(note).not.toMatch(/up to/i)
+  })
+
+  it("says no amount when every day is zero", async () => {
+    mockedPortfolios.getPortfolioAnalytics.mockResolvedValue(
+      analyticsWithGaps(["BST0922"], null, [100, 110], [0, 0]),
+    )
+    const w = await mountCard()
+    expect(w.find('[data-testid="card-chart-history-gap-note"]').text()).not.toMatch(/up to/i)
   })
 })

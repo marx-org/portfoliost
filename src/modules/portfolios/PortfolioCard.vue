@@ -107,6 +107,31 @@ const recomputeBusy = ref(false)
 // its value excluded positions it was in fact counting in full.
 const heldChartGap = ref<string[] | null>(null)
 const historyChartGap = ref<string[] | null>(null)
+/**
+ * §78.5 — the base-currency PEAK the card's sparkline was short by on any one
+ * day, or null when nothing was withheld (or nothing was measured).
+ *
+ * Computed here rather than passed down because the card already flattens the
+ * series to `number[]` for the sparkline, so the peak is captured at the same
+ * moment the series is read and costs nothing to keep.
+ *
+ * **Peak, not sum** — these positions are held for months, so summing multiplies
+ * the same money by its holding period into a figure that cannot be reconciled
+ * against the chart beside it. The peak is what a single point was short by.
+ */
+const unpricedPeak = ref<number | null>(null)
+/**
+ * "up to 10,465.32 PLN" — omitted entirely when unknown, never "PLN 0.00".
+ *
+ * **`portfolio.baseCurrency`, not `displayCurrencyOr()`**, and deliberately: the
+ * card's sparkline is built from raw `timeSeries[].value` with no rate applied,
+ * so it is already denominated in the portfolio base. The headline value above is
+ * converted, the sparkline below is not. Annotating the line in the headline's
+ * currency would put a differently-denominated number on the chart it describes.
+ */
+const unpricedAmountLabel = computed(() =>
+  unpricedPeak.value == null ? "" : `up to ${formatCurrency(unpricedPeak.value, props.portfolio.baseCurrency)}`,
+)
 
 const showRename = ref(false)
 const renameName = ref(props.portfolio.name)
@@ -190,13 +215,26 @@ async function loadChart() {
  * list reads as history — the safe direction, because it never claims a
  * complete value is short. The next backfill on a current backend fills it in.
  */
-function applyGapSymbols(analytics: { gapSymbols?: string[] | null; heldGapSymbols?: string[] | null }) {
+function applyGapSymbols(analytics: {
+  gapSymbols?: string[] | null
+  heldGapSymbols?: string[] | null
+  performance?: { timeSeries?: Array<{ unpricedValue?: number | null }> | null } | null
+}) {
   const all = analytics.gapSymbols ?? []
   const held = analytics.heldGapSymbols ?? []
   heldChartGap.value = held.length ? held : null
   const heldSet = new Set(held)
   const history = all.filter((s) => !heldSet.has(s))
   historyChartGap.value = history.length ? history : null
+  // §78.5 — the amount, from the same response. Absent on a pre-migration
+  // backend, and absent is unknown rather than zero: saying "nothing withheld"
+  // for a series that is short by 10,465 PLN is the defect this fixes.
+  let peak: number | null = null
+  for (const p of analytics.performance?.timeSeries ?? []) {
+    const v = p?.unpricedValue
+    if (typeof v === "number" && v > 0 && (peak === null || v > peak)) peak = v
+  }
+  unpricedPeak.value = peak
 }
 
 /**
@@ -480,10 +518,10 @@ async function exportPositions(format: "csv" | "xml" | "json") {
            have both, and dropping the history note just because an urgent one is
            already on screen hides a real gap for the sake of tidiness. -->
       <p v-if="heldChartGap && heldChartGap.length" class="mt-1 text-xs font-medium text-amber-600 dark:text-amber-400" data-testid="card-chart-gap-warning">
-        Value excludes {{ heldChartGap.length }} position{{ heldChartGap.length === 1 ? "" : "s" }} without price history.
+        Value excludes {{ heldChartGap.length }} position{{ heldChartGap.length === 1 ? "" : "s" }} without price history<span v-if="unpricedAmountLabel"> ({{ unpricedAmountLabel }})</span>.
       </p>
       <p v-if="historyChartGap && historyChartGap.length" class="mt-1 text-xs text-slate-500 dark:text-slate-400" data-testid="card-chart-history-gap-note">
-        {{ historyChartGap.length }} earlier position{{ historyChartGap.length === 1 ? "" : "s" }} had no price history &mdash; those chart points are partial. Today's value is complete.
+        {{ historyChartGap.length }} earlier position{{ historyChartGap.length === 1 ? "" : "s" }} had no price history<span v-if="unpricedAmountLabel"> &mdash; {{ unpricedAmountLabel }} of the chart is missing for those days</span> &mdash; those chart points are partial. Today's value is complete.
       </p>
     </div>
 
