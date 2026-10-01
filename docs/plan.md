@@ -264,7 +264,7 @@ quotes — §63.5 is gated on reproducing the bad symbol's provider response.
 
 ### 63.3 — Wallets: cash included in consolidated + per-portfolio performance series
 
-- [ ] **Verified broken 2026-09-27 — three headline numbers that do not
+- [x] **Verified broken 2026-09-27 — three headline numbers that do not
       reconcile.** The per-portfolio *cards* include cash; the page *headline*
       does not, and the API's `total-metrics` reports a third figure in a
       different currency. Measured in PROD:
@@ -315,7 +315,7 @@ quotes — §63.5 is gated on reproducing the bad symbol's provider response.
         > that used to run behind this route is the plausible mechanism — but that
         > is an inference from the code, not a reproduction, and it is recorded as
         > one. The verified part is that the property holds and is now pinned.
-  - [ ] **The end-to-end number needs a browser session.** What IS established
+  - [x] **The end-to-end number needs a browser session.** What IS established
         from the database (measured 2026-09-30, all 10 portfolios PLN):
         >
         > ```
@@ -335,6 +335,31 @@ quotes — §63.5 is gated on reproducing the bad symbol's provider response.
         > date window, now a hand-rebuilt pipeline): reimplementing a calculation
         > instead of calling it produces a confident wrong answer. Recorded as a
         > failed measurement, not as a finding.
+        >
+        > **Answered in a signed-in PROD tab 2026-10-01, and the answer was not
+        > the one the box expected.** It called `/total-metrics` with the user's
+        > token and got a *fourth* number: the headline reconciled with its own
+        > breakdown to **0.00**, but neither reconciled with the ten cards, which
+        > summed to 1,094,279.02 against a 1,096,223.87 headline — **−1,944.85
+        > PLN**. All of it on four portfolios (IKE Marek +514.63, IBKR −2,698.17,
+        > IKE Beata +26.43, Equate+ +212.26); the other six agreed only because
+        > they hold ≤1 instrument, where a bar close and a live quote coincide.
+        >
+        > **Cause, and it is §63.2's rule breaking a third time.** The card read
+        > `portfolio.currentValue` — stored, written by the backfill from
+        > `price_bars` — while the headline read `/total-metrics`, computed live
+        > from `positions.market_value`. One number, two price sources. §63.2 was
+        > opened to make "one live valuation path for headline + cards" true and
+        > was closed on a *unit* test that seeds both paths from the same value,
+        > which proves the UI renders what it is given and not that the two
+        > givens agree. The browser was the only thing that could catch it.
+        >
+        > Fixed in SPA `e85ada1`: each card renders its own
+        > `portfolioBreakdown` row — the rows the headline is summed from — so
+        > they reconcile by construction. Verified in PROD on the deployed
+        > v1.0.318: **Σ the 10 cards = the headline, difference 0.00**, while the
+        > stored column still differs by the same ~1.9k, which is what makes it a
+        > real check rather than a coincidence.
   - [x] Investigate why `total-metrics` reported `Crypto` as `0 / −100%` when the
         snapshot holds 887.74 PLN and the card is positive. A portfolio with cash
         and a position must not floor at zero.
@@ -383,13 +408,53 @@ quotes — §63.5 is gated on reproducing the bad symbol's provider response.
         > test.
   - [x] Tests: `npm run build`, full `vitest` green.
         > 515 green, build clean.
-  - [ ] Playwright: re-check `/en/investments` headline vs the card sum.
-        > The only §63.3 item left. Note the unit-level reconciliation is now
-        > pinned from both sides (headline == Σ cards, and merged last point ==
-        > headline), so this is a visual confirmation of what the tests assert —
-        > worth doing once, not as a gate.
+  - [x] Playwright: re-check `/en/investments` headline vs the card sum.
+        > **Done 2026-10-01, and it was not a confirmation — it found the defect
+        > this section has been chasing since the fact-check.** The note above
+        > called it "a visual confirmation of what the tests assert, worth doing
+        > once, not as a gate". That was the wrong call, and the reason is worth
+        > recording: the unit test it referred to *could not* assert what it
+        > claimed, because it seeded the card and the headline from one number.
+        > The browser compares two numbers that were never the same.
+        >
+        > Read off the deployed SPA in a signed-in PROD tab (v1.0.318), summing
+        > the rendered `[data-testid="card-value"]` against the rendered
+        > `tile-total-value`:
+        >
+        > ```
+        > cards rendered : 10
+        > Σ cards        : PLN 1,097,128.03
+        > headline       : PLN 1,097,128.03
+        > difference     :        0.00        <- was −1,944.85
+        > ```
+        >
+        > The same call against the *stored* column still returns 1,094,279.02,
+        > which is what makes the 0.00 a real result rather than a coincidence:
+        > the two sources still disagree, and the page now sums the one the
+        > headline is made of.
+        >
+        > **A second defect surfaced in the same pass, from a field this section
+        > also owns.** The amber "Value excludes N positions without price
+        > history" banner was firing on four portfolios and three of them were
+        > lying: Crypto (1), IKE Beata (7) and IKE Marek (6) had *every* flagged
+        > symbol already closed, so their current values were complete. Those
+        > cards now read "N earlier positions had no price history — those chart
+        > points are partial. Today's value is complete." There is no amber
+        > warning left in PROD, and that is correct: an independent SQL check
+        > (against the carried-forward price map, not the exact-date test §63.9
+        > warns about) shows **0** open positions without a price on the last day
+        > in all ten portfolios.
+        >
+        > That is `heldGapSymbols`, split out of the window-wide `gapSymbols`:
+        > contracts v1.6.55, wallets v1.1.110, SPA `94ba8f5`. Migration 0010
+        > applied in PROD and every `held_gap_symbols` is NULL, which is the
+        > honest reading of the data above rather than a column nobody filled.
   - [x] Commit.
-        > `f303440`, `345bd8a`.
+        > `f303440`, `345bd8a`, and for the two defects the Playwright pass
+        > found: SPA `e85ada1` + `94ba8f5`, wallets `b7fa6c5`, contracts
+        > `8bb416a`, homelab `d7bc71fcb`. **§63.3 is now closed** — every box
+        > either shipped, was superseded, or was answered by a measurement that
+        > found something new.
 
 ### 63.4 — Sheets-sync: derive free-cash from flows+trades; Gotówka as reconciliation reference (multi-currency)
 
@@ -564,7 +629,7 @@ shows a silently-wrong value.
 both, migration 0009 (`gap_symbols`) applied in PROD.
 
 **What's still missing (continue here next session):**
-- [ ] **Item #2 — the actual price history** (GATED, provider tier / §63.5).
+- [x] **Item #2 — the actual price history** (GATED, provider tier / §63.5).
       Until the `.WA`/`.AS` symbols get bars, the value is *flagged* partial,
       not *corrected*. The 5 missing IKE Beata symbols (≈ 50k): **XTB.WA,
       EMIM.AS, RBOE.AS** (`fetch_status='failed'`, 0 bars) and **AMZN, SP20.L**
@@ -576,11 +641,58 @@ both, migration 0009 (`gap_symbols`) applied in PROD.
       value matches the live path. Also still open on the instruments side:
       log the provider error into `fetch_status`/`last_error` (diagnosability)
       and add a scheduled "fill gaps for held symbols" pass.
-- [ ] **Confirm in UI** (needs a fresh PROD login — Playwright session closed
+      > **RESOLVED 2026-10-01, and the two halves of it have different answers.**
+      > The five named symbols are all priced — §63.9's cachest limiter fix and
+      > its gap-fill healed them, and a recompute of all ten portfolios today
+      > cleared `AMZN` and `SP20.L` too. What is *not* fixed is the standing
+      > work this item also asked for: `fetch_status`/`last_error`
+      > diagnosability and a scheduled "fill gaps for held symbols" pass.
+      >
+      > **The measurement that matters, and it is not "gap_symbols is empty".**
+      > `gap_symbols` is window-wide and *should* be non-empty — IKE Beata still
+      > lists 7 symbols it held in 2022 with no bars, which is real and worth
+      > keeping. The question this item actually asks is whether *today's* value
+      > is short, and the answer is no, verified independently in SQL against the
+      > **carried-forward** price map rather than the exact-date test:
+      >
+      > ```
+      > portfolio                     open   held with no price on the last day
+      > IBKR                            35   0
+      > IKE Beata                      23   0
+      > IKE Marek                      13   0
+      > Rach. rejestrowy PKO BP        23   0
+      > ...all ten portfolios              0
+      > ```
+      >
+      > The exact-date version of that query reports 32/35 for IBKR and looks
+      > alarming; it is §63.9's warning arriving again — `buildPriceMap` carries
+      > prices forward, so a symbol with a 09-30 close *is* valued on 10-01. Two
+      > of the three checks in this plan's history have now been wrong for that
+      > same reason, which is worth more as a note than as a fix.
+- [x] **Confirm in UI** (needs a fresh PROD login — Playwright session closed
       mid-verification): on IKE Beata → Performance, verify (a) the amber
       "Value excludes 5 positions without price history" banner shows after one
       recompute, and (b) the chart grays out + Recompute is disabled during a
       Recompute and re-renders fresh when done.
+      > **Both halves verified in a signed-in PROD tab 2026-10-01 (SPA v1.0.318),
+      > and (a) came back false — which is the finding.** Read off the rendered
+      > DOM on IKE Beata → Performance, 1802 points, `backfillStatus: complete`:
+      >
+      > ```
+      > wrapper class (idle)   : "relative transition-opacity duration-300"
+      > wrapper class (in flight): "relative transition-opacity duration-300
+      >                            pointer-events-none select-none opacity-50"
+      > overlay (in flight)    : "Recomputing — please wait…"
+      > Recompute disabled     : true in flight → false again, ~2 s
+      > ```
+      >
+      > So (b) is exactly as designed and holds. (a) is not, and could not be:
+      > the banner said "Value excludes 7 positions without price history" about
+      > a value that was complete, because all 7 had been sold. Fixed as
+      > `heldGapSymbols` (contracts v1.6.55, wallets `b7fa6c5`, SPA `94ba8f5`);
+      > the same page now reads "Earlier in this period, 7 positions were held
+      > with no price history — those points are partial sums. The latest value
+      > is complete." The count is still 7, the claim is now true.
 - [x] ~~**Turn RECALC_DEBUG off**~~ — done in §63.10.5 (now `RECALC_DEBUG: "0"`).
 
 ### 63.9 — cachest's rate limiter caps upstream concurrency at 3 (RCA of the IKE Beata spike, 2026-09-27)
