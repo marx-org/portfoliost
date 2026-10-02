@@ -1,5 +1,8 @@
 import { expect, test } from "@playwright/test"
 
+const GATEWAY = process.env.PORTFOLIOST_GATEWAY_URL || "http://localhost:8080"
+const MOCK = process.env.PORTFOLIOST_MOCK_URL || "http://localhost:4010"
+
 async function login(page: import("@playwright/test").Page) {
   await page.goto("/login")
   await page.getByTestId("email").fill("demo@example.com")
@@ -114,4 +117,74 @@ test("holdings: no AI premium banner, customize columns, sort and export", async
   await page.getByRole("button", { name: "Export", exact: true }).click()
   const download = await downloadPromise
   expect(download.suggestedFilename()).toMatch(/positions\.csv$/)
+})
+
+/** §81.3 — the Drawdown card's Current Drawdown is a peak-to-trough over the
+ * flow-neutral TWR index, not over raw portfolio value. Taking the peak over
+ * `value` lets every deposit raise the running maximum, so a deposit made
+ * during a drawdown *shrinks* the reported drawdown by roughly its own size —
+ * and the card's own Max Drawdown tile (fed by the backend's flow-neutral
+ * metric) then disagrees with it on one screen.
+ *
+ * The compose seed has no cash flows at all — every portfolio's net_flow is 0,
+ * so value and TWR are proportional and the two paths cannot be told apart from
+ * seeded data. The test therefore splices a flow-bearing series into the
+ * analytics response the SPA receives:
+ *
+ *   100 → 50 → +100 → 150 → 75
+ *
+ * The deposit lands on a flat price day and the portfolio then halves, so the
+ * flow-neutral index is [100, 50, 50, 25] → −75%, while the raw-value peak of
+ * 150 would report −50%. */
+test("performance: Current Drawdown is measured on the TWR index, not raw value (§81.3)", async ({ page, request }) => {
+  const res = await request.post(`${MOCK}/api/auth/login`, {
+    data: { email: "demo@example.com", password: "example-service-mock" },
+  })
+  const token = ((await res.json()) as { access_token?: string }).access_token ?? ""
+  const auth = { Authorization: `Bearer ${token}` }
+
+  const pfRes = await request.get(`${GATEWAY}/api/portfolios`, { headers: auth })
+  const top10 = ((await pfRes.json()) as Array<{ id: string; name: string }>).find((p) => p.name === "Top10")
+  expect(top10, "seeded Top10 portfolio").toBeTruthy()
+
+  const FLOW_BEARING = [
+    { date: "2026-01-01", value: 100, cumulativeTwr: 100 },
+    { date: "2026-01-02", value: 50, cumulativeTwr: 50 },
+    { date: "2026-01-03", value: 150, cumulativeTwr: 50 },
+    { date: "2026-01-04", value: 75, cumulativeTwr: 25 },
+  ]
+  // Guard the premise: the injected series must make the two paths disagree, or
+  // the assertion below would pass on either implementation.
+  const drawdownOver = (xs: number[]) => (xs[xs.length - 1] / Math.max(...xs) - 1) * 100
+  expect(drawdownOver(FLOW_BEARING.map((p) => p.cumulativeTwr))).toBeCloseTo(-75, 10)
+  expect(drawdownOver(FLOW_BEARING.map((p) => p.value))).toBeCloseTo(-50, 10)
+
+  await page.route(`**/api/portfolios/${top10!.id}/analytics*`, async (route) => {
+    const upstream = await route.fetch()
+    const body = (await upstream.json()) as { performance?: { timeSeries?: unknown[] } }
+    body.performance = { ...body.performance, timeSeries: FLOW_BEARING }
+    await route.fulfill({ response: upstream, json: body })
+  })
+
+  // Max Drawdown comes from a different endpoint. Stub it with the same
+  // flow-neutral figure so the cross-tile check below compares like with like:
+  // the card must not show two drawdowns measured on different series.
+  await page.route(`**/api/portfolios/${top10!.id}/risk-metrics*`, async (route) => {
+    const upstream = await route.fetch()
+    const body = (await upstream.json()) as { maxDrawdown?: number }
+    await route.fulfill({ response: upstream, json: { ...body, maxDrawdown: -0.75 } })
+  })
+
+  await login(page)
+  await page.goto(`/en/portfolios/${top10!.id}/performance`)
+
+  const current = page.getByTestId("performance-current-drawdown")
+  await expect(current).toBeVisible({ timeout: 30_000 })
+  await expect(current).toHaveText("-75.00%")
+
+  // The two tiles on the card are now on one series: the current drawdown
+  // cannot be deeper than the maximum one.
+  const max = page.getByTestId("performance-max-drawdown")
+  await expect(max).toBeVisible()
+  await expect(max).toHaveText("-75.00%")
 })

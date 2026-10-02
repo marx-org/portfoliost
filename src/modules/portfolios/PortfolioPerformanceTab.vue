@@ -6,6 +6,7 @@ import { getPortfolioAnalytics, getPortfolioRiskMetrics, recomputePortfolio } fr
 import type { PortfolioAnalyticsTimeframe } from "@/api/portfolios"
 import type { PortfolioPositions } from "@/api/types"
 import { formatPercent, formatSignedCurrency } from "@/utils/format"
+import { currentDrawdownPercent as currentDrawdownPercentOf } from "@/utils/drawdown"
 import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
 import { useDisplayConversion } from "@/composables/useDisplayConversion"
 import { storeToRefs } from "pinia"
@@ -171,15 +172,11 @@ const monthlyOptions = {
   },
 }
 
-const seriesValues = computed(() => (store.analytics?.performance?.timeSeries ?? []).map((p) => p.value ?? 0))
+const performanceSeries = computed(() => store.analytics?.performance?.timeSeries ?? [])
 
-const currentDrawdownPercent = computed(() => {
-  const values = seriesValues.value
-  if (values.length < 2) return null
-  const max = Math.max(...values)
-  if (!max) return null
-  return (values[values.length - 1] / max - 1) * 100
-})
+const currentDrawdownPercent = computed(() =>
+  currentDrawdownPercentOf(performanceSeries.value),
+)
 
 const maxDrawdownPercent = computed(() => {
   const v = riskMetrics.value?.["maxDrawdown"]
@@ -334,11 +331,11 @@ const chartBenchmarks = computed(() => {
       <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div class="rounded-lg bg-slate-50 dark:bg-slate-800/50 p-4">
           <dt class="text-sm text-slate-500 dark:text-slate-400">Max Drawdown</dt>
-          <dd class="mt-1 text-xl font-semibold tabular-nums text-red-600 dark:text-red-400">{{ formatPercent(maxDrawdownPercent, 2, true) }}</dd>
+          <dd class="mt-1 text-xl font-semibold tabular-nums text-red-600 dark:text-red-400" data-testid="performance-max-drawdown">{{ formatPercent(maxDrawdownPercent, 2, true) }}</dd>
         </div>
         <div class="rounded-lg bg-slate-50 dark:bg-slate-800/50 p-4">
           <dt class="text-sm text-slate-500 dark:text-slate-400">Current Drawdown</dt>
-          <dd class="mt-1 text-xl font-semibold tabular-nums text-red-600 dark:text-red-400">{{ formatPercent(currentDrawdownPercent, 2, true) }}</dd>
+          <dd class="mt-1 text-xl font-semibold tabular-nums text-red-600 dark:text-red-400" data-testid="performance-current-drawdown">{{ formatPercent(currentDrawdownPercent, 2, true) }}</dd>
         </div>
       </dl>
       <p v-if="showCustomTimeframe" class="mt-3 text-sm text-slate-500 dark:text-slate-400">
