@@ -18978,3 +18978,431 @@ the mock or the suite follows them, and e2e reads the real `wallets` service, so
 nothing observes it. Adding three portfolios to `portfolios_summaries.json` would
 make the mock internally consistent and is the obvious follow-up if anyone ever
 runs the SPA against the mock.
+
+
+---
+
+## 82. Performance tab: overview tiles & per-year returns (D85–D89)
+
+Proposal: [performance.md](proposals/performance.md) — make the Performance tab
+answer "how much more cash than I put in?" and "how efficiently is it invested,
+per year and overall".
+
+One new card above the Performance Chart (five tiles) and a `Monthly | Yearly`
+toggle on the existing Returns Chart. Touches `portfoliost` and
+`portfoliost-wallets` only — **no contract change**, because every field the
+proposal needs is already declared in `openapi.yaml` and three of them are
+already computed by the route and returned to a UI that displays none of them
+(`portfolios.ts:1345-1359`). Risk ratios stay on the Risk tab.
+
+The provider-tier ordering (openst → cachest → instruments) does not apply: no
+new data source, no scraping, no route in `config.yaml`. Steps run
+backend → SPA tiles → per-year table → benchmark column → parity + full suite.
+
+**Dependency:** TWR p.a. must be annualised over *elapsed calendar years from
+the flow-neutral index*. §81.2 is where that number gets built correctly; this
+section consumes it and must not re-derive annualization independently.
+
+---
+
+### 82.1 — Populate `performance.annualizedReturn` with the flow-neutral annualised rate
+
+The only backend change in this section. `annualizedReturn` and
+`annualizedReturnWithheldReason` are declared in the contract
+(`openapi.yaml:1447`, `:1449`) and the analytics route returns **neither** — the
+`performance` object it builds ends at `simpleReturnPercent`
+(`portfolios.ts:1343-1360`). The SPA therefore has nothing to render a TWR p.a.
+tile from.
+
+- [x] **Compute the TWR p.a. in the analytics route** from the already-selected
+      `cumulativeTwr` column, annualising over elapsed calendar days:
+      `(twr_last / 100) ** (365 / calendarDays(first, last)) − 1`, expressed as a
+      **percentage** to match every sibling in `performance.*`
+      (`totalReturnPercent`, `moneyWeightedReturn`, `timeWeightedReturn` are all
+      percents). Use the existing `daysBetween` helper in
+      `src/services/returnColumns.ts` rather than a second date-difference
+      implementation.
+      > Reuse §81.2's `annualizedReturn(values, dates)` if it accepts the TWR
+      > index by then — one implementation, and this step becomes a two-line
+      > call. Do not add a third annualizer if it does not.
+      > Landed as a two-line call to §81.2's `annualizedReturn`. `cumulative_twr`
+      > is stored on a 100 base, but the function takes a ratio `iN / i0`, so the
+      > stored index is passed unscaled. Rows with a NULL `cumulative_twr` are
+      > `flatMap`-dropped, never coerced to 0 — a 0 in the index is a −100% day.
+- [x] **Return `annualizedReturn: null` plus a reason** when the span is under a
+      full year, rather than annualising a partial window. Reuse the existing
+      `annualizedReturnWithheldReason` (`src/services/riskMetrics.ts:176-188`)
+      as the single source of truth for the predicate so the Risk tab and this
+      tile cannot disagree about the same window. The reason string travels in
+      the already-declared `annualizedReturnWithheldReason` field — **no new
+      vocabulary, no `openapi.yaml` edit.**
+      > **The two clauses of this bullet conflicted** — "under a full year"
+      > (365 days) and "reuse the existing predicate" (≥60 points AND ≥90 days)
+      > are different gates, and a one-quarter series falls between them. User
+      > decision 2026-10-02: the shared predicate wins. A full-year gate here
+      > would have made this tile print `—` for every sub-year portfolio while
+      > the Risk tab printed a number for the same window — the exact
+      > disagreement this bullet exists to prevent. So the tile annualises a
+      > quarter, as the Risk tab already does.
+      > **Unit split, also user-confirmed:** `performance.annualizedReturn` is a
+      > **percent** (13.04) and `/risk-metrics`'s `annualizedReturn` is a
+      > **fraction** (0.1304) — one contract field name, two units. Kept, because
+      > the percent is what `performance.*`'s siblings speak, and recorded in a
+      > comment at the call site because §81's archive already flagged this
+      > payload's mixed units as a defect.
+- [x] **Test the arithmetic in the route test** (`src/routes/analytics.test.ts`):
+      a 365-point series with `cumulativeTwr` rising 100 → 110 must return
+      `annualizedReturn: 10`, and a 91-point series must return `null` with the
+      reason set, not a larger number.
+      > Two corrections to this fixture, both because the plan's numbers did not
+      > survive contact with `daysBetween`:
+      > **366** points (not 365) is what returns exactly `10`. A point count is
+      > not a day count: 365 daily points span 364 days, so the exponent is
+      > 365/364 and the answer is **10.03**, not 10. Both are now pinned — the
+      > 10.03 case exists so nobody "simplifies" the exponent back to 1.
+      > The 91-point series now asserts the **number** `(1.1 ** (365/90) − 1)×100`
+      > rather than `null`, per the decision above; it still fails loudly if the
+      > withholding gate ever moves back to a full year. The withheld cases are
+      > 59 points and 80 points / 79 days.
+- [x] **Tests**: `npm run test` green in `portfoliost-wallets`; `npm run build`
+      (tsc) green.
+      > 568/568. One flake on the first run — `internal.test.ts:432` timed out at
+      > 5000ms under full-suite load, passes in isolation and on a clean re-run.
+      > FX service-token test, no relation to this step.
+- [x] **Commit** `feat(wallets): return the flow-neutral annualized return in analytics`
+
+### 82.2 — Overview tiles card
+
+A new `card` **above the Performance Chart card** in
+`src/modules/portfolios/PortfolioPerformanceTab.vue`, four tiles plus one
+full-width Timing line: Net gain, Net invested, XIRR, TWR p.a., Timing =
+`XIRR − TWR p.a.` with a plain-language reading ("adding money helped" / "adding
+money hurt").
+
+- [x] **Add the card** reading `store.analytics.performance` only —
+      `totalReturn`, `totalInvested`, `moneyWeightedReturn`, `annualizedReturn`,
+      `annualizedReturnWithheldReason`. **No new API call**: all five are on the
+      payload the tab already holds. Absent or `null` renders `—`, never `0`.
+      > Also reads `moneyWeightedReturnWithheldReason` — already declared, already
+      > returned, and the only thing that explains an XIRR `—`. Both withheld
+      > reasons render as plain text ("not enough history yet"), so an em-dash is
+      > never a mystery. A test asserts `getPortfolioAnalytics` is NOT called.
+- [x] **Convert the money tiles through the existing display-currency path** —
+      reuse the `useDisplayConversion` / `chartRate` pair already built at
+      `:251-264` rather than adding a sixth conversion copy, so switching the
+      display currency re-converts the tiles in place without a re-mount.
+      > Same composable instance, `convert()` rather than `chartRate` directly —
+      > §66.3 rule 1: `convert()` returns `null` while the rate is unknown, so
+      > the tile prints `—` instead of a 1:1 guess (§67.2's bug). Covered by a
+      > test that shows `—` when the rate fails to resolve. The two rate tiles
+      > (XIRR, TWR p.a.) are deliberately **not** converted — a percentage is not
+      > money, and there is a test asserting a 4× rate does not reach them.
+- [x] **Render the Timing line defensively**: it is a difference of two rates,
+      so it is only meaningful when both are present. Hide the whole line when
+      either input is withheld, and never print a difference against `null`.
+      > `?? null`, never `?? 0`. Four states are tested: both present, XIRR
+      > withheld, TWR p.a. withheld, both withheld. Threshold ±1 pp per D85.
+- [x] **Reuse the Drawdown card's tile markup** (`:334-343`) for the four tiles
+      so the tab does not grow a second visual dialect, and give the card the
+      `data-testid="perf-overview"` prefix with `-net-gain`, `-net-invested`,
+      `-xirr`, `-twr-pa`, `-timing` on the tiles.
+      > The Timing tile lives INSIDE the `<dl>` as a `sm:col-span-2` item rather
+      > than a sibling block — a `<dt>` outside a `<dl>` is invalid HTML, and the
+      > plan's "full-width Timing line" reads as a tile that spans both columns,
+      > not as a different element.
+- [x] **Tests**: extend
+      `tests/unit/modules/portfolios/PortfolioPerformanceTab.test.ts` — assert
+      the tiles render the payload values, that `annualizedReturn: null` with a
+      reason renders `—` and hides the Timing line, and that a display-currency
+      switch re-renders the money tiles without remount (mirroring the existing
+      §48.6e B3 cases at `:113`). `npm run build` (includes `vue-tsc --noEmit`)
+      green.
+      > The file did not exist — created, 13 cases. `:113` referred to a
+      > `PortfolioPerformanceTab.test.ts` that was never written, so the §48.6e B3
+      > shape was taken from its real home, the sibling tests in
+      > `tests/e2e/performance-display-currency.spec.ts`. 546/546 SPA unit tests,
+      > build green (vue-tsc included).
+- [x] **Commit** `feat(spa): add the performance overview tiles`
+
+### 82.3 — `Monthly | Yearly` toggle on the Returns Chart, with TWR % and Gain
+
+Per proposal D87. The toggle sits in the Returns Chart card header; Monthly is
+today's bar chart unchanged, Yearly renders the four-column table.
+
+- [x] **Extract the per-year derivation as a named export** next to the component
+      (`docs/COMPONENTS.md` — shared pure logic exported from a component file),
+      taking `performance.timeSeries[]` and returning one row per calendar year:
+      `year`, `twrPercent`, `gain`, `isYtd`. Two formulas, both exact: year TWR
+      = `cumulativeTwr(last of y) / cumulativeTwr(last of y−1) − 1`; year gain
+      = `[value − invested](end of y) − [value − invested](start of y)`. The
+      first year uses the series' own first point as its base.
+      > Do **not** re-chain TWR from monthly bars — `cumulativeTwr` is already the
+      > exact chain, and differencing it introduces rounding. Do **not** sum or
+      > average the monthly percentages.
+      > Landed as two exports: `yearlyReturns(series, today)` and
+      > `yearlyTotals(rows)`. `today` is a parameter, not `new Date()` inside, so
+      > `isYtd` is testable. A year whose last point has no `cumulative_twr` is
+      > **skipped**, not shown as 0.00% — 0.00% is a claim about the year and an
+      > absent index supports no claim.
+- [x] **Render Yearly as a table** with a `Σ` footer row: the % cell shows the
+      compounded product (`× 1.7044`), the Gain cell the sum. Mark the current
+      calendar year `YTD` and never annualise it.
+      > A caption states that Σ is a compounded product, not a sum — the Σ row's
+      > job is to make the difference visible, and a label that only encodes it
+      > positionally is a label nobody reads.
+- [x] **Gate Yearly to `ALL`** (proposal D87): `analytics` is timeframe-filtered
+      server-side, so a 3M window holds no year. Selecting any other timeframe
+      forces Monthly and disables the toggle with a visible hint. Do not issue a
+      second `ALL` fetch.
+      > The forced-Monthly case is a computed (`activeReturnsMode`) over the
+      > stored choice, so returning to `ALL` restores Yearly — and a test asserts
+      > `getPortfolioAnalytics` is not called to satisfy the toggle.
+- [x] **Convert the Gain column** with the same `chartRate` used by the tiles, so
+      the Σ footer equals the Net gain tile on screen.
+      > Pinned as an equality between the two testids, before and after a
+      > display-currency switch — they share one rate, so a regression in either
+      > is one assertion away.
+- [x] **Tests**: unit-test the exported derivation against the worked example in
+      the proposal — four years at +24.1 / +18.2 / +11.4 / +4.3 % with gains
+      5,300 / 4,100 / 2,950 / 890 must yield a compounded product of `1.7044`
+      (±0.0001 on the stored 2 dp index) and a gain sum of `13,240`; plus the
+      reconciliation assertions (`Σ gains` equals `performance.totalReturn`, and
+      `Π(1 + twr)` equals `cumulativeTwr` at the last point) which are the whole
+      point of the two columns and must fail loudly if either drifts. Add
+      component cases for the toggle state and the YTD label.
+      > 20 new cases (45 in the file). **Mutation-verified**, because "must fail
+      > loudly" is only worth anything if it does: summing the percentages instead
+      > of compounding them fails 3 cases (`× 0.5800` vs `× 1.7044`), and basing
+      > each year on its own FIRST point instead of the previous year's end fails
+      > 7, including both reconciliations.
+      > One fixture correction: `cumulative_twr` is stored at 2 dp
+      > (`returnColumns.buildTwr` rounds `v * 10000 / 100`), so the fixture is
+      > built at that precision, not at the proposal's rounded percentages.
+      >
+      > **The `Σ gains` reconciliation above is WRONG and was corrected after the
+      > PROD deploy.** `Σ gains` telescopes to `net(last) − net(first)`, so it
+      > equals `performance.totalReturn` only when the series opens at net 0.
+      > See §82.5's PROD measurements. The test now asserts the true identity and
+      > carries a PROD-shaped fixture that the old assertion would have failed.
+      > 578/578 SPA unit tests, `npm run build` (vue-tsc) green.
+- [x] **Commit** `feat(spa): add yearly TWR and gain to the returns chart`
+
+### 82.4 — Excess TWR per year against the benchmark
+
+The fourth column. `benchmarks[].timeSeries[]` already carries the
+transaction-mirrored series, so this is the same year-boundary ratio applied to
+the benchmark's own index.
+
+- [x] **Compute excess per year** as `portfolio year TWR − benchmark year TWR` for
+      the **first selected benchmark only**, and render the column header with
+      that symbol (`vs SPY`). With no benchmark selected, omit the column
+      entirely rather than rendering an empty one.
+      > Benchmarks are a list, so "excess vs all of them" is not a single number.
+      > One column for the first is a deliberate cap; widening it is a separate
+      > decision.
+      > `benchmarkYearlyReturns()` reuses §82.3's year-boundary walk through a
+      > shared `yearRows()` core with an index accessor, rather than a second copy
+      > of the walk — two copies could pick different year boundaries, which is
+      > the only way a per-year excess is wrong while both of its inputs look
+      > right. The benchmark's index is its normalised `value`; the portfolio's is
+      > `cumulative_twr`. A year the benchmark has no row for renders `—`, not
+      > 0.00%.
+- [x] **Render no total in that column** and say so — excess returns compound
+      but do not sum, and a Σ row that looked additive would be wrong.
+      > The cell reads "no total", not a blank and not a number.
+- [x] **Tests**: component case with one benchmark selected asserting the column
+      appears with the right symbol and that the per-year excess matches a
+      hand-computed fixture; and a no-benchmark case asserting the column is
+      absent.
+      > 11 new cases (44 in the file). Mutation-verified: using the LAST
+      > benchmark instead of the first fails the "first only" case, and reversing
+      > the subtraction fails 5. Two fixture corrections worth recording — a
+      > UNIFORM `× 1.5` on the benchmark proves nothing (`value` is already
+      > normalised to 100, so scaling every point leaves every yearly return
+      > identical), so the negative case needed a genuinely steeper path; and the
+      > benchmark's yearly values are now exact multiples so the hand-computed
+      > excesses are exact rather than tolerance-asserted.
+      > 577/577 SPA unit tests, `npm run build` (vue-tsc) green.
+- [x] **Commit** `feat(spa): add per-year excess return against the benchmark`
+
+### 82.5 — Example service parity check and the full suite
+
+`AGENTS.md` makes `app.example-service.ai` the source of truth for UI and a Playwright
+side-by-side comparison the preferred way to find gaps. This section adds a card
+and a toggle that example-service does not have in this shape, so the comparison is about
+layout, tile styling and wording — not about whether the tiles exist.
+
+- [x] **Compare before/after with Playwright** against both apps: the Performance
+      tab at the same viewport, plus the a11y tree, and diff the two cards this
+      section touched. Record any example-service wording for a money or return tile and
+      adopt it verbatim where it does not contradict the proposal's semantics.
+      > Both at 1280×900, read-only (nothing in example-service's Top10 was touched).
+      > **Section order** — example-service: Performance Chart, Drawdown, Returns Chart,
+      > Return statistics, Top/Bottom Performers. Ours now: **Overview**,
+      > Performance Chart: USD, Drawdown, Returns Chart, Top/Bottom Performers.
+      > **Seven findings, recorded; three adoptable, and the carve-out applies to
+      > all three:**
+      > 1. **Example service has no money tiles on this tab at all** — no net gain, net
+      >    invested, XIRR or TWR p.a. D85's five tiles have no example-service wording to
+      >    match, so the proposal is their only source.
+      > 2. **Example service's excess is in percentage points** — its top strip reads
+      >    `VS SPY · NET TR · USD  12.1 pp (2 Aug - 2 Oct 2026: portfolio
+      >    +15.26%, SPY +3.19%)`. D89's worked example renders the same quantity as
+      >    a **percentage** (`+3.2% / −1.1% / +2.0%`), so adopting "pp" contradicts
+      >    the proposal's own figures. **Not adopted** — this is exactly the
+      >    carve-out the step's sentence provides. Worth revisiting only if the
+      >    proposal is amended.
+      > 3. **Example service's Returns Chart toggle is `Day | Month | Year` and is NOT
+      >    gated to All Time** — it aggregates the selected window into year
+      >    buckets (its own strip still reads "Timeframe: 3 Months"). Our D87 gate
+      >    is a deliberately different semantic: a 3M window has no calendar year
+      >    to report. **Not adoptable.** Example service also labels singular
+      >    (`Year`); D87 specifies `Yearly`. Proposal wins.
+      > 4. Example service's card headings are **H3 and UPPERCASE**, ours H2 and sentence
+      >    case. **Pre-existing across the whole tab**, not introduced by §82 —
+      >    restyling it would touch the four cards §82 did not.
+      > 5. Example service's Drawdown labels carry a trailing colon (`MAX DRAWDOWN:`); ours
+      >    do not. Pre-existing, same reason.
+      > 6. Example service's nearest wording for an invested-capital tile is on the
+      >    **investments** page, as a tooltip: "The external capital the return
+      >    beside it is measured on (the peak of your own money put to work)",
+      >    paired with "Total return since inception: gain divided by the invested
+      >    capital printed beside it". The second **contradicts** D85 (example-service's is
+      >    a percent, our Net gain is money) — not adoptable. The first is a
+      >    genuine superset explanation of "Net invested"; recorded as available if
+      >    a tooltip affordance is ever added.
+      > 7. Example service keeps a **distribution** card (`Return statistics`: Avg daily
+      >    return / Best day / Worst day / Green days / Longest winning streak) on
+      >    the Performance tab. D89 instead leaves Sharpe/Sortino/Calmar/volatility
+      >    on our Risk tab — the same split, different side of the line. Our Risk
+      >    tab already carries them, so adopting example-service's placement would duplicate
+      >    a second copy that can drift. Recorded, not adopted.
+      >
+      > **Live in compose, on the seeded Top10:** Overview reads Net gain
+      > +$11,599.01 / Net invested +$138,083.40 / XIRR +8.40% / **TWR p.a. `—`
+      > with "not enough history yet"**, and the Timing line is **hidden**. That is
+      > §82.1's decision playing out on real seeded data: the §75 seed writes 49
+      > `value_snapshots` rows, below the 60-point floor the shared predicate
+      > imposes. So the Timing tile is unreachable in compose and will first be
+      > seen on PROD, whose portfolios carry 1,663–2,704 points.
+      >
+      > **Reconciliation verified live, not just in fixtures:** the yearly Σ Gain
+      > reads +$11,599.01, which is the Net gain tile reading +$11,599.01, which is
+      > the API's `performance.totalReturn` of 11599.0056. Σ TWR reads × 1.0840
+      > against a +8.40% year. The excess column renders `+8.98%` (portfolio
+      > +8.40% vs SPY −0.58%).
+- [x] **Run the whole suite**: `npm run build` (includes `vue-tsc --noEmit`),
+      `npm run test`, `npm run test:mock`, `npm run test:e2e` against
+      `docker compose up -d --build`. Rebuild the `portfoliost` container after
+      the frontend changes and **restart the gateway** afterwards, or only
+      wallets-routed e2e paths will 404 for the wrong reason (see `AGENTS.md`).
+      > `docker compose up -d --build`, then `up -d --force-recreate gateway` (the
+      > KB's cached-upstream-IP trap; a plain `restart` was also issued after the
+      > mutation rebuild). build green, 577/577 unit, 239/239 mock, **122 e2e
+      > passed / 1 failed / 1 skipped**. The failure is
+      > `tests/e2e/portfolios.spec.ts:289` — the pre-existing KO-search one,
+      > identical cause and line to the failure KB entry 8 records as
+      > reproducing on an unmodified checkout. Not §82's.
+- [x] **Extend `tests/e2e/performance-display-currency.spec.ts`** with one case
+      that switches the display currency and asserts both the Net gain tile and
+      the Gain column re-convert together — they share a rate, so a regression in
+      either is one assertion away.
+      > Drives `ALL` → `Yearly` rather than relying on the default, so the gate is
+      > covered too. **Mutation-verified end-to-end**: dropping the conversion from
+      > the Σ footer (container rebuilt, gateway restarted) fails it with
+      > `Expected: "+PLN 11,599.01" / Received: "+PLN 46,181.23"` — the tile
+      > converted and the footer did not, which is precisely the regression the
+      > assertion exists to catch.
+- [x] **Commit** `test(spa): cover the performance overview and yearly returns in e2e`
+
+### 82.6 — PROD verification, and the `Σ gains` reconciliation D88 got wrong
+
+**Deployed to PROD 2026-10-02** — `portfoliost-wallets` v1.1.119 → **v1.1.120**,
+SPA v1.0.354 → **v1.0.356** (v1.0.355 was the docs-only §84 archive commit, no
+`src/` change). Homelab commit `af7c4898b`. Both wallets pins moved together —
+the app Deployment and the `snapshotsync` CronJob run the same image. Tags read
+from `gh release list`, and the checkout was 2 auto-update commits behind, so the
+bump was rebased onto the deployed revision. Flux reconciled both kustomizations
+at `main@sha1:af7c4898b`; both Deployments rolled out clean, no errors in the
+wallets log.
+
+| portfolio | window | metric | before | after |
+| --- | --- | --- | --- | --- |
+| Equate+ | 1Y | `periodReturnPercent` (§81, already in PROD) | **−18.69** | — |
+| Equate+ | 1Y | Overview → **TWR p.a.** | tile did not exist | **−18.69%** |
+| Equate+ | 1Y | Overview → **XIRR** | tile did not exist | **−23.57%** |
+| Equate+ | ALL | Overview → **TWR p.a.** | tile did not exist | **+3.23%** |
+
+The 1Y row is the useful one: §81's archive records that *"every 1Y window
+returns `annualizedReturn` numerically equal to `periodReturnPercent`, which is
+the 365/365 case and a further check that the exponent is 365 and not 252."* The
+new tile reads −18.69% on that same window — an independent confirmation, from
+a different code path, that §82.1 is wired to §81.2's number rather than to a
+third annualiser. XIRR reads −23.57%, the same `moneyWeightedReturn` §81 verified.
+The Timing tile then prints −4.88% / "adding money hurt", which is exactly the
+gap between those two figures.
+
+Equate+'s yearly table (ALL): 2019 +7.85% … 2024 +51.00% … 2026 YTD −10.41%,
+Σ `× 1.2655`. Verified in SQL against `value_snapshots`:
+`cumulative_twr(last)/cumulative_twr(first)` = 126.55/100 = **1.2655** — the TWR
+reconciliation holds exactly in PROD, not just in fixtures.
+
+**In compose the Timing tile is unreachable.** The §75 seed writes 49
+`value_snapshots` rows, below the 60-point floor the shared withholding predicate
+imposes, so Top10 renders `TWR p.a. —` / "not enough history yet" and hides the
+Timing line. That is §82.1's decision behaving correctly on thin data; PROD's
+portfolios carry 1 663–2 704 points and all four rate tiles are populated.
+
+#### The defect this deploy found: `Σ gains` ≠ `performance.totalReturn`
+
+The two reconciliations are NOT equivalent, and D88 claimed they were. `Σ gains`
+telescopes to `net(last) − net(first)`, so it equals `totalReturn` **only for a
+series that opens at net 0**. Measured across all ten PROD portfolios:
+
+| portfolio | opening net | `totalReturn` (tile) | `Σ gains` (footer) | gap |
+| --- | --- | --- | --- | --- |
+| IKE Marek | −2 610.72 | 37 314.36 | 39 925.08 | **7.00 %** |
+| Crypto | −7.20 | 16.16 | 23.37 | **44.56 %** |
+| XTB | −1.90 | −24.08 | −22.18 | 7.89 % |
+| IKE Beata | −62.76 | 72 575.14 | 72 637.90 | 0.09 % |
+| Equate+ | −19.77 | −6 388.76 | −6 368.99 | 0.31 % |
+| IBKR | +2.88 | 76 629.39 | 76 626.52 | 0.00 % |
+| NN TFI PPO / PPK, Rach. PKO BP, Obligacje PKO SA Beata | 0.00 | — | equal | 0 % |
+
+Six of ten disagree, and two by enough to matter. The arithmetic is not wrong —
+the two numbers measure different windows: the tile reports gain since inception,
+the footer reports gain accumulated across the displayed series. The trap is that
+they sit on the same card looking like one figure.
+
+**Why nothing caught it.** The compose seed opens at net 0 for every portfolio,
+so every fixture and the §82.5 e2e passed. The assertion was true of the test
+data and false of the data that exists. Only the deploy surfaced it.
+
+**Two causes, and they are not the same defect.** `unpriced_value` on the first
+snapshot explains IKE Marek's 2 605.72 of its 2 610.72 — day-1 positions the
+backfill had no price bar for, which the app already reports as
+`heldGapSymbols`. Crypto, Equate+, XTB and IKE Beata open with `unpriced_value`
+0.00, so theirs are small real opening values (fees, FX, partial pricing), not a
+pricing hole. Suppressing the first row's Gain would fix only the first kind and
+would misattribute the rest.
+
+**The data fix is already planned and is not §82's.** User decision 2026-10-02:
+the opening-net values belong to **§78.1** (XTB's missing `Wpłata` row) and
+**§78.2** (IBKR / IKE Marek / IKE Beata's missing ledger rows) — those are the
+accounts with a non-zero opening net, and §78.2's own table already shows IKE
+Marek running ~4 k *ahead* of what the ledger explains. §82 therefore does **not**
+change the derivation or the UI; it stops asserting the false invariant:
+
+- The §82.3 unit test now asserts the true identity
+  (`Σ gains = totalReturn − openingNet`) and carries a PROD-shaped fixture built
+  from IKE Marek's numbers, which the original assertion fails.
+- The §82.5 e2e reads `openingNet` from the payload and subtracts it, and its
+  post-switch assertion is now on the shared **rate** (`tile / Σ` equals
+  `totalReturn / expectedGain`) rather than on two text strings being equal —
+  which is the property the case was always meant to test.
+- Re-verified by mutation: dropping the Σ footer's conversion still fails it,
+  now with `Expected: 1 / Received: 3.98`.
+
+No UI change, so no re-deploy for this step. When §78 lands and the opening nets
+go to zero, the bare equality becomes true on its own and the subtraction becomes
+a no-op — which is the right shape for a fix that is about to arrive.
