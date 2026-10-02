@@ -315,17 +315,27 @@ every sibling research tab. Log these against §78 rather than expanding §79.
 Decide between labelling and pinning, then implement the chosen one. Both close
 the defect; they differ in cost and in what they promise the user.
 
-- [ ] **Record which of the two this section implements**, in a
+**Design decisions (resolved)**
+
+*This section implements **labelling**, not pinning* — chosen by the user
+2026-10-02 after the inspection below, and the inspection is what settled it.
+Both options need provider identity out of openst, because `get_fundamentals`
+walks `STATEMENT_PROVIDERS` and returns rows only, so the provider that
+answered was already unrecoverable. Pinning is not the cheaper of the two, and
+it cannot keep the promise it makes: the walk is **stateful** —
+`_provider_is_blocked` blocks a provider for 24 h the moment it starts
+returning 402 — so which provider answers can change under an identical
+request, and a pin would need persisting to be worth anything. Labelling claims
+only what is true.
+
+Cost of the choice, stated plainly: a mixed-provider table stays mixed. That is
+the point — it is now *marked* as mixed instead of silently merged, and pinning
+would have bought a single basis by deleting statements (PKO.WA already has no
+working-capital line to lose; a pinned provider would take more).
+
+- [x] **Record which of the two this section implements**, in a
       `Design decisions (resolved)` note under this section.
-      > The two are not exclusive, but they are different scopes. *Label*
-      > adds `currency` + `sources` to `FundamentalsData` and is honest about
-      > what the data is: mixed-provider, single-currency-as-reported. *Pin*
-      > resolves one provider per instrument, requests all three statements from
-      > it, and can then legitimately claim a single consistent basis — at the
-      > cost of losing statements the pinned provider does not carry (yfinance
-      > has no balance sheet for some GPW names, so pinning can turn a
-      > partially-filled table into an empty one).
-- [ ] **Add `currency` and `sources` to `FundamentalsData`** in
+- [x] **Add `currency` and `sources` to `FundamentalsData`** in
       `../portfoliost-contracts/contracts/openapi.yaml`, as
       `sources: { incomeStatement, balanceSheet, cashFlow }` carrying the
       provider name per statement, `currency: string`, and `currencySource`
@@ -337,7 +347,21 @@ the defect; they differ in cost and in what they promise the user.
       > fallback is what makes it correct for a venue-qualified symbol with no
       > listing in `ticker_reference`. Threading `exchangeHint` here closes the
       > same class of defect §72.4 documents.
-- [ ] **Regenerate types** with `npm run gen:types` from
+      > Done. Three rules, each the honest answer rather than the convenient one:
+      > **agreement is required ACROSS all three statements**, so income in EUR
+      > beside a balance sheet in USD yields no currency at all rather than the
+      > first one seen; **silence is not disagreement**, so a statement with no
+      > `reported_currency` (every yfinance row) does not veto the others; and
+      > the **venue hint is the symbol's own suffix**, a fact rather than a
+      > guess, which is what §72.4 requires of a hint and what lets a
+      > venue-qualified symbol with no `ticker_reference` listing resolve at all.
+      > Measured live through the gateway: AAPL → `USD` / `provider` (FMP
+      > declares it), SAP.DE → `EUR` / `estimated`, PKO.WA → `PLN` /
+      > `estimated`, MC.PA and BMW.DE → `EUR` / `estimated` with all three
+      > statements attributed to yfinance. ORCL is the interesting one: yfinance
+      > serves it, so it reads `estimated` even though it is a US listing — the
+      > label follows the provider that actually answered, not the country.
+- [x] **Regenerate types** with `npm run gen:types` from
       `../portfoliost-contracts/contracts` (not the repo root), then populate
       the new fields in `toFundamentals()`.
       > `toFundamentals(income, balance, cash)` currently receives only three
@@ -350,25 +374,69 @@ the defect; they differ in cost and in what they promise the user.
       > from `request.state`-style plumbing in openst or from cachest response
       > metadata — **inspect `cachest/config.yaml:251-258` for what it forwards
       > before choosing**. Do not guess this shape.
-- [ ] **Render the currency in the tab** — a currency label on each of the three
+      > Inspected, and the answer decided the design. `OPENST_FUNDAMENTALS`
+      > forwards only `statement` and `period` and stores the **body** for 24 h
+      > (`cache_ttl 86400`, `stale_ttl 2592000`) — so provenance has to travel
+      > in the body. A header would be dropped on precisely the requests that
+      > hit the cache, which are the cheap ones. cachest itself needed no change.
+      > openst now answers `{"provider", "rows"}`; `fetchFundamentals` returns
+      > that envelope and **tolerates the legacy bare-array body**, because for
+      > up to a day after the openst deploy a statement can still be served from
+      > a body cached by the old code. A null provider keeps the numbers on
+      > screen and admits the attribution is missing; a thrown error would blank
+      > the tab. `toFundamentals` gained a fourth `provenance` argument rather
+      > than the merge being lifted, because the currency answer needs `await` on
+      > the DB and the provider names arrive with the rows.
+- [x] **Render the currency in the tab** — a currency label on each of the three
       cards, plus a visible source marker when the three statements disagree on
       provider.
       > `ResearchFundamentals.vue:43-55` `cell()` has no currency argument today;
       > the label belongs at card level, not per cell, to avoid repeating a
       > symbol on 30 values.
-- [ ] **If pinning instead of labelling**: resolve the provider once per
+      > Done, at card level. `estimated` is spelled out rather than shown as a
+      > bare code, because "EUR" and "EUR (estimated)" are different claims and a
+      > reader reconciling against a broker has to know which. A per-cell symbol
+      > would also have been wrong for the growth and margin columns, which are
+      > ratios and carry no currency.
+      > **The mixed-source marker does not fire today, and that is worth saying
+      > rather than leaving implied**: no instrument actually mixes providers
+      > right now, because FMP 402s on every non-US statement endpoint (§79.4),
+      > so EU listings are all-yfinance and US listings are fmp-first. The marker
+      > exists for the day that stops being true. What DOES show today is a null
+      > attribution for any symbol whose statements came from a pre-envelope
+      > cached body — rendered as silence, not as a marker naming nothing.
+- [x] **If pinning instead of labelling**: resolve the provider once per
       instrument, pass it to all three `fetchFundamentals` calls, and record the
       choice so it is stable across the 24 h cachest TTL
       > (`cachest/config.yaml:251-258`, `cache_ttl 86400`,
       > `stale_ttl 2592000`) rather than re-resolved per request — a per-request
       > pin would flip providers mid-table on a cache miss, which is the same
       > defect with a shorter fuse.
-- [ ] **Tests**: contract schema test for the new fields; `toFundamentals` test
+      > Not applicable — labelling was chosen. The checkbox stays ticked with
+      > that recorded rather than deleted, so the alternative is not re-derived
+      > from scratch later.
+- [x] **Tests**: contract schema test for the new fields; `toFundamentals` test
       asserting `sources` matches the providers actually used and that
       `currencySource` is `"estimated"` (not `"provider"`) when the answer comes
       from the venue; a component test that a mixed-source response renders the
       disagreement marker. `npm run test` and `npm run build` green.
-- [ ] **Commit** `feat(instruments): expose statement currency and provider provenance`
+      > Contracts `openapi.yaml OK`, 16 tests. openst 448 + 104 + 53 + 21.
+      > instruments 502, `tsc` clean. SPA 512 unit tests, `vue-tsc` clean, 7
+      > component tests for this surface, 235 mock, 117 e2e green.
+      > The venue path is asserted live rather than in a unit test: the route
+      > tests run without a DB, so `resolveCurrency` has nothing local to answer
+      > with and correctly returns `unknown`. A unit test asserting `"estimated"`
+      > there would have been asserting a fixture, not the resolver — so the two
+      > cases that DO hold without a DB (agreement → `provider`; disagreement or
+      > silence → never `provider`) are asserted, and the venue answer is
+      > verified against the running stack instead.
+- [x] **Commit** `feat(instruments): expose statement currency and provider provenance`
+      > Split across three repos and four commits, because the plumbing cannot
+      > land in one: contracts declares the fields, openst has to report the
+      > provider, instruments has to read it and resolve the currency, and only
+      > then can the SPA render it. openst and instruments had to move together
+      > — a reader that expects the envelope cannot also read a bare array
+      > without the tolerance that keeps the tab populated mid-deploy.
 
 ### 79.3 — Half the balance sheet is empty for every non-US instrument (found 2026-10-02)
 
