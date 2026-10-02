@@ -1,11 +1,14 @@
 import { flushPromises, mount } from "@vue/test-utils"
 import { createPinia, setActivePinia } from "pinia"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import PortfolioPerformanceTab, {
+import PortfolioPerformanceTab from "@/modules/portfolios/PortfolioPerformanceTab.vue"
+// §83.1 — the D88/D89 derivation moved with its only consumer into the extracted
+// tab body. Import path only; no assertion below was changed.
+import {
   benchmarkYearlyReturns,
   yearlyReturns,
   yearlyTotals,
-} from "@/modules/portfolios/PortfolioPerformanceTab.vue"
+} from "@/components/PerformanceTabContent.vue"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
 import * as portfoliosApi from "@/api/portfolios"
