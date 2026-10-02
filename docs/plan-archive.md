@@ -19406,3 +19406,808 @@ change the derivation or the UI; it stops asserting the false invariant:
 No UI change, so no re-deploy for this step. When §78 lands and the opening nets
 go to zero, the bare equality becomes true on its own and the subtraction becomes
 a no-op — which is the right shape for a fix that is about to arrive.
+
+---
+
+## 83. Cumulative (all-portfolios) Performance tab (2026-10-02)
+
+User request (no proposal file): "a performance tab for cumulative portfolio —
+maybe make a component out of the existing per-portfolio tab and just load all
+data into it?"
+
+Placed as an **additional tab on the main Portfolios page** (`InvestmentsTabs`),
+not a route under `/portfolios/:id`, because it aggregates over all portfolios
+and therefore has no `:id`. Built the way the request suggests: extract
+`PortfolioPerformanceTab.vue`'s body into a prop-driven component and mount it
+twice — per-portfolio from the existing route, and for the account from a new
+`/investments/performance` route backed by `GET /api/portfolios/merged`.
+
+**Half of the reuse already exists.** `PortfolioPerformanceChart.vue` is
+deliberately one component with no variant prop (§41: *"the charts differ only in
+the data delivered"*), and the combined chart on
+`src/modules/portfolios/InvestmentsView.vue:382-410`
+already uses it. Do not add a second chart or a `combined` prop.
+
+**The other half is the blocker.** "Load all data into it" cannot work as stated,
+because the aggregate's return columns do not exist and cannot be read off a sum
+of per-portfolio columns. `buildMergedPerformance` (`mergedAnalytics.ts:146-163`)
+returns `timeSeries[]` as `{date, value, invested}` only and hard-nulls
+`timeWeightedReturn` / `moneyWeightedReturn` with `monthlyReturns: []`; §82.1
+does not reach it either, since it scopes to `/:id/analytics`.
+
+The fix is structural, not cosmetic, and it is short: **select `net_flow`
+alongside `value` in `/merged` and run the same builders on the summed series.**
+`(ΣVₜ) / (ΣVₜ₋₁ + ΣFₜ) − 1` *is* the aggregate's daily return, so no
+per-portfolio weighting is needed and no portfolio is privileged.
+`buildDailyReturns(values, flows)` (`returnColumns.ts:43`) is already exactly
+that expression, and it is now the single implementation §81.1 established — this
+section consumes it and must not re-derive it. `netFlow` is external-only per
+portfolio (§62.4/D50), so a transfer between two of the user's own portfolios is
+excluded on both legs and cancels in the sum.
+
+**Dependency: satisfied.** §81.1–81.3 landed in `811d942`. What this section
+builds on, by name:
+
+- `buildDailyReturns(values, flows)` / `chainReturns(returns)` / `buildTwr` —
+  `returnColumns.ts:43` / `:53` / `:63`
+- `computeRiskMetrics(returns, dates, riskFreeRate?)` — `riskMetrics.ts:242`,
+  **pure**, and it returns `maxDrawdown`, `annualizedReturn` and the withheld
+  reason. This is why §83.4 needs no new route and no contract change.
+- `currentDrawdownPercent(points)` — `src/utils/drawdown.ts`, reads `cumulativeTwr`
+  first with a raw-`value` fallback (§81.3)
+
+**Ordering: satisfied.** §81.1–81.3 landed in `811d942`; §82 landed in `05c6855`,
+`d02a289`, `a3275be`, `b667c5d`, `ed62b62`. §83.1 now edits the file §82.2–82.4
+also edited, so the D85–D89 metrics are already in it — §83.1 is the extraction,
+not the introduction.
+
+**Revised 2026-10-02 after §82 landed — what that changed here.** §83 was drafted
+against a `PortfolioPerformanceTab.vue` that had no Overview card, one Returns
+Chart and no per-year view. It is now 788 lines carrying all of that, so three
+things in this section are no longer accurate as written and are corrected in
+place below:
+
+1. **The tab grew a second consumer-shaped dependency.** §82.2's Overview card
+   (Net gain / Net invested / XIRR / TWR p.a. / Timing) and §82.3's Monthly |
+   Yearly toggle read `performance.annualizedReturn`,
+   `annualizedReturnWithheldReason`, `moneyWeightedReturn`,
+   `moneyWeightedReturnWithheldReason` and `timeframe`. So §83.2 must populate
+   `annualizedReturn` **and its withheld reason** on the aggregate, not just the
+   return scalars — a tab whose TWR p.a. tile always renders `—` while the
+   per-portfolio tab shows a number is the exact "looks like a working page"
+   failure §83.6's last test is written to catch. §83.3 and §83.4 are unaffected:
+   benchmarks and risk ratios were already declared.
+2. **§83.1's extraction surface grew.** Four more things cannot move as-is and
+   must become props or internal state: `store.analyticsTimeframe` (which gates
+   the Yearly toggle's availability, `:467`), `firstBenchmark` (`:485`),
+   `excessByYear` (`:488`), and the `<script lang="ts">` block (`:1-117`) holding
+   `yearlyReturns` / `benchmarkYearlyReturns` / `yearlyTotals`. The math block
+   travels *with* the template — it is the D88 derivation the Yearly table needs —
+   so the existing unit test's import path changes (one line; §83.1).
+3. **The FX caveat moved from a footnote to the headline.** §82.2's two money
+   tiles (`totalReturn`, `totalInvested`) are the numbers a reader checks against
+   their own bank balance, and on a multi-currency aggregate they are the most
+   constant-currency-shaped figures on the page. §83.6 says so where those tiles
+   are, not only in a footnote under the chart.
+
+Recorded decisions (resolved with the user):
+
+- **Benchmarks need no contract change and no persistence.** `benchmarks[]` is
+  already declared on `PortfolioAnalytics` (`openapi.yaml:1545`); `/merged`
+  simply ignores the query param today. The selection is per-request store state
+  (`stores/portfolios.ts:81-91`), not a DB column, so there is no schema to add.
+- **Performers need one contract addition** — see §83.5. `/held-stocks`
+  (`portfolios.ts:498`) is *not* reusable: it aggregates by symbol across
+  portfolios, drops P/L entirely, and hardcodes `changePercent: 0`.
+- **The existing `combined-chart` card is replaced, not duplicated.**
+  `InvestmentsView.vue:382-410` renders the same endpoint through the same chart;
+  leaving both puts the same curve on two adjacent pages.
+- **FX is constant-currency by construction** and the tab must say so — see §83.6.
+
+### 83.1 — Extract `PerformanceTabContent.vue` with no behaviour change
+
+- [x] **Move the tab body** (Overview card, chart card, Drawdown card, Returns
+      Chart, Top/Bottom Performers) out of `PortfolioPerformanceTab.vue` into
+      `src/components/PerformanceTabContent.vue` — `docs/COMPONENTS.md`: used by
+      ≥2 places, so `src/components/`, not the module folder. Props: `analytics`,
+      `riskMetrics`, `positions`, `baseCurrency`, `selectedBenchmarks`,
+      `timeframe`, `loading`, `backfillPending`, `recomputing`, `testid`,
+      `titlePrefix?`. Emits `update:selectedBenchmarks`, `update:timeframe` and
+      `recompute`. Take a `testid` prop and prefix every testid with it, per
+      `COMPONENTS.md`.
+      > The nine things that cannot move as-is and must become props or emits
+      > (line numbers are the landed 788-line file): `route.params.id` (`:138`),
+      > `store.analytics` (`:141`, `:293`, `:473`), `getPortfolioRiskMetrics(id)`
+      > (`:232`), `store.positions` (`:312`),
+      > `store.setBenchmarks(syms, id)` (`:203`), `store.detail.baseCurrency`
+      > (`:366`), **`store.analyticsTimeframe` (`:467`, added by §82.3 — it is
+      > what makes Yearly available at all, so it must be a prop and the emit a
+      > `update:timeframe`; letting the component own it would leave the
+      > aggregate's selector writing per-portfolio store state)**.
+      > `firstBenchmark` (`:485`) and `excessByYear` (`:488`) derive from the
+      > `analytics` prop, so they move as computeds untouched. The `chartRate` /
+      > `displayCurrencyOr` pair (`:378`) and `convertedPnl` (`:350`) stay
+      > **inside** the component — both are pure functions of props plus the
+      > display-currency store, so both tabs get them for free. That is the whole
+      > return on this refactor. Purely local UI state moves inside with it:
+      > `returnsMode` (`:464`), `showCustomTimeframe` (`:140`), the whole
+      > Customize modal incl. `InstrumentSearchModal` + `benchmarkOptions`
+      > (`:133`, `:153-205`).
+- [x] **Move the `<script lang="ts">` block with the template** (`:1-117`) —
+      `yearlyReturns`, `benchmarkYearlyReturns`, `yearlyTotals`, `YearlyReturnRow`,
+      `YearlyReturnTotals`, `yearRows`. It is the D88/D89 derivation, and the
+      Yearly table in the template consumes it, so splitting the two would leave
+      a component whose testids and whose maths live in different files.
+      `tests/unit/modules/portfolios/PortfolioPerformanceTab.test.ts:4-8`
+      therefore changes its **import path only** (to
+      `@/components/PerformanceTabContent.vue`); no assertion changes. Do **not**
+      re-export the functions from the wrapper to avoid that edit — two import
+      paths for one derivation is how the two tabs end up with two answers.
+- [x] **Keep every existing `data-testid` string.** `PortfolioPerformanceTab.test.ts`
+      and `tests/e2e/performance-display-currency.spec.ts` +
+      `tests/e2e/parity-portfolios.spec.ts` select on them; a rename breaks three
+      specs for no gain. Testids are stable API per `COMPONENTS.md`. (The
+      `testid` prop therefore prefixes the *aggregate* copy only — the
+      per-portfolio mount must pass `testid=""` and render byte-identical ids.)
+- [x] **Keep `PortfolioPerformanceTab.vue` as a thin route wrapper** that fetches,
+      converts and delegates, so its behaviour is unchanged by construction. It
+      keeps the `AnalyticsTimeframe` state machine: `changeTimeframe` (`:244`),
+      the 5s backfill poll (`:214`) and `handleRecompute` (`:257`).
+- [x] Tests: a new `tests/unit/components/PerformanceTabContent.test.ts` porting
+      the cases from `PortfolioPerformanceTab.test.ts` against the component
+      directly — tiles render payload values, `annualizedReturn: null` with a
+      reason renders `—` and hides the Timing line, a display-currency switch
+      re-renders the money tiles without a remount. The existing
+      `PortfolioPerformanceTab.test.ts` and `InvestmentsView.test.ts` pass
+      **unmodified** apart from that import line.
+- [x] Tests: `npm run build` (includes `vue-tsc --noEmit`) and `npm run test` green.
+- [x] Commit `refactor(spa): extract the performance tab body into a prop-driven component`
+
+
+> Landed in `c5096c0`: the extracted component is `src/components/PerformanceTabContent.vue`
+> (id-prefix convention `${tid}-<field>`, unset on this mount), the wrapper keeps only the
+> fetch/poll/recompute state machine, and the `<script lang="ts">` block moved with the
+> template. All 25 `data-testid` strings verified byte-identical against `HEAD` (the four
+> per-year ones as `` `${tid('perf-returns-yearly-*')}-${row.year}` ``). `vue-tsc` clean;
+> 583 unit tests green, of which 5 are new in
+> `tests/unit/components/PerformanceTabContent.test.ts`.
+### 83.2 — `/merged`: sum the flows and build the aggregate return columns
+
+The only step that makes the tab possible. Everything after it is presentation.
+
+- [x] **Add `netFlow`, `unpricedValue` and `carriedValue`** to the `/merged`
+      SELECT (`portfolios.ts:786-792`) and thread all three through
+      `sumSnapshotsByDateForwardFilled` (`mergedAnalytics.ts:83`) so the aggregate
+      sums them per date exactly as it already sums `value` / `invested`. A
+      portfolio with no row on date *d* contributes its carried value and **0**
+      flow, so its slice of that day's return is 0 — which is correct, not an
+      omission.
+      > The two withheld amounts are not optional. They are what fires
+      > `PortfolioPerformanceChart`'s §78.5 chip (`:109-146`), which reports
+      > *"up to 10,465 PLN is missing from this curve"*. Omitting them reuses a
+      > chart component with its honesty warning silently disarmed — on the one
+      > screen where a wrong total is most expensive. `unpricedValue` must stay
+      > **absent rather than 0** on a row that predates the column, for the reason
+      > the per-portfolio route spells out at `portfolios.ts:1268-1277`.
+- [x] **Chain the aggregate TWR** through `buildDailyReturns` + `chainReturns`
+      (`returnColumns.ts:43`, `:53`) — the same path `buildTwr` takes. Do not
+      re-derive `Vₜ/(Vₜ₋₁+Fₜ)−1` here, and do not read any stored
+      `cumulative_twr` column: those are per-portfolio and summing indices is
+      meaningless.
+- [x] **Emit per-point `cumulativeTwr`** on the aggregate series, and the scalars
+      `timeWeightedReturn` / `moneyWeightedReturn` / `simpleReturnPercent` from
+      the last index point, mirroring `:1381-1389`. The aggregate MWR has no
+      stored `cumulative_mwr` column to read, so compute it with
+      `buildMwr(aggValues, aggFlows, aggDates)` (`returnColumns.ts:109`) at
+      request time and read its last element the same way.
+- [x] **Populate `annualizedReturn` + `annualizedReturnWithheldReason`** —
+      `annualizedReturnWithheldReason(index, dates)` then
+      `annualizedReturn(index, dates)` (`riskMetrics.ts:213` / `:177`), exactly
+      as `:1305-1319` does, and percent as that line percentises it. §82.1 made
+      `/merged`'s absence of these the reason the Overview tab could not be
+      reused; without them the cumulative tab's TWR p.a. tile reads `—` forever.
+      > **The withholding predicate is shared on purpose**
+      > (`annualizedReturnWithheldReason` = ≥60 points AND ≥90 calendar days),
+      > so the aggregate tile and the per-portfolio tile can never disagree about
+      > the same window. Do not "helpfully" lower the floor for the aggregate:
+      > it has more points than any single portfolio, so it is the side that
+      > least needs the exemption.
+      > **Unit trap, restated because this is a third call site:**
+      > `annualizedReturn()` returns a **fraction**; `/:id/analytics` sends a
+      > **percent** under the same field name, and `/:id/risk-metrics` sends the
+      > fraction. §83.2 writes to the analytics shape, so percent it.
+- [x] **`moneyWeightedReturnWithheldReason` mirrors `/:id/analytics`, which is
+      hardcoded `null` (`:1545`).** `buildMwr` silently falls back to
+      `buildSimple` when XIRR has no sign change (`:129-131`), so a value with
+      `null` reason is not proof the number is an XIRR. Do not invent a new
+      reason here — that would be a fourth answer. Record it as the same
+      (accepted) defect the per-portfolio tab has, and let §83.2's test pin the
+      *current* behaviour so the two tabs cannot diverge.
+- [x] **Populate `monthlyReturns`** with `buildMonthlyReturns` (`:1294`) over the
+      aggregate TWR index, so the Returns Chart is not empty — and, since §82.3
+      landed, so the **Yearly** toggle has an index to walk. Yearly availability
+      is still gated on `timeframe === "ALL"` in the SPA (`:467`); `/merged` must
+      therefore honour `?timeframe=ALL` as the full window or the toggle shows a
+      partial year as a whole one.
+- [x] **Fix the early return at `:749-782`.** When *any* portfolio has fewer than
+      2 snapshots, the route returns `backfillStatus:"pending"` with an **empty
+      series** — so one brand-new portfolio erases every other portfolio's history
+      from a view whose entire purpose is the cumulative total. Return the partial
+      sum *and* the pending flag, keeping §72.7's rule that reporting a mid-rebuild
+      portfolio is a read and firing a backfill from a GET is not.
+- [x] Tests — a deposit into one of two portfolios must leave the aggregate TWR
+      **unchanged** (§81.1's invariant, applied to the aggregate: this is the test
+      that would have caught the missing `net_flow`); an internal transfer between
+      two of the user's own portfolios leaves it unchanged; `Π(1 + monthlyReturns)`
+      reconciles to `cumulativeTwr` at the last point; one portfolio with < 2
+      snapshots still returns the other portfolios' series plus
+      `backfillStatus:"pending"`.
+- [x] Tests: `npm run test` green in `portfoliost-wallets`; `npm run build` (tsc) green.
+- [x] Commit `feat(wallets): build the aggregate TWR and monthly returns in /merged`
+
+
+> Landed in `portfoliost-wallets@31aed4b`: `/merged` now selects `net_flow`,
+> `unpriced_value` and `carried_value`; `sumSnapshotsByDateForwardFilled` carries value
+> and invested forward but counts flow only on its own date; `buildMergedPerformance`
+> derives `cumulativeTwr` / `timeWeightedReturn` / `moneyWeightedReturn` /
+> `simpleReturnPercent` / `annualizedReturn` (+ withheld reason) / `monthlyReturns` from
+> `returnColumns.ts` + `riskMetrics.ts`, never from a stored column. `buildMonthlyReturns`
+> MOVED from `routes/portfolios.ts` to `returnColumns.ts` so one month-boundary rule serves
+> both routes. The pending early-return now returns the partial sum with the flag.
+> 574 tests green, `tsc` clean.
+>
+> **Two boxes above were written before the code existed and needed widening, both
+> recorded in the diff rather than worked around:**
+> 1. The plan asked only for the two withheld *amounts*, but
+>    `PortfolioPerformanceChart`'s chip needs a COUNT beside the amount —
+>    `gapMessage` returns `""` when both `gapSymbols` and `heldGapSymbols` are
+>    absent (`PortfolioPerformanceChart.vue:126-147`). Threading the amounts alone
+>    would have left the honesty warning silent. `/merged` therefore also returns the
+>    UNION of the per-portfolio `getGapSymbols` claims via a new `aggregateGapSymbols`
+>    helper — a union, not a re-derivation, and `null` (not `[]`) when nothing claims
+>    a gap, per §72.30.
+> 2. `unpricedValue`/`carriedValue` had to become tri-state on the aggregate: a
+>    contributor that did not measure them makes the whole sum `null` (unknown), not
+>    a sum of the measured ones. Summing past an unmeasured row would report "nothing
+>    withheld" on exactly the series that need the warning — the same argument the
+>    per-portfolio route makes at `portfolios.ts:1272-1277`.
+### 83.3 — Benchmark overlays on the aggregate
+
+- [x] **Accept `?benchmarks=SPY,QQQ` on `/merged`** and mirror the benchmark block
+      at `:1295-1323`: aggregate `dailyExternalFlows` across **all** the user's
+      portfolios, seed with the aggregate `invested` at the window start, and call
+      `buildBenchmarkSeries` per symbol in the **aggregate base** currency.
+      > Give `dailyExternalFlows` (`cashLedger.ts:255-287`) a
+      > `string | string[]` portfolio filter rather than writing a second flow
+      > reader. It already owns the external-only rule and the per-day historical
+      > FX rate (`rateToBase(..., day)`, `:307`), and both are exactly what a
+      > second implementation gets subtly wrong.
+      > Its per-day rate is deliberately **unlike** §83.6's single spot rate on
+      > the value series. A benchmark must pay for the flows on the day they
+      > happened; the value series is a constant-currency restatement. Do not
+      > "unify" them.
+- [x] **Pin the internal-transfer case with a test, not an assumption.** Both legs
+      are external-only-excluded per portfolio, so neither reaches the aggregate
+      flow map and the benchmark is not perturbed by money moving between the
+      user's own portfolios.
+- [x] No contract change and no persistence (see recorded decisions above).
+- [x] Tests: a fixture where a deposit buys the benchmark and the line rises with
+      the market only on flow-free days; an internal transfer does not perturb it;
+      unknown tickers are dropped (`:1321`); no `benchmarks` param → `[]` as today.
+- [x] Tests: `npm run test` green in `portfoliost-wallets`; `npm run build` green.
+- [x] Commit `feat(wallets): support benchmark overlays on the merged series`
+
+
+> Landed in `portfoliost-wallets@d0f4263`: `dailyExternalFlows` takes
+> `string | string[]` (`inArray` for the array case) so `/merged` sums the user's flows with the
+> function that already owns the external-only rule and the per-day rate; `/merged` accepts
+> `?benchmarks=` + `?benchmarkCalcType=`, seeds with the aggregate `invested` at the window
+> start, and drops unknown tickers. `BenchmarkBuildContext.portfolioId` became OPTIONAL
+> with a note — `buildBenchmarkSeries` never read it (`grep ctx.portfolioId` is empty), and
+> the aggregate has no single portfolio to put there; inventing one would put a lie in a
+> field that looks like it scopes something.
+> Three route tests pin it: the deposit line is `[100, 100, 110]` (flat ON the deposit day —
+> a value-ratio mirror prints 200 there and claims +120%), the paired transfer leaves the
+> line at `[100, 100, 110]` / +10%, and an unknown ticker drops the overlay while the
+> aggregate series still comes back. 577 tests green, `tsc` clean.
+
+> Landed in `portfoliost-wallets@d0f4263`: `dailyExternalFlows` takes
+> `string | string[]` (`inArray` for the array case) so `/merged` sums the user's flows with the
+> function that already owns the external-only rule and the per-day rate; `/merged` accepts
+> `?benchmarks=` + `?benchmarkCalcType=`, seeds with the aggregate `invested` at the window
+> start, and drops unknown tickers. `BenchmarkBuildContext.portfolioId` became OPTIONAL
+> with a note — `buildBenchmarkSeries` never read it (`grep ctx.portfolioId` is empty), and
+> the aggregate has no single portfolio to put there; inventing one would put a lie in a
+> field that looks like it scopes something.
+> Three route tests pin it: the deposit line is `[100, 100, 110]` (flat ON the deposit day —
+> a value-ratio mirror prints 200 there and claims +120%), the paired transfer leaves the
+> line at `[100, 100, 110]` / +10%, and an unknown ticker drops the overlay while the
+> aggregate series still comes back. 577 tests green, `tsc` clean.
+83.4 needs no new route and no contract change.
+- `currentDrawdownPercent(points)` — `src/utils/drawdown.ts`, reads `cumulativeTwr`
+  first with a raw-`value` fallback (§81.3)
+
+**Ordering: satisfied.** §81.1–81.3 landed in `811d942`; §82 landed in `05c6855`,
+`d02a289`, `a3275be`, `b667c5d`, `ed62b62`. §83.1 now edits the file §82.2–82.4
+also edited, so the D85–D89 metrics are already in it — §83.1 is the extraction,
+not the introduction.
+
+**Revised 2026-10-02 after §82 landed — what that changed here.** §83 was drafted
+against a `PortfolioPerformanceTab.vue` that had no Overview card, one Returns
+Chart and no per-year view. It is now 788 lines carrying all of that, so three
+things in this section are no longer accurate as written and are corrected in
+place below:
+
+1. **The tab grew a second consumer-shaped dependency.** §82.2's Overview card
+   (Net gain / Net invested / XIRR / TWR p.a. / Timing) and §82.3's Monthly |
+   Yearly toggle read `performance.annualizedReturn`,
+   `annualizedReturnWithheldReason`, `moneyWeightedReturn`,
+   `moneyWeightedReturnWithheldReason` and `timeframe`. So §83.2 must populate
+   `annualizedReturn` **and its withheld reason** on the aggregate, not just the
+   return scalars — a tab whose TWR p.a. tile always renders `—` while the
+   per-portfolio tab shows a number is the exact "looks like a working page"
+   failure §83.6's last test is written to catch. §83.3 and §83.4 are unaffected:
+   benchmarks and risk ratios were already declared.
+2. **§83.1's extraction surface grew.** Four more things cannot move as-is and
+   must become props or internal state: `store.analyticsTimeframe` (which gates
+   the Yearly toggle's availability, `:467`), `firstBenchmark` (`:485`),
+   `excessByYear` (`:488`), and the `<script lang="ts">` block (`:1-117`) holding
+   `yearlyReturns` / `benchmarkYearlyReturns` / `yearlyTotals`. The math block
+   travels *with* the template — it is the D88 derivation the Yearly table needs —
+   so the existing unit test's import path changes (one line; §83.1).
+3. **The FX caveat moved from a footnote to the headline.** §82.2's two money
+   tiles (`totalReturn`, `totalInvested`) are the numbers a reader checks against
+   their own bank balance, and on a multi-currency aggregate they are the most
+   constant-currency-shaped figures on the page. §83.6 says so where those tiles
+   are, not only in a footnote under the chart.
+
+Recorded decisions (resolved with the user):
+
+- **Benchmarks need no contract change and no persistence.** `benchmarks[]` is
+  already declared on `PortfolioAnalytics` (`openapi.yaml:1545`); `/merged`
+  simply ignores the query param today. The selection is per-request store state
+  (`stores/portfolios.ts:81-91`), not a DB column, so there is no schema to add.
+- **Performers need one contract addition** — see §83.5. `/held-stocks`
+  (`portfolios.ts:498`) is *not* reusable: it aggregates by symbol across
+  portfolios, drops P/L entirely, and hardcodes `changePercent: 0`.
+- **The existing `combined-chart` card is replaced, not duplicated.**
+  `InvestmentsView.vue:382-410` renders the same endpoint through the same chart;
+  leaving both puts the same curve on two adjacent pages.
+- **FX is constant-currency by construction** and the tab must say so — see §83.6.
+
+### 83.1 — Extract `PerformanceTabContent.vue` with no behaviour change
+
+- [x] **Move the tab body** (Overview card, chart card, Drawdown card, Returns
+      Chart, Top/Bottom Performers) out of `PortfolioPerformanceTab.vue` into
+      `src/components/PerformanceTabContent.vue` — `docs/COMPONENTS.md`: used by
+      ≥2 places, so `src/components/`, not the module folder. Props: `analytics`,
+      `riskMetrics`, `positions`, `baseCurrency`, `selectedBenchmarks`,
+      `timeframe`, `loading`, `backfillPending`, `recomputing`, `testid`,
+      `titlePrefix?`. Emits `update:selectedBenchmarks`, `update:timeframe` and
+      `recompute`. Take a `testid` prop and prefix every testid with it, per
+      `COMPONENTS.md`.
+      > The nine things that cannot move as-is and must become props or emits
+      > (line numbers are the landed 788-line file): `route.params.id` (`:138`),
+      > `store.analytics` (`:141`, `:293`, `:473`), `getPortfolioRiskMetrics(id)`
+      > (`:232`), `store.positions` (`:312`),
+      > `store.setBenchmarks(syms, id)` (`:203`), `store.detail.baseCurrency`
+      > (`:366`), **`store.analyticsTimeframe` (`:467`, added by §82.3 — it is
+      > what makes Yearly available at all, so it must be a prop and the emit a
+      > `update:timeframe`; letting the component own it would leave the
+      > aggregate's selector writing per-portfolio store state)**.
+      > `firstBenchmark` (`:485`) and `excessByYear` (`:488`) derive from the
+      > `analytics` prop, so they move as computeds untouched. The `chartRate` /
+      > `displayCurrencyOr` pair (`:378`) and `convertedPnl` (`:350`) stay
+      > **inside** the component — both are pure functions of props plus the
+      > display-currency store, so both tabs get them for free. That is the whole
+      > return on this refactor. Purely local UI state moves inside with it:
+      > `returnsMode` (`:464`), `showCustomTimeframe` (`:140`), the whole
+      > Customize modal incl. `InstrumentSearchModal` + `benchmarkOptions`
+      > (`:133`, `:153-205`).
+- [x] **Move the `<script lang="ts">` block with the template** (`:1-117`) —
+      `yearlyReturns`, `benchmarkYearlyReturns`, `yearlyTotals`, `YearlyReturnRow`,
+      `YearlyReturnTotals`, `yearRows`. It is the D88/D89 derivation, and the
+      Yearly table in the template consumes it, so splitting the two would leave
+      a component whose testids and whose maths live in different files.
+      `tests/unit/modules/portfolios/PortfolioPerformanceTab.test.ts:4-8`
+      therefore changes its **import path only** (to
+      `@/components/PerformanceTabContent.vue`); no assertion changes. Do **not**
+      re-export the functions from the wrapper to avoid that edit — two import
+      paths for one derivation is how the two tabs end up with two answers.
+- [x] **Keep every existing `data-testid` string.** `PortfolioPerformanceTab.test.ts`
+      and `tests/e2e/performance-display-currency.spec.ts` +
+      `tests/e2e/parity-portfolios.spec.ts` select on them; a rename breaks three
+      specs for no gain. Testids are stable API per `COMPONENTS.md`. (The
+      `testid` prop therefore prefixes the *aggregate* copy only — the
+      per-portfolio mount must pass `testid=""` and render byte-identical ids.)
+- [x] **Keep `PortfolioPerformanceTab.vue` as a thin route wrapper** that fetches,
+      converts and delegates, so its behaviour is unchanged by construction. It
+      keeps the `AnalyticsTimeframe` state machine: `changeTimeframe` (`:244`),
+      the 5s backfill poll (`:214`) and `handleRecompute` (`:257`).
+- [x] Tests: a new `tests/unit/components/PerformanceTabContent.test.ts` porting
+      the cases from `PortfolioPerformanceTab.test.ts` against the component
+      directly — tiles render payload values, `annualizedReturn: null` with a
+      reason renders `—` and hides the Timing line, a display-currency switch
+      re-renders the money tiles without a remount. The existing
+      `PortfolioPerformanceTab.test.ts` and `InvestmentsView.test.ts` pass
+      **unmodified** apart from that import line.
+- [x] Tests: `npm run build` (includes `vue-tsc --noEmit`) and `npm run test` green.
+- [x] Commit `refactor(spa): extract the performance tab body into a prop-driven component`
+
+
+> Landed in `c5096c0`: the extracted component is `src/components/PerformanceTabContent.vue`
+> (id-prefix convention `${tid}-<field>`, unset on this mount), the wrapper keeps only the
+> fetch/poll/recompute state machine, and the `<script lang="ts">` block moved with the
+> template. All 25 `data-testid` strings verified byte-identical against `HEAD` (the four
+> per-year ones as `` `${tid('perf-returns-yearly-*')}-${row.year}` ``). `vue-tsc` clean;
+> 583 unit tests green, of which 5 are new in
+> `tests/unit/components/PerformanceTabContent.test.ts`.
+### 83.2 — `/merged`: sum the flows and build the aggregate return columns
+
+The only step that makes the tab possible. Everything after it is presentation.
+
+- [x] **Add `netFlow`, `unpricedValue` and `carriedValue`** to the `/merged`
+      SELECT (`portfolios.ts:786-792`) and thread all three through
+      `sumSnapshotsByDateForwardFilled` (`mergedAnalytics.ts:83`) so the aggregate
+      sums them per date exactly as it already sums `value` / `invested`. A
+      portfolio with no row on date *d* contributes its carried value and **0**
+      flow, so its slice of that day's return is 0 — which is correct, not an
+      omission.
+      > The two withheld amounts are not optional. They are what fires
+      > `PortfolioPerformanceChart`'s §78.5 chip (`:109-146`), which reports
+      > *"up to 10,465 PLN is missing from this curve"*. Omitting them reuses a
+      > chart component with its honesty warning silently disarmed — on the one
+      > screen where a wrong total is most expensive. `unpricedValue` must stay
+      > **absent rather than 0** on a row that predates the column, for the reason
+      > the per-portfolio route spells out at `portfolios.ts:1268-1277`.
+- [x] **Chain the aggregate TWR** through `buildDailyReturns` + `chainReturns`
+      (`returnColumns.ts:43`, `:53`) — the same path `buildTwr` takes. Do not
+      re-derive `Vₜ/(Vₜ₋₁+Fₜ)−1` here, and do not read any stored
+      `cumulative_twr` column: those are per-portfolio and summing indices is
+      meaningless.
+- [x] **Emit per-point `cumulativeTwr`** on the aggregate series, and the scalars
+      `timeWeightedReturn` / `moneyWeightedReturn` / `simpleReturnPercent` from
+      the last index point, mirroring `:1381-1389`. The aggregate MWR has no
+      stored `cumulative_mwr` column to read, so compute it with
+      `buildMwr(aggValues, aggFlows, aggDates)` (`returnColumns.ts:109`) at
+      request time and read its last element the same way.
+- [x] **Populate `annualizedReturn` + `annualizedReturnWithheldReason`** —
+      `annualizedReturnWithheldReason(index, dates)` then
+      `annualizedReturn(index, dates)` (`riskMetrics.ts:213` / `:177`), exactly
+      as `:1305-1319` does, and percent as that line percentises it. §82.1 made
+      `/merged`'s absence of these the reason the Overview tab could not be
+      reused; without them the cumulative tab's TWR p.a. tile reads `—` forever.
+      > **The withholding predicate is shared on purpose**
+      > (`annualizedReturnWithheldReason` = ≥60 points AND ≥90 calendar days),
+      > so the aggregate tile and the per-portfolio tile can never disagree about
+      > the same window. Do not "helpfully" lower the floor for the aggregate:
+      > it has more points than any single portfolio, so it is the side that
+      > least needs the exemption.
+      > **Unit trap, restated because this is a third call site:**
+      > `annualizedReturn()` returns a **fraction**; `/:id/analytics` sends a
+      > **percent** under the same field name, and `/:id/risk-metrics` sends the
+      > fraction. §83.2 writes to the analytics shape, so percent it.
+- [x] **`moneyWeightedReturnWithheldReason` mirrors `/:id/analytics`, which is
+      hardcoded `null` (`:1545`).** `buildMwr` silently falls back to
+      `buildSimple` when XIRR has no sign change (`:129-131`), so a value with
+      `null` reason is not proof the number is an XIRR. Do not invent a new
+      reason here — that would be a fourth answer. Record it as the same
+      (accepted) defect the per-portfolio tab has, and let §83.2's test pin the
+      *current* behaviour so the two tabs cannot diverge.
+- [x] **Populate `monthlyReturns`** with `buildMonthlyReturns` (`:1294`) over the
+      aggregate TWR index, so the Returns Chart is not empty — and, since §82.3
+      landed, so the **Yearly** toggle has an index to walk. Yearly availability
+      is still gated on `timeframe === "ALL"` in the SPA (`:467`); `/merged` must
+      therefore honour `?timeframe=ALL` as the full window or the toggle shows a
+      partial year as a whole one.
+- [x] **Fix the early return at `:749-782`.** When *any* portfolio has fewer than
+      2 snapshots, the route returns `backfillStatus:"pending"` with an **empty
+      series** — so one brand-new portfolio erases every other portfolio's history
+      from a view whose entire purpose is the cumulative total. Return the partial
+      sum *and* the pending flag, keeping §72.7's rule that reporting a mid-rebuild
+      portfolio is a read and firing a backfill from a GET is not.
+- [x] Tests — a deposit into one of two portfolios must leave the aggregate TWR
+      **unchanged** (§81.1's invariant, applied to the aggregate: this is the test
+      that would have caught the missing `net_flow`); an internal transfer between
+      two of the user's own portfolios leaves it unchanged; `Π(1 + monthlyReturns)`
+      reconciles to `cumulativeTwr` at the last point; one portfolio with < 2
+      snapshots still returns the other portfolios' series plus
+      `backfillStatus:"pending"`.
+- [x] Tests: `npm run test` green in `portfoliost-wallets`; `npm run build` (tsc) green.
+- [x] Commit `feat(wallets): build the aggregate TWR and monthly returns in /merged`
+
+
+> Landed in `portfoliost-wallets@31aed4b`: `/merged` now selects `net_flow`,
+> `unpriced_value` and `carried_value`; `sumSnapshotsByDateForwardFilled` carries value
+> and invested forward but counts flow only on its own date; `buildMergedPerformance`
+> derives `cumulativeTwr` / `timeWeightedReturn` / `moneyWeightedReturn` /
+> `simpleReturnPercent` / `annualizedReturn` (+ withheld reason) / `monthlyReturns` from
+> `returnColumns.ts` + `riskMetrics.ts`, never from a stored column. `buildMonthlyReturns`
+> MOVED from `routes/portfolios.ts` to `returnColumns.ts` so one month-boundary rule serves
+> both routes. The pending early-return now returns the partial sum with the flag.
+> 574 tests green, `tsc` clean.
+>
+> **Two boxes above were written before the code existed and needed widening, both
+> recorded in the diff rather than worked around:**
+> 1. The plan asked only for the two withheld *amounts*, but
+>    `PortfolioPerformanceChart`'s chip needs a COUNT beside the amount —
+>    `gapMessage` returns `""` when both `gapSymbols` and `heldGapSymbols` are
+>    absent (`PortfolioPerformanceChart.vue:126-147`). Threading the amounts alone
+>    would have left the honesty warning silent. `/merged` therefore also returns the
+>    UNION of the per-portfolio `getGapSymbols` claims via a new `aggregateGapSymbols`
+>    helper — a union, not a re-derivation, and `null` (not `[]`) when nothing claims
+>    a gap, per §72.30.
+> 2. `unpricedValue`/`carriedValue` had to become tri-state on the aggregate: a
+>    contributor that did not measure them makes the whole sum `null` (unknown), not
+>    a sum of the measured ones. Summing past an unmeasured row would report "nothing
+>    withheld" on exactly the series that need the warning — the same argument the
+>    per-portfolio route makes at `portfolios.ts:1272-1277`.
+### 83.3 — Benchmark overlays on the aggregate
+
+- [x] **Accept `?benchmarks=SPY,QQQ` on `/merged`** and mirror the benchmark block
+      at `:1295-1323`: aggregate `dailyExternalFlows` across **all** the user's
+      portfolios, seed with the aggregate `invested` at the window start, and call
+      `buildBenchmarkSeries` per symbol in the **aggregate base** currency.
+      > Give `dailyExternalFlows` (`cashLedger.ts:255-287`) a
+      > `string | string[]` portfolio filter rather than writing a second flow
+      > reader. It already owns the external-only rule and the per-day historical
+      > FX rate (`rateToBase(..., day)`, `:307`), and both are exactly what a
+      > second implementation gets subtly wrong.
+      > Its per-day rate is deliberately **unlike** §83.6's single spot rate on
+      > the value series. A benchmark must pay for the flows on the day they
+      > happened; the value series is a constant-currency restatement. Do not
+      > "unify" them.
+- [x] **Pin the internal-transfer case with a test, not an assumption.** Both legs
+      are external-only-excluded per portfolio, so neither reaches the aggregate
+      flow map and the benchmark is not perturbed by money moving between the
+      user's own portfolios.
+- [x] No contract change and no persistence (see recorded decisions above).
+- [x] Tests: a fixture where a deposit buys the benchmark and the line rises with
+      the market only on flow-free days; an internal transfer does not perturb it;
+      unknown tickers are dropped (`:1321`); no `benchmarks` param → `[]` as today.
+- [x] Tests: `npm run test` green in `portfoliost-wallets`; `npm run build` green.
+- [x] Commit `feat(wallets): support benchmark overlays on the merged series`
+
+
+> Landed in `portfoliost-wallets@d0f4263`: `dailyExternalFlows` takes
+> `string | string[]` (`inArray` for the array case) so `/merged` sums the user's flows with the
+> function that already owns the external-only rule and the per-day rate; `/merged` accepts
+> `?benchmarks=` + `?benchmarkCalcType=`, seeds with the aggregate `invested` at the window
+> start, and drops unknown tickers. `BenchmarkBuildContext.portfolioId` became OPTIONAL
+> with a note — `buildBenchmarkSeries` never read it (`grep ctx.portfolioId` is empty), and
+> the aggregate has no single portfolio to put there; inventing one would put a lie in a
+> field that looks like it scopes something.
+> Three route tests pin it: the deposit line is `[100, 100, 110]` (flat ON the deposit day —
+> a value-ratio mirror prints 200 there and claims +120%), the paired transfer leaves the
+> line at `[100, 100, 110]` / +10%, and an unknown ticker drops the overlay while the
+> aggregate series still comes back. 577 tests green, `tsc` clean.
+### 83.4 — Aggregate drawdown: no new route, no SPA arithmetic
+
+Written this way because §81.1 made `computeRiskMetrics` **pure** — it takes
+`(returns, dates)` and nothing else. After §83.2 the route already holds both.
+
+- [x] **Populate the already-declared `performance.*` risk fields inline on
+      `/merged`** — `maxDrawdown`, `sharpeRatio`, `sortinoRatio`, `calmarRatio`,
+      `volatility`, `winRate` — by calling
+      `computeRiskMetrics(buildDailyReturns(aggValues, aggFlows), aggDates)`
+      (`riskMetrics.ts:242`). Every one of those keys is already declared
+      (`openapi.yaml:1484-1491`), so this is wiring, not schema: **no
+      `/merged/risk-metrics` route and no contract change.**
+      > This is a deliberate transport divergence from the per-portfolio tab,
+      > which reads `maxDrawdown` from a separate `/:id/risk-metrics` call. The
+      > *numbers* come from the same `computeRiskMetrics`, so they cannot drift —
+      > but do not hand-roll a second Max Drawdown in the SPA to "make it
+      > symmetric". That is the drift this step exists to prevent.
+      > **Units are the per-route ones, deliberately.** `computeRiskMetrics`
+      > returns `annualizedReturn` as a **fraction** (that is what
+      > `/:id/risk-metrics` ships), while `performance.*` on `/merged` is the
+      > analytics shape, where `/:id/analytics` ships **percents** (`:1311-1319`).
+      > So the one field this step writes twice — `annualizedReturn`, populated in
+      > §83.2 — must be the analytics unit here too, and `maxDrawdown` /
+      > `sharpeRatio` / `sortinoRatio` / `calmarRatio` / `volatility` / `winRate`
+      > keep the ratios-as-fractions form the Risk tab already shows. Writing the
+      > risk-metrics form onto `/merged` would put the same contract field at two
+      > magnitudes on one response, which is the defect §82.1's comment records.
+- [x] **Do not add a Max Drawdown tile to the aggregate tab** beyond the one the
+      Drawdown card already renders. Per D89, risk *ratios* stay on the Risk tab;
+      the aggregate has no Risk tab, so drawdown is the only one of these that
+      travels, and it travels because the existing card needs it.
+- [x] Test: the §81.3 fixture on the aggregate path — `cumulativeTwr` of
+      `{100, 50, 150, 75}` reports **−75%**, not −50%, and
+      `currentDrawdownPercent` (which the card calls for Current) agrees with
+      `maxDrawdown` on the peak-to-trough leg.
+- [x] Tests: `npm run test` green in `portfoliost-wallets`; `npm run build` green.
+- [x] Commit `feat(wallets): return aggregate risk metrics on the merged series`
+
+
+> Landed in `portfoliost-wallets@afb993c`: `buildMergedPerformance` now calls
+> `computeRiskMetrics(buildDailyReturns(values, flows), dates)` and copies `maxDrawdown`,
+> `sharpeRatio`, `sortinoRatio`, `calmarRatio`, `volatility`, `winRate` onto `performance`.
+> No new route, no contract change — every key was already declared at
+> `openapi.yaml:1484-1491`. `annualizedReturn` is deliberately NOT copied from the risk
+> result: that field is a FRACTION and §83.2's is the analytics PERCENT, so the last box's
+> unit rule is enforced by the code rather than by a reviewer's memory.
+> The §81.3 fixture on the aggregate path reports **−75%**, and the emitted index peaks at
+> 100 and ends at 25, which is what `currentDrawdownPercent` reads for the Current tile.
+> 579 tests green, `tsc` clean.
+### 83.5 — Cross-portfolio performers: one contract addition and a bulk route
+
+- [x] **Contracts:** add `GET /api/portfolios/positions` → `{ positions: Position[] }`,
+      reusing the already-declared `Position` schema (`openapi.yaml:1382`), which
+      carries `portfolioId`, `unrealizedGainLoss`, `percentageChange`,
+      `instrumentCurrency`, `country` and `assetType` — everything the two
+      performer cards render. Add **`portfolioName: { type: string, nullable: true }`
+      to `Position`** in the same push: the aggregate cards must say which
+      portfolio each row came from, since one ticker can be held in two
+      portfolios with very different results, and the per-portfolio tab simply
+      does not need the label because its whole page is that portfolio. Nullable,
+      so the per-portfolio route keeps satisfying the schema unchanged.
+      Then the `AGENTS.md` workflow: push `main`, let CI bump the patch and
+      publish, then `NODE_AUTH_TOKEN=$(gh auth token) npm install @marx2/contracts@<new-version>`
+      and `npm run gen:types`.
+      > This is the only contract change in the section — §83.2/§83.3/§83.4 are
+      > all wiring against fields already declared, so this is the one release to
+      > get right.
+- [x] **Wallets:** register the route **above `/:id`** — the `:726` precedent, or
+      `"positions"` is parsed as a portfolio id — selecting open positions for the
+      identity ordered by `unrealizedGainLoss` desc, reusing the wire-shaping of
+      `GET /:id/positions` (`portfolio-transactions.ts:1197`) so the two responses
+      cannot drift.
+- [x] **SPA:** `getAllPositions()` in `api/portfolios.ts`; `TotalPerformanceView.vue`
+      passes the result to `PerformanceTabContent` as `positions`. No new card —
+      the existing performers block already sorts on `unrealizedGainLoss`
+      (`PortfolioPerformanceTab.vue:311-318`). Render `portfolioName` as a
+      secondary line under the ticker, omitted when null so the per-portfolio
+      cards are unaffected.
+- [x] Tests: contract validation; a wallets route test asserting the response is
+      the `Position[]` shape, carries `portfolioName`, and is scoped to the
+      identity (another user's positions never appear); an SPA case asserting the
+      aggregate list spans more than one portfolio and labels each row.
+- [x] Commit, one per repo in `AGENTS.md` order: `feat(contracts): declare the
+      all-portfolios positions endpoint` → `feat(wallets): serve all open
+      positions` → `feat(spa): show cross-portfolio performers on the cumulative
+      tab`.
+
+
+> Landed across three repos in `AGENTS.md` order:
+> `portfoliost-contracts@1.6.61` (`5f7ebe0`, released by CI — GHA bumped and published it, so
+> the workflow in this box's note was followed rather than hand-tagged), `portfoliost-wallets@3f44f67`,
+> `portfoliost@7a46b21`. `/portfolios/positions` is registered above `/:id` and returns
+> `{ positions: Position[] }`, each row through the now-EXPORTED `positionWire` so the two
+> responses cannot drift, ordered by `unrealized_gain_loss DESC NULLS LAST`, scoped to the
+> identity (a route with no `:id` is otherwise one missing `where` from a cross-tenant read —
+> asserted in its own test).
+> **One box's prescription had to change:** `resolveRates` resolves INTO a single target, and
+> a position belongs to one portfolio, so a response-wide rate table would have converted rows
+> at the WRONG base (and quietly, since a wrong-rate conversion still returns a number). The
+> route now resolves one table per DISTINCT portfolio base among its rows.
+> `Position.portfolioName` is nullable and the per-portfolio route leaves it undefined, so
+> that response is unchanged; the performer card renders the name only when present.
+### 83.6 — Route, tab, view; retire the duplicate card; state the FX caveat
+
+- [x] **Add the tab** to `src/modules/portfolios/InvestmentsTabs.vue` (`:8-30`,
+      the `tabs` array) after `Portfolios`, and route `investments/performance`
+      → `TotalPerformanceView.vue` in `router/index.ts` (beside `:59`). Both
+      files live under `src/modules/portfolios/`, not `src/views/`.
+- [x] **`TotalPerformanceView.vue` owns exactly what the per-portfolio wrapper
+      owns:** the `/merged` fetch, the timeframe selector (which `PerformanceTabContent`
+      now emits `update:timeframe` for, rather than writing
+      `store.analyticsTimeframe` — that state is per-portfolio and this view has
+      no portfolio), the display-currency conversion off
+      `store.totalMetrics.baseCurrency` (the `InvestmentsView.vue:93-107` pattern),
+      the recompute fan-out, and the backfill poll. It passes the result into
+      `PerformanceTabContent`.
+      > `handleMergedRecompute` (`:66-78`) fires `recomputePortfolio` once per
+      > portfolio in a `Promise.all` — ten portfolios is ten writes from one
+      > button click. Keep the behaviour (it is what the user asked for by
+      > clicking it) but put the count in the button label so the cost is visible
+      > before it is paid.
+- [x] **Remove the `combined-chart` card** and its `merged*` state from
+      `src/modules/portfolios/InvestmentsView.vue` (`:21-78`, `:97-107`,
+      `:382-410`) replacing it with a link to the new tab. Same endpoint, same
+      chart component — only the placement moves.
+- [x] **State the FX caveat on the tab, next to the Overview card.** `resolveRates`
+      (`instruments-fx.ts:153-170`) resolves **one spot rate per pair** and
+      applies it across the whole history, so the aggregate is a
+      constant-currency total: it excludes FX moves between a portfolio's base
+      and the aggregate base. On a single-base portfolio this is invisible; on a
+      multi-currency aggregate it is a material omission from "total return", and
+      a user reading a flat PLN portfolio's history would otherwise take it for a
+      currency call. Say it — do not leave it implicit.
+      > **Revised after §82: put it on the Overview card, not under the chart.**
+      > §82.2's `perf-overview-net-gain` / `perf-overview-net-invested` tiles
+      > render `performance.totalReturn` / `totalInvested` in the display
+      > currency, and they are the two numbers a reader checks against a bank
+      > balance. A caveat printed below the chart is one scroll away from the
+      > tiles it qualifies. The one-line note goes at the top of the Overview
+      > card on the aggregate view only — `PerformanceTabContent` must not render
+      > it unconditionally, because on a single-base portfolio it would be
+      > commentary about a problem the page does not have. Hence a prop.
+      > This is existing §68.4 behaviour, unchanged by this section. It becomes
+      > *visible* here, not *wrong* here.
+- [x] Tests: retarget `tests/e2e/combined-chart.spec.ts` onto the new tab's
+      testids, keeping both existing cases (chart renders; the timeframe selector
+      switches). Add cases asserting **every §82 tile is not `—` on the seeded
+      aggregate** — TWR, MWR/XIRR, TWR p.a., Timing, and drawdown — a tab that
+      renders dashes where the per-portfolio tab renders numbers is the failure
+      mode of every step above, and it looks like a working page. Add a case for
+      the Yearly toggle, which is new on this tab: `ALL` shows it enabled and a
+      non-`ALL` timeframe disables it (`PortfolioPerformanceTab.vue:467`), and the
+      Σ footer reconciles to the Net gain tile.
+- [x] Tests: a display-currency switch re-converts chart and tiles together (they
+      share a rate). `npm run build` + `npm run test` green.
+- [x] Commit `feat(spa): add the cumulative performance tab`
+
+
+> Landed in `portfoliost@556cdfc` (+ mock route in `mocks/portfolios/index.js`, registered
+> before `/:id`). `TotalPerformanceView.vue` owns the `/merged` fetch, the timeframe (a LOCAL
+> ref — `store.analyticsTimeframe` is per-portfolio and this view has no portfolio), the
+> recompute fan-out with the count in the label, and the poll; the tab body is the shared
+> component. The `combined-chart` card is gone, replaced by a link.
+> **Two things the boxes did not anticipate:**
+> 1. The view must load `store.fetchAll()` ITSELF. Reading `store.totalMetrics` alone works
+>    only when the user arrived from the Investments page; on a hard reload of this URL it is
+>    null, which is §67.2's bug exactly — native values under a foreign currency symbol. Its
+>    unit test asserts the §46.3 conversion on a fresh mount for that reason.
+> 2. `combined-chart.spec.ts` had two cases asserting the removed card; both were PORTED to
+>    `TotalPerformanceView.test.ts` rather than deleted, and a third
+>    (`accounts-balance.spec.ts:81`) asserted the tab strip verbatim, so it gained
+>    `"Performance"`. A spec that pins a list must be updated when the list changes.
+> `getMergedAnalytics` now forwards `benchmarks`/`benchmarkCalcType` (§83.3) — without it the
+> Customize modal would select overlays the client never asked for.
+> e2e: 5 cases on the new tab (both originals retargeted, plus no-dashes, Yearly/Σ-reconciles,
+> the caveat, and the dashboard link). Full suite **126 passed / 1 failed / 1 skipped**, the
+> one failure being the pre-existing `portfolios.spec.ts:289` (`KO` pushed out of instrument
+> search by ANALIZY name matches — reproduces on a clean checkout).
+### 83.7 — Example service parity and the full suite
+
+- [x] **Playwright side-by-side** against `app.example-service.ai`'s performance page at
+      the same viewport, plus the a11y tree. This section adds a page example-service has
+      no exact equivalent for, so the comparison is about layout, tile styling and
+      wording — adopt example-service's wording verbatim for a money or return tile where it
+      does not contradict D85–D89.
+- [x] **Run the whole suite:** `npm run build` (includes `vue-tsc --noEmit`),
+      `npm run test`, `npm run test:mock`, `npm run test:e2e` against
+      `docker compose up -d --build`. Rebuild the `portfoliost` container after the
+      frontend changes and **restart the gateway** afterwards, or only
+      wallets-routed e2e paths will 404 for the wrong reason (see `AGENTS.md`).
+- [x] `portfoliost-wallets` suite green; then release per `AGENTS.md` (push
+      `main` → GHA bumps `v*` → pin in the homelab helmrelease → Flux applies →
+      verify with kubectl).
+- [x] Commit `test(spa): cover the cumulative performance tab in e2e`
+
+> Example service parity (Playwright, read-only — Top10 opened but never modified): example-service's
+> performance page headings are **Performance Chart / Drawdown / Returns Chart /
+> Return statistics / Top Performers / Bottom Performers**, with a `Customize`
+> button, a timeframe strip, and the same two performer cards. Ours match all but
+> one — `Overview`, which is D85–D89's card and has no example-service counterpart to copy
+> wording from. Example service's nearest neighbour, `Return statistics` (Positions / Total
+> Value / Free funds / Return / Unrealized / Realized / Income / Best day / Worst
+> day / Green days), is a different set of claims from D85–D89's five tiles, so
+> nothing was adopted from it. Example service's Returns Chart also offers **Day** returns
+> and a **Heatmap**; neither is in the contract (`monthlyReturns` is
+> month-resolution) and both are outside §83's scope — recorded rather than
+> silently skipped. Its account-level strip has no Performance tab at all, which
+> is why §83 puts this page on the Investments tabs.
+>
+> Full suite green before release (see §83.6's note). Released per `AGENTS.md`:
+> push main → GHA bumped **SPA v1.0.359** and **wallets v1.1.121** →
+> `git log --oneline v<old>..v<new> -- src/` confirmed both carry real `src/`
+> commits (3 SPA, 4 wallets) → pinned in `~/prv/homelab/homelab` (wallets **2×**,
+> app + `snapshotsync`, moved together) → Flux applied → `kubectl rollout status`
+> green on both, images verified as the pinned tags, and the `snapshotsync`
+> CronJob confirmed to have moved with the app.
+>
+> **PROD verified in the browser**, which is the only check that mattered:
+> Net gain **+PLN 346,136.53**, Net invested **+PLN 746,100.99**, XIRR +201.05%,
+> TWR p.a. **+12.92%**, Max DD −27.31%, Current DD −0.82%, two charts, recompute
+> labelled "Recompute all 10 portfolios". TWR p.a. renders a NUMBER in PROD
+> (1 663–2 704 points) while compose shows `—` (49 points, below §82.1's floor) —
+> the withholding behaves exactly as specified. The money tiles were cross-checked
+> against the database rather than trusted: Net gain is the sum of the ten
+> per-portfolio last `value − invested` to the grosz (346 136.52), and Net
+> invested matches Σ `invested` exactly. TWR p.a. +12.92% is consistent with the
+> recorded PROD anchor (`annualizedReturn == periodReturnPercent` on a 365-day
+> window).
+>
+> The XIRR tile is a different story, and it is why §83.8 exists.
