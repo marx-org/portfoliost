@@ -377,3 +377,65 @@ describe("PortfolioPerformanceChart (§78.5 — count and amount stay separate)"
     expect(warn).not.toMatch(/up to/i)
   })
 })
+
+/**
+ * §72.31 — a day priced from a carried-forward close is partial, and nothing else
+ * on the wire said so.
+ *
+ * `buildPriceMap` advances the last close onto every subsequent day, so a day with
+ * no returned bar is priced from yesterday and `value` looks complete. That makes
+ * `unpricedValue` structurally blind to it — carry-forward means a price exists.
+ * Measured on PROD: Crypto reported `gapSymbols: ["BTC-USD"]`, 24 coverage days, and
+ * `unpricedValue` of 0 on all 1,690.
+ */
+describe("PortfolioPerformanceChart (§72.31 — carriedValue)", () => {
+  it("warns when days are priced from a carried-forward close and no gap note applies", async () => {
+    const w = mount(PortfolioPerformanceChart, {
+      props: {
+        timeSeries: [
+          { date: "2022-06-12", value: 500, carriedValue: 0 },
+          { date: "2022-06-13", value: 498, carriedValue: 250 },
+          { date: "2022-06-14", value: 501, carriedValue: 180 },
+        ],
+        gapSymbols: null,
+        heldGapSymbols: null,
+        currency: "PLN",
+      },
+      global: { stubs: { apexchart: true } },
+    })
+    const warn = w.find('[data-testid="portfolio-chart-gap-warning"]').text()
+    expect(warn).toMatch(/2 days priced from a carried-forward close/i)
+    expect(warn).not.toMatch(/up to/i)
+  })
+
+  it("stays silent when every day has a real bar", async () => {
+    const w = mount(PortfolioPerformanceChart, {
+      props: {
+        timeSeries: [{ date: "2022-06-12", value: 500, carriedValue: 0 }],
+        gapSymbols: null,
+        heldGapSymbols: null,
+        currency: "PLN",
+      },
+      global: { stubs: { apexchart: true } },
+    })
+    expect(w.find('[data-testid="portfolio-chart-gap-warning"]').exists()).toBe(false)
+  })
+
+  it("does not report a gap count it cannot scope — carried days are a window claim", async () => {
+    // The count and the series are filtered differently, so pairing them asserts a
+    // count about a period the number does not describe. Carried days are their own
+    // claim and stand alone.
+    const w = mount(PortfolioPerformanceChart, {
+      props: {
+        timeSeries: [{ date: "2022-06-13", value: 500, carriedValue: 250 }],
+        gapSymbols: ["BST0922", "INS0922", "VOX0224", "NVA0624", "ARH0324", "KIN1025", "S2B.WA"],
+        heldGapSymbols: null,
+        currency: "PLN",
+      },
+      global: { stubs: { apexchart: true } },
+    })
+    const warn = w.find('[data-testid="portfolio-chart-gap-warning"]').text()
+    expect(warn).toMatch(/carried-forward close/i)
+    expect(warn).not.toMatch(/7 position/i)
+  })
+})

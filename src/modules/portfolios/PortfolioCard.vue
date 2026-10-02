@@ -120,6 +120,8 @@ const historyChartGap = ref<string[] | null>(null)
  * against the chart beside it. The peak is what a single point was short by.
  */
 const unpricedPeak = ref<number | null>(null)
+/** §72.31 — days priced from a carried-forward close while the market was open. */
+const carriedDays = ref<number | null>(null)
 /**
  * "up to 10,465.32 PLN" — omitted entirely when unknown, never "PLN 0.00".
  *
@@ -218,7 +220,7 @@ async function loadChart() {
 function applyGapSymbols(analytics: {
   gapSymbols?: string[] | null
   heldGapSymbols?: string[] | null
-  performance?: { timeSeries?: Array<{ unpricedValue?: number | null }> | null } | null
+  performance?: { timeSeries?: Array<{ unpricedValue?: number | null; carriedValue?: number | null }> | null } | null
 }) {
   const all = analytics.gapSymbols ?? []
   const held = analytics.heldGapSymbols ?? []
@@ -235,6 +237,10 @@ function applyGapSymbols(analytics: {
     if (typeof v === "number" && v > 0 && (peak === null || v > peak)) peak = v
   }
   unpricedPeak.value = peak
+  const carried = (analytics.performance?.timeSeries ?? []).filter(
+    (p) => typeof p?.carriedValue === "number" && p.carriedValue > 0,
+  ).length
+  carriedDays.value = carried > 0 ? carried : null
 }
 
 /**
@@ -520,7 +526,10 @@ async function exportPositions(format: "csv" | "xml" | "json") {
       <p v-if="heldChartGap && heldChartGap.length" class="mt-1 text-xs font-medium text-amber-600 dark:text-amber-400" data-testid="card-chart-gap-warning">
         Value excludes {{ heldChartGap.length }} position{{ heldChartGap.length === 1 ? "" : "s" }} without price history<span v-if="unpricedAmountLabel"> &mdash; {{ unpricedAmountLabel }} withheld</span>.
       </p>
-      <p v-if="historyChartGap && historyChartGap.length" class="mt-1 text-xs text-slate-500 dark:text-slate-400" data-testid="card-chart-history-gap-note">
+      <p v-if="carriedDays && !(historyChartGap && historyChartGap.length)" class="mt-1 text-xs text-slate-500 dark:text-slate-400" data-testid="card-chart-carried-note">
+        {{ carriedDays }} day{{ carriedDays === 1 ? " was" : "s were" }} priced from a carried-forward close rather than a real price. Today's value is complete.
+      </p>
+      <p v-else-if="historyChartGap && historyChartGap.length" class="mt-1 text-xs text-slate-500 dark:text-slate-400" data-testid="card-chart-history-gap-note">
         <!--
           §78.5 — the AMOUNT and the COUNT are two claims about two different
           windows, so they never share a sentence.
@@ -538,6 +547,9 @@ async function exportPositions(format: "csv" | "xml" | "json") {
         -->
         <template v-if="unpricedAmountLabel">
           {{ unpricedAmountLabel }} of this chart is missing &mdash; those points are partial. Today's value is complete.
+        </template>
+        <template v-else-if="carriedDays">
+          {{ carriedDays }} day{{ carriedDays === 1 ? " was" : "s were" }} priced from a carried-forward close rather than a real price. Today's value is complete.
         </template>
         <template v-else>
           {{ historyChartGap.length }} earlier position{{ historyChartGap.length === 1 ? "" : "s" }} had no price history &mdash; those chart points are partial. Today's value is complete.
