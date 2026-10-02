@@ -48,6 +48,20 @@ export async function getPortfolioPositions(id: string, labelIds?: string[]): Pr
   return http.get<PortfolioPositions>(`/api/portfolios/${id}/positions${labels}`)
 }
 
+/**
+ * §83.5 — every OPEN position across every portfolio, each carrying
+ * `portfolioName`. For the cumulative Performance tab's performer cards, which
+ * must say which portfolio a row came from: one ticker can be held in two
+ * portfolios with very different results.
+ *
+ * Not `getHeldStocks`, which aggregates by symbol across portfolios and so
+ * cannot answer that question.
+ */
+export async function getAllPositions(): Promise<PortfolioPositions> {
+  const { positions } = await http.get<{ positions: PortfolioPositions }>("/api/portfolios/positions")
+  return positions
+}
+
 export interface CreatePortfolioPositionInput {
   symbol: string
   quantity: number

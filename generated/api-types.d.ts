@@ -1020,6 +1020,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portfolios/positions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Open positions across all portfolios
+         * @description Every OPEN position the identity holds, across every one of its portfolios, each carrying `portfolioName`.
+         *     Distinct from `/portfolios/held-stocks`, which aggregates BY SYMBOL and so cannot answer "which portfolio is this row from" — the question the cumulative Performance tab's performer cards exist to answer, since the same ticker can be held in two portfolios with very different results. Unlike `/portfolios/{id}/positions` it needs no id, and it deliberately returns no portfolio-specific derived state.
+         *     `portfolioName` is null on the per-portfolio route, which keeps satisfying the same `Position` schema unchanged.
+         */
+        get: operations["getAllPositions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portfolios/shares": {
         parameters: {
             query?: never;
@@ -3209,6 +3231,7 @@ export interface components {
                 [key: string]: unknown;
             };
             displayCurrency: string;
+            portfolioName?: string | null;
             logo?: string | null;
             labels?: components["schemas"]["Label"][];
         };
@@ -5431,6 +5454,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HeldStocks"];
+                };
+            };
+        };
+    };
+    getAllPositions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Positions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        positions?: components["schemas"]["Position"][];
+                    };
                 };
             };
         };

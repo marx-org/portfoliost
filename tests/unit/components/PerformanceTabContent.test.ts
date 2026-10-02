@@ -134,6 +134,44 @@ describe("PerformanceTabContent — §83.1 prop-driven tab body", () => {
     expect(wrapper.emitted("update:timeframe")).toEqual([["ALL"]])
   })
 
+  it("labels each performer row with its portfolio, and omits the line when null", async () => {
+    // §83.5 — the reason the aggregate tab needs its own positions call: the same
+    // ticker can sit in two portfolios with very different results, and a card
+    // that does not say which one is answering half the question.
+    const pos = (over: Record<string, unknown>) =>
+      ({
+        id: "p1",
+        symbol: "AAPL",
+        companyName: "Apple",
+        assetType: "STOCK",
+        instrumentCurrency: "USD",
+        isOpen: true,
+        unrealizedGainLoss: 100,
+        percentageChange: 10,
+        country: "US",
+        ...over,
+      }) as never
+
+    const labelled = await mountContent({
+      positions: [
+        pos({ id: "a", symbol: "AAPL", portfolioName: "Broker" }),
+        pos({ id: "b", symbol: "AAPL", portfolioName: "Pension", unrealizedGainLoss: 250 }),
+      ] as never,
+    })
+    expect(labelled.find('[data-testid="perf-performer-portfolio-a"]').text()).toBe("Broker")
+    expect(labelled.find('[data-testid="perf-performer-portfolio-b"]').text()).toBe("Pension")
+    // Both rows are in the Top card, i.e. the list spans portfolios rather than
+    // deduplicating by ticker. (Scoped to the first `ul`: with only two positions
+    // the Top and Bottom cards legitimately show the same two, which is existing
+    // behaviour and not what this test is about.)
+    expect(labelled.findAll("ul")[0].findAll('[data-testid^="perf-performer-portfolio-"]')).toHaveLength(2)
+
+    // The per-portfolio route sends `portfolioName: null` (or omits it), and the
+    // line must disappear rather than render an empty row of text.
+    const bare = await mountContent({ positions: [pos({ id: "a", portfolioName: null })] as never })
+    expect(bare.find('[data-testid="perf-performer-portfolio-a"]').exists()).toBe(false)
+  })
+
   it("prefixes every testid only when a prefix is passed", async () => {
     // The per-portfolio mount must keep its ids byte-identical — three existing
     // specs select on them.

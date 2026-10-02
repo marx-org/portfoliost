@@ -672,15 +672,24 @@ function convertedPnl(p: PortfolioPositions[number]): number | null {
         <h2 class="mb-3 text-base font-semibold">Top Performers</h2>
         <p v-if="!performers.top.length" class="text-sm text-slate-500 dark:text-slate-400">No open positions.</p>
         <ul v-else class="divide-y divide-slate-100 dark:divide-slate-800">
-          <li v-for="p in performers.top" :key="p.id" class="flex items-center justify-between py-2 text-sm">
-            <TickerBadge
-              size="sm"
-              :symbol="p.symbol"
-              :name="p.companyName"
-              :country-code="p.country"
-              :asset-type="p.assetType"
-            />
-            <div class="text-right">
+          <li v-for="p in performers.top" :key="p.id" class="flex items-center justify-between gap-3 py-2 text-sm">
+            <div class="min-w-0">
+              <TickerBadge
+                size="sm"
+                :symbol="p.symbol"
+                :name="p.companyName"
+                :country-code="p.country"
+                :asset-type="p.assetType"
+              />
+              <!-- §83.5 — which portfolio this row came from. Omitted when null,
+                   so the per-portfolio tab (whose whole page is that portfolio)
+                   renders exactly what it always did. On the aggregate it is the
+                   answer to "I hold this in two places — which one is this?" -->
+              <p v-if="p.portfolioName" class="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400" :data-testid="tid(`perf-performer-portfolio-${p.id}`)">
+                {{ p.portfolioName }}
+              </p>
+            </div>
+            <div class="shrink-0 text-right">
               <p class="font-medium tabular-nums" :class="gainClass(p.unrealizedGainLoss)">{{ formatSignedCurrency(p.unrealizedGainLoss, p.instrumentCurrency) }}</p>
               <p class="text-xs tabular-nums" :class="gainClass(p.percentageChange)">
                 <span v-if="convertedPnl(p) != null" class="opacity-70">{{ formatSignedCurrency(convertedPnl(p), displayCurrency) }}&nbsp;</span>
@@ -695,15 +704,20 @@ function convertedPnl(p: PortfolioPositions[number]): number | null {
         <h2 class="mb-3 text-base font-semibold">Bottom Performers</h2>
         <p v-if="!performers.bottom.length" class="text-sm text-slate-500 dark:text-slate-400">No open positions.</p>
         <ul v-else class="divide-y divide-slate-100 dark:divide-slate-800">
-          <li v-for="p in performers.bottom" :key="p.id" class="flex items-center justify-between py-2 text-sm">
-            <TickerBadge
-              size="sm"
-              :symbol="p.symbol"
-              :name="p.companyName"
-              :country-code="p.country"
-              :asset-type="p.assetType"
-            />
-            <div class="text-right">
+          <li v-for="p in performers.bottom" :key="p.id" class="flex items-center justify-between gap-3 py-2 text-sm">
+            <div class="min-w-0">
+              <TickerBadge
+                size="sm"
+                :symbol="p.symbol"
+                :name="p.companyName"
+                :country-code="p.country"
+                :asset-type="p.assetType"
+              />
+              <p v-if="p.portfolioName" class="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400" :data-testid="tid(`perf-performer-portfolio-${p.id}`)">
+                {{ p.portfolioName }}
+              </p>
+            </div>
+            <div class="shrink-0 text-right">
               <p class="font-medium tabular-nums" :class="gainClass(p.unrealizedGainLoss)">{{ formatSignedCurrency(p.unrealizedGainLoss, p.instrumentCurrency) }}</p>
               <p class="text-xs tabular-nums" :class="gainClass(p.percentageChange)">
                 <span v-if="convertedPnl(p) != null" class="opacity-70">{{ formatSignedCurrency(convertedPnl(p), displayCurrency) }}&nbsp;</span>
