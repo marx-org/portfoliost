@@ -4,6 +4,7 @@ import { useRoute } from "vue-router"
 import { getInstrumentFundamentals } from "@/api/instruments"
 import type { components } from "@/api/types"
 import { formatCompact } from "@/utils/format"
+import { formatFundamentalsCell as cell } from "./fundamentalsFormat"
 
 const route = useRoute()
 const symbol = String(route.params.symbol).toUpperCase()
@@ -40,19 +41,6 @@ const trendChartOptions = computed(() => ({
   yaxis: { labels: { formatter: (v: number) => formatCompact(v) } },
 }))
 
-function cell(row: Record<string, unknown>, key: string): string {
-  const v = row[key]
-  if (v === null || v === undefined) return "—"
-  if (typeof v === "number") {
-    if (key.toLowerCase().includes("growth") || key === "netIncomeMargin" || key === "debtEquityRatio" || key === "freeCashFlowPerShare") {
-      return `${v.toFixed(1)}%`
-    }
-    if (Math.abs(v) >= 1e6) return formatCompact(v)
-    if (Math.abs(v) >= 1000) return v.toLocaleString("en-US", { maximumFractionDigits: 0 })
-    return v.toFixed(2)
-  }
-  return String(v)
-}
 </script>
 
 <template>
