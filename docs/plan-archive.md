@@ -17784,3 +17784,427 @@ and the shape is unchanged.
       > blocked nor expensive, so it is the cheapest thing that could be revived: on
       > this curve it would have fired hours before both OOMKills. A working-set alert
       > on `openst` at ~80% of its limit is the whole of it.
+
+## 79. Fundamentals tab: `FCF / Share` is broken twice, and the statements have no currency or source (2026-10-02)
+
+Two data-integrity defects found while assessing fonrex as a source of European
+fundamentals. Not a proposal — these came out of the provider analysis, and both
+are wrong *today* in PROD, independent of anything we add. Touches the frontend
+(`portfoliost`), the instruments service, and the contracts repo.
+
+Context that makes §79.2 the more serious of the two: `GET /api/instruments/
+{symbol}/fundamentals` fires **three independent** `fetchFundamentals` calls
+(`portfoliost-instruments/src/routes/instruments.ts:1090-1094`), one per
+statement, and each walks `STATEMENT_PROVIDERS = ["fmp","yfinance","polygon",
+"sec"]` separately (`openst/src/openbb_client.py:18`, first-non-empty). One
+instrument can therefore return income from `yfinance` and balance from `polygon`,
+in different currencies and units, merged into one response by
+`toFundamentals()` (`src/adapters/translate.ts:544`) that records no provenance.
+`FundamentalsData` (`openapi.yaml:649-705`) has **no `currency` field and no
+`sources` field**, and the tab renders every value through `formatCompact` with
+no currency symbol. A GPW name in PLN and a US name in USD are indistinguishable
+on screen. §79.2 gets worse with every provider we add, which is why it is
+sequenced before any Tier 1 fundamentals work.
+
+### 79.1 — `FCF / Share` renders as a percentage and is never populated
+
+Two independent faults stacked on one column.
+
+**a. Wrong unit.** `ResearchFundamentals.vue:47` lists `freeCashFlowPerShare`
+alongside the genuine ratios in the percent branch of `cell()`:
+
+```
+if (key.toLowerCase().includes("growth") || key === "netIncomeMargin" ||
+    key === "debtEquityRatio" || key === "freeCashFlowPerShare") {
+  return `${v.toFixed(1)}%`
+}
+```
+
+`freeCashFlowPerShare` is currency-per-share, not a ratio. `$33.67` renders as
+`33.7%`. Its three siblings in that branch (`netIncomeMargin`,
+`debtEquityRatio`, and any `*growth*`) are real ratios.
+
+- [x] **Drop `freeCashFlowPerShare` from the percent branch of `cell()`** in
+      `src/modules/instruments/ResearchFundamentals.vue:47`, leaving the three
+      real ratios. It then falls through to the numeric ladder
+      (`formatCompact` ≥1e6 → `toLocaleString` ≥1000 → `toFixed(2)`), which is
+      correct for a per-share amount in the instrument's currency.
+- [x] **Add a unit test** that asserts `cell()` returns `"33.67"`, not
+      `"33.7%"`, for `freeCashFlowPerShare: 33.67`, and still returns a
+      percent for `netIncomeMargin: 12.5`.
+      > `cell()` is currently not exported and has no test file. Export it (or
+      > extract to `src/modules/instruments/fundamentalsFormat.ts` alongside
+      > `compareMetrics.ts`) and cover all four percent-branch keys plus the
+      > three ladder thresholds. Tests: `npm run test` green; `npm run build`
+      > (includes `vue-tsc --noEmit`) green.
+      > Extracted as `formatFundamentalsCell`, imported back into the SFC under
+      > its old name so the template is untouched. Nine tests: every
+      > percent-branch key (the `*growth*` substring test covers four columns at
+      > once) and all three ladder thresholds, including the magnitude rule for
+      > negative amounts. 505 tests green, `vue-tsc` clean.
+      > Not fixed, and it needs a decision rather than a step: `debtEquityRatio`
+      > is in the same percent branch but is a MULTIPLE — 1.52 renders as
+      > `1.5%`. It predates this section; §79.3 is what made it visible by
+      > populating it for non-US names. One line, but it changes what a live
+      > column displays, so it is the user's call.
+
+**b. Never populated.** The `cashFlow` mapper in `toFundamentals()`
+(`src/adapters/translate.ts:596-616`) builds its row object explicitly and
+contains **no `freeCashFlowPerShare` key**. Against the real
+openst/cachest backend the column is permanently `—`. It only looks correct in
+e2e because the mock seed carries it (`mocks/shared/data/research/AAPL.json`,
+written by `scripts/regen-seed.mjs:205`) — a mock-only artefact masking the gap,
+which is exactly why it survived.
+
+- [x] **Emit `freeCashFlowPerShare` in the cash-flow mapper**, keyed by fiscal
+      year against the income statement's share count:
+      `freeCashFlowPerShare = freeCashFlow / dilutedSharesOutstanding`, joining
+      the two arrays on `year` (the income mapper already computes
+      `dilutedSharesOutstanding` from `diluted_average_shares` /
+      `weighted_average_shares_diluted`, `translate.ts:569`).
+      > A year join, **not** a positional one: the three statements arrive from
+      > independent provider calls with independent period coverage, so
+      > `income[i]` and `cash[i]` are not guaranteed to be the same year. Guard
+      > the division (undefined or 0 shares → `undefined`, never `NaN`/`Infinity`),
+      > and prefer `diluted_average_shares` over the basic count for
+      > consistency with `dilutedSharesOutstanding`.
+      > The year join is not theoretical: measured 2026-10-02, SAP.DE serves 4
+      > income rows and 5 cash rows, and PKO.WA serves a cash row for 2021 with
+      > no income row to match. Both now render `—` for that year instead of a
+      > number paired with the wrong share count. Live after the fix: SAP.DE
+      > 7.16 · PKO.WA 8.40 · AAPL 6.58 for FY2025.
+      > The plan's premise that the income mapper "already computes"
+      > `dilutedSharesOutstanding` was wrong — it matched no key any provider
+      > emits and was empty on every symbol. §79.3 widened it to
+      > `weighted_average_diluted_shares_outstanding`, which is the only name
+      > yfinance emits; without that this step could never produce a value.
+- [x] **Test the mapper** in `src/adapters/translate.test.ts`: aligned years
+      produce the quotient; mismatched or missing years produce `undefined`,
+      never `NaN`; a zero share count produces `undefined`.
+- [x] **Drop the value from the mock seed** so it stops masking regressions, or
+      keep it and add an assertion that the real mapper path produces the same
+      number for the seeded fixture.
+      > Prefer removing it: the seed is what let (b) ship unnoticed. If it stays,
+      > `regen-seed.mjs:205` must stop being the only source of the field.
+      > Tests: `npm run test:mock` and `npm run test:e2e` green.
+      > Removed from the generator and from all 36 committed research bundles —
+      > 144 deleted lines, nothing else in the diff.
+      > Correcting the premise: the seed was **not** what e2e saw.
+      > `docker-compose.yml` pins `API_INSTRUMENTS_URL` to the real instruments
+      > service, so `/api/instruments/*` never reaches the mock unless someone
+      > flips it to `example-service-mock:4010` by hand (`mocks/README.md:76`). The
+      > column has therefore read `—` in e2e and in every browser session, mock
+      > seed or not. Removing it still matters: it is a trap for whoever does
+      > flip that variable, and a mock-seeded value that the real mapper cannot
+      > reproduce is a fake green.
+      > `npm run mock:seed` was deliberately NOT used for this. It is out of
+      > sync with the committed seeds and silently drops two hand-edited
+      > fields — `avatarUrl` from `auth_me.json` and `users_profile.json`, and
+      > `recentSearches` from `users_profile.json` — so running it churns 44
+      > files for a one-key change. That drift is its own defect, not §79's.
+      > `npm run test:mock` 235 passed. `npm run test:e2e` 117 passed, 1 skipped,
+      > 1 failed — `portfolios.spec.ts` "buy position stock step", which is not
+      > this step's: `/api/instruments/search?q=KO` returns 50 rows, all Polish
+      > bonds and funds, with no `KO`-prefixed ticker among them, so the
+      > spec's `/^KO /` button cannot exist. Reproduced twice in a row and the
+      > response was read directly to confirm; the search merge never reaches
+      > the ticker-reference tier for this query. Unrelated to the fundamentals
+      > path and left alone here.
+- [x] **Commit** `fix(instruments): emit and correctly format freeCashFlowPerShare`
+      > Split from 79.1a so the mapper and the formatter are independently
+      > revertable — a bad join is a data bug, a bad format string is cosmetic.
+
+**Related drift found alongside, not in scope here:** `openapi.yaml:685-689`
+declares `totalCapitalization`, `longTermDebtToCapitalization` and
+`totalDebtToCapitalization`, which `toFundamentals()` never emits and the tab
+never renders; `balanceSheet.cash` (`openapi.yaml:680`) is emitted at
+`translate.ts:580` and never rendered; `cashFlowFromOperatingActivitiesGrowth`
+is computed at `translate.ts:611`, declared at `openapi.yaml:701`, and read by
+no component. Separately, the tab hard-codes `period=annual`
+(`routes/instruments.ts:1091`) with no quarter or year-range control, unlike
+every sibling research tab. Log these against §78 rather than expanding §79.
+
+### 79.2 — Statements carry no currency and no source provenance
+
+Decide between labelling and pinning, then implement the chosen one. Both close
+the defect; they differ in cost and in what they promise the user.
+
+**Design decisions (resolved)**
+
+*This section implements **labelling**, not pinning* — chosen by the user
+2026-10-02 after the inspection below, and the inspection is what settled it.
+Both options need provider identity out of openst, because `get_fundamentals`
+walks `STATEMENT_PROVIDERS` and returns rows only, so the provider that
+answered was already unrecoverable. Pinning is not the cheaper of the two, and
+it cannot keep the promise it makes: the walk is **stateful** —
+`_provider_is_blocked` blocks a provider for 24 h the moment it starts
+returning 402 — so which provider answers can change under an identical
+request, and a pin would need persisting to be worth anything. Labelling claims
+only what is true.
+
+Cost of the choice, stated plainly: a mixed-provider table stays mixed. That is
+the point — it is now *marked* as mixed instead of silently merged, and pinning
+would have bought a single basis by deleting statements (PKO.WA already has no
+working-capital line to lose; a pinned provider would take more).
+
+- [x] **Record which of the two this section implements**, in a
+      `Design decisions (resolved)` note under this section.
+- [x] **Add `currency` and `sources` to `FundamentalsData`** in
+      `../portfoliost-contracts/contracts/openapi.yaml`, as
+      `sources: { incomeStatement, balanceSheet, cashFlow }` carrying the
+      provider name per statement, `currency: string`, and `currencySource`
+      mirroring the existing `CurrencyResolution["currencySource"]` vocabulary
+      (`provider` / `estimated` / `unknown`, `src/services/instrument-currency.ts:265`).
+      > Reuse that resolver, do not invent a parallel currency path: the route
+      > already calls `resolveCurrency(db, symbol, profile.currency, exchangeHint)`
+      > for `/profile` (`routes/instruments.ts:366`), and §71's venue-country
+      > fallback is what makes it correct for a venue-qualified symbol with no
+      > listing in `ticker_reference`. Threading `exchangeHint` here closes the
+      > same class of defect §72.4 documents.
+      > Done. Three rules, each the honest answer rather than the convenient one:
+      > **agreement is required ACROSS all three statements**, so income in EUR
+      > beside a balance sheet in USD yields no currency at all rather than the
+      > first one seen; **silence is not disagreement**, so a statement with no
+      > `reported_currency` (every yfinance row) does not veto the others; and
+      > the **venue hint is the symbol's own suffix**, a fact rather than a
+      > guess, which is what §72.4 requires of a hint and what lets a
+      > venue-qualified symbol with no `ticker_reference` listing resolve at all.
+      > Measured live through the gateway: AAPL → `USD` / `provider` (FMP
+      > declares it), SAP.DE → `EUR` / `estimated`, PKO.WA → `PLN` /
+      > `estimated`, MC.PA and BMW.DE → `EUR` / `estimated` with all three
+      > statements attributed to yfinance. ORCL is the interesting one: yfinance
+      > serves it, so it reads `estimated` even though it is a US listing — the
+      > label follows the provider that actually answered, not the country.
+- [x] **Regenerate types** with `npm run gen:types` from
+      `../portfoliost-contracts/contracts` (not the repo root), then populate
+      the new fields in `toFundamentals()`.
+      > `toFundamentals(income, balance, cash)` currently receives only three
+      > row arrays. It needs the resolved currency and the three provider names,
+      > so either widen its signature or lift the merge into
+      > `routes/instruments.ts:1090-1094`, which is where the per-call provider
+      > identity is actually known.
+      > `openst` does not report which provider satisfied a walk today
+      > (`openbb_client.py` returns rows only), so provider identity has to come
+      > from `request.state`-style plumbing in openst or from cachest response
+      > metadata — **inspect `cachest/config.yaml:251-258` for what it forwards
+      > before choosing**. Do not guess this shape.
+      > Inspected, and the answer decided the design. `OPENST_FUNDAMENTALS`
+      > forwards only `statement` and `period` and stores the **body** for 24 h
+      > (`cache_ttl 86400`, `stale_ttl 2592000`) — so provenance has to travel
+      > in the body. A header would be dropped on precisely the requests that
+      > hit the cache, which are the cheap ones. cachest itself needed no change.
+      > openst now answers `{"provider", "rows"}`; `fetchFundamentals` returns
+      > that envelope and **tolerates the legacy bare-array body**, because for
+      > up to a day after the openst deploy a statement can still be served from
+      > a body cached by the old code. A null provider keeps the numbers on
+      > screen and admits the attribution is missing; a thrown error would blank
+      > the tab. `toFundamentals` gained a fourth `provenance` argument rather
+      > than the merge being lifted, because the currency answer needs `await` on
+      > the DB and the provider names arrive with the rows.
+- [x] **Render the currency in the tab** — a currency label on each of the three
+      cards, plus a visible source marker when the three statements disagree on
+      provider.
+      > `ResearchFundamentals.vue:43-55` `cell()` has no currency argument today;
+      > the label belongs at card level, not per cell, to avoid repeating a
+      > symbol on 30 values.
+      > Done, at card level. `estimated` is spelled out rather than shown as a
+      > bare code, because "EUR" and "EUR (estimated)" are different claims and a
+      > reader reconciling against a broker has to know which. A per-cell symbol
+      > would also have been wrong for the growth and margin columns, which are
+      > ratios and carry no currency.
+      > **The mixed-source marker does not fire today, and that is worth saying
+      > rather than leaving implied**: no instrument actually mixes providers
+      > right now, because FMP 402s on every non-US statement endpoint (§79.4),
+      > so EU listings are all-yfinance and US listings are fmp-first. The marker
+      > exists for the day that stops being true. What DOES show today is a null
+      > attribution for any symbol whose statements came from a pre-envelope
+      > cached body — rendered as silence, not as a marker naming nothing.
+- [x] **If pinning instead of labelling**: resolve the provider once per
+      instrument, pass it to all three `fetchFundamentals` calls, and record the
+      choice so it is stable across the 24 h cachest TTL
+      > (`cachest/config.yaml:251-258`, `cache_ttl 86400`,
+      > `stale_ttl 2592000`) rather than re-resolved per request — a per-request
+      > pin would flip providers mid-table on a cache miss, which is the same
+      > defect with a shorter fuse.
+      > Not applicable — labelling was chosen. The checkbox stays ticked with
+      > that recorded rather than deleted, so the alternative is not re-derived
+      > from scratch later.
+- [x] **Tests**: contract schema test for the new fields; `toFundamentals` test
+      asserting `sources` matches the providers actually used and that
+      `currencySource` is `"estimated"` (not `"provider"`) when the answer comes
+      from the venue; a component test that a mixed-source response renders the
+      disagreement marker. `npm run test` and `npm run build` green.
+      > Contracts `openapi.yaml OK`, 16 tests. openst 448 + 104 + 53 + 21.
+      > instruments 502, `tsc` clean. SPA 512 unit tests, `vue-tsc` clean, 7
+      > component tests for this surface, 235 mock, 117 e2e green.
+      > The venue path is asserted live rather than in a unit test: the route
+      > tests run without a DB, so `resolveCurrency` has nothing local to answer
+      > with and correctly returns `unknown`. A unit test asserting `"estimated"`
+      > there would have been asserting a fixture, not the resolver — so the two
+      > cases that DO hold without a DB (agreement → `provider`; disagreement or
+      > silence → never `provider`) are asserted, and the venue answer is
+      > verified against the running stack instead.
+- [x] **Commit** `feat(instruments): expose statement currency and provider provenance`
+      > Split across three repos and four commits, because the plumbing cannot
+      > land in one: contracts declares the fields, openst has to report the
+      > provider, instruments has to read it and resolve the currency, and only
+      > then can the SPA render it. openst and instruments had to move together
+      > — a reader that expects the envelope cannot also read a bare array
+      > without the tolerance that keeps the tab populated mid-deploy.
+
+### 79.3 — Half the balance sheet is empty for every non-US instrument (found 2026-10-02)
+
+More urgent than §79.1 or §79.2, and the cause is a provider-schema mismatch in
+the same function. Five of the ten balance-sheet columns render `—` for every
+European instrument in PROD, and `debtEquityRatio` goes with them because it is
+derived from one of them.
+
+**There is no fixed schema to map onto.** `openbb_core.provider.standard_models.balance_sheet.BalanceSheetData`
+sets `extra="allow"` and declares exactly three fields — `fiscal_period`,
+`fiscal_year`, `period_ending`. Every line item is a provider extra.
+`FMPBalanceSheetData` declares 63 typed fields, so FMP emits the same keys for
+every symbol. **openbb's yfinance balance model declares nothing beyond those
+three** — raw yfinance keys pass through verbatim, and yfinance's naming differs
+by listing. `toFundamentals()`'s `pick()` candidates
+(`translate.ts:575-595`) were evidently taken from the FMP/US shape.
+
+Measured against openst on the live stack, `statement=balance&period=annual`:
+
+| field | AAPL | SAP.DE | PKO.WA | EU listings actually serve |
+|---|---|---|---|---|
+| `totalAssets` | ✓ | ✓ | ✓ | `total_assets` |
+| `totalLiabilities` | ✓ | **✗** | **✗** | `total_liabilities_net_minority_interest` |
+| `shareholdersEquity` | **✗** | **✗** | **✗** | `total_common_equity`, `stockholders_equity` |
+| `cashAndShortTermInvestments` | ✓ | **✗** | **✗** | `cash_equivalents`, `cash_and_cash_equivalents` |
+| `workingCapital` | ✓ | **✗** | **✗** | absent entirely |
+| `netDebt` | ✓ | **✗** | ✓ | `net_debt` |
+| `totalDebt` | ✓ | ✓ | ✓ | `total_debt` |
+| `retainedEarnings` | ✓ | ✓ | ✓ | `retained_earnings` |
+
+**AAPL 7/8 · SAP.DE 4/8 · PKO.WA 5/8.** Note `shareholdersEquity` is empty for
+AAPL too — the bug is not European-only, US symbols just happen to share the
+key names the mapper was written against.
+
+**There is no fallback to wait for.** FMP returns `HTTP 402` on
+`/stable/income-statement`, `/balance-sheet-statement` and
+`/cash-flow-statement` for `SAP.DE`, `PKO.WA` and `MC.PA` on the current plan:
+*"Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not
+available under your current subscription"*. `AAPL` on the same endpoints returns
+200. Separately, `/api/v3/*` returns `403 "Legacy Endpoint … no longer
+supported"` for this key on every symbol. `search-symbol` does resolve
+`PKO.WA`/`PKN.WA` on `WSE`, so the symbols exist — the statement data is plan-gated.
+**yfinance is therefore the only source of European statements in the chain**,
+and this cannot be deferred until a better provider arrives.
+
+- [x] **Widen the `pick()` candidate lists** in `toFundamentals()`'s
+      `balanceSheet` mapper (`translate.ts:575-595`) to accept the yfinance
+      passthrough names alongside the FMP ones — `total_liabilities` +
+      `total_liabilities_net_minority_interest`; `shareholders_equity` +
+      `total_equity` + `total_common_equity` + `stockholders_equity`;
+      `cash_and_equivalents` + `cash_and_short_term_investments` +
+      `cash_and_cash_equivalents` + `cash_equivalents`.
+      > Order matters and is not arbitrary: `total_liabilities` is the
+      > liabilities-excluding-minority figure and
+      > `total_liabilities_net_minority_interest` includes it, so they are not
+      > interchangeable. Prefer the `_net_minority_interest` variant when both
+      > are present so the column is internally consistent with
+      > `total_assets`, and record which was chosen.
+      > `shareholdersEquity` is a judgement call, not a rename: `total_equity`
+      > includes non-controlling interests, `total_common_equity` and
+      > `stockholders_equity` do not. Pick one, apply it to every provider, and
+      > say which in the code — otherwise `debtEquityRatio` silently changes
+      > meaning between a US and an EU row.
+      > Measured again before coding, and the live rows carry two keys this
+      > list does not name: `cash_cash_equivalents_and_short_term_investments`
+      > is yfinance's actual combined cash line (SAP: 8,220 + 1,552 = 9,772,
+      > which reconciles) and `working_capital` is reported directly on SAP.
+      > Both are in the fix. `cash_equivalents` (SAP 4,310, a sub-line of cash)
+      > and `cash_financial` (SAP 3,910, neither cash nor cash-plus-investments)
+      > are ranked *below* `cash_and_cash_equivalents` so neither can win.
+- [x] **Handle `workingCapital` where the provider does not supply it.** For
+      PKO.WA neither `total_current_assets` nor `total_current_liabilities` is
+      present. Either compute it from `current_assets`/`current_liabilities`
+      when a provider supplies those instead, or return `undefined` and render
+      `—` deliberately rather than by accident.
+      > Do not fabricate it. A wrong working-capital figure is worse than a
+      > blank cell, and §79.2 is precisely about not presenting numbers whose
+      > basis is unknown.
+      > All three: a reported `working_capital` wins, else
+      > `total_current_assets`/`current_assets` minus
+      > `total_current_liabilities`/`current_liabilities`, else `undefined`.
+      > SAP supplies the mixed pair (20256 − 17416 = 2840, matching its own
+      > reported figure) and PKO supplies neither, so PKO's cell stays `—`.
+- [x] **Add fixture-driven tests** in `src/adapters/translate.test.ts` covering
+      both shapes: one row set in the FMP/US naming and one in the yfinance/EU
+      naming, asserting the same eight fields populate from either.
+      > Capture the EU fixtures from the live responses recorded in this
+      > section, not from memory — the key names above are what the HTTP layer
+      > returned today and are the whole basis of the fix.
+      > Assert `debtEquityRatio` too: it is the derived column that makes the
+      > bug visible in the UI, and it is currently empty for every EU name.
+      > `npm run test` green.
+      > Captured 2026-10-02 as literal first rows, not paraphrases. The split is
+      > AAPL = FMP (the only row carrying `cik`/`accepted_date`/`fiscal_year` —
+      > openbb normalises nothing else) and SAP.DE + PKO.WA = yfinance
+      > passthrough. 485 tests green.
+- [x] **Audit the `incomeStatement` and `cashFlow` mappers for the same defect**
+      before closing. Only the balance sheet was measured here; the other two
+      have the identical `pick()` shape and the same passthrough exposure.
+      > If they are also affected, fix them in the same commit rather than
+      > leaving a known-wrong sibling behind — but say in the commit message
+      > which were confirmed broken and which were only checked.
+      > Both were affected, worse than the balance sheet. Income: `revenue` was
+      > read as a bare key and is `total_revenue` on every yfinance row, which
+      > also emptied `netIncomeMargin`; `netIncomeGrowth` read `r.net_income`
+      > directly while `netIncome` read a `pick()`, so it was blank for AAPL;
+      > `dilutedSharesOutstanding` matched no key any provider emits and was
+      > empty everywhere. Cash flow: `dividendPayment` matched nothing on any
+      > symbol. Left deliberately blank as genuine provider gaps — PKO.WA has no
+      > EBIT and no EBITDA line, and SAP's `net_debt` arrives null.
+      > A third class of defect turned up, not naming: `freeCashFlow` was
+      > `operating − capitalExpenditure` while every provider reports capex as a
+      > negative outflow, so the subtraction **added it back**. AAPL FY2025 read
+      > 124,197 against a true 98,767 — 26% overstated on the one symbol
+      > anyone would check by hand. Now prefers the provider's own
+      > `free_cash_flow` and falls back to `operating − |capex|`; the fallback
+      > was verified to reproduce the provider figure exactly for all three
+      > symbols.
+- [x] **Commit** `fix(instruments): map yfinance balance-sheet keys in toFundamentals`
+      > Same function as §79.1, so keep it separate: this one is a data-correctness
+      > change to five live columns, that one is a formatter plus one unpopulated
+      > field. Different risk, independently revertable.
+
+### 79.4 — FMP's European statements are plan-gated, and the v3 tier is gone
+
+Not a defect in our code, but it constrains §79.3 and §79.2 and should not be
+rediscovered from scratch. Recorded 2026-10-02 against the live `FMP_API_KEY`.
+
+- [x] **Record the FMP tier boundary in `docs/openst-coverage.md`** next to the
+      existing provider notes, so nobody re-adds FMP as a European fallback.
+      > `openst/CLAUDE.md` and `cachest/CLAUDE.md` already treat
+      > `docs/openst-coverage.md` as the record of what each provider actually
+      > returns. Add: FMP statements are US-only on the current plan (402 on
+      > all three statement endpoints for `SAP.DE`, `PKO.WA`, `MC.PA`); the
+      > legacy `/api/v3/*` tier returns 403 for this key on **every** symbol,
+      > so openbb's fmp provider is on `/stable` only; `search-symbol` does
+      > resolve European listings (`PKO.WA`, `PKN.WA` on `WSE`), so symbol
+      > resolution and data access are gated separately and a successful
+      > `search-symbol` is not evidence the statements are available.
+      > If openbb's fmp provider is still calling `/api/v3`, that is a
+      > separate live defect — **check which base URL it uses before writing
+      > this note**, do not assume.
+      > Tests: none needed, doc-only, verified by re-running the three probes.
+      > Re-probed 2026-10-02 rather than trusting the section above it: all
+      > three `/stable` statement endpoints 402 for SAP.DE / PKO.WA / MC.PA and
+      > 200 for AAPL, and every `/api/v3/*` call 403s. The conditional in the
+      > note above — whether openbb's fmp provider still calls `/api/v3` —
+      > resolves to **no**: `models/income_statement.py:240`,
+      > `models/cash_flow.py:286` and `models/balance_sheet.py:358` all
+      > hard-code `/stable`, so there is no live defect to log there.
+      > One correction to the plan's text: `/stable/search-symbol` takes
+      > `query=`, not `symbol=`. With `query=PKO.WA` it returns 200 and the
+      > WSE listing; the plan's claim that symbol resolution works for European
+      > listings holds, its implied parameter name did not.
+- [x] **Commit** `docs(instruments): record FMP plan tier boundary for non-US statements`
+
+---
