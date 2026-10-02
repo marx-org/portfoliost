@@ -1,7 +1,11 @@
 import { flushPromises, mount } from "@vue/test-utils"
 import { createPinia, setActivePinia } from "pinia"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import PortfolioPerformanceTab, { yearlyReturns, yearlyTotals } from "@/modules/portfolios/PortfolioPerformanceTab.vue"
+import PortfolioPerformanceTab, {
+  benchmarkYearlyReturns,
+  yearlyReturns,
+  yearlyTotals,
+} from "@/modules/portfolios/PortfolioPerformanceTab.vue"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
 import * as portfoliosApi from "@/api/portfolios"
@@ -487,5 +491,153 @@ describe("PortfolioPerformanceTab — §82.3 Monthly | Yearly toggle", () => {
     await wrapper.get('[data-testid="perf-returns-mode-yearly"]').trigger("click")
     await flushPromises()
     expect(mocked.getPortfolioAnalytics).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * §82.4 / D89 — a benchmark mirroring the portfolio's years. `value` is the
+ * route's normalised index (starts at 100), so it IS the benchmark's TWR.
+ * Chosen so every year's excess is hand-computable from the portfolio's own
+ * percentages in `WORKED`: +20 / +12 / +9 / +3 % → +4.1 / +6.2 / +2.4 / +1.3 pp.
+ */
+const BENCH_STRONG = [
+  { date: "2023-01-01", value: 100 },
+  { date: "2023-12-31", value: 140 },
+  { date: "2024-12-31", value: 168 },
+  { date: "2025-12-31", value: 201.6 },
+  { date: "2026-09-30", value: 207.6 },
+]
+const BENCH = [
+  { date: "2023-01-01", value: 100 },
+  { date: "2023-12-31", value: 120 },  // +20% exactly
+  { date: "2024-12-31", value: 144 },  // +20% exactly
+  { date: "2025-12-31", value: 180 },  // +25% exactly
+  { date: "2026-09-30", value: 189 },  // +5% exactly
+]
+
+describe("benchmarkYearlyReturns (§82.4 / D89)", () => {
+  it("reads the benchmark's own index year by year", () => {
+    const rows = benchmarkYearlyReturns(BENCH, TODAY)
+    expect(rows.map((r) => r.year)).toEqual([2023, 2024, 2025, 2026])
+    rows.forEach((r, i) => expect(r.twrPercent).toBeCloseTo([20, 20, 25, 5][i], 9))
+  })
+
+  it("ignores gain — the benchmark series has no invested line to difference", () => {
+    // The shared walk computes a `gain` from `value − invested`; on a benchmark
+    // `invested` is absent, so that number is meaningless and nothing reads it.
+    const first = benchmarkYearlyReturns(BENCH, TODAY)[0]
+    expect(Object.keys(first).sort()).toEqual(["twrPercent", "year"])
+    expect(first.year).toBe(2023)
+    expect(first.twrPercent).toBeCloseTo(20, 10)
+  })
+
+  it("returns nothing for an empty benchmark series", () => {
+    expect(benchmarkYearlyReturns([], TODAY)).toEqual([])
+  })
+})
+
+describe("PortfolioPerformanceTab — §82.4 excess column", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocked.getPortfolioRiskMetrics.mockResolvedValue({ maxDrawdown: -0.1 } as never)
+    mocked.getPortfolioAnalytics.mockResolvedValue(analytics() as never)
+    mockedRate.mockResolvedValue({ rate: 1, asOf: "2026-10-02" } as never)
+  })
+
+  async function mountWithBenchmarks(benchmarks: Array<Record<string, unknown>>) {
+    const env = makeEnv("USD")
+    const store = usePortfolioStore()
+    store.analyticsTimeframe = "ALL"
+    store.analytics = {
+      ...analytics(),
+      timeframe: "ALL",
+      benchmarks,
+      performance: { ...analytics().performance, timeSeries: WORKED, totalReturn: 13240 },
+    } as never
+    const wrapper = await mountTab(env)
+    await wrapper.get('[data-testid="perf-returns-mode-yearly"]').trigger("click")
+    return wrapper
+  }
+
+  const spy = () => [{ symbol: "SPY", name: "S&P 500", timeSeries: BENCH, returnPercent: 50.9 }]
+
+  it("adds the column, headed with the benchmark's symbol", async () => {
+    const wrapper = await mountWithBenchmarks(spy())
+    expect(wrapper.get('[data-testid="perf-returns-yearly-excess-header"]').text()).toBe("vs SPY")
+  })
+
+  it("shows portfolio year TWR − benchmark year TWR per year", async () => {
+    const wrapper = await mountWithBenchmarks(spy())
+    // Portfolio 24.100 / 18.203 / 11.398 / 4.302 % minus the benchmark's exact
+    // 20 / 20 / 25 / 5 % — the stored 2 dp index, differenced, then subtracted.
+    // Hand-computed from the fixture, so a change in either derivation lands here.
+    expect(wrapper.get('[data-testid="perf-returns-yearly-excess-2023"]').text()).toBe("+4.10%")
+    expect(wrapper.get('[data-testid="perf-returns-yearly-excess-2024"]').text()).toBe("-1.80%")
+    expect(wrapper.get('[data-testid="perf-returns-yearly-excess-2025"]').text()).toBe("-13.60%")
+    expect(wrapper.get('[data-testid="perf-returns-yearly-excess-2026"]').text()).toBe("-0.70%")
+  })
+
+  it("renders a negative excess as negative", async () => {
+    // A UNIFORM scale-up would prove nothing: `value` is already normalised to
+    // 100, so multiplying every point by 1.5 leaves every yearly return identical.
+    // The benchmark has to be genuinely steeper, not merely bigger.
+    const lagging = [{ symbol: "QQQ", timeSeries: BENCH_STRONG }]
+    const wrapper = await mountWithBenchmarks(lagging)
+    expect(wrapper.get('[data-testid="perf-returns-yearly-excess-header"]').text()).toBe("vs QQQ")
+    // 24.100 − 40.0 = −15.90
+    expect(wrapper.get('[data-testid="perf-returns-yearly-excess-2023"]').text()).toBe("-15.90%")
+  })
+
+  it("uses the FIRST selected benchmark only", async () => {
+    const wrapper = await mountWithBenchmarks([
+      ...spy(),
+      { symbol: "QQQ", timeSeries: BENCH.map((p) => ({ date: p.date, value: p.value * 1.5 })) },
+    ])
+    expect(wrapper.get('[data-testid="perf-returns-yearly-excess-header"]').text()).toBe("vs SPY")
+    expect(wrapper.findAll('[data-testid^="perf-returns-yearly-excess-header"]')).toHaveLength(1)
+    expect(wrapper.get('[data-testid="perf-returns-yearly-excess-2023"]').text()).toBe("+4.10%")
+  })
+
+  it("says 'no total' rather than rendering a Σ that would look additive", async () => {
+    // Excess returns compound but do not sum: 4.1 + 6.2 + 2.4 + 1.3 = +14.0 pp is
+    // not what the portfolio actually beat the benchmark by.
+    const wrapper = await mountWithBenchmarks(spy())
+    expect(wrapper.get('[data-testid="perf-returns-yearly-excess-total"]').text()).toBe("no total")
+    expect(wrapper.get('[data-testid="perf-returns-yearly-excess-total"]').text()).not.toContain("14")
+  })
+
+  it("omits the column entirely when no benchmark is selected", async () => {
+    const wrapper = await mountWithBenchmarks([])
+    expect(wrapper.find('[data-testid="perf-returns-yearly-excess-header"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="perf-returns-yearly-excess-2023"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="perf-returns-yearly-excess-total"]').exists()).toBe(false)
+    // …and the rest of the table is unaffected.
+    expect(wrapper.get('[data-testid="perf-returns-yearly-twr-2023"]').text()).toBe("+24.10%")
+    expect(wrapper.get('[data-testid="perf-returns-yearly-total-product"]').text()).toBe("× 1.7044")
+  })
+
+  it("renders — for a year the benchmark has no row, not 0.00%", async () => {
+    const partial = [{ symbol: "SPY", timeSeries: [BENCH[0], BENCH[1]] }] // 2023 only
+    const wrapper = await mountWithBenchmarks(partial)
+    expect(wrapper.get('[data-testid="perf-returns-yearly-excess-2023"]').text()).toBe("+4.10%")
+    expect(wrapper.get('[data-testid="perf-returns-yearly-excess-2024"]').text()).toBe("—")
+    expect(wrapper.get('[data-testid="perf-returns-yearly-excess-2024"]').text()).not.toContain("0.00%")
+  })
+
+  it("does not convert the excess column — a percentage is not money", async () => {
+    mockedRate.mockResolvedValue({ rate: 4, asOf: "2026-10-02" } as never)
+    const env = makeEnv("USD")
+    useDisplayCurrencyStore().setCurrency("PLN")
+    const store = usePortfolioStore()
+    store.analyticsTimeframe = "ALL"
+    store.analytics = {
+      ...analytics(),
+      timeframe: "ALL",
+      benchmarks: spy(),
+      performance: { ...analytics().performance, timeSeries: WORKED },
+    } as never
+    const wrapper = await mountTab(env)
+    await wrapper.get('[data-testid="perf-returns-mode-yearly"]').trigger("click")
+    expect(wrapper.get('[data-testid="perf-returns-yearly-excess-2023"]').text()).toBe("+4.10%")
   })
 })

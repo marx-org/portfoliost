@@ -29,8 +29,19 @@ interface SeriesPoint {
   cumulativeTwr?: number
 }
 
-/** One row per calendar year, in ascending order. */
-export function yearlyReturns(series: SeriesPoint[], today: Date): YearlyReturnRow[] {
+type Indexed = SeriesPoint & { date: string; index: number }
+
+/**
+ * The year-boundary walk both derivations share: pick each year's last point that
+ * carries a usable index, then difference it against the previous year's end (or
+ * the series' own first point, for the first year).
+ *
+ * `indexOf` is what differs between them — the portfolio's index is the stored
+ * flow-neutral `cumulative_twr`, the benchmark's is its normalised `value`. One
+ * walk, so the two can never pick different year boundaries, which is the only
+ * way a per-year excess number is wrong while both of its inputs look right.
+ */
+function yearRows(series: SeriesPoint[], today: Date, indexOf: (p: SeriesPoint) => unknown): YearlyReturnRow[] {
   const points = series
     .filter((p): p is SeriesPoint & { date: string } => typeof p.date === "string" && p.date.length >= 4)
     .sort((a, b) => a.date.localeCompare(b.date))
@@ -38,19 +49,19 @@ export function yearlyReturns(series: SeriesPoint[], today: Date): YearlyReturnR
   const net = (p: SeriesPoint) => (p.value ?? 0) - (p.invested ?? 0)
   const currentYear = today.getFullYear()
 
-  // Last point of each year that actually carries a TWR index. A row without one
-  // cannot be differenced, so its year is skipped rather than reported as 0% —
-  // 0.00% is a claim about the year, and an absent index supports no claim.
-  type YearEnd = SeriesPoint & { date: string; cumulativeTwr: number }
-  const yearEnd = new Map<number, YearEnd>()
+  // A year whose last point carries no index cannot be differenced, so it is
+  // skipped rather than reported as 0% — 0.00% is a claim about the year, and an
+  // absent index supports no claim.
+  const yearEnd = new Map<number, Indexed>()
   for (const p of points) {
-    if (typeof p.cumulativeTwr !== "number" || !Number.isFinite(p.cumulativeTwr)) continue
-    yearEnd.set(Number(p.date.slice(0, 4)), { ...p, cumulativeTwr: p.cumulativeTwr })
+    const index = indexOf(p)
+    if (typeof index !== "number" || !Number.isFinite(index)) continue
+    yearEnd.set(Number(p.date.slice(0, 4)), { ...p, index })
   }
 
   const first = points[0]
   const rows: YearlyReturnRow[] = []
-  let base: YearEnd | undefined = first && typeof first.cumulativeTwr === "number" ? { ...first, cumulativeTwr: first.cumulativeTwr } : undefined
+  let base: Indexed | undefined = first ? withIndex(first, indexOf) : undefined
 
   for (const year of [...yearEnd.keys()].sort((a, b) => a - b)) {
     const end = yearEnd.get(year)!
@@ -58,19 +69,42 @@ export function yearlyReturns(series: SeriesPoint[], today: Date): YearlyReturnR
     // base the series does not contain: a series starting mid-year reports a
     // partial year as a partial year.
     const from = base
-    if (!from || from.cumulativeTwr <= 0) {
+    if (!from || from.index <= 0) {
       base = end
       continue
     }
     rows.push({
       year,
-      twrPercent: (end.cumulativeTwr / from.cumulativeTwr - 1) * 100,
+      twrPercent: (end.index / from.index - 1) * 100,
       gain: net(end) - net(from),
       isYtd: year === currentYear,
     })
     base = end
   }
   return rows
+}
+
+function withIndex(p: SeriesPoint & { date: string }, indexOf: (p: SeriesPoint) => unknown): Indexed | undefined {
+  const index = indexOf(p)
+  return typeof index === "number" && Number.isFinite(index) ? { ...p, index } : undefined
+}
+
+/** One row per calendar year, in ascending order. */
+export function yearlyReturns(series: SeriesPoint[], today: Date): YearlyReturnRow[] {
+  return yearRows(series, today, (p) => p.cumulativeTwr)
+}
+
+/**
+ * §82.4 / D89 — the same walk over a benchmark's own series. `value` is already
+ * the transaction-mirrored index (normalised to 100 by the route), so it is the
+ * benchmark's TWR year by year; `gain` is not meaningful here and nothing reads
+ * it.
+ */
+export function benchmarkYearlyReturns(
+  series: SeriesPoint[],
+  today: Date,
+): Array<Pick<YearlyReturnRow, "year" | "twrPercent">> {
+  return yearRows(series, today, (p) => p.value).map(({ year, twrPercent }) => ({ year, twrPercent }))
 }
 
 /** The Σ footer. Deliberately a product for % and a sum for money. */
@@ -442,6 +476,29 @@ const yearlyTotalsRow = computed(() => yearlyTotals(yearlyRows.value))
 /** Gain column rides the same `convert()` as the Net gain tile, so the Σ footer
  *  and that tile are the same number on screen by construction. */
 const yearlyTotalsGain = computed(() => convert(yearlyTotalsRow.value.gain))
+
+// ---------------------------------------------------------------------------
+// §82.4 / D89 — excess per year against the FIRST selected benchmark
+// ---------------------------------------------------------------------------
+// Benchmarks are a list, so "excess vs all of them" is not a single number. One
+// column, for the first, is a deliberate cap.
+const firstBenchmark = computed(() => store.analytics?.benchmarks?.[0] ?? null)
+const benchmarkSymbol = computed(() => firstBenchmark.value?.symbol ?? null)
+
+const excessByYear = computed(() => {
+  const b = firstBenchmark.value
+  if (!b) return null
+  return new Map(
+    benchmarkYearlyReturns(b.timeSeries ?? [], new Date()).map((r) => [r.year, r.twrPercent]),
+  )
+})
+
+/** null = the benchmark holds no row for that year, which is not the same as 0%. */
+function excessPercent(row: YearlyReturnRow): number | null {
+  const bench = excessByYear.value
+  if (!bench || !bench.has(row.year)) return null
+  return row.twrPercent - bench.get(row.year)!
+}
 </script>
 
 <template>
@@ -583,7 +640,8 @@ const yearlyTotalsGain = computed(() => convert(yearlyTotalsRow.value.gain))
             <tr class="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500 dark:border-slate-700 dark:text-slate-400">
               <th scope="col" class="py-2 pr-3 font-medium">Year</th>
               <th scope="col" class="py-2 pr-3 text-right font-medium">TWR %</th>
-              <th scope="col" class="py-2 text-right font-medium">Gain</th>
+              <th scope="col" :class="benchmarkSymbol ? 'py-2 pr-3' : 'py-2'" class="text-right font-medium">Gain</th>
+              <th v-if="benchmarkSymbol" scope="col" class="py-2 pl-3 text-right font-medium" data-testid="perf-returns-yearly-excess-header">vs {{ benchmarkSymbol }}</th>
             </tr>
           </thead>
           <tbody>
@@ -595,14 +653,16 @@ const yearlyTotalsGain = computed(() => convert(yearlyTotalsRow.value.gain))
             >
               <td class="py-2 pr-3 tabular-nums">{{ row.year }}<span v-if="row.isYtd" class="ml-1 text-xs text-slate-400 dark:text-slate-500">YTD</span></td>
               <td class="py-2 pr-3 text-right tabular-nums" :class="signClass(row.twrPercent)" :data-testid="`perf-returns-yearly-twr-${row.year}`">{{ formatPercent(row.twrPercent, 2, true) }}</td>
-              <td class="py-2 text-right tabular-nums" :class="signClass(row.gain)" :data-testid="`perf-returns-yearly-gain-${row.year}`">{{ formatSignedCurrency(convert(row.gain), chartCcy) }}</td>
+              <td :class="[benchmarkSymbol ? 'pr-3' : '', 'py-2 text-right tabular-nums', signClass(row.gain)]" :data-testid="`perf-returns-yearly-gain-${row.year}`">{{ formatSignedCurrency(convert(row.gain), chartCcy) }}</td>
+              <td v-if="benchmarkSymbol" class="py-2 pl-3 text-right tabular-nums" :class="signClass(excessPercent(row))" :data-testid="`perf-returns-yearly-excess-${row.year}`">{{ formatPercent(excessPercent(row), 2, true) }}</td>
             </tr>
           </tbody>
           <tfoot>
             <tr class="border-t-2 border-slate-200 dark:border-slate-700" data-testid="perf-returns-yearly-total">
               <td class="py-2 pr-3 font-medium">Σ</td>
               <td class="py-2 pr-3 text-right tabular-nums font-medium" data-testid="perf-returns-yearly-total-product">× {{ yearlyTotalsRow.compounded.toFixed(4) }}</td>
-              <td class="py-2 text-right tabular-nums font-medium" data-testid="perf-returns-yearly-total-gain">{{ formatSignedCurrency(yearlyTotalsGain, chartCcy) }}</td>
+              <td :class="benchmarkSymbol ? 'py-2 pr-3' : 'py-2'" class="text-right tabular-nums font-medium" data-testid="perf-returns-yearly-total-gain">{{ formatSignedCurrency(yearlyTotalsGain, chartCcy) }}</td>
+              <td v-if="benchmarkSymbol" class="py-2 pl-3 text-right text-xs text-slate-400 dark:text-slate-500" data-testid="perf-returns-yearly-excess-total">no total</td>
             </tr>
           </tfoot>
         </table>

@@ -377,20 +377,37 @@ The fourth column. `benchmarks[].timeSeries[]` already carries the
 transaction-mirrored series, so this is the same year-boundary ratio applied to
 the benchmark's own index.
 
-- [ ] **Compute excess per year** as `portfolio year TWR − benchmark year TWR` for
+- [x] **Compute excess per year** as `portfolio year TWR − benchmark year TWR` for
       the **first selected benchmark only**, and render the column header with
       that symbol (`vs SPY`). With no benchmark selected, omit the column
       entirely rather than rendering an empty one.
       > Benchmarks are a list, so "excess vs all of them" is not a single number.
       > One column for the first is a deliberate cap; widening it is a separate
       > decision.
-- [ ] **Render no total in that column** and say so — excess returns compound
+      > `benchmarkYearlyReturns()` reuses §82.3's year-boundary walk through a
+      > shared `yearRows()` core with an index accessor, rather than a second copy
+      > of the walk — two copies could pick different year boundaries, which is
+      > the only way a per-year excess is wrong while both of its inputs look
+      > right. The benchmark's index is its normalised `value`; the portfolio's is
+      > `cumulative_twr`. A year the benchmark has no row for renders `—`, not
+      > 0.00%.
+- [x] **Render no total in that column** and say so — excess returns compound
       but do not sum, and a Σ row that looked additive would be wrong.
-- [ ] **Tests**: component case with one benchmark selected asserting the column
+      > The cell reads "no total", not a blank and not a number.
+- [x] **Tests**: component case with one benchmark selected asserting the column
       appears with the right symbol and that the per-year excess matches a
       hand-computed fixture; and a no-benchmark case asserting the column is
       absent.
-- [ ] **Commit** `feat(spa): add per-year excess return against the benchmark`
+      > 11 new cases (44 in the file). Mutation-verified: using the LAST
+      > benchmark instead of the first fails the "first only" case, and reversing
+      > the subtraction fails 5. Two fixture corrections worth recording — a
+      > UNIFORM `× 1.5` on the benchmark proves nothing (`value` is already
+      > normalised to 100, so scaling every point leaves every yearly return
+      > identical), so the negative case needed a genuinely steeper path; and the
+      > benchmark's yearly values are now exact multiples so the hand-computed
+      > excesses are exact rather than tolerance-asserted.
+      > 577/577 SPA unit tests, `npm run build` (vue-tsc) green.
+- [x] **Commit** `feat(spa): add per-year excess return against the benchmark`
 
 ### 82.5 — Example service parity check and the full suite
 
