@@ -63,14 +63,22 @@ export const topologyNodes: TopologyNodeDef[] = [
   { id: "postgres", label: "PostgreSQL", area: "storage", rank: R.back, live: true },
   { id: "redis", label: "Redis", area: "storage", rank: R.back, live: true },
   // jobs
-  { id: "portfoliost-wallets-fxsync", label: "FX Sync", area: "jobs", rank: R.back, live: false },
-  { id: "portfoliost-instruments-tickersync", label: "Ticker Sync", area: "jobs", rank: R.back, live: false },
-  { id: "portfoliost-sheets-sync", label: "Sheets Sync", area: "jobs", rank: R.back, live: false },
-  { id: "stooq-downloader", label: "Stooq Downloader", area: "jobs", rank: R.back, live: false },
-  { id: "stooq-importer", label: "Stooq Importer", area: "jobs", rank: R.back, live: false },
-  { id: "jobshot", label: "Jobshot", area: "jobs", rank: R.back, live: false },
-  // Verified against pfire CronJobs, 2026-09-17. These populate the provider
-  // tier consumed by instruments; they are not instruments API deployments.
+  // Static data by design: kube-state-metrics exposes no "last run succeeded"
+  // signal for a CronJob, so `job` metadata below is what the manifest
+  // declares, not what the cluster observed. Resynced against the pfire
+  // CronJobs on 2026-10-02 (§80.3).
+  { id: "portfoliost-instruments-fxsync", label: "FX Sync", area: "jobs", rank: R.back, live: false, job: { schedule: "10 17 * * *", suspended: false, purpose: "Upserts FX rates into instruments' fx_rates table; wallets reads them through /api/internal/fx-rates (§48.6a)." } },
+  { id: "portfoliost-instruments-tickersync", label: "Ticker Sync", area: "jobs", rank: R.back, live: false, job: { schedule: "30 4 * * 1", suspended: false, purpose: "Syncs the ticker reference from adanos plus the curated crypto rows (§40)." } },
+  { id: "portfoliost-instruments-corpbondsync", label: "Corp Bond Sync", area: "jobs", rank: R.back, live: false, job: { schedule: "45 4 * * *", suspended: false, purpose: "Upserts the D80 Catalyst corporate-bond catalogue into instruments." } },
+  { id: "portfoliost-instruments-fundcategorysync", label: "Fund Category Sync", area: "jobs", rank: R.back, live: false, job: { schedule: "15 5 * * *", suspended: false, purpose: "Upserts analizy.pl fund categories; without an ANALIZY:: row a fund routes as a stock and silently returns zero bars (§72.39)." } },
+  { id: "portfoliost-wallets-snapshotsync", label: "Snapshot Sync", area: "jobs", rank: R.back, live: false, job: { schedule: "0 13 * * *", suspended: false, purpose: "The only writer of positions.market_value in the scheduled pipeline (§76.1) — the most consequential job in the namespace." } },
+  { id: "portfoliost-sheets-sync", label: "Sheets Sync", area: "jobs", rank: R.back, live: false, job: { schedule: "", suspended: false, purpose: "On-demand jobshot Job (no CronJob): imports the Transakcje sheet into transactions." } },
+  { id: "stooq-downloader", label: "Stooq Downloader", area: "jobs", rank: R.back, live: false, job: { schedule: "0 3 * * 0", suspended: true, purpose: "Downloads stooq.pl CSV volumes; suspended in the cluster." } },
+  { id: "stooq-importer", label: "Stooq Importer", area: "jobs", rank: R.back, live: false, job: { schedule: "@yearly", suspended: true, purpose: "Loads stooq CSV volumes with pgloader; suspended in the cluster." } },
+  { id: "jobshot", label: "Jobshot", area: "jobs", rank: R.back, live: false, job: { schedule: "", suspended: false, purpose: "Job runner as a Deployment, not a schedule: admin triggers Jobs through it." } },
+  // Verified against pfire CronJobs, 2026-09-17 (§80.3 resync 2026-10-02). These
+  // populate the provider tier consumed by instruments; they are not
+  // instruments API deployments.
   { id: "openst-bond-import", label: "Bond Import", area: "jobs", rank: R.back, live: false, job: { schedule: "30 4 * * *", suspended: false, purpose: "Incrementally imports Treasury bond series into OpenST." } },
   { id: "openst-bond-archive", label: "Bond Archive", area: "jobs", rank: R.back, live: false, job: { schedule: "0 6 3 * *", suspended: false, purpose: "Archives Treasury bond series in OpenST." } },
   { id: "openst-cpi-import", label: "CPI Import", area: "jobs", rank: R.back, live: false, job: { schedule: "30 4 * * *", suspended: false, purpose: "Incrementally imports CPI data into OpenST." } },
@@ -151,8 +159,9 @@ export const topologyEdges: TopologyEdgeDef[] = [
   { source: "openst", target: "tmx", label: "OpenBB SDK", kind: "provider", measurable: "otel" },
   { source: "openst", target: "biznesradar", label: "OpenBB plugin (scraper)", kind: "provider", measurable: "none" },
   { source: "openst", target: "obligacje", label: "OpenBB plugin (local pricing)", kind: "provider", measurable: "none" },
-  // FX
-  { source: "portfoliost-wallets", target: "ecb", label: "FX rates (via fxsync CronJob)", kind: "provider", measurable: "none" },
+  // FX — fx_rates lives in instruments since §48.6a; wallets reads it over the
+  // internal API and no longer talks to the ECB or owns the importer (§80.3).
+  { source: "portfoliost-instruments", target: "ecb", label: "FX rates (via fxsync CronJob)", kind: "provider", measurable: "none" },
   // jobs
   { source: "openst-bond-import", target: "openst", label: "Imports bond series", kind: "job", measurable: "none" },
   { source: "openst-bond-archive", target: "openst", label: "Archives bond series", kind: "job", measurable: "none" },
@@ -161,8 +170,11 @@ export const topologyEdges: TopologyEdgeDef[] = [
   { source: "portfoliost-admin", target: "jobshot", label: "On-demand job trigger", kind: "job", measurable: "none" },
   { source: "portfoliost-sheets-sync", target: "google-sheets", label: "Fetches Transakcje sheet", kind: "provider", measurable: "none" },
   { source: "portfoliost-sheets-sync", target: "portfoliost-wallets", label: "Imports transactions", kind: "job", measurable: "none" },
-  { source: "portfoliost-wallets-fxsync", target: "portfoliost-wallets", label: "Updates FX rates", kind: "job", measurable: "none" },
+  { source: "portfoliost-instruments-fxsync", target: "portfoliost-instruments", label: "Updates FX rates", kind: "job", measurable: "none" },
   { source: "portfoliost-instruments-tickersync", target: "portfoliost-instruments", label: "Syncs tickers", kind: "job", measurable: "none" },
+  { source: "portfoliost-instruments-corpbondsync", target: "portfoliost-instruments", label: "Upserts corp-bond catalogue", kind: "job", measurable: "none" },
+  { source: "portfoliost-instruments-fundcategorysync", target: "portfoliost-instruments", label: "Upserts fund categories", kind: "job", measurable: "none" },
+  { source: "portfoliost-wallets-snapshotsync", target: "portfoliost-wallets", label: "Writes positions.market_value", kind: "job", measurable: "none" },
   { source: "stooq-downloader", target: "stooq-pl", label: "CSV download", kind: "provider", measurable: "none" },
   { source: "stooq-downloader", target: "stooq-importer", label: "CSV volume", kind: "job", measurable: "none" },
   { source: "stooq-importer", target: "portfoliost-instruments", label: "Imports price history", kind: "job", measurable: "none" },

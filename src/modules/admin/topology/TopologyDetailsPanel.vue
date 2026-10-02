@@ -72,7 +72,7 @@ const quickLink = computed<{ name: string; label: string } | null>(() => {
   const id = def.value?.id
   const area = def.value?.area
   if (!id) return null
-  if (id === "portfoliost-wallets-fxsync") return { name: "admin-currencies", label: "Currency Rates" }
+  if (id === "portfoliost-instruments-fxsync") return { name: "admin-currencies", label: "Currency Rates" }
   if (area === "jobs") return { name: "admin-jobs", label: "Jobs" }
   if (area === "internal") return { name: "admin-system", label: "System" }
   if (area === "storage") return { name: "admin-system", label: "System" }

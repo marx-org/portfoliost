@@ -141,11 +141,27 @@ exports[`topology graph definition (D55-3) > snapshots node IDs and edge pairs 1
     ],
     [
       "portfoliost-instruments",
+      "ecb",
+    ],
+    [
+      "portfoliost-instruments",
       "portfoliost-users-auth",
     ],
     [
       "portfoliost-instruments",
       "postgres",
+    ],
+    [
+      "portfoliost-instruments-corpbondsync",
+      "portfoliost-instruments",
+    ],
+    [
+      "portfoliost-instruments-fundcategorysync",
+      "portfoliost-instruments",
+    ],
+    [
+      "portfoliost-instruments-fxsync",
+      "portfoliost-instruments",
     ],
     [
       "portfoliost-instruments-tickersync",
@@ -165,10 +181,6 @@ exports[`topology graph definition (D55-3) > snapshots node IDs and edge pairs 1
     ],
     [
       "portfoliost-wallets",
-      "ecb",
-    ],
-    [
-      "portfoliost-wallets",
       "portfoliost-users-auth",
     ],
     [
@@ -176,7 +188,7 @@ exports[`topology graph definition (D55-3) > snapshots node IDs and edge pairs 1
       "postgres",
     ],
     [
-      "portfoliost-wallets-fxsync",
+      "portfoliost-wallets-snapshotsync",
       "portfoliost-wallets",
     ],
     [
@@ -217,11 +229,14 @@ exports[`topology graph definition (D55-3) > snapshots node IDs and edge pairs 1
     "portfoliost",
     "portfoliost-admin",
     "portfoliost-instruments",
+    "portfoliost-instruments-corpbondsync",
+    "portfoliost-instruments-fundcategorysync",
+    "portfoliost-instruments-fxsync",
     "portfoliost-instruments-tickersync",
     "portfoliost-sheets-sync",
     "portfoliost-users-auth",
     "portfoliost-wallets",
-    "portfoliost-wallets-fxsync",
+    "portfoliost-wallets-snapshotsync",
     "postgres",
     "redis",
     "scanst",

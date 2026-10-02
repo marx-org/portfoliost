@@ -297,6 +297,13 @@ function laneNode(page: import("@playwright/test").Page, area: string) {
 }
 
 async function laneBox(locator: import("@playwright/test").Locator): Promise<{ x: number; y: number }> {
+  // Park the element at a fixed viewport spot before measuring. The canvas is
+  // taller than a 720px-tall window, so a lane can sit below the fold: without
+  // this, mouse.down() at those coordinates lands outside the viewport and the
+  // drag silently never starts. Centring is deterministic, so repeated calls
+  // for the same element measure in the same scroll state and stay comparable
+  // — including after a click that scrolled the page on its own.
+  await locator.evaluate((el) => el.scrollIntoView({ block: "center", inline: "nearest" }))
   const box = await locator.boundingBox()
   expect(box).not.toBeNull()
   return { x: box!.x, y: box!.y }

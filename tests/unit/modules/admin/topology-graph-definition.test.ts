@@ -30,9 +30,12 @@ const EXPECTED_NODE_IDS = [
   "openst-bond-archive",
   "openst-cpi-import",
   "openst-cpi-seed",
+  "portfoliost-instruments-corpbondsync",
+  "portfoliost-instruments-fundcategorysync",
+  "portfoliost-instruments-fxsync",
   "portfoliost-instruments-tickersync",
   "portfoliost-sheets-sync",
-  "portfoliost-wallets-fxsync",
+  "portfoliost-wallets-snapshotsync",
   "stooq-downloader",
   "stooq-importer",
   // external-services
@@ -94,16 +97,19 @@ const EXPECTED_EDGE_PAIRS = [
   ["portfoliost-admin", "portfoliost-wallets"],
   ["portfoliost-admin", "postgres"],
   ["portfoliost-instruments", "cachest"],
+  ["portfoliost-instruments", "ecb"],
   ["portfoliost-instruments", "portfoliost-users-auth"],
   ["portfoliost-instruments", "postgres"],
+  ["portfoliost-instruments-corpbondsync", "portfoliost-instruments"],
+  ["portfoliost-instruments-fundcategorysync", "portfoliost-instruments"],
+  ["portfoliost-instruments-fxsync", "portfoliost-instruments"],
   ["portfoliost-instruments-tickersync", "portfoliost-instruments"],
   ["portfoliost-sheets-sync", "google-sheets"],
   ["portfoliost-sheets-sync", "portfoliost-wallets"],
   ["portfoliost-users-auth", "postgres"],
-  ["portfoliost-wallets", "ecb"],
   ["portfoliost-wallets", "portfoliost-users-auth"],
   ["portfoliost-wallets", "postgres"],
-  ["portfoliost-wallets-fxsync", "portfoliost-wallets"],
+  ["portfoliost-wallets-snapshotsync", "portfoliost-wallets"],
   ["pocketid", "portfoliost-users-auth"],
   ["stooq-downloader", "stooq-importer"],
   ["stooq-downloader", "stooq-pl"],
@@ -139,7 +145,7 @@ describe("topology graph definition (D55-3)", () => {
     expect(NODE_AREAS).toHaveLength(5)
     expect(areaNodes("internal")).toHaveLength(6)
     expect(areaNodes("storage")).toHaveLength(2)
-    expect(areaNodes("jobs")).toHaveLength(10)
+    expect(areaNodes("jobs")).toHaveLength(13)
     expect(areaNodes("external-services")).toHaveLength(5)
     expect(areaNodes("data-providers")).toHaveLength(16)
   })
@@ -165,6 +171,53 @@ describe("topology graph definition (D55-3)", () => {
       expect(downstreamOf(id)).toEqual(["openst"])
     }
     expect(nodeById.get("openst-cpi-seed")?.job?.suspended).toBe(true)
+  })
+
+  // §80.3 — the job tier was static data that had drifted from the cluster.
+  it("maps the pfire CronJob tier the cluster actually runs (§80.3)", () => {
+    const cronJobNodeIds = [
+      "portfoliost-instruments-corpbondsync",
+      "portfoliost-instruments-fundcategorysync",
+      "portfoliost-instruments-fxsync",
+      "portfoliost-instruments-tickersync",
+      "portfoliost-wallets-snapshotsync",
+      "openst-bond-archive",
+      "openst-bond-import",
+      "openst-cpi-import",
+      "openst-cpi-seed",
+      "stooq-downloader",
+      "stooq-importer",
+    ]
+    for (const id of cronJobNodeIds) {
+      const node = nodeById.get(id)
+      expect(node?.area, id).toBe("jobs")
+      expect(node?.job?.schedule, `${id}: schedule`).toBeTruthy()
+      expect(node?.job?.purpose, `${id}: purpose`).toBeTruthy()
+      expect(node?.live, `${id}: not probed`).toBe(false)
+    }
+    // FX ownership moved to instruments in §48.6a, so the dead wallets fxsync
+    // node must not come back.
+    expect(nodeById.has("portfoliost-wallets-fxsync")).toBe(false)
+    expect(nodeById.get("portfoliost-instruments-fxsync")?.job).toMatchObject({ schedule: "10 17 * * *", suspended: false })
+    expect(downstreamOf("portfoliost-instruments-fxsync")).toEqual(["portfoliost-instruments"])
+  })
+
+  it("marks the suspended jobs suspended, so they do not render as ordinary work", () => {
+    // Three of the pfire CronJobs are suspended; before §80.3 stooq's two
+    // rendered as ordinary scheduled work.
+    const suspended = areaNodes("jobs")
+      .filter((n) => n.job?.suspended)
+      .map((n) => n.id)
+      .sort()
+    expect(suspended).toEqual(["openst-cpi-seed", "stooq-downloader", "stooq-importer"])
+  })
+
+  it("gives every job node a purpose, and the ECB edge the instruments owner", () => {
+    for (const n of areaNodes("jobs")) {
+      expect(n.job?.purpose, `${n.id}: purpose`).toBeTruthy()
+    }
+    expect(upstreamOf("ecb")).toEqual(["portfoliost-instruments"])
+    expect(downstreamOf("portfoliost-wallets")).not.toContain("ecb")
   })
 
   it("computes upstream/downstream neighbours correctly", () => {
