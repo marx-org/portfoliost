@@ -269,7 +269,7 @@ Recorded decisions (resolved with the user):
 
 ### 83.1 — Extract `PerformanceTabContent.vue` with no behaviour change
 
-- [ ] **Move the tab body** (Overview card, chart card, Drawdown card, Returns
+- [x] **Move the tab body** (Overview card, chart card, Drawdown card, Returns
       Chart, Top/Bottom Performers) out of `PortfolioPerformanceTab.vue` into
       `src/components/PerformanceTabContent.vue` — `docs/COMPONENTS.md`: used by
       ≥2 places, so `src/components/`, not the module folder. Props: `analytics`,
@@ -296,7 +296,7 @@ Recorded decisions (resolved with the user):
       > `returnsMode` (`:464`), `showCustomTimeframe` (`:140`), the whole
       > Customize modal incl. `InstrumentSearchModal` + `benchmarkOptions`
       > (`:133`, `:153-205`).
-- [ ] **Move the `<script lang="ts">` block with the template** (`:1-117`) —
+- [x] **Move the `<script lang="ts">` block with the template** (`:1-117`) —
       `yearlyReturns`, `benchmarkYearlyReturns`, `yearlyTotals`, `YearlyReturnRow`,
       `YearlyReturnTotals`, `yearRows`. It is the D88/D89 derivation, and the
       Yearly table in the template consumes it, so splitting the two would leave
@@ -306,26 +306,34 @@ Recorded decisions (resolved with the user):
       `@/components/PerformanceTabContent.vue`); no assertion changes. Do **not**
       re-export the functions from the wrapper to avoid that edit — two import
       paths for one derivation is how the two tabs end up with two answers.
-- [ ] **Keep every existing `data-testid` string.** `PortfolioPerformanceTab.test.ts`
+- [x] **Keep every existing `data-testid` string.** `PortfolioPerformanceTab.test.ts`
       and `tests/e2e/performance-display-currency.spec.ts` +
       `tests/e2e/parity-portfolios.spec.ts` select on them; a rename breaks three
       specs for no gain. Testids are stable API per `COMPONENTS.md`. (The
       `testid` prop therefore prefixes the *aggregate* copy only — the
       per-portfolio mount must pass `testid=""` and render byte-identical ids.)
-- [ ] **Keep `PortfolioPerformanceTab.vue` as a thin route wrapper** that fetches,
+- [x] **Keep `PortfolioPerformanceTab.vue` as a thin route wrapper** that fetches,
       converts and delegates, so its behaviour is unchanged by construction. It
       keeps the `AnalyticsTimeframe` state machine: `changeTimeframe` (`:244`),
       the 5s backfill poll (`:214`) and `handleRecompute` (`:257`).
-- [ ] Tests: a new `tests/unit/components/PerformanceTabContent.test.ts` porting
+- [x] Tests: a new `tests/unit/components/PerformanceTabContent.test.ts` porting
       the cases from `PortfolioPerformanceTab.test.ts` against the component
       directly — tiles render payload values, `annualizedReturn: null` with a
       reason renders `—` and hides the Timing line, a display-currency switch
       re-renders the money tiles without a remount. The existing
       `PortfolioPerformanceTab.test.ts` and `InvestmentsView.test.ts` pass
       **unmodified** apart from that import line.
-- [ ] Tests: `npm run build` (includes `vue-tsc --noEmit`) and `npm run test` green.
-- [ ] Commit `refactor(spa): extract the performance tab body into a prop-driven component`
+- [x] Tests: `npm run build` (includes `vue-tsc --noEmit`) and `npm run test` green.
+- [x] Commit `refactor(spa): extract the performance tab body into a prop-driven component`
 
+
+> Landed in `c5096c0`: the extracted component is `src/components/PerformanceTabContent.vue`
+> (id-prefix convention `${tid}-<field>`, unset on this mount), the wrapper keeps only the
+> fetch/poll/recompute state machine, and the `<script lang="ts">` block moved with the
+> template. All 25 `data-testid` strings verified byte-identical against `HEAD` (the four
+> per-year ones as `` `${tid('perf-returns-yearly-*')}-${row.year}` ``). `vue-tsc` clean;
+> 583 unit tests green, of which 5 are new in
+> `tests/unit/components/PerformanceTabContent.test.ts`.
 ### 83.2 — `/merged`: sum the flows and build the aggregate return columns
 
 The only step that makes the tab possible. Everything after it is presentation.
