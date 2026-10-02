@@ -338,7 +338,7 @@ Recorded decisions (resolved with the user):
 
 The only step that makes the tab possible. Everything after it is presentation.
 
-- [ ] **Add `netFlow`, `unpricedValue` and `carriedValue`** to the `/merged`
+- [x] **Add `netFlow`, `unpricedValue` and `carriedValue`** to the `/merged`
       SELECT (`portfolios.ts:786-792`) and thread all three through
       `sumSnapshotsByDateForwardFilled` (`mergedAnalytics.ts:83`) so the aggregate
       sums them per date exactly as it already sums `value` / `invested`. A
@@ -352,18 +352,18 @@ The only step that makes the tab possible. Everything after it is presentation.
       > screen where a wrong total is most expensive. `unpricedValue` must stay
       > **absent rather than 0** on a row that predates the column, for the reason
       > the per-portfolio route spells out at `portfolios.ts:1268-1277`.
-- [ ] **Chain the aggregate TWR** through `buildDailyReturns` + `chainReturns`
+- [x] **Chain the aggregate TWR** through `buildDailyReturns` + `chainReturns`
       (`returnColumns.ts:43`, `:53`) — the same path `buildTwr` takes. Do not
       re-derive `Vₜ/(Vₜ₋₁+Fₜ)−1` here, and do not read any stored
       `cumulative_twr` column: those are per-portfolio and summing indices is
       meaningless.
-- [ ] **Emit per-point `cumulativeTwr`** on the aggregate series, and the scalars
+- [x] **Emit per-point `cumulativeTwr`** on the aggregate series, and the scalars
       `timeWeightedReturn` / `moneyWeightedReturn` / `simpleReturnPercent` from
       the last index point, mirroring `:1381-1389`. The aggregate MWR has no
       stored `cumulative_mwr` column to read, so compute it with
       `buildMwr(aggValues, aggFlows, aggDates)` (`returnColumns.ts:109`) at
       request time and read its last element the same way.
-- [ ] **Populate `annualizedReturn` + `annualizedReturnWithheldReason`** —
+- [x] **Populate `annualizedReturn` + `annualizedReturnWithheldReason`** —
       `annualizedReturnWithheldReason(index, dates)` then
       `annualizedReturn(index, dates)` (`riskMetrics.ts:213` / `:177`), exactly
       as `:1305-1319` does, and percent as that line percentises it. §82.1 made
@@ -379,35 +379,61 @@ The only step that makes the tab possible. Everything after it is presentation.
       > `annualizedReturn()` returns a **fraction**; `/:id/analytics` sends a
       > **percent** under the same field name, and `/:id/risk-metrics` sends the
       > fraction. §83.2 writes to the analytics shape, so percent it.
-- [ ] **`moneyWeightedReturnWithheldReason` mirrors `/:id/analytics`, which is
+- [x] **`moneyWeightedReturnWithheldReason` mirrors `/:id/analytics`, which is
       hardcoded `null` (`:1545`).** `buildMwr` silently falls back to
       `buildSimple` when XIRR has no sign change (`:129-131`), so a value with
       `null` reason is not proof the number is an XIRR. Do not invent a new
       reason here — that would be a fourth answer. Record it as the same
       (accepted) defect the per-portfolio tab has, and let §83.2's test pin the
       *current* behaviour so the two tabs cannot diverge.
-- [ ] **Populate `monthlyReturns`** with `buildMonthlyReturns` (`:1294`) over the
+- [x] **Populate `monthlyReturns`** with `buildMonthlyReturns` (`:1294`) over the
       aggregate TWR index, so the Returns Chart is not empty — and, since §82.3
       landed, so the **Yearly** toggle has an index to walk. Yearly availability
       is still gated on `timeframe === "ALL"` in the SPA (`:467`); `/merged` must
       therefore honour `?timeframe=ALL` as the full window or the toggle shows a
       partial year as a whole one.
-- [ ] **Fix the early return at `:749-782`.** When *any* portfolio has fewer than
+- [x] **Fix the early return at `:749-782`.** When *any* portfolio has fewer than
       2 snapshots, the route returns `backfillStatus:"pending"` with an **empty
       series** — so one brand-new portfolio erases every other portfolio's history
       from a view whose entire purpose is the cumulative total. Return the partial
       sum *and* the pending flag, keeping §72.7's rule that reporting a mid-rebuild
       portfolio is a read and firing a backfill from a GET is not.
-- [ ] Tests — a deposit into one of two portfolios must leave the aggregate TWR
+- [x] Tests — a deposit into one of two portfolios must leave the aggregate TWR
       **unchanged** (§81.1's invariant, applied to the aggregate: this is the test
       that would have caught the missing `net_flow`); an internal transfer between
       two of the user's own portfolios leaves it unchanged; `Π(1 + monthlyReturns)`
       reconciles to `cumulativeTwr` at the last point; one portfolio with < 2
       snapshots still returns the other portfolios' series plus
       `backfillStatus:"pending"`.
-- [ ] Tests: `npm run test` green in `portfoliost-wallets`; `npm run build` (tsc) green.
-- [ ] Commit `feat(wallets): build the aggregate TWR and monthly returns in /merged`
+- [x] Tests: `npm run test` green in `portfoliost-wallets`; `npm run build` (tsc) green.
+- [x] Commit `feat(wallets): build the aggregate TWR and monthly returns in /merged`
 
+
+> Landed in `portfoliost-wallets@31aed4b`: `/merged` now selects `net_flow`,
+> `unpriced_value` and `carried_value`; `sumSnapshotsByDateForwardFilled` carries value
+> and invested forward but counts flow only on its own date; `buildMergedPerformance`
+> derives `cumulativeTwr` / `timeWeightedReturn` / `moneyWeightedReturn` /
+> `simpleReturnPercent` / `annualizedReturn` (+ withheld reason) / `monthlyReturns` from
+> `returnColumns.ts` + `riskMetrics.ts`, never from a stored column. `buildMonthlyReturns`
+> MOVED from `routes/portfolios.ts` to `returnColumns.ts` so one month-boundary rule serves
+> both routes. The pending early-return now returns the partial sum with the flag.
+> 574 tests green, `tsc` clean.
+>
+> **Two boxes above were written before the code existed and needed widening, both
+> recorded in the diff rather than worked around:**
+> 1. The plan asked only for the two withheld *amounts*, but
+>    `PortfolioPerformanceChart`'s chip needs a COUNT beside the amount —
+>    `gapMessage` returns `""` when both `gapSymbols` and `heldGapSymbols` are
+>    absent (`PortfolioPerformanceChart.vue:126-147`). Threading the amounts alone
+>    would have left the honesty warning silent. `/merged` therefore also returns the
+>    UNION of the per-portfolio `getGapSymbols` claims via a new `aggregateGapSymbols`
+>    helper — a union, not a re-derivation, and `null` (not `[]`) when nothing claims
+>    a gap, per §72.30.
+> 2. `unpricedValue`/`carriedValue` had to become tri-state on the aggregate: a
+>    contributor that did not measure them makes the whole sum `null` (unknown), not
+>    a sum of the measured ones. Summing past an unmeasured row would report "nothing
+>    withheld" on exactly the series that need the warning — the same argument the
+>    per-portfolio route makes at `portfolios.ts:1272-1277`.
 ### 83.3 — Benchmark overlays on the aggregate
 
 - [ ] **Accept `?benchmarks=SPY,QQQ` on `/merged`** and mirror the benchmark block
@@ -937,3 +963,533 @@ regression — but the request's scope ("bond, fund, etc") makes it visible.
       the frontend changes and **restart the gateway** afterwards, or only
       wallets-routed paths will 404 for the wrong reason (`AGENTS.md`).
 - [ ] Commit `test(spa): cover ticker-to-research links in e2e and document the rule`
+
+---
+
+## 86. Key facts per instrument class — bonds, funds, ETFs, crypto (2026-10-02)
+
+User request (no proposal file): *"Make a specific 'key facts' in Research per
+instrument. Currently it is designed for stocks, but we have bonds, funds, crypto
+and they have their own specific information we currently miss, even different
+bonds types has different info."*
+
+**The gap, measured, not assumed.** The Key Facts card
+(`ResearchOverview.vue:297-335`) is eight hard-coded `<dt>/<dd>` pairs — Name,
+Sector, Industry, Country, ISIN, Exchange, Employees, CEO. Six of those are
+shared identity; **Sector, Industry, Employees and CEO are equity-only**, and for
+any non-equity symbol all four render a dash. Four of the eight are *already
+fetched and thrown away at the last step*:
+
+- **`etf_category` is populated and never displayed.** The profile route maps it
+  into `finnhubIndustry` (`routes/instruments.ts:446`) and separately into
+  `gicsSector` (`:447`); the card reads `gicsSector` for "Sector" and
+  `gicsIndustry` for "Industry", and `translate.ts:221-224` hard-codes
+  `gicsSector`/`gicsIndustryGroup`/`gicsIndustry`/`gicsSubIndustry` all `null`.
+  Verified live in the local reference table: `etf_category` holds
+  `"Equity"` / `"Fixed Income"` for 16 530 ETF rows. **The cheapest real win in
+  this section is a row the backend already fills.**
+
+**`toInstrumentProfile` is the lossy point, and it is lossy for every class.**
+`translate.ts:189-231` reads only equity-shaped keys. For a savings bond the
+provider returns ten fields and the translator emits three. For a Catalyst
+corporate bond it returns thirteen and emits three. Verified live through
+cachest on 2026-10-02:
+
+```
+GET :8090/fixedincome/profile/…  → upstream 404 (no emissions synced locally)
+GET :8090/corp-bond/profile/BST0327
+  {"symbol":"BST0327","name":"Best S.A.","isin":"PLBEST000333",
+   "stock_exchange":"GPW RR","hq_country":"PL","asset_type":"corp_bond",
+   "issuer":"Best S.A.","series":"W3","market":"GPW RR","status":"Notowane",
+   "nominal_value":"100.0","nominal_currency":"PLN","secured":"NIE",
+   "coupon_type":"zmienne WIBOR 3M + 4%","current_rate":"7.83%",
+   "maturity_date":"2027-03-07","country":"PL","currency":"PLN"}
+GET :8090/crypto/profile/BTC-USD
+  {"symbol":"BTC-USD","currency":"USD","price":84127.1484,"date":"2026-10-02"}
+```
+
+Every one of those bond fields — issuer, series, coupon type, current rate,
+maturity, secured, status, nominal — is **already in production through the
+provider tier, is cached by cachest, and dies in the translator.**
+
+**Two provider profiles are never called at all.** `src/adapters/cachest.ts` has
+`fetchBondProfile` (`:138-140`, `/fixedincome/profile`) and has **no**
+`fetchCorpBondProfile` and **no** `fetchCryptoProfile`, although both routes
+already exist and are configured — `cachest/config.yaml:183-190`
+(`OPENST_CORP_BOND_PROFILE`, `cache_ttl 86400`) and `:243-249`
+(`OPENST_CRYPTO_PROFILE`, `cache_ttl 21600`), served from `openst/src/main.py:650`
+and `:454`. Consequence, and it is a live bug rather than a missing feature: a
+Catalyst bond symbol is not a savings bond, so `isSavingsBond` is false, the
+profile route tries the **equity** tier (`:367`), and on failure tries the
+**savings-bond** tier (`:456`) — which obligacje.pl does not carry. `/corp-bond/
+profile` is never reached, so a Catalyst bond's research page 502s today. The
+comment at `:371-375` documents the cost of the current probe order ("the equity
+fallback spins through three OpenBB providers") and that cost is paid on every
+bond lookup.
+
+**The crypto ceiling is real and must not be papered over.** The installed
+`openbb_fmp/models/crypto_search.py` declares `FMPCryptoSearchData` with exactly
+`symbol`, `name`, `exchange`, `ico_date`, `circulating_supply`, `total_supply`,
+and `openbb_core/.../crypto_search.py` adds nothing beyond `symbol` and `name`.
+There is **no market cap, no rank, no ATH and no ATL** available from the one
+configured provider (`openst/src/openbb_client.py:537`, `CRYPTO_SEARCH_PROVIDERS
+= ["fmp"]`). Those four are recorded below as unavailable rather than specified
+as nullable fields that are permanently `—`.
+
+Recorded decisions (resolved with the user, 2026-10-02):
+
+- **Contract shape: a nullable `keyFacts` on the existing `InstrumentProfile`,
+  discriminated by `kind`, one schema per asset class.** Not a new route — the
+  page already fetches the profile on every load (`ResearchOverview.vue:34-41`),
+  so a second request buys nothing. Not flattened onto the profile either: at
+  most six of ~20 flat nullable fields are ever populated for any one instrument,
+  and the per-class rendering logic lands in the view regardless.
+- **`kind` reuses the existing canonical vocabulary** —
+  `stock | etf | fund | crypto | bond | corp_bond`, the exact `AssetType` union
+  at `tickerref-queries.ts:8` and the lowercase form of the contract's six
+  `InstrumentType` values (`translate.ts:86-108`). Six kinds, no seventh.
+  `kind` is deliberately redundant with the existing `profile.assetType`: the
+  latter is the contract enum in `SCREAMING_CASE` and is **nullable** when the
+  symbol is absent from the local reference table (`routes/instruments.ts:429-448`),
+  whereas `kind` is non-null whenever `keyFacts` is present and is what makes
+  the union discriminable. A reviewer will ask why both exist; the answer is
+  above, and it is the reason the two are not merged.
+- **Bonds are two kinds, not one — `bond` and `corp_bond` — because the field
+  sets are disjoint**, which is the request's own point ("even different bonds
+  types has different info"). A savings bond has `rateRule` / `margin` /
+  `redemptionFee` / `termMonths` / `seriesCode`; a Catalyst bond has `issuer` /
+  `series` / `secured` / `status` / `couponType` / `currentRate` / `nominalValue`.
+  They share only `maturityDate` and a notion of nominal, so they share one
+  *concept* and nothing else — one schema with fourteen nullable fields would be
+  worse than two schemas with six each, because every reader would have to know
+  which half applies.
+- **`margin` is not a contract field on either bond kind.** `CorporateBondProfileData`
+  declares it (`corp_bond_profile.py:47`) but the scraper's own docstring says
+  "`margin` is `None` — the detail page embeds the margin in `coupon_type` for
+  variable-rate bonds" (`obligacje.py:62-68`), and the live payload above has no
+  `margin` key. A field that is structurally always null is a permanent dash.
+- **`margin` on a savings bond is a semantic overload and the card must not
+  label it "Margin".** `_extract_margin` (`openst/src/importers/bond_series.py:228-246`)
+  documents all three cases explicitly: for `rate_rule: "fixed"` the stored value
+  *is* the flat annual rate; for `cpi_12m+margin` it is the inflation add-on; for
+  `nbp_ref+margin` it is the NBP add-on. The column is called `margin` and means
+  a **rate** in one case and a **spread** in the other two. The label switches on
+  `rateRule` — see §86.9 — and the default label when `rateRule` is absent is
+  "Rate".
+- **Provider strings render verbatim; nothing is translated.** `secured` arrives
+  as `"NIE"`, `status` as `"Notowane"`, `couponType` as
+  `"zmienne WIBOR 3M + 4%"`. Translating them means inventing an English
+  vocabulary the rest of the app does not have. One rule, applied once: raw text
+  is shown raw, only numeric and date values are formatted.
+- **Three Catalyst fields arrive as strings, not numbers, and two of them carry
+  their own unit.** `nominal_value` is `"100.0"`, `current_rate` is `"7.83%"`
+  (a trailing `%` that would render as `7.83%%` through `formatPercent`), and
+  `secured` is a Polish boolean string. Each conversion is pinned in §86.6.
+- **Crypto key facts are exactly what FMP returns** (user's call, after the
+  measurement above): `name`, `exchange`, `icoDate`, `circulatingSupply`,
+  `totalSupply`, plus the quote currency already on the profile. Market cap,
+  rank, ATH and ATL are **not** specified as nullable fields — they are recorded
+  as unavailable from the current provider, which is a different statement from
+  "we fetch it and it happens to be empty".
+- **Funds ship thin, on purpose** (user's call). The local reference carries
+  name + aliases only; the ANALIZY snapshot CSV is
+  `code,name,currency,points,first,last,close` (`openst/data/fund-catalogue.csv`,
+  verified: `ARK01,Erste Akcji Polskich,PLN,7183,1998-04-02,2026-09-29,90.4`).
+  There is no manager, category type, OPL/TER, risk class or recommended holding
+  period anywhere in the stack. `FundKeyFacts` therefore carries **one** field,
+  `categoryCode`, and the section says so on the page rather than implying
+  coverage. The TFI detail importer that would fix it is named as follow-up in
+  §86.10.
+- **ETFs also ship thin**: `category` from `ticker_reference.etf_category`. That
+  is one row, but it is a row the backend fills today and the UI discards.
+
+Ordering: **contracts land before instruments, deliberately.** The provider-tier
+rule (fixture → openst → cachest → instruments) orders *data*; the contract is a
+*compile* dependency — `translate.ts` types its return as
+`components["schemas"]["InstrumentProfile"]`, so an adapter cannot emit
+`keyFacts` until the schema exists. Fixture capture still comes first, because it
+decides which fields the contract declares. There is **no cachest step**: all
+three profile routes are already configured, and the fix is on the instruments
+side of the boundary.
+
+Rules: one step = one commit; a step is marked `[x]` only after its tests pass
+(unit + `docker compose` level per `openst/CLAUDE.md`, `cachest/CLAUDE.md`, and
+`AGENTS.md`).
+
+### 86.1 — Fixture capture: pin the real field set for all four classes
+
+No code. The point of this step is that §86.2 declares fields and §86.6 parses
+them, and neither may be written against a guessed shape.
+
+- [ ] `openst/tests/fixtures/bond/corp_bond_profile_BST0327.json` — save the
+      verbatim body captured above (already verified reachable at
+      `:8090/corp-bond/profile/BST0327`; the HTML that produces it is already
+      committed at `openst/tests/fixtures/obligacje_bond_profile_BST0327.html`,
+      so this JSON is the *parsed* form and must be regenerated, not hand-typed).
+- [ ] `openst/tests/fixtures/crypto/search_BTC-USD.json` — the raw
+      `obb.crypto.search("BTCUSD", provider="fmp")` response behind
+      `/crypto/search`, so §86.3's assertions are made against a recorded shape
+      rather than a live key. **Note in the commit body which of
+      `circulating_supply` / `total_supply` / `ico_date` / `exchange` are
+      non-null for `BTC-USD`** — FMP populates them for majors and may not for
+      long-tail tokens, and that difference is the reason the contract fields are
+      nullable.
+- [ ] `openst/tests/fixtures/crypto/profile_BTC-USD.json` — today's
+      four-field body, so §86.3's test proves the widening is additive rather
+      than a replacement.
+- [ ] Record the savings-bond field set from
+      `openst/tests/fixtures/obligacjeskarbowe/ros.html` — that fixture already
+      exists and is committed; what is new is asserting the parsed values. It
+      carries `Seria:`, `Oprocentowanie:` and the literal prose
+      `"marża 2,00% + inflacja"`, i.e. `rate_rule = "cpi_12m+margin"` with
+      `margin = 2.00` and `fee_b = 2.00` per `_classify_rate` /
+      `_extract_margin`. **No live emission is available locally** — verified:
+      `openst.bond_series` is empty and `/fixedincome/search` 404s, because the
+      bond-series import has not been run in this compose stack. The fixture is
+      therefore the source of truth for this step, and the commit body must say
+      so rather than implying a live capture.
+- [ ] **Commit body carries the measured table** — one row per class, field →
+      wire key → type (number / string / date) → nullable. §86.2's schema is
+      transcribed from it, so a disagreement between the table and the schema is
+      a reviewable diff.
+- [ ] Commit `chore(openst): capture the profile payloads key facts are built from`
+
+### 86.2 — Contracts: six `*KeyFacts` schemas and `InstrumentProfile.keyFacts`
+
+- [ ] `portfoliost-contracts/contracts/openapi.yaml` — add six schemas
+      (`StockKeyFacts`, `EtfKeyFacts`, `FundKeyFacts`, `CryptoKeyFacts`,
+      `BondKeyFacts`, `CorpBondKeyFacts`), each opening with a literal
+      `kind` property whose value is fixed (`const`), and add
+      `keyFacts: { oneOf: [ … ], nullable: true }` to `InstrumentProfile`
+      (`:465-502`). Fields transcribed from §86.1's table — **only** the fields
+      that table marks populated, plus `margin` explicitly annotated as the
+      overloaded value the label depends on. Numeric fields are
+      `type: number, nullable: true`; the four Catalyst fields that arrive as
+      strings (`nominalValue`, `currentRate`, `secured`, `status`) are
+      `type: string, nullable: true`, **not** numbers — typing them as numbers
+      would make §86.6's parsing an unchecked cast rather than a `Number()` with
+      a `NaN` guard.
+- [ ] `npm run lint` from `portfoliost-contracts/contracts/` — this is
+      `scripts_check_spec.py`, the duplicate-property-key guard. It exists
+      because §70.2 inserted a block into `PortfolioTotalMetrics` twice and two
+      contracts published before a consumer caught it. Six new schemas is the
+      exact shape of edit that caused it.
+- [ ] `npm test` and `npm run build` in the same directory.
+- [ ] **Push `main` and let CI bump the patch version — never tag by hand**
+      (`AGENTS.md`, ops section). Verify the real tag with
+      `gh release list --repo Marx2/portfoliost-contracts`.
+- [ ] `NODE_AUTH_TOKEN=$(gh auth token) npm install @marx2/contracts@<new-version>`
+      in **both** consumers — `portfoliost-instruments` and `portfoliost` — then
+      `npm run gen:types` in each. Commit `package-lock.json` and
+      `src/generated/api-types.d.ts` (`portfoliost-instruments`) /
+      `generated/api-types.d.ts` (`portfoliost`) in each repo.
+      > Both repos already carry the `gen:types` script
+      > (`portfoliost-instruments/package.json:23`, `portfoliost/package.json:20`).
+      > The installed and repo specs are both `1.6.59` today, so there is no
+      > pre-existing drift to reconcile — if the install lands a different
+      > version than `gh release list` reported, stop and reconcile rather than
+      > committing a mixed state.
+- [ ] Tests: `npm run build` in `portfoliost-instruments` (its
+      `src/generated/api-types.d.ts` must contain the six schema names — a
+      missing one means the wrong package version was installed).
+- [ ] Commit `feat(contracts): per-asset-class key facts on the instrument profile`
+
+### 86.3 — openst: widen the crypto profile
+
+`get_crypto_profile` (`openbb_client.py:610-626`) derives its body from the quote
+and explicitly omits `name` because "name is not derivable from a price bar".
+That reasoning was right for a quote-derived body and is now superseded: the
+search leg already exists, already runs against the only provider that has
+crypto metadata (`CRYPTO_SEARCH_PROVIDERS = ["fmp"]`, `:537`), and already
+carries the name.
+
+- [ ] Rewrite `get_crypto_profile(pair)` to call
+      `obb.crypto.search(pair, provider=<first provider with a key, honouring
+      the existing `_provider_is_blocked` / `_provider_has_key` gate>)` and merge
+      the matching row onto the quote-derived body. Add `name`, `exchange`,
+      `ico_date`, `circulating_supply`, `total_supply`; keep `symbol`,
+      `currency`, `price`, `date` exactly as they are.
+      > **Match on symbol, not on the first row returned.** The fetcher's
+      > `transform_data` filters with `str.contains(query, case=False)` and
+      > returns a list — `BTC` matches `BTC-USD` but the first hit is not
+      > guaranteed to be the pair asked for. Selecting `symbol == pair` and
+      > returning the body unchanged when there is no exact match is the
+      > difference between a fact and a plausible-looking wrong fact.
+- [ ] `margin` is not part of this; it is not a crypto field.
+- [ ] Tests in the openst suite, fixture-driven against §86.1's two JSON files:
+      a crypto whose search row has all five fields populated; one whose supply
+      fields are null (must emit `null`, never `0`); a pair with no exact symbol
+      match (must keep the quote-derived body and omit the five); and a search
+      provider without a key (must not raise — `_provider_has_key` gating is the
+      established pattern from `get_crypto_quote`).
+- [ ] Tests: `docker compose --profile test build test &&
+      docker compose --profile test run --rm test` — all 542 green.
+- [ ] Commit `feat(openst): carry name and supply on the crypto profile`
+
+### 86.4 — openst standalone smoke
+
+- [ ] `docker compose up -d` in `openst`, then **one** `curl` per symbol:
+      `/crypto/profile/BTC-USD`, `/corp-bond/profile/BST0327`, and
+      `/fixedincome/profile/<a real emission>`.
+- [ ] Call each **twice** and confirm the second is a Redis cache HIT (the
+      `_cached_or_404` envelope makes this observable in the response), so the
+      widened crypto profile costs one upstream call per TTL, not two per
+      research page view.
+- [ ] The third curl is expected to fail locally — `openst.bond_series` is empty
+      and no emission is synced (verified in §86.1). **Record that in the commit
+      body** rather than skipping the check silently, and note that the
+      standalone smoke therefore covers crypto and corporate bonds only.
+- [ ] Commit — none required if nothing changed; if the smoke forced a fix, that
+      fix is its own commit before the instruments steps.
+
+### 86.5 — instruments: the two cachest adapters that do not exist
+
+`src/adapters/cachest.ts` has `fetchBondProfile` (`:138-140`) and nothing for
+Catalyst or crypto. Both upstream routes exist and are already cached by
+cachest, so **this step adds no cachest configuration** — it only makes the
+existing cache reachable.
+
+- [ ] `fetchCorpBondProfile(symbol)` → `${BASE_URL}/corp-bond/profile/{symbol}`,
+      modelled on `fetchBondProfile`. Same `UpstreamError` behaviour — the
+      caller needs to distinguish "not a Catalyst bond" from "cachest is down",
+      which is exactly why `fetchFundSearch` (`:54-61`) swallows 404 while
+      `fetchBondProfile` does not.
+- [ ] `fetchCryptoProfile(pair)` → `${BASE_URL}/crypto/profile/{pair}`.
+- [ ] Tests in `src/adapters/`: each encodes the path with
+      `encodeURIComponent` (assert on the exact URL, including a pair whose
+      quote currency contains a character that must be escaped), and each turns
+      a non-2xx into an `UpstreamError` carrying the status.
+- [ ] Tests: `npm test` green (`vitest run`, `src/routes/instruments.test.ts` is
+      the file that will need its fetch mocks extended in §86.8).
+- [ ] Commit `feat(instruments): fetch the corporate-bond and crypto profiles`
+
+### 86.6 — instruments: `toKeyFacts`, bonds first
+
+Bonds are the headline of the request and the only class with two disjoint field
+sets, so they get their own step and their own commit.
+
+- [ ] `src/adapters/translate.ts` — add `toBondKeyFacts(row: Row, kind)` and
+      `toCorpBondKeyFacts(row: Row)`, returning the §86.2 schemas. Every field
+      reads through the existing `str` / `num` / `pick` helpers (`translate.ts:47-79`)
+      so a provider change degrades to `null` rather than throwing.
+- [ ] **Savings bond** (source keys from `openbb_client.py:727-738`):
+      `seriesCode`←`series_code`, `issueDate`←`issue_date`,
+      `maturityDate`←`maturity_date`, `termMonths`←`term_months`,
+      `rateRule`←`rate_rule`, `margin`←`margin`, `redemptionFee`←`fee_b`,
+      `nominal`←`nominal`.
+      > `fee_b` and `nominal` arrive through `_plain`, i.e. as JSON numbers or
+      > strings depending on the driver — `num()` handles both, and a
+      > `termMonths` of `0` must survive as `0` rather than becoming `null`
+      > (`num` already returns `0`; do not add a truthiness filter on top).
+- [ ] **Catalyst corporate bond** — the three string-shaped fields, pinned:
+      - `nominalValue` ← `nominal_value` (`"100.0"`) →
+        `num()`, so a malformed value becomes `null` and never `NaN`.
+      - `currentRate` ← `current_rate` (`"7.83%"`) → **strip the trailing `%`
+        and parse the remainder**, yielding `7.83` as a number. Keeping the `%`
+        in the value would render `7.83%%` through `formatPercent` in §86.9. If
+        the string has no `%`, parse it as a plain decimal rather than
+        returning `null` — `current_rate` is the single most useful number on
+        the card and a missing suffix must not cost it.
+      - `secured` ← `secured` (`"NIE"`) → kept as the provider's string. Per the
+        recorded decisions it is **not** mapped to a boolean and **not**
+        translated; `"NIE"` on the card is the honest rendering of a Polish
+        source.
+      - The rest are pass-through: `issuer`, `series`, `market`, `status`,
+        `nominalCurrency`, `couponType`, `maturityDate`.
+      > **`margin` is deliberately absent** — the scraper never sets it
+      > (`obligacje.py:62-68`) and the live payload has no such key. Its absence
+      > is a decision recorded in this section, not an oversight.
+- [ ] Wire `toBondKeyFacts` into `toInstrumentProfile` (`:189-231`) for the
+      existing `isBond` branch (`:198`), and into `toInstrumentDetail`
+      (`:160-187`) only if `InstrumentDetail` grows the field — it has not been
+      specified to, so **do not** touch it in this step.
+- [ ] Tests in `src/adapters/translate.test.ts` against the §86.1 fixtures:
+      savings bond with `rate_rule: "cpi_12m+margin"` → `kind: "bond"`,
+      `margin: 2`, `fee_b` → `redemptionFee: 2`, `rateRule` passed through
+      **untranslated**; `rate_rule: "fixed"` → `kind: "bond"` with the same
+      `margin` value and a different `rateRule` (this pair is the test that
+      proves the label switch in §86.9 has its data); Catalyst →
+      `kind: "corp_bond"`, `nominalValue: 100`, `currentRate: 7.83`,
+      `secured: "NIE"`, `status: "Notowane"`, and **no** `margin` key at all;
+      a row missing `current_rate` entirely → `currentRate: null` without
+      throwing; `"7.83"` without the `%` → `7.83`.
+- [ ] Tests: `npm test` and `npm run build` green.
+- [ ] Commit `feat(instruments): translate savings-bond and Catalyst key facts`
+
+### 86.7 — instruments: `toKeyFacts` for crypto, ETF, fund, stock
+
+The remaining four kinds. Each is a different source, which is why they are one
+step rather than four: no single one of them is a change of behaviour on its own,
+and four near-empty commits would be noise.
+
+- [ ] **Crypto** (`kind: "crypto"`) — `name`←`name`,
+      `exchange`←`exchange`, `icoDate`←`ico_date`,
+      `circulatingSupply`←`circulating_supply`, `totalSupply`←`total_supply`.
+      `quoteCurrency` comes from the profile's existing `currency`, not from the
+      key-facts row. **No `marketCap`, `rank`, `ath` or `atl` keys** — FMP does not
+      carry them (§86.1) and a permanently-null field is a permanent dash.
+- [ ] **ETF** (`kind: "etf"`) — `category` ← the `ticker_reference` row's
+      `etfCategory`. This is the value already mapped to `finnhubIndustry` at
+      `routes/instruments.ts:446`; prefer reading `etfCategory` from the same
+      reference `ref` the route already holds rather than re-querying.
+- [ ] **Fund** (`kind: "fund"`) — `categoryCode` only, and only when the
+      reference row is an `ANALIZY::` listing key; `null` for a `TFI::` row.
+      Verified shapes: `ANALIZY::ARK01` / `ARK01` / `Erste Akcji Polskich`, and
+      `TFI::NNEP65.TFI` / `NNEP65.TFI`, whose `isin` is empty and whose aliases
+      carry the human name. One field, and the page says so.
+- [ ] **Stock** (`kind: "stock"`) — `sector`←`gicsSector`,
+      `industry`←`gicsIndustry`, `employees`←`employeeTotal`, `ceo`, plus
+      `ipo`←`ipo`, `sharesOutstanding`←`shareOutstanding`,
+      `marketCap`←`marketCapitalization`. Pure relocation: every value is already
+      on the profile and already fetched. **No new upstream call.**
+      > `gicsSector`/`gicsIndustry` are hard-coded `null` in
+      > `translate.ts:221-224` and filled by the route's reference-table pass
+      > (`:447`). The stock kind therefore reads the **post-fill** object, not
+      > the raw provider row — meaning `toKeyFacts` for stocks runs in the route
+      > (`:429-452`), not inside the pure translator. Keep the translator pure and
+      > let the route pass the enriched profile in; a `toStockKeyFacts` that
+      > re-reads the provider row would return the dashes this section is
+      > removing.
+- [ ] Tests in `translate.test.ts` for each of the four, including: a crypto row
+      with null supplies → `null` not `0`; an ETF with `etf_category: "Fixed
+      Income"` → `category: "Fixed Income"`; a fund on a `TFI::` key →
+      `categoryCode: null`; a stock with a null `ceo` → `ceo: null` and the key
+      still present.
+- [ ] Tests: `npm test` and `npm run build` green.
+- [ ] Commit `feat(instruments): translate crypto, ETF, fund and stock key facts`
+
+### 86.8 — instruments: dispatch the profile by asset class
+
+This is where the Catalyst-bond 502 is actually fixed, and it replaces a probe
+order that costs a three-provider equity spin on every bond lookup.
+
+- [ ] `src/routes/instruments.ts` `/:symbol/profile` (`:390-467`) — resolve the
+      asset class **first** from the local reference via the existing
+      `assetTypeForSymbol` + `normalizeAssetType`, then fetch the matching
+      provider profile: `bond` → `fetchBondProfile`, `corp_bond` →
+      `fetchCorpBondProfile`, `crypto` → `fetchCryptoProfile`, everything else →
+      `fetchProfile`.
+      > Copy the pattern, do not invent one: `services/quote-dispatch.ts:109-121`
+      > already dispatches the quote route exactly this way off the same
+      > `assetTypeForSymbol` read, including the `catch` that falls back to
+      > `"stock"`. Two dispatchers reading the same column is cheap; a third
+      > ordering convention is not.
+- [ ] **Keep today's probe order for a symbol the reference does not know.** A
+      null `assetType` means no sync has run, not that the symbol is an equity;
+      falling back to the existing `fetchProfile` → `fetchBondProfile` cascade
+      (`:453-464`) preserves current behaviour for unsynced symbols and is what
+      stops this step from turning a WSE stock into a 404.
+- [ ] Leave the `/:symbol/detail` route (`:340-388`) on its existing path in
+      this step. It has the same dispatch problem, but `InstrumentDetail` has
+      not been given `keyFacts`, so there is nothing to fix there yet — noted
+      here so the omission is deliberate and recorded, not forgotten.
+- [ ] Extend `src/routes/instruments.test.ts` (the fetch mocks): a `BST0327`
+      reference row with `asset_type: "corp_bond"` resolves through
+      `fetchCorpBondProfile` and returns `kind: "corp_bond"` with `issuer`; a
+      `BTC-USD` row with `asset_type: "crypto"` resolves through
+      `fetchCryptoProfile`; an unknown symbol still resolves through the
+      cascade; and — the regression this step exists for — a Catalyst bond whose
+      equity profile **succeeds** with an empty frame must still be served as a
+      bond, not as a stock.
+- [ ] Tests: `npm test` and `npm run build` green.
+- [ ] Commit `fix(instruments): dispatch the profile route by asset class`
+
+### 86.9 — SPA: `KeyFactsCard` replaces the hard-coded card
+
+- [ ] New `src/modules/instruments/KeyFactsCard.vue` — feature-scoped, used by
+      one view, so it belongs in the module and not `src/components/`
+      (`docs/COMPONENTS.md:17`). Props: `profile: InstrumentsProfile`. It
+      renders the **shared identity block** (Name, Country with the flag image,
+      ISIN, Exchange, plus the `weburl` link at `ResearchOverview.vue:326-334`)
+      and then the **kind-specific block** from `profile.keyFacts`.
+- [ ] One `KEY_FACT_ROWS: Record<kind, ReadonlyArray<{ field: keyof …;
+      label: string }>>` map drives the second block, so a new field is one array
+      entry and not a new `<dt>`. Labels live in exactly one place, the same way
+      `ASSET_TYPE_LABELS` does in `TickerBadge.vue:8` — and for the same reason:
+      the contract enums are not display strings.
+- [ ] **The `margin` label switch** — `bond` rows label `margin` as
+      **"Rate"** when `rateRule === "fixed"`, **"Inflation margin"** when
+      `rateRule === "cpi_12m+margin"`, **"NBP margin"** when
+      `rateRule === "nbp_ref+margin"`, and **"Rate"** when `rateRule` is null.
+      This is the single most important line in the component: the same stored
+      number is a rate in one case and a spread in the others
+      (`bond_series.py:228-246`), and a card that always says "Margin" states
+      something false for two of the three savings-bond families.
+- [ ] Formatting, using the existing helpers in `src/utils/format.ts`:
+      `formatAmount` (`:30`) for `nominal` / `nominalValue` paired with
+      `nominalCurrency`; `formatNumber` (`:41`) for `termMonths`,
+      `circulatingSupply`, `totalSupply`; `formatCompact` (`:58`) for
+      `marketCap`; `formatDate` (`:70`) for `maturityDate` / `issueDate` /
+      `icoDate`; **verbatim strings** for `issuer`, `series`, `market`, `status`,
+      `secured`, `couponType`, `rateRule`, `exchange`, `category`,
+      `categoryCode`, `name`. A null value renders the card's existing `"—"`
+      (`ResearchOverview.vue:70-72`).
+- [ ] `ResearchOverview.vue:297-335` — delete the hard-coded card, mount
+      `<KeyFactsCard :profile="profile" />` in its place. **The `Key Facts`
+      heading and the `card p-6` wrapper move into the new component** so the
+      markup is identical and `tests/e2e/research.spec.ts:27`
+      (`getByText("Key Facts")`) keeps passing unchanged.
+- [ ] **Hide the card when there is nothing to say.** A symbol with identity but
+      no `keyFacts` (an unsynced WSE stock, a crypto pair whose search leg has no
+      exact match) must not render a card of six dashes. The existing
+      "Limited data availability" banner (`:217-225`) already covers that case;
+      the card is `v-if`'d off `profile.keyFacts || sharedIdentityRows.length`.
+- [ ] **Do not touch** the Analyst Price Target card (`:263-295`), the
+      "Latest Earnings Call" card (`:337-354`), or the "Key Statistics" block
+      (`:371-383`). All three are equity-only and already degrade correctly —
+      `v-if="metrics"` at `:371`, `v-if="latestEarningsCall"` at `:337`. They are
+      the model this section follows, not part of it.
+- [ ] Tests in `tests/unit/modules/instruments/`: a new `KeyFactsCard.test.ts`
+      with one case per kind asserting the exact label set rendered —
+      stock keeps all eight original rows, `corp_bond` renders Issuer / Series /
+      Market / Status / Nominal / Nominal currency / Secured / Coupon type /
+      Current rate / Maturity and **not** Employees or CEO, `bond` renders Series
+      / Issue date / Term / Rate rule / Maturity / Nominal / Redemption fee and
+      **no** Margin, `crypto` renders Name / Exchange / ICO / Circulating supply /
+      Total supply, `etf` renders Category, `fund` renders Category code. Plus:
+      the same savings-bond fixture rendered under `fixed` and under
+      `cpi_12m+margin` asserts the label is **"Rate"** in one and
+      **"Inflation margin"** in the other.
+- [ ] Extend `tests/unit/modules/instruments/ResearchOverview.test.ts`: the
+      existing "renders the company profile fields" case (`:215`) must still pass
+      unchanged — it is the proof that a stock's card is byte-identical after the
+      move.
+- [ ] Tests: `npm run build`, `npm run test`, `npm run test:mock` green.
+- [ ] Commit `feat(spa): render per-class key facts on the research overview`
+
+### 86.10 — Stack smoke, e2e, docs, and the recorded gaps
+
+- [ ] `docker compose up -d redis openst cachest instruments`, curl each of
+      `AAPL`, `SPY` (ETF), `BST0327`, `BTC-USD`, `ARK01` through the gateway at
+      `:8080` and confirm a non-null `keyFacts` with the right `kind` on each.
+      **`docker compose restart gateway` after any upstream recreate** or only
+      instruments-routed paths will 404 for the wrong reason — nginx caches each
+      upstream address for the life of the process and the symptom is a 404 from
+      the wrong Hono service, not a 502 (`portfoliost/AGENTS.md`).
+- [ ] e2e in `tests/e2e/research.spec.ts`: a corporate bond, a crypto pair and an
+      ETF each render their own key facts. A bond lookup needs the reference row,
+      so assert against the symbols the local sync actually produced — query
+      `instruments.ticker_reference` for one `corp_bond` and one `crypto` row
+      first, and **skip with a named reason rather than inventing a symbol** if
+      the local sync has not run.
+- [ ] `npm run test:stack` green, then the full SPA gate: `npm run build`,
+      `npm run test`, `npm run test:mock`, `npm run test:e2e` against a rebuilt
+      stack.
+- [ ] **`docs/COMPONENTS.md`** — add a `KeyFactsCard` entry under "Where things
+      live": the shared-identity rows come from the profile, the kind-specific
+      rows from `profile.keyFacts`, labels live in `KEY_FACT_ROWS` and nowhere
+      else, and a new asset class is one schema plus one array entry.
+- [ ] **Record the three gaps this section deliberately does not close**, in the
+      commit body and in this section's archive note — not as new work:
+      1. **Funds have no real key facts.** One field ships. The TFI detail
+         importer — manager, category type, OPL/TER, risk class, recommended
+         holding period — needs a new openst plugin route against
+         analizy.pl or biznesradar's TFI section, plus a fixture capture and its
+         own cachest route. Named as the obvious next proposal; not started here.
+      2. **Crypto has no market cap, rank, ATH or ATL.** FMP's crypto search is
+         the only configured crypto search provider and carries none of them.
+         CoinGecko does; adopting it means a new provider + API key in openst.
+      3. **`/:symbol/detail` (`routes/instruments.ts:340-388`) still uses the
+         probe order.** Same dispatch as §86.8, deferred because
+         `InstrumentDetail` has no `keyFacts` field yet.
+- [ ] Commit `docs(spa): document KeyFactsCard and record the remaining class gaps`
