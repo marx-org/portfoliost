@@ -145,6 +145,36 @@ test.describe("§87.5 — cash leg on trade", () => {
     await request.delete(`${GATEWAY}/api/portfolios/${pid}`, { headers: a })
   })
 
+  test("the CARD's settings dialog carries the same switch (two dialogs, one setting)", async ({ page, request }) => {
+    // Regression guard for the gap this found: the app has TWO "Rename portfolio"
+    // dialogs — the portfolio page's and the investments card's — and the switch
+    // was added to only one of them, so the setting was editable from one route
+    // and invisible from the other.
+    const run = Date.now()
+    const a = await auth(request)
+    const post = mk(a, request)
+    const portfolio = await post("/api/portfolios", { name: `E2E CashLegCard ${run}`, baseCurrency: "USD" })
+    const pid = String(portfolio.id)
+
+    await login(page)
+    await page.goto("/en/investments")
+    const card = page.locator(".card").filter({ hasText: `E2E CashLegCard ${run}` }).first()
+    await card.getByRole("button", { name: "Portfolio actions" }).click()
+    await card.getByRole("button", { name: "Edit", exact: true }).click()
+    const dialog = page.getByRole("dialog", { name: "Rename portfolio" })
+    await expect(dialog).toBeVisible()
+    const flag = dialog.getByTestId("card-cash-leg-on-trade")
+    await expect(flag).not.toBeChecked()
+    await flag.check()
+    await dialog.getByRole("button", { name: "Save" }).click()
+    await expect(dialog).toBeHidden()
+
+    const after = await request.get(`${GATEWAY}/api/portfolios/${pid}`, { headers: a })
+    expect(((await after.json()) as { cashLegOnTrade?: boolean }).cashLegOnTrade).toBe(true)
+
+    await request.delete(`${GATEWAY}/api/portfolios/${pid}`, { headers: a })
+  })
+
   test("Portfolio settings toggles the flag and the form follows it", async ({ page, request }) => {
     const run = Date.now()
     const a = await auth(request)

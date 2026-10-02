@@ -1233,15 +1233,18 @@ Flagged here because it crosses more than two.
 
 ### 87.1 — Sell-side cash leg in the mapper
 
-- [ ] `transakcje-mapper.ts:405` — split the branch: `SALE_PROCEEDS_TO.has(konto)`
+- [x] `transakcje-mapper.ts:405` — split the branch: `SALE_PROCEEDS_TO.has(konto)`
       keeps the existing `TRANSFER` → `IBKR` payload unchanged; every other kontо
       with `row.au` on a `Sprzedaż` row posts
       `{ type: "WITHDRAWAL", currency: row.currency, amount: rowCcyCash(row) }`
       with `externalId: ${row.externalId}#w` and
       `description: "Withdrawal: <aktywo>"` (mirroring `:396-404`).
-- [ ] Leave the comment at `:411-413` rewritten, not deleted — it is the reason
+- [x] Leave the comment at `:411-413` rewritten, not deleted — it is the reason
       the gate existed and the reason it is now narrower.
-- [ ] Tests in `src/transakcje-mapper.test.ts`, alongside the existing
+> The narrowed reading is spelled out in the comment: the gate was never "Equate+
+> is the only kontо with an outflow", it was "the only kontо whose outflow is a
+> TRANSFER rather than a WITHDRAWAL".
+- [x] Tests in `src/transakcje-mapper.test.ts`, alongside the existing
       `"AU=1 Kupno: trade leg + DEPOSIT cash leg (#d)"` (`:93`):
       1. `Sprzedaż` + `AU=1` on `XTB` → `WITHDRAWAL`, `#w`, PLN col 19 ÷ col 21
          into the row currency, and the derived `SELL` still present.
@@ -1250,8 +1253,12 @@ Flagged here because it crosses more than two.
       3. `Sprzedaż` + `AU=0` → no cash row at all.
       4. A funded buy then a funded sell on the same kontо nets the account to
          ≈0 — the §78.1 outcome, asserted on mapper output rather than on PROD.
-- [ ] `npm run test && npm run build` in `portfoliost-sheets-sync`; commit
+- [x] `npm run test && npm run build` in `portfoliost-sheets-sync`; commit
       `feat(sheets-sync): post a WITHDRAWAL for AU=1 sell rows outside Equate+`.
+> 180 tests green; commit `2a06d60`, released as sheets-sync `v1.0.36`. The
+> pre-existing test "AU=1 Sprzedaż (non-Equate+): trade leg ONLY" asserted the
+> behaviour this step removes, so it was retitled to `AU=0` — the state it always
+> meant — rather than deleted.
 
 ### 87.2 — 1:1 link between a trade and its cash leg
 
@@ -1286,7 +1293,7 @@ independent — `DELETE /:id/transactions/:txId` deletes only the trade
   Accepted by the owner rather than solved — it is recorded here so the drift is a
   decision and not a bug report later.
 
-- [ ] `drizzle/0014_cash_leg_link.sql` — `ALTER TABLE
+- [x] `drizzle/0014_cash_leg_link.sql` — `ALTER TABLE
       portfolios.portfolio_cash_transactions ADD COLUMN IF NOT EXISTS
       linked_trade_id uuid REFERENCES portfolios.transactions(id) ON DELETE
       CASCADE;` plus `CREATE INDEX IF NOT EXISTS
@@ -1297,30 +1304,40 @@ independent — `DELETE /:id/transactions/:txId` deletes only the trade
       the migration applies on the next rollout; `pfire-init-sql` needs no change
       (it carries only the `postgres_fdw` server and the `instruments.stooq_daily_*`
       foreign tables — zero wallets DDL).
-- [ ] **Backfill all 362 existing pairs.** The link is fully derivable from the
+- [x] **Backfill all 362 existing pairs.** The link is fully derivable from the
       `#d`/`#t` suffix convention: verified in PROD, `left(external_id,
       length(external_id)-2)` matches a trade for **362 of 362** suffixed cash rows
       (324 `#d` DEPOSIT + 38 `#t` TRANSFER), with 1 977 of 1 977 trades carrying an
       `external_id`. One `UPDATE … FROM` in the same migration. `linked_tx_id` is
       left alone — it is the cash↔cash transfer pair and means something else.
-- [ ] Set `linked_trade_id` at import time, in the same transaction as the insert,
+- [x] Set `linked_trade_id` at import time, in the same transaction as the insert,
       so a partial import cannot leave one leg unlinked. Requires the import to know
       the trade's id when it writes the cash row — today `import.ts` builds both
       from the same `externalId`, so it must capture the returned trade id rather
       than re-derive it.
-- [ ] Leave both delete handlers alone. `portfolio-transactions.ts:793` needs no
+- [x] Leave both delete handlers alone. `portfolio-transactions.ts:793` needs no
       change (the cascade fires); `portfolio-cash.ts:665` needs no change (the link
       is the row). Confirm `recomputePortfolioTotals` still runs **once** per
       request, not once per leg.
-- [ ] Tests: `DELETE` the trade → the cash row is gone and the balance moved once,
+- [x] Tests: `DELETE` the trade → the cash row is gone and the balance moved once,
       asserted by cascade not by application code; `DELETE` the cash row → the trade
       survives with `linked_trade_id` now `NULL` on nothing (the column is on the
       deleted row) and the position quantity unchanged; deleting an **unlinked**
       cash row (a hand-written `Wpłata`) leaves everything else alone; an `AU=0`
       trade imports with no cash row and nothing to point at.
-- [ ] `npm run test && npm run build` in `portfoliost-wallets`; commit.
-
-### 87.3 — The kontо list: which accounts always get a cash leg
+- [x] `npm run test && npm run build` in `portfoliost-wallets`; commit.
+> Commit `014900d`, released as wallets `v1.1.122`; 595 unit tests green on PGlite.
+> The import sets the link at cash-insert time **and** catches up after the trade
+> insert (`linkCashLegsToTrade`) — a trade and its leg are two rows of the batch in
+> two database transactions, so a partially-failed batch is enough to leave one
+> without the other, and one direction alone would strand it.
+> **PROD 2026-10-02**: migration journal id 15, `linked_trade_id` present,
+> `portfolio_cash_transactions_linked_trade_id_transactions_id_fk ON DELETE=CASCADE`,
+> and the backfill linked **324 `#d` + 38 `#t` = 362 of 362** suffixed rows, with
+> **0** suffixed rows left unlinked — the count the plan predicted.
+> Deliberately out of scope, same rule in the migration and at import time:
+> Equate+'s TRANSFER *debit* leg carries the sheet's unsuffixed id, so the suffix
+> rule cannot reach it; the `#t` credit leg on IBKR is what links to the sale. — The kontо list: which accounts always get a cash leg
 
 **Owner decision 2026-10-02: no spreadsheet edits at all.** The kontо that get a
 cash leg on every trade are decided **in code**, not by flipping col 47 row by row
@@ -1346,47 +1363,99 @@ are 41 `Wpłata` + 5 `Wypłata` rows — it genuinely holds cash), `IKE Marek` (
 sells `AU=0`) and `IKE Beata` (54 sells `AU=0`), where sale proceeds stay in the
 account.
 
-- [ ] Add `const ALWAYS_CASH_LEG = new Set([...])` to
+- [x] Add `const ALWAYS_CASH_LEG = new Set([...])` to
       `portfoliost-sheets-sync/src/transakcje-mapper.ts`, beside the existing
       `SALE_PROCEEDS_TO` (`:23`) and `KOTO_MAP`. Keep the three constants adjacent
       and cross-reference them in one comment block — this is now three curated
       lists about the same accounts and the next reader needs to see all three.
-- [ ] Resolution order in `mapRow`: `SALE_PROCEEDS_TO` (transfer) → listed kontо
+- [x] Resolution order in `mapRow`: `SALE_PROCEEDS_TO` (transfer) → listed kontо
       (deposit on buy, withdrawal on sell) → `row.au` (deposit on buy only, as
       today). Equate+ is checked first so its transfer path is untouched.
-- [ ] Tests: a listed kontо at `AU=0` still gets both legs (the XTB case, asserted
+- [x] Tests: a listed kontо at `AU=0` still gets both legs (the XTB case, asserted
       on mapper output — 5 buys + 5 sells netting to ≈0); an unlisted kontо at
       `AU=0` gets neither; an unlisted kontо at `AU=1` gets the buy deposit and
       still no sell leg (today's behaviour, unchanged); Equate+ still transfers.
-- [ ] **`sheets-sync` has no `@marx2/contracts` dependency** (the SPA and wallets
+- [x] **`sheets-sync` has no `@marx2/contracts` dependency** (the SPA and wallets
       both pin `^1.6.61`), so the list cannot be shared through contracts without
       adding one. Follow the existing convention: the constant lives in the mapper,
       and §87.5's wallets copy carries a pointer comment back to it. Record the
       duplication rather than pretend it is shared.
-- [ ] Deploy, then re-run the **incremental** sync (Admin → Jobs → "Sync sheet",
+- [x] Deploy, then re-run the **incremental** sync (Admin → Jobs → "Sync sheet",
       not "Wipe & Reimport"). §69.3 re-backfills every touched portfolio from its
       first trade, so nobody presses Recompute.
-- [ ] Verify: `invested` now tracks real cash in/out for the six listed accounts
+- [x] Verify: `invested` now tracks real cash in/out for the six listed accounts
       instead of sitting flat, no account's balance goes negative on a day it was
       actually empty, and `IB` / `IKE Marek` / `IKE Beata` are bit-identical to
       before the deploy.
 
+> Commit `c299b62`, released as sheets-sync `v1.0.36`; 188 unit tests green.
+> **PROD 2026-10-02**: wallets `v1.1.122` + the sheets-sync image pinned in
+> `portfoliost-admin`'s HelmRelease (`SHEETS_SYNC_IMAGE`), then the incremental sync
+> from Admin → Jobs → "Run Sync": `inserted=21 skipped=2365 errors=0`,
+> `portfoliosTouched=5` — **XTB 10, NN TFI PPK 4, NN TFI PPO 2, Rach. rejestrowy
+> PKO BP 2, Crypto 3**, exactly the predicted shape (each listed kontо's AU=0 rows,
+> nothing for Equate+ which keeps the transfer). All five backfills reported
+> `complete` by 22:10.
+> Bit-identical, as required: `IB` / `IKE Marek` / `IKE Beata` / `Equate+` last net
+> read `76 629.39` / `37 314.36` / `72 575.14` / `−6 388.76`, unchanged from the
+> pre-deploy baseline, and the sync inserted **zero** rows for them.
+> The "no negative day" check, as a per-day replay of cash rows + trade effects:
+> XTB `−0.79 … +0.26` USD, Crypto `−0.09 … 0.00`, the other three exactly `0.00`.
+> Those residues are the sheet's own col-19 rounding (the deposit is `|col19| ÷
+> col21`, the derived trade effect is `qty × price`), not a leak — 1.0% of the
+> ~650 USD that moved through XTB.
+> **This step contradicts §87.3's own test list, and §87.1 won.** §87.3 wrote "an
+> unlisted kontо at `AU=1` gets the buy deposit and still no sell leg (today's
+> behaviour, unchanged)", which contradicts §87.1's decision text — "every other
+> kontо with `row.au` on a `Sprzedaż` row posts a `WITHDRAWAL`". `AU=1` is a
+> per-row statement that cash crossed the account boundary; a gate that honours it
+> for only some accounts is the old gate again. It costs nothing today: PROD has
+> zero `AU=1` sells outside the listed kontо, so both readings import identically
+> against the current sheet. The test asserts §87.1's reading and says why.
+
 ### 87.4 — XTB closes at 0, with no sheet edit
 
-- [ ] **No owner action.** XTB goes on §87.3's list; its 5 `Kupno` and 5
+- [x] **No owner action.** XTB goes on §87.3's list; its 5 `Kupno` and 5
       `Sprzedaż` rows stay at `AU=0` and the round trip is forced by the importer.
       Compare the two routes: the withdrawn `Wpłata` row would have pinned
       `invested` at `2 716,60` permanently (buys only — the `2 957,88` of sales
       and the `+241,28` realised were never in it), which is the offset §78.1 was
       written to remove. The sheet row 138 insertion point worked out for it is
       not needed either.
-- [ ] Assert XTB closes: external flow nets to ≈0 across 2022-02-11 → 2026-10-02
+- [x] Assert XTB closes: external flow nets to ≈0 across 2022-02-11 → 2026-10-02
       and `invested` on the final snapshot is ≈0 rather than `2 716,60` or `0.00`
       for the wrong reason. Baseline captured 2026-10-02: 1 695 snapshots, every
       row `invested = 0.00`, opening net `−1.90`, total return `−24.08`, and the
       `9.49 → −4.04` day on 2022-02-17.
-- [ ] Then §78.5's verification applies to XTB unchanged and §78.6's
+- [x] Then §78.5's verification applies to XTB unchanged and §78.6's
       `moneyWeightedReturn` re-measure finally has a flow series to read.
+
+> **PROD 2026-10-02 — it closes, and the two assertions needed different units.**
+> The account is genuinely flat: **0 open positions**, 4 closed, derived cash
+> balance `−0.79` USD, and 10 cash rows (5 DEPOSIT `+656.45`, 5 WITHDRAWAL
+> `−649.97`, all ten linked to their trade). External flow in the row currency
+> nets to **`+6.48` USD** — 1.0% of what moved, the sheet's own col-19 rounding.
+> Not ≈0 in the portfolio's base currency, and it should not be: **XTB's sheet
+> rows are USD while its portfolio base is PLN**, so `invested` converts each leg
+> at its own historical rate (USD/PLN ≈ 3.96 in Feb 2022 → ≈ 4.4 in Feb 2023). The
+> PLN-equivalent net flow is therefore `−236.82`, which is what the last snapshot
+> reads and what the header shows as `Total Invested −PLN 236.82`. That is an FX
+> loss on the round trip, not a leak, and it is the honest number.
+> So the assertion holds where it was written (row currency ≈0, nothing pinned at
+> `2 716,60`, not `0.00` for the wrong reason) and the plan's currency was wrong.
+> The baseline it quotes also holds: 1 695 snapshots, opening net `−1.90`.
+>
+> **§78.6's re-measure, and a new finding.** XTB now HAS a flow series, and
+> `moneyWeightedReturn` reads **`+1 023 769.62%`** on the Performance tab while
+> `TWR p.a.` reads a sane `+7.70%`. XIRR is meaningless here by construction: the
+> account's whole point is that deposits and withdrawals cancel, so net invested
+> is ≈0 (negative in base ccy) and there is no capital base to annualise against.
+> §78.6's earlier `XTB +1166%` was incomplete flow history; this is a different
+> artefact of the same field, and it will hit every account whose external flow
+> nets near zero — which is exactly the set §87.3 put on the kontо list.
+> `annualizedReturn` already has a withholding predicate (§81, the SHARED
+> `annualizedReturnWithheldReason`); `moneyWeightedReturn` has none, and it needs
+> the same guard on the net-flow basis. That is a §78.6 follow-up, not a §87 one.
 
 ### 87.5 — Per-account setting: "generate cash transaction on buy/sell" (UI only)
 
@@ -1400,23 +1469,181 @@ Two independent mechanisms, deliberately:
   a cash transaction" checkbox from it, so the box reflects what will actually
   happen; the user can still untick it per transaction.
 
-- [ ] `portfolios.portfolios` gains `cash_leg_on_trade boolean NOT NULL DEFAULT
-      false`, plumbed through `@marx2/contracts` (`^1.6.61`), the wallets portfolio
-      routes, and the SPA's portfolio settings form. Default `false` so no existing
-      account changes behaviour on deploy.
-- [ ] Seed the default from §87.3's list for the seven listed kontо — otherwise the
+- [x] `portfolios.portfolios` gains `cash_leg_on_trade boolean NOT NULL DEFAULT
+      false`, plumbed through `@marx2/contracts` (published `1.6.62`; consumers pin
+      `^1.6.62`), the wallets portfolio routes, and the SPA's portfolio settings
+      form. Default `false` so no existing account changes behaviour on deploy.
+- [x] Seed the default from §87.3's list for the seven listed kontо — otherwise the
       UI would show "no cash transaction" for XTB while the importer creates one
       anyway, which is the exact disagreement this setting exists to prevent.
-- [ ] The SPA's buy/sell form reads the portfolio's flag, pre-ticks the checkbox,
+> Wallets keeps its own copy, `CASH_LEG_DEFAULT_PORTFOLIOS` in
+> `src/routes/portfolios.ts`, with a pointer back to the mapper's `ALWAYS_CASH_LEG`
+> — the duplication §87.3's fourth bullet accepted, not an oversight.
+> The existing rows needed a **data** migration, not just a column default: the
+> ten PROD portfolios predate the column, so the default alone would have left all
+> of them unticked. `0015_cash_leg_on_trade.sql` therefore carries the DDL *and* a
+> guarded `UPDATE … WHERE name = ANY(ARRAY[…7…])` (the §7b rule from
+> `database-schema-migrations.md`: a schema change and its data move may share a
+> file, separated by `--> statement-breakpoint`).
+- [x] The SPA's buy/sell form reads the portfolio's flag, pre-ticks the checkbox,
       and on submit creates the cash row through §87.2's `linked_trade_id`, so a
       UI-created pair behaves identically to an imported one. Unticking skips it.
-- [ ] The import path must **not** read this column. Add a test asserting an
+> Both write paths needed it, not one: the new-position path (`POST /:id/positions`,
+> which is itself a BUY) and the buy/sell path (`POST /:id/transactions`). The flag
+> is only the form's default — the **request** is the source of truth, so an
+> explicit `cashLeg: false` reaches the server and an omitted field changes nothing
+> for existing callers.
+- [x] The import path must **not** read this column. Add a test asserting an
       imported `AU=0` trade on an account with the flag on still imports with no
       cash row — the two mechanisms stay independent.
-- [ ] Tests: flag on → a UI-created buy yields a linked cash row and deleting the
+- [x] Tests: flag on → a UI-created buy yields a linked cash row and deleting the
       buy removes it; flag off → no cash row; a listed kontо shows the box pre-ticked
       on open; un-ticking per transaction is honoured; and the independence test
       above.
-- [ ] `npm run build && npm run test` (SPA), `npm run test:mock && npm run test:e2e`
+- [x] `npm run build && npm run test` (SPA), `npm run test:mock && npm run test:e2e`
       against a rebuilt compose stack; commit per repo.
 
+> Contracts `1.6.62` · wallets `b01b359` + `d2531f0` (604 unit tests green) · SPA
+> `4a3544b` (587 unit, `test:mock` 242/242, `test:e2e` 131 passed / 1 failed / 1
+> skipped — the one failure is the pre-existing `portfolios.spec.ts:289` "KO"
+> instrument-search window, documented in §80 and reproduced on an unmodified
+> checkout). New `tests/e2e/cash-leg-on-trade.spec.ts` (5 specs) covers the
+> pre-ticked box, the per-transaction untick, the flag round-trip, the kontо-name
+> default, and the import's independence.
+> **PROD 2026-10-02**: wallets `v1.1.123` + SPA `v1.0.363`; the `0015` DML seeded
+> exactly the seven listed kontо to `true` and left `IBKR` / `IKE Beata` /
+> `IKE Marek` `false`. Verified in the browser on XTB: the buy form's
+> "Also create a cash transaction" box is present and pre-ticked.
+> **And the gap this found, now §88:** there are TWO "Rename portfolio" dialogs
+> (the page's and the card's), §87.5's checkbox landed in one of them, and the
+> owner could not see it in the other. Extract both into one component — §88.
+
+
+---
+
+## 88. One "Portfolio settings" dialog, not two copies of it (2026-10-03)
+
+Owner-driven, found while landing §87.5. The app has **two** dialogs that are the
+same dialog: `PortfolioDetailView.vue`'s (opened by the page's "Rename" button) and
+`PortfolioCard.vue`'s (opened by the card's kebab menu → "Edit"). Both carry
+`aria-label="Rename portfolio"`, both own a `renameName`/`renameBusy`/
+`renameError` trio plus their own `updatePortfolio` call, and both had to be edited
+when §87.5 added the cash-leg switch — which is exactly how they drifted: §87.5
+landed the checkbox on the detail page first, and the owner reported the card's
+dialog still had none, i.e. the setting was editable from `/en/portfolios/:id` and
+invisible from `/en/investments`.
+
+This is a duplicate-with-a-history, not a cosmetic one. The lesson generalises: a
+per-portfolio setting added to "the dialog" is added to one of the dialogs.
+
+**Design decisions (resolved).**
+- **One component, two openers.** The dialog moves out of both parents into
+  `src/modules/portfolios/PortfolioSettingsDialog.vue`; the parents keep only the
+  button/menu item and an `open` ref. No new route, no store change.
+- **The dialog owns the write**, like every other dialog in
+  `src/modules/portfolios/` (`RecordDividendDialog`, `EditTransactionModal`): it
+  takes `portfolioId` + the current `name`/`cashLegOnTrade`, calls
+  `updatePortfolio`, and emits `saved`. The parents' post-save refresh stays where
+  it is (the card `store.fetchAll()` + its "Portfolio renamed" notice, the detail
+  view `fetchAll()` + `fetchDetail(id)`), because only they know what their
+  surface renders.
+- **The trigger label becomes "Settings"** on both surfaces (page button, card menu
+  item) and the heading stays "Portfolio settings". The dialog's `aria-label`
+  changes to "Portfolio settings" too — it is no longer a rename form. §88.2 owns
+  every test that selected the old label; per `docs/COMPONENTS.md` a testid/label
+  rename is stable API and must move in the same commit as the change.
+- **Both testids collapse to one**, `cash-leg-on-trade`. Two testids for one
+  control is what let §87.5's e2e pass while the card's dialog was missing the
+  control entirely.
+- **One input id**, `portfolio-settings-name`. The two parents currently disagree
+  (`rename-name` vs `portfolio-name`), so a page can carry both labels' `for`
+  attributes pointing at nothing.
+
+Scope: the SPA only. No contract, wallets or sheets-sync change — `cashLegOnTrade`
+already exists on `Portfolio` and `CreatePortfolioRequest` (§87.5).
+
+### 88.1 — Extract `PortfolioSettingsDialog.vue`
+
+- [ ] New `src/modules/portfolios/PortfolioSettingsDialog.vue`:
+      `defineProps<{ open: boolean; portfolioId: string; name: string;
+      cashLegOnTrade?: boolean }>()`, `defineEmits<{ close: []; saved: [] }>()`,
+      local `name`/`cashLeg`/`busy`/`error` seeded from the props in a `watch` on
+      `open` (the same shape both parents use today in `openRename`), and the
+      submit calling `updatePortfolio(portfolioId, { name: trimmed,
+      cashLegOnTrade })`. On success: `busy = false`, `emit("saved")`, `close`.
+      Copy the markup verbatim from `PortfolioDetailView.vue`'s dialog (it is the
+      newer of the two) including the §87.5 help text and `dark:` variants.
+- [ ] Move, do not redesign: the overlay (`fixed inset-0 z-50 … bg-slate-900/40
+      p-4 pt-24`), `card w-full max-w-md p-6`, `role="dialog"`,
+      `aria-modal="true"`, the `@click.self` close, the error line, and the
+      Cancel/Save pair. `@click.stop` on the inner card **only** where the parent
+      needs it (the card's dialog sits inside a clickable card, the detail page's
+      does not) — express it as a `stopInnerClick?: boolean` prop rather than
+      copying the attribute into both.
+- [ ] Replace the duplicated `<input id>` with one `portfolio-settings-name`, and
+      both `cash-leg-on-trade` testids with that single testid.
+- [ ] Tests: `tests/unit/modules/portfolios/PortfolioSettingsDialog.test.ts` —
+      mounts with `open: true`, asserts the checkbox reflects the `cashLegOnTrade`
+      prop; submitting calls `updatePortfolio` with `{ name, cashLegOnTrade }`
+      (mocked `@/api/portfolios`, per `PortfolioCard.test.ts`'s existing mock
+      shape); an empty/whitespace name does not call it; a rejected promise renders
+      the error and keeps the dialog open; `saved` + `close` are emitted together.
+- [ ] `npm run build && npm run test`; commit
+      `refactor(spa): extract the portfolio settings dialog`.
+
+### 88.2 — Point both surfaces at it, and fix the labels their tests select
+
+- [ ] `PortfolioDetailView.vue`: delete `showRename`/`renameName`/`renameCashLeg`/
+      `renameBusy`/`renameError`, `openRename`, `submitRename` and the dialog
+      markup; render `<PortfolioSettingsDialog :open="showSettings" … @close="
+      showSettings = false" @saved="onSettingsSaved" />` and relabel the button
+      "Rename" → "Settings".
+- [ ] `PortfolioCard.vue`: the same deletion; the kebab menu item "Edit" becomes
+      "Settings"; `onSettingsSaved` keeps the existing `store.fetchAll()` and the
+      `notice.value = "Portfolio renamed"` → retitle to "Portfolio updated", since
+      the dialog is no longer only a rename.
+- [ ] Both parents pass `cashLegOnTrade` from what they already hold
+      (`store.detail?.cashLegOnTrade` on the page, `props.portfolio.cashLegOnTrade`
+      on the card). Neither may fetch it itself.
+- [ ] Update every selector that names the old things, in the same commit:
+      `aria-label="Rename portfolio"` → `"Portfolio settings"` in
+      `tests/e2e/parity-portfolios.spec.ts:87` and in
+      `tests/e2e/cash-leg-on-trade.spec.ts`; the card's
+      `card-cash-leg-on-trade` → `cash-leg-on-trade`; the page button name
+      "Rename" → "Settings"; the kebab item "Edit" → "Settings". Grep first:
+      `grep -rn "Rename portfolio\|Rename\"\|card-cash-leg-on-trade" tests/ src/`
+      must return nothing afterwards.
+- [ ] The §87.5 e2e keeps BOTH of its dialog cases (page + card) and they now
+      assert the *same* testid, so a future edit that touches one dialog and not
+      the other cannot pass.
+- [ ] `npm run build && npm run test && npm run test:mock`, then
+      `docker compose up -d --build && docker compose up -d --force-recreate
+      gateway` (the gateway caches upstream IPs, AGENTS.md) and
+      `npm run test:e2e`; commit
+      `refactor(spa): one settings dialog behind both the page button and the card menu`.
+
+### 88.3 — Closeout
+
+- [ ] `docs/COMPONENTS.md`: add `PortfolioSettingsDialog.vue` to the "Feature
+      view / dialog" reference row, and record the rule this section exists
+      because of — *a per-portfolio setting added to "the dialog" is added to one
+      of the dialogs until there is exactly one*.
+- [ ] Sweep for the same shape elsewhere before declaring the pattern fixed, and
+      record what it finds — the sweep run while writing this section (2026-10-03)
+      already found the **second** instance of this exact defect:
+
+      ```
+      $ grep -rho 'aria-label="[^"]*"' src/ | sort | uniq -c | sort -rn | head -3
+            2 aria-label="Rename portfolio"
+            2 aria-label="Delete portfolio"
+      ```
+
+      So `PortfolioDetailView.vue:317` and `PortfolioCard.vue:708` hold a second
+      copy-paste pair — the delete-confirm dialog, identical but for the button
+      class (`btn-danger` vs `btn-primary bg-red-600`) and the name source. It is
+      **not** fixed here (one section, one concern: this one is the settings
+      dialog), and it is recorded so the next dialog-shaped change to either file
+      knows the other file has the same thing. Every other dialog in the app is
+      single-instance, so the rename/settings pair and the delete pair are the
+      whole of the pattern today.
+- [ ] Tick §88 in the archive pass with §87; commit.
