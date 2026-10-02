@@ -10,7 +10,7 @@ const props = defineProps<{ data: TopologyNodeData }>()
 
 <template>
   <div
-    class="relative flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 dark:border-blue-900/40 dark:bg-blue-950/30"
+    class="relative flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 dark:border-blue-900/40 dark:bg-blue-950/30"
     :data-node-id="props.data.id"
   >
     <svg
@@ -27,7 +27,7 @@ const props = defineProps<{ data: TopologyNodeData }>()
       <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
       <path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3" />
     </svg>
-    <span class="truncate text-sm font-medium text-blue-900 dark:text-blue-100">{{ props.data.label }}</span>
+    <span class="truncate text-base font-medium text-blue-900 dark:text-blue-100">{{ props.data.label }}</span>
     <StatusDot v-if="props.data.live" :data="props.data" />
     <NodeHandles />
   </div>

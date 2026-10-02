@@ -352,6 +352,33 @@ test("lane parent boxes render per area and never overlap", async ({ page }) => 
   }
 })
 
+test("every rendered node fits inside its lane, not just the sampled five (§80.4)", async ({ page }) => {
+  await openTopology(page)
+
+  // NODE_SIZES is a hand-maintained per-area constant and the components draw
+  // their own box from Tailwind padding, so the two can disagree — and a node
+  // wider than the lane that reserved room for it is clipped. Measure what the
+  // browser actually painted, for every node.
+  const overflow = await page.evaluate(() => {
+    const bad: string[] = []
+    for (const el of Array.from(document.querySelectorAll("[data-node-id]"))) {
+      const node = el as HTMLElement
+      const lane = node.closest(".topo-lane-node") as HTMLElement | null
+      if (!lane) continue
+      const n = node.getBoundingClientRect()
+      const l = lane.getBoundingClientRect()
+      const id = node.getAttribute("data-node-id")
+      if (n.left < l.left - 1 || n.right > l.right + 1 || n.top < l.top - 1 || n.bottom > l.bottom + 1) {
+        bad.push(
+          `${id}: node ${n.width.toFixed(0)}x${n.height.toFixed(0)} at ${n.left.toFixed(0)},${n.top.toFixed(0)} escapes lane ${l.width.toFixed(0)}x${l.height.toFixed(0)} at ${l.left.toFixed(0)},${l.top.toFixed(0)}`,
+        )
+      }
+    }
+    return bad
+  })
+  expect(overflow).toEqual([])
+})
+
 test("dragging a lane header moves its member nodes together", async ({ page }) => {
   await openTopology(page)
 

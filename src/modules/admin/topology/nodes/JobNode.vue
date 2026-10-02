@@ -10,7 +10,7 @@ const props = defineProps<{ data: TopologyNodeData }>()
 
 <template>
   <div
-    class="relative flex items-center gap-2 rounded-lg border border-dashed border-green-400 bg-green-50 px-3 py-2 dark:border-green-700 dark:bg-green-950/30"
+    class="relative flex items-center gap-2 rounded-lg border border-dashed border-green-400 bg-green-50 px-4 py-2.5 dark:border-green-700 dark:bg-green-950/30"
     :data-node-id="props.data.id"
   >
     <svg
@@ -26,7 +26,7 @@ const props = defineProps<{ data: TopologyNodeData }>()
       <circle cx="12" cy="12" r="9" />
       <polyline points="12 7 12 12 15 14" />
     </svg>
-    <span class="truncate text-sm font-medium text-green-900 dark:text-green-100">{{ props.data.label }}</span>
+    <span class="truncate text-base font-medium text-green-900 dark:text-green-100">{{ props.data.label }}</span>
     <StatusDot v-if="props.data.live" :data="props.data" />
     <NodeHandles />
   </div>

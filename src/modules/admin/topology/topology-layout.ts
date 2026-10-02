@@ -37,16 +37,46 @@ export function laneId(area: NodeArea): string {
   return `lane-${area}`
 }
 
-/** Approximate rendered node size per area — drives dagre spacing. */
+/**
+ * Rendered node size per area — drives dagre spacing and the lane boxes.
+ *
+ * This has to be the size the component actually renders at, not a guess: dagre
+ * spaces columns by it and `areaBox` sizes each lane from it, so a value smaller
+ * than the markup makes the lane clip its own members. §80.4 measured the boxes
+ * in the browser (`getBoundingClientRect()` on each rendered node, divided by
+ * the vue-flow zoom) after enlarging the components to `px-4 py-2.5` / `text-base`
+ * — see MIN_RENDERED_SIZES below for the measured range, and the
+ * `NODE_SIZES >= MIN_RENDERED_SIZES` test that keeps the two from drifting.
+ *
+ * Widths are the widest rendered node of the area, rounded up: labels drive the
+ * box (they truncate only inside a constrained lane), so anything narrower
+ * overlaps the next column. Heights are the rendered height plus a 2px margin.
+ */
 export const NODE_SIZES: Record<NodeArea, { width: number; height: number }> = {
-  internal: { width: 200, height: 40 },
-  storage: { width: 150, height: 40 },
-  jobs: { width: 160, height: 40 },
-  "external-services": { width: 160, height: 36 },
-  "data-providers": { width: 120, height: 28 },
+  internal: { width: 240, height: 48 },
+  storage: { width: 160, height: 48 },
+  jobs: { width: 220, height: 48 },
+  "external-services": { width: 190, height: 48 },
+  "data-providers": { width: 210, height: 36 },
 }
 
-const LANE_PADDING = 24
+/**
+ * The *smallest* box each area's component renders at, measured in the browser
+ * on 2026-10-02 (widest node recorded per area too, in the comment):
+ * internal 166.8…230.3, storage 99.0…146.6, jobs 118.3…208.5,
+ * external-services 107.0…179.8, data-providers 53.5…197.2, all 46 tall except
+ * providers at 34. NODE_SIZES must be at least this, or the constant can drift
+ * back below the markup without anything failing.
+ */
+export const MIN_RENDERED_SIZES: Record<NodeArea, { width: number; height: number }> = {
+  internal: { width: 167, height: 46 },
+  storage: { width: 99, height: 46 },
+  jobs: { width: 118, height: 46 },
+  "external-services": { width: 107, height: 46 },
+  "data-providers": { width: 54, height: 34 },
+}
+
+const LANE_PADDING = 32
 /** Minimum separation kept between two lanes after packing. */
 const LANE_GAP = 16
 

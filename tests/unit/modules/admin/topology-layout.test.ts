@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { layoutTopology, nearOverlap, packAreas, NODE_SIZES, laneId } from "@/modules/admin/topology/topology-layout"
+import { layoutTopology, nearOverlap, packAreas, NODE_SIZES, MIN_RENDERED_SIZES, laneId } from "@/modules/admin/topology/topology-layout"
 import { NODE_AREAS, nodeById, topologyNodes } from "@/modules/admin/topology/graph-definition"
 
 const layout = layoutTopology()
@@ -155,5 +155,16 @@ describe("topology layout (D55-9)", () => {
     const lane = layout.lanes.find((l) => l.area === "external-services")!
     const full = layout.lanes.reduce((m, l) => Math.max(m, l.x + l.width), 0)
     expect(lane.width).toBeLessThan(full * 0.5)
+  })
+
+  it("reserves at least the box each node component renders at (§80.4)", () => {
+    // NODE_SIZES is maintained by hand against the Tailwind padding in
+    // nodes/*.vue, and the two used to disagree silently — dagre spaced columns
+    // for a smaller box than the component drew, so a lane could clip its own
+    // members. MIN_RENDERED_SIZES is the measurement; this is the tripwire.
+    for (const area of NODE_AREAS) {
+      expect(NODE_SIZES[area].width, `${area}: width vs rendered`).toBeGreaterThanOrEqual(MIN_RENDERED_SIZES[area].width)
+      expect(NODE_SIZES[area].height, `${area}: height vs rendered`).toBeGreaterThanOrEqual(MIN_RENDERED_SIZES[area].height)
+    }
   })
 })
