@@ -210,12 +210,12 @@ if (key.toLowerCase().includes("growth") || key === "netIncomeMargin" ||
 `33.7%`. Its three siblings in that branch (`netIncomeMargin`,
 `debtEquityRatio`, and any `*growth*`) are real ratios.
 
-- [ ] **Drop `freeCashFlowPerShare` from the percent branch of `cell()`** in
+- [x] **Drop `freeCashFlowPerShare` from the percent branch of `cell()`** in
       `src/modules/instruments/ResearchFundamentals.vue:47`, leaving the three
       real ratios. It then falls through to the numeric ladder
       (`formatCompact` ≥1e6 → `toLocaleString` ≥1000 → `toFixed(2)`), which is
       correct for a per-share amount in the instrument's currency.
-- [ ] **Add a unit test** that asserts `cell()` returns `"33.67"`, not
+- [x] **Add a unit test** that asserts `cell()` returns `"33.67"`, not
       `"33.7%"`, for `freeCashFlowPerShare: 33.67`, and still returns a
       percent for `netIncomeMargin: 12.5`.
       > `cell()` is currently not exported and has no test file. Export it (or
@@ -223,6 +223,16 @@ if (key.toLowerCase().includes("growth") || key === "netIncomeMargin" ||
       > `compareMetrics.ts`) and cover all four percent-branch keys plus the
       > three ladder thresholds. Tests: `npm run test` green; `npm run build`
       > (includes `vue-tsc --noEmit`) green.
+      > Extracted as `formatFundamentalsCell`, imported back into the SFC under
+      > its old name so the template is untouched. Nine tests: every
+      > percent-branch key (the `*growth*` substring test covers four columns at
+      > once) and all three ladder thresholds, including the magnitude rule for
+      > negative amounts. 505 tests green, `vue-tsc` clean.
+      > Not fixed, and it needs a decision rather than a step: `debtEquityRatio`
+      > is in the same percent branch but is a MULTIPLE — 1.52 renders as
+      > `1.5%`. It predates this section; §79.3 is what made it visible by
+      > populating it for non-US names. One line, but it changes what a live
+      > column displays, so it is the user's call.
 
 **b. Never populated.** The `cashFlow` mapper in `toFundamentals()`
 (`src/adapters/translate.ts:596-616`) builds its row object explicitly and
