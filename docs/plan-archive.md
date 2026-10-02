@@ -18676,3 +18676,305 @@ percents. `PortfolioPerformanceTab.vue` compensates with an explicit `v * 100`
 and a comment; the Risk tab does not. Pre-existing, not caused by §81 (the
 pre-deploy value 1.809 would have rendered `1.81%`).
 
+
+---
+
+## 84. Accounts balance tab — per-account value, deposits and P/L table (D84)
+
+Source: the `Konto` summary block of the source spreadsheet (columns M–S). The
+ten `Konto` values are the ten **portfolios** in PROD — verified 2026-10-02:
+`IB` is the only renamed account (`IBKR`), the other nine match by name. The row
+unit is a portfolio, not a wallet, so no new entity is introduced and no join to
+the sheet's own catalog is needed.
+
+Column semantics, as the spreadsheet defines them:
+
+| # | Column | Definition | Payload field |
+|---|---|---|---|
+| 1 | Account | portfolio name | `name` |
+| 2 | Investments | instruments' current value | `instrumentsValue` |
+| 3 | Free cash | current free cash, not invested | `cashValue` |
+| 4 | Total | 2 + 3 | `totalValue` |
+| 5 | Deposits | inflow − outflow **± transfer** to the account | `totalInvested` |
+| 6 | P/L | 4 − 5 | derived |
+| 7 | Return % | 6 / 5 | `returnPercentage` |
+
+**Every field is already on `PortfolioTotalMetrics.portfolioBreakdown`, so this
+section adds no contract field, no backend route and no new endpoint.** Column 6
+is the derivation the store already performs at `stores/portfolios.ts:219`; this
+tab reuses it rather than writing a second copy.
+
+Two properties of the payload make the table exact rather than approximate, and
+both are load-bearing — do not "simplify" either away:
+
+- **Column 4 = column 2 + column 3 holds to the cent.** `portfolios.ts:350-351`
+  rounds `instrumentsValue` and `cashValue` *first* and sets `totalValue` from
+  the rounded parts (`:367-369`), so the contract's promise is literally kept.
+- **Column 5 already includes transfers.** The breakdown reads the denormalized
+  `portfolios.totalInvested` column, written by `externalCashInvested`
+  (`cashLedger.ts:329`) = Σ DEPOSIT − Σ WITHDRAWAL **± TRANSFER legs**. Verified
+  arithmetically on IBKR in PROD: deposits ≈ 15.9k PLN, withdrawals −121 130 PLN,
+  net transfers +69 420,89 EUR, summing at an implied ~4,43 PLN/EUR to the
+  202 750,68 the endpoint returns. A deposits-only basis could not produce it.
+
+Including transfers in the basis is what makes `Total − Deposits` an identity.
+Excluding them would leave the two columns on different conventions — `cashValue`
+is a *balance* and must count an own-account transfer that arrived, while a
+transfers-free *flow* basis would not — and the P/L of such a row would silently
+contain that transfer.
+
+Recorded decisions (resolved with the user):
+
+- **New tab, first in the strip, and the landing page.** `Accounts balance` at
+  `/en/investments/accounts-balance`; `/` and the sidebar point at it.
+  `/en/investments` keeps working, so no existing deep link or e2e breaks.
+- **Exactly these seven columns plus a bold Σ footer.** No share-of-total column
+  (`weight` is already on the cards), no per-row unpriced/stale marker.
+- **Rows are links** to `/en/portfolios/:id/holdings`.
+- **One repo, `portfoliost`.** The provider tier (openst → cachest → instruments)
+  does not apply: no new data source, no scraping, no `config.yaml` route.
+- **Ordering vs §83:** §83.6 also edits `InvestmentsTabs.vue` and adds a tab after
+  `Portfolios`. No conflict — the strip ends up Accounts balance → Portfolios →
+  Performance → Transactions → Watchlists — but land whichever lands first and let
+  the other edit the same array.
+
+### 84.1 — Refresh the stale `/total-metrics` mock seed
+
+`mocks/shared/data/raw/portfolios_total_metrics.json` does not satisfy the
+contract today: its single row carries `portfolioId` / `portfolioName` /
+`originalValue` / `convertedGainLoss` and has no `name`, `instrumentsValue`,
+`cashValue`, `weight` or `unpricedPositions`. The new table needs real rows to
+render in unit and e2e tests, and it is the only source the mock route reads
+(`mocks/portfolios/index.js:266-269`).
+
+- [x] Rewrite the seed to the current `PortfolioTotalMetrics` shape with ≥3 rows
+ whose arithmetic holds (`totalValue == instrumentsValue + cashValue`), one
+ **negative `cashValue`** row and one **`totalInvested: 0`** row, so the table's
+      edge cases are covered by tests rather than only in PROD.
+      > Pick the two edge rows from real behaviour: PROD's XTB has cash −24,26 and
+      > deposits 0 today, which is exactly the pair that must render `—` for
+      > Return % and keep a signed cash figure.
+      > Four rows: Top10 on the mock's real seeded id (keeping the capture's own
+      > 109984,34 / 98083,40), IBKR, a losing IKE Marek, and XTB as the edge pair.
+      > Only `mocks/shared/data/raw/` was rewritten — `discovery/raw/` keeps the
+      > example-service capture, which is the split the tree already uses for
+      > `auth_me.json`, `portfolios_summaries.json` and four others. The mock's
+      > `/api/portfolios` carries Top10 alone, so the other three rows are
+      > fixture-only; nothing in the mock or the suite follows their links.
+- [x] **Tests**: `npm run test:mock` green; the existing breakdown cases in
+      `tests/unit/modules/portfolios/InvestmentsView.test.ts:393-492` still pass
+      against the new seed.
+      > Four checks added to `mocks/tests/run.mjs`, because nothing asserted this
+      > fixture and it drifted silently once already — the dashboard tile and this
+      > table both render whatever the breakdown says. Verified by restoring the
+      > stale file: 235 passed / 4 failed; with the new seed, 239 passed.
+- [x] Commit `test(mock): refresh the total-metrics seed to the current contract shape`
+
+### 84.2 — `AccountsBalanceView` + route + tab + landing
+
+- [x] Add `{ path: "investments/accounts-balance", name: "accounts-balance",
+      component: () => import("@/modules/portfolios/AccountsBalanceView.vue") }`
+      to the `/en` children (`src/router/index.ts:45-65`) and repoint the `/`
+      redirect (`:9`) at it. `/en/investments` stays untouched.
+- [x] Prepend the tab to `InvestmentsTabs.vue:8-24`
+      (`label: "Accounts balance"`, `match: startsWith(...)`) so the strip reads
+      Accounts balance → Portfolios → Transactions → Watchlists on all four views
+      that render it (`InvestmentsView.vue:325`, `TransactionsView.vue:13`,
+      `CashTransactionsView.vue:15`, `WatchlistsView.vue:94`).
+- [x] Add the new route name to `SidebarNav.vue` `isActive` (`:77-86`) — the
+      function enumerates route names explicitly, so without this the sidebar item
+      goes dark on the new landing page.
+      > The decision above says "the sidebar points at it", which two edits
+      > satisfy without mislabelling anything: the route name joins the `isActive`
+      > enumeration, and the sidebar's logo link now targets the landing page. The
+      > "Portfolios" nav item still targets `/en/investments` — a tab switch
+      > inside the same section — rather than a link labelled Portfolios that
+      > opens Accounts balance. Reverse the logo `to` if the user wants the nav
+      > item itself repointed.
+- [x] New `src/modules/portfolios/AccountsBalanceView.vue`: the seven columns
+      above, sortable on every one (click toggles asc/desc, numeric compare, default
+      Total desc), each row a `router-link` to `/en/portfolios/:id/holdings`, and a
+      bold Σ footer row.
+      > A `<router-link>` cannot wrap a `<tr>`, so a row is a `<tr>` with a click
+      > handler plus a real `<router-link>` in the Account cell (focusable,
+      > middle-clickable, announced as a link); the handler ignores a click that
+      > already landed on an anchor, so the target is never pushed twice. The
+      > footer's Return % is `Σgain / Σinvested`, not a sum of ratios — the only
+      > figure a reader can reconcile with the row above it, and the headline's own
+      > return. A row whose Return % is `null` sorts last in BOTH directions:
+      > flipping it to the front on a descending sort would put a non-number where
+      > the user looks for their best performer.
+- [x] **Call `store.fetchAll()` in `onMounted`,** as `WatchlistsView.vue:26` does.
+      The store is per-route state, so landing straight on this tab finds it empty;
+      this adds no new *endpoint* (`fetchAll` already fetches `/api/portfolios` and
+      `/api/portfolios/total-metrics`, `stores/portfolios.ts:20-36`) but it does
+      need the fetch.
+- [x] Read **`store.totalMetrics.portfolioBreakdown` only.** P/L is
+      `totalValue − totalInvested`; Return % is `row.returnPercentage` with the same
+      `(totalValue − invested) / invested × 100` fallback the store already applies
+      at `stores/portfolios.ts:219-225`, because the field is optional in the
+      contract and a response omitting it would otherwise render blank.
+- [x] Put the row derivation and the sort comparator in an exported pure function
+      in a plain `<script>` block (`docs/COMPONENTS.md` — "shared math"), so the
+      unit test exercises the arithmetic without mounting.
+- [x] Convert every money column through
+      `useDisplayConversion(() => store.totalMetrics?.baseCurrency)`
+      (`composables/useDisplayConversion.ts:22`) — the same aggregate base the
+      dashboard tiles use, so the Σ footer and the "Total value" tile are one
+      number by construction. `convert()` returns `null` while the rate resolves:
+      render `—`, never `0`.
+- [x] Format through `src/utils/format.ts` (`formatCurrency`, `formatSignedCurrency`,
+      `formatPercent`); money cells `tabular-nums`. Two rendering rules the data
+      forces: a `totalInvested <= 0` row renders `—` for Return % (0/0 is not a
+      number and the route returns `0`, not `NaN`), and a negative `cashValue`
+      keeps its sign — it must not be clamped, per `openapi.yaml:1201`.
+- [x] `data-testid="accounts-balance"` with `-row`, `-account`, `-investments`,
+      `-cash`, `-total`, `-deposits`, `-gain`, `-return` and `-totals`.
+- [x] **Tests**: new `tests/unit/modules/portfolios/AccountsBalanceView.test.ts` —
+      rows render the payload; a negative cash row keeps its sign; a
+      `totalInvested: 0` row renders `—` for Return %; column 6 equals
+      `totalValue − totalInvested` and column 7 equals `6 / 5`; the footer Σ
+      equals Σ rows and equals `toDisplay(totalMetrics.totalValue)`; sorting
+      toggles both directions; a display-currency switch re-renders the money
+      columns without a remount (mirror `InvestmentsView.test.ts:275-330`).
+- [x] **Tests**: `npm run build` (includes `vue-tsc --noEmit`) + `npm run test` green.
+- [x] Commit `feat(spa): add the Accounts balance tab`
+
+### 84.3 — E2E + full local gate
+
+- [x] New `tests/e2e/accounts-balance.spec.ts`: `/` lands on the tab; the tab is
+      first in the strip; all seven headers render; column 6 equals column 4 minus
+      column 5 on a seeded row; the Σ footer's Total equals the Portfolios page's
+      `tile-total-value` after the same conversion; switching the display currency
+      to USD re-renders the money columns; a row click reaches
+      `/en/portfolios/:id/holdings`.
+      > The compose seed has exactly ONE portfolio (Top10), so the multi-row
+      > behaviour — sorting, the em-dash Return % — is the unit test's job; the
+      > browser covers the landing page, the DOM arithmetic and the cross-route
+      > agreement with `tile-total-value`. The currency spec forces USD before it
+      > starts and restores it after: `setCurrency` writes through to the server
+      > preference (`stores/displayCurrency.ts`), so a sibling spec that leaves the
+      > preference on PLN would otherwise make this one order-dependent.
+- [x] `docker compose up -d --build` (rebuild `portfoliost` after the SPA change),
+      then `docker compose restart gateway` — per `portfoliost/AGENTS.md` a
+      recreated upstream leaves nginx holding a stale IP and the symptom is a
+      misleading 404, not a 502.
+      > Confirmed by measurement after the rebuild: `/api/portfolios` answered 200
+      > direct on :3002 and through :8080, and `/api/portfolios/total-metrics`
+      > through the gateway returned the seeded breakdown, not an empty one.
+- [x] **Tests**: `npm run build && npm run test && npm run test:mock && npm run test:e2e`
+      all green.
+      > build green · 537 unit tests · 239 mock checks · e2e 121 passed, 1 skipped,
+      > **1 failed**: `portfolios.spec.ts:289`, the pre-existing KO instrument-search
+      > failure that reproduces on an unmodified checkout (§80, and the KB entry for
+      > this repo). Not caused by this section and not fixed by it.
+- [x] Commit `test(e2e): cover the Accounts balance tab`
+
+### 84.4 — PROD release + sheet cross-check (homelab skill)
+
+- [x] Push `portfoliost` `main`; GHA builds `ghcr.io/marx2/portfoliost`. Verify the
+      real tag with `gh release list --repo Marx2/portfoliost` before pinning —
+      never tag by hand.
+- [x] Pin it in
+      `~/prv/homelab/homelab/cluster/apps/pfire/portfoliost/app/helmrelease.yaml`,
+      commit + push the homelab repo, wait ~1 min for Flux, then
+      `export KUBECONFIG=$HOME/.kube/homylab-tailscale`, namespace `pfire`.
+- [x] Verify in PROD with the persistent Playwright daemon (`.pi/skills/playwright`,
+      already authenticated against `portfoliost.k.homylab.com`):
+      - Σ footer Total == the dashboard "Total value" tile;
+      - the Deposits column reproduces the sheet's `Wpłata` **exactly** on the five
+        accounts where the sheet and the sync still agree — PPK 74 443,29 · PPO
+        97 485,29 · Obligacje PKO SA Beata 115 000,00 · IKE Beata 132 099,00 · IKE
+        Marek 54 548,00 (all confirmed in PROD 2026-10-02). That equality is the
+        strongest available proof the basis means the same thing in both systems.
+      - IBKR and Equate+ are **expected** to differ from the sheet (192 468,70 and
+        21 379,79 there, against 202 750,68 and 23 901,40 in PROD): the sheet's own
+        deposit ledger has drifted from what the sync imported. Record the PROD
+        figures; do not treat the gap as a defect of this tab.
+- [x] Archive §84 into `plan-archive.md` once the PROD check passes.
+- [x] Commit `chore(homelab): pin the accounts-balance release`
+
+### Closeout — deployed to PROD 2026-10-02
+
+SPA **v1.0.352 → v1.0.354** (v1.0.353 was an unrelated push that landed between
+the two; the tag was read from `gh release list`, never chosen). Homelab commit
+`1c83a9f`, Flux reconciled to `main@sha1:1c83a9fda…` in ~30 s, Helm upgrade
+succeeded and `/en/investments/accounts-balance` served the new bundle. No
+`portfoliost-wallets` release: §84 adds no contract field and no route.
+
+### The seed fixture had drifted, and nothing noticed
+
+`mocks/shared/data/raw/portfolios_total_metrics.json` was still the 2026-08-11
+example-service capture — one row of `portfolioId` / `portfolioName` / `originalValue`, no
+`name` / `instrumentsValue` / `cashValue` / `weight`. Both consumers render
+whatever the breakdown says, so a fixture that stops satisfying the schema fails
+*silently*: the dashboard tile and this table keep drawing a plausible number.
+Rewritten to four rows whose arithmetic holds, and `mocks/tests/run.mjs` now
+asserts the contract rather than trusting the file — verified by restoring the
+stale copy, which fails all four checks.
+
+`discovery/raw/` keeps the capture. That is the split the tree already uses
+(`auth_me.json`, `portfolios_summaries.json` and four others differ between the
+two directories).
+
+### PROD verification (2026-10-02, base PLN, display PLN)
+
+The sheet cross-check the section was opened for:
+
+| account | sheet `Wpłata` | PROD Deposits | |
+| --- | --- | --- | --- |
+| NN TFI PPK | 74 443,29 | 74 443,29 | exact |
+| NN TFI PPO | 97 485,29 | 97 485,29 | exact |
+| Obligacje PKO SA Beata | 115 000,00 | 115 000,00 | exact |
+| IKE Beata | 132 099,00 | 132 099,00 | exact |
+| IKE Marek | 54 548,00 | 54 548,00 | exact |
+| IBKR | 192 468,70 | 202 750,68 | expected gap |
+| Equate+ | 21 379,79 | 23 901,40 | expected gap |
+
+Five exact matches, and the two expected gaps came out at exactly the figures the
+plan had already recorded from PROD. That equality is the strongest available
+proof that `totalInvested` means the same thing in the sheet and in the sync.
+
+Both edge rows behave as designed on live data: **XTB** renders Free cash
+`-PLN 24.26` (sign kept) with Return % `—` on `Deposits 0.00`, and **Equate+**
+renders `-PLN 6,033.85` / `-25.24%` rather than a clamped zero.
+
+Also verified in the browser: default sort Total desc; every column sortable in
+both directions with a `null` Return % last in both; a row click reaching
+`/en/portfolios/4242385c…/holdings` (Crypto); the Account cell a real
+`<a href>`; the display-currency selector re-denominating the columns; no console
+errors. The display currency was left on PLN, as found.
+
+### Σ rows == the headline exactly — but only WITHIN one payload
+
+Checked on the exact response the page rendered from: Σ rows equals the header on
+all four money columns (1 058 679,65 / 41 267,29 / 1 099 946,94 / 746 100,99), and
+`totalValue == instrumentsValue + cashValue` holds to the cent on all ten rows.
+
+Across **two separate fetches seconds apart** it does not: cash moved
+41 267,29 → 41 267,31 and `totalInvested` 746 100,99 → 746 100,97, and one response
+mid-session came back with `baseCurrency: DKK` where the next returned PLN. The
+aggregate re-converts the multi-currency cash ledger at *latest* rates that tick
+between calls. A first PROD pass therefore showed the footer at PLN 1 099 946,94
+against a tile at 1 099 946,95 — the payload had moved, not the arithmetic.
+
+This is why the e2e asserts the footer against `tile-total-value` with a
+**1-unit tolerance** and not byte equality. A byte-equality assertion would be a
+flake waiting for a price tick, and "fixing" it by making the footer read the
+headline instead of Σ rows would be worse: the footer would then disagree with
+the Total column printed directly above it.
+
+### The table fits at 1280 and scrolls below it
+
+Intrinsic need ≈ 1 008 px. At a 1280 viewport the overflow is 2 px (float hair);
+at 1200 it is 82 px and Return % needs the horizontal scroller — the same
+behaviour `TransactionsTable` has below its design width. Left as is.
+
+### Adjacent finding, NOT fixed — the fixture rows are not portfolios
+
+The mock's `/api/portfolios` carries Top10 alone, so the seed's other three
+breakdown rows are fixture-only: in mock mode their links would 404. Nothing in
+the mock or the suite follows them, and e2e reads the real `wallets` service, so
+nothing observes it. Adding three portfolios to `portfolios_summaries.json` would
+make the mock internally consistent and is the obvious follow-up if anyone ever
+runs the SPA against the mock.
