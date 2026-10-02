@@ -319,7 +319,7 @@ money hurt").
 Per proposal D87. The toggle sits in the Returns Chart card header; Monthly is
 today's bar chart unchanged, Yearly renders the four-column table.
 
-- [ ] **Extract the per-year derivation as a named export** next to the component
+- [x] **Extract the per-year derivation as a named export** next to the component
       (`docs/COMPONENTS.md` — shared pure logic exported from a component file),
       taking `performance.timeSeries[]` and returning one row per calendar year:
       `year`, `twrPercent`, `gain`, `isYtd`. Two formulas, both exact: year TWR
@@ -329,16 +329,30 @@ today's bar chart unchanged, Yearly renders the four-column table.
       > Do **not** re-chain TWR from monthly bars — `cumulativeTwr` is already the
       > exact chain, and differencing it introduces rounding. Do **not** sum or
       > average the monthly percentages.
-- [ ] **Render Yearly as a table** with a `Σ` footer row: the % cell shows the
+      > Landed as two exports: `yearlyReturns(series, today)` and
+      > `yearlyTotals(rows)`. `today` is a parameter, not `new Date()` inside, so
+      > `isYtd` is testable. A year whose last point has no `cumulative_twr` is
+      > **skipped**, not shown as 0.00% — 0.00% is a claim about the year and an
+      > absent index supports no claim.
+- [x] **Render Yearly as a table** with a `Σ` footer row: the % cell shows the
       compounded product (`× 1.7044`), the Gain cell the sum. Mark the current
       calendar year `YTD` and never annualise it.
-- [ ] **Gate Yearly to `ALL`** (proposal D87): `analytics` is timeframe-filtered
+      > A caption states that Σ is a compounded product, not a sum — the Σ row's
+      > job is to make the difference visible, and a label that only encodes it
+      > positionally is a label nobody reads.
+- [x] **Gate Yearly to `ALL`** (proposal D87): `analytics` is timeframe-filtered
       server-side, so a 3M window holds no year. Selecting any other timeframe
       forces Monthly and disables the toggle with a visible hint. Do not issue a
       second `ALL` fetch.
-- [ ] **Convert the Gain column** with the same `chartRate` used by the tiles, so
+      > The forced-Monthly case is a computed (`activeReturnsMode`) over the
+      > stored choice, so returning to `ALL` restores Yearly — and a test asserts
+      > `getPortfolioAnalytics` is not called to satisfy the toggle.
+- [x] **Convert the Gain column** with the same `chartRate` used by the tiles, so
       the Σ footer equals the Net gain tile on screen.
-- [ ] **Tests**: unit-test the exported derivation against the worked example in
+      > Pinned as an equality between the two testids, before and after a
+      > display-currency switch — they share one rate, so a regression in either
+      > is one assertion away.
+- [x] **Tests**: unit-test the exported derivation against the worked example in
       the proposal — four years at +24.1 / +18.2 / +11.4 / +4.3 % with gains
       5,300 / 4,100 / 2,950 / 890 must yield a compounded product of `1.7044`
       (±0.0001 on the stored 2 dp index) and a gain sum of `13,240`; plus the
@@ -346,7 +360,16 @@ today's bar chart unchanged, Yearly renders the four-column table.
       `Π(1 + twr)` equals `cumulativeTwr` at the last point) which are the whole
       point of the two columns and must fail loudly if either drifts. Add
       component cases for the toggle state and the YTD label.
-- [ ] **Commit** `feat(spa): add yearly TWR and gain to the returns chart`
+      > 20 new cases (33 in the file). **Mutation-verified**, because "must fail
+      > loudly" is only worth anything if it does: summing the percentages instead
+      > of compounding them fails 3 cases (`× 0.5800` vs `× 1.7044`), and basing
+      > each year on its own FIRST point instead of the previous year's end fails
+      > 7, including both reconciliations.
+      > One fixture correction: `cumulative_twr` is stored at 2 dp
+      > (`returnColumns.buildTwr` rounds `v * 10000 / 100`), so the fixture is
+      > built at that precision, not at the proposal's rounded percentages.
+      > 566/566 SPA unit tests, `npm run build` (vue-tsc) green.
+- [x] **Commit** `feat(spa): add yearly TWR and gain to the returns chart`
 
 ### 82.4 — Excess TWR per year against the benchmark
 

@@ -1,3 +1,87 @@
+<script lang="ts">
+// §82.3 / D88 — the per-year derivation, as an exported pure function beside the
+// component (docs/COMPONENTS.md — shared math goes in a plain `<script>` block).
+// Exported so the reconciliation it exists to guarantee can be asserted without
+// mounting anything.
+
+export interface YearlyReturnRow {
+  /** Calendar year of the row. */
+  year: number
+  /** Year TWR as a PERCENTAGE (same unit as `performance.timeWeightedReturn`). */
+  twrPercent: number
+  /** Change in net gain (`value − invested`) over the year, portfolio base currency. */
+  gain: number
+  /** The current calendar year — a partial year, never annualised. */
+  isYtd: boolean
+}
+
+export interface YearlyReturnTotals {
+  /** Π(1 + twrPercent/100) — the compounded product, NOT the sum of percentages. */
+  compounded: number
+  /** Σ `gain`. */
+  gain: number
+}
+
+interface SeriesPoint {
+  date?: string
+  value?: number
+  invested?: number | null
+  cumulativeTwr?: number
+}
+
+/** One row per calendar year, in ascending order. */
+export function yearlyReturns(series: SeriesPoint[], today: Date): YearlyReturnRow[] {
+  const points = series
+    .filter((p): p is SeriesPoint & { date: string } => typeof p.date === "string" && p.date.length >= 4)
+    .sort((a, b) => a.date.localeCompare(b.date))
+
+  const net = (p: SeriesPoint) => (p.value ?? 0) - (p.invested ?? 0)
+  const currentYear = today.getFullYear()
+
+  // Last point of each year that actually carries a TWR index. A row without one
+  // cannot be differenced, so its year is skipped rather than reported as 0% —
+  // 0.00% is a claim about the year, and an absent index supports no claim.
+  type YearEnd = SeriesPoint & { date: string; cumulativeTwr: number }
+  const yearEnd = new Map<number, YearEnd>()
+  for (const p of points) {
+    if (typeof p.cumulativeTwr !== "number" || !Number.isFinite(p.cumulativeTwr)) continue
+    yearEnd.set(Number(p.date.slice(0, 4)), { ...p, cumulativeTwr: p.cumulativeTwr })
+  }
+
+  const first = points[0]
+  const rows: YearlyReturnRow[] = []
+  let base: YearEnd | undefined = first && typeof first.cumulativeTwr === "number" ? { ...first, cumulativeTwr: first.cumulativeTwr } : undefined
+
+  for (const year of [...yearEnd.keys()].sort((a, b) => a - b)) {
+    const end = yearEnd.get(year)!
+    // §82.3 — the FIRST year is based on the series' own first point, not on a
+    // base the series does not contain: a series starting mid-year reports a
+    // partial year as a partial year.
+    const from = base
+    if (!from || from.cumulativeTwr <= 0) {
+      base = end
+      continue
+    }
+    rows.push({
+      year,
+      twrPercent: (end.cumulativeTwr / from.cumulativeTwr - 1) * 100,
+      gain: net(end) - net(from),
+      isYtd: year === currentYear,
+    })
+    base = end
+  }
+  return rows
+}
+
+/** The Σ footer. Deliberately a product for % and a sum for money. */
+export function yearlyTotals(rows: YearlyReturnRow[]): YearlyReturnTotals {
+  return {
+    compounded: rows.reduce((acc, r) => acc * (1 + r.twrPercent / 100), 1),
+    gain: rows.reduce((acc, r) => acc + r.gain, 0),
+  }
+}
+</script>
+
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watchEffect } from "vue"
 import { useRoute } from "vue-router"
@@ -339,6 +423,25 @@ function withheldText(reason: string | null | undefined): string {
   if (reason === "invalid_data") return "history contains gaps"
   return "not available"
 }
+
+// ---------------------------------------------------------------------------
+// §82.3 / D87 — the Monthly | Yearly toggle on the Returns Chart
+// ---------------------------------------------------------------------------
+const returnsMode = ref<"monthly" | "yearly">("monthly")
+
+/** `analytics` is timeframe-filtered server-side, so only `ALL` holds a year. */
+const yearlyAvailable = computed(() => store.analyticsTimeframe === "ALL")
+
+/** Non-ALL forces Monthly without touching the stored choice, so returning to
+ *  `ALL` restores Yearly without a second fetch. */
+const activeReturnsMode = computed(() => (yearlyAvailable.value ? returnsMode.value : "monthly"))
+
+const yearlyRows = computed(() => yearlyReturns(store.analytics?.performance?.timeSeries ?? [], new Date()))
+const yearlyTotalsRow = computed(() => yearlyTotals(yearlyRows.value))
+
+/** Gain column rides the same `convert()` as the Net gain tile, so the Σ footer
+ *  and that tile are the same number on screen by construction. */
+const yearlyTotalsGain = computed(() => convert(yearlyTotalsRow.value.gain))
 </script>
 
 <template>
@@ -436,10 +539,81 @@ function withheldText(reason: string | null | undefined): string {
       </p>
     </div>
 
-    <div class="card p-6">
-      <h2 class="mb-3 text-base font-semibold">Returns Chart</h2>
-      <component :is="'apexchart'" v-if="monthlySeries[0].data.length" :options="monthlyOptions" :series="monthlySeries" height="220" />
-      <p v-else class="text-sm text-slate-500 dark:text-slate-400">No monthly data available.</p>
+    <div class="card p-6" data-testid="perf-returns">
+      <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 class="text-base font-semibold">Returns Chart</h2>
+        <div class="flex items-center gap-1" role="group" aria-label="Returns period">
+          <button
+            type="button"
+            class="btn-secondary text-xs"
+            :class="activeReturnsMode === 'monthly' ? 'border-blue-600 bg-blue-50 text-blue-700 dark:border-blue-600 dark:bg-blue-500/10 dark:text-blue-400' : ''"
+            :aria-pressed="activeReturnsMode === 'monthly'"
+            data-testid="perf-returns-mode-monthly"
+            @click="returnsMode = 'monthly'"
+          >
+            Monthly
+          </button>
+          <button
+            type="button"
+            class="btn-secondary text-xs"
+            :class="activeReturnsMode === 'yearly' ? 'border-blue-600 bg-blue-50 text-blue-700 dark:border-blue-600 dark:bg-blue-500/10 dark:text-blue-400' : ''"
+            :aria-pressed="activeReturnsMode === 'yearly'"
+            :disabled="!yearlyAvailable"
+            data-testid="perf-returns-mode-yearly"
+            @click="returnsMode = 'yearly'"
+          >
+            Yearly
+          </button>
+        </div>
+      </div>
+
+      <component
+        :is="'apexchart'"
+        v-if="activeReturnsMode === 'monthly' && monthlySeries[0].data.length"
+        :options="monthlyOptions"
+        :series="monthlySeries"
+        height="220"
+      />
+      <p v-else-if="activeReturnsMode === 'monthly'" class="text-sm text-slate-500 dark:text-slate-400">No monthly data available.</p>
+
+      <div v-else data-testid="perf-returns-yearly">
+        <p v-if="!yearlyRows.length" class="text-sm text-slate-500 dark:text-slate-400">No yearly data available.</p>
+        <table v-else class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500 dark:border-slate-700 dark:text-slate-400">
+              <th scope="col" class="py-2 pr-3 font-medium">Year</th>
+              <th scope="col" class="py-2 pr-3 text-right font-medium">TWR %</th>
+              <th scope="col" class="py-2 text-right font-medium">Gain</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="row in yearlyRows"
+              :key="row.year"
+              class="border-b border-slate-100 dark:border-slate-800"
+              :data-testid="`perf-returns-yearly-row-${row.year}`"
+            >
+              <td class="py-2 pr-3 tabular-nums">{{ row.year }}<span v-if="row.isYtd" class="ml-1 text-xs text-slate-400 dark:text-slate-500">YTD</span></td>
+              <td class="py-2 pr-3 text-right tabular-nums" :class="signClass(row.twrPercent)" :data-testid="`perf-returns-yearly-twr-${row.year}`">{{ formatPercent(row.twrPercent, 2, true) }}</td>
+              <td class="py-2 text-right tabular-nums" :class="signClass(row.gain)" :data-testid="`perf-returns-yearly-gain-${row.year}`">{{ formatSignedCurrency(convert(row.gain), chartCcy) }}</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr class="border-t-2 border-slate-200 dark:border-slate-700" data-testid="perf-returns-yearly-total">
+              <td class="py-2 pr-3 font-medium">Σ</td>
+              <td class="py-2 pr-3 text-right tabular-nums font-medium" data-testid="perf-returns-yearly-total-product">× {{ yearlyTotalsRow.compounded.toFixed(4) }}</td>
+              <td class="py-2 text-right tabular-nums font-medium" data-testid="perf-returns-yearly-total-gain">{{ formatSignedCurrency(yearlyTotalsGain, chartCcy) }}</td>
+            </tr>
+          </tfoot>
+        </table>
+        <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+          Σ shows the compounded product, not the sum of yearly percentages.
+        </p>
+      </div>
+
+      <p v-if="!yearlyAvailable" class="mt-2 text-xs text-slate-500 dark:text-slate-400" data-testid="perf-returns-yearly-hint">
+        Yearly is available on the ALL timeframe only — a shorter window holds no full calendar year.
+      </p>
     </div>
 
     <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
