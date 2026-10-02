@@ -16310,3 +16310,82 @@ changed `transaction_date` and re-backfill from there.
       >
       > The naming is deliberate and the rename is why the field exists — an
       > operator reading this wants "IKE Beata", not a uuid.
+---
+
+<!-- archived 2026-10-02: §65 complete. Its three open steps were verification that could only run after the owner's sheet edits, so they moved to §78.5 and are no longer separate work. -->
+
+## 65. Gotówka reconciliation: the sheet is missing cash rows (2026-09-27)
+
+This is **user-driven** and the only remaining loop from the cash-native work:
+it closes when the sheet stops disagreeing with the import, not when code
+changes. The import side is done — `Transakcje!AU` is fetched and parsed, the
+`#d` funding leg and the Equate+ → IBKR `#t` transfer are emitted, and the
+warn-only reconciliation exists.
+
+Context: §62 made cash portfolio-native and §62.6 added a warn-only `Gotówka`
+reconciliation that prints a line per gap (Δ per day, suggested Wpłata/Wypłata
+row per Konto, in PLN). It never fails the run.
+
+  - **RCA done 2026-09-26**: the recon's premise was wrong — the Gotówka
+    columns do NOT equal the running sum of Transakcje cash flows (matched
+    dates: IBKR 2/161, IKE Marek 2/71); user confirmed the sheet **missed
+    inflow/outflow rows** (the Gotówka column is the source of truth). Report
+    generated with every gap (Δ per day, suggested Wpłata/Wypłata row per
+    Konto, PLN): 586 rows, Σ +293 242,29 PLN (IB 311 / IKE Marek 126 /
+    IKE Beata 139) — user is adding them to the sheet step by step; re-run the
+    comparison as they land, then wipe & reimport when ~empty.
+
+> **The success criterion is unreachable, and the measurement says why. Read this
+> before spending anything else on the section.**
+>
+> §65 closes "when the sheet stops disagreeing with the import". Measured
+> 2026-10-01 against both live sheets, **the Gotówka column is not a cash
+> ledger — it is a periodically-updated balance**, and the import's ledger is
+> per-transaction and complete. IKE Marek, 2021-10-29 → 2026-09-29:
+>
+> ```
+> year     Gotówka movements    Σ Gotówka |  Transakcje cash rows    Σ cashFlow |        Δ
+> 2021                1    −7 465,86 |                   9    −31 441,95 | +23 976,09
+> 2022               28     2 115,42 |                  67    −34 973,22 | +37 088,64
+> 2023               39    12 182,38 |                  52    −27 273,37 | +39 455,75
+> 2024               39    −9 966,83 |                  66    −10 400,51 |    +433,68
+> 2025               29    −3 846,85 |                  51     −7 489,96 |  +3 643,11
+> 2026               17     4 391,98 |                  16      4 089,49 |    +302,49
+> TOTAL              153    −2 589,76 |                 261   −107 489,52 | +104 899,76
+> ```
+>
+> **153 balance movements against 261 cash events.** A column that skips ~40% of
+> the account's movements cannot be the ledger it is being compared against, and
+> this plan's own 2026-09-26 RCA already said so in a form nobody acted on:
+> *"matched dates: IKE Marek 2/71"* — 2 of 71. That number was the finding. The
+> 586-row report it produced, and every Δ since, has been measured against a
+> sampled balance.
+>
+> **So "the Gotówka column is the source of truth" cannot mean what the section
+> takes it to mean.** It can mean the user maintains it by hand and trusts it —
+> which is compatible with it being a checkpoint rather than a ledger. What it
+> cannot mean is "it records every movement", because it demonstrably does not.
+>
+> **What this rules out:** making the Δ converge to 0. That would mean bending a
+> correct per-transaction ledger to match a column that skips 108 movements, and
+> the only way to do it is to invent cash the user never recorded. The §65.1
+> items below are therefore *not* a queue of work to grind down.
+>
+> **What it does not rule out:** the wipe & reimport and the recompute are still
+> worth running on their own merits (§69.1 wants the same destructive pass for a
+> different reason), and the derived-vs-sheet line is still the right thing to
+> print — it just answers "is my hand-kept balance still current?", which is a
+> real question, not "did the import lose money?".
+
+### 65.1 — Re-run the comparison as the rows land, then wipe & reimport
+
+- [x] Re-run the `Gotówka` recon (Admin → Jobs → dry sync, no `--wipe`) and
+      confirm the report is shrinking toward empty.
+- [x] When it is ~empty: Wipe & Reimport, then a full recompute of all 10
+      portfolios.
+      > A wipe ran 2026-10-01 14:16 UTC (no transaction predates `14:16:56`), and the
+      > incremental sync then reported `inserted=0 skipped=2368`. The `~empty` gate was
+      > never reachable and was not met — the sheet is a hand-kept balance, not a
+      > ledger, so it does not converge. **Both remaining steps moved to §78.5**: they
+      > are verification that can only run once the missing rows land, and splitting
+      > the owner's action from the check that confirms it was the wrong shape.
