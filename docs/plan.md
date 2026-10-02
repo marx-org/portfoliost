@@ -167,15 +167,17 @@ pressing Recompute. Admin → Jobs → "Sync sheet" (not "Wipe & Reimport").
       > *withdrawals* — Equate+'s true worst day is −22.0%. IKE Marek's −76.1% and
       > IKE Beata's −34.1% are **explained** by §78.5's `unpricedValue`: each is
       > exactly the unpriceable bond purchase on that day. XTB remains, and it needs
-      > §78.1.
+      > §78.1. The **money-weighted** column has the same cause and its own
+      > re-measurement in §78.6 — a flow series that starts late is why XIRR reads
+      > +201% on the aggregate while TWR p.a. reads +12.92%.
 
----
+### 78.6 — Then re-measure the money-weighted return, once the rows land
 
+**Folded in from §83.8** (archived with §83 in `plan-archive.md`), which was
+the one thing §83.7's PROD verification left behind — found in the browser, not
+by a test. It belongs here because its cause is §78.1 + §78.2, so it is the same
+chain as §78.5: your rows, then this check.
 
-## 83.8. The money-weighted (XIRR) tile is unusable on PROD until §78.2 lands (2026-10-02)
-
-§83 itself is archived in `plan-archive.md`; what follows is the one thing its
-PROD verification (§83.7) left behind, found in the browser rather than by a test.
 The cumulative tab renders XIRR **+201.05%** beside TWR p.a. **+12.92%** — a
 pairing that cannot both be true of the same money, and the aggregate is only the
 sum of portfolios that each show it too.
@@ -199,8 +201,9 @@ The pattern is unambiguous: the two portfolios whose TWR p.a. is small (IBKR
 *in total*. XIRR can exceed the simple return only if the money arrived late in
 the window — and it did, because the deposit history is incomplete.
 
-**This is not a new defect and not §83's.** It is §78.2 (IBKR / IKE Marek / IKE
-Beata missing ledger rows) reaching the money-weighted column: `net_flow` is
+**This is not a new defect, and not a rendering one.** It is §78.2 (IBKR / IKE Marek /
+IKE Beata missing ledger rows) and §78.1 (XTB's missing `Wpłata`) reaching the
+money-weighted column: `net_flow` is
 written from `dailyExternalFlows` (`backfill.ts:1344`), so a portfolio whose
 early deposits are missing has a flow series that starts too late, and XIRR
 compounds the remainder as if it had been invested for the whole period. The KB's
@@ -212,7 +215,7 @@ against compose seed data, where the 49-point fixture produces sane numbers, and
 was never checked in PROD.** It is the same false-assumption class that made §82's
 Σ-gains reconciliation wrong for 6 of 10 real portfolios.
 
-- [ ] **Do not "fix" the aggregate.** §83.2 reads `buildMwr` unchanged, which is
+- [ ] **Do not "fix" the aggregate.** §83.2 (archived) reads `buildMwr` unchanged, which is
       correct: the aggregate's money-weighted return of a set of portfolios with
       incomplete ledgers is wrong in the same way, and for the same reason. Any
       clamp or sanity filter applied only here would make the two tabs disagree.
@@ -227,13 +230,13 @@ was never checked in PROD.** It is the same false-assumption class that made §8
       simple return" — §83.2's note keeps that parity rather than inventing a
       reason the per-portfolio route does not send. Until §78 lands, the cheapest
       honest improvement is a one-line caveat on the Overview card naming the
-      known §78.1/§78.2 data gap, the same way §83.6 states the FX caveat.
+      known §78.1/§78.2 data gap, the same way §83.6 (archived) states the FX caveat.
 - [ ] Test: the PROD table above becomes the regression fixture — assert that a
       portfolio whose flow series starts on the same day as its first snapshot
       reports an XIRR within a sane band of its TWR p.a. The unit tests that
       pinned §82.2's tile all used a fixture with a complete ledger, which is
       precisely why they passed.
-- [ ] Commit `fix(spa): disclose the known money-weighted data gap (plan §83.8)`.
+- [ ] Commit `fix(spa): disclose the known money-weighted data gap (plan §78.6)`.
 
 ---
 

@@ -20210,4 +20210,6 @@ Written this way because §81.1 made `computeRiskMetrics` **pure** — it takes
 > recorded PROD anchor (`annualizedReturn == periodReturnPercent` on a 365-day
 > window).
 >
-> The XIRR tile is a different story, and it is why §83.8 exists.
+> The XIRR tile is a different story, and it is why **§78.6** exists — that step
+> was folded into §78 ("Everything that needs YOU"), because the cause is §78.1 +
+> §78.2's missing ledger rows rather than anything in this section.
