@@ -5,14 +5,19 @@ import { formatCompact } from "@/utils/format"
  *
  * `*growth*` is a substring test on purpose: four of the statement's growth
  * columns share that suffix and none of them is an amount, so one test covers
- * them. The two named keys are the ratios the statement declares.
+ * them. The one named key is the only true ratio the statement carries.
  *
  * `freeCashFlowPerShare` used to be in this set. It is currency PER SHARE, not a
  * ratio — `$33.67` rendered as `33.7%`, a wrong unit rather than a wrong
  * precision, and nothing on the card said which currency it was even in.
- * It now falls through to the numeric ladder below.
+ *
+ * `debtEquityRatio` was here too, and cost more than a unit disagreement: at
+ * one decimal, SAP.DE's 0.17 / 0.23 / 0.20 / 0.33 rendered as
+ * `0.2% / 0.2% / 0.2% / 0.3%` — three distinct years collapsed into one
+ * identical cell. Expressing D/E as a percentage is defensible in finance;
+ * rounding a small multiple to one decimal is not, whatever the unit.
  */
-const PERCENT_KEYS = new Set(["netIncomeMargin", "debtEquityRatio"])
+const PERCENT_KEYS = new Set(["netIncomeMargin"])
 
 function isPercentKey(key: string): boolean {
   return key.toLowerCase().includes("growth") || PERCENT_KEYS.has(key)
@@ -24,11 +29,6 @@ function isPercentKey(key: string): boolean {
  * Percentages take one decimal; everything else takes the numeric ladder, which
  * exists because a single table mixes amounts in the millions with per-share
  * figures in single digits and both must stay readable.
- *
- * Known and NOT fixed here: `debtEquityRatio` is a MULTIPLE, not a percentage,
- * so `1.52` still renders as `1.5%`. It was in the percent branch before §79.1
- * and is out of scope for a step about one column's unit; §79.3 is what made it
- * visible by populating it for non-US names.
  */
 export function formatFundamentalsCell(row: Record<string, unknown>, key: string): string {
   const v = row[key]

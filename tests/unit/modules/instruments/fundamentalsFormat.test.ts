@@ -6,7 +6,6 @@ const cell = formatFundamentalsCell
 describe("formatFundamentalsCell — percent branch (§79.1)", () => {
   it("renders the real ratios and growth columns as percentages", () => {
     expect(cell({ netIncomeMargin: 12.5 }, "netIncomeMargin")).toBe("12.5%")
-    expect(cell({ debtEquityRatio: 1.52 }, "debtEquityRatio")).toBe("1.5%")
     expect(cell({ netIncomeGrowth: 15.48 }, "netIncomeGrowth")).toBe("15.5%")
     expect(cell({ earningsPerShareGrowth: -3.2 }, "earningsPerShareGrowth")).toBe("-3.2%")
     expect(cell({ freeCashFlowGrowth: 90.86 }, "freeCashFlowGrowth")).toBe("90.9%")
