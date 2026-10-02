@@ -697,87 +697,128 @@ contract today: its single row carries `portfolioId` / `portfolioName` /
 render in unit and e2e tests, and it is the only source the mock route reads
 (`mocks/portfolios/index.js:266-269`).
 
-- [ ] Rewrite the seed to the current `PortfolioTotalMetrics` shape with ≥3 rows
+- [x] Rewrite the seed to the current `PortfolioTotalMetrics` shape with ≥3 rows
  whose arithmetic holds (`totalValue == instrumentsValue + cashValue`), one
  **negative `cashValue`** row and one **`totalInvested: 0`** row, so the table's
       edge cases are covered by tests rather than only in PROD.
       > Pick the two edge rows from real behaviour: PROD's XTB has cash −24,26 and
       > deposits 0 today, which is exactly the pair that must render `—` for
       > Return % and keep a signed cash figure.
-- [ ] **Tests**: `npm run test:mock` green; the existing breakdown cases in
+      > Four rows: Top10 on the mock's real seeded id (keeping the capture's own
+      > 109984,34 / 98083,40), IBKR, a losing IKE Marek, and XTB as the edge pair.
+      > Only `mocks/shared/data/raw/` was rewritten — `discovery/raw/` keeps the
+      > example-service capture, which is the split the tree already uses for
+      > `auth_me.json`, `portfolios_summaries.json` and four others. The mock's
+      > `/api/portfolios` carries Top10 alone, so the other three rows are
+      > fixture-only; nothing in the mock or the suite follows their links.
+- [x] **Tests**: `npm run test:mock` green; the existing breakdown cases in
       `tests/unit/modules/portfolios/InvestmentsView.test.ts:393-492` still pass
       against the new seed.
-- [ ] Commit `test(mock): refresh the total-metrics seed to the current contract shape`
+      > Four checks added to `mocks/tests/run.mjs`, because nothing asserted this
+      > fixture and it drifted silently once already — the dashboard tile and this
+      > table both render whatever the breakdown says. Verified by restoring the
+      > stale file: 235 passed / 4 failed; with the new seed, 239 passed.
+- [x] Commit `test(mock): refresh the total-metrics seed to the current contract shape`
 
 ### 84.2 — `AccountsBalanceView` + route + tab + landing
 
-- [ ] Add `{ path: "investments/accounts-balance", name: "accounts-balance",
+- [x] Add `{ path: "investments/accounts-balance", name: "accounts-balance",
       component: () => import("@/modules/portfolios/AccountsBalanceView.vue") }`
       to the `/en` children (`src/router/index.ts:45-65`) and repoint the `/`
       redirect (`:9`) at it. `/en/investments` stays untouched.
-- [ ] Prepend the tab to `InvestmentsTabs.vue:8-24`
+- [x] Prepend the tab to `InvestmentsTabs.vue:8-24`
       (`label: "Accounts balance"`, `match: startsWith(...)`) so the strip reads
       Accounts balance → Portfolios → Transactions → Watchlists on all four views
       that render it (`InvestmentsView.vue:325`, `TransactionsView.vue:13`,
       `CashTransactionsView.vue:15`, `WatchlistsView.vue:94`).
-- [ ] Add the new route name to `SidebarNav.vue` `isActive` (`:77-86`) — the
+- [x] Add the new route name to `SidebarNav.vue` `isActive` (`:77-86`) — the
       function enumerates route names explicitly, so without this the sidebar item
       goes dark on the new landing page.
-- [ ] New `src/modules/portfolios/AccountsBalanceView.vue`: the seven columns
+      > The decision above says "the sidebar points at it", which two edits
+      > satisfy without mislabelling anything: the route name joins the `isActive`
+      > enumeration, and the sidebar's logo link now targets the landing page. The
+      > "Portfolios" nav item still targets `/en/investments` — a tab switch
+      > inside the same section — rather than a link labelled Portfolios that
+      > opens Accounts balance. Reverse the logo `to` if the user wants the nav
+      > item itself repointed.
+- [x] New `src/modules/portfolios/AccountsBalanceView.vue`: the seven columns
       above, sortable on every one (click toggles asc/desc, numeric compare, default
       Total desc), each row a `router-link` to `/en/portfolios/:id/holdings`, and a
       bold Σ footer row.
-- [ ] **Call `store.fetchAll()` in `onMounted`,** as `WatchlistsView.vue:26` does.
+      > A `<router-link>` cannot wrap a `<tr>`, so a row is a `<tr>` with a click
+      > handler plus a real `<router-link>` in the Account cell (focusable,
+      > middle-clickable, announced as a link); the handler ignores a click that
+      > already landed on an anchor, so the target is never pushed twice. The
+      > footer's Return % is `Σgain / Σinvested`, not a sum of ratios — the only
+      > figure a reader can reconcile with the row above it, and the headline's own
+      > return. A row whose Return % is `null` sorts last in BOTH directions:
+      > flipping it to the front on a descending sort would put a non-number where
+      > the user looks for their best performer.
+- [x] **Call `store.fetchAll()` in `onMounted`,** as `WatchlistsView.vue:26` does.
       The store is per-route state, so landing straight on this tab finds it empty;
       this adds no new *endpoint* (`fetchAll` already fetches `/api/portfolios` and
       `/api/portfolios/total-metrics`, `stores/portfolios.ts:20-36`) but it does
       need the fetch.
-- [ ] Read **`store.totalMetrics.portfolioBreakdown` only.** P/L is
+- [x] Read **`store.totalMetrics.portfolioBreakdown` only.** P/L is
       `totalValue − totalInvested`; Return % is `row.returnPercentage` with the same
       `(totalValue − invested) / invested × 100` fallback the store already applies
       at `stores/portfolios.ts:219-225`, because the field is optional in the
       contract and a response omitting it would otherwise render blank.
-- [ ] Put the row derivation and the sort comparator in an exported pure function
+- [x] Put the row derivation and the sort comparator in an exported pure function
       in a plain `<script>` block (`docs/COMPONENTS.md` — "shared math"), so the
       unit test exercises the arithmetic without mounting.
-- [ ] Convert every money column through
+- [x] Convert every money column through
       `useDisplayConversion(() => store.totalMetrics?.baseCurrency)`
       (`composables/useDisplayConversion.ts:22`) — the same aggregate base the
       dashboard tiles use, so the Σ footer and the "Total value" tile are one
       number by construction. `convert()` returns `null` while the rate resolves:
       render `—`, never `0`.
-- [ ] Format through `src/utils/format.ts` (`formatCurrency`, `formatSignedCurrency`,
+- [x] Format through `src/utils/format.ts` (`formatCurrency`, `formatSignedCurrency`,
       `formatPercent`); money cells `tabular-nums`. Two rendering rules the data
       forces: a `totalInvested <= 0` row renders `—` for Return % (0/0 is not a
       number and the route returns `0`, not `NaN`), and a negative `cashValue`
       keeps its sign — it must not be clamped, per `openapi.yaml:1201`.
-- [ ] `data-testid="accounts-balance"` with `-row`, `-account`, `-investments`,
+- [x] `data-testid="accounts-balance"` with `-row`, `-account`, `-investments`,
       `-cash`, `-total`, `-deposits`, `-gain`, `-return` and `-totals`.
-- [ ] **Tests**: new `tests/unit/modules/portfolios/AccountsBalanceView.test.ts` —
+- [x] **Tests**: new `tests/unit/modules/portfolios/AccountsBalanceView.test.ts` —
       rows render the payload; a negative cash row keeps its sign; a
       `totalInvested: 0` row renders `—` for Return %; column 6 equals
       `totalValue − totalInvested` and column 7 equals `6 / 5`; the footer Σ
       equals Σ rows and equals `toDisplay(totalMetrics.totalValue)`; sorting
       toggles both directions; a display-currency switch re-renders the money
       columns without a remount (mirror `InvestmentsView.test.ts:275-330`).
-- [ ] **Tests**: `npm run build` (includes `vue-tsc --noEmit`) + `npm run test` green.
-- [ ] Commit `feat(spa): add the Accounts balance tab`
+- [x] **Tests**: `npm run build` (includes `vue-tsc --noEmit`) + `npm run test` green.
+- [x] Commit `feat(spa): add the Accounts balance tab`
 
 ### 84.3 — E2E + full local gate
 
-- [ ] New `tests/e2e/accounts-balance.spec.ts`: `/` lands on the tab; the tab is
+- [x] New `tests/e2e/accounts-balance.spec.ts`: `/` lands on the tab; the tab is
       first in the strip; all seven headers render; column 6 equals column 4 minus
       column 5 on a seeded row; the Σ footer's Total equals the Portfolios page's
       `tile-total-value` after the same conversion; switching the display currency
       to USD re-renders the money columns; a row click reaches
       `/en/portfolios/:id/holdings`.
-- [ ] `docker compose up -d --build` (rebuild `portfoliost` after the SPA change),
+      > The compose seed has exactly ONE portfolio (Top10), so the multi-row
+      > behaviour — sorting, the em-dash Return % — is the unit test's job; the
+      > browser covers the landing page, the DOM arithmetic and the cross-route
+      > agreement with `tile-total-value`. The currency spec forces USD before it
+      > starts and restores it after: `setCurrency` writes through to the server
+      > preference (`stores/displayCurrency.ts`), so a sibling spec that leaves the
+      > preference on PLN would otherwise make this one order-dependent.
+- [x] `docker compose up -d --build` (rebuild `portfoliost` after the SPA change),
       then `docker compose restart gateway` — per `portfoliost/AGENTS.md` a
       recreated upstream leaves nginx holding a stale IP and the symptom is a
       misleading 404, not a 502.
-- [ ] **Tests**: `npm run build && npm run test && npm run test:mock && npm run test:e2e`
+      > Confirmed by measurement after the rebuild: `/api/portfolios` answered 200
+      > direct on :3002 and through :8080, and `/api/portfolios/total-metrics`
+      > through the gateway returned the seeded breakdown, not an empty one.
+- [x] **Tests**: `npm run build && npm run test && npm run test:mock && npm run test:e2e`
       all green.
-- [ ] Commit `test(e2e): cover the Accounts balance tab`
+      > build green · 537 unit tests · 239 mock checks · e2e 121 passed, 1 skipped,
+      > **1 failed**: `portfolios.spec.ts:289`, the pre-existing KO instrument-search
+      > failure that reproduces on an unmodified checkout (§80, and the KB entry for
+      > this repo). Not caused by this section and not fixed by it.
+- [x] Commit `test(e2e): cover the Accounts balance tab`
 
 ### 84.4 — PROD release + sheet cross-check (homelab skill)
 
