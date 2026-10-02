@@ -389,6 +389,41 @@ async function main() {
     const r = await request(name, { token })
     check(`portfolios${name}`, r.status === 200, `got ${r.status}`)
   }
+  // §84.1 — `portfolios_total_metrics.json` is hand-authored, NOT a raw capture:
+  // the copy in discovery/raw is the 2026-08-11 example-service response, whose breakdown
+  // predates the §68 contract (portfolioId/portfolioName/originalValue, no name /
+  // instrumentsValue / cashValue / weight). So its arithmetic is asserted here instead
+  // of trusted — a fixture that stops satisfying the schema fails silently, because
+  // the dashboard tile and the §84 accounts-balance table both render whatever the
+  // breakdown says.
+  const tm = await request("/portfolios/total-metrics", { token })
+  const tmRows = tm.json?.portfolioBreakdown ?? []
+  const contractFields = ["id", "name", "instrumentsValue", "cashValue", "totalValue", "totalInvested"]
+  check(
+    "portfolios.total-metrics breakdown carries the §68 contract fields",
+    tmRows.length >= 3 && tmRows.every((r) => hasKeys(r, contractFields)),
+    `rows=${tmRows.length} keys=${JSON.stringify(Object.keys(tmRows[0] ?? {}))}`,
+  )
+  // The contract's own promise (openapi.yaml:1239): totalValue == instrumentsValue + cashValue.
+  check(
+    "portfolios.total-metrics row totalValue == instrumentsValue + cashValue",
+    tmRows.every((r) => Math.abs(r.totalValue - (r.instrumentsValue + r.cashValue)) < 0.005),
+    JSON.stringify(tmRows.map((r) => [r.name, r.totalValue, r.instrumentsValue + r.cashValue])).slice(0, 220),
+  )
+  check(
+    "portfolios.total-metrics Σ breakdown == the headline",
+    hasKeys(tm.json ?? {}, ["instrumentsValue", "cashValue", "totalValue", "totalInvested"]) &&
+      ["instrumentsValue", "cashValue", "totalValue", "totalInvested"].every((k) =>
+        Math.abs(tm.json[k] - tmRows.reduce((s, r) => s + r[k], 0)) < 0.005),
+    JSON.stringify(["instrumentsValue", "cashValue", "totalValue", "totalInvested"].map((k) => [k, tm.json?.[k], tmRows.reduce((s, r) => s + r[k], 0)])).slice(0, 220),
+  )
+  // The two edge rows §84 renders differently (signed cash, em-dash return %) exist
+  // in the fixture so those branches are exercised outside PROD too.
+  check(
+    "portfolios.total-metrics keeps a negative-cash row and a zero-invested row",
+    tmRows.some((r) => r.cashValue < 0) && tmRows.some((r) => r.totalInvested === 0),
+    JSON.stringify(tmRows.map((r) => [r.name, r.cashValue, r.totalInvested])).slice(0, 220),
+  )
   const detail2 = await request(`/portfolios/${pid}`, { token })
   check("portfolios.detail", detail2.status === 200 && detail2.json.id === pid, `got ${detail2.status}`)
   const merged1Y = await request("/portfolios/merged?timeframe=1Y", { token })
