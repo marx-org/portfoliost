@@ -85,6 +85,11 @@ export interface CreatePortfolioPositionInput {
   exchangeRate?: number
   feeRateSource?: "automatic" | "manual"
   feeExchangeRate?: number
+  /**
+   * §87.5 — a new position is a BUY, so this creates its funding DEPOSIT as a cash
+   * row linked to the trade. Omitting it sends nothing (existing callers unaffected).
+   */
+  cashLeg?: boolean
 }
 
 export async function createPortfolioPosition(
@@ -126,6 +131,13 @@ export async function createPortfolioTransaction(
     /** DIVIDEND withholding tax (gross − taxes = net totalAmount; must be ≤ quantity × price) */
     taxes?: number
     notes?: string
+    /**
+     * §87.5 — also create the external cash leg (DEPOSIT for a BUY, WITHDRAWAL for
+     * a SELL) linked to this trade. OMITTING it sends nothing, so every existing
+     * caller keeps its current behaviour; the Add-Transaction form sets it from the
+     * portfolio's `cashLegOnTrade` flag and the user can untick per transaction.
+     */
+    cashLeg?: boolean
   },
 ): Promise<PortfolioTransactionsPage["items"][number]> {
   return http.post<PortfolioTransactionsPage["items"][number]>(`/api/portfolios/${id}/transactions`, input)

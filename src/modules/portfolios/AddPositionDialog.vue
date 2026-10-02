@@ -53,6 +53,24 @@ const stockForm = ref({
 const busy = ref(false)
 const error = ref<string | null>(null)
 
+/**
+ * §87.5 — "also create a cash transaction", pre-ticked from the portfolio's
+ * `cashLegOnTrade` flag so the box reflects what will actually happen.
+ *
+ * Deliberately its own ref rather than a `stockForm` field: the form object is
+ * rebuilt from scratch in three places (dialog open with a position action, after
+ * an instrument search, and on reset) and a fourth copy of this flag in each of
+ * them is a fourth way to forget it. The request stays the source of truth —
+ * unticking here sends `cashLeg: false`, which the server honours over the flag.
+ */
+const cashLeg = ref(false)
+const portfolioCashLegDefault = computed(
+  () =>
+    store.detail?.cashLegOnTrade ??
+    store.portfolios.find((p) => p.id === props.portfolioId)?.cashLegOnTrade ??
+    false,
+)
+
 const optionForm = ref({
   transactionType: "Buy to Open (new long position)",
   optionType: "CALL",
@@ -80,6 +98,9 @@ watch(
     if (open) {
       showSearch.value = false
       error.value = null
+      // §87.5 — the box starts from the portfolio's flag, every time the dialog
+      // opens, so it never carries the last transaction's answer into this one.
+      cashLeg.value = portfolioCashLegDefault.value
       if (!currenciesStore.loaded) void currenciesStore.load()
       if (props.positionAction) {
         const { kind, position } = props.positionAction
@@ -303,6 +324,10 @@ async function submitStock() {
         positionId: position.id,
         currency: position.instrumentCurrency || "",
         executedAt: stockForm.value.date ? new Date(stockForm.value.date).toISOString() : undefined,
+        // §87.5 — sent even when false: omitting it would be read as "the caller
+        // does not know", and the server treats an explicit false as the user's
+        // untick.
+        cashLeg: cashLeg.value,
       }
       if (stockForm.value.feesType === "fixed" && Number(stockForm.value.fees) > 0) {
         txPayload.fees = Number(stockForm.value.fees)
@@ -367,6 +392,8 @@ async function submitStock() {
             ? Number(stockForm.value.feeExchangeRate)
             : undefined,
         executedAt: stockForm.value.date ? new Date(stockForm.value.date).toISOString() : undefined,
+        // §87.5 — a new position IS a buy, so the funding leg rides along here too.
+        cashLeg: cashLeg.value,
       })
       emit("added")
       close()
@@ -524,6 +551,21 @@ import TickerBadge from "@/components/TickerBadge.vue"
           @submit="submitStock"
         >
           <template #footer="{ totalCost }">
+            <label class="mb-3 flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
+              <input
+                id="add-pos-cash-leg"
+                v-model="cashLeg"
+                type="checkbox"
+                class="mt-0.5"
+                data-testid="add-position-cash-leg"
+              />
+              <span>
+                Also create a cash transaction
+                <span class="block text-xs text-slate-500 dark:text-slate-400">
+                  A deposit for a buy, a withdrawal for a sell — default from Portfolio settings.
+                </span>
+              </span>
+            </label>
             <p v-if="error" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ error }}</p>
             <div class="flex justify-end gap-2">
               <button type="button" class="btn-ghost" @click="close">Cancel</button>

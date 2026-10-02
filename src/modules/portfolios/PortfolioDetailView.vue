@@ -38,8 +38,13 @@ const tabs = [
   { name: "portfolio-compare", label: "Compare" },
 ]
 
+// §87.5 — the dialog is now "Portfolio settings": the name plus the UI-only
+// "generate a cash transaction on buy/sell" switch. The aria-label stays
+// "Rename portfolio" — tests/e2e/parity-portfolios.spec.ts:87 selects the dialog by
+// that name, and a renamed label is a gratuitous e2e break for no user gain.
 const showRename = ref(false)
 const renameName = ref("")
+const renameCashLeg = ref(false)
 const renameBusy = ref(false)
 const renameError = ref<string | null>(null)
 
@@ -110,6 +115,9 @@ function gainClass(value: number | undefined): string {
 
 function openRename() {
   renameName.value = portfolioName.value
+  // §87.5 — default the box from the portfolio's own flag, so it reflects what
+  // will actually happen rather than asking the user to remember.
+  renameCashLeg.value = store.detail?.cashLegOnTrade ?? false
   renameError.value = null
   showRename.value = true
 }
@@ -119,7 +127,7 @@ async function submitRename() {
   renameBusy.value = true
   renameError.value = null
   try {
-    await updatePortfolio(id, { name: renameName.value.trim() })
+    await updatePortfolio(id, { name: renameName.value.trim(), cashLegOnTrade: renameCashLeg.value })
     showRename.value = false
     await Promise.all([store.fetchAll(), store.fetchDetail(id)])
   } catch (err) {
@@ -267,10 +275,29 @@ async function submitDelete() {
       @click.self="showRename = false"
     >
       <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Rename portfolio">
-        <h3 class="mb-4 text-base font-semibold">Rename portfolio</h3>
+        <h3 class="mb-4 text-base font-semibold">Portfolio settings</h3>
         <form @submit.prevent="submitRename">
           <label for="rename-name" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Name</label>
           <input id="rename-name" v-model="renameName" type="text" required class="input mb-4" />
+          <!-- §87.5 — UI ONLY. The buy/sell form pre-ticks its "also create a cash
+               transaction" box from this, so the two surfaces cannot disagree. It
+               deliberately does not govern the Google Sheets import, which uses its
+               own kontо list — changing this must never change what a sheet imports. -->
+          <label class="mb-4 flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
+            <input
+              id="cash-leg-on-trade"
+              v-model="renameCashLeg"
+              type="checkbox"
+              class="mt-0.5"
+              data-testid="cash-leg-on-trade"
+            />
+            <span>
+              Generate a cash transaction on buy/sell
+              <span class="block text-xs text-slate-500 dark:text-slate-400">
+                Pre-ticks the cash checkbox on the buy/sell form. Sheet imports are unaffected.
+              </span>
+            </span>
+          </label>
           <p v-if="renameError" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ renameError }}</p>
           <div class="flex justify-end gap-2">
             <button type="button" class="btn-ghost" @click="showRename = false">Cancel</button>
