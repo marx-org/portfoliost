@@ -36,9 +36,26 @@ describe("researchBackTarget", () => {
     )
   })
 
-  it("rejects anything that is not an internal /en/ path", () => {
+  it("passes a public share path through (§85.1)", () => {
+    expect(researchBackTarget({ from: "/public/portfolio/abc123" })).toBe("/public/portfolio/abc123")
+  })
+
+  it("rejects the prefix lookalikes, so the two allowlisted prefixes stay literal", () => {
+    expect(researchBackTarget({ from: "/publicsomething" })).toBe(RESEARCH_FALLBACK_PATH)
+    expect(researchBackTarget({ from: "//public" })).toBe(RESEARCH_FALLBACK_PATH)
+    expect(researchBackTarget({ from: "/logout" })).toBe(RESEARCH_FALLBACK_PATH)
+    expect(researchBackTarget({ from: "public/portfolio/abc123" })).toBe(RESEARCH_FALLBACK_PATH)
+  })
+
+  it("rejects a bare prefix without its trailing slash", () => {
+    expect(researchBackTarget({ from: "/en" })).toBe(RESEARCH_FALLBACK_PATH)
+    expect(researchBackTarget({ from: "/public" })).toBe(RESEARCH_FALLBACK_PATH)
+  })
+
+  it("rejects anything that is not an allowlisted internal path", () => {
     expect(researchBackTarget({})).toBe(RESEARCH_FALLBACK_PATH)
     expect(researchBackTarget({ from: "http://evil.example/en/investments" })).toBe(RESEARCH_FALLBACK_PATH)
+    expect(researchBackTarget({ from: "http://evil.example/public/portfolio/abc123" })).toBe(RESEARCH_FALLBACK_PATH)
     expect(researchBackTarget({ from: "//evil.example/en/x" })).toBe(RESEARCH_FALLBACK_PATH)
     expect(researchBackTarget({ from: "investments" })).toBe(RESEARCH_FALLBACK_PATH)
     expect(researchBackTarget({ from: "/pl/investments" })).toBe(RESEARCH_FALLBACK_PATH)

@@ -349,7 +349,7 @@ and `researchBackTarget` (`:28-32`) accepts only a `from` starting `/en/` — so
 `from` passed from the share page would be **silently discarded** and "Go back"
 would land on `/en/investments` instead of the share.
 
-- [ ] Accept two literal internal prefixes in `researchBackTarget`: `/en/` (as
+- [x] Accept two literal internal prefixes in `researchBackTarget`: `/en/` (as
       today) and `/public/`. Nothing else changes — no scheme, no `//`, no
       relative path can satisfy either, so the open-redirect property is
       identical to what §60.1 established.
@@ -357,12 +357,23 @@ would land on `/en/investments` instead of the share.
       > `/logout` and the catch-all `/:pathMatch(.*)*` are both single-segment
       > or otherwise outside the two prefixes precisely so they cannot be used
       > as a redirect target. Two named prefixes is the whole allowlist.
-- [ ] Tests in `tests/unit/utils/research.test.ts`: `/public/portfolio/abc123`
+      > `src/utils/research.ts` — `RESEARCH_BACK_PREFIXES = ["/en/", "/public/"]`,
+      > matched with `.some(startsWith)`. Tests pin the lookalikes: `/publicsomething`,
+      > `//public`, `/logout`, relative `public/…`, and the bare `"/en"` / `"/public"`
+      > (no trailing slash) all still fall back.
+- [x] Tests in `tests/unit/utils/research.test.ts`: `/public/portfolio/abc123`
       passes through; `/publicsomething`, `//public`, `http://…`, `public/…`
       (relative) and a non-string still fall back to `/en/investments` — the
       trailing-slash shape matters, so `"/en"` alone must still be rejected.
-- [ ] Tests: `npm run test` green.
-- [ ] Commit `feat(spa): let the research back link return to a shared portfolio`
+- [x] Tests: `npm run test` green.
+      > 590/590 unit (71 files), 242/242 `test:mock`, `npm run build`
+      > (vue-tsc + vite) clean. No `lint` script in this repo. The AbortError
+      > lines in the vitest output are the pre-existing happy-dom teardown
+      > noise, not failures.
+      > e2e `tests/e2e/research.spec.ts` against the rebuilt docker stack:
+      > 20 passed / 1 skipped — including all five §60.3 "Go back" tests, so
+      > the existing `/en/` origins are unregressed.
+- [x] Commit `feat(spa): let the research back link return to a shared portfolio`
 
 ### 85.2 — The nine badges that render but do not link
 
