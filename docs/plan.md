@@ -831,6 +831,44 @@ sum instead of being stamped `complete`.
       > (§72.21), shipped in wallets v1.1.117 and rendered in SPA v1.0.337.
 - [ ] Propagate the window-wide gap into the UI: `GET /:id/analytics` can flag the
       value as partial, but "partial on which days" is not currently represented.
+      > **NOT CLOSED — the data half shipped, the UI half is blocked on the same
+      > trading calendar §72.21 is.** Contracts **v1.6.59**, wallets `95344ad`
+      > (**v1.1.118**, migration `0013_carried_value`), verified in PROD.
+      >
+      > **What was missing and is now measured.** `buildPriceMap` advances the last
+      > close onto every subsequent day, so a day with no returned bar is priced from
+      > yesterday and `value` looks complete. That makes `unpricedValue` structurally
+      > blind to it — carry-forward means `price != null`, so the unpriced path never
+      > fires. PROD: Crypto reported `gapSymbols: ["BTC-USD"]`, 24 coverage days, and
+      > `unpricedValue` of **0 on all 1,690**. `carriedValue` closes that, and
+      > **Crypto measures 24 — matching `fxCoverageHoles` exactly**, which is the
+      > cross-check that the two are describing the same days.
+      >
+      > **The weekend exclusion works, and that was worth measuring rather than
+      > assuming:** IBKR's 103 carried days contain **0** Saturday/Sunday. A naive
+      > version would have put ~29% of every series in this column.
+      >
+      > **And then the reason it still cannot be shown.** Those 103 days over 4.55
+      > years are **22.6/year**, and the dates are the exchange calendar:
+      >
+      > ```
+      > 2022-04-15 Good Friday   2022-05-30 Memorial Day  2022-07-04 Independence
+      > 2022-11-24 Thanksgiving 2022-12-26 Christmas obs  2023-01-02 New Year obs
+      > 2023-02-20 Presidents    2023-05-01 UK Labour      2023-05-08 Coronation
+      > ```
+      >
+      > Every one a day the venue was legitimately shut. **A single-day exchange
+      > holiday is indistinguishable from a single-day coverage hole** without a
+      > per-venue calendar — the identical limitation recorded against
+      > `fxCoverageHoles`. Shipping "103 days priced from a carried-forward close"
+      > would be the 820-weekends mistake one level down, so **the SPA warning was
+      > built, measured, and reverted** (`602ab46` → v1.0.345). The field and the
+      > per-day data stay: the measurement is correct and is the substrate the
+      > calendar-based fix needs.
+      >
+      > **What closing this needs:** per-venue trading sessions from instruments, then
+      > `isMarketClosure` extended to cover single-day holidays. Both this and
+      > §72.21's residual unblock on that one input.
 
 ### 72.32 — unfunded-portfolio audit finding (wallets v1.1.97, verified in prod)
 
