@@ -18,10 +18,6 @@ interface PerformancePoint {
    * price, so `value` does not include them. Absent = not measured (a row
    * written before the column existed), which is NOT the same as 0. */
   unpricedValue?: number | null
-  /** §72.31 — cost of positions priced from a CARRIED-FORWARD close on a day the
-   * market was open. Distinct from `unpricedValue`: carry-forward means the grid
-   * HAS a price, so the value looks complete. Absent = not measured. */
-  carriedValue?: number | null
   cumulativeTwr?: number | null
   cumulativeMwr?: number | null
   cumulativeSimple?: number | null
@@ -124,30 +120,6 @@ const unpriced = computed(() => {
     days: affected.length,
   }
 })
-
-/**
- * §72.31 — days whose price is CARRIED FORWARD rather than a real bar, while the
- * market was open. Reported separately from `unpriced` because the two are
- * different defects: `unpriced` has no price at all, this one has a stale one, and
- * only the second is invisible without this field.
- *
- * Summed, not peaked: carry-forward is per-position and short, so the same money is
- * not counted across days the way a held position would be. The number answers
- * "how much of the line was stale", which is what a reader comparing two points on
- * the chart needs.
- */
-const carried = computed(() => {
-  const affected = props.timeSeries.filter(
-    (p): p is PerformancePoint & { carriedValue: number } =>
-      typeof p.carriedValue === "number" && p.carriedValue > 0,
-  )
-  if (affected.length === 0) return null
-  const total = affected.reduce((a, b) => a + b.carriedValue, 0)
-  return { total, days: affected.length, first: affected[0].date ?? null, last: affected[affected.length - 1].date ?? null }
-})
-const carriedLabel = computed(() =>
-  carried.value ? `${carried.value.days} day${carried.value.days === 1 ? "" : "s"} priced from a carried-forward close` : "",
-)
 /** "up to 10,465.32 PLN" — the amount, in the portfolio's own currency. */
 const unpricedAmount = computed(() =>
   unpriced.value ? `up to ${formatCurrency(unpriced.value.peak, props.currency)}` : "",
@@ -167,15 +139,10 @@ const gapMessage = computed(() => {
   if (historyGapCount.value > 0) {
     const amt = unpricedAmount.value
     if (amt) return `${amt} of this chart is missing — those points are partial sums. The latest value is complete.`
-    // §72.31 — carried days are WINDOW-SCOPED, so they lead the count for the same
-    // reason `unpricedAmount` does: `historyGapCount` is window-wide and cannot be
-    // attributed to the range on screen. Putting the count first here would repeat
-    // exactly the two-windows bug this message was split to remove.
-    if (carried.value) return `${carriedLabel.value} rather than a real price. The latest value is complete.`
     const n = historyGapCount.value
     return `Earlier in this period, ${n} position${n === 1 ? " was" : "s were"} held with no price history — those points are partial sums. The latest value is complete.`
   }
-  return carriedLabel.value ? `${carriedLabel.value} rather than a real price. The latest value is complete.` : ""
+  return ""
 })
 // Config-only options (no `series`). The object is memoised by
 // (currency, colour, benchmark names) so a data swap that keeps the same
