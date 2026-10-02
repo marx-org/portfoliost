@@ -3,7 +3,6 @@ import { createPinia, setActivePinia, type Pinia } from "pinia"
 import { useCurrenciesStore } from "@/stores/currencies"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import InvestmentsView from "@/modules/portfolios/InvestmentsView.vue"
-import PortfolioPerformanceChart from "@/components/PortfolioPerformanceChart.vue"
 import * as portfoliosApi from "@/api/portfolios"
 import * as fxApi from "@/api/fx"
 
@@ -82,7 +81,8 @@ function mountView() {
     global: {
       plugins: [pinia],
       stubs: {
-        RouterLink: { template: "<a><slot /></a>" },
+        // Keeps `to` on the stub, so the target route is assertable here.
+        RouterLink: { props: ["to"], template: "<a :href='to'><slot /></a>" },
         apexchart: { template: "<div class='apexchart-stub' />" },
         PortfolioPerformanceChart: {
           name: "PortfolioPerformanceChart",
@@ -272,65 +272,20 @@ describe("InvestmentsView", () => {
     expect(wrapper.text()).toContain("EUR")
   })
 
-  it("converts the merged series from totalMetrics.baseCurrency to the display currency (§46.3), when the display currency changes", async () => {
-    localStorage.setItem("portfoliost_display_currency", "EUR")
-    mocked.getPortfolioTotalMetrics.mockResolvedValue({
-      totalValue: 1200,
-      totalInvested: 1000,
-      totalGainLoss: 200,
-      returnPercentage: 20,
-      baseCurrency: "USD",
-      portfolioBreakdown: [],
-    } as never)
-    mocked.getMergedAnalytics.mockResolvedValue({
-      performance: {
-        timeSeries: [
-          { date: "2026-01-01", value: 1000 },
-          { date: "2026-01-02", value: 1200 },
-        ],
-        monthlyReturns: [],
-      },
-    } as never)
-
-    const wrapper = mountView()
-    await flushPromises()
-    await flushPromises()
-
-    // Source currency = totalMetrics.baseCurrency (the wallets merged route's USD).
-    expect(mockedFx.getLatestRate).toHaveBeenCalledWith("USD", "EUR")
-    const chart = wrapper.findComponent(PortfolioPerformanceChart)
-    const series = chart.props("timeSeries") as Array<{ date: string; value: number }>
-    expect(series).toHaveLength(2)
-    expect(series[0].value).toBeCloseTo(900, 6) // 1000 × 0.9
-    expect(series[1].value).toBeCloseTo(1080, 6) // 1200 × 0.9
-    expect(chart.props("currency")).toBe("EUR")
-
-    // §48.6e B5 — the total-metrics cards (baseCurrency USD) convert to the
-    // display currency with the same rate, never a $ value under a € label.
-    expect(wrapper.text()).toContain("€1,080.00") // 1200 × 0.9
-    expect(wrapper.text()).toContain("€900.00") // 1000 × 0.9
-    expect(wrapper.text()).toContain("+€180.00") // 200 × 0.9
-  })
-
-  it("shows the combined block currency and switches the merged timeframe (§46.7)", async () => {
+  // §83.6 — the merged chart and its timeframe selector MOVED to
+  // TotalPerformanceView. The conversion and switching cases live in
+  // TotalPerformanceView.test.ts now, against the same endpoint and the same
+  // chart component; what stays here is that the dashboard points at the tab
+  // rather than rendering the curve a second time.
+  it("links to the cumulative performance tab instead of repeating the curve (§83.6)", async () => {
     localStorage.removeItem("portfoliost_display_currency")
     const wrapper = mountView()
     await flushPromises()
 
-    expect(wrapper.text()).toContain("Portfolio Value: USD")
-
-    const timeframes = wrapper.find('[data-testid="combined-chart-timeframes"]')
-    const buttons = timeframes.findAll("button")
-    const allBtn = buttons.find((b) => b.text() === "ALL")!
-    const y1Btn = buttons.find((b) => b.text() === "1Y")!
-    expect(allBtn.attributes("aria-pressed")).toBe("true")
-
-    await y1Btn.trigger("click")
-    await flushPromises()
-
-    expect(mocked.getMergedAnalytics).toHaveBeenLastCalledWith("1Y")
-    expect(y1Btn.attributes("aria-pressed")).toBe("true")
-    expect(allBtn.attributes("aria-pressed")).toBe("false")
+    expect(wrapper.find('[data-testid="combined-chart"]').exists()).toBe(false)
+    const link = wrapper.get('[data-testid="combined-chart-link"]')
+    expect(link.attributes("href")).toBe("/en/investments/performance")
+    expect(link.text()).toContain("Open performance")
   })
 })
 

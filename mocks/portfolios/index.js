@@ -273,6 +273,32 @@ export function register(app) {
     ctx.res.json(loadRaw("portfolios_held_stocks.json"))
   })
 
+  // §83.5 — every OPEN position across every portfolio, each labelled with the
+  // portfolio it came from. Registered BEFORE "/:id" for the same reason the real
+  // service does it: "positions" must not be parsed as a portfolio id.
+  //
+  // Built from the same `enrichedPositions` the per-portfolio route uses, so the
+  // two responses cannot drift — the mock's whole job is to let the SPA be
+  // developed against a shape the service really serves.
+  app.get("/api/portfolios/positions", (ctx) => {
+    if (!requireAuth(ctx)) return
+    const byId = new Map(loadRaw("portfolios_summaries.json").map((p) => [p.id, p]))
+    for (const [id, p] of created) byId.set(id, p)
+    const np = noPricePortfolio()
+    if (!byId.has(np.id)) byId.set(np.id, np)
+    const positions = []
+    for (const pf of byId.values()) {
+      for (const p of enrichedPositions(pf.id)) {
+        if (p.isOpen === false) continue
+        positions.push({ ...p, portfolioName: pf.name })
+      }
+    }
+    // The route orders by unrealized P/L; mirror it so the mock exercises the
+    // same ordering the SPA will be handed.
+    positions.sort((a, b) => (b.unrealizedGainLoss ?? 0) - (a.unrealizedGainLoss ?? 0))
+    ctx.res.json({ positions })
+  })
+
   app.get("/api/portfolios/shares", (ctx) => {
     if (!requireAuth(ctx)) return
     ctx.res.json(allShares())

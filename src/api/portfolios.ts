@@ -149,8 +149,18 @@ export async function deletePortfolioTransaction(id: string, txId: string): Prom
 
 export type PortfolioBenchmarkCalcType = "moneyWeighted" | "timeWeighted" | "simple"
 
-export async function getMergedAnalytics(timeframe: PortfolioAnalyticsTimeframe = "ALL"): Promise<PortfolioAnalytics1Y> {
-  return http.get<PortfolioAnalytics1Y>(`/api/portfolios/merged?timeframe=${timeframe}`)
+/**
+ * §83.3 — `benchmarks` was accepted by `/merged` and ignored by this client, so
+ * the aggregate tab's Customize modal would have selected overlays and shown
+ * none. Same param shape as {@link getPortfolioAnalytics}.
+ */
+export async function getMergedAnalytics(
+  timeframe: PortfolioAnalyticsTimeframe = "ALL",
+  benchmarks: string[] = [],
+  calcType: PortfolioBenchmarkCalcType = "timeWeighted",
+): Promise<PortfolioAnalytics1Y> {
+  const bench = benchmarks.length ? `&benchmarks=${encodeURIComponent(benchmarks.join(","))}` : ""
+  return http.get<PortfolioAnalytics1Y>(`/api/portfolios/merged?timeframe=${timeframe}${bench}&benchmarkCalcType=${calcType}`)
 }
 
 export async function getPortfolioAnalytics(

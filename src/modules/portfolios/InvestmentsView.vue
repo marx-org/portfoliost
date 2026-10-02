@@ -7,75 +7,13 @@ import { usePortfolioFreshness, usePortfolioValues } from "@/stores/portfolios"
 import { useCurrenciesStore } from "@/stores/currencies"
 import { storeToRefs } from "pinia"
 import { formatCurrency, formatPercent, formatSignedCurrency } from "@/utils/format"
-import { getMergedAnalytics, recomputePortfolio, type PortfolioAnalyticsTimeframe } from "@/api/portfolios"
-import type { PortfolioAnalytics } from "@/api/types"
 import InvestmentsTabs from "@/modules/portfolios/InvestmentsTabs.vue"
 import PortfolioCard from "@/modules/portfolios/PortfolioCard.vue"
 import AddPositionDialog from "@/modules/portfolios/AddPositionDialog.vue"
-import PortfolioPerformanceChart from "@/components/PortfolioPerformanceChart.vue"
 
 const store = usePortfolioStore()
 const loading = ref(true)
 const error = ref<string | null>(null)
-
-// §41.5 — combined (all-portfolios) value chart, example-service position on the main
-// investments page. degrades gracefully: on fetch failure merged = null and the
-// chart block stays hidden.
-const merged = ref<PortfolioAnalytics | null>(null)
-const mergedBackfillPending = ref(false)
-const mergedBusy = ref(false)
-const mergedLoading = ref(false)
-
-// §46.7 — the combined chart is timeframe-selectable (example-service has a period
-// selector on the block; the real `merged` endpoint supports timeframe).
-const mergedTimeframes: Array<{ value: PortfolioAnalyticsTimeframe; label: string }> = [
-  { value: "1W", label: "1W" },
-  { value: "1M", label: "1M" },
-  { value: "3M", label: "3M" },
-  { value: "6M", label: "6M" },
-  { value: "1Y", label: "1Y" },
-  { value: "2Y", label: "2Y" },
-  { value: "ALL", label: "ALL" },
-]
-const mergedTimeframe = ref<PortfolioAnalyticsTimeframe>("ALL")
-
-let mergedReqSeq = 0
-async function refetchMerged() {
-  const seq = ++mergedReqSeq
-  mergedLoading.value = true
-  try {
-    const data = await getMergedAnalytics(mergedTimeframe.value)
-    if (seq !== mergedReqSeq) return // stale response for an older timeframe — drop it
-    merged.value = data
-    mergedBackfillPending.value = false
-  } catch {
-    if (seq !== mergedReqSeq) return
-    merged.value = null
-    mergedBackfillPending.value = false
-  } finally {
-    if (seq === mergedReqSeq) mergedLoading.value = false
-  }
-}
-
-function changeMergedTimeframe(timeframe: PortfolioAnalyticsTimeframe) {
-  if (mergedTimeframe.value === timeframe || mergedLoading.value) return
-  mergedTimeframe.value = timeframe
-  void refetchMerged()
-}
-
-async function handleMergedRecompute() {
-  if (mergedBusy.value) return
-  mergedBusy.value = true
-  mergedBackfillPending.value = true
-  try {
-    await Promise.all(store.portfolios.map((p) => recomputePortfolio(p.id)))
-    await refetchMerged()
-  } catch {
-    // network error — stay idle; the user can retry
-  } finally {
-    mergedBusy.value = false
-  }
-}
 
 // D26: every currency selector is fed exclusively by the /api/currencies registry
 const currenciesStore = useCurrenciesStore()
@@ -90,22 +28,9 @@ const showCurrencyMenu = ref(false)
 // (useDisplayConversion, §66.3) instead of a second copy of the same
 // getLatestRate watchEffect. Source is the aggregate's own baseCurrency, exactly
 // as before, so this is a dedup and not a behaviour change.
-const { rate: mergedChartRate, convert: toDisplay } = useDisplayConversion(
+const { convert: toDisplay } = useDisplayConversion(
   () => store.totalMetrics?.baseCurrency,
 )
-
-const mergedChartSeries = computed(() => {
-  const rate = mergedChartRate.value ?? 1
-  return (merged.value?.performance?.timeSeries ?? []).map((p) => ({
-    ...p,
-    value: (p.value ?? 0) * rate,
-    invested: p.invested != null ? p.invested * rate : null,
-    // §78.5 — same rate as `value`, for the same reason: an unscaled amount
-    // would be a warning in the wrong currency sitting next to a converted axis.
-    unpricedValue: p.unpricedValue != null ? p.unpricedValue * rate : null,
-  }))
-})
-
 
 // §68.4 — Total Gain/Loss and Total Return are now DERIVED from the same
 // (totalValue, totalInvested) pair the tiles show, in the aggregate base currency
@@ -225,7 +150,6 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
-  void refetchMerged()
 })
 
 function setDisplayCurrency(currency: string) {
@@ -379,34 +303,21 @@ async function submitCreate() {
       </div>
     </template>
 
-    <div v-if="merged?.performance?.timeSeries?.length" class="card mb-6 p-6" data-testid="combined-chart">
-      <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 class="text-base font-semibold">Portfolio Value: {{ displayCurrency }}</h2>
-        <div class="flex flex-wrap items-center gap-1" data-testid="combined-chart-timeframes">
-          <button
-            v-for="tf in mergedTimeframes"
-            :key="tf.value"
-            type="button"
-            class="btn-secondary text-xs"
-            :class="mergedTimeframe === tf.value ? 'border-blue-600 bg-blue-50 text-blue-700 dark:border-blue-600 dark:bg-blue-500/10 dark:text-blue-400' : ''"
-            :aria-pressed="mergedTimeframe === tf.value"
-            :disabled="mergedLoading || mergedBusy"
-            @click="changeMergedTimeframe(tf.value)"
-          >
-            {{ tf.label }}
-          </button>
-        </div>
+    <!-- §83.6 — the combined chart MOVED to /en/investments/performance, which
+         renders the same endpoint through the same chart component as the rest of
+         the Performance tab. Leaving it here would put the same curve on two
+         adjacent pages, and only one of them would have the TWR, MWR, timing and
+         drawdown numbers beside it. -->
+    <div class="card mb-6 flex flex-wrap items-center justify-between gap-3 p-6">
+      <div>
+        <h2 class="text-base font-semibold">Portfolio performance</h2>
+        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          Value, returns and drawdown across all {{ store.portfolios.length }} portfolios.
+        </p>
       </div>
-      <PortfolioPerformanceChart
-        :time-series="mergedChartSeries"
-        :currency="displayCurrency"
-        color="#2563eb"
-        :loading="mergedLoading"
-        :backfill-pending="mergedBackfillPending"
-        :recomputing="mergedBusy || mergedBackfillPending"
-        :height="300"
-        @recompute="handleMergedRecompute"
-      />
+      <router-link to="/en/investments/performance" class="btn-primary text-sm" data-testid="combined-chart-link">
+        Open performance
+      </router-link>
     </div>
 
     <section v-if="!loading" class="mb-10">

@@ -383,6 +383,7 @@ async function main() {
     ["/portfolios/merged/light", ""],
     ["/portfolios/total-metrics", ""],
     ["/portfolios/held-stocks", ""],
+    ["/portfolios/positions", ""],
     ["/portfolios/shares", ""],
     ["/portfolios/transactions", ""],
   ]) {
@@ -443,6 +444,22 @@ async function main() {
   )
   const summaryMetrics = await request(`/portfolios/${pid}/summary-metrics`, { token })
   check("portfolios.summary-metrics", summaryMetrics.status === 200 && "totalValue" in summaryMetrics.json, `got ${summaryMetrics.status}`)
+
+  // §83.5 — the all-portfolios list must LABEL its rows. An endpoint that
+  // answers with positions but no portfolio name is the failure the cumulative
+  // tab's performer cards exist to avoid, and it is invisible in a 200 response.
+  const allPos = await request("/portfolios/positions", { token })
+  const labelled = (allPos.json?.positions ?? []).filter((p) => typeof p.portfolioName === "string" && p.portfolioName)
+  check(
+    "portfolios.positions labels every row with its portfolio (§83.5)",
+    allPos.status === 200 && Array.isArray(allPos.json?.positions) && labelled.length === allPos.json.positions.length && labelled.length > 0,
+    `got ${allPos.status}, ${labelled.length}/${(allPos.json?.positions ?? []).length} labelled`,
+  )
+  check(
+    "portfolios.positions spans more than one portfolio",
+    new Set(labelled.map((p) => p.portfolioName)).size > 1,
+    `portfolios: ${[...new Set(labelled.map((p) => p.portfolioName))].join(", ")}`,
+  )
   for (const tf of ["1W", "1M", "3M", "6M", "1Y", "2Y", "ALL"]) {
     const a = await request(`/portfolios/${pid}/analytics?timeframe=${tf}`, { token })
     check(`portfolios.analytics ${tf}`, a.status === 200 && a.json.performance && isObj(a.json.performance), `got ${a.status}`)

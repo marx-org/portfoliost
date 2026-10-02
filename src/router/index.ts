@@ -56,6 +56,14 @@ const router = createRouter({
           component: () => import("@/modules/portfolios/AccountsBalanceView.vue"),
         },
         {
+          // §83.6 — the cumulative (all-portfolios) Performance tab. A tab on the
+          // investments strip rather than a `/portfolios/:id` route, because it
+          // aggregates over every portfolio and therefore has no `:id`.
+          path: "investments/performance",
+          name: "investments-performance",
+          component: () => import("@/modules/portfolios/TotalPerformanceView.vue"),
+        },
+        {
           path: "investments/transactions",
           name: "transactions",
           component: () => import("@/modules/portfolios/TransactionsView.vue"),

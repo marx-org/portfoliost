@@ -18,6 +18,13 @@ const tabs = [
     match: (path: string) => path === "/en/investments",
   },
   {
+    // §83.6 — the cumulative (all-portfolios) performance tab. After Portfolios
+    // because it summarises exactly what those cards summarise.
+    label: "Performance",
+    to: "/en/investments/performance",
+    match: (path: string) => path.startsWith("/en/investments/performance"),
+  },
+  {
     label: "Transactions",
     to: "/en/investments/transactions",
     match: (path: string) => path.startsWith("/en/investments/transactions"),

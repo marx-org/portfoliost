@@ -170,6 +170,15 @@ const props = defineProps<{
    * aggregate mount passes `testid="total"` for `total-perf-overview`.
    */
   testid?: string
+  /**
+   * §83.6 — print the constant-currency caveat on the Overview card. Set by the
+   * aggregate mount only, and deliberately a prop rather than "always": on a
+   * single-base portfolio there is no FX omission to disclose, and commentary
+   * about a problem the page does not have is noise. On the aggregate it sits
+   * ABOVE the two money tiles, because those are the numbers a reader checks
+   * against a bank balance.
+   */
+  fxCaveat?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -496,6 +505,20 @@ function convertedPnl(p: PortfolioPositions[number]): number | null {
   <div class="space-y-6">
     <div class="card p-6" :data-testid="tid('perf-overview')">
       <h2 class="mb-3 text-base font-semibold">Overview</h2>
+      <!-- §83.6 — see the `fxCaveat` prop: this is §68.4 behaviour made VISIBLE
+           here, not wrong here. One spot rate per pair is applied across the whole
+           history, so the total excludes FX moves between a portfolio's base and
+           the aggregate base — material on a multi-currency account, and
+           invisible if left implicit next to a number that looks like a bank
+           balance. -->
+      <p
+        v-if="fxCaveat"
+        class="mb-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:bg-slate-800/50 dark:text-slate-400"
+        :data-testid="tid('perf-overview-fx-caveat')"
+      >
+        Constant currency: these totals are converted at today's rate across the whole
+        history, so they exclude currency moves over the period.
+      </p>
       <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div class="rounded-lg bg-slate-50 dark:bg-slate-800/50 p-4">
           <dt class="text-sm text-slate-500 dark:text-slate-400">Net gain</dt>
