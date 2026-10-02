@@ -501,17 +501,17 @@ empty. So `cachestProviders` is always `[]`, and
 renders the per-upstream latency table. The service rows next to it are fine —
 they go through `queryMapByLabel`, which is why this one query was missed.
 
-- [ ] **Resolve the cachest identity through `LABEL_PREF`** the same way the
+- [x] **Resolve the cachest identity through `LABEL_PREF`** the same way the
       service rows do, instead of hardcoding `service_name`.
-- [ ] **Test** that the generated PromQL carries no unresolvable label filter,
+- [x] **Test** that the generated PromQL carries no unresolvable label filter,
       and that a stubbed series keyed on `job` yields a populated
       `cachestProviders`.
       > Extend `portfoliost-admin/src/topology.test.ts` — the ingress/OTel
       > fallback paths are already covered there, so this is an added case, not
       > a new file.
-- [ ] **Tests**: `npm run test` green in `portfoliost-admin`; confirm against the
+- [x] **Tests**: `npm run test` green in `portfoliost-admin`; confirm against the
       live cluster that the endpoint returns a non-empty `cachestProviders`.
-- [ ] **Commit** `fix(admin): resolve cachest provider latency through the label fallback`
+- [x] **Commit** `fix(admin): resolve cachest provider latency through the label fallback`
 
 
 ## 81. Drawdowns and annualization both ignore cash flows (2026-10-02)
