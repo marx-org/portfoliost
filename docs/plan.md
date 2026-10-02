@@ -383,24 +383,43 @@ doubles as the geometry the lane-bounds and persistence tests assert against. Th
 rendered box is whatever the node component's Tailwind padding makes it, so the
 two are maintained by hand and can disagree.
 
-- [ ] **Enlarge the five node components**: `InternalNode`, `StorageNode`,
+- [x] **Enlarge the five node components**: `InternalNode`, `StorageNode`,
       `JobNode` from `px-3 py-2` / `text-sm` to `px-4 py-2.5` / `text-base`;
       `ExternalNode` likewise; `ProviderNode` from `px-2.5 py-1` / `text-xs` to
       `px-3 py-1.5` / `text-sm`, with the quota badge `text-[10px]` → `text-xs`.
-- [ ] **Update `NODE_SIZES` to the rendered sizes**, and raise `LANE_PADDING`
+- [x] **Update `NODE_SIZES` to the rendered sizes**, and raise `LANE_PADDING`
       from 24 so a lane still frames its contents.
       > Measure, do not guess: `getBoundingClientRect()` on a rendered node in
       > the browser is the number `NODE_SIZES` has to match, because
       > `extent: "parent"` clamps children to the lane and dagre spaces by this
       > constant. A lane smaller than its contents clips them.
-- [ ] **Assert the two agree**: a test that every area's `NODE_SIZES` entry is at
+- [x] **Assert the two agree**: a test that every area's `NODE_SIZES` entry is at
       least the component's minimum rendered box, so the constant cannot silently
       drift from the markup again.
-- [ ] **Tests**: `npm run test` green (layout snapshot updates), `npm run build`
+      > `MIN_RENDERED_SIZES` holds the measured minimum per area and
+      > `topology-layout.test.ts` asserts `NODE_SIZES >=` it. It is deliberately
+      > the *minimum*: widths are label-driven, so one constant per area cannot
+      > equal all of them, and `NODE_SIZES` is set to the widest measured node
+      > (the value that stops a lane clipping a long label) — which satisfies the
+      > minimum as a side effect.
+      > The stronger half of the guard is an **e2e** test: it measures every
+      > painted node against its lane, where `:311` only sampled five ids. That is
+      > the invariant that actually matters — a node wider than the lane that
+      > reserved room for it is clipped — and it is only observable in a browser.
+- [x] **Tests**: `npm run test` green (layout snapshot updates), `npm run build`
       green, plus a Playwright pass on `tests/e2e/topology.spec.ts` — the lane
       tests at `:311` and `:348` assert boxes render and drag together, which is
       exactly what a size mismatch breaks.
-- [ ] **Commit** `fix(spa): enlarge topology nodes to a readable size`
+      > Measured in the browser, as the step demands — `getBoundingClientRect()`
+      > on every rendered node divided by the vue-flow zoom, with the zoom read
+      > off a lane whose graph-unit width is in its inline style (reading the
+      > matrix on `.vue-flow__viewport` returns identity here and silently
+      > reports CSS pixels): internal 166.8…230.3 × 46, storage 99.0…146.6 × 46,
+      > jobs 118.3…208.5 × 46, external-services 107.0…179.8 × 46,
+      > data-providers 53.5…197.2 × 34. Reserved before: 200×40, 150×40, 160×40,
+      > 160×36, 120×28 — i.e. the providers lane reserved 120 for a box that
+      > renders up to 197 wide.
+- [x] **Commit** `fix(spa): enlarge topology nodes to a readable size`
 
 ### 80.5 — Pack lanes sideways, so a wide screen is used
 
@@ -410,31 +429,62 @@ overlapping lanes **downward**, so five areas stack into a tall column and
 mechanism behind "boxes are very small and unreadable"; §80.4 alone makes the
 boxes bigger and the zoom-out worse.
 
-- [ ] **Flip the pack axis**: in `packAreas`, advance `x` instead of `y` when a
+- [x] **Flip the pack axis**: in `packAreas`, advance `x` instead of `y` when a
       lane must clear an already-placed one, and order the pass by raw `x` then
       definition order.
       > Keep the guarantee the same — pairwise-disjoint lanes — and keep
       > `nearOverlap` as the single overlap predicate. `clampLaneMotion` is
       > already axis-symmetric (binary search over the displacement vector), so
       > lane dragging needs no change.
-- [ ] **Fix the tests that encode the old axis.**
+- [x] **Fix the tests that encode the old axis.**
       > `topology-layout.test.ts:48` asserts lane *left edges* ascend in the
       > order data-providers → storage → internal → external-services; that
       > ordering came from the rank columns, and horizontal packing re-orders it.
       > Either relax it to "no two lanes overlap and every node is inside its
       > lane" (`:83`, `:103`) or pin the new left-to-right lane order
       > deliberately — but do not leave it asserting the old geometry.
-- [ ] **Shorten the canvas** in `mission-control.css`: `.mission-canvas` is
+      > It kept passing, and that is the problem: with the pass ordered by raw
+      > `x`, a left-edge ordering *is* the comparator's output, so the test
+      > asserted the sort. Replaced with the axis guarantee — lanes move right,
+      > never down: `lane.y + LANE_PADDING` equals the area's first member's `y` —
+      > and `packAreas`' own test now asserts `y` is untouched while `x` moves.
+- [x] **Shorten the canvas** in `mission-control.css`: `.mission-canvas` is
       `clamp(540px, calc(100vh - 430px), 1000px)`. A wide layout wants a shorter
       stage, and `fitView` has more width to spend on the zoom that §80.4 needs.
       Check the `≤720px` media block at `:115` still collapses sensibly.
-- [ ] **Raise `max-zoom`** from 1.5 (`TopologyView.vue:459`) only if §80.4 and
+      > `clamp(380px, calc(100vh - 430px), 760px)`.
+      > **The step's reasoning is wrong**, and the change is smaller than it looks:
+      > a shorter canvas adds no width. It pays off only because after the flip
+      > *height stops being the binding axis* — measured on 1280×720, height alone
+      > allows 0.310 and width only 0.223 — so the extra 160px was pure scroll. The
+      > `≤720px` block overrides only `.mission-control--focus .mission-canvas`, so
+      > it needed no change; the 380px floor keeps the graph usable there.
+- [x] **Raise `max-zoom`** from 1.5 (`TopologyView.vue:459`) only if §80.4 and
       §80.5 together still leave the default view short of 1:1 — measure on a
       real viewport before changing it.
-- [ ] **Tests**: `npm run test` green; `npm run test:e2e` green — `:311` asserts
+      > Measured, and **not** raised. 1280×720, canvas 1006×540 after the shorter
+      > height: vertical pack was extent 2104×3682 at zoom **0.128** (height-bound
+      > 0.147); horizontal pack is 4507×1226 at zoom **0.194** (width-bound 0.223).
+      > A 1.5× bigger default view, still far short of 1:1.
+      > A floor was tried and reverted. `fitView` clamps its computed zoom into
+      > `[minZoom, maxZoom]`, so the lever is a **floor** — `maxZoom: 0.6` would
+      > leave 0.194 untouched — and `fit-view-on-init` takes only a boolean in
+      > @vue-flow/core 1.48, so it needs a `@nodes-initialized` refit. At 0.6 the
+      > graph is 3× more legible and **11 of 17 topology tests fail**: the default
+      > view shows a 40%-width slice and every node click lands off-canvas. 42
+      > labelled nodes cannot be both fully visible and readable in a ~1000px
+      > canvas; the toolbar zooms 0.05…1.5 and focus mode widens the stage, so
+      > legibility is reachable on demand. Making the *default* legible means
+      > shipping a pannable-by-default view — a product decision about which to
+      > give up, not a layout tweak.
+- [x] **Tests**: `npm run test` green; `npm run test:e2e` green — `:311` asserts
       lanes never overlap, `:373` that Re-layout restores the canonical
       arrangement, `:394` that moved lanes survive a reload.
-- [ ] **Commit** `feat(spa): pack topology lanes horizontally for wide screens`
+      > `:394` compared *screen* pixels across a reload and broke once the wider
+      > layout let a drag push a lane far enough sideways that the next measurement
+      > scrolled. A persisted position is a graph-space fact, so it now reads
+      > vue-flow's inline `transform: translate(x, y)`.
+- [x] **Commit** `feat(spa): pack topology lanes horizontally for wide screens`
 
 ### 80.6 — `cachestProviders` is permanently empty (found while renovating the proposal)
 
