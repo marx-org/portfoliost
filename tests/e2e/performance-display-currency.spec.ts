@@ -138,12 +138,26 @@ test("overview Net gain tile and yearly Gain column re-convert together (§82.5)
   const analytics = (await (
     await request.get(`${GATEWAY}/api/portfolios/${top10!.id}/analytics?timeframe=ALL`, { headers: auth })
   ).json()) as {
-    performance?: { totalReturn?: number; timeSeries?: unknown[]; annualizedReturn?: number | null }
+    performance?: {
+      totalReturn?: number
+      timeSeries?: Array<{ value?: number; invested?: number | null }>
+      annualizedReturn?: number | null
+    }
   }
+  const series = analytics.performance?.timeSeries ?? []
   const totalReturn = analytics.performance?.totalReturn ?? 0
-  const pointCount = analytics.performance?.timeSeries?.length ?? 0
-  expect(pointCount, "seeded Top10 has a populated ALL series").toBeGreaterThan(1)
+  expect(series.length, "seeded Top10 has a populated ALL series").toBeGreaterThan(1)
   expect(totalReturn).not.toBe(0)
+
+  // §82.5 (PROD) — the Σ Gain footer is `totalReturn − openingNet`, NOT
+  // `totalReturn`. D88 claimed they were equal; that holds only for a series
+  // that opens at net 0, which the compose seed always is and PROD often is not
+  // (6 of 10 PROD portfolios open non-zero; the gap reaches 45%). Asserting the
+  // bare equality here would pass in compose forever and be false in PROD, so the
+  // opening net is read from the payload and subtracted explicitly.
+  const openingNet = (series[0]?.value ?? 0) - (series[0]?.invested ?? 0)
+  expect(openingNet, "compose seed opens at net 0").toBe(0)
+  const expectedGain = totalReturn - openingNet
 
   const rate = ((await (await request.get(`${GATEWAY}/api/fx/latest?from=${baseCcy}&to=PLN`, { headers: auth })).json()) as {
     rate: number
@@ -163,13 +177,15 @@ test("overview Net gain tile and yearly Gain column re-convert together (§82.5)
   const netGain = page.getByTestId("perf-overview-net-gain")
   const sumGain = page.getByTestId("perf-returns-yearly-total-gain")
 
-  // Baseline (display USD): the Σ footer IS the Net gain tile, and it is the
-  // payload's `totalReturn` — the §82.3 reconciliation, on seeded data.
+  // Baseline (display USD): the tile is the payload's `totalReturn` …
   await expect(netGain).toHaveText(/[\d,]+\.\d\d/)
+  // … and the Σ footer is the same figure net of the series' opening net.
   await expect
     .poll(async () => parseMoney(await sumGain.textContent() ?? ""), { timeout: 15_000 })
+    .toBeCloseTo(expectedGain, 1)
+  await expect
+    .poll(async () => parseMoney(await netGain.textContent() ?? ""), { timeout: 15_000 })
     .toBeCloseTo(totalReturn, 1)
-  expect(await netGain.textContent()).toBe(await sumGain.textContent())
 
   // Switch the display to PLN: both re-convert by the live rate.
   await page.getByRole("button", { name: /Display currency:/ }).click()
@@ -182,6 +198,18 @@ test("overview Net gain tile and yearly Gain column re-convert together (§82.5)
     })
     .toBeCloseTo(totalReturn * rate, 0)
 
-  expect(await netGain.textContent(), "tile and Σ footer stay one number").toBe(await sumGain.textContent())
+  // Both re-converted by the SAME rate — which is the property this case exists
+  // for. They are two different quantities that must move together, not one
+  // number asserted twice, so the equality is on the RATE, not the amount.
+  await expect
+    .poll(
+      async () => {
+        const tile = parseMoney(await netGain.textContent() ?? "")
+        const sum = parseMoney(await sumGain.textContent() ?? "")
+        return tile && sum ? tile / sum : 0
+      },
+      { timeout: 15_000, message: "tile and Σ footer must re-convert by the same rate" },
+    )
+    .toBeCloseTo(totalReturn / expectedGain, 3)
   await expect(sumGain).toHaveText(/PLN|zł|₺/)
 })

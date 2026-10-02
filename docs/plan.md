@@ -360,7 +360,7 @@ today's bar chart unchanged, Yearly renders the four-column table.
       `Π(1 + twr)` equals `cumulativeTwr` at the last point) which are the whole
       point of the two columns and must fail loudly if either drifts. Add
       component cases for the toggle state and the YTD label.
-      > 20 new cases (33 in the file). **Mutation-verified**, because "must fail
+      > 20 new cases (45 in the file). **Mutation-verified**, because "must fail
       > loudly" is only worth anything if it does: summing the percentages instead
       > of compounding them fails 3 cases (`× 0.5800` vs `× 1.7044`), and basing
       > each year on its own FIRST point instead of the previous year's end fails
@@ -368,7 +368,13 @@ today's bar chart unchanged, Yearly renders the four-column table.
       > One fixture correction: `cumulative_twr` is stored at 2 dp
       > (`returnColumns.buildTwr` rounds `v * 10000 / 100`), so the fixture is
       > built at that precision, not at the proposal's rounded percentages.
-      > 566/566 SPA unit tests, `npm run build` (vue-tsc) green.
+      >
+      > **The `Σ gains` reconciliation above is WRONG and was corrected after the
+      > PROD deploy.** `Σ gains` telescopes to `net(last) − net(first)`, so it
+      > equals `performance.totalReturn` only when the series opens at net 0.
+      > See §82.5's PROD measurements. The test now asserts the true identity and
+      > carries a PROD-shaped fixture that the old assertion would have failed.
+      > 578/578 SPA unit tests, `npm run build` (vue-tsc) green.
 - [x] **Commit** `feat(spa): add yearly TWR and gain to the returns chart`
 
 ### 82.4 — Excess TWR per year against the benchmark
@@ -498,6 +504,98 @@ layout, tile styling and wording — not about whether the tiles exist.
       > converted and the footer did not, which is precisely the regression the
       > assertion exists to catch.
 - [x] **Commit** `test(spa): cover the performance overview and yearly returns in e2e`
+
+### 82.6 — PROD verification, and the `Σ gains` reconciliation D88 got wrong
+
+**Deployed to PROD 2026-10-02** — `portfoliost-wallets` v1.1.119 → **v1.1.120**,
+SPA v1.0.354 → **v1.0.356** (v1.0.355 was the docs-only §84 archive commit, no
+`src/` change). Homelab commit `af7c4898b`. Both wallets pins moved together —
+the app Deployment and the `snapshotsync` CronJob run the same image. Tags read
+from `gh release list`, and the checkout was 2 auto-update commits behind, so the
+bump was rebased onto the deployed revision. Flux reconciled both kustomizations
+at `main@sha1:af7c4898b`; both Deployments rolled out clean, no errors in the
+wallets log.
+
+| portfolio | window | metric | before | after |
+| --- | --- | --- | --- | --- |
+| Equate+ | 1Y | `periodReturnPercent` (§81, already in PROD) | **−18.69** | — |
+| Equate+ | 1Y | Overview → **TWR p.a.** | tile did not exist | **−18.69%** |
+| Equate+ | 1Y | Overview → **XIRR** | tile did not exist | **−23.57%** |
+| Equate+ | ALL | Overview → **TWR p.a.** | tile did not exist | **+3.23%** |
+
+The 1Y row is the useful one: §81's archive records that *"every 1Y window
+returns `annualizedReturn` numerically equal to `periodReturnPercent`, which is
+the 365/365 case and a further check that the exponent is 365 and not 252."* The
+new tile reads −18.69% on that same window — an independent confirmation, from
+a different code path, that §82.1 is wired to §81.2's number rather than to a
+third annualiser. XIRR reads −23.57%, the same `moneyWeightedReturn` §81 verified.
+The Timing tile then prints −4.88% / "adding money hurt", which is exactly the
+gap between those two figures.
+
+Equate+'s yearly table (ALL): 2019 +7.85% … 2024 +51.00% … 2026 YTD −10.41%,
+Σ `× 1.2655`. Verified in SQL against `value_snapshots`:
+`cumulative_twr(last)/cumulative_twr(first)` = 126.55/100 = **1.2655** — the TWR
+reconciliation holds exactly in PROD, not just in fixtures.
+
+**In compose the Timing tile is unreachable.** The §75 seed writes 49
+`value_snapshots` rows, below the 60-point floor the shared withholding predicate
+imposes, so Top10 renders `TWR p.a. —` / "not enough history yet" and hides the
+Timing line. That is §82.1's decision behaving correctly on thin data; PROD's
+portfolios carry 1 663–2 704 points and all four rate tiles are populated.
+
+#### The defect this deploy found: `Σ gains` ≠ `performance.totalReturn`
+
+The two reconciliations are NOT equivalent, and D88 claimed they were. `Σ gains`
+telescopes to `net(last) − net(first)`, so it equals `totalReturn` **only for a
+series that opens at net 0**. Measured across all ten PROD portfolios:
+
+| portfolio | opening net | `totalReturn` (tile) | `Σ gains` (footer) | gap |
+| --- | --- | --- | --- | --- |
+| IKE Marek | −2 610.72 | 37 314.36 | 39 925.08 | **7.00 %** |
+| Crypto | −7.20 | 16.16 | 23.37 | **44.56 %** |
+| XTB | −1.90 | −24.08 | −22.18 | 7.89 % |
+| IKE Beata | −62.76 | 72 575.14 | 72 637.90 | 0.09 % |
+| Equate+ | −19.77 | −6 388.76 | −6 368.99 | 0.31 % |
+| IBKR | +2.88 | 76 629.39 | 76 626.52 | 0.00 % |
+| NN TFI PPO / PPK, Rach. PKO BP, Obligacje PKO SA Beata | 0.00 | — | equal | 0 % |
+
+Six of ten disagree, and two by enough to matter. The arithmetic is not wrong —
+the two numbers measure different windows: the tile reports gain since inception,
+the footer reports gain accumulated across the displayed series. The trap is that
+they sit on the same card looking like one figure.
+
+**Why nothing caught it.** The compose seed opens at net 0 for every portfolio,
+so every fixture and the §82.5 e2e passed. The assertion was true of the test
+data and false of the data that exists. Only the deploy surfaced it.
+
+**Two causes, and they are not the same defect.** `unpriced_value` on the first
+snapshot explains IKE Marek's 2 605.72 of its 2 610.72 — day-1 positions the
+backfill had no price bar for, which the app already reports as
+`heldGapSymbols`. Crypto, Equate+, XTB and IKE Beata open with `unpriced_value`
+0.00, so theirs are small real opening values (fees, FX, partial pricing), not a
+pricing hole. Suppressing the first row's Gain would fix only the first kind and
+would misattribute the rest.
+
+**The data fix is already planned and is not §82's.** User decision 2026-10-02:
+the opening-net values belong to **§78.1** (XTB's missing `Wpłata` row) and
+**§78.2** (IBKR / IKE Marek / IKE Beata's missing ledger rows) — those are the
+accounts with a non-zero opening net, and §78.2's own table already shows IKE
+Marek running ~4 k *ahead* of what the ledger explains. §82 therefore does **not**
+change the derivation or the UI; it stops asserting the false invariant:
+
+- The §82.3 unit test now asserts the true identity
+  (`Σ gains = totalReturn − openingNet`) and carries a PROD-shaped fixture built
+  from IKE Marek's numbers, which the original assertion fails.
+- The §82.5 e2e reads `openingNet` from the payload and subtracts it, and its
+  post-switch assertion is now on the shared **rate** (`tile / Σ` equals
+  `totalReturn / expectedGain`) rather than on two text strings being equal —
+  which is the property the case was always meant to test.
+- Re-verified by mutation: dropping the Σ footer's conversion still fails it,
+  now with `Expected: 1 / Received: 3.98`.
+
+No UI change, so no re-deploy for this step. When §78 lands and the opening nets
+go to zero, the bare equality becomes true on its own and the subtraction becomes
+a no-op — which is the right shape for a fix that is about to arrive.
 
 ## 83. Cumulative (all-portfolios) Performance tab (2026-10-02)
 

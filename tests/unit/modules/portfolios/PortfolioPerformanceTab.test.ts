@@ -297,17 +297,48 @@ describe("yearlyReturns (§82.3 / D88)", () => {
   })
 
   /**
-   * The two reconciliations are the entire point of the two columns. `Σ gains`
-   * telescopes into `value − invested` at the endpoints, and `Π(1 + twr)` is the
-   * telescoping ratio of the stored index — so both must hold exactly, and a
-   * wrong base year breaks both.
+   * `Π(1 + twr)` reconciles exactly, and this is the property that catches a
+   * wrong base year: it is the telescoping ratio of the stored index.
    */
-  it("reconciles: Σ gains equals performance.totalReturn", () => {
-    // totalReturn is (value − invested) at the last point.
-    const last = WORKED[WORKED.length - 1]
-    const totalReturn = last.value - (last.invested ?? 0)
-    expect(yearlyTotals(yearlyReturns(WORKED, TODAY)).gain).toBeCloseTo(totalReturn, 6)
-    expect(totalReturn).toBe(13240)
+  /**
+   * §82.5 (PROD) — `Σ gains` reconciles to `totalReturn` ONLY when the series
+   * opens at net 0. It telescopes to `net(last) − net(first)`, so on a series
+   * that already carries a gain or a loss on its first snapshot day the two
+   * differ by exactly that opening net.
+   *
+   * D88 asserted the two are equal. That is false in PROD: 6 of 10 portfolios
+   * open non-zero (IKE Marek by −2 610.72, of which 2 605.72 is `unpriced_value`
+   * — day-1 positions with no price bar), so the gap reaches 7% there and 45% on
+   * Crypto. Every fixture opened at 0, which is why the original assertion passed
+   * and the e2e passed, and why only a deploy to real data exposed it.
+   *
+   * The opening-net values are the data defect §78.1/§78.2 already own (XTB's
+   * missing `Wpłata` row, IBKR / IKE Marek / IKE Beata's missing ledger rows).
+   * §82 does not paper over it — but it must not assert it away either.
+   */
+  it("reconciles: Σ gains equals totalReturn MINUS the series' opening net", () => {
+    const netOf = (p: { value: number; invested: number }) => p.value - p.invested
+    const openingNet = netOf(WORKED[0])
+    const totalReturn = netOf(WORKED[WORKED.length - 1])
+    // WORKED opens at net 0, so the two coincide here — which is precisely why
+    // this fixture could never have caught the false invariant.
+    expect(openingNet).toBe(0)
+    expect(yearlyTotals(yearlyReturns(WORKED, TODAY)).gain).toBeCloseTo(totalReturn - openingNet, 6)
+  })
+
+  it("shows the gap on a PROD-shaped series whose first day already carries a net loss", () => {
+    // IKE Marek's shape: opens 2 610.72 under water, closes 37 314.36 over.
+    const marek = [point("2021-10-22", 100, -2610.72), point("2021-12-31", 120, 10000), point("2022-12-31", 150, 37314.36)]
+    const rows = yearlyReturns(marek, new Date("2026-10-02T12:00:00"))
+    const sum = yearlyTotals(rows).gain
+    const totalReturn = 37314.36 - 0
+    expect(rows.map((r) => r.year)).toEqual([2021, 2022])
+    // The Σ measures the change ACROSS the series …
+    expect(sum).toBeCloseTo(37314.36 - -2610.72, 6)
+    // … so it is 2 610.72 ABOVE the tile, which reports gain since inception.
+    expect(sum - totalReturn).toBeCloseTo(2610.72, 6)
+    // This is the assertion the old suite would have failed on.
+    expect(sum).not.toBeCloseTo(totalReturn, 2)
   })
 
   it("reconciles: Π(1 + twr) equals cumulativeTwr(last) / cumulativeTwr(first)", () => {
