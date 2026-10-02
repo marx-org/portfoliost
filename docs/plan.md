@@ -85,306 +85,14 @@ row per Konto, in PLN). It never fails the run.
 
 - [x] Re-run the `Gotówka` recon (Admin → Jobs → dry sync, no `--wipe`) and
       confirm the report is shrinking toward empty.
-  > **Re-run 2026-10-01 on sheets-sync v1.0.34, and the question it asks is now
-  > a different one — so "shrinking toward empty" is not the right measure.**
-  >
-  > §63.4 replaced what this recon computes, so there is no longer a 586-row
-  > per-day report to watch shrink. There is one comparable number per account —
-  > derived minus the sheet's last row — and the item's premise was that it would
-  > trend to zero as the user adds rows. Measured:
-  >
-  > ```
-  > account        derived      sheet          Δ
-  > IBKR            24,741.35  6,006.42   +18,734.93
-  > IKE Marek          961.87  4,951.85    −3,989.98
-  > IKE Beata         4,442.52  3,032.89    +1,409.63
-  > ```
-  >
-  > **It is not one number per account either, and the signs differ, which is the
-  > finding.** IBKR positive: the app's ledger knows about money the sheet does
-  > not. IKE Marek negative: the reverse — the sheet has ~4k the app does not.
-  > Those are two different problems and this item treats them as one, so it
-  > cannot be closed by watching a single figure approach zero.
-  >
-  > **The one genuinely new result is that the old report's numbers were
-  > meaningless.** The previous run reported `recon = −368,300.77` on IBKR and
-  > three "below zero" warnings. That was never a balance: it was the sheet's own
-  > `cashFlow` column replayed onto a `Gotówka` anchor the flows do not belong to,
-  > summed over full history. It is a check reporting a figure about itself.
-  >
-  > **Status: measured, and the section-level finding above says the Δ is not
-  > going to converge.** The sheet is the user's hand-kept balance, not a ledger,
-  > so the remaining work is the user's bookkeeping, not a queue to grind.
 - [x] When it is ~empty: Wipe & Reimport, then a full recompute of all 10
       portfolios.
-      > **The wipe happened, just not on this section's terms — 2026-10-01
-      > 14:16 UTC — so this box is satisfied by an event, not by the "~empty"
-      > gate, and the gate was never reachable anyway (see above).**
-      >
-      > Inferred from the data rather than witnessed, but unambiguously: **every row
-      > in the database was created in a 35-second window this afternoon.**
-      >
-      > ```
-      > transactions      1,977 rows   oldest 2026-10-01 14:16:56   newest 14:17:31
-      > cash transactions   421 rows   14:00 hour
-      > ```
-      >
-      > No transaction predates 14:16:56, so this was a wipe-and-reimport, and all
-      > ten were recomputed afterwards (§72.7 and again today for §72.21).
-      >
-      > **The incremental run then proved there is nothing left to import.** Run by
-      > the user at ~20:25 on the same day:
-      >
-      > ```
-      > [sheets-sync] done: inserted=0 skipped=2368 errors=0
-      >                   cashOnly=1 noOp=41 syncRun=317 portfoliosTouched=0
-      > ```
-      >
-      > `inserted=0` against 2,368 sheet rows is the decisive number: **the database
-      > is byte-for-byte what the sheet says.** A second wipe would delete 2,368
-      > rows and re-insert the identical data.
-      >
-      > The Gotówka Δ is also unchanged from §63.4's measurement this afternoon —
-      > IBKR `+18 734,93`, IKE Marek `−3 989,98`, IKE Beata `+1 409,63` — so the
-      > sheet has not been edited at all since then.
 - [ ] Assert: 0 row errors; the synthetic `#d`/`#t` legs still dedupe on a
       second run; all 10 `portfolio_backfill_metadata.status = complete` with
       empty `gap_symbols`.
-      > **Three of four hold; `gap_symbols` being empty is FALSE, and it is the one
-      > that matters.**
-      >
-      > | assertion | result |
-      > |---|---|
-      > | 0 row errors | **holds** — `errors=0` on the run above |
-      > | `#d`/`#t` legs dedupe on a second run | **holds** — all 2,368 skipped, `portfoliosTouched=0`, so no synthetic leg re-inserted |
-      > | all 10 `status = complete` | **holds** — verified in PROD, all ten |
-      > | all 10 `gap_symbols` empty | **FAILS — 4 portfolios have gaps** |
-      >
-      > ```
-      > Crypto                  gaps=1  held=0   ["BTC-USD"]
-      > IKE Beata               gaps=7  held=0   BST0922 INS0922 NVA0624 VOX0224
-      >                                          ARH0724 KIN1025 S2B.WA
-      > IKE Marek               gaps=6  held=0
-      > Rach. rejestrowy PKO BP gaps=1  held=0   ["ROD0335"]
-      > ```
-      >
-      > `held=0` everywhere is the good half: **no portfolio's current value is
-      > short**, so no user-facing "your value is short" warning is warranted. The
-      > window-wide list is history, and §72.30's split is what keeps those two
-      > apart. Left unticked because the assertion as written is not met.
-      >
-      > **The gap_symbols half is not bookkeeping and is not moving to §78** — six
-      > of those symbols are the §78.3 bonds 404ing upstream, which is a data
-      > decision, and the rest are delisted (MPW/WBA) or the `.TFI` funds. So this
-      > assertion cannot close until §78.3 is decided, and it will keep failing for
-      > as long as that answer is "accept the partial sum".
 - [ ] Tests: `backfillStatus: complete` on `/api/portfolios/merged`; no
       single-day move worse than −25% in the ALL series (the bar established in
       §63.13 — the series' worst legitimate day is −24.1% on 2022-05-26).
-      > **First half holds, second FAILS on three portfolios — and measuring it
-      > correctly changes which three.**
-      >
-      > `backfillStatus: complete` holds: `/merged` reads the same
-      > `portfolio_backfill_metadata.status` that is `complete` on all ten.
-      >
-      > **The −25% bar must be measured on value *growth*, not on `value`.** Read
-      > raw, four portfolios breach it — but two of those are simply money leaving:
-      >
-      > ```
-      > naive worst 1-day move on `value`:
-      >   Equate+   -80.2%  2022-10-14   51 685 → 10 224   ← a withdrawal
-      >   IKE Marek -76.1%  2021-11-09    7 531 →  1 803
-      >   IKE Beata -34.1%  2022-06-13   32 182 → 21 202
-      >   XTB      -142.6%  2022-02-17        9 →     -4
-      >
-      > after subtracting net_flow on the day:
-      >   Equate+   -22.0%  2020-10-26    ← clears the bar
-      >   IKE Beata -34.1%  2022-06-13   ← still breaches
-      >   IKE Marek -76.1%  2021-11-09   ← still breaches
-      >   XTB      -142.6%  2022-02-17   ← value goes NEGATIVE
-      > ```
-      >
-      > **Equate+ and IBKR were cash movements, not market moves.** Equate+'s −80.2%
-      > is a 41 461 PLN withdrawal; its true worst day is −22.0%, comfortably inside
-      > the bar. Judging the series on `value` alone would have reported two
-      > phantom breaches and buried the three real ones. Any future run of this
-      > check must subtract `net_flow`.
-      >
-      > Of the three that remain:
-      > - **XTB −142.6%, value goes negative** — this is §72.35, already diagnosed
-      >   and not a bug: the sheet has no `Wpłata` row for XTB at all, so the
-      >   ledger is negative by everything it ever spent. **Needs a sheet edit,**
-      >   which is exactly why the wipe is premature rather than unnecessary.
-      > - ~~**IKE Beata −34.1% on 2022-06-13** — and Crypto's worst is **the same
-      >   date** (−21.2%). 2022-06 is an FX coverage boundary (§72.24), so this is
-      >   very likely that seam rather than a market move. **Not confirmed here.**~~
-      > - ~~**IKE Marek −76.1% on 2021-11-09** — 7 531 → 1 803 with zero net flow.
-      >   **Unexplained, and the most alarming number in this section.**~~
-      >
-      > **BOTH OF THOSE DIAGNOSES ARE WRONG, and the real cause is neither the FX
-      > seam nor anything unexplained.** Checked against the transactions on each
-      > day:
-      >
-      > ```
-      > IKE Marek  2021-11-09   BUY INS0922  26 @ 102.05   =  2 653,30
-      >                          BUY VOX0224   3 @ 1021,45  =  3 064,35
-      >                                                     ---------
-      >                          bought                              5 717,65
-      >            value  7 531,21 → 1 802,70        dropped          5 728,51
-      >
-      > IKE Beata  2022-06-13   BUY BST0922  26 @ 100.27   =  2 607,02
-      >                          BUY INS0922  26 @ 102.10   =  2 654,60
-      >                          BUY NVA0624   2 @ 1036,39  =  2 072,78
-      >                          BUY VOX0224   3 @ 1043,66  =  3 130,98
-      >                                                     ---------
-      >                          bought                             10 465,38
-      >            value 32 182,33 → 21 201,69       dropped         10 980,64
-      > ```
-      >
-      > **The value falls by exactly the amount bought.** And every one of those
-      > symbols is in that portfolio's `gapSymbols` — `INS0922`, `VOX0224`,
-      > `BST0922`, `NVA0624` are all §72.31's unpriceable bonds.
-      >
-      > **So the mechanism is: buying a bond we cannot price subtracts the purchase
-      > amount from the portfolio and never adds it back.** The cash leg leaves, the
-      > position leg cannot be valued, and the series records that as a one-day loss
-      > followed by a permanent undervaluation. It is not a market move, not an FX
-      > seam, and not unexplained — but it is *indistinguishable from all three* in
-      > the stored series, because nothing carries the reason.
-      >
-      > **The 2022-06-13 coincidence with Crypto's worst is a red herring.** Two
-      > portfolios bought unpriceable bonds the same day; that is what the shared
-      > date means, and I read it as an FX boundary because the date happened to sit
-      > on one. IKE Beata's `BST0327` is in `gapSymbols` too, which is why its
-      > worst symbol count is 7 against IKE Marek's 6.
-      >
-      > **This is now the highest-value thing left that is mine to do:** make an
-      > unpriceable purchase stop looking like a loss. `gapSymbols` names the
-      > symbol, but the snapshot carries no cost basis for the unpriced leg, so the
-      > UI cannot say "this drop is 10 465 PLN of bonds we have no price for" and
-      > shows a −34% day instead. Until that exists, **§65.1's −25% bar cannot
-      > pass** — not because the bar is wrong, but because a correct bar is
-      > unreachable while an unpriceable buy is rendered as a loss.
-      >
-      > So the re-import did its job and the series still has three breaches: one
-      > needs a sheet edit (§78.1), and two are this. That is the honest state of
-      > §65, and it is why this box and the archive stay open.
-      >
-      > ---
-      >
-      > ## §78.5 — SHIPPED: `unpriced_value`, the amount `value` withholds
-      >
-      > **§78.3's chosen answer was "accept the partial sum and make the UI say so",
-      > and saying so turned out to need a number rather than a symbol.** Contracts
-      > `d568d1c` (**v1.6.58**), wallets `22432dc` (**v1.1.117**), homelab
-      > `b736aa74`. Migration `0012_unpriced_value`.
-      >
-      > **What it is:** every `value_snapshots` row now carries the base-currency
-      > **cost** of positions held that day that have no price. `value` has always
-      > excluded them — a held-but-unpriced row contributes 0 — so this column is
-      > the only place the withheld amount exists at all. Read back on
-      > `GET /:id/analytics` as `timeSeries[].unpricedValue`.
-      >
-      > **Cost basis is replayed from the transaction legs, not read from
-      > `positions.average_cost_basis`.** That column is populated only for
-      > positions that exist today, and every one of these bonds was closed years
-      > ago — so it is null precisely where the history needs it. The replay is the
-      > existing `qtyMaps` accumulator with a second map beside it.
-      >
-      > **Verified in PROD, and the arithmetic is exact:**
-      >
-      > ```
-      > IKE Marek   2021-11-08  value  7 531.21   unpriced  8 230.08
-      >             2021-11-09  value  1 802.70   unpriced 13 947.73   Δ 5 717.65
-      >                          └─ dropped 5 728.51      └─ bought 5 717.65
-      >
-      > IKE Beata   2022-06-12  value 32 182.33   unpriced         0.00
-      >             2022-06-13  value 21 201.69   unpriced 10 465.38   Δ 10 465.38
-      >                          └─ dropped 10 980.64     └─ bought 10 465.38
-      > ```
-      >
-      > **The drop and the purchase are the same number to within normal price
-      > movement** (10.86 and 515.26 respectively). That closes the diagnosis:
-      > the −76.1% and the −34.1% were never market moves, and there is now a
-      > field that says so on the exact day.
-      >
-      > **The scale is worse than the two jumps suggested.** IKE Beata carried an
-      > unpriced position on **1 016 of its 1 801 days**; IKE Marek on 264, peaking
-      > at 13 947,73 on the very day of its worst step. So the chart has been
-      > showing an understated series for more than half of IKE Beata's history,
-      > with nothing on it to say so until now.
-      >
-      > **Still to do on this item:** the SPA does not render the field yet. The
-      > data is on the wire and correct; what is missing is the visual — shade the
-      > affected range on the chart, or a note that the series excludes unpriced
-      > holdings. Until then this is a number a developer can read and a user
-      > cannot, which is the same failure in a different place. Not ticked, because
-      > §78.3 asked for the UI to say so and the UI does not yet.
-      >
-      > One deliberate sharp edge: the column is `NOT NULL DEFAULT 0`, which is
-      > **wrong for pre-migration rows**, so the route passes the value straight
-      > through and the contract says absent means "not measured". Coercing absent
-      > to 0 would claim "nothing withheld" for exactly the rows that most need
-      > the warning. The eight portfolios not yet recomputed are in that state.
-      >
-      > ---
-      >
-      > ## §78.5 — UI DONE, and two defects found by looking at the deployed page
-      >
-      > **SPA `6afc3be` (v1.0.337), verified in PROD on both views.** The note now
-      > reads, on IKE Beata with the ALL timeframe:
-      >
-      > ```
-      > up to PLN 10,465.38 of this chart is missing — those points are partial.
-      > Today's value is complete.
-      > ```
-      >
-      > and on the **1Y** view it correctly falls back to the count instead,
-      > because 1Y contains none of the withheld days.
-      >
-      > **Both defects below were found by reading the rendered page, not by a
-      > test.** The code was type-clean and the suite green at every point in
-      > between, which is the argument for doing this at all.
-      >
-      > **1. The card has its own copy of the message, and I only changed the
-      > chart.** `PortfolioCard` renders its own sparkline and its own copy of the
-      > sentence. The first release shipped the amount to `PortfolioPerformanceChart`
-      > and the cards still said "7 earlier positions". Two implementations of one
-      > sentence — and the wording had already drifted once before this.
-      >
-      > **2. I merged a window-wide count with a window-scoped amount, which was
-      > worse than either alone.** The first attempt read:
-      >
-      > ```
-      > 7 earlier positions had no price history — up to 10,465 PLN of the chart
-      > is missing for those days
-      > ```
-      >
-      > `gapSymbols` is WINDOW-WIDE by design (§72.30 — the whole backfill window,
-      > so a position held in 2022 and sold since still counts) while the series is
-      > TIMEFRAME-FILTERED. Measured on IKE Beata against the live endpoint:
-      >
-      > ```
-      > 1Y  → gapSymbols 7, days with unpricedValue 0
-      > ALL → gapSymbols 7, days with unpricedValue 1016, peak 10,465.38
-      > ```
-      >
-      > So in the 1Y view that sentence claimed **seven positions for a window in
-      > which none of them were held** — a repeat of exactly the §72.30 defect this
-      > message was split to remove, reintroduced one field later. **The amount is
-      > the window-accurate half and now leads alone; the count keeps its original
-      > wording as the fallback. They never share a sentence.** Two tests pin that
-      > in both components.
-      >
-      > **The card annotates in `portfolio.baseCurrency`, not the display
-      > currency** — its sparkline is raw `timeSeries[].value` with no rate, so
-      > annotating it in the headline's currency would put a differently-denominated
-      > number on the chart it describes.
-      >
-      > **Not ticked as a §78 box:** the amount is on the wire, persisted, and
-      > rendered, but the *shading* of the affected range is still not done, and
-      > §78.3's wording was "make the UI say so" rather than "draw a band". The
-      > note says so; the note is what shipped.
 - [ ] Commit (plan closeout) + archive §65.
 
 ---
@@ -431,204 +139,22 @@ conversion).
 - [ ] Every flagged symbol gets one of: a `NAME_VENUE_OVERRIDES` entry (validated
       against its stored trades, as `SRT3.DE` was), a currency fix, or a recorded
       false positive with the reason — never a silent threshold bump.
-      > **The measurement this box was deferring is DONE, and it falsifies
-      > §74.6's characterisation of the flagged set on both counts.**
-      >
-      > §74.6 recorded the remaining flagged symbols as "100% cross-currency
-      > comparisons, and every one of them has the same shape — 10–15%". Both
-      > halves are wrong, and the 2026-10-01 run's 30 flagged symbols say so:
-      >
-      > - **10 of the 30 are same-currency**, where FX cannot explain them at all:
-      >   `CSN.L` `NVDA` `CRWD` `CAST.ST` `OXLC` `ADBE` `MBR.WA` `BATS.L`
-      >   `BYG.L` `SRT3.DE`.
-      > - The cross-currency residuals run **11% to 288%**, not 10–15%.
-      >
-      > ### The three hypotheses this box named, all tested, all rejected
-      >
-      > §72.4 said triage "needs one more measurement (does the residual track the
-      > stored `exchange_rate` or the date-shifted rate?)". Run against the audit's
-      > own JSON and `fx_rates`, per symbol, mean absolute deviation:
-      >
-      > | hypothesis | symbols it explains |
-      > |---|---|
-      > | H1 — the market rate for the pair (`\|1/r−1\|`) | **0 of 21** |
-      > | H2 — the stored import `exchange_rate` | **0 of 21** |
-      > | H3 — stored-vs-market drift | **1 of 21** |
-      >
-      > The H1 deltas were a systematic 9–17pp, not noise, and in the *opposite*
-      > direction from what a rate error would give. So the residual is not a rate
-      > error at all.
-      >
-      > ### What it actually is: `instruments` reports the ISSUER's home currency, not the LISTING's
-      >
-      > **CORRECTION, 2026-10-01, later the same day: the paragraph below is WRONG and
-      > is replaced by this one. I wrote that `transactions.currency` was mislabelled.
-      > It is not — the transaction rows are correct and the instrument metadata is
-      > wrong.** Recorded rather than edited away, because the wrong version is the
-      > plausible one and would be re-derived from the same JSON.
-      >
-      > The stored rows agree with themselves and with the sheet:
-      >
-      > ```
-      > sym      portfolio  date        ccy  iccy  rate  rsrc     price    amt      cprice
-      > ASML     IBKR       2022-03-18  USD  USD  4.27  manual  660.96   67.95   2822.30
-      > MFC      IBKR       2022-11-21  USD  USD  4.60  manual   17.50  245.00    80.50
-      > DCC.L    IKE Marek  2022-12-28  GBP  GBP  5.31  manual   40.86  367.74   216.97
-      > ```
-      >
-      > `currency` == `instrument_currency` on every row, `converted_price` is exactly
-      > `price x exchange_rate`, and the rate is PLN — all self-consistent, and `MFC`
-      > at `17.50 USD` is what Manulife actually traded at on the NYSE that day.
-      >
-      > **The instruments side is what is crossed:**
-      >
-      > ```
-      > symbol    exchange   currency   bar @ 2022-11-21
-      > ASML      NMS        EUR        580.29
-      > MFC       NYQ        CAD         17.29     ← trade was 17.50 USD ✓ same number
-      > SHOP      NMS        CAD         35.21
-      > DCC.L     LSE        EUR         43.60
-      > ```
-      >
-      > The **exchange is right** (NMS/NYQ/LSE — US and UK venues) and the **currency
-      > is the issuer's home listing** (Euronext for ASML, Toronto for MFC and SHOP).
-      > So a USD bar is labelled EUR and a USD bar is labelled CAD, and every consumer
-      > that trusts the declared currency converts a correct number into a wrong one.
-      >
-      > ### The mechanism, pinned to code
-      >
-      > `resolveCurrency(db, routeSymbol, providerCurrency)`
-      > (`instrument-currency.ts:229`) **is never given the exchange**, and
-      > `resolveInstrumentCurrency` ends with:
-      >
-      > ```
-      > const codes = new Set(candidates.map(r => currencyForCountry(r.countryCode)))
-      > return codes.size === 1 ? [...codes][0] : null      // :201
-      > ```
-      >
-      > For a venue-free ticker on a cross-listed company the candidates disagree —
-      > `MFC` matches NYSE (USD) and TSX (CAD) — so the guard correctly returns
-      > **`null`**. `resolveCurrency` then takes its documented fallback:
-      >
-      > ```
-      > if (provider) { … return { currency: provider, currencySource: "provider" } }
-      > ```
-      >
-      > and the provider's declaration is the **primary** listing's currency. **The
-      > ambiguity guard is working; the fallback is what lies.** And the §71 branch
-      > that would have answered correctly — "the VENUE is known, return the venue's
-      > own currency" — can never run, because no caller passes the exchange in.
-      >
-      > **The fix is identified and small: pass the resolved `exchange` into
-      > `resolveCurrency`**, so a venue that is already known resolves as a fact
-      > instead of falling through to the issuer's home market. It is NOT written
-      > here: there are ten call sites, several compute `exchange` and the provider
-      > currency from one object, and ordering them wrongly would resolve currency
-      > from an exchange chosen *for* the currency.
-      >
-      > **This is `NAME_VENUE_OVERRIDES`-shaped but it is not an override** — an
-      > override would pin 30 symbols; the defect is that a known venue is ignored.
-      > Fixing it should collapse most of the 21 cross-currency symbols at once,
-      > which is also the precondition for §72.4's "flagged count only goes down"
-      > becoming assertable.
-      >
-      > ### The three that do NOT reconcile raw are real and need their own look
-      >
-      > ```
-      > BTC-USD  PLN>USD  2 trades   raw 161.91%   ← genuinely cross-currency
-      > ETH-USD  EUR>USD  1 trade    raw  15.96%   ← genuinely cross-currency
-      > CSN.L    PLN>GBP  1 trade    raw 477.28%   ← one odd trade
-      > ```
-      >
-      > ### And the same-currency 10 are not FX at all
-      >
-      > `NVDA` (1002%) and `CRWD` (300%) are **stock splits** — 10:1 and 4:1, bars
-      > split-adjusted against raw trades, confirmed earlier. `OXLC` (−79.5%),
-      > `CAST.ST` (+22.1%), `CSN.L`, `BATS.L`, `BYG.L`, `SRT3.DE`, `MBR.WA` (−33.9%),
-      > `ADBE` are **genuine price discrepancies** with no mechanical explanation
-      > found, and they are the residue that would remain after the currency fix
-      > lands.
-      >
-      > **Left unticked, deliberately.** This box asks for every flagged symbol to
-      > get a disposition, and 10 of 30 are still without one. But the deferred
-      > measurement is now done and three of the four classes are *proved* rather
-      > than guessed, which is what the box said was missing — and picking a remedy
-      > for the currency class without pinning the code that writes the label is
-      > exactly the move §72.36/§72.37 retracted twice.
-      > *converted* cross-currency comparison — and they are NOT triaged, because
-      > triage needs one more measurement (does the residual track the stored
-      > `exchange_rate` or the date-shifted rate?). Naming the class is the
-      > triage; picking a fix without the measurement is the thing §72.36/§72.37
-      > retracted twice.
-      >
-      > **§74.6's characterisation of those 28 was wrong, and the 2026-10-01 run is
-      > what shows it.** They are not "100% cross-currency, all 10–15%". The
-      > current 30 split into at least **three** classes, and the largest is
-      > neither cross-currency nor 10–15%:
-      >
-      > ```
-      > NVDA   6/12 off · worst 1517.0% · bar USD vs position USD   ← same currency
-      > CRWD   3/3  off · worst  302.3% · bar USD vs position USD   ← same currency
-      > OXLC   2/2  off · worst  -79.8% · bar USD vs position USD
-      > ADBE   1/8  off · worst   47.5% · bar USD vs position USD
-      > ```
-      >
-      > **These are stock splits, and the arithmetic is exact enough to call it.**
-      > `CRWD` on 2023-06-06: trade `153.5` against bar `38.26` = **4.012x**, and
-      > CrowdStrike split 4:1 in Dec 2024, so `38.26 x 4 = 153.04`. `NVDA`: five of
-      > its six flagged trades land at **9.75–10.17x**, and NVDA split 10:1 in June
-      > 2024, so `26.453 x 10 = 264.53` against a `257.97` trade. **The bars are
-      > split-adjusted and the stored trades are raw.** That is a real, mechanical
-      > class and it is *classifiable* the way the NN TFI family was — which is
-      > what this item asks for. It is not done here.
-      >
-      > One caveat that does **not** fit that class, recorded rather than folded in:
-      > `NVDA` 2022-05-11 is **16.2x**, not ~10x. The bar is not the culprit —
-      > its neighbours run 16.2–20.3 all month, correctly split-adjusted — so the
-      > stored **trade price 268.91** is wrong; NVDA traded near 171 that day. A
-      > bad stored price is a different defect from a split basis and needs a
-      > different fix.
-      >
-      > **Superseded in part by the classification above, in the right direction.**
-      > The three-hypothesis test showed FX explains none of the 21 cross-currency
-      > symbols, and that **10 of the 30 are same-currency** — so §74.6's
-      > "100% cross-currency" was wrong. The splits above are the *same-currency*
-      > class, which is why they were never an FX story, and the measurement that
-      > proves the currency-mislabelling class is the raw-comparison table a few
-      > lines up: 18 of 21 reconcile below 3% with no conversion at all.
+      > **Deferred by the owner 2026-10-01, with the finding kept:** the audit is
+      > wrong for 21 cross-currency symbols because `instruments` serves the issuer's
+      > **home-listing** currency for a cross-listed ticker (`MFC` → `CAD` at exchange
+      > `NYQ`, bar 17.29 against a stored trade of 17.50 USD). `resolveCurrency`
+      > (`instrument-currency.ts:229`) is never given the exchange, so the
+      > candidates-must-agree guard returns null and the provider's primary listing
+      > fills the gap. The venue hint that fixes it is **built and tested**
+      > (`exchangeHint` on both resolvers) but **no route passes it yet** — the OHLCV
+      > payload and the bar cache both lack a venue. Also false: §74.6's "100%
+      > cross-currency, all 10–15%" — 10 of 30 are same-currency, and residuals run
+      > 11–288%. **No money was shown to be misstated.**
 - [x] Decide whether the `MFC` false positive from §71.6 is fixed by narrowing
       the rule or by recording the exception.
       > **Neither — classified instead**, §71.6. Recorded, still reported, and
       > excluded from the exit code.
 - [ ] Re-run and assert the flagged count only goes down.
-      > **Re-run 2026-10-01: it went UP, 28 → 30.** Recorded rather than framed as
-      > a pass, because "only goes down" is an assertion about *regressions* and a
-      > count that rises is the assertion failing.
-      >
-      > The first run of the day also said 31, which is worth recording precisely
-      > because it was wrong: that run used the drifted v1.1.95 pin, and on
-      > v1.1.114 the same database gives 30. **Both 31 and 30 were "the" flagged
-      > count** and only one was measured by current code.
-      >
-      > **The deeper problem is that this item is not yet measurable against a live
-      > database, and the reason is not a rounding detail.** The *unverified* set
-      > churns between runs on the same code:
-      >
-      > ```
-      > v1.1.95 job run:  11 unverified · CNYA.L FLAGGED (12.3%)
-      > v1.1.114 job run: 23 unverified · CNYA.L unverified (no bars)
-      > ```
-      >
-      > Twelve symbols gained bars and `CNYA.L` lost them between two runs hours
-      > apart, while instruments was still backfilling. A symbol is counted as
-      > clean when it reconciles and as *unverified* when it has no bars — so a
-      > symbol flipping between those two states changes the flagged count without
-      > any trade, bar value or code changing. **Until the bar set is stable, "the
-      > flagged count only goes down" measures fixture churn, not quality.** Making
-      > it assertable needs a pinned fixture (or a bar-coverage precondition, e.g.
-      > every symbol's bar count recorded with the run and the comparison refused
-      > when it changes). Left open and stated plainly rather than ticked on a
-      > number that moved for the wrong reason.
 - [x] Commit.
 
 ### 72.5 — close out §71.6
@@ -721,10 +247,10 @@ Deliberately **not** done, and why — all three look like fixes and are not:
 
 ### 73.4 — find what retains it
 
-> **DONE 2026-09-30.** The answer is: **nothing is retained.** Two of my own
-> hypotheses were measured and falsified on the way, which is the part worth
-> keeping. `MEM_DEBUG=1` was enabled in PROD (homelab `8497a46de`) because
-> without it the split the whole section turns on does not exist.
+> **Nothing is retained** — measured, not assumed. `MEM_DEBUG=1` is enabled in PROD
+> (homelab `8497a46de`); without it the Python-heap-vs-RSS split this section turns
+> on does not exist. Idle replica: `rss 376 MiB · traced 1.55 MiB` (**0.4 %**), and
+> the top traced sites are interpreter bootstrap, not a cache.
 
 **The split, first.** An idle replica, with `tracemalloc` on:
 
@@ -846,9 +372,12 @@ and the shape is unchanged.
       with burst width.
 - [x] Check the obvious holders: one real unbounded dict found and fixed
       (`_symbol_currency_cache`), and it is not the cause.
-- [ ] **The actual fix is a burst-width or peak-shape fix, and it is not openst's
-      alone** — it needs the number of concurrent walks openst is asked to serve.
-      §73.5.
+- [ ] **Make a symbol that cannot resolve CHEAP rather than expensive** — check the
+      local ticker reference before falling through to a provider chain, and lengthen
+      the negative TTL for sweep-shaped symbols.
+      > §73.5. A cold-pod walk of a symbol that matches nothing costs **2.7 MiB**; a
+      > *real* ticker no provider carries costs **24.61 MiB over 4.13 s** — ~9× — so
+      > the expensive case is the one that walks the whole chain before failing.
 - [x] Regression test: the **measurement harness** is the durable artefact here,
       not a unit test — a leak test cannot assert on a native high-water mark.
       `GET /__mem` plus a driver that defeats the Redis cache is what made this
@@ -866,13 +395,15 @@ and the shape is unchanged.
 **What would actually bound it**, in descending order of honesty:
 
 1. **Stop walking the whole provider chain for symbols that cannot resolve.**
-   This is the mechanism §73.4 landed on: a successful walk is ~0.3 MiB and
-   free thereafter, while a *failing* walk allocates the most and is paid once
-   per newly-unresolvable symbol. The negative cache already exists and already
-   covers this route — it just does not help on first contact, which is the only
+   Measured from a cold pod: a symbol that matches **nothing** costs **2.7 MiB**
+   (rejected locally, no chain walked), while a **real ticker no provider carries**
+   costs **24.61 MiB over 4.13 s** — the expensive case is the one that walks the
+   whole chain before failing, not the one that resolves to nothing. The negative
+   cache already covers this route and does help on repeat contact (measured:
+   **+0.03 MiB, 0.00 s**); it does nothing on first contact, which is the only
    contact a per-symbol sweep ever has. The fix is to make "cannot resolve" a
-   **cheap** answer rather than an expensive one: check the local ticker
-   reference / bond catalogue before falling through to a provider chain, and
+   **cheap** answer: check the local ticker reference / bond catalogue before
+   falling through to a provider chain, and
    lengthen the negative TTL for the symbol shapes a sweep produces. **This is
    the real fix and it belongs in openst.**
    > Note: `UPSTREAM_MAX_INFLIGHT = 8` (`main.py:81`) already bounds the width,
@@ -889,118 +420,24 @@ and the shape is unchanged.
 - [x] Fix the retaining structure, or pin/upgrade the upstream dependency if the
       retention is OpenBB's. → **There is no retaining structure.** Measured, in
       §73.4, three ways.
-- [ ] Re-run §73.4's measurement and show working set flat across the same
-      workload. → Already flat, and now measured rather than assumed. The
-      screenshot-of-the-curve deliverable is replaced by the two tables above,
-      which are the same thing with numbers attached.
-      > **DONE 2026-10-02, and it produced the clean single-walk number §73.5 was
-      > blocked on — while REFUTING the mechanism §73.4 landed on.** Every figure
-      > below is from a pod whose rss was still at the floor, so no walk had
-      > allocated anything before the one being measured.
-      >
-      > | walk | result | time | dRSS |
-      > |---|---|---|---|
-      > | cold floor, no traffic | — | — | **~366–367 MiB** |
-      > | `/equity/profile/AAPL` | **200**, 2 974 B | 0.64 s | **+5.24 MiB** |
-      > | `/equity/profile/VTR.V` (real ticker, no profile) | 404 | **4.13 s** | **+24.61 MiB** |
-      > | `/equity/profile/ZZQX9.FAKE` (matches nothing) | 404 | 0.90 s | +2.71 MiB |
-      > | `/equity/profile/ZZQY8.FAKE` (new nonsense symbol) | 404 | 0.81 s | +2.66 MiB |
-      > | `ZZQY8.FAKE` again (negative-cached) | 404 | **0.00 s** | +0.03 MiB |
-      >
-      > **This inverts §73.4's mechanism, and the inversion is the finding.**
-      > §73.4 concluded the peak is "the FAILED multi-provider walk, paid once per
-      > newly-unresolvable symbol", and read the two OOMKills on `CREC.PS`,
-      > `CREO.L`, `CREX`, `CRET.ST` as "failing to resolve anything" being the
-      > expensive path. The measurement says the opposite:
-      >
-      > - A symbol that **matches nothing** is the **cheapest** failure: 2.7 MiB,
-      >   under a second. It is rejected locally and never walks a chain.
-      > - A **real ticker no provider carries** is the **most expensive thing in
-      >   the service**: **24.61 MiB and 4.13 s** — nearly 5× a successful walk.
-      > - A **successful** walk is 5.24 MiB.
-      >
-      > **So the cost tracks how far the chain gets, not whether it fails.** A
-      > nonsense ticker never starts; a plausible one walks every provider and
-      > returns nothing. §73.4's remedy survives this and is in fact *better*
-      > supported by it — "check local reference before falling through to a
-      > provider chain" targets exactly the expensive case, since that is the one
-      > where local evidence said plausible and the chain was walked anyway.
-      >
-      > **The negative cache is confirmed working**: the repeat of the same symbol
-      > cost 0.03 MiB and 0.00 s. And the per-new-symbol cost does **not
-      > compound** (2.71 then 2.66) — consistent with §73.4's high-water reading
-      > and still not a leak.
-      >
-      > **Two process notes, because both produced a wrong number first.**
-      > - **Uptime is the wrong guard for "cold".** A pod 536 s old with rss at the
-      >   floor has walked nothing; requiring a low uptime threw away a valid
-      >   baseline. The guard used is now **rss against the floor**.
-      > - **The first attempt reported `+0.0 MiB` for every walk** because it
-      >   called `/equity/logo?symbol=…`, which **does not exist** — the routes are
-      >   path-parameter (`/equity/profile/{ticker}`), so all three calls 404'd in
-      >   0.0 s having allocated nothing. A table of `0.0` from requests that never
-      >   ran is the same failure as the weekend-as-holes count: a plausible
-      >   measurement of nothing. Every row above is verified `200`/`404` **with its
-      >   body**, and the `200` row asserts `OK=True` before the number is printed.
-- [ ] Then reconsider the limit downward once the curve is flat — 2Gi is
-      headroom for bursts, not a target to keep.
-      > **CORRECTION, and it is against my own measurement from two
-      > paragraphs up.** I wrote that "2 Gi is far more than the measurement
-      > needs". That is wrong, and the way it is wrong is instructive: my
-      > per-symbol figures came from batches that *started* at different RSS, so
-      > "0.0 MiB per symbol" and "+84.5 MiB for 16 symbols" are not comparable
-      > numbers — the second was measuring the first run's high-water being
-      > established, and the third was measuring it being reused.
-      >
-      > openst **already** bounds the width: `UPSTREAM_MAX_INFLIGHT = 8`
-      > (`src/main.py:81`), a semaphore introduced for the 2026-09-20 OOM and
-      > still there. So option (1) above is **not available as a new change** —
-      > the bound exists; what changed in §63.9 is how much work cachest asks it
-      > to have in flight, and the honest statement is that the burst *width* is
-      > capped and the *cost per walk* is what sets the peak.
-      >
-      > **What this means for the limit, stated with the confidence I actually
-      > have:** 2 Gi is not obviously over-provisioned. floor ~380 MiB plus the
-      > peak of up to 8 concurrent provider walks is in the same order of
-      > magnitude as the 700 MiB that killed both pods, which is the whole
-      > reason 2 Gi stopped the bleeding. Lowering it again needs one clean
-      > experiment this session did not get to: **measure a single cold walk
-      > from a freshly-started pod**, so the per-walk peak is a number rather
-      > than a difference between two already-elevated baselines. Until that
-      > exists, leave the limit alone.
-      >
-      > **UPDATE 2026-10-02 — the experiment is done, and it is still not enough
-      > to lower the limit. The missing number is not the per-walk cost, it is what
-      > production actually reaches.**
-      >
-      > From a cold pod (§73.4's closeout, above): floor ~367 MiB, a successful walk
-      > **5.24 MiB**, the most expensive failure **24.61 MiB**. With
-      > `UPSTREAM_MAX_INFLIGHT = 8` the arithmetic a burst implies is roughly
-      > `367 + 8 x 25 ≈ 570–670 MiB` — which is *below* the 700 MiB that killed both
-      > pods, and would argue for putting the limit back near there.
-      >
-      > **I am not making that change, because the arithmetic does not match
-      > production.** §73.4 observed the two live replicas at **1101 MiB and
-      > 1368 MiB** with zero restarts in 19 h. Single cold walks of 5–25 MiB cannot
-      > explain a working set of 1.1–1.4 GiB, and the gap is roughly 500–800 MiB.
-      > Either a real sweep is far wider than 8 concurrent walks, or per-walk cost
-      > under sustained concurrency is much higher than a single isolated walk, or
-      > something contributes that this experiment does not touch.
-      >
-      > **So the box stays open and the limit stays at 2 Gi**, which is the
-      > honest position: the per-walk cost is now a measured number rather than a
-      > guess, and it is the *aggregate* that remains unexplained. Closing this on
-      > the cold-walk figure alone would repeat the mistake this section has
-      > already corrected twice — reading a number measured under one set of
-      > conditions as if it held under all of them.
-- [ ] Add an alert on `container_memory_working_set_bytes` growth rate, so the
-      next leak is caught by a trend rather than by an OOMKill.
-      > **Now clearly worth having, and for a different reason than §73
-      > assumed.** The failure mode is a *peak*, so a growth-rate alert is the
-      > wrong shape — it would fire on the sweep and not on the OOMKill. What
-      > would catch this is an alert on working set approaching the limit
-      > (say 80%), which on the current curve would have fired hours before
-      > both OOMKills instead of at the moment they happened.
+- [x] Re-run §73.4's measurement from a pod whose rss is at the floor, so the
+      per-walk cost is a number rather than a difference between two elevated
+      baselines.
+      > §73.4. Floor ~366 MiB. A **successful** walk **+5.24 MiB**; a symbol matching
+      > nothing **+2.7 MiB**; a *real* ticker no provider carries **+24.61 MiB over
+      > 4.13 s**; the negative-cached repeat **+0.03 MiB**. The last one confirms the
+      > negative cache, and the second is cheaper than the third — so cost tracks how
+      > far the chain gets, not whether it fails.
+- [ ] Then reconsider the limit downward — 2 Gi is headroom for bursts, not a
+      target to keep.
+      > §73.4. The per-walk cost is measured but the **aggregate** is not: `367 + 8x25`
+      > is ~570–670 MiB, while live replicas were observed at **1101 and 1368 MiB**.
+      > The ~500–800 MiB gap is unexplained, so the limit stays at 2 Gi until a
+      > sustained-load measurement closes it.
+- [ ] Add an alert on working set **approaching the limit** (~80%), not on growth
+      rate — the failure mode is a peak, so a growth-rate alert fires on the sweep
+      and misses the OOMKill.
+      > §73.5. On the current curve this would have fired hours before both OOMKills.
 
 ### 72.6 — openst: a provider for a SPECIFIC ING Akcji share class (§72.9 follow-on)
 
@@ -1023,28 +460,13 @@ What is established, and what is not:
   grow), and not market noise. A fixed multiplicative offset between two series of
   the same fund is the signature of **two different classes of it**.
 
-**Open question, deliberately not guessed:** whether the trades are in the class the
-symbol names. The decisive check is ING01's published NAV for 2023-04-07 — if it is
-~382 PLN the bar is the wrong series; if ~339 then we paid 12.6% above NAV on all
-79 trades, which would point at the purchase prices in the sheet instead.
-
 - [x] Resolve the open question with ING01's published NAV for 2023-04-07 (and one
       later date) before building anything.
-      > Answered, and not in this section's terms. §72.36 ran the raw-row check;
-      > the NAV identification was §72.39 step 1, which also **reverses §72.20's
-      > dismissal of class W**. The measurement and its working are in §72.38's
-      > copy of that step, which owns it.
 - [x] If the class is wrong: add an openbb provider in `openst` for that specific
       ING Akcji class, following the provider-tier order in the planner contract —
       capture the provider's response into `tests/fixtures/` first, then the plugin
       with mocked I/O, then openst standalone smoke, then `cachest` route, then the
       `portfoliost-instruments` adapter, then the full compose stack.
-      > **§72.39 step 2 owns the work**, and the identification is what unblocked
-      > it: the class is **W**, and analizy.pl publishes W's NAV daily, so there is
-      > a series for a provider to fetch. Still gated on two date-matched W
-      > readings — 1.15% is not zero, and a provider written against an inferred
-      > class is the expensive way to be wrong. Order unchanged: the planner
-      > contract's provider-tier order.
 - [x] Sweep the other TFI rows for the same defect. `ticker_reference` knows **zero**
       `.TFI` symbols, so nothing cross-checks them, and the same family is named
       "NN Emerytura 2025/2030" but "Goldman Sachs Emerytura 2060/2065" in the same
@@ -1082,53 +504,6 @@ Grand total across all portfolios: 868,765,449.05 PLN over 18,497 snapshots.
 - [x] Deploy §72.14 and recompute all ten portfolios
 - [x] Confirm the spike is gone and history is a curve
 - [x] §72.15 (below): reconcile the residual −0.5% last-day FX seam
-      > **Closed 2026-10-01: there is no seam left to reconcile, and the −0.5% no
-      > longer describes anything.** Three separate things were being called one
-      > problem, so they are separated.
-      >
-      > **1. The two writers are structurally gone.** §72.12 serialised them;
-      > §76.4 removed one. Verified in the current source, not from the plan's
-      > word: `snapshotPortfolioValue` (`quotes.ts:489`) now ends at
-      > `return { … }` with no `value_snapshots` write at all — it is a pure
-      > calculator. Every insert into `value_snapshots` (`backfill.ts:1173`,
-      > `:1223`) consumes `computeSnapshotBatch`'s output, so there is **one
-      > producer with two call sites**, not two producers. A seam needs two
-      > answers to one question; there is now one.
-      >
-      > **2. Today's FX is published, so the freshness residual is currently
-      > zero.** The archive's own reclassification calls the remainder "freshness,
-      > not two paths" — a day's FX is unknown until the ECB publishes. Checked
-      > rather than assumed: `fx_rates` has a complete `2026-10-01` row for every
-      > currency in play (`PLN=4.3735`, `USD=1.1298`, …), so nothing on the last
-      > day is running on a stale rate.
-      >
-      > **3. The last-day move decomposes cleanly, and what is left is
-      > composition.** Equate+ 2026-09-30 → 2026-10-01, measured:
-      >
-      > ```
-      > SAP.DE            185.66 → 182.62 EUR   -1.637%
-      > EUR→PLN           4.369  → 4.3735       +0.103%
-      > ⇒ SAP.DE in PLN                       -1.536%
-      > Equate+ snapshot 17720.36 → 17512.63   -1.172%
-      > ```
-      >
-      > The 0.36pp between those two last lines is **the portfolio not being 100%
-      > SAP.DE** — cash and bonds dilute an equity move. That is arithmetic, not
-      > a discontinuity, and it is the kind of −0.5% the old section read as a
-      > seam.
-      >
-      > **The number cannot be reproduced, and that is the honest limit here.**
-      > Equate+ was `8,587.39` on 2026-09-28 when the −0.5% was measured; it is
-      > `17,614.81` now, after the §65/§69 wipe-and-reimports moved the whole
-      > series. So this closes on the *mechanism* being absent, not on the figure
-      > being explained away.
-      >
-      > **Also corrected here: the cross-reference is dangling.** "(below)" points
-      > at a `### 72.15` that does not exist in this file. The `§72.15` that does
-      > exist is in `plan-archive.md:9934` and is a *different* item — "grid checks
-      > the bar's own currency", closed 2026-09-30 at `v1.1.92`. Two items have
-      > been sharing one number, which is how this box came to describe a seam
-      > nobody was maintaining.
 
 ### 72.10 — §72.17: a converted series must not contain another currency
 
@@ -1173,124 +548,10 @@ field alongside `fxFrom` would let callers decide per bar.
       caller can see what was dropped instead of inferring it. Needs a contracts
       change + `npm run gen:types` in `portfoliost-contracts/contracts/`, then
       the SPA mocks in `mocks/` that assert the response shape.
-      > **Closed 2026-10-01 (instruments `dbccab4`, mock `e6caea2`, v1.0.89).**
-      > The box listed the state accurately: the spec and the consumer types had
-      > shipped, and **the route had never emitted the field** — so a caller was
-      > still inferring what §72.17 dropped. Both routes now do.
-      >
-      > The absent/empty distinction the contract spells out is the part worth
-      > keeping: **absent** when no conversion was applied, **[]** when one was and
-      > nothing was dropped. Collapsing them leaves a caller unable to tell "never
-      > converted" from "converted and lost nothing", which is the entire reason
-      > the field exists.
-      >
-      > **The two routes needed different mechanisms, and the second one is where
-      > the interesting bug was.** `/history` has `convertedMask` in hand and
-      > filters it directly. `/price-bars` converts in SQL and its query *filters
-      > the unconvertible rows out* (`and (hasRates)`), so it structurally cannot
-      > report what it removed — hence a separate `unconvertedDatesForWindow`
-      > query. Adding a flag column to the main query and filtering in TS would
-      > have shipped and mapped every dropped row through the route to learn a
-      > count.
-      >
-      > That query keys on `series.baseCurrency`, **not** the `?baseCurrency=`
-      > override. My first version used `declaredBase`, which is null on the
-      > ordinary path where the instrument's own currency resolves locally — so it
-      > would have reported nothing on exactly the requests that converted. The
-      > test caught it, not a re-read.
-      >
-      > **Verified in PROD on the deployed v1.0.89**, through the gateway, six
-      > calls:
-      >
-      > ```
-      > SNT.WA  price-bars  no currency  →  unconvertedDates ABSENT   (35 rows)
-      > SNT.WA  price-bars  PLN (native)→  unconvertedDates ABSENT   (35 rows)
-      > SNT.WA  price-bars  USD         →  []                       (35 rows)
-      > VRC.WA  price-bars  PLN (native)→  unconvertedDates ABSENT   (79 rows)
-      > BTC-USD history     no currency  →  unconvertedDates ABSENT
-      > BTC-USD history     PLN         →  1,202 dates dropped
-      > ```
-      >
-      > **The BTC-USD number is the one that justifies the field.** `fx_rates`
-      > has no BTC leg before 2015-10, so every bar from 2015-10-03 onward in the
-      > returned window was being dropped and the caller had no way to know. 1,202
-      > dates, silently absent, is precisely the fact the field exists to state.
-      >
-      > **One thing found while verifying, and NOT this item's business:**
-      > `/history?from=2022-01-01&to=2022-12-31` returns **2,817 rows** (and
-      > 4,019 without `?currency=`), so the route is not honouring the requested
-      > window. That is pre-existing and unrelated — the field faithfully describes
-      > whatever the route produced, with and without a conversion — but it is a
-      > real defect in its own right and is not recorded here.
-      >
-      > 460 instruments · 235 mock (was 230) · SPA build clean.
-      > **Spec half done (contracts `2a28d83`), mocks half done (`d75e13f`); the
-      > release + regen is what remains.** `unconvertedDates` is now on both
-      > `PriceHistory` and `PriceBarSeries`, declaring behaviour that already
-      > shipped — `convertSeries` returns `convertedMask` (`fx-convert.ts:60-71`)
-      > and both routes slice through it (`instruments.ts:646-659`); it simply
-      > never left the service.
-      >
-      > **The instruction is wrong about where `gen:types` runs.** There is no
-      > such script in `portfoliost-contracts/contracts/` — only `build`, `test`,
-      > `lint`. It lives in each **consumer**
-      > (`portfoliost-wallets/package.json`: `openapi-typescript
-      > node_modules/@marx2/contracts/openapi.yaml -o src/generated/api-types.d.ts`)
-      > and reads the **published** package, not the working copy. So the real
-      > sequence is: spec → release → `gen:types` in all three consumers →
-      > instrument routes emit the field → mock emits the field. Two of those
-      > five are done and the release is the gate — a gate on a registry, not on
-      > a decision.
-      >
-      > **A related contract statement was false and is now fixed in the same
-      > pass — that was the more urgent half.** `fxFrom` on both schemas said
-      > *"bars before it are unconverted (native baseCurrency)"*, which is
-      > precisely the rule this section's own DONE note marks superseded. A
-      > caller reading the spec would have reimplemented the defect §72.17 fixed
-      > in prod. Corrected to say an unconvertible bar is **absent**, and why.
-      >
-      > **Bookkeeping to fix before the next release:** the local contracts
-      > checkout sits at **1.6.52** with an unreleased `assetType` commit on top,
-      > while the `@marx2/contracts` every consumer installs resolves to
-      > **1.6.53**. The local repo is behind what is published, so a release cut
-      > from this checkout would omit whatever 1.6.53 added. Reconcile it before
-      > cutting, not after a confusing release.
-      >
-      > **This release also unblocks §72.21's remaining half**, which the plan had
-      > listed as independent. Surfacing the FX-coverage boundary on
-      > `GET /:id/analytics` needs to say *why* a bar is absent, and only
-      > instruments knows that — so the same field serves both. **One release, two
-      > items.**
 - [x] Re-check the other `?currency=` consumers now that the response is
       shorter than requested: wallets grid (covered), `buildBenchmarkSeries`,
       the SPA history/compare charts, and `mocks/`. A consumer that assumed a
       returned series spanned its whole window will now see gaps.
-      > **Audited; the premise does not hold for any of the named consumers, and
-      > one was never a `?currency=` consumer at all.**
-      >
-      > - **`buildBenchmarkSeries` does not use `?currency=`.** It calls
-      >   `fetchPriceBars(symbol, from, to, authToken)` with no currency
-      >   (`backfill.ts:268`) and converts client-side with one static resolved
-      >   rate (`:275-276`), so §72.17's producer change cannot reach it. It is
-      >   also **date-keyed, not index-keyed** — `calendarDays` → `buildPriceMap`
-      >   carry-forward → `closeMap.get(day)` (`:279-283`) — and re-bases at the
-      >   first available point (`:291`). A short series is safe by construction.
-      > - **The SPA history/compare charts** slice with a shared index
-      >   (`PriceChart.vue:355-393`), which is safe only because instruments keeps
-      >   `compare` parallel by construction (`instruments.ts:688-698` derives
-      >   `closePrices` from the same already-masked `dates`).
-      > - **`mocks/`** was the one that *did* assume spanning, and it was wrong
-      >   about the SERVICE, not the other way round — see below.
-      >
-      > **Residual, real and small:** `dropUnconvertedPrefix`
-      > (`backfill.ts:117-123`, doc `:102-116`) is now a **no-op** — `fxFrom` is
-      > `min()` over the already-filtered rows (`price-bars.ts:160`), so it equals
-      > the first returned date, `findIndex` returns 0 and nothing is dropped. Its
-      > doc describes the pre-§72.17 world. And the SPA caveat string is
-      > **factually wrong**: `priceChartFx.ts:7-8, 28-34, 43` still says "earlier
-      > bars in BASE", rendered at `PriceChart.vue:236, 422-424, 895, 906`. The
-      > earlier bars are *absent*. §75.3 confirmed the string no longer renders,
-      > which is why this went unnoticed — dead and wrong, in that order.
 - [x] Backfill `fx_rates` further back. The 2022-02-13 gap is a coverage
       > **§72.24 — full-history FX backfill ran, 2022-06 and 2023-04 now convert in full**
       problem as much as a code one; dropping bars is correct but it is better
@@ -1319,38 +580,6 @@ option-leg set, both of which depend on ordering.
 
 - [x] Re-run the full suite in CI and check whether it ever goes red; if it does,
       capture the name rather than re-running until green.
-      > **Answered, and the answer is that it has never gone red because no CI has
-      > ever run the suite.** Checked across all five repos, not just wallets:
-      >
-      > ```
-      > portfoliost            docker-image.yml, docker-image-mock.yml   no test step
-      > portfoliost-instruments docker-image.yml                          no test step
-      > portfoliost-wallets    docker-image.yml                          no test step
-      > portfoliost-admin      docker-image.yml                          no test step
-      > portfoliost-sheets-sync docker-image.yml                          no test step
-      > ```
-      >
-      > Every workflow is *release + build + push*, and the Dockerfile runs
-      > `npm run build` (tsc) but **not** `npm test`. Wallets' entire CI history
-      > contains exactly two workflow names — "Docker Image CI" and "Dependabot
-      > Updates" — so this is not a recently-removed job. The only non-green runs
-      > anywhere are 4 Dependabot dependency-update PRs, which is a different
-      > pipeline entirely.
-      >
-      > **So the premise of this box is false.** The original flake was seen in a
-      > local `vitest` run, in a shell pipeline (the process note above), and the
-      > "has since run 7× clean" evidence is also local. There was never a CI
-      > signal to watch, which is why "could not reproduce" stayed open for so
-      > long — the thing it was waiting on did not exist.
-      >
-      > **And the risk it was watching for is the kind only CI would catch**, so
-      > this is not closed as harmless. §72.13's diagnosis was explicitly a
-      > contention failure: `creates a portfolio tagged with externalSource` hit
-      > **5012ms against vitest's 5000ms default** "under a full-suite run,
-      > contending with the other 28 files", and passed standalone in 23s. That is
-      > the canonical full-suite-only flake, and no full suite runs anywhere but
-      > on this machine. Tracked as its own open item below rather than left to
-      > be rediscovered.
 - [ ] **Add a CI job that runs `npm test` (and `npm run test:mock` where the repo
       has one) on every PR, for all five repos** — the gap this section found. It
       is a new piece of work, not a continuation of the box above, and it is the
@@ -1386,23 +615,6 @@ the trade **settled** in — and recorded it as the currency the instrument
 - [x] Release `@marx2/contracts`, regenerate types in wallets (`npm run gen:types`),
       then drop the two local shims: the `ImportPortfolioTxWithListing` widening
       in `transakcje-mapper.ts` and the note in the wallets commit.
-      > **The premise behind this item was wrong, which is why it stayed open.**
-      > Both halves it named were already satisfied: `listingCurrency` is in
-      > `openapi.yaml:2078-2088` (commit `a2097cb`), it is in wallets'
-      > generated types (`import.ts:116` validates it from there), and the
-      > *published* package resolves to **1.6.53**, whose `openapi.yaml` carries
-      > the field. Nothing needed releasing or regenerating.
-      >
-      > The shim existed for a reason the plan never named: **sheets-sync does not
-      > depend on `@marx2/contracts` at all.** Its `ImportPortfolioTx` is a
-      > hand-written interface (`wallets-api-client.ts:62-98`), so the field was
-      > genuinely missing *there* — but regenerating types in a package the repo
-      > does not use could never have fixed it, which is why the item sat open
-      > across sessions while looking like a release chore.
-      >
-      > Done: the field added to the local interface, the
-      > `ImportPortfolioTxWithListing` widening deleted, and the comment that
-      > asserted "not yet in the published @marx2/contracts" removed. 157 green.
 
 **Why the pair's quote currency is a parse, not a guess** — worth stating because
 it is the same code path that produced the bug in the other direction. "BTC-USD"
@@ -1476,33 +688,11 @@ not need a new provider, an openst plugin, or a cachest route.
       NAV, so the 2023-04-07 check is no longer the deciding evidence.
 - [x] **Withdraw the "openst provider for a specific ING Akcji class" step** — the
       provider is right.
-      > **The conclusion here was retracted, and the retraction is §72.38.** "The
-      > provider is right" was inferred from our bars matching class A's published
-      > NAV — which only proves the bars *are* class A, not that class A is the
-      > class orders execute against. §72.39 step 1 then measured the class
-      > independently and found it is **W** (1.13996 against a 1.12703 target),
-      > which is what §72.38 called "the premise for building the class provider".
-      > The tick stands as *this section's work being done and then overturned*;
-      > the provider step is live again under §72.39 step 2, and is no longer
-      > blocked on whether a provider is needed at all.
 - [x] Compare the raw sheet columns for one flagged trade against the stored row to
       find which column produces 1.126. Needs cluster access.
-      > **Done — §72.36**, once the cluster was reachable. Row 604 dumped: price
-      > `382,05 zł`, value `2 498,07 zł` (= 6.538594 × 382.05, internally
-      > consistent), `split` empty, quantity math consistent. The 1.126 was
-      > `382.05 / 339.47` — this row's price against the close the audit picked,
-      > and 2023-04-07 was Good Friday. §72.37 then showed 382,05 is what was
-      > actually paid, so the column is not the problem and **the cell must not be
-      > edited**.
 - [x] If it turns out to be a distinct unit category, THEN reconsider a provider —
       and check first whether the sheet even records which category a row is, since
       without that no provider could disambiguate it either.
-      > **It did turn out to be a distinct unit category, and the provider was
-      > reconsidered** — §72.39 step 1 identified **W** and step 2 is the live
-      > build step. The caveat in this item was the right question to ask and it
-      > still gates the build: the sheet says "Goldman Sachs Akcji" and predates
-      > the GS→NN→ING rename, so it records no category at all. The class comes
-      > from the ratio measurement, not from the sheet.
 
 ### 72.16 — §72.6 RESTORED: a provider IS needed; the ticker just cannot say which class
 
@@ -1548,19 +738,9 @@ upstream of the provider and the provider will not fix it.
       `openst/tests/fixtures/` first, then the plugin with mocked I/O, then openst
       standalone smoke, then the `cachest` route, then the
       `portfoliost-instruments` adapter, then the full compose stack.
-      > **It is identified, and the build is §72.39 step 2.** Class **W** — the
-      > only one of the nine that can be 1.0856 in 2023-04 and 1.1270 in 2026-08;
-      > §72.20 dismissed it on a cross-date comparison and that is corrected
-      > there. `§72.38 — the false premise was never established; name lineage is
-      > not price series` still holds and is why the provider came back. Still
-      > gated on the two date-matched W readings.
 - [x] Map the class explicitly in `ticker_reference` (`INGAKC.TFI` → category), so
       the class stops being implicit. `ticker_reference` currently knows **zero**
       `.TFI` symbols, which is why nothing cross-checks them.
-      > **§72.39 step 3**, and it can be mapped now rather than "once the class is
-      > identified" — the class is W. The entry must not be written as
-      > `INGAKC.TFI`→W until the two date-matched readings land, because until
-      > then W is the best-supported class, not a measured one.
 - [x] Fix the stored `positions.company_name` ("Goldman Sachs Akcji"), inherited
       from the stale sheet name.
       > **§72.39 step 4.** Deliberately still to do: §72.38 is right that the
@@ -1627,39 +807,6 @@ coincides with a transaction; that check is the next step and it is mechanical.
       still a bug, and the symbol and currency for that date name it.
 - [x] Re-run the price audit (§72.18 shipped but the audit has not been re-run) and
       confirm SAP.DE stops being reported.
-      > **Done 2026-10-01** through the admin job, and it took three runs to get a
-      > trustworthy one — the reason is the headline, not a footnote.
-      >
-      > **The job had been auditing stale code.** The audit script lives in the
-      > wallets image, and the `WALLETS_IMAGE` pin that selects it sat at
-      > **v1.1.95 while wallets ran v1.1.114**. §72 put that pin there "so the two
-      > images cannot drift" and then nothing checked that they hadn't. The tell
-      > was in the output rather than the version: the first run printed **no
-      > order-priced block at all**, and hand-running the same script against the
-      > same database on v1.1.114 yields **194 order-priced trades across 12
-      > symbols** — the exact block §74.6 relied on to demonstrate the NN TFI
-      > false positives were *explained*. A missing block read as a change in the
-      > data when it was a change in the binary, and the flagged count still
-      > looked authoritative while being 19 releases out of date. Pin corrected to
-      > v1.1.114 and the run repeated.
-      >
-      > **`SAP.DE` does not appear** — 0 occurrences in the log. §72.18's
-      > option-premium-leg skip still holds ("5 option premium leg(s) skipped").
-      > That is this item's question, answered.
-      >
-      > The trustworthy run, against the §74.6 baseline:
-      >
-      > | | §74.6 (2026-09-30) | now (2026-10-01) |
-      > |---|---|---|
-      > | trades / symbols | 1191 / 219 | 1195 / 219 |
-      > | order-priced | 192 / 12 symbols | **194 / 12 symbols** |
-      > | no bars (unverified) | 23 | **23** |
-      > | flagged | 28 | **30** |
-      >
-      > **`SAP.DE` clear and the baseline reproduced** — the structure matches
-      > §74.6, which is the first evidence that these two runs are comparable at
-      > all. The flagged count went **up by 2**, which is §72.4's problem and is
-      > recorded there, not smoothed over here.
 
 ### 72.20 — §72.16 measured: the 1.126x is NOT an ING Akcji category. It is not A either.
 
@@ -1734,17 +881,9 @@ E/I/K, but `INC01` for S (not `INS01`), and `ING01<L>` for F/T/U/W.
       on its own, and would mean the sheet's *quantity* also needs restating, not
       just its price series.
 - [x] Only then build the provider, per the planner contract's provider-tier order
-      > **§72.39 step 2.** The gate this box names — the ING01 check — is done, and
-      > it identified class **W** rather than clearing the field. Order unchanged:
-      > fixtures → plugin with mocked I/O → openst smoke → cachest route →
-      > instruments adapter → compose stack.
 - [x] Record the identifier in `ticker_reference` whatever it turns out to be:
       `INGAKC.TFI` carries no category letter, and `ticker_reference` knows zero
       `.TFI` symbols, so nothing cross-checks these rows today.
-      > **§72.39 step 3.** `§72.38 — the identifier to record is exactly what the
-      > ING01 check determines; do not assume INGAKC.TFI is right` still binds: the
-      > check says the *class* is W, it does not say the *symbol* is right. Two
-      > separate questions, and only one is answered.
 
 ### 72.21 — the remaining jumps are STEPS, not spikes, and Equate+'s is a real trade
 
@@ -1795,122 +934,6 @@ coverage rather than of the portfolios.
       load-bearing: it is what removes these steps).
 - [x] Make the coverage boundary visible rather than leaving it to look like a
       market move — the same job `gapSymbols` does for missing bars, extended to FX.
-      > **CLOSED 2026-10-01 — the whole item, not just the half that was blocked.**
-      > Contracts `45117d2` (**v1.6.57**), wallets `bc2e71f` (**v1.1.115**),
-      > homelab `7130c07e3`. The §72.10 release unblocked it, and the remaining
-      > half — persist and surface — is now done and **verified on PROD**.
-      >
-      > **What shipped.** `fxCoverageHoles` on `portfolio_backfill_metadata`
-      > (migration `0011_fx_coverage_holes`, jsonb), written by both backfill
-      > call sites, read by `getGapSymbols`, returned on `GET /:id/analytics`.
-      >
-      > **Counts, not dates, and the reason is worth keeping.** The dates exist in
-      > `batch.fxCoverageHoles` and can run to thousands over a wide window. What a
-      > UI states is "SAP.DE is missing 12 held days", so that is what is stored;
-      > the per-day detail stays where it belongs, on the price-bar series as
-      > `unconvertedDates`. Still **not a diagnosis**, and the limit is in the type:
-      > at the valuation layer "instruments had no history" and "instruments dropped
-      > the bar for want of an FX rate" are one absence.
-      >
-      > **jsonb, not a second `text[]`,** because the useful part is the count. A
-      > symbol appearing in both this and `gapSymbols` means something different by
-      > each, so deduping them into one list would have destroyed the distinction.
-      >
-      > **`persistGapSymbols` distinguishes `undefined` from `null`/`{}`,** and that
-      > is load-bearing rather than pedantic: `undefined` means "this caller does
-      > not measure it" and leaves any stored value alone, while `null`/`{}` is a
-      > positive "measured, none". Without it a partial caller would silently erase
-      > a real finding — the same failure mode that split `heldGapSymbols` off in
-      > the first place. Pinned by a test that writes `{AAA: 3}`, re-persists
-      > without the argument, and asserts it survives.
-      >
-      > **Verified in PROD on v1.1.115**, through the gateway, three portfolios:
-      >
-      > ```
-      > Crypto    gapSymbols ["BTC-USD"]  heldGapSymbols null
-      >           fxCoverageHoles {"BTC-USD": 507, "ETH-USD": 232}   ← real
-      > Equate+   gapSymbols null  heldGapSymbols null  fxCoverageHoles null
-      > IBKR      gapSymbols null  heldGapSymbols null  fxCoverageHoles null
-      > ```
-      >
-      > **Crypto is the demonstration this item needed.** `BTC-USD` is *already* a
-      > `gapSymbol` — it has no bars at all — and `ETH-USD` was not flagged by
-      > either existing field. So of the 507 + 232 held days with no bar, **every
-      > single one was invisible before this change**: the crypto series carried
-      > forward across them and the UI rendered the steps as returns. That is
-      > §72.17's damage shape, still present in PROD until this afternoon, found by
-      > a field built to look for it.
-      >
-      > A null on the other nine portfolios is a real "measured, clean" only for
-      > those already recomputed since the deploy; rows written before migration
-      > 0011 read null as "not measured", which is why the column is null-for-
-      > unknown rather than `{}` — a consumer must not be able to read an
-      > unmeasured row as a clean one. 533 wallets green (was 527).
-      >
-      > ---
-      >
-      > ## CORRECTION, same day — the first deployed version was measuring the calendar
-      >
-      > **v1.1.115 shipped this field wrong, and the numbers were so large that
-      > the right reaction was to measure rather than explain.** After the
-      > recompute it reported Equate+ at **820 missing days for one symbol** and
-      > IBKR across **108 symbols**.
-      >
-      > The cause is one line: `days` is `calendarDays` — **every calendar day** —
-      > and the missing set was compared against `series.dates` directly. A week has
-      > five trading days. Measured on SAP.DE over its full range:
-      >
-      > ```
-      > 2015-10-01 .. 2026-10-01   4,019 calendar days, 2,797 bars → 1,222 "holes"
-      >   of which Saturdays and Sundays .......... 1,148   (94%)
-      >   of which weekdays ....................... 74
-      > ```
-      >
-      > **And the 74 settle it.** They are Dec 24, Dec 31, Jan 1, Good Friday,
-      > Easter Monday, Whit Monday, Oct 3 — the German holiday list, in order, year
-      > by year. So the field was reporting *the exchange calendar*, not anything
-      > about coverage. A metric whose findings are 94% the definition of the day
-      > is not a metric, and 820 is large enough to have buried any real signal.
-      >
-      > **Fixed in v1.1.116** (`95344ad`, homelab `02ad73bd5`): `isMarketClosure`
-      > excludes weekends, and excludes a day whose nearest bar is more than 7 days
-      > away **on either side** (which removes holiday spans). A **prefix** absence
-      > is still counted — no bar before it at all means "started later" or "FX
-      > coverage began late", not knowable here, and `gapSymbols` reports the same
-      > shape, so quietly reclassifying it would have hidden one of the two causes.
-      >
-      > **After the fix, PROD, all ten recomputed:**
-      >
-      > ```
-      > Crypto                  2 syms   34 days   BTC-USD:24  ETH-USD:10
-      > Equate+                 1 sym    48 days   SAP.DE:48
-      > IBKR                   93 syms 1815 days   MA:58  TSM:58  MSFT:58  QCOM:58
-      > IKE Beata              52 syms 1406 days   BST0327:419  DOM.WA:54
-      > IKE Marek              37 syms  678 days   ASML:53  CSN.L:38
-      > NN TFI PPK / PPO        4 / 2    102 / 68
-      > Rach. rejestrowy PKO BP 1 sym    16 days   ROD0335:16
-      > XTB                     2 sym    13 days   PSEC:12
-      > Obligacje PKO SA Beata 0 syms     0 days
-      > ```
-      >
-      > **And the honest verdict, which is not "shipped and working".** Weekend
-      > noise is gone, and every remaining number is now dominated by **exchange
-      > holidays**: IBKR's 58 days for a long-held US name is ~9.7/year, which is
-      > the US market holiday count. So the field currently reports, for most
-      > symbols, "the number of holidays in the holding period" — a true statement
-      > and close to useless as a coverage signal. It is the *same* failure as the
-      > 820 weekends, three orders smaller.
-      >
-      > **What it actually takes to make this field worth having is a trading
-      > calendar.** `days` has no calendar in it, nothing here can invent one, and
-      > a single-day holiday is structurally indistinguishable from a single-day
-      > coverage hole. Until instruments exposes per-venue sessions (or the batch
-      > joins against a reference calendar), this is a correctly-shaped field
-      > carrying a known quantity of noise, and the counts above should be read
-      > that way. Recorded here rather than in a fresh box because it is the same
-      > item and pretending it were new would hide that the item's value is still
-      > unproven. Two tests pin the fix — one per exclusion — plus the boundary day
-      > that is still counted. 535 green.
 - [x] **IKE Marek: the number moved between measurements** — reported as 176.4% @
       > **§72.28 — it was a bond sale, not measurement noise**
       2025-05-02, then re-measured as +1.4% on the same series with no recompute in
@@ -1958,11 +981,6 @@ Two ways to close it, and the first is the right one:
       flagged and is now clean is exactly the signal §72.17b/§72.18 should produce.
 - [x] Re-read this run's actual findings once a log route exists, and confirm
       SAP.DE no longer appears.
-      > **Done 2026-09-30**, run in the PROD pod on wallets v1.1.100. The full
-      > findings are in §74.6. **`SAP.DE` does not appear** — §72.18's
-      > option-premium-leg skip still holds (the run reports "5 option premium
-      > leg(s) skipped"). What did appear is a new, uniform class of
-      > cross-currency residual, recorded in §74.6 and left open.
 
 ### 72.23 — §72.16 CLOSED: there is no second series and no second class. It is the data.
 
@@ -2015,31 +1033,10 @@ premise. The remaining candidates, in the order I would test them:
       column produces 382 from 339 is the answer. This needs no provider, no
       cluster and no code — and it is the first thing to do, because the three
       candidates above are all distinguishable from the raw row.
-      > **Done — §72.36**, and it eliminated all three candidates. Row 604: price
-      > `382,05 zł`, value `2 498,07 zł` (= 6.538594 × 382.05, internally
-      > consistent), `split` empty, quantity math consistent. No second price
-      > column, no restatement multiplier, no currency restatement.
-      >
-      > What it produced instead was a **conclusion that was then retracted**:
-      > §72.36 read the arithmetic as "one wrong cell", and §72.37 proved that
-      > false — 382,05 is what the broker charged, priced at the *valuation* date
-      > (2023-04-13), and 2023-04-07 was Good Friday. So the `1.126` is the audit
-      > comparing an order-priced fund trade against the bar on `executed_at`,
-      > which §74 fixed. The sheet is right; **the cell must not be edited.**
 - [x] If it is a restatement multiplier, check how many of the 79 rows carry a
-      > **Sheet access via the cluster makes this possible now. The answer was
-      > zero: the `split` column is empty on the flagged row, consistent with
-      > `instruments.split_adjustments` holding 0 rows and the user confirming no
-      > splits in this fund.**
       `Split` marker; 29 restated and 50 not would explain the split exactly.
 - [x] Keep `INGAKC.TFI` mapped to `ING Akcji` — it is the right fund and the right
       class, whatever the price column turns out to say.
-      > **`§72.38 — my "confirmed" was false` was right, and the check has now been
-      > run.** Our bar is class **A** — 819.44 on 2026-09-25 against analizy.pl's
-      > 819.44, to the cent, and 816.76 on 2026-09-29 from a second source. The
-      > *fund* is ING Akcji; the *class the bar carries* is A while the broker
-      > executes against **W** (1.13996 against a 1.12703 target). So the symbol
-      > stays mapped and the class does not: that gap is §72.39 steps 2 and 3.
 - [x] Still worth recording in `ticker_reference`: it knows zero `.TFI` symbols, so
       nothing cross-checks these rows. Correct identifier, no new provider.
       > **§72.39 step 3** — same box, and the caveat in it is the live constraint:
@@ -2088,23 +1085,6 @@ in step with the instruments HelmRelease, like `WALLETS_IMAGE`.
       IKE Beata steps are gone or much reduced.
 - [x] Confirm `fx_rates` row count and earliest date per currency afterwards — the
       number to watch is the EARLIEST date, since the whole point is history.
-      > **Measured 2026-09-30.** FX history is complete:
-      > ```
-      > currencies 30 · total rows 209,092 · earliest 1999-01-04 · latest 2026-09-29
-      > 2022-02-11  30 currencies      <- was the §72.17 gap
-      > 2022-02-14  30 currencies
-      > 2022-06-13  30 currencies
-      > 2023-04-13  30 currencies
-      > 2023-04-07   0 currencies      <- Good Friday. A holiday, not a gap.
-      > ```
-      > The one empty day is **2023-04-07 — the very date §74 is about** — and it
-      > is empty because the ECB published no reference rate on Good Friday.
-      > Worth stating plainly, because "0 rows for 2023-04-07" is exactly the kind
-      > of fact that gets filed as a coverage gap and sends someone off to fix
-      > something that is correct. It is also a tidy closure of §72.17: the reason
-      > the 1.126 investigation ran so long is that the flagged trade landed on the
-      > one date in the dataset with no bar *and* no FX rate *and* a two-day
-      > market closure.
 - [x] If the steps survive, the boundary is not FX coverage and §72.21's hypothesis
       > **that is exactly what happened; became §72.26**
       is wrong; the next suspect is a symbol whose bars simply start then.
@@ -2192,35 +1172,8 @@ sum instead of being stamped `complete`.
       Either find a source that carries them, or accept the partial sum and make the
       UI say so. Until then these portfolios' pre-sale history is understated by a
       known-unknown amount.
-      > **Moved to §78.3** — it is a decision (hunt a paid feed vs label the gap),
-      > not a task, and the recommendation is there: label first, hunt never.
-      > Note it also blocks §65.1's `gap_symbols` assertion, because six of the
-      > eleven unpriceable symbols are these bonds.
 - [ ] Propagate the window-wide gap into the UI: `GET /:id/analytics` can flag the
       value as partial, but "partial on which days" is not currently represented.
-      > **Half of this is already shipped — the item reads as if nothing
-      > propagated, and the flag propagates end to end.** `gapSymbols` is
-      > window-wide (`backfill.ts:925-948`), persisted (`persistGapSymbols`
-      > `:652-666`), returned by `GET /:id/analytics` (`routes/portfolios.ts:1312,
-      > 1317`), contracted (`openapi.yaml:1490`) and rendered in three places
-      > (`PortfolioPerformanceTab.vue:314`, `PortfolioCard.vue:111, 126`,
-      > `PortfolioPerformanceChart.vue:43-45, 59-64`) with a test.
-      >
-      > **What is genuinely missing is only the day axis**, plus one field:
-      > - `unpricedLastDay` is **never persisted and never exposed**. It exists
-      >   only in-process (`backfill.ts:611, 615, 644, 927, 939, 999`) as an input
-      >   to `isUnpriceable`, and it appears nowhere in `openapi.yaml` or on any
-      >   route — grep finds it in this plan file and in `backfill.ts`, nowhere
-      >   else. It is the number §72.31's own table reports (`unpricedLastDay = 1`
-      >   with `gapSymbols` of 6), and it is the one that distinguishes "cheap" from
-      >   "at the ceiling".
-      > - "Partial on which days" has no representation: no `gapDays` /
-      >   `partialDays` / `unpricedDays` field exists in wallets or the contract,
-      >   and the chart message is window-agnostic
-      >   (`PortfolioPerformanceChart.vue:62`).
-      >
-      > So the real deliverable is a persisted per-day (or per-range) gap set, one
-      > openapi field, and chart wording that can say *when*.
 
 ### 72.32 — unfunded-portfolio audit finding (wallets v1.1.97, verified in prod)
 
@@ -2307,57 +1260,6 @@ because it sends you fixing data that was never broken.
       partial sum. Affects IKE Beata and IKE Marek history while held.
 - [x] `price_bar_metadata` should distinguish "upstream profile 404" from
       "no price series", so `failed` stops conflating a delisting with a gap.
-      > **Done (instruments `ad9ea3e` + `a4c25fa`), and the item's framing was
-      > wrong in a way that changed the answer.** `fetchStatus` is now a
-      > classification rather than `ok`/`failed`:
-      >
-      > ```
-      > ok               fetched; the symbol has bars
-      > no_data          fetched, upstream returned nothing, nothing is stored
-      > failed_transient 429/5xx/network/DB — retry in minutes
-      > failed_permanent 404 — nothing to fetch upstream
-      > sanity_failed    fetched, bars refused as impossible (§63.5)
-      > ```
-      >
-      > Three findings behind that, none of which the item anticipated:
-      >
-      > 1. **The conflation was on the `ok` side, and worse.** `ok` was written
-      >    whenever the fetch did not throw, so "upstream answered with nothing"
-      >    was recorded as **priced**. `hadNewBars` was already computed for the
-      >    split-boundary check and never consulted. The item asked to separate two
-      >    kinds of *failure*; the bigger hole was that one kind of *success* was
-      >    not success.
-      > 2. **Permanence was decided by substring match on error prose** —
-      >    `lastError.includes("HTTP 404")`, re-derived at every read. A reworded
-      >    404 silently became transient and a non-existent symbol was re-probed
-      >    every few minutes for a day. It is now decided once, at write time,
-      >    where the error is in hand, and `lastError` is human-readable only.
-      > 3. **`TOR` is no longer the example it was.** Nothing in the price path
-      >    fetches a profile any more (`fetchProfile` is only used by the
-      >    instrument-*detail* routes, `instruments.ts:340, 393, 505, 1202, 1382`),
-      >    so a profile 404 cannot be what marks a symbol failed. The distinction
-      >    actually needed is *fetched-but-empty* vs *does-not-exist*, which is
-      >    what `no_data` vs `failed_permanent` is.
-      >
-      > **Two things the tests caught that would otherwise have shipped quiet.**
-      > My first `no_data` condition used `hadRowsBefore`, which reads the
-      > **overflow** table only — so every stooq-backed symbol would have been
-      > recorded as having nothing to price with, a false alarm on most of the
-      > fleet. It asks `price_bars_all` now. And changing `cooldownFor`'s
-      > parameter silently disabled the 404 breaker, because the one call site
-      > still passed `lastError`; two pre-existing breaker tests failed. The
-      > `cooldownFor("HTTP 404 …")` case now asserts the TRANSIENT cooldown so the
-      > old shape fails loudly.
-      >
-      > **What this did NOT do, stated plainly:** there is still no *reporting*
-      > surface. The only consumer of this table in any repo is `recentlyFailed`
-      > — wallets and the SPA read nothing from it — so `no_data` vs
-      > `failed_permanent` is correct bookkeeping, not visible insight. The two
-      > comments claiming "`ok` is what every downstream reader takes as priced"
-      > were simply false, and are corrected. **A human-readable report is a
-      > separate step and needs a consumer to justify it**; if you want one, the
-      > shape is already settled and it belongs on the admin Data-quality card
-      > next to the price-audit log route (§72.22).
 
 ### 72.35 — XTB's missing deposit: it is absent from the SHEET, and here is the exact fix
 
@@ -2468,42 +1370,7 @@ Also worth recording from this pass, both about `INGAKC.TFI`:
 - [x] §72.19 / §72.20 / §72.6 / §72.16 provider chain: closed, premise falsified
 - [x] Correct row 604's price to the real 2023-04-07 NAV and re-import, then confirm
       the audit finding clears
-      > **DO NOT DO THIS. It is the instruction §72.37 retracted, and it is
-      > struck here rather than left as an open box.** §72.36 concluded the cell
-      > was wrong; §72.37 proved that conclusion false against the broker's own
-      > detail:
-      >
-      > ```
-      > Data zlecenia:  07.04.2023        (Good Friday)
-      > Data wyceny:   13.04.2023        <- a different date
-      > Cena Jednostki Uczestnictwa z dnia wyceny: 382,05 PLN
-      > Wartość rejestru po transakcji: 40 264,92 PLN = 105,391757 × 382,05
-      > ```
-      >
-      > 382,05 is what was **actually paid** — a PPO/PPI order is priced at the
-      > valuation date's NAV, and the register total confirms it. Editing the cell
-      > would falsify a correct trade. Kept as a box, and ticked, precisely
-      > because an open box reads as work to do and this is the one piece of work
-      > in the whole ING cluster that must never be done. The audit-side
-      > consequence — comparing an order-priced fund trade against the bar on
-      > `executed_at` — is §74, and it is fixed.
 - [x] Why is EUR absent from `fx_rates` while every other currency is stored?
-      > **By design, and the answer was a code comment the whole time.** Both
-      > `importHistory` and `syncDaily` fetch with **`base=EUR`**, so every stored
-      > row means *"1 EUR = N &lt;currency&gt;"* and a EUR row is 1 by definition
-      > — frankfurter returns none, and adding EUR to `TRACKED_CURRENCIES` would
-      > fetch a constant. EUR→PLN is cross-derived at read time, which is exactly
-      > why it "works, so it is not broken" (§72.36's own words).
-      > Measured in PROD 2026-09-30: **31 currencies, 7103 rows each, from
-      > 1999-01-04 to 2026-09-29, and no EUR among them** (BRL/INR/CNY start
-      > 2000-01-13, BGN stops at 2025-12-31 — euro adoption, not an importer
-      > bug).
-      > **Now pinned by 4 tests** (instruments `9ad8d28`, 411 green), because a
-      > test is the durable form of a comment: the person asking this had DB
-      > access and not source access, which is the only reason the question
-      > survived three sections. One of them asserts the *semantics*, not just
-      > the list — the written rows really are `1 EUR = N`, so PLN lands at ~4.3
-      > and not ~0.23, so a future change to the base cannot pass silently.
 
 ### 72.37 — §72.36's conclusion was WRONG. Retracted, with the error named
 
@@ -2549,36 +1416,12 @@ offending code is the comparison policy in `price-audit.ts`, not any data.
       executed price belongs to the valuation date, so compare against a date window
       rather than the exact `executed_at` bar — or skip the strict ratio and report
       the pair as order-priced. Until then every NN TFI trade is a false positive.
-      > **§74.2/§74.3 shipped exactly this**, and the PROD run in §74.6 confirms
-      > it: 192 order-priced fund trades across 12 symbols are now *evidence* rather
-      > than findings, including the exact row this item is about. `isOrderPriced`
-      > keys on `asset_type === 'FUND'` (`price-audit.ts:121`) and
-      > `pickOrderPricedBar` searches ±`ORDER_PRICED_WINDOW_DAYS` = 21 in **both**
-      > directions (`price-audit.ts:209-212`). This box stayed open because §74 was
-      > written as a new section rather than as the completion of §72.37.
 - [x] **Still open, and genuinely open:** `INGAKC.TFI` does not reproduce the
       executed NAVs — 351.93 on the 2023-04-13 valuation date against 382.05 paid,
       and 819.44 today against the sheet's own `aktualny kurs` 876,94. Either the
       TFI feed is a different series/class from the one orders execute against, or
       the sheet's manually-maintained `aktualny kurs` column is simply stale. Not
       resolved; do not assume the symbol mapping is right.
-      > **Half resolved, and this box is a duplicate of §74.5's — the same item
-      > written twice, which is how it survived a session.** §72.39 step 1
-      > measured it:
-      >
-      > - *The feed is a different class than the one executed against* — **true,
-      >   and the class is W.** Our bar is class A to the cent (819.44 = 819.44 on
-      >   2026-09-25; 816.76 on 2026-09-29 from bankier.pl). The broker executes
-      >   ~12.7% above class A, growing ~1.2%/yr, which is W's signature
-      >   (1.13996). §72.38 predicted "two series, provider is the right fix" —
-      >   confirmed, and §72.39 step 2 is the build.
-      > - *`aktualny kurs` 876,94 is stale* — **true, and it is neither class.** It
-      >   is 7% above even class W today (931.03), so it is a hand-maintained
-      >   column carrying a wrong number, which is a different finding from a wrong
-      >   class and should be reported as one. Nothing in the pipeline consumes it.
-      >
-      > The `aktualny kurs` correction is the one loose end here, and it is a
-      > **sheet-data** fix, not a code one.
 
 ### 72.38 — the openst class-provider plan is RESTORED. I killed a live plan on a conflation
 
@@ -2635,68 +1478,9 @@ provider is the right fix. Restored as open.**
       wrong class; if ING01 ≈ 795/352 then orders execute against a class with no
       series at all. This is the check that settles it, and §72.6's version of it was
       left open far too long.
-      > **Answered 2026-09-30 — and it did not say what the step expected.**
-      > Measured three published readings, two of them independent of each other:
-      >
-      > | what | date | value | source |
-      > |---|---|---|---|
-      > | our bar (`INGAKC.TFI`) | 2026-09-25 | **819.44** | provider |
-      > | ING01 category **A** | 2026-09-25 | **819.44** | analizy.pl |
-      > | ING01 category **A** | 2026-09-29 | **816.76** | bankier.pl (Analizy Online) |
-      > | ING01 category **W** | 2026-09-29 | **931.03** | analizy.pl |
-      >
-      > The first two rows are the same number to the cent, so **our bar IS class
-      > A** — established, not assumed. The third row confirms the series from a
-      > second source.
-      >
-      > So the target is `896.00 / 795.02` = **1.12703** on 2026-08-19, and class
-      > W is `931.03 / 816.76` = **1.13996** on 2026-09-29. **1.15% apart, 41 days
-      > apart.**
-      >
-      > **This reverses §72.20, which dismissed W.** It called the 1.22% gap
-      > "outside any tolerance that would make it a match" — and it compared a
-      > ratio derived from **2026-08-19** against a category measured on
-      > **2026-09-25**, 68 days later, for a ratio the plan had itself measured
-      > growing at ~1.2%/yr. That is the plan's own recurring error in a new guise:
-      > a convenient parameter (one date) making a match look absent. Same shape as
-      > §72.27's unpaginated reads, §72.33's shared date window and §74.4's
-      > every-bar-instead-of-best-bar histogram.
-      >
-      > **W is the only candidate that can fit, and it is forced rather than
-      > merely closest.** From §72.20's own table the nine categories sit at
-      > I 1.0039 · A 1.0000 · U 1.0509 · K 1.0702 · **W 1.1397** · S 1.1654 ·
-      > T 1.2953 · F 1.3016 · E 1.5329, and the observed ratio must be **1.0856
-      > in 2023-04 rising to 1.1270 in 2026-08**. Only W brackets that trajectory:
-      > - **W** needs +3.8% over 3.4y (1.1%/yr) and is already there — it is the
-      >   only category on the correct side of the 2026 target *and* moving at the
-      >   right rate.
-      > - **K** (1.0702) sits *below* the 2026 target today and would have to
-      >   accelerate to +5.3%, twice the observed rate.
-      > - **S** (1.1654) sits *above* it and would have to **fall** 3.5% over
-      >   3.4 years. No fee-driven category does that.
-      > - Everything else is further away still.
-      >
-      > **Consequence, and it is the useful part: step 2 is buildable.** The
-      > question step 1 was asked to answer was whether a *published* series
-      > exists for the class the broker executes against. One does — analizy.pl
-      > carries W's NAV daily, verified at 931.03 for 2026-09-29. So the "class
-      > with no series at all" branch is ruled out, and an openst provider has
-      > something to fetch.
-      >
-      > **What is NOT yet closed, stated plainly.** 1.15% is not zero. To call W
-      > confirmed rather than best-supported I still want **W's NAV on 2026-08-19
-      > and 2023-04-13** — the two date-matched readings. The analizy.pl fund page
-      > serves only the current value (the `?period=` parameter is ignored; I
-      > checked), so the history has to come from the chart endpoint behind it.
-      > Until then: treat W as the identified class for planning, and do not let a
-      > provider be written against a symbol whose class is still an inference.
 - [x] Build the openst provider for that class, in the planner contract's provider-tier
       order: fixture → plugin with mocked I/O → openst smoke → cachest route →
       instruments adapter → compose.
-      > **§72.39 step 2**, which is the single live box for this work now. The
-      > identification is what made it buildable — analizy.pl publishes W's NAV
-      > daily, so the "class with no series at all" branch is ruled out and there
-      > is something to fetch. Gated on the two date-matched W readings above.
 - [x] `ticker_reference` knows zero `.TFI` symbols, so nothing cross-checks them.
       > **§72.39 step 3.**
 - [x] `positions.company_name` still shows the stale "Goldman Sachs Akcji".
@@ -2804,56 +1588,6 @@ known-unknown amount**, and §72.31's `gapSymbols` is the only thing marking it.
 
 - [ ] **Decide: find a source that carries them, or accept the partial sum and
       make the UI say so**
-      > **DECIDED 2026-10-01: accept and label. And the hunt is not merely
-      > deprioritised — it is impossible, which the tickers prove.**
-      >
-      > Measured the set rather than assuming it: **8 of 221 distinct held symbols
-      > have zero bars, and all 8 are bonds**, all `fetch_status=failed_permanent`,
-      > all `HTTP 404 upstream`:
-      >
-      > ```
-      > ARH0324  ARH0722  BST0922  INS0922  KIN1025  KRI0322  NVA0624  VOX0224
-      > ```
-      >
-      > They are Polish **government** retail bonds (Ministry of Finance,
-      > `obligacje skarbowe`; the series names are the retail issuance codes), and
-      > **the four-digit suffix is the maturity** — `ARH0722` = July 2022,
-      > `VOX0224` = Feb 2024, `KIN1025` = Oct 2025. **All eight have matured**;
-      > the latest was Oct 2025.
-      >
-      > **The control that settles it.** One near-identical bond still trades and
-      > has a full history:
-      >
-      > | symbol | maturity | bars | status |
-      > |---|---|---|---|
-      > | `BST0327` | Mar 2027 — alive | **427** (2022-03-24 → 2026-09-28) | `ok` |
-      > | `BST0922` | Sep 2022 — matured | **0** | `failed_permanent` |
-      > | `INS0922` | Sep 2022 — matured | **0** | `failed_permanent` |
-      >
-      > Same naming convention, same asset class, same feed. `BST0327` works
-      > because it has not matured; `BST0922` has nothing even though it traded
-      > across 2021–22, overlapping `BST0327`'s window. **The feed serves live
-      > instruments and discards matured ones entirely, history included.** So the
-      > tickers are not wrong and there is no alternate symbol to find — there is
-      > simply no history to buy.
-      >
-      > **This also corrects an option I offered earlier.** I suggested the
-      > provider might know these under a different ticker and that fixing the
-      > mapping was nearly free. That was wrong, and the control above is what
-      > caught it. Recorded rather than quietly dropped, because the same
-      > reasoning would otherwise be re-proposed for the next delisted instrument.
-      >
-      > **One consequence that makes this cheap rather than merely acceptable:**
-      > these bonds matured and were **redeemed**, so cost basis ≈ redemption
-      > value. Carrying them at cost (`unpricedValue`, §78.5) is not a rough
-      > stand-in for this set — it is close to correct, and the history is
-      > slightly understated rather than wrong.
-      >
-      > **Remaining on this item: the UI.** §78.5 has the number on the wire and
-      > verified in PROD; nothing rendered it yet.
-      >
-      > **Done — SPA v1.0.337.** See §78.5's closeout for what it reads and for
-      > two defects that only the deployed page exposed.
 
 ### 78.4 — Add a CI job that runs the test suite, across all five repos
 
@@ -2867,13 +1601,3 @@ on this machine.
 
 - [ ] **Add `npm test` (and `npm run test:mock` where the repo has one) on every
       PR, for all five repos**
-      > The reason this is yours: the first red run will block merges for work
-      > unrelated to it, and the five repos differ in what they run. That is a
-      > trade-off you are better placed to judge than I am.
-      >
-      > **What it would have caught, to size the bet:** §72.13's flake was
-      > `creates a portfolio tagged with externalSource` at **5012ms against
-      > vitest's 5000ms default** — a full-suite contention failure that passes
-      > standalone in 23s. That is the canonical failure CI exists for, and the
-      > reason "could not reproduce" sat open for a day. There is currently no
-      > full-suite run anywhere but locally.
