@@ -461,3 +461,359 @@ Written this way because §81.1 made `computeRiskMetrics` **pure** — it takes
       `main` → GHA bumps `v*` → pin in the homelab helmrelease → Flux applies →
       verify with kubectl).
 - [ ] Commit `test(spa): cover the cumulative performance tab in e2e`
+
+---
+
+## 85. Every ticker is a link to its research page (2026-10-02)
+
+User request (no proposal file): *"Extend stock ticker to be clickable. Link
+should lead to research page for this stock (bond, fund, etc)."* — and, on
+follow-up, not only to add the missing links but to **put a `TickerBadge`
+where a symbol is still rendered as plain text** (Top/Bottom Performers,
+Dividend History, and the rest of that list).
+
+**Half of this already exists and must not be rebuilt.** §60.1–60.3 established
+the only sanctioned way into research — `researchRoute(symbol, route.fullPath)`
+(`src/utils/research.ts:14`) plus the `from` query param and
+`researchBackTarget` — and wired it at eight call sites. Four surfaces are
+already linked: the transactions table (`:390`), the holdings table
+(`PortfolioHoldingsTab.vue:417`), the calendar chips
+(`PortfolioCalendarTab.vue:218`) and the compare rows
+(`PortfolioCompareTab.vue:59`). §85 adds call sites to that same helper. It
+introduces no new route, no new component, and no second way to build a link.
+
+**The gap, measured.** An audit of every surface that shows a symbol found:
+
+- **9 files render a `TickerBadge` that is not inside a link** —
+  `TransactionFormFields.vue:59` (shared by the Add-Position stock step *and*
+  `EditPositionDialog.vue:321`), `AddPositionDialog.vue:555`,
+  `EditTransactionModal.vue:184`, `RecordDividendDialog.vue:124`,
+  `PortfolioDividendsTab.vue:98`, `PortfolioNewsTab.vue:62`,
+  `PortfolioPerformanceTab.vue:685` + `:708`, `ResearchCompare.vue:56`.
+- **10 files render a symbol as bare text** — the chart-modal `<h2>`
+  (`PortfolioHoldingsTab.vue:578`), the Edit-position (`EditPositionDialog.vue:278`)
+  and Add-position (`AddPositionDialog.vue:507`) dialog headings, the yearly
+  returns `vs {{ benchmarkSymbol }}` header (`:644`), both Chart-controls
+  benchmark lists (`:757`, `:763`), the Charting page chip and comparison
+  headers (`ChartingView.vue:130`, `:190`), the public share holdings table
+  (`PublicPortfolioView.vue:72`), and the admin bond-catalogue / market-data
+  symbol cells (`BondCatalogueView.vue:66`, `MarketDataView.vue:140`, `:187`,
+  `:212`).
+
+**Ordering: run §83 first.** §83.1 moves the Top/Bottom Performers block out of
+`PortfolioPerformanceTab.vue` into `PerformanceTabContent.vue`. §85.2/§85.3 edit
+those exact lines and the Chart-controls modal, so **apply them to
+`PerformanceTabContent.vue`, not to the file §83.1 empties.** Doing §85 first
+means doing the same four edits twice.
+
+Recorded decisions (resolved with the user):
+
+- **Mechanism: wrap the call site.** Add
+  `<router-link :to="researchRoute(sym, route.fullPath)">` around the badge,
+  exactly as `TransactionsTable.vue:390`, `PortfolioHoldingsTab.vue:417` and
+  `WatchlistsView.vue:128` already do. **No `to` prop on `TickerBadge`** — it
+  is documented as "fetches nothing" and each call site passes the data it has
+  (`docs/COMPONENTS.md`), and a router-coupled prop breaks its no-router unit
+  mounts. **No `TickerLink.vue` wrapper** either: 19 call sites do not justify a
+  fourth layer, and the wrapping is the pattern §60.2 already proved.
+- **Inside a modal, the badge does not use `router-link`.** `router-link`
+  navigates without closing the dialog it sits in, leaving the research page
+  under an unmounting overlay. Modal surfaces reuse the emit-then-push path
+  those files already have (`EditTransactionModal.goResearch` `:162`,
+  `AddPositionDialog.goResearch` `:463`, `PortfolioHoldingsTab.goResearch`
+  `:313`) — `emit("close")` first, then
+  `router.push(researchRoute(sym, route.fullPath))`. This is also why
+  `from` is the page *behind* the modal: the route is unchanged while a modal
+  is open.
+- **Scope: everywhere, including the public share page and the admin tables.**
+- **A symbol that has no research page stays clickable.** `/:symbol/profile`
+  already falls back to the bond profile (`portfoliost-instruments/src/routes/instruments.ts:366-375`)
+  and `ResearchOverview.vue:217` already renders a "Limited data availability"
+  banner for a symbol with identity but no market data. Only a total 404 leaves
+  the red error banner — that page is **left exactly as it is**, it is
+  pre-existing behaviour and not this section's business.
+
+Rules: one step = one commit; a step is marked `[x]` only after its tests pass
+(unit + e2e against the dockerized stack per `AGENTS.md`).
+
+### 85.1 — `researchBackTarget`: a second allowlisted internal prefix
+
+The one prerequisite, and it is tiny. The share page lives at
+`/public/portfolio/:shareId` (`router/index.ts:36-40`, `meta: { public: true }`),
+and `researchBackTarget` (`:28-32`) accepts only a `from` starting `/en/` — so a
+`from` passed from the share page would be **silently discarded** and "Go back"
+would land on `/en/investments` instead of the share.
+
+- [ ] Accept two literal internal prefixes in `researchBackTarget`: `/en/` (as
+      today) and `/public/`. Nothing else changes — no scheme, no `//`, no
+      relative path can satisfy either, so the open-redirect property is
+      identical to what §60.1 established.
+      > Do **not** generalise this to "any path that starts with a slash".
+      > `/logout` and the catch-all `/:pathMatch(.*)*` are both single-segment
+      > or otherwise outside the two prefixes precisely so they cannot be used
+      > as a redirect target. Two named prefixes is the whole allowlist.
+- [ ] Tests in `tests/unit/utils/research.test.ts`: `/public/portfolio/abc123`
+      passes through; `/publicsomething`, `//public`, `http://…`, `public/…`
+      (relative) and a non-string still fall back to `/en/investments` — the
+      trailing-slash shape matters, so `"/en"` alone must still be rejected.
+- [ ] Tests: `npm run test` green.
+- [ ] Commit `feat(spa): let the research back link return to a shared portfolio`
+
+### 85.2 — The nine badges that render but do not link
+
+Split by navigation mechanism, per the recorded decision above. Each site gets
+`from = route.fullPath` so "Go back" returns to the page the user is on.
+
+- [ ] **`<router-link>` wrap — surfaces with no dialog to close:**
+      `PortfolioDividendsTab.vue:98` (Symbol column; the `<tr>` at `:96` has no
+      click handler, so the cell is a clean slot), `PortfolioNewsTab.vue:62`
+      (article-card header; the sibling title `<a>` at `:73` is unaffected),
+      `PortfolioPerformanceTab.vue:685` and `:708` (Top/Bottom Performers `<li>`
+      — **in `PerformanceTabContent.vue`**, per the ordering note),
+      `ResearchCompare.vue:56` (peer column headers).
+      > `ResearchCompare.vue` gets the wrap on **peer columns only**. The
+      > primary column (`r.symbol === symbol`, blue at `:54`) must stay a plain
+      > badge: `researchRoute` hard-codes `research-overview`, so linking it
+      > would silently move the user off the Compare tab to the page they are
+      > already on. Its `r.symbol` is also nullable (`:63`) — guard `v-if` on
+      > `r.symbol`, which also skips the empty-string badge case.
+      > `PortfolioDividendsTab.vue:37` hardcodes `symbol: "—"` on the legacy
+      > `history[]` fallback path. `researchRoute("—")` would produce
+      > `/en/research/%E2%80%94/overview` — a real link to nothing. **Guard the
+      > wrap on a symbol that is neither empty nor `"—"`**, so the legacy table
+      > renders its badge plain.
+- [ ] **Emit-then-push — surfaces inside a dialog:**
+      `TransactionFormFields.vue:59` (shared identity block), `AddPositionDialog.vue:555`
+      (Option step), `EditTransactionModal.vue:184`, `RecordDividendDialog.vue:124`.
+      Reuse the `view-chart` event rather than adding a new one: in
+      `TransactionFormFields` make the badge `@click="emit('view-chart')"` —
+      the same thing the "View chart" text button at `:69` already does, and
+      `EditTransactionModal.goResearch` already pushes `researchRoute`.
+      > This is what gives **`EditPositionDialog.vue` research access at all**.
+      > It passes `:show-view-chart="false"` (`:332`) and has **no** `@view-chart`
+      > handler, so today that modal has no route into research whatsoever.
+      > Add `@view-chart="goResearch"` there — close the dialog, then
+      > `router.push(researchRoute(position.symbol, route.fullPath))` — and the
+      > badge is the only affordance the modal needs. The same applies to
+      > `AddPositionDialog`'s Option step (`:523` already wires `@view-chart`,
+      > so the badge reuses it) and to `RecordDividendDialog`, which needs a
+      > `goResearch` written because it has neither a button nor a handler.
+      > Do **not** make `TransactionFormFields` emit a second, parallel event
+      > for the badge. One event, two triggers, one code path.
+- [ ] Tests: `PortfolioNewsTab.test.ts:75` asserts the badge lives under
+      `article > div` — a `<a>` **inside** that div keeps it passing; do not
+      re-parent the badge. New cases: the Dividend History symbol cell renders
+      a link to `{ name: "research-overview", params: { symbol: "AAPL" } }` on
+      the `items[]` path and a **plain badge, no link**, on the legacy
+      `history[]` path (`PortfolioDividendsTab.test.ts`, new file);
+      `PortfolioPerformanceTab.test.ts` asserts the Top Performers badge is
+      clickable (it stubs `TickerBadge: true` at `:77` — the test must assert
+      the wrapping `RouterLink`'s `to`, not the badge); a new
+      `EditPositionDialog` case asserts the badge emits `view-chart` while
+      `show-view-chart` is false, and that `@view-chart` is handled.
+- [ ] Tests: `npm run build` and `npm run test` green.
+- [ ] Commit `feat(spa): link every ticker badge that renders without a link`
+
+### 85.3 — Badges where the symbol is still plain text
+
+`docs/COMPONENTS.md` requires instrument logos to go through `TickerBadge` and
+holds a checkable invariant: `grep -rn "/api/logos/" src` must return
+`TickerBadge.vue` and `RecentSearchesBar.vue` only. Every conversion below
+preserves it by construction — that is the reason to convert through the badge
+instead of pasting in a `<span>`.
+
+- [ ] **Dialog and modal headings → the badge, still leaving the wording:**
+      `PortfolioHoldingsTab.vue:578` (`<h2>` of the full-screen chart modal —
+      render `TickerBadge size="lg"` beside the existing `— {{ companyName }}`
+      rather than replacing the heading text, since the `h2` is also the
+      `role="heading"` the e2e locates), `EditPositionDialog.vue:278`
+      (`<h3>Edit {{ symbol }} position</h3>` — put the badge inside the `h3`,
+      the `aria-label` at `:276` stays text), `AddPositionDialog.vue:507`.
+- [ ] **Chart-controls benchmark rows — the one nested-interactive hazard.**
+      `PortfolioPerformanceTab.vue:757` sits inside a `<label>` (`:749`) that
+      wraps the row's `<input type="checkbox" @change="toggleDraftBenchmark">`.
+      A link there **toggles the checkbox** unless it stops propagation. Wrap in
+      `<router-link>` **with `@click.prevent.stop`**, and use the same
+      `:to="researchRoute(opt.symbol, route.fullPath)"`.
+      `:763` (the Custom rows) has no checkbox and only a sibling Remove
+      `button`, so it is a clean wrap. Both are in `PerformanceTabContent.vue`.
+      > Keep the visible option **name** at `:756` as-is. That row is
+      > "SPDR S&P 500 — SPY", and `researchRoute` needs the symbol, so the badge
+      > belongs on the right-hand symbol chip at `:757`, not replacing the
+      > human-readable name.
+- [ ] **Yearly-returns benchmark header.** `PortfolioPerformanceTab.vue:644`
+      renders `vs {{ benchmarkSymbol }}`. Wrap the **symbol** in a
+      `<router-link>` with a `TickerBadge size="sm" align="right"`, keeping the
+      literal `vs ` text so the column still reads as a comparison.
+      > This breaks an exact-text assertion: `PortfolioPerformanceTab.test.ts:597`
+      > asserts `perf-returns-yearly-excess-header` `toBe("vs SPY")`, and the
+      > badge appends the `(US) ETF` details line. Relax it to
+      > `toContain("vs")` + `toContain("SPY")` (cases at `:597`, `:617`,
+      > `:627`; the absent-when-no-benchmark case at `:642` still holds).
+      > State the reason in the commit body — the text is deliberately richer
+      > now, not accidentally different.
+- [ ] **Deliberately not converted, with reasons:** `PriceChart.vue:891` (the
+      chart `<h2>` renders on the research page itself, where a link would be a
+      self-link; the holdings modal that also reaches it already gets a linked
+      badge from the line above), `PortfolioHoldingsTab.vue:556` (the
+      Confirm-delete message — a navigation target inside a destructive
+      confirmation is a mis-click waiting to happen), and
+      `InstrumentSearchModal.vue:98` (the badge is inside a `<button>`;
+      a nested `<a>` is invalid HTML, and that row already navigates in
+      `mode="navigate"` via `openResult` at `:43`).
+- [ ] Tests: new `tests/unit/modules/portfolios/PortfolioHoldingsTab.test.ts`
+      case for the chart-modal badge (no test file exists for that modal
+      today); the relaxed `perf-returns-yearly-excess-header` assertions;
+      a `PerformanceTabContent.test.ts` case asserting the Chart-controls
+      symbol link carries `@click.prevent.stop` semantics — i.e. clicking it
+      does **not** call `toggleDraftBenchmark` (assert by trigger, not by
+      reading the attribute).
+- [ ] Tests: `npm run build` and `npm run test` green.
+- [ ] Commit `feat(spa): show the ticker badge where a symbol was bare text`
+
+### 85.4 — Charting page: the chip links, the comparison headers get a badge
+
+- [ ] `ChartingView.vue:124-141` — wrap the chip's symbol + name in
+      `<router-link :to="researchRoute(symbol, route.fullPath)">` with
+      `class="min-w-0 truncate"`. **Keep the `rounded-full` pill and do not put
+      a `TickerBadge` inside it**: a logo plate in a pill is not example-service's
+      geometry, and the chip already carries symbol + name. Confirm against
+      `app.example-service.ai` charting at the same viewport in this step's gate, and
+      switch to the badge if example-service shows a plate there. The sibling Remove
+      `button` (`:137`) keeps its own handler and is unaffected.
+      > `tests/e2e/charting.spec.ts:29/54/64/70-71` and
+      > `ChartingView.test.ts:52/65/68/78` assert on **counts** of
+      > `stock-chip` / `remove-stock`, not chip internals — a wrapping link
+      > keeps all of them green. That is the reason to prefer a wrap here over
+      > a DOM restructure.
+- [ ] `ChartingView.vue:190` — the fundamentals-comparison `<th>` per stock
+      becomes `TickerBadge size="sm" align="right"` inside a `<router-link>`,
+      matching `ResearchCompare.vue:56` exactly (that table is the same shape:
+      `r.symbol` is optional, so guard `v-if="r.symbol"`). Drop the `uppercase`
+      on those cells — an uppercase class applied to a company name is a bug
+      the research table already documents against (`ResearchCompare.vue:48-51`).
+- [ ] Tests: `ChartingView.test.ts` gains a case asserting the chip's link
+      `to` is `research-overview` for `AAPL`; `tests/e2e/charting.spec.ts`
+      gains a case clicking a chip and asserting
+      `/\/en\/research\/[A-Z0-9.-]+\/overview/`.
+- [ ] Tests: `npm run build`, `npm run test`, and `npm run test:e2e` green.
+- [ ] Commit `feat(spa): link the charting chips and badge the comparison headers`
+
+### 85.5 — Public shared portfolio: the holdings table gets a linked badge
+
+- [ ] `PublicPortfolioView.vue:72` — replace `<td>{{ p.symbol }}</td>` with a
+      `<router-link :to="researchRoute(p.symbol, route.fullPath)">` wrapping
+      `TickerBadge size="sm"`, keeping the `<td>`'s padding. Pass `from`
+      (`route.fullPath` is `/public/portfolio/:shareId`) — §85.1 is what makes
+      that survive `researchBackTarget`, and without it "Go back" drops the
+      share context entirely.
+      `PublicPortfolioShare.portfolio.positions[]` (`src/api/portfolios.ts:380`)
+      carries `symbol`; the badge's optional `name` / `countryCode` /
+      `assetType` are simply not passed, so the block degrades to logo + ticker,
+      which is the documented behaviour (`docs/COMPONENTS.md`).
+- [ ] **Say what actually happens to an unauthenticated visitor, in the commit
+      body.** `/en/research/:symbol/overview` is `meta: { requiresAuth: true }`,
+      so `router.beforeEach` (`router/index.ts:284-286`) bounces a logged-out
+      visitor to `/login?redirect=…`. For the owner, who is authenticated, it
+      works and "Go back" returns to the share. This is the accepted
+      consequence of putting research links on a public page — the alternative
+      is a share page whose tickers are the one thing a visitor cannot act on.
+      > A `<router-link>` renders as an `<a>` regardless of auth state, so it
+      > must not be conditionally hidden on `auth.isAuthenticated` — the SPA
+      > cannot know who holds the share, and hiding it would make the page
+      > differ per viewer.
+- [ ] Tests: new `tests/unit/modules/settings/PublicPortfolioView.test.ts`
+      (no test file exists) asserting the holdings cell renders a
+      `RouterLink` whose `to` is
+      `{ name: "research-overview", params: { symbol: "SNT.WA" }, query: { from: "/public/portfolio/abc" } }`;
+      e2e in `tests/e2e/` for the share page asserting
+      `href="/en/research/SNT.WA/overview?from=…"` on the row.
+- [ ] Tests: `npm run build`, `npm run test` green.
+- [ ] Commit `feat(spa): link the tickers on a public shared portfolio`
+
+### 85.6 — Admin: bond catalogue and market data
+
+- [ ] `BondCatalogueView.vue:66` — `TickerBadge size="sm"` inside a
+      `<router-link>`, keeping the existing `font-mono font-semibold` cell
+      styling for the symbol and leaving the separate Name column at `:67`
+      alone.
+      > **This is the case the request names explicitly — "bond".** The symbols
+      > here are `ROD1033` / `NNEP25`-style series, not equity tickers, and the
+      > bond profile fallback (`portfoliost-instruments/src/routes/instruments.ts:366-375`)
+      > is what makes the target resolve. `TickerBadge` requests
+      > `/api/logos/ROD1033`; confirm the logos endpoint returns a plate rather
+      > than a broken image for series with no logo, and if it 404s, accept the
+      > alt-text fallback rather than special-casing the badge.
+- [ ] `MarketDataView.vue:140` (pending split candidates), `:187` (history),
+      `:212` (overflow summary) — same conversion. These carry no name, so the
+      badge shows logo + ticker only.
+      > These tables are operational, not navigational: a click now navigates
+      > away from a half-filled "Apply factor" form at `:153-162`. That is
+      > acceptable (the input state is not persisted today anyway) but it must
+      > be **noted in the commit body**, not silently shipped.
+- [ ] Tests: new unit cases for the three `MarketDataView` tables and
+      `BondCatalogueView` asserting each symbol cell is a `RouterLink` with the
+      bare symbol in `params.symbol`.
+- [ ] Tests: `npm run build` and `npm run test` green.
+- [ ] Commit `feat(spa): link instrument symbols in the admin tables`
+
+### 85.7 — The venue-suffix wart, surfaced by this section
+
+Found while auditing the call sites. **§60.2 kept this deliberately** ("keep the
+existing `.US` suffix handling"), so it is a decision to revisit, not a
+regression — but the request's scope ("bond, fund, etc") makes it visible.
+
+- [ ] `AddPositionDialog.vue:463` appends `.US` to any symbol that lacks it:
+      `router.push(researchRoute(symbol.endsWith(".US") ? symbol : `${symbol}.US`, …))`.
+      A Polish position therefore produces `/en/research/SNT.WA.US/overview`.
+      It **resolves** — `venueFreeSymbol` (`portfoliost-instruments/src/adapters/symbol.ts:21-24`)
+      cuts at the last dot and `isSavingsBond` uses it — so this is a wrong-looking
+      URL, not a 404. Drop the suffixing and pass the symbol through.
+      > Only `AddPositionDialog` does this. Every other surface passes the
+      > symbol verbatim, so removing it makes the app consistent rather than
+      > changing behaviour anywhere else. Check the e2e regexes
+      > (`portfolios.spec.ts:213` and `research.spec.ts:327`) still match — they
+      > are written as `/(\.US)?/` precisely because this existed.
+- [ ] Tests: a case asserting `goResearch` for a `.WA` and a bare savings-bond
+      symbol produces the **unadorned** symbol in `params.symbol`; extend
+      `tests/unit/utils/research.test.ts` to record that `researchSymbol`
+      uppercases and **does not** strip venue suffixes — it never has, and the
+      strip is `venueFreeSymbol`'s job on the backend.
+- [ ] Commit `fix(spa): stop appending .US to research links from the position dialog`
+
+### 85.8 — Docs, Example service parity, and the full suite
+
+- [ ] **`docs/COMPONENTS.md`** — under "TickerBadge (the instrument identity
+      block)", record that a badge on a portfolio-, charting-, admin- or
+      share-page surface is expected to be wrapped in
+      `researchRoute(sym, route.fullPath)`, and that dialogs use the
+      emit-then-push path instead (§85.2's reason: a `router-link` does not
+      close its dialog). Add the two-step **and check** to the section: a badge
+      reachable from a portfolio page should be reachable by link.
+      Re-verify the existing invariant still holds:
+      `grep -rn "/api/logos/" src` → `TickerBadge.vue` and `RecentSearchesBar.vue` only.
+- [ ] **Playwright side by side** against `app.example-service.ai` at the same viewport
+      for the four surfaces this changes: Holdings → Performance (Top/Bottom
+      Performers), Portfolio → Dividends, Charting chips, and a watchlist. This
+      is the step that decides the §85.4 chip question; record the comparison in
+      the commit body.
+- [ ] **E2E for the newly linked surfaces** in `tests/e2e/research.spec.ts`,
+      reusing the `Go back` describe block at `:270` so every new entry point
+      proves the `from` round-trip, not just the navigation: Top Performers
+      (extend `tests/e2e/top-performers-currency.spec.ts:26`, which already
+      locates the `SNT.WA` row by text), Dividend History
+      (`tests/e2e/dividends.spec.ts:115`), a news card
+      (`portfolios.spec.ts:77`), the dialogs (open → click badge → back), and
+      the chart modal.
+- [ ] **Regression net on the existing specs** that locate badges by role, so
+      a link does not break a locator: `research.spec.ts:259`
+      (`getByRole("button", { name: "MSFT" })` — the search modal is untouched,
+      assert it still passes), `portfolios.spec.ts:72-74`
+      (`getByRole("link", { name: "META" })`) and `:77-104`
+      (`getByTestId("ticker-badge")` on the news cards).
+- [ ] **Full suite:** `npm run build` (includes `vue-tsc --noEmit`),
+      `npm run test`, `npm run test:mock`, `npm run test:e2e` against
+      `docker compose up -d --build`. Rebuild the `portfoliost` container after
+      the frontend changes and **restart the gateway** afterwards, or only
+      wallets-routed paths will 404 for the wrong reason (`AGENTS.md`).
+- [ ] Commit `test(spa): cover ticker-to-research links in e2e and document the rule`
