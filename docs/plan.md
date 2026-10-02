@@ -228,11 +228,11 @@ so they should take returns, not values). `periodReturnPercent` becomes
 index: it is rounded to 2 dp (`returnColumns.ts:38`), which is ~1 bp of
 quantisation per day and far too coarse for a daily σ.
 
-- [ ] **Export the daily flow-neutral return series** as a single named function
+- [x] **Export the daily flow-neutral return series** as a single named function
       in `src/services/returnColumns.ts` (next to `buildTwr`, sharing its
       per-day expression), and have `buildTwr` consume it so there is one
       implementation of the sub-period return.
-- [ ] **Change the risk-metric functions to take the prepared series**:
+- [x] **Change the risk-metric functions to take the prepared series**:
       `maxDrawdown(index)` / `annualizedVolatility(returns)` /
       `sharpeRatio(returns)` / `sortinoRatio(returns)` / `winRate(returns)` /
       `periodReturnPercent(index)`, and `computeRiskMetrics` to select `netFlow`
@@ -244,16 +244,16 @@ quantisation per day and far too coarse for a daily σ.
       > bulk of this step — do it as one mechanical pass, then add the flow cases
       > below. `src/routes/risk-metrics.test.ts` (9 cases) seeds `netFlow: "0"`
       > and will keep passing unchanged.
-- [ ] **Add the flow tests that would have caught this** — for each of
+- [x] **Add the flow tests that would have caught this** — for each of
       `volatility`, `sharpe`, `sortino`, `winRate`, `maxDrawdown`,
       `periodReturnPercent`: a portfolio that receives one large deposit
       mid-window with **flat** prices must return the *same* metric as the same
       series with the deposit removed (this is the invariant that was violated),
       and a `calmar` case where a deposit during a drawdown no longer truncates
       it.
-- [ ] **Tests**: `npm run test` green in `portfoliost-wallets`; `npm run build`
+- [x] **Tests**: `npm run test` green in `portfoliost-wallets`; `npm run build`
       (tsc) green.
-- [ ] **Commit** `fix(wallets): derive risk metrics from flow-neutral returns, not raw value`
+- [x] **Commit** `fix(wallets): derive risk metrics from flow-neutral returns, not raw value`
 
 ### 81.2 — `annualizedReturn` annualizes calendar days with a trading-day exponent
 
@@ -269,11 +269,21 @@ wherever the window is measured in days rather than years.
 
 The error is largest exactly where it does the most damage — a one-year window
 gives `n ≈ 365`, exponent `252/365 = 0.690`, so a genuine **+10.0%** year is
-reported as **+6.8%**. It inverts at short windows: a quarter gives `n ≈ 91`,
-exponent `252/91 = 2.77`, so **+5.0%** in three months is reported as **+14.5%
-annualized**. That last one is the "small profit inflated into a large
-percentage" failure in its purest form, and it needs no deposits at all —
-any portfolio with a flat three months of returns is being annualized this way.
+reported as **+6.8%**. It inverts at short windows: a 91-point quarter gives
+`n = 90`, exponent `252/90 = 2.80`, so **+5.0%** in three months is reported as
+**+14.6%** annualized where the correct figure is **+21.9%**. That last one is
+the "small profit inflated into a large percentage" failure in its purest form,
+and it needs no deposits at all — any portfolio with a flat three months of
+returns is being annualized this way.
+
+> **Corrected 2026-10-02 during implementation.** This paragraph originally read
+> "a quarter gives `n ≈ 91`, exponent `252/91 = 2.77`, so +5.0% in three months
+> is reported as **+14.5%** annualized" and implied +5.0% was the correct
+> answer. It is not: annualizing a quarterly return to a yearly rate is supposed
+> to exceed it. 14.6% *was* the old code's output; the corrected exponent
+> (`365/90`) gives +21.9%. Measured in `riskMetrics.test.ts`
+> ("annualizes a 91-day +5% quarter to ~+21.9%, not ~+14.6%"), which pins both
+> numbers so neither can drift again.
 
 The basis is also the wrong construct even once the exponent is corrected:
 annualizing `V_last / V_first` measures the growth of the *value*, which grows
@@ -287,16 +297,34 @@ annualized = (index_last / index_first) ** (365 / calendarDays) − 1
 using calendar days in both the exponent numerator and the step count, which is
 the only self-consistent pairing given the series is calendar-daily.
 
-- [ ] **Rewrite `annualizedReturn`** to take the flow-neutral index and the dates,
+> **Implementation note.** Reading the dates rather than `index.length − 1` also
+> matters for a *sparse* series: 100 points on a 4-day stride span 396 elapsed
+> days, and a point-count exponent reads that +9.2% as +27.5%. Pinned in
+> `riskMetrics.test.ts` ("reads elapsed days off the dates, so a sparse series is
+> not read as daily").
+>
+> `TRADING_DAYS` stays at 252 for `annualizedVolatility` / `sharpeRatio` /
+> `sortinoRatio`. Those scale a per-day dispersion by `√(periods per year)`
+> rather than converting a measured span, so a trading-day σ is the comparable
+> unit — and unlike the exponent, the √-scaling does not depend on how many
+> points the series happens to have. See §81.4 for what that unit costs on a
+> calendar-daily series.
+>
+> `daysBetween` in `returnColumns.ts` is now exported and is the single
+> date-difference implementation: `annualizedReturn` and
+> `annualizedReturnWithheldReason` both call it, so the 90-day predicate cannot
+> drift from the exponent.
+
+- [x] **Rewrite `annualizedReturn`** to take the flow-neutral index and the dates,
       annualizing over `365 / calendarDays` instead of `252 / n`.
-- [ ] **Add the regression test for the exponent**: a 365-point series rising
+- [x] **Add the regression test for the exponent**: a 365-point series rising
       exactly 10% must annualize to ~10%, not ~6.8%. Plus a 91-point series to
-      pin the quarterly case (+5% in 91 days must read ~+14.5%, not ~+5%), and a
-      case with one mid-window deposit asserting the annualized figure is
-      unchanged by it.
-- [ ] **Tests**: `npm run test` green in `portfoliost-wallets`; `npm run build`
-      (tsc) green.
-- [ ] **Commit** `fix(wallets): annualize over elapsed calendar years from TWR`
+      pin the quarterly case (+5% in 91 days must read ~+21.9%, not ~+14.6% —
+      corrected, see above), a sparse-series case, and a case with one mid-window
+      deposit asserting the annualized figure is unchanged by it.
+- [x] **Tests**: `npm run test` green in `portfoliost-wallets` (559 tests); `npm
+      run build` (tsc) green.
+- [x] **Commit** `fix(wallets): annualize over elapsed calendar years from TWR`
 
 ### 81.3 — `currentDrawdownPercent` in the SPA takes its peak over raw `value`
 
@@ -331,10 +359,10 @@ daily σ. Do **not** import the backend's TWR builder into the SPA; if a future
 card needs the daily return series rather than the index, add it to the
 `analytics` payload instead.
 
-- [ ] **Recompute `currentDrawdownPercent` over `cumulativeTwr`**, falling back to
+- [x] **Recompute `currentDrawdownPercent` over `cumulativeTwr`**, falling back to
       the existing raw-`value` path when the series has no TWR column (a
       pre-migration snapshot row), so the card still renders rather than blanking.
-- [ ] **Add the component test** that pins the defect: a `timeSeries` of
+- [x] **Add the component test** that pins the defect: a `timeSeries` of
       `[{value:100, cumulativeTwr:100},{value:50, cumulativeTwr:50},{value:150, cumulativeTwr:50},{value:75, cumulativeTwr:25}]`
       must report **−50%**, not −75% — and a no-flow series must report the same
       number as before, so the fallback and the TWR path agree.
@@ -342,12 +370,88 @@ card needs the daily return series rather than the index, add it to the
       > SFC, so it is not directly testable today. Extract the arithmetic to a
       > named export alongside the other shared maths (`docs/COMPONENTS.md`) and
       > import it back, which is the same treatment §79.1 gave `cell()`.
-- [ ] **Tests**: `npm run test` green in `portfoliost` (vitest unit) and
+- [x] **Tests**: `npm run test` green in `portfoliost` (vitest unit) and
       `npm run build` (includes `vue-tsc --noEmit`) green. Add the tile to the
       existing Performance tab e2e rather than a new spec — one assertion that a
       seeded flow-bearing portfolio's Current Drawdown matches its Max Drawdown's
       peak-to-trough is enough to catch a regression.
-- [ ] **Commit** `fix(spa): take the current-drawdown peak over the TWR index`
+      > **Plan correction.** The step assumed the compose seed carries a
+      > flow-bearing portfolio. It does not: `SELECT count(DISTINCT net_flow)`
+      > over `portfolios.value_snapshots` returns 1 for every seeded portfolio and
+      > `max(abs(net_flow))` is 0, so `value` and `cumulative_twr` are exactly
+      > proportional and *no* seeded portfolio can tell the two paths apart. The
+      > e2e therefore splices a flow-bearing `timeSeries` into the analytics
+      > response with `page.route()` (and stubs `risk-metrics` to match, so the
+      > cross-tile comparison is like-for-like). Verified it fails against the old
+      > raw-value implementation and passes against this one.
+- [x] **Commit** `fix(spa): take the current-drawdown peak over the TWR index`
+
+### 81.4 — `√252` understates annualised volatility on a calendar-daily series (OPEN — not implemented)
+
+Found while implementing §81.2 and **deliberately left out of it**: §81.2's
+defect is a unit mismatch in an *exponent*, this one is a unit mismatch in a
+*√-scaling*, and they have opposite fixes. Bundling them would have made the
+§81.2 commit change three displayed numbers for a reason unrelated to its stated
+bug. Raising it rather than quietly doing it.
+
+`TRADING_DAYS` (252) survives §81.2 and is still applied to a **calendar-daily**
+series at `riskMetrics.ts:56` (`annualizedVolatility`), `:88` (`sharpeRatio`)
+and `:112` (`sortinoRatio`). The series carries a point for every calendar day
+with weekend/holiday **carry-forward** prices (`backfill.ts:487`), so ~104 of
+every 365 daily returns are exactly 0. Two compounding errors:
+
+1. Those zero days damp the daily σ by `√(261/365)` ≈ 0.846 — the dispersion is
+   diluted across days on which nothing could move.
+2. `√252` then scales a *calendar*-daily σ by a *trading*-day count, a factor
+   `√(252/365)` ≈ 0.831 low.
+
+Measured on a synthetic 365-day series of 261 real returns with a true daily σ of
+0.549% plus 104 flat days (2026-10-02):
+
+| | annualised σ |
+| --- | --- |
+| reported today (`sd_cal × √252`) | 7.37% |
+| `sd_cal × √365` | 8.87% |
+| true (`sd_real × √261`) | 8.87% |
+
+So volatility reads **~17% low**, and Sharpe and Sortino inherit it (both are
+`excessMean / sd × √TRADING_DAYS`, so the ratio of annualised σ to annualised
+excess return is off by the same ~17% — Sharpe and Sortino are understated
+together and stay internally consistent with each other, but not with the
+annualised return that §81.2 now reports correctly).
+
+The fix is one constant in three places, and note that `√365` is not a
+compromise: it is **exactly** right here, because `√(261/365)` × `√365` =
+`√261`. The flat weekend days are already doing the damping the trading-day
+count assumes.
+
+**The open question is comparability, not correctness.** `√252` is the
+near-universal convention for annualising a *trading-day* σ, and example-service and
+most published Sharpe ratios use it. Changing it moves three numbers on the Risk
+tab by ~17% with no accompanying correction to the rest of the industry. So the
+choice is:
+
+- **Correct the maths** (→ `√365`, one constant, three call sites, numbers move
+  ~17%) and document that our Sharpe is annualised on a calendar-daily basis;
+  or
+- **Keep `√252`** and document the convention as the price of being comparable
+  with example-service and with published figures.
+
+Note that *not* choosing is a real answer too — it leaves `annualizedReturn` on
+a 365-day exponent (measured span) beside a `√252`-scaled σ (trading-day
+convention), which is defensible because the two constructs genuinely differ but
+should at least be written down rather than left to look like an oversight.
+
+- [ ] **Decide** which way the Risk tab goes, with the user. No implementation
+      until then.
+- [ ] If correcting: replace `√TRADING_DAYS` with `√DAYS_PER_YEAR` in
+      `annualizedVolatility` / `sharpeRatio` / `sortinoRatio`, add the
+      `sd_real × √261` table above as a unit test, and re-check the Risk tab e2e
+      for hardcoded expectations.
+- [ ] If keeping: add the convention note to `docs/proposals/portfolios-module.md`
+      next to the Sharpe/Sortino definitions, so the two annualisation
+      conventions in this file read as deliberate.
+
 
 ## 82. Performance tab: overview tiles & per-year returns (D82)
 
