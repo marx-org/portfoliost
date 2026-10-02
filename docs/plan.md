@@ -326,3 +326,380 @@ the defect; they differ in cost and in what they promise the user.
       from the venue; a component test that a mixed-source response renders the
       disagreement marker. `npm run test` and `npm run build` green.
 - [ ] **Commit** `feat(instruments): expose statement currency and provider provenance`
+
+### 79.3 — Half the balance sheet is empty for every non-US instrument (found 2026-10-02)
+
+More urgent than §79.1 or §79.2, and the cause is a provider-schema mismatch in
+the same function. Five of the ten balance-sheet columns render `—` for every
+European instrument in PROD, and `debtEquityRatio` goes with them because it is
+derived from one of them.
+
+**There is no fixed schema to map onto.** `openbb_core.provider.standard_models.balance_sheet.BalanceSheetData`
+sets `extra="allow"` and declares exactly three fields — `fiscal_period`,
+`fiscal_year`, `period_ending`. Every line item is a provider extra.
+`FMPBalanceSheetData` declares 63 typed fields, so FMP emits the same keys for
+every symbol. **openbb's yfinance balance model declares nothing beyond those
+three** — raw yfinance keys pass through verbatim, and yfinance's naming differs
+by listing. `toFundamentals()`'s `pick()` candidates
+(`translate.ts:575-595`) were evidently taken from the FMP/US shape.
+
+Measured against openst on the live stack, `statement=balance&period=annual`:
+
+| field | AAPL | SAP.DE | PKO.WA | EU listings actually serve |
+|---|---|---|---|---|
+| `totalAssets` | ✓ | ✓ | ✓ | `total_assets` |
+| `totalLiabilities` | ✓ | **✗** | **✗** | `total_liabilities_net_minority_interest` |
+| `shareholdersEquity` | **✗** | **✗** | **✗** | `total_common_equity`, `stockholders_equity` |
+| `cashAndShortTermInvestments` | ✓ | **✗** | **✗** | `cash_equivalents`, `cash_and_cash_equivalents` |
+| `workingCapital` | ✓ | **✗** | **✗** | absent entirely |
+| `netDebt` | ✓ | **✗** | ✓ | `net_debt` |
+| `totalDebt` | ✓ | ✓ | ✓ | `total_debt` |
+| `retainedEarnings` | ✓ | ✓ | ✓ | `retained_earnings` |
+
+**AAPL 7/8 · SAP.DE 4/8 · PKO.WA 5/8.** Note `shareholdersEquity` is empty for
+AAPL too — the bug is not European-only, US symbols just happen to share the
+key names the mapper was written against.
+
+**There is no fallback to wait for.** FMP returns `HTTP 402` on
+`/stable/income-statement`, `/balance-sheet-statement` and
+`/cash-flow-statement` for `SAP.DE`, `PKO.WA` and `MC.PA` on the current plan:
+*"Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not
+available under your current subscription"*. `AAPL` on the same endpoints returns
+200. Separately, `/api/v3/*` returns `403 "Legacy Endpoint … no longer
+supported"` for this key on every symbol. `search-symbol` does resolve
+`PKO.WA`/`PKN.WA` on `WSE`, so the symbols exist — the statement data is plan-gated.
+**yfinance is therefore the only source of European statements in the chain**,
+and this cannot be deferred until a better provider arrives.
+
+- [ ] **Widen the `pick()` candidate lists** in `toFundamentals()`'s
+      `balanceSheet` mapper (`translate.ts:575-595`) to accept the yfinance
+      passthrough names alongside the FMP ones — `total_liabilities` +
+      `total_liabilities_net_minority_interest`; `shareholders_equity` +
+      `total_equity` + `total_common_equity` + `stockholders_equity`;
+      `cash_and_equivalents` + `cash_and_short_term_investments` +
+      `cash_and_cash_equivalents` + `cash_equivalents`.
+      > Order matters and is not arbitrary: `total_liabilities` is the
+      > liabilities-excluding-minority figure and
+      > `total_liabilities_net_minority_interest` includes it, so they are not
+      > interchangeable. Prefer the `_net_minority_interest` variant when both
+      > are present so the column is internally consistent with
+      > `total_assets`, and record which was chosen.
+      > `shareholdersEquity` is a judgement call, not a rename: `total_equity`
+      > includes non-controlling interests, `total_common_equity` and
+      > `stockholders_equity` do not. Pick one, apply it to every provider, and
+      > say which in the code — otherwise `debtEquityRatio` silently changes
+      > meaning between a US and an EU row.
+- [ ] **Handle `workingCapital` where the provider does not supply it.** For
+      PKO.WA neither `total_current_assets` nor `total_current_liabilities` is
+      present. Either compute it from `current_assets`/`current_liabilities`
+      when a provider supplies those instead, or return `undefined` and render
+      `—` deliberately rather than by accident.
+      > Do not fabricate it. A wrong working-capital figure is worse than a
+      > blank cell, and §79.2 is precisely about not presenting numbers whose
+      > basis is unknown.
+- [ ] **Add fixture-driven tests** in `src/adapters/translate.test.ts` covering
+      both shapes: one row set in the FMP/US naming and one in the yfinance/EU
+      naming, asserting the same eight fields populate from either.
+      > Capture the EU fixtures from the live responses recorded in this
+      > section, not from memory — the key names above are what the HTTP layer
+      > returned today and are the whole basis of the fix.
+      > Assert `debtEquityRatio` too: it is the derived column that makes the
+      > bug visible in the UI, and it is currently empty for every EU name.
+      > `npm run test` green.
+- [ ] **Audit the `incomeStatement` and `cashFlow` mappers for the same defect**
+      before closing. Only the balance sheet was measured here; the other two
+      have the identical `pick()` shape and the same passthrough exposure.
+      > If they are also affected, fix them in the same commit rather than
+      > leaving a known-wrong sibling behind — but say in the commit message
+      > which were confirmed broken and which were only checked.
+- [ ] **Commit** `fix(instruments): map yfinance balance-sheet keys in toFundamentals`
+      > Same function as §79.1, so keep it separate: this one is a data-correctness
+      > change to five live columns, that one is a formatter plus one unpopulated
+      > field. Different risk, independently revertable.
+
+### 79.4 — FMP's European statements are plan-gated, and the v3 tier is gone
+
+Not a defect in our code, but it constrains §79.3 and §79.2 and should not be
+rediscovered from scratch. Recorded 2026-10-02 against the live `FMP_API_KEY`.
+
+- [ ] **Record the FMP tier boundary in `docs/openst-coverage.md`** next to the
+      existing provider notes, so nobody re-adds FMP as a European fallback.
+      > `openst/CLAUDE.md` and `cachest/CLAUDE.md` already treat
+      > `docs/openst-coverage.md` as the record of what each provider actually
+      > returns. Add: FMP statements are US-only on the current plan (402 on
+      > all three statement endpoints for `SAP.DE`, `PKO.WA`, `MC.PA`); the
+      > legacy `/api/v3/*` tier returns 403 for this key on **every** symbol,
+      > so openbb's fmp provider is on `/stable` only; `search-symbol` does
+      > resolve European listings (`PKO.WA`, `PKN.WA` on `WSE`), so symbol
+      > resolution and data access are gated separately and a successful
+      > `search-symbol` is not evidence the statements are available.
+      > If openbb's fmp provider is still calling `/api/v3`, that is a
+      > separate live defect — **check which base URL it uses before writing
+      > this note**, do not assume.
+      > Tests: none needed, doc-only, verified by re-running the three probes.
+- [ ] **Commit** `docs(instruments): record FMP plan tier boundary for non-US statements`
+
+---
+
+## 80. Admin → Topology: the cronjob list has drifted, and the graph is unreadable (2026-10-02)
+
+User request, two halves. Both are defects in the **D55 Topology tab** and the
+**System tab** beside it, and both are in the same subsystem, so they are one
+section with one ordering rule: **fix the data before the geometry** — a bigger
+canvas that still shows the wrong jobs is a bigger wrong picture.
+
+Proposal: [proposals/portfoliost-presentation.md](proposals/portfoliost-presentation.md)
+— renovated 2026-10-02 to as-built; its "Known drift" section is the short
+version of this one.
+
+Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
+
+### The drift, measured against the cluster on 2026-10-02
+
+Both tabs hardcode the job list, and both are wrong. `portfoliost-admin` already
+holds RBAC to list CronJobs (`cluster-read-role`, `cluster/apps/pfire/rbac.yaml`),
+so this is a curation problem, not a permissions one.
+
+The request was about last week's changes; the measured drift is older than that,
+so the table carries ages rather than just names. `fundcategorysync` (25 h) and
+`snapshotsync` (19 h) are the two genuinely new ones, `fxsync` is the rename
+(9 d — the old name's death is what left a dead row behind), and `corpbondsync`
+(12 d) plus the four openst jobs were never in the System tab at all.
+
+| CronJob | schedule | age | System tab | Topology graph |
+|---|---|---|---|---|
+| `portfoliost-instruments-tickersync` | `30 4 * * 1` | 39 d | yes | yes |
+| `portfoliost-instruments-fxsync` | `10 17 * * *` | 9 d | **no** | **no** (as `portfoliost-wallets-fxsync`) |
+| `portfoliost-instruments-corpbondsync` | `45 4 * * *` | 12 d | **no** | **no** |
+| `portfoliost-instruments-fundcategorysync` | `15 5 * * *` | 25 h | **no** | **no** |
+| `portfoliost-wallets-snapshotsync` | `0 13 * * *` | 19 h | **no** | **no** |
+| `openst-bond-import` | `30 4 * * *` | 15 d | **no** | yes |
+| `openst-bond-archive` | `0 6 3 * *` | 15 d | **no** | yes |
+| `openst-cpi-import` | `30 4 * * *` | 16 d | **no** | yes |
+| `openst-cpi-seed` | `0 5 1 1 *` (**suspended**) | 15 d | **no** | yes |
+| `stooq-downloader` | `0 3 * * 0` (**suspended**) | 140 d | yes | yes |
+| `stooq-importer` | `@yearly` (**suspended**) | 140 d | yes | yes |
+
+**Removed:** `portfoliost-wallets-fxsync` is gone — FX ownership moved to
+instruments (§48.6a), and the cluster has `portfoliost-instruments-fxsync`
+instead. The System tab still lists the dead name, so it shows a row whose image
+can never resolve. **Removed:** `portfoliost-wallets-snapshotsync-postfx`, which
+existed until 2026-10-01 when the two identical snapshotsync objects were merged
+into one (k3s v1.36.2 rejects a comma-separated `schedule`, so one object could
+not hold both windows — the reasoning is in the wallets HelmRelease comment).
+Neither tab listed it, so nothing to delete in code; it is recorded here because
+"the post-FX pass is gone" is a real behavioural change: day-end converted values
+now settle on the next morning's run instead of the same evening.
+
+**Three suspended jobs** (`openst-cpi-seed`, `stooq-downloader`,
+`stooq-importer`) currently render as ordinary scheduled work. The graph already
+carries `suspended` metadata for the openst four; the other two do not, and the
+System tab has no column for it at all.
+
+Not ours, and must stay out of both tabs: `pgdb` (flyway),
+`postgres-pfire-repo1-{diff,full,incr}` (CrunchyData pgBackRest, operator-owned),
+`scanst` / `scanst-override` / `scanst-test`, `stooq` (`stooq-daily`), plus the
+non-portfoliost deployments sharing the namespace (grist, pgadmin, pgweb,
+swaggerui, investbrain, …). The ownership line is **the homelab manifests**, not
+`kubectl get cronjobs` — the namespace is shared.
+
+### 80.1 — System tab: resync the hardcoded CronJob list
+
+`src/jobs-version.ts` `CRONJOBS` is a four-element array
+(`portfoliost-wallets-fxsync`, `portfoliost-instruments-tickersync`,
+`stooq-downloader`, `stooq-importer`) read against a live
+`listNamespacedCronJob` result. Entries absent from the cluster are skipped, so
+the dead `fxsync` name degrades to *silently missing* rather than to an error —
+which is why nobody noticed.
+
+- [ ] **Replace the array with the eleven portfoliost-owned CronJobs**, in the
+      table above, and export it so a test can assert on it.
+      > Names are the rendered object names, not the app-template keys:
+      > `fxsync` under the instruments HelmRelease renders as
+      > `portfoliost-instruments-fxsync`. Take them from
+      > `~/prv/homelab/homelab` `origin/main`
+      > (`cluster/apps/pfire/{openst,portfoliost-instruments,stooq-downloader,stooq-importer}/app/`),
+      > which is the source of truth — **not** from the cluster listing, which
+      > also carries the shared-namespace jobs that are not ours. Note the local
+      > homelab checkout lags `origin/main`; read it via
+      > `git show origin/main:<path>` after a fetch. `jobshot` (a Deployment) and
+      > `portfoliost-sheets-sync` (an on-demand jobshot Job, no CronJob) stay out
+      > of this array — `index.ts` already appends sheets-sync separately.
+- [ ] **Add `schedule` and `suspended` to `JobVersion`**, read from
+      `cj.spec.schedule` / `cj.spec.suspend`, so the System tab can render
+      `impl: "job"` rows as *Job · Scheduled* / *Job · Suspended* instead of a
+      single green "Job" badge that reads as "running".
+      > `SystemInfoView.vue:42` maps `impl === "job"` to one badge. The endpoint
+      > shape is `ServiceVersion` in `src/api/admin.ts` and in the contracts
+      > spec — check whether `ServiceVersion` already tolerates the extra fields
+      > before widening it, and add them there if it does not.
+- [ ] **New test file** `src/jobs-version.test.ts` — there is none today. Assert
+      that `CRONJOBS` equals the eleven names above, and that
+      `listJobVersions()` against a stubbed `listNamespacedCronJob` returns a row
+      per name that exists, skips a name that does not, and never invents one.
+      > The "skips a name that does not exist" case is the behaviour that hid
+      > the dead `fxsync` entry: it is correct and it is also why the array can
+      > rot unnoticed. Lock it deliberately rather than by accident.
+- [ ] **Tests**: `npm run test` green in `portfoliost-admin`; `npm run build`
+      green in `portfoliost` (the `ServiceVersion` type change flows into
+      `SystemInfoView.vue`).
+- [ ] **Commit** `fix(admin): resync the System tab CronJob list and show suspension`
+
+### 80.2 — A guard, so the next drift is a failing test and not an eyeball
+
+The decision recorded for this section is **keep the list hardcoded and resync
+it** — discovery was considered and rejected for now, because the namespace is
+shared and every discovered CronJob would need an ownership rule that is itself
+a hardcoded list. The cost of that choice is drift, so the list needs a
+tripwire.
+
+- [ ] **Add a captured fixture** of the portfoliost-owned CronJobs — name,
+      schedule, suspend flag, image tag, capture date — as
+      `src/cronjobs.fixture.json`, and a test asserting `CRONJOBS` matches it.
+- [ ] **Add `scripts/check-cronjobs.mjs`** that reads the live namespace with
+      `kubectl get cronjobs -n pfire -o json`, filters to the fixture's names,
+      and exits non-zero on any difference in name / schedule / suspend; with
+      `--refresh` it rewrites the fixture instead.
+      > Its honest limit: **an offline test cannot fail on its own.** The fixture
+      > only changes when someone runs `--refresh`, so this catches a job edited
+      > in the HelmRelease without a resync, and nothing more. Saying so here is
+      > the point — a guard that needs the same manual act it is guarding against
+      > is a tripwire, not automation. Wiring it into CI against the live cluster
+      > is the follow-up that would make it self-firing, and it needs a
+      > kubeconfig in CI.
+- [ ] **Tests**: `npm run test` green; `node scripts/check-cronjobs.mjs` run
+      against the live cluster exits 0 with the fixture as captured on 2026-10-02
+      (i.e. the filter does not drag the shared-namespace jobs in).
+- [ ] **Commit** `test(admin): guard the CronJob list against cluster drift`
+
+### 80.3 — Topology graph: same drift, plus an edge that points at the wrong owner
+
+`topology/graph-definition.ts` carries the job nodes as static data with
+hand-written `job: { schedule, suspended, purpose }` metadata — no live probe,
+by design: kube-state-metrics exposes no "last run succeeded" signal for a
+CronJob, so the honest wording is "what the manifest declares".
+
+- [ ] **Replace the `portfoliost-wallets-fxsync` node with
+      `portfoliost-instruments-fxsync`** and re-point its edge at
+      `portfoliost-instruments` (`Updates FX rates`, `10 17 * * *`, not
+      suspended).
+- [ ] **Add three job nodes** with schedule / suspend / purpose metadata:
+      `portfoliost-instruments-corpbondsync` (`45 4 * * *` → instruments, the
+      D80 corp-bond catalogue upsert deployed in §35),
+      `portfoliost-instruments-fundcategorysync` (`15 5 * * *` → instruments,
+      the analizy.pl fund-category upsert that §72.39's classification depends
+      on — with no `ANALIZY::` row a fund routes as a stock and silently
+      returns zero bars),
+      `portfoliost-wallets-snapshotsync` (`0 13 * * *` → wallets, the only
+      writer of `positions.market_value` in the scheduled pipeline since §76.1 —
+      say so in the `purpose` text, it is the most consequential job in the
+      namespace).
+- [ ] **Fix the FX edge owner**: `portfoliost-wallets → ecb` is labelled "FX
+      rates (via fxsync CronJob)", but wallets no longer owns FX. Move the edge
+      to `portfoliost-instruments → ecb` (`fx_rates` lives there since §48.6a).
+- [ ] **Add `suspended: true` to `stooq-downloader` and `stooq-importer`**, both
+      suspended in the cluster. Give all twelve job nodes a `purpose` string —
+      the details panel renders it, and the three new ones have none.
+- [ ] **Update `tests/unit/modules/admin/topology-graph-definition.test.ts`** —
+      `EXPECTED_NODE_IDS` (39 → 41), `EXPECTED_EDGE_PAIRS` (47 → 49),
+      `areaNodes("jobs")` count (10 → 12), the vitest snapshot, and the
+      "maps verified OpenST CronJobs" case.
+      > Counts: one node out, three in; one job edge out, three in, and the ECB
+      > edge changes source rather than count.
+      > `loadTopologyLayout` applies a stored layout only on an exact id-set
+      > match, so adding and removing node ids invalidates every saved
+      > `pfire.topology-layout.v1` position and users get the fresh dagre pass on
+      > first load. That is the intended behaviour, not something to work around.
+- [ ] **Tests**: `npm run test` and `npm run test:e2e` green
+      (`tests/e2e/topology.spec.ts:112` asserts the OpenST job nodes are mapped
+      and inspectable — check whether it enumerates ids).
+- [ ] **Commit** `fix(spa): resync topology job nodes with the cluster`
+
+### 80.4 — Nodes sized to be read
+
+`NODE_SIZES` in `topology-layout.ts:41` (internal 200×40, storage 150×40, jobs
+160×40, external 160×36, providers 120×28) is dagre's idea of each box, and it
+doubles as the geometry the lane-bounds and persistence tests assert against. The
+rendered box is whatever the node component's Tailwind padding makes it, so the
+two are maintained by hand and can disagree.
+
+- [ ] **Enlarge the five node components**: `InternalNode`, `StorageNode`,
+      `JobNode` from `px-3 py-2` / `text-sm` to `px-4 py-2.5` / `text-base`;
+      `ExternalNode` likewise; `ProviderNode` from `px-2.5 py-1` / `text-xs` to
+      `px-3 py-1.5` / `text-sm`, with the quota badge `text-[10px]` → `text-xs`.
+- [ ] **Update `NODE_SIZES` to the rendered sizes**, and raise `LANE_PADDING`
+      from 24 so a lane still frames its contents.
+      > Measure, do not guess: `getBoundingClientRect()` on a rendered node in
+      > the browser is the number `NODE_SIZES` has to match, because
+      > `extent: "parent"` clamps children to the lane and dagre spaces by this
+      > constant. A lane smaller than its contents clips them.
+- [ ] **Assert the two agree**: a test that every area's `NODE_SIZES` entry is at
+      least the component's minimum rendered box, so the constant cannot silently
+      drift from the markup again.
+- [ ] **Tests**: `npm run test` green (layout snapshot updates), `npm run build`
+      green, plus a Playwright pass on `tests/e2e/topology.spec.ts` — the lane
+      tests at `:311` and `:348` assert boxes render and drag together, which is
+      exactly what a size mismatch breaks.
+- [ ] **Commit** `fix(spa): enlarge topology nodes to a readable size`
+
+### 80.5 — Pack lanes sideways, so a wide screen is used
+
+The graph reads left-to-right (`rankdir: "RL"`, D55-9) but `packAreas` pushes
+overlapping lanes **downward**, so five areas stack into a tall column and
+`fitView` — which fits both axes — zooms out to satisfy the height. That is the
+mechanism behind "boxes are very small and unreadable"; §80.4 alone makes the
+boxes bigger and the zoom-out worse.
+
+- [ ] **Flip the pack axis**: in `packAreas`, advance `x` instead of `y` when a
+      lane must clear an already-placed one, and order the pass by raw `x` then
+      definition order.
+      > Keep the guarantee the same — pairwise-disjoint lanes — and keep
+      > `nearOverlap` as the single overlap predicate. `clampLaneMotion` is
+      > already axis-symmetric (binary search over the displacement vector), so
+      > lane dragging needs no change.
+- [ ] **Fix the tests that encode the old axis.**
+      > `topology-layout.test.ts:48` asserts lane *left edges* ascend in the
+      > order data-providers → storage → internal → external-services; that
+      > ordering came from the rank columns, and horizontal packing re-orders it.
+      > Either relax it to "no two lanes overlap and every node is inside its
+      > lane" (`:83`, `:103`) or pin the new left-to-right lane order
+      > deliberately — but do not leave it asserting the old geometry.
+- [ ] **Shorten the canvas** in `mission-control.css`: `.mission-canvas` is
+      `clamp(540px, calc(100vh - 430px), 1000px)`. A wide layout wants a shorter
+      stage, and `fitView` has more width to spend on the zoom that §80.4 needs.
+      Check the `≤720px` media block at `:115` still collapses sensibly.
+- [ ] **Raise `max-zoom`** from 1.5 (`TopologyView.vue:459`) only if §80.4 and
+      §80.5 together still leave the default view short of 1:1 — measure on a
+      real viewport before changing it.
+- [ ] **Tests**: `npm run test` green; `npm run test:e2e` green — `:311` asserts
+      lanes never overlap, `:373` that Re-layout restores the canonical
+      arrangement, `:394` that moved lanes survive a reload.
+- [ ] **Commit** `feat(spa): pack topology lanes horizontally for wide screens`
+
+### 80.6 — `cachestProviders` is permanently empty (found while renovating the proposal)
+
+Not requested. Recorded because it was found, it is in the same subsystem, and
+it is a two-line fix next to `LABEL_PREF`. Drop this step if the section is
+already long enough.
+
+`CACHEST_P99_Q` filters `service_name="cachest"`, but the OTel exporter in this
+cluster emits `job` and `service` and **no `service_name`**. Verified against
+the live Prometheus on 2026-10-02:
+`count(http_client_request_duration_seconds_bucket{service_name="cachest"})` →
+empty. So `cachestProviders` is always `[]`, and
+`TopologyDetailsPanel.vue:192` (`v-if="… && cachestProviders.length"`) never
+renders the per-upstream latency table. The service rows next to it are fine —
+they go through `queryMapByLabel`, which is why this one query was missed.
+
+- [ ] **Resolve the cachest identity through `LABEL_PREF`** the same way the
+      service rows do, instead of hardcoding `service_name`.
+- [ ] **Test** that the generated PromQL carries no unresolvable label filter,
+      and that a stubbed series keyed on `job` yields a populated
+      `cachestProviders`.
+      > Extend `portfoliost-admin/src/topology.test.ts` — the ingress/OTel
+      > fallback paths are already covered there, so this is an added case, not
+      > a new file.
+- [ ] **Tests**: `npm run test` green in `portfoliost-admin`; confirm against the
+      live cluster that the endpoint returns a non-empty `cachestProviders`.
+- [ ] **Commit** `fix(admin): resolve cachest provider latency through the label fallback`
+

@@ -1,6 +1,13 @@
 # D55 — System Topology / Data Flow Tab
 
-## Status: Proposed
+## Status: Implemented
+
+Shipped 2026-09-20 (closeout recorded in `plan-archive.md`, "Topology — cinematic
+observability experience"); storage-workload metrics added afterwards by §26.
+**This document was renovated 2026-10-02 to describe what actually exists**; the
+sections that had drifted from the code are marked *as-built correction* and say
+what shipped instead of what was planned. Open work on the tab lives in
+`plan.md` §80 (cronjob drift, node readability, lane orientation).
 
 ## Goal
 
@@ -21,120 +28,122 @@ flat card list. It does not convey dependencies, data flow, or provider
 relationships. This proposal extends that foundation into a live topology map.
 
 **Prerequisite:** D56 (OpenTelemetry observability) enriches the traffic data
-available to this visualization. D55 is designed to degrade gracefully without
-D56 (using nginx-ingress metrics alone), but D56 should be implemented first
-for the richest experience.
+available to this visualization. The tab degrades gracefully without D56 (using
+nginx-ingress metrics alone), but D56 ships first for the richest experience.
 
 ---
 
-## Codebase findings
-
-Relevant files investigated before writing this proposal:
+## Codebase map (as-built)
 
 | File | Role |
 |---|---|
-| `portfoliost/src/modules/admin/AdminLayout.vue` | Tab shell — new tab added here |
-| `portfoliost/src/modules/admin/SystemInfoView.vue` | Existing system tab (flat card list) |
-| `portfoliost/src/api/admin.ts` | Admin API client, `ServiceVersion` type |
-| `portfoliost-admin/src/index.ts` | `GET /api/admin/system/versions` handler |
-| `portfoliost-admin/src/jobs-version.ts` | Kubernetes-backed deployment/cronjob image discovery |
-| `portfoliost/src/styles/main.css` | Design tokens (Tailwind, dark/light) |
-| `portfoliost/package.json` | Only charting lib: ApexCharts; no graph lib present |
+| `src/modules/admin/AdminLayout.vue` | Tab shell — "Topology" sits between "System" and "Currency Rates" |
+| `src/modules/admin/TopologyView.vue` | The tab: Vue Flow canvas, toolbar, stats header, mission-control visuals |
+| `src/modules/admin/topology/graph-definition.ts` | Static graph: 39 nodes, 47 edges, provider + job metadata |
+| `src/modules/admin/topology/topology-layout.ts` | dagre layout, area lanes, `NODE_SIZES` |
+| `src/modules/admin/topology/topology-store.ts` | Pinia store, polls both endpoints every 30 s |
+| `src/modules/admin/topology/TopologyDetailsPanel.vue` | Click-to-inspect slide-in |
+| `src/modules/admin/topology/nodes/*.vue` | One node component per area + `StatusDot` + `NodeHandles` |
+| `src/modules/admin/topology/LaneNode.vue` | Swim-lane parent node (drag, clamp, persistence) |
+| `src/modules/admin/topology/mission-control.css` | The visual layer (aurora, grain, stats, legend, focus mode) |
+| `src/api/admin.ts` | `fetchTopologyStatus` / `fetchTopologyTraffic` |
+| `portfoliost-admin/src/topology.ts` | `GET /api/admin/topology/status` |
+| `portfoliost-admin/src/topology-traffic.ts` | `GET /api/admin/topology/traffic` |
+| `portfoliost-admin/src/service-probe.ts` | `/__meta` fan-out target table |
+| `portfoliost-admin/src/workload-probe.ts` | postgres/redis k8s-only target table |
+| `portfoliost-admin/src/jobs-version.ts` | `GET /api/admin/system/versions` image discovery (System tab) |
+
+Dependencies: `@vue-flow/core ^1.48.2`, `@dagrejs/dagre ^3.1.1` (app-template
+v3 API: `new Graph()`, `layout(g)`, no `setGraph({ rankdir })` on a name).
 
 ---
 
 ## What data is actually available
 
-### Service identity & reachability (existing)
+### Service identity & reachability
 
-`GET /api/admin/system/versions` already returns, for every component:
-
-| Field | Source |
-|---|---|
-| `service` | `/__meta` response |
-| `impl` | `"real"` / `"mock"` / `"unknown"` / `"job"` |
-| `version` | semver string |
-| `image` | full `ghcr.io/marx2/<name>:<tag>` ref (from k8s Deployment API) |
-
-Services probed: `portfoliost` (SPA injects itself), `portfoliost-admin`,
+`GET /api/admin/topology/status` fans `/__meta` out to six services
+(`serviceTargets()` in `service-probe.ts`): `portfoliost-admin`,
 `portfoliost-users-auth`, `portfoliost-wallets`, `portfoliost-instruments`,
-`openst`, `cachest`.
+`openst`, `cachest`. A service that does not answer within 3 s is reported with
+`impl: "unknown"` and `reachable: false` — that is the only signal available
+without Prometheus.
 
-CronJobs reported as `impl: "job"`: `portfoliost-wallets-fxsync`,
-`portfoliost-instruments-tickersync`, `stooq-downloader`, `stooq-importer`,
-`jobshot`.
+### Kubernetes health via Prometheus / kube-state-metrics
 
-The `impl: "unknown"` case means the service did not respond to `/__meta` — this
-is the only health signal available today beyond k8s pod status (see below).
+kube-prometheus-stack runs in the `monitoring` namespace and scrapes
+kube-state-metrics for `pfire`. `portfoliost-admin` reaches it in-cluster at
+`PROMETHEUS_URL` (`kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090`,
+set in the admin HelmRelease), so Prometheus is never exposed to the browser.
 
-### Kubernetes pod/deployment status via Prometheus/kube-state-metrics
+Deployment health uses `kube_deployment_status_replicas{ready}` plus a
+pod → ReplicaSet → Deployment owner chain for restarts. When `PROMETHEUS_URL` is
+unset (local dev) the endpoint returns reachability-only rows and the frontend
+greys the status dots.
 
-The cluster runs **kube-prometheus-stack** in the `monitoring` namespace,
-scraping `kube-state-metrics` which emits per-deployment and per-pod metrics for
-the `pfire` namespace. These are queryable from `portfoliost-admin` via the
-in-cluster Prometheus endpoint
-`http://kube-prometheus-stack-prometheus.monitoring.svc:9090`.
+### k8s-only storage workloads
 
-Useful PromQL queries:
+`postgres` and `redis` have no `/__meta`, so `workloadTargets()` addresses them
+directly: postgres as the Crunchy StatefulSet
+`postgres-pfire-postgres-pfire-k8db` (`kube_statefulset_*` + created_by_name
+restart attribution), redis as the `redis` Deployment (container `main`, pod
+regex `redis-.*` — anchored PromQL `=~` so `ib-redis` cannot match). Each row
+degrades field-by-field; a failed query nulls that field, never 500s. This was
+added by §26, after the original proposal.
 
-```promql
-# Is at least one replica ready?
-kube_deployment_status_replicas_ready{namespace="pfire"} > 0
+### Traffic
 
-# Pod phase distribution per deployment
-kube_pod_status_phase{namespace="pfire"}
+`GET /api/admin/topology/traffic` prefers D56 OTel metrics and falls back to
+nginx-ingress. Per service: request rate, 4xx/5xx share, P99 latency.
 
-# Restart count (indicates flapping)
-kube_pod_container_status_restarts_total{namespace="pfire"}
-```
+> **as-built correction.** The proposal assumed the OTel series carry
+> `service_name`. They do not. Verified against the live Prometheus on
+> 2026-10-02: `http_server_request_duration_seconds_count` is exported with
+> `job` (and `service`) only — `count by (service_name)` returns no series.
+> `topology-traffic.ts` therefore probes labels in the order
+> `service_name → job → service` (`LABEL_PREF`) and takes the first that yields
+> series, which is what makes `source: "otel"` actually resolve in this cluster.
 
-This gives a reliable **green / degraded / down** signal per named deployment
-without requiring any code changes to the application pods.
+`INGRESS_APP_HOST` (`portfoliost.k.homylab.com`) adds an aggregate row for the
+`nginx-gateway` node, since the ingress controller exports per-host series for
+it. Without that env var the gateway has no traffic box.
 
-### Ingress request traffic via Prometheus/nginx-ingress
+`cachestProviders` carries cachest's per-upstream P99 keyed by `server_address`
+— the details panel shows it as a latency table when the node is inspected.
 
-The nginx ingress controller exposes per-service metrics scraped by Prometheus:
+### CronJobs
 
-```promql
-nginx_ingress_controller_requests{exported_namespace="pfire", service="<name>", status="<code>"}
-nginx_ingress_controller_request_duration_seconds_{bucket,count,sum}{...}
-```
+CronJobs are **not** part of the live status overlay. They are static nodes with
+hand-written schedule/suspend metadata, because a CronJob has no steady state to
+probe: `kube-state-metrics` exposes no "last run succeeded" signal, and the
+honest wording is "this is what the manifest declares", not "this is healthy".
+`TopologyServiceStatus.reachable` is defined on deployment readiness, which a
+CronJob does not have.
 
-These provide, per service:
-- Request rate over the last 5 minutes
-- P50 / P99 latency
-- Error rate (4xx / 5xx share)
-
-This data can meaningfully distinguish **active** edges (traffic flowing now)
-from **idle** ones in the topology, without any application-level changes.
-
-Once D56 is live, application-level `http.server.request.duration` and
-cachest's `http.client.request.duration` (per upstream provider) can replace
-or supplement the ingress metrics for more precise per-route data.
+> **Known defect (2026-10-02).** `CACHEST_P99_Q` filters on
+> `service_name="cachest"`, but no exported series carries `service_name`, so
+> `count(http_client_request_duration_seconds_bucket{service_name="cachest"})`
+> is empty and `cachestProviders` is always `[]` in this cluster. The panel's
+> cachest latency table is therefore permanently hidden. It needs the same
+> `LABEL_PREF` treatment as the service rows. Tracked in `plan.md` §80.6.
 
 ### Provider topology (static, from config)
 
-The data-provider chain is fully known from source code and config:
+The data-provider chain is known from source and is represented as a structured
+static definition with live status overlaid:
 
 ```
-openst → OpenBB SDK → yfinance / fmp / intrinio / polygon / sec /
-                       nasdaq / cboe / tiingo / tmx
-cachest → openst (most routes, proxied with TTL caching)
-        → dividendhistory.org (HTML scrape, direct)
-        → alphavantage.co (direct, 25 req/day quota)
-        → financialmodelingprep.com (direct, 250 req/day quota)
-portfoliost-wallets → ECB (FX rates via fxsync CronJob → wallets.fx_rates)
-portfoliost-instruments → cachest (all market data)
+openst → OpenBB SDK → yfinance / fmp / intrinio / polygon / sec / nasdaq /
+                       cboe / tiingo / tmx / biznesradar / obligacje
+cachest → openst (most routes, TTL-cached)
+        → alphavantage.co, financialmodelingprep.com, dividendhistory.org
+portfoliost-instruments → ECB (fx_rates, own fxsync CronJob)
 portfoliost-* → portfoliost-users-auth (JWT verification)
-portfoliost-admin → portfoliost-{users-auth,wallets,instruments} + openst + cachest (/__meta fan-out)
-nginx gateway → portfoliost-{users-auth,wallets,instruments,admin} (path-prefix routing)
+portfoliost-admin → {users-auth, wallets, instruments, openst, cachest} (/__meta)
+nginx gateway → {users-auth, wallets, instruments, admin} (path-prefix routing)
 SPA → nginx gateway
-PocketID (OIDC) → portfoliost-users-auth (token exchange)
+PocketID → portfoliost-users-auth
 ```
-
-This topology is stable and well-understood. It is appropriate to represent it
-as a structured static definition embedded in the frontend, with live status
-overlaid on top.
 
 ---
 
@@ -142,303 +151,197 @@ overlaid on top.
 
 ### D55-1 — Graph library: `@vue-flow/core`
 
-Install `@vue-flow/core` (MIT, Vue 3 native, TypeScript-first, custom node/edge
-rendering, built-in zoom/pan, animated edges, active maintenance). No other
-graph library is currently in the project. `@dagrejs/dagre` is added as the
-layout engine (hierarchical left-to-right layout).
+Vue 3 native, TypeScript-first, custom node/edge rendering, built-in zoom/pan,
+animated edges. `@dagrejs/dagre` is the layout engine. `cytoscape.js` was
+considered and rejected for imperative DOM handling at this graph size (39
+nodes).
 
-`cytoscape.js` was considered and is more capable for very large graphs, but
-`@vue-flow/core` is the better fit here: idiomatic Vue 3 composition API, no
-imperative DOM manipulation, easier dark/light mode via CSS variables, and a
-cleaner custom node rendering model. With ≤20 nodes, performance is not a
-concern.
+### D55-2 — Route and tab
 
-### D55-2 — New frontend route
-
-```
-/en/admin/topology  →  TopologyView.vue   name: "admin-topology"
-```
-
-Added to `AdminLayout.vue` tabs as **"Topology"**, inserted between "System"
-and "Currency Rates". The existing System tab is unchanged.
+`/en/admin/topology` → `TopologyView.vue`, route name `admin-topology`, declared
+in `src/router/index.ts` under the `admin` parent with `meta: { admin: true }`.
+The tab list in `AdminLayout.vue` now reads System, **Topology**, Currency
+Rates, Users, Jobs, Market Data, Bond Catalogue — Topology kept its slot; the
+area grew tabs after this proposal. The System tab itself is unchanged.
 
 ### D55-3 — Static graph definition
 
-A TypeScript module
-`portfoliost/src/modules/admin/topology/graph-definition.ts` defines all nodes
-and edges. Node areas:
+`topology/graph-definition.ts` defines 39 nodes and 47 edges:
 
-| Area | Nodes |
-|---|---|
-| `internal` | SPA (portfoliost), nginx gateway, portfoliost-admin, portfoliost-users-auth, portfoliost-wallets, portfoliost-instruments |
-| `storage` | postgres (shared), redis (shared) |
-| `jobs` | fxsync CronJob, tickersync CronJob, stooq-downloader CronJob, stooq-importer CronJob, jobshot |
-| `external-services` | PocketID (OIDC), stooq.pl, scanst, mastra-ticker |
-| `data-providers` | openst (aggregator node) + individual provider leaf nodes: yfinance, FMP, Intrinio, Polygon, SEC/EDGAR, Nasdaq, CBOE, Tiingo, TMX, AlphaVantage (quota badge: 25/day), dividendhistory.org, ECB |
+| Area | Count | Nodes |
+|---|---|---|
+| `internal` | 6 | SPA, nginx gateway, admin, users-auth, wallets, instruments |
+| `storage` | 2 | postgres, redis |
+| `jobs` | 10 | fxsync, tickersync, sheets-sync, stooq-downloader, stooq-importer, jobshot, openst-bond-import, openst-bond-archive, openst-cpi-import, openst-cpi-seed |
+| `external-services` | 5 | PocketID, Google Sheets, stooq.pl, scanst, mastra-ticker |
+| `data-providers` | 16 | openst + cachest aggregators, and leaf providers yfinance, FMP, Intrinio, Polygon, SEC/EDGAR, Nasdaq, CBOE, Tiingo, TMX, AlphaVantage (25/day), dividendhistory.org, ECB, BiznesRadar, Obligacje |
 
-Each provider leaf node carries metadata: data types it supplies
-(e.g. OHLCV, dividends, company profile, news, SEC filings, FX rates) and any
-quota constraints.
-
-Each edge carries: source, target, label (data type description), and whether
-it is measurable via Prometheus ingress or OTel metrics (D56).
+Each provider leaf carries `dataTypes` and, where real, a `quota` badge. Each
+job node carries `job: { schedule, suspended, purpose }`. Each edge carries
+`kind` (`api` / `gateway` / `auth` / `job` / `provider` / `storage`) and
+`measurable` (`ingress` / `otel` / `none`).
 
 ### D55-4 — Live status overlay
 
-A Pinia store `useTopologyStore` polls two new backend endpoints every 30 s
-(matching the existing System tab cadence):
+`useTopologyStore` polls `GET /api/admin/topology/status` and
+`GET /api/admin/topology/traffic` every 30 s (the System tab cadence), fetching
+both in parallel. Either may fail independently: a failed call keeps its
+previous data and records the message, the other still applies, and polling never
+rejects.
 
-**`GET /api/admin/topology/status`** — new endpoint in `portfoliost-admin`
+Both endpoints sit behind `requireGroup("portfoliost_admin")`.
 
-Fans out `/__meta` to all services (reusing existing logic) and additionally
-queries Prometheus for k8s deployment health:
-
-```typescript
-// Response shape (new contract schema: TopologyStatusResponse)
-{
-  services: Array<{
-    name: string          // deployment name (matches graph node id)
-    reachable: boolean    // /__meta responded within 3 s
-    impl: "real" | "mock" | "unknown" | "job"
-    version: string
-    replicas: { desired: number; ready: number } | null  // null if Prometheus unavailable
-    restarts: number | null
-  }>
-  fetchedAt: string       // ISO-8601
-}
-```
-
-If `PROMETHEUS_URL` env var is not set (local dev), the endpoint returns
-reachability-only data — no replicas/restarts fields. The frontend handles this
-gracefully (no status dot, grey node).
-
-**`GET /api/admin/topology/traffic`** — new endpoint in `portfoliost-admin`
-
-Queries Prometheus for 5-minute traffic windows per service. When D56 is live,
-prefers application-level `http_server_request_duration_seconds` metrics (all 6
-services emit this after D56); falls back to nginx-ingress
-`nginx_ingress_controller_requests` metrics when D56 metrics are absent:
-
-```typescript
-// Response shape (new contract schema: TopologyTrafficResponse)
-{
-  services: Array<{
-    name: string            // service name (matches graph node id)
-    requestsPerMin: number
-    errorRate: number       // fraction 0–1
-    p99LatencyMs: number
-    source: "otel" | "ingress" | "none"  // which metric source was used
-  }>
-  // Per-provider outbound latency from cachest (populated when D56 is live)
-  cachestProviders: Array<{
-    provider: string        // server_address label, e.g. "openst", "alphavantage.co"
-    p99LatencyMs: number
-  }>
-  fetchedAt: string
-}
-```
-
-**PromQL used when D56 (`source: "otel"`) is available:**
-```promql
-# request rate per service (all 6 after D56)
-sum by (service_name) (rate(http_server_request_duration_seconds_count[5m]))
-
-# P99 latency per service
-histogram_quantile(0.99,
-  sum by (le, service_name) (
-    rate(http_server_request_duration_seconds_bucket[5m])
-  )
-)
-
-# cachest per-provider outbound P99 (D56-3)
-histogram_quantile(0.99,
-  sum by (le, server_address) (
-    rate(http_client_request_duration_seconds_bucket{service_name="cachest"}[5m])
-  )
-)
-```
-
-**PromQL used when falling back (`source: "ingress"`):**
-```promql
-nginx_ingress_controller_requests{exported_namespace="pfire"}
-nginx_ingress_controller_request_duration_seconds_bucket{exported_namespace="pfire"}
-```
-
-Falls back to an empty `services` array (and empty `cachestProviders`) if
-Prometheus is unavailable.
-
-Both new endpoints are guarded by the existing `requireGroup("portfoliost_admin")`
-middleware.
+> **as-built correction.** `TopologyServiceTraffic`'s HTTP fields are
+> **nullable** (`requestsPerMin`, `errorRate`, `p99LatencyMs`), and it carries
+> `cpuCores`, `memoryBytes` and `connections` for the storage workloads. §26.1
+> made them nullable precisely so a missing exporter scrape reads as "unknown"
+> rather than a flatlined 0.
 
 ### D55-5 — Node visual design
 
-Custom Vue Flow node components, one per area:
+One component per area: `card`-backed rounded rect (internal), cylinder-tinted
+(storage), dashed green (jobs), indigo (external), amber pill with quota badge
+(providers). Live nodes carry a `StatusDot` in the corner:
 
-| Area | Visual style |
+| State | Condition |
 |---|---|
-| `internal` | Rounded rect, `card` class background, service icon (inline SVG) |
-| `storage` | Rounded rect with a subtle cylinder-hint header, blue-slate tint |
-| `jobs` | Dashed border, green tint, clock icon |
-| `external-services` | Rounded rect, indigo tint |
-| `data-providers` | Compact pill/chip, amber tint; quota badge where applicable |
+| Healthy | reachable + all replicas ready + restarts < 5 |
+| Degraded | reachable but partial replicas, or restarts ≥ 5 |
+| Down | unreachable / `impl: "unknown"` |
+| Unknown | no Prometheus data (CronJobs, external providers) |
 
-Status indicator overlaid on every live-service node (bottom-right corner dot):
-
-| State | Colour | Condition |
-|---|---|---|
-| Healthy | Green | reachable + all replicas ready + restarts < 5 |
-| Degraded | Amber | reachable but partial replicas, or restarts ≥ 5 |
-| Down | Red | unreachable / `impl: "unknown"` |
-| Unknown | Grey | no Prometheus data available (CronJob / external provider) |
-
-The dot pulses (CSS `@keyframes` scale animation) when the service has active
-ingress traffic (`requestsPerMin > 0`).
+The dot pulses when the node has live traffic.
 
 ### D55-6 — Edge animation
 
-`@vue-flow/core` supports custom SVG edge paths and CSS animation.
-
-| Edge type | Style |
-|---|---|
-| Active (traffic > 0) | Animated moving-dot along a dashed SVG path; dot speed proportional to request rate |
-| Idle (traffic = 0 or unmeasured) | Static thin line with arrow |
-| Job-trigger (CronJob → service) | Dashed static line, green tint |
-| External-provider edge | Static thin line, no animation |
-
-The animated dot uses the vue-flow built-in edge animation pattern
-(`stroke-dashoffset` CSS keyframe on the SVG path).
+`FlowEdge.vue` draws the moving-dot overlay on top of the standard path.
+Active (measured traffic) animates with duration and intensity derived from the
+request rate; idle, job-trigger and provider edges render no overlay.
 
 ### D55-7 — Click-to-inspect panel
 
-Clicking a node opens a right-side slide-in details panel (320 px wide):
+A right-side slide-in inspector (`width: min(360px, calc(100% - 20px))`): name,
+area badge, status pill, image ref, upstream / downstream neighbours, provider
+data types + quota, replica / restart / request rate / P99 / error rate, and for
+jobs the schedule block (`purpose`, cron expression, "Scheduled · Controller
+timezone" or "Suspended"). Traffic renders for every live area, **not** only
+`internal` — cachest and openst are probed services in `data-providers` and their
+traffic was invisible until a gate was removed. The cachest per-upstream latency
+table renders only when `cachestProviders` is non-empty (see the known defect
+above).
 
-- Service name, area badge, status pill
-- Current version and image ref (for internal services)
-- Upstream / downstream neighbours (derived from graph edges)
-- For `data-provider` nodes: data types supplied, quota limits
-- For `internal` services: replica count, restart count, request rate, P99
-  latency, error rate (from `/topology/traffic`)
-- For the **cachest** node specifically: per-upstream-provider P99 latency table
-  (`cachestProviders` from `/topology/traffic`), showing response times for
-  `openst`, `alphavantage.co`, `financialmodelingprep.com`, `dividendhistory.org`
-  — populated when D56 is live; section hidden otherwise
-- Quick-link to the relevant Admin tab where one exists:
-  e.g. "Currency Rates" for fxsync, "Jobs" for stooq-importer, "System" for
-  all backend services
-
-Clicking a node also:
-1. Highlights that node with a coloured ring
-2. Highlights directly connected edges and their endpoints (full opacity)
-3. Dims all unrelated nodes and edges (opacity: 0.2)
-
-Clicking the canvas background resets the selection to show all nodes at full
-opacity.
+Clicking highlights the node with a ring, keeps connected edges at full opacity
+and dims the rest to 0.25; clicking the pane resets. `Escape` closes the panel.
 
 ### D55-8 — Graph controls
 
-A floating toolbar anchored to the top-right of the canvas:
-- Zoom in / zoom out
-- Fit to screen
-- Reset view (restore default zoom and pan position)
-- Search input (case-insensitive substring match against node label; matching
-  nodes are highlighted, non-matching nodes dimmed)
-- Filter pills: **All** | **Internal** | **Storage** | **Jobs** |
-  **External** | **Providers**
+Toolbar: search (case-insensitive substring, dims non-matches), per-area filter
+pills, Re-layout, zoom in / out, Fit view. Theme switch (Light / Auto / Dark),
+Pause effects and Focus mode sit in the header; Focus mode hides the stats row
+and gives the canvas `calc(100dvh - 285px)`.
 
 ### D55-9 — Layout
 
-`dagre` hierarchical layout (LR direction). The static graph definition
-provides a recommended rank/group hint per node so dagre produces a stable
-left-to-right flow: `Providers → openst/cachest → Instruments/Wallets →
-Gateway → SPA`, with storage and jobs arranged in their own ranks below.
+> **as-built correction, twice.**
+>
+> **Direction.** The plan said left-to-right ranks. What shipped is
+> `rankdir: "RL"`: every request edge points upstream (SPA → gateway → services →
+> providers), so right-to-left rank assignment puts the data flow left-to-right on
+> screen — the intended reading — without inverting the edge list.
+>
+> **Lanes.** The plan described "faint translucent rounded rectangles". What
+> shipped is stronger: each area is a **vue-flow parent node** (`LaneNode.vue`),
+> its members are children with `extent: "parent"` so a box is physically
+> bounded and can never overlap a sibling, and dragging a lane header moves the
+> whole group with `clampLaneMotion` binary-searching the largest collision-free
+> displacement against `LANE_BOUNDS`. Positions persist to localStorage under
+> `pfire.topology-layout.v1` and are applied **only when the stored id set
+> matches the graph exactly**, so any node add/remove invalidates a saved layout
+> and falls back to a fresh dagre pass. The Re-layout button is the manual
+> escape hatch.
 
-Area swim lanes are drawn as faint translucent rounded rectangles behind each
-group, providing visual grouping without heavy borders.
+`packAreas` runs a deterministic greedy pass that pushes each lane down until it
+clears every already-placed lane, guaranteeing pairwise-disjoint lanes while
+leaving the horizontal column reading intact. `ISOLATED_ANCHORS` pins edge-less
+nodes (`scanst`, `mastra-ticker`) next to their logical column, because dagre
+v3 ignores `minRank`/`maxRank` and would otherwise fling them to the far rank
+and stretch their lane across the canvas.
+
+> **Known limitation.** Packing downward is what makes the canvas tall and
+> narrow, which forces `fitView` to zoom out and is the direct cause of the
+> unreadable-node complaint. Changing the pack axis to horizontal is §80.5.
 
 ### D55-10 — Dark/light mode
 
-All custom node and panel colours use Tailwind's `dark:` variant classes.
-The Vue Flow canvas background is set to `bg-slate-50 dark:bg-slate-950`
-(matching the app body). Edge stroke colours reference CSS variables
-(`--color-slate-300` / `--color-slate-600`) so they adapt automatically.
+Node and panel colours use Tailwind `dark:` variants; edge strokes reference
+CSS variables. The stage is a fixed dark "mission control" surface in both
+themes — the header switch drives the app theme store, and the tab follows.
 
 ### D55-11 — Backend contract additions
 
-Two new schemas added to `portfoliost-contracts/contracts/openapi.yaml`:
-
-- `TopologyStatusResponse` (described in D55-4 above)
-- `TopologyTrafficResponse` (described in D55-4 above)
-
-After adding schemas: bump contracts patch version via CI, run
-`NODE_AUTH_TOKEN=$(gh auth token) npm install @marx2/contracts@<new>` in
-`portfoliost` and `portfoliost-admin`, run `npm run gen:types` in both
-consumers, commit updated lockfiles and `api-types.d.ts`.
+`portfoliost-contracts/contracts/openapi.yaml` carries
+`TopologyStatusResponse`, `TopologyServiceStatus`, `TopologyTrafficResponse`,
+`TopologyServiceTraffic`. Consumers regenerate with `npm run gen:types` from
+`../portfoliost-contracts/contracts`.
 
 ---
 
 ## What is NOT in scope
 
-- No CPU/memory/disk charts per service.
+- No CPU/memory/disk charts per service beyond the storage rows' scalar readouts.
 - No log viewer integration.
 - No historical traffic graphs or time-series dashboards.
 - No Kubernetes deployment controls (restart, scale, rollout).
-- No changes to the existing System tab.
 - No replacement of Grafana or any existing monitoring tooling.
+- No live execution health for CronJobs — declared schedule only, by design.
 
 ---
 
-## Implementation plan
+## Delivery record
 
-Each step ships as one commit, passing its specified test(s) before the step
-is marked complete.
+All fourteen original steps shipped; the closeout is in `plan-archive.md`.
+Test coverage that locks the behaviour:
 
-- [x] **Step 1** — Add `TopologyStatusResponse` + `TopologyTrafficResponse` to `openapi.yaml`; bump contracts; regenerate `api-types.d.ts` in admin + portfoliost
-  - _Test:_ Contract compile passes in both repos
-- [x] **Step 2** — Implement `GET /api/admin/topology/status` in `portfoliost-admin` (fan-out `/__meta` + Prometheus k8s queries with graceful fallback)
-  - _Test:_ Unit: mock Prometheus, verify fallback path
-- [x] **Step 3** — Implement `GET /api/admin/topology/traffic` in `portfoliost-admin` (prefer D56 OTel `http_server_request_duration_seconds` when available; fall back to nginx-ingress metrics; include `cachestProviders` from cachest's `http_client_request_duration_seconds`)
-  - _Test:_ Unit: mock Prometheus OTel metrics path + ingress fallback path; verify `cachestProviders` populated from cachest per-`server_address` histogram
-- [x] **Step 4** — Install `@vue-flow/core` + `@dagrejs/dagre` in `portfoliost`
-  - _Test:_ Build passes, no TS errors
-- [x] **Step 5** — Write `graph-definition.ts` (all nodes, edges, provider metadata)
-  - _Test:_ Snapshot: all expected node IDs and edge source/target pairs present
-- [x] **Step 6** — Implement custom node components (one per area) with status dot logic
-  - _Test:_ Visual review
-- [x] **Step 7** — Implement `useTopologyStore` (Pinia, polls both endpoints, maps to node status)
-  - _Test:_ Unit: correct status mapping for all `impl` values and Prometheus states
-- [x] **Step 8** — Implement `TopologyView.vue`: Vue Flow canvas + dagre layout + swim-lane backgrounds
-- [x] **Step 9** — Implement edge animation (active vs. idle, CSS animated dash with moving dot)
-  - _Test:_ Visual review
-- [x] **Step 10** — Implement click-to-inspect details panel + selection highlighting/dimming
-  - _Test:_ Playwright: click node → panel visible; click background → panel closed
-- [x] **Step 11** — Implement toolbar (zoom/fit/reset/search/filter pills)
-  - _Test:_ Playwright: search filters nodes; filter pill toggles area visibility
-- [x] **Step 12** — Add route + tab entry in `AdminLayout.vue` + `router/index.ts`
-  - _Test:_ Playwright: admin user can navigate to `/en/admin/topology`
-- [x] **Step 13** — Dark/light mode QA pass
-  - _Test:_ Visual review in both modes
-- [x] **Step 14** — Add `PROMETHEUS_URL` env var to homelab HelmRelease for `portfoliost-admin`; verify live status dots appear in cluster
-  - _Test:_ Manual smoke test in cluster
+| Layer | File | Locks |
+|---|---|---|
+| unit | `tests/unit/modules/admin/topology-graph-definition.test.ts` | 39 node ids, 47 edge pairs, area counts, `live` set, job metadata, snapshot |
+| unit | `topology-layout.test.ts` | determinism, chain direction, lane ordering, no overlap, members inside lanes, `packAreas`/`nearOverlap` |
+| unit | `topology-store.test.ts` | polling, per-endpoint failure isolation, `nodeData` merge |
+| unit | `topology-filters`, `topology-selection`, `topology-edge-state`, `topology-lane-motion`, `topology-persistence`, `topology-node-status` (one `.test.ts` each) | search/area filters, selection dimming, edge state, lane clamping, layout cache validity, dot grading |
+| e2e | `tests/e2e/topology.spec.ts` | tab reachable, canvas renders, filters, panel open/close, keyboard |
+| backend | `portfoliost-admin/src/topology.test.ts`, `index.test.ts` | endpoint shapes, Prometheus degradation paths |
 
 ---
 
-## Open questions resolved
+## Design decisions (resolved)
 
-**Q: Should the existing System tab be replaced?**
-No. The Topology tab is additive. The System tab retains its flat-list view for
-quick version lookup.
+**System tab replaced?** No. Additive; System keeps its flat list for quick
+version lookup.
 
-**Q: Static graph definition vs. auto-discovered topology?**
-Static definition for nodes/edges/provider metadata; live overlay for status
-and traffic. The topology is stable and well-understood. Full dynamic discovery
-would add significant backend complexity for negligible benefit at this scale.
+**Static graph or auto-discovery?** Static definition for nodes, edges and
+provider metadata; live overlay for status and traffic. The topology is stable
+and well-understood; full dynamic discovery would add backend complexity for no
+benefit at this scale.
 
-**Q: Where does Prometheus access live?**
-Inside `portfoliost-admin` as a thin proxy. The admin pod already queries the
-Kubernetes API in-cluster (`@kubernetes/client-node`); adding Prometheus HTTP
-queries is the same pattern. Prometheus is not exposed to the browser.
+**Where does Prometheus access live?** Inside `portfoliost-admin` as a thin
+proxy. The admin pod already queries the Kubernetes API in-cluster; Prometheus
+HTTP queries are the same pattern and keep Prometheus off the browser.
 
-**Q: Graph library choice?**
-`@vue-flow/core`. Vue 3 native, TypeScript-first, custom node/edge rendering,
-built-in zoom/pan, animated edges, active maintenance. Optimal for this graph
-size and visual quality bar.
+**Graph library?** `@vue-flow/core` — see D55-1.
+
+---
+
+## Known drift, 2026-10-02
+
+Two things in this document were true when written and are not now. Both are
+scheduled in `plan.md` §80.
+
+1. **The cronjob list in both tabs is stale.** The System tab's hardcoded
+   `CRONJOBS` array (`jobs-version.ts`) and the graph's job nodes have drifted
+   from the cluster: `portfoliost-wallets-fxsync` no longer exists (FX ownership
+   moved to instruments in §48.6a), and `corpbondsync`, `fundcategorysync` and
+   `snapshotsync` are missing from both tabs. §80.1–80.3.
+2. **Nodes are too small to read, and the lane axis is wrong for a wide
+   screen.** `NODE_SIZES` (28–40 px tall) drives dagre spacing, the rendered box
+   is 12 px text on a 28 px provider pill, and `fitView` then shrinks a tall
+   canvas further. §80.4–80.5.
