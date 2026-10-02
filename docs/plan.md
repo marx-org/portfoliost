@@ -25,6 +25,14 @@ only the portfolio owner can take — three are edits to the source spreadsheet,
 is a decision. Nothing here is a queue I can grind through, and each one blocks
 work that is otherwise ready.
 
+**Two of the four are now closed (2026-10-02), and one of them moved.** §78.1
+(XTB's funding) was answered by the owner and is superseded by **§87** — XTB never
+holds cash, so the fix is a sell-side cash leg in the importer plus an `AU` flip on
+its ten trade rows, not a `Wpłata` row. §78.3's decision was accepted: the six
+bonds' pre-sale history is unrecoverable. What remains for you is **§78.2** (the
+IKE Marek `Gotówka` series, and the IKE Beata rows) and **§78.4** (the CI
+decision). §78.5 and §78.6 stay parked until §78.2 lands.
+
 **Everything below this line needs no `--wipe`.** The wipe ran today at 14:16 UTC
 and the incremental import reports `inserted=0 skipped=2368`, so the database is
 already exactly what the sheet says. Adding rows and re-running the *incremental*
@@ -64,14 +72,24 @@ as the **AU flag**, and `parseRow` *throws* on a `Wpłata`/`Wypłata` row whose 
 flag is 0 — the whole import aborts. So a plausible-looking `0` there costs you
 every row in the sheet, not just this one.
 
-- [ ] Add the row above, re-import, confirm the unfunded-portfolio finding clears
+- [x] Add the row above, re-import, confirm the unfunded-portfolio finding clears
       and `invested` stops being 0
-      > **Then:** I re-measure XTB's worst single-day move (flow-adjusted) and
-      > re-run §65.1's −25% bar across all ten.
-- [ ] Decide whether XTB's `Gotówka` column should exist at all
-      > Not blocking. The recon (§63.4) derives cash from the ledger, so the row
-      > above is sufficient; a `Gotówka XTB` column would only make the recon
-      > cross-checkable for this one account.
+      > **Superseded by §87.4 — this row is withdrawn, not deferred.** The owner
+      > established on 2026-10-02 that XTB never holds cash: it is deposit→buy and
+      > sell→withdraw, all ten trade rows. §87.1 adds the missing sell-side
+      > `WITHDRAWAL`, so flipping XTB's 5 `Kupno` + 5 `Sprzedaż` to `AU=1` closes
+      > the account at ≈0 with no spreadsheet row at all. The `2 716,60` figure
+      > above is the trap this avoids: it is the buy total only, so a lone
+      > `Wpłata` row would have pinned `invested` at `2 716,60` for the rest of
+      > time and re-created the offset it was meant to remove. The insertion point
+      > worked out for it (sheet row 138, above the first `Kupno`) is not needed.
+- [x] Decide whether XTB's `Gotówka` column should exist at all
+      > **No — 2026-10-02.** The `Gotówka` sheet's account columns are `ING ROR`,
+      > `OKO wspolne`, `OKO Obligacje`, `Smart Saver/PKO SA/OKO Rudnik`,
+      > `Inteligo ROR`, `IKE Marek`, `IKE Beata`, `IB` — no XTB, and none is
+      > needed: §63.4's recon derives cash from the ledger, which is what §87.4
+      > makes correct. A column would only make the recon cross-checkable for this
+      > one account.
 
 ### 78.2 — IBKR / IKE Marek / IKE Beata: the Transakcje rows are missing, not Gotówka
 
@@ -97,6 +115,17 @@ full history. A check reporting a figure about itself.
 
 - [ ] Add the missing Transakcje rows for IBKR and IKE Beata
       > **Then:** I re-run the dry sync and confirm both deltas fall toward zero.
+      > **The IBKR half is measured against a sheet that has since changed
+      > (2026-10-02)** and its `+18 734,93` cannot be closed by what moved. The
+      > owner normalised all three of IB's `AU=1` trades to `AU=0` — rows 1565,
+      > 1646, 1805 (3 funded `Kupno`s, 9 975,17 PLN / 2 344,88 EUR of `DEPOSIT`s
+      > that were genuinely being posted) and row 1852, the 40-share ASRNL exit
+      > that was already inert. Those three buys were the only IB rows posting any
+      > cash, so the gap can shrink by at most 9 975,17 and still stands at
+      > ≥ `+8 759,76`; flipping 1852 changed nothing because the sell branch was
+      > already inert outside `Equate+` (§87.1). Re-measure before chasing this
+      > one — the number above is arithmetic on a prior measurement, not a fresh
+      > reading.
 - [ ] **IKE Marek is the one to look at first** — a *negative* Δ means the sheet
       records money the app has no record of. That is not a missing row; it is a
       row whose `Typ`/`Aktywo` the importer does not read as a deposit. Give me
@@ -1123,3 +1152,271 @@ order that costs a three-provider equity spin on every bond lookup.
          probe order.** Same dispatch as §86.8, deferred because
          `InstrumentDetail` has no `keyFacts` field yet.
 - [ ] Commit `docs(spa): document KeyFactsCard and record the remaining class gaps`
+
+---
+
+## 87. Withdrawal-on-sell, and a per-account "cash leg" switch (2026-10-02)
+
+Owner-driven. Supersedes the `Wpłata`-row remedy proposed in §78.1: the owner
+closed XTB with cash that never rests (deposit→buy, sell→withdraw), so the fix
+is a **code path that already exists for buys and is missing for sells**, not a
+new spreadsheet row per account.
+
+**The asymmetry, measured in the code today.** `sheets-sync/src/transakcje-mapper.ts`
+already posts an external cash leg for a funded trade — but only one direction of
+it:
+
+| sheet row | `Typ` | col 47 `wpłata/wypłata` | cash row posted | anchor |
+|---|---|---|---|---|
+| any kontо | `Kupno` | `1` | `DEPOSIT`, `${externalId}#d` | `transakcje-mapper.ts:387-404` |
+| `Equate+` only | `Sprzedaż` | `1` | `TRANSFER` → `IBKR`, `#t` | `:405-419`, gated on `SALE_PROCEEDS_TO` (`:23`) |
+| every other kontо | `Sprzedaż` | `1` | **nothing** | `:411-413` — "the derived SELL +X IS the proceeds in place" |
+| any kontо | `Wpłata`/`Wypłata` | `0` | — | parser **throws**, `transakcje-parser.ts:118-119` |
+
+So a funded buy is a round trip (deposit nets the derived `BUY −notional` to ≈0)
+and a funded sell is not (the derived `SELL +notional` credit stands alone with
+no offsetting outflow). `invested` reads it exactly: `backfill.ts:1165-1168` —
+"cumulative net EXTERNAL cash flow … deposits − withdrawals ± transfer legs",
+position cost basis deliberately excluded. AU flags therefore decide whether a
+portfolio has flows at all, and today a sell can never contribute one.
+
+**Sheet state, measured read-only 2026-10-02** (spreadsheet
+`1iDzR0OTHvqPbjjRSnAI4SdoD7sZOGy8uT9991sPFFps`, `Transakcje!A1:AU`, 2041 data
+rows). `Sprzedaż` rows carrying `AU=1`:
+
+| kontо | `Sprzedaż` `AU=1` | rows | `Wartość transakcji` | status |
+|---|---|---|---|---|
+| `Equate+` | 39 | — | — | already on the transfer path |
+| `Rach. rejestrowy PKO BP` | 2 | 131, 132 | 8 500,00 PLN | inert today |
+| `Crypto` | 3 | 317, 1180, 1181 | 39,33 USD + 113,40 EUR + 55,26 EUR | inert today |
+| `IB` | 0 | — | — | settled 2026-10-02, see below |
+
+All five inert rows read as deliberate — each is a sale whose cash left the
+investment account, which is precisely what a `WITHDRAWAL` means. Contrast the
+accounts that keep proceeds in place: `IKE Beata` 54 sells all `AU=0`,
+`IKE Marek` 36 all `AU=0`.
+
+**`IB` is a cash-holding account and stays out of this section.** The owner
+normalised it on 2026-10-02: its 3 funded `Kupno` rows (1565, 1646, 1805 — all
+ASR Nederland, 40 shares, 9 975,17 PLN / 2 344,88 EUR of `DEPOSIT`s that were
+already being posted) went to `AU=0` alongside row 1852, the 40-share exit that
+had been its matching withdrawal. `IB` now reads 387 `Kupno` / 91 `Sprzedaż` /
+448 `Div` / 2 `Split`, **every trade at `AU=0`**, and its flows come only from 41
+`Wpłata` + 5 `Wypłata` rows at `AU=1` — the explicit-deposit pattern, which is
+the correct shape for an account that does hold cash. It is worth recording
+because IB is the account that *looked* like XTB's twin: 3 funded buys in, one
+full exit out. Had 1852 been left at `AU=1`, §87.1 would have closed it at 0 by
+accident. It is deliberately the "proceeds stay put" case instead.
+
+**Design decisions (resolved).**
+- **A `Sprzedaż` row with `AU=1` posts a `WITHDRAWAL` **from the row's own
+  portfolio**, in the row currency, amount `rowCcyCash(row)` — the same col 19 ÷
+  col 21 helper the buy's `DEPOSIT` uses (`:100-104`). It is the exact mirror of
+  `:396-404`, so a funded sell nets to ≈0 the way a funded buy already does.
+- **For kontо on §87.3's list the cash leg is forced and `AU` is not consulted at
+  all** — the owner's rule is "listed portfolios always force cash transactions to
+  be created, not listed still check AU=0/1". This is what removes every
+  spreadsheet edit from the section.
+- `Equate+` keeps its `TRANSFER` → `IBKR` leg. The `SALE_PROCEEDS_TO` gate moves
+  from "the only kontо that gets an outflow" to "the only kontо whose outflow is a
+  transfer rather than a withdrawal", which is what it was modelling in the first
+  place (`:40-54`).
+- `AU=0` on a trade stays "pure replay, no cash row" (`:386`). Unchanged.
+- New cash legs use the documented suffix convention `#d` / `#w` / `#t`
+  (`:137`, `sync.ts:190`).
+
+**Repos touched: three** — `portfoliost-sheets-sync` (the mapper),
+`portfoliost-wallets` (the link + the cascade), `portfoliost` (the SPA setting).
+Flagged here because it crosses more than two.
+
+---
+
+### 87.1 — Sell-side cash leg in the mapper
+
+- [ ] `transakcje-mapper.ts:405` — split the branch: `SALE_PROCEEDS_TO.has(konto)`
+      keeps the existing `TRANSFER` → `IBKR` payload unchanged; every other kontо
+      with `row.au` on a `Sprzedaż` row posts
+      `{ type: "WITHDRAWAL", currency: row.currency, amount: rowCcyCash(row) }`
+      with `externalId: ${row.externalId}#w` and
+      `description: "Withdrawal: <aktywo>"` (mirroring `:396-404`).
+- [ ] Leave the comment at `:411-413` rewritten, not deleted — it is the reason
+      the gate existed and the reason it is now narrower.
+- [ ] Tests in `src/transakcje-mapper.test.ts`, alongside the existing
+      `"AU=1 Kupno: trade leg + DEPOSIT cash leg (#d)"` (`:93`):
+      1. `Sprzedaż` + `AU=1` on `XTB` → `WITHDRAWAL`, `#w`, PLN col 19 ÷ col 21
+         into the row currency, and the derived `SELL` still present.
+      2. `Sprzedaż` + `AU=1` on `Equate+` → still the `TRANSFER` pair, unchanged
+         (regression guard on the narrowed gate).
+      3. `Sprzedaż` + `AU=0` → no cash row at all.
+      4. A funded buy then a funded sell on the same kontо nets the account to
+         ≈0 — the §78.1 outcome, asserted on mapper output rather than on PROD.
+- [ ] `npm run test && npm run build` in `portfoliost-sheets-sync`; commit
+      `feat(sheets-sync): post a WITHDRAWAL for AU=1 sell rows outside Equate+`.
+
+### 87.2 — 1:1 link between a trade and its cash leg
+
+The two rows are created together and must die together. Nothing links them
+today: `linked_tx_id` (`wallets/src/db/schema.ts:122`) is documented as the
+cross-currency **transfer pair** link (`:100`) and carries no FK and no cascade,
+and `transactions` has no cash column at all. The delete paths are
+independent — `DELETE /:id/transactions/:txId` deletes only the trade
+(`portfolio-transactions.ts:712`, delete at `:793`) and
+`DELETE /cash/transactions/:txId` deletes only the cash row
+(`portfolio-cash.ts:659`). Only the source wipe knows about both
+(`import.ts:754`).
+
+**Design decisions (resolved, owner 2026-10-02).**
+- **A real FK, nullable, and it lives on the CASH row pointing at the TRADE** —
+  `portfolio_cash_transactions.linked_trade_id uuid NULL REFERENCES
+  portfolios.transactions(id)`. Not the other way round, and not by reusing
+  `linked_tx_id`. The direction is what makes both deletes work with **zero
+  application logic**:
+  - delete the trade → the FK's `ON DELETE CASCADE` takes the cash row with it;
+  - delete the cash row → the link dies with the row and the trade is untouched,
+    because the link *was* the cash row.
+  The reverse layout (`transactions.cash_tx_id`) would need hand-written cascade
+  in `portfolio-transactions.ts:793` for the direction that matters most — silently
+  orphaning a money row when someone deletes a trade — so it is the wrong end to
+  put the key on.
+- **Nullable, so it exists only when a related cash transaction exists.** `AU=0`
+  trades, and every hand-written `Wpłata`/`Wypłata`, stay `NULL`. No row, no key,
+  no sentinel.
+- **Edits are explicitly out of scope.** Changing a funded trade's amount, price
+  or date does **not** re-derive its cash row; the pair is allowed to drift.
+  Accepted by the owner rather than solved — it is recorded here so the drift is a
+  decision and not a bug report later.
+
+- [ ] `drizzle/0014_cash_leg_link.sql` — `ALTER TABLE
+      portfolios.portfolio_cash_transactions ADD COLUMN IF NOT EXISTS
+      linked_trade_id uuid REFERENCES portfolios.transactions(id) ON DELETE
+      CASCADE;` plus `CREATE INDEX IF NOT EXISTS
+      portfolio_cash_transactions_linked_trade_id_idx ON
+      portfolio_cash_transactions (linked_trade_id);` — **unqualified index name**,
+      because PGlite rejects schema-qualified ones. Same file registers the column
+      on `schema.ts`. Wallets runs `npm run db:migrate` as its container `CMD`, so
+      the migration applies on the next rollout; `pfire-init-sql` needs no change
+      (it carries only the `postgres_fdw` server and the `instruments.stooq_daily_*`
+      foreign tables — zero wallets DDL).
+- [ ] **Backfill all 362 existing pairs.** The link is fully derivable from the
+      `#d`/`#t` suffix convention: verified in PROD, `left(external_id,
+      length(external_id)-2)` matches a trade for **362 of 362** suffixed cash rows
+      (324 `#d` DEPOSIT + 38 `#t` TRANSFER), with 1 977 of 1 977 trades carrying an
+      `external_id`. One `UPDATE … FROM` in the same migration. `linked_tx_id` is
+      left alone — it is the cash↔cash transfer pair and means something else.
+- [ ] Set `linked_trade_id` at import time, in the same transaction as the insert,
+      so a partial import cannot leave one leg unlinked. Requires the import to know
+      the trade's id when it writes the cash row — today `import.ts` builds both
+      from the same `externalId`, so it must capture the returned trade id rather
+      than re-derive it.
+- [ ] Leave both delete handlers alone. `portfolio-transactions.ts:793` needs no
+      change (the cascade fires); `portfolio-cash.ts:665` needs no change (the link
+      is the row). Confirm `recomputePortfolioTotals` still runs **once** per
+      request, not once per leg.
+- [ ] Tests: `DELETE` the trade → the cash row is gone and the balance moved once,
+      asserted by cascade not by application code; `DELETE` the cash row → the trade
+      survives with `linked_trade_id` now `NULL` on nothing (the column is on the
+      deleted row) and the position quantity unchanged; deleting an **unlinked**
+      cash row (a hand-written `Wpłata`) leaves everything else alone; an `AU=0`
+      trade imports with no cash row and nothing to point at.
+- [ ] `npm run test && npm run build` in `portfoliost-wallets`; commit.
+
+### 87.3 — The kontо list: which accounts always get a cash leg
+
+**Owner decision 2026-10-02: no spreadsheet edits at all.** The kontо that get a
+cash leg on every trade are decided **in code**, not by flipping col 47 row by row
+— "listed portfolios always force cash transactions to be created, not listed
+still check AU=0/1". So the AU flips this section originally called for are
+redundant: `NN TFI PPK`'s 3 sells and `NN TFI PPO`'s 1 sell stay at `AU=0` and
+still produce withdrawals, and XTB's 10 rows stay at `AU=0` and still round-trip.
+
+The list, and why each entry is on it:
+
+| kontо | on the list because |
+|---|---|
+| `Equate+` | separate path — keeps the `TRANSFER` → `IBKR` sale simulation (`SALE_PROCEEDS_TO`) |
+| `Crypto` | instant cash; 2 buys + 3 sells already at `AU=1`, consistent with the rest |
+| `NN TFI PPK` | instant cash; 90 of 91 buys already `AU=1`, only its 3 sells disagree |
+| `NN TFI PPO` | same shape; 80 of 81 buys `AU=1` |
+| `Obligacje PKO SA Beata` | 2 buys, both `AU=1` |
+| `Rach. rejestrowy PKO BP` | 24 buys + 2 sells, all `AU=1`; the 2 sells are the inert rows 131/132 |
+| `XTB` | the §78.1 case — deposit→buy, sell→withdraw, never holds cash |
+
+**Deliberately NOT on it:** `IB` (every trade `AU=0` as of 2026-10-02; its flows
+are 41 `Wpłata` + 5 `Wypłata` rows — it genuinely holds cash), `IKE Marek` (36
+sells `AU=0`) and `IKE Beata` (54 sells `AU=0`), where sale proceeds stay in the
+account.
+
+- [ ] Add `const ALWAYS_CASH_LEG = new Set([...])` to
+      `portfoliost-sheets-sync/src/transakcje-mapper.ts`, beside the existing
+      `SALE_PROCEEDS_TO` (`:23`) and `KOTO_MAP`. Keep the three constants adjacent
+      and cross-reference them in one comment block — this is now three curated
+      lists about the same accounts and the next reader needs to see all three.
+- [ ] Resolution order in `mapRow`: `SALE_PROCEEDS_TO` (transfer) → listed kontо
+      (deposit on buy, withdrawal on sell) → `row.au` (deposit on buy only, as
+      today). Equate+ is checked first so its transfer path is untouched.
+- [ ] Tests: a listed kontо at `AU=0` still gets both legs (the XTB case, asserted
+      on mapper output — 5 buys + 5 sells netting to ≈0); an unlisted kontо at
+      `AU=0` gets neither; an unlisted kontо at `AU=1` gets the buy deposit and
+      still no sell leg (today's behaviour, unchanged); Equate+ still transfers.
+- [ ] **`sheets-sync` has no `@marx2/contracts` dependency** (the SPA and wallets
+      both pin `^1.6.61`), so the list cannot be shared through contracts without
+      adding one. Follow the existing convention: the constant lives in the mapper,
+      and §87.5's wallets copy carries a pointer comment back to it. Record the
+      duplication rather than pretend it is shared.
+- [ ] Deploy, then re-run the **incremental** sync (Admin → Jobs → "Sync sheet",
+      not "Wipe & Reimport"). §69.3 re-backfills every touched portfolio from its
+      first trade, so nobody presses Recompute.
+- [ ] Verify: `invested` now tracks real cash in/out for the six listed accounts
+      instead of sitting flat, no account's balance goes negative on a day it was
+      actually empty, and `IB` / `IKE Marek` / `IKE Beata` are bit-identical to
+      before the deploy.
+
+### 87.4 — XTB closes at 0, with no sheet edit
+
+- [ ] **No owner action.** XTB goes on §87.3's list; its 5 `Kupno` and 5
+      `Sprzedaż` rows stay at `AU=0` and the round trip is forced by the importer.
+      Compare the two routes: the withdrawn `Wpłata` row would have pinned
+      `invested` at `2 716,60` permanently (buys only — the `2 957,88` of sales
+      and the `+241,28` realised were never in it), which is the offset §78.1 was
+      written to remove. The sheet row 138 insertion point worked out for it is
+      not needed either.
+- [ ] Assert XTB closes: external flow nets to ≈0 across 2022-02-11 → 2026-10-02
+      and `invested` on the final snapshot is ≈0 rather than `2 716,60` or `0.00`
+      for the wrong reason. Baseline captured 2026-10-02: 1 695 snapshots, every
+      row `invested = 0.00`, opening net `−1.90`, total return `−24.08`, and the
+      `9.49 → −4.04` day on 2022-02-17.
+- [ ] Then §78.5's verification applies to XTB unchanged and §78.6's
+      `moneyWeightedReturn` re-measure finally has a flow series to read.
+
+### 87.5 — Per-account setting: "generate cash transaction on buy/sell" (UI only)
+
+**Owner decision 2026-10-02: the setting is UI-only and never touches the import.**
+Two independent mechanisms, deliberately:
+
+- **Import** — hardcoded kontо list, §87.3. Listed → always a cash leg. Not listed
+  → obey col 47. The spreadsheet's `AU` keeps its meaning for every account not on
+  the list, so the sheet never lies about an account it governs.
+- **UI** — a per-portfolio boolean. The transaction form pre-ticks the "also create
+  a cash transaction" checkbox from it, so the box reflects what will actually
+  happen; the user can still untick it per transaction.
+
+- [ ] `portfolios.portfolios` gains `cash_leg_on_trade boolean NOT NULL DEFAULT
+      false`, plumbed through `@marx2/contracts` (`^1.6.61`), the wallets portfolio
+      routes, and the SPA's portfolio settings form. Default `false` so no existing
+      account changes behaviour on deploy.
+- [ ] Seed the default from §87.3's list for the seven listed kontо — otherwise the
+      UI would show "no cash transaction" for XTB while the importer creates one
+      anyway, which is the exact disagreement this setting exists to prevent.
+- [ ] The SPA's buy/sell form reads the portfolio's flag, pre-ticks the checkbox,
+      and on submit creates the cash row through §87.2's `linked_trade_id`, so a
+      UI-created pair behaves identically to an imported one. Unticking skips it.
+- [ ] The import path must **not** read this column. Add a test asserting an
+      imported `AU=0` trade on an account with the flag on still imports with no
+      cash row — the two mechanisms stay independent.
+- [ ] Tests: flag on → a UI-created buy yields a linked cash row and deleting the
+      buy removes it; flag off → no cash row; a listed kontо shows the box pre-ticked
+      on open; un-ticking per transaction is honoured; and the independence test
+      above.
+- [ ] `npm run build && npm run test` (SPA), `npm run test:mock && npm run test:e2e`
+      against a rebuilt compose stack; commit per repo.
+
