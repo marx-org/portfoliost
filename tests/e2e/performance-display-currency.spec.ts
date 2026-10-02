@@ -96,3 +96,92 @@ test("performance chart converts the series (and axis) to the display currency",
   const ticks = await yTicks(page)
   expect(ticks.every((t) => !t.symbol.includes("$")), "no $ symbol over converted values").toBe(true)
 })
+
+/** §82.5 — the overview card's Net gain tile and the yearly table's Gain column
+ *  share ONE rate (`useDisplayConversion().convert`), and the yearly Σ footer is
+ *  asserted equal to the tile on screen. That equality is the property: it can
+ *  only hold because both read the same conversion, so a regression in either is
+ *  one assertion away.
+ *
+ *  Yearly is gated to the `ALL` timeframe (`analytics` is timeframe-filtered
+ *  server-side), so this drives ALL → Yearly rather than relying on a default. */
+async function token(request: import("@playwright/test").APIRequestContext) {
+  const res = await request.post(`${MOCK}/api/auth/login`, {
+    data: { email: "demo@example.com", password: "example-service-mock" },
+  })
+  return ((await res.json()) as { access_token?: string }).access_token ?? ""
+}
+
+/** "zł 11,599.01" / "$11,599.01" → 11599.01. Returns null for the "—" placeholder. */
+function parseMoney(text: string): number | null {
+  const cleaned = text.replace(/[^0-9.,-]/g, "")
+  if (!cleaned) return null
+  return Number(cleaned.replace(/,/g, ""))
+}
+
+test("overview Net gain tile and yearly Gain column re-convert together (§82.5)", async ({ page, request }) => {
+  const auth = { Authorization: `Bearer ${await token(request)}` }
+  const portfolios = (await (await request.get(`${GATEWAY}/api/portfolios`, { headers: auth })).json()) as Array<{
+    id: string
+    name: string
+  }>
+  const top10 = portfolios.find((p) => p.name === "Top10")
+  expect(top10, "seeded Top10 portfolio").toBeTruthy()
+
+  const detail = (await (
+    await request.get(`${GATEWAY}/api/portfolios/${top10!.id}`, { headers: auth })
+  ).json()) as { baseCurrency?: string }
+  const baseCcy = (detail.baseCurrency ?? "USD").toUpperCase()
+
+  // The seeded history is what it is; read the SAME numbers the SPA will render
+  // so the assertions are against the payload, not against a guess.
+  const analytics = (await (
+    await request.get(`${GATEWAY}/api/portfolios/${top10!.id}/analytics?timeframe=ALL`, { headers: auth })
+  ).json()) as {
+    performance?: { totalReturn?: number; timeSeries?: unknown[]; annualizedReturn?: number | null }
+  }
+  const totalReturn = analytics.performance?.totalReturn ?? 0
+  const pointCount = analytics.performance?.timeSeries?.length ?? 0
+  expect(pointCount, "seeded Top10 has a populated ALL series").toBeGreaterThan(1)
+  expect(totalReturn).not.toBe(0)
+
+  const rate = ((await (await request.get(`${GATEWAY}/api/fx/latest?from=${baseCcy}&to=PLN`, { headers: auth })).json()) as {
+    rate: number
+  }).rate
+  expect(rate).toBeGreaterThan(0)
+
+  await login(page)
+  await page.goto(`/en/portfolios/${top10!.id}/performance`)
+
+  // ALL, then Yearly — the gate is part of the feature under test.
+  await page.getByRole("button", { name: "ALL", exact: true }).click()
+  const yearlyBtn = page.getByTestId("perf-returns-mode-yearly")
+  await expect(yearlyBtn).toBeEnabled({ timeout: 30_000 })
+  await yearlyBtn.click()
+  await expect(page.getByTestId("perf-returns-yearly")).toBeVisible()
+
+  const netGain = page.getByTestId("perf-overview-net-gain")
+  const sumGain = page.getByTestId("perf-returns-yearly-total-gain")
+
+  // Baseline (display USD): the Σ footer IS the Net gain tile, and it is the
+  // payload's `totalReturn` — the §82.3 reconciliation, on seeded data.
+  await expect(netGain).toHaveText(/[\d,]+\.\d\d/)
+  await expect
+    .poll(async () => parseMoney(await sumGain.textContent() ?? ""), { timeout: 15_000 })
+    .toBeCloseTo(totalReturn, 1)
+  expect(await netGain.textContent()).toBe(await sumGain.textContent())
+
+  // Switch the display to PLN: both re-convert by the live rate.
+  await page.getByRole("button", { name: /Display currency:/ }).click()
+  await page.locator("div.absolute.right-0").getByRole("button", { name: "PLN", exact: true }).click()
+
+  await expect
+    .poll(async () => parseMoney(await netGain.textContent() ?? ""), {
+      timeout: 15_000,
+      message: "Net gain tile should re-convert to PLN",
+    })
+    .toBeCloseTo(totalReturn * rate, 0)
+
+  expect(await netGain.textContent(), "tile and Σ footer stay one number").toBe(await sumGain.textContent())
+  await expect(sumGain).toHaveText(/PLN|zł|₺/)
+})

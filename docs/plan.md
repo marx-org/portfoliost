@@ -416,20 +416,88 @@ side-by-side comparison the preferred way to find gaps. This section adds a card
 and a toggle that example-service does not have in this shape, so the comparison is about
 layout, tile styling and wording — not about whether the tiles exist.
 
-- [ ] **Compare before/after with Playwright** against both apps: the Performance
+- [x] **Compare before/after with Playwright** against both apps: the Performance
       tab at the same viewport, plus the a11y tree, and diff the two cards this
       section touched. Record any example-service wording for a money or return tile and
       adopt it verbatim where it does not contradict the proposal's semantics.
-- [ ] **Run the whole suite**: `npm run build` (includes `vue-tsc --noEmit`),
+      > Both at 1280×900, read-only (nothing in example-service's Top10 was touched).
+      > **Section order** — example-service: Performance Chart, Drawdown, Returns Chart,
+      > Return statistics, Top/Bottom Performers. Ours now: **Overview**,
+      > Performance Chart: USD, Drawdown, Returns Chart, Top/Bottom Performers.
+      > **Seven findings, recorded; three adoptable, and the carve-out applies to
+      > all three:**
+      > 1. **Example service has no money tiles on this tab at all** — no net gain, net
+      >    invested, XIRR or TWR p.a. D85's five tiles have no example-service wording to
+      >    match, so the proposal is their only source.
+      > 2. **Example service's excess is in percentage points** — its top strip reads
+      >    `VS SPY · NET TR · USD  12.1 pp (2 Aug - 2 Oct 2026: portfolio
+      >    +15.26%, SPY +3.19%)`. D89's worked example renders the same quantity as
+      >    a **percentage** (`+3.2% / −1.1% / +2.0%`), so adopting "pp" contradicts
+      >    the proposal's own figures. **Not adopted** — this is exactly the
+      >    carve-out the step's sentence provides. Worth revisiting only if the
+      >    proposal is amended.
+      > 3. **Example service's Returns Chart toggle is `Day | Month | Year` and is NOT
+      >    gated to All Time** — it aggregates the selected window into year
+      >    buckets (its own strip still reads "Timeframe: 3 Months"). Our D87 gate
+      >    is a deliberately different semantic: a 3M window has no calendar year
+      >    to report. **Not adoptable.** Example service also labels singular
+      >    (`Year`); D87 specifies `Yearly`. Proposal wins.
+      > 4. Example service's card headings are **H3 and UPPERCASE**, ours H2 and sentence
+      >    case. **Pre-existing across the whole tab**, not introduced by §82 —
+      >    restyling it would touch the four cards §82 did not.
+      > 5. Example service's Drawdown labels carry a trailing colon (`MAX DRAWDOWN:`); ours
+      >    do not. Pre-existing, same reason.
+      > 6. Example service's nearest wording for an invested-capital tile is on the
+      >    **investments** page, as a tooltip: "The external capital the return
+      >    beside it is measured on (the peak of your own money put to work)",
+      >    paired with "Total return since inception: gain divided by the invested
+      >    capital printed beside it". The second **contradicts** D85 (example-service's is
+      >    a percent, our Net gain is money) — not adoptable. The first is a
+      >    genuine superset explanation of "Net invested"; recorded as available if
+      >    a tooltip affordance is ever added.
+      > 7. Example service keeps a **distribution** card (`Return statistics`: Avg daily
+      >    return / Best day / Worst day / Green days / Longest winning streak) on
+      >    the Performance tab. D89 instead leaves Sharpe/Sortino/Calmar/volatility
+      >    on our Risk tab — the same split, different side of the line. Our Risk
+      >    tab already carries them, so adopting example-service's placement would duplicate
+      >    a second copy that can drift. Recorded, not adopted.
+      >
+      > **Live in compose, on the seeded Top10:** Overview reads Net gain
+      > +$11,599.01 / Net invested +$138,083.40 / XIRR +8.40% / **TWR p.a. `—`
+      > with "not enough history yet"**, and the Timing line is **hidden**. That is
+      > §82.1's decision playing out on real seeded data: the §75 seed writes 49
+      > `value_snapshots` rows, below the 60-point floor the shared predicate
+      > imposes. So the Timing tile is unreachable in compose and will first be
+      > seen on PROD, whose portfolios carry 1,663–2,704 points.
+      >
+      > **Reconciliation verified live, not just in fixtures:** the yearly Σ Gain
+      > reads +$11,599.01, which is the Net gain tile reading +$11,599.01, which is
+      > the API's `performance.totalReturn` of 11599.0056. Σ TWR reads × 1.0840
+      > against a +8.40% year. The excess column renders `+8.98%` (portfolio
+      > +8.40% vs SPY −0.58%).
+- [x] **Run the whole suite**: `npm run build` (includes `vue-tsc --noEmit`),
       `npm run test`, `npm run test:mock`, `npm run test:e2e` against
       `docker compose up -d --build`. Rebuild the `portfoliost` container after
       the frontend changes and **restart the gateway** afterwards, or only
       wallets-routed e2e paths will 404 for the wrong reason (see `AGENTS.md`).
-- [ ] **Extend `tests/e2e/performance-display-currency.spec.ts`** with one case
+      > `docker compose up -d --build`, then `up -d --force-recreate gateway` (the
+      > KB's cached-upstream-IP trap; a plain `restart` was also issued after the
+      > mutation rebuild). build green, 577/577 unit, 239/239 mock, **122 e2e
+      > passed / 1 failed / 1 skipped**. The failure is
+      > `tests/e2e/portfolios.spec.ts:289` — the pre-existing KO-search one,
+      > identical cause and line to the failure KB entry 8 records as
+      > reproducing on an unmodified checkout. Not §82's.
+- [x] **Extend `tests/e2e/performance-display-currency.spec.ts`** with one case
       that switches the display currency and asserts both the Net gain tile and
       the Gain column re-convert together — they share a rate, so a regression in
       either is one assertion away.
-- [ ] **Commit** `test(spa): cover the performance overview and yearly returns in e2e`
+      > Drives `ALL` → `Yearly` rather than relying on the default, so the gate is
+      > covered too. **Mutation-verified end-to-end**: dropping the conversion from
+      > the Σ footer (container rebuilt, gateway restarted) fails it with
+      > `Expected: "+PLN 11,599.01" / Received: "+PLN 46,181.23"` — the tile
+      > converted and the footer did not, which is precisely the regression the
+      > assertion exists to catch.
+- [x] **Commit** `test(spa): cover the performance overview and yearly returns in e2e`
 
 ## 83. Cumulative (all-portfolios) Performance tab (2026-10-02)
 
