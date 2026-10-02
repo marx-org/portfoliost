@@ -202,7 +202,6 @@ function synthCashFlow(b, rnd, years = 4) {
       freeCashFlow: round(ocf - capex),
       freeCashFlowGrowth: i === 0 ? null : round(between(rnd, -5, 30)),
       cashFlowFromOperatingActivitiesGrowth: i === 0 ? null : round(between(rnd, -5, 25)),
-      freeCashFlowPerShare: round((ocf - capex) / b.sharesOutstanding, 2),
       capitalExpenditures: capex,
       depreciation: round(capex * between(rnd, 0.6, 1.2)),
       dividendPayment: round(-ocf * between(rnd, 0.05, 0.3)),

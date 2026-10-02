@@ -242,7 +242,7 @@ e2e because the mock seed carries it (`mocks/shared/data/research/AAPL.json`,
 written by `scripts/regen-seed.mjs:205`) — a mock-only artefact masking the gap,
 which is exactly why it survived.
 
-- [ ] **Emit `freeCashFlowPerShare` in the cash-flow mapper**, keyed by fiscal
+- [x] **Emit `freeCashFlowPerShare` in the cash-flow mapper**, keyed by fiscal
       year against the income statement's share count:
       `freeCashFlowPerShare = freeCashFlow / dilutedSharesOutstanding`, joining
       the two arrays on `year` (the income mapper already computes
@@ -254,16 +254,49 @@ which is exactly why it survived.
       > the division (undefined or 0 shares → `undefined`, never `NaN`/`Infinity`),
       > and prefer `diluted_average_shares` over the basic count for
       > consistency with `dilutedSharesOutstanding`.
-- [ ] **Test the mapper** in `src/adapters/translate.test.ts`: aligned years
+      > The year join is not theoretical: measured 2026-10-02, SAP.DE serves 4
+      > income rows and 5 cash rows, and PKO.WA serves a cash row for 2021 with
+      > no income row to match. Both now render `—` for that year instead of a
+      > number paired with the wrong share count. Live after the fix: SAP.DE
+      > 7.16 · PKO.WA 8.40 · AAPL 6.58 for FY2025.
+      > The plan's premise that the income mapper "already computes"
+      > `dilutedSharesOutstanding` was wrong — it matched no key any provider
+      > emits and was empty on every symbol. §79.3 widened it to
+      > `weighted_average_diluted_shares_outstanding`, which is the only name
+      > yfinance emits; without that this step could never produce a value.
+- [x] **Test the mapper** in `src/adapters/translate.test.ts`: aligned years
       produce the quotient; mismatched or missing years produce `undefined`,
       never `NaN`; a zero share count produces `undefined`.
-- [ ] **Drop the value from the mock seed** so it stops masking regressions, or
+- [x] **Drop the value from the mock seed** so it stops masking regressions, or
       keep it and add an assertion that the real mapper path produces the same
       number for the seeded fixture.
       > Prefer removing it: the seed is what let (b) ship unnoticed. If it stays,
       > `regen-seed.mjs:205` must stop being the only source of the field.
       > Tests: `npm run test:mock` and `npm run test:e2e` green.
-- [ ] **Commit** `fix(instruments): emit and correctly format freeCashFlowPerShare`
+      > Removed from the generator and from all 36 committed research bundles —
+      > 144 deleted lines, nothing else in the diff.
+      > Correcting the premise: the seed was **not** what e2e saw.
+      > `docker-compose.yml` pins `API_INSTRUMENTS_URL` to the real instruments
+      > service, so `/api/instruments/*` never reaches the mock unless someone
+      > flips it to `example-service-mock:4010` by hand (`mocks/README.md:76`). The
+      > column has therefore read `—` in e2e and in every browser session, mock
+      > seed or not. Removing it still matters: it is a trap for whoever does
+      > flip that variable, and a mock-seeded value that the real mapper cannot
+      > reproduce is a fake green.
+      > `npm run mock:seed` was deliberately NOT used for this. It is out of
+      > sync with the committed seeds and silently drops two hand-edited
+      > fields — `avatarUrl` from `auth_me.json` and `users_profile.json`, and
+      > `recentSearches` from `users_profile.json` — so running it churns 44
+      > files for a one-key change. That drift is its own defect, not §79's.
+      > `npm run test:mock` 235 passed. `npm run test:e2e` 117 passed, 1 skipped,
+      > 1 failed — `portfolios.spec.ts` "buy position stock step", which is not
+      > this step's: `/api/instruments/search?q=KO` returns 50 rows, all Polish
+      > bonds and funds, with no `KO`-prefixed ticker among them, so the
+      > spec's `/^KO /` button cannot exist. Reproduced twice in a row and the
+      > response was read directly to confirm; the search merge never reaches
+      > the ticker-reference tier for this query. Unrelated to the fundamentals
+      > path and left alone here.
+- [x] **Commit** `fix(instruments): emit and correctly format freeCashFlowPerShare`
       > Split from 79.1a so the mapper and the formatter are independently
       > revertable — a bad join is a data bug, a bad format string is cosmetic.
 
@@ -744,4 +777,3 @@ they go through `queryMapByLabel`, which is why this one query was missed.
 - [ ] **Tests**: `npm run test` green in `portfoliost-admin`; confirm against the
       live cluster that the endpoint returns a non-empty `cachestProviders`.
 - [ ] **Commit** `fix(admin): resolve cachest provider latency through the label fallback`
-
