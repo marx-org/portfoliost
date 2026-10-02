@@ -371,7 +371,7 @@ supported"` for this key on every symbol. `search-symbol` does resolve
 **yfinance is therefore the only source of European statements in the chain**,
 and this cannot be deferred until a better provider arrives.
 
-- [ ] **Widen the `pick()` candidate lists** in `toFundamentals()`'s
+- [x] **Widen the `pick()` candidate lists** in `toFundamentals()`'s
       `balanceSheet` mapper (`translate.ts:575-595`) to accept the yfinance
       passthrough names alongside the FMP ones — `total_liabilities` +
       `total_liabilities_net_minority_interest`; `shareholders_equity` +
@@ -389,7 +389,14 @@ and this cannot be deferred until a better provider arrives.
       > `stockholders_equity` do not. Pick one, apply it to every provider, and
       > say which in the code — otherwise `debtEquityRatio` silently changes
       > meaning between a US and an EU row.
-- [ ] **Handle `workingCapital` where the provider does not supply it.** For
+      > Measured again before coding, and the live rows carry two keys this
+      > list does not name: `cash_cash_equivalents_and_short_term_investments`
+      > is yfinance's actual combined cash line (SAP: 8,220 + 1,552 = 9,772,
+      > which reconciles) and `working_capital` is reported directly on SAP.
+      > Both are in the fix. `cash_equivalents` (SAP 4,310, a sub-line of cash)
+      > and `cash_financial` (SAP 3,910, neither cash nor cash-plus-investments)
+      > are ranked *below* `cash_and_cash_equivalents` so neither can win.
+- [x] **Handle `workingCapital` where the provider does not supply it.** For
       PKO.WA neither `total_current_assets` nor `total_current_liabilities` is
       present. Either compute it from `current_assets`/`current_liabilities`
       when a provider supplies those instead, or return `undefined` and render
@@ -397,7 +404,12 @@ and this cannot be deferred until a better provider arrives.
       > Do not fabricate it. A wrong working-capital figure is worse than a
       > blank cell, and §79.2 is precisely about not presenting numbers whose
       > basis is unknown.
-- [ ] **Add fixture-driven tests** in `src/adapters/translate.test.ts` covering
+      > All three: a reported `working_capital` wins, else
+      > `total_current_assets`/`current_assets` minus
+      > `total_current_liabilities`/`current_liabilities`, else `undefined`.
+      > SAP supplies the mixed pair (20256 − 17416 = 2840, matching its own
+      > reported figure) and PKO supplies neither, so PKO's cell stays `—`.
+- [x] **Add fixture-driven tests** in `src/adapters/translate.test.ts` covering
       both shapes: one row set in the FMP/US naming and one in the yfinance/EU
       naming, asserting the same eight fields populate from either.
       > Capture the EU fixtures from the live responses recorded in this
@@ -406,13 +418,33 @@ and this cannot be deferred until a better provider arrives.
       > Assert `debtEquityRatio` too: it is the derived column that makes the
       > bug visible in the UI, and it is currently empty for every EU name.
       > `npm run test` green.
-- [ ] **Audit the `incomeStatement` and `cashFlow` mappers for the same defect**
+      > Captured 2026-10-02 as literal first rows, not paraphrases. The split is
+      > AAPL = FMP (the only row carrying `cik`/`accepted_date`/`fiscal_year` —
+      > openbb normalises nothing else) and SAP.DE + PKO.WA = yfinance
+      > passthrough. 485 tests green.
+- [x] **Audit the `incomeStatement` and `cashFlow` mappers for the same defect**
       before closing. Only the balance sheet was measured here; the other two
       have the identical `pick()` shape and the same passthrough exposure.
       > If they are also affected, fix them in the same commit rather than
       > leaving a known-wrong sibling behind — but say in the commit message
       > which were confirmed broken and which were only checked.
-- [ ] **Commit** `fix(instruments): map yfinance balance-sheet keys in toFundamentals`
+      > Both were affected, worse than the balance sheet. Income: `revenue` was
+      > read as a bare key and is `total_revenue` on every yfinance row, which
+      > also emptied `netIncomeMargin`; `netIncomeGrowth` read `r.net_income`
+      > directly while `netIncome` read a `pick()`, so it was blank for AAPL;
+      > `dilutedSharesOutstanding` matched no key any provider emits and was
+      > empty everywhere. Cash flow: `dividendPayment` matched nothing on any
+      > symbol. Left deliberately blank as genuine provider gaps — PKO.WA has no
+      > EBIT and no EBITDA line, and SAP's `net_debt` arrives null.
+      > A third class of defect turned up, not naming: `freeCashFlow` was
+      > `operating − capitalExpenditure` while every provider reports capex as a
+      > negative outflow, so the subtraction **added it back**. AAPL FY2025 read
+      > 124,197 against a true 98,767 — 26% overstated on the one symbol
+      > anyone would check by hand. Now prefers the provider's own
+      > `free_cash_flow` and falls back to `operating − |capex|`; the fallback
+      > was verified to reproduce the provider figure exactly for all three
+      > symbols.
+- [x] **Commit** `fix(instruments): map yfinance balance-sheet keys in toFundamentals`
       > Same function as §79.1, so keep it separate: this one is a data-correctness
       > change to five live columns, that one is a formatter plus one unpopulated
       > field. Different risk, independently revertable.
