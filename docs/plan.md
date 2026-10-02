@@ -242,7 +242,7 @@ swaggerui, investbrain, …). The ownership line is **the homelab manifests**, n
 the dead `fxsync` name degrades to *silently missing* rather than to an error —
 which is why nobody noticed.
 
-- [ ] **Replace the array with the eleven portfoliost-owned CronJobs**, in the
+- [x] **Replace the array with the eleven portfoliost-owned CronJobs**, in the
       table above, and export it so a test can assert on it.
       > Names are the rendered object names, not the app-template keys:
       > `fxsync` under the instruments HelmRelease renders as
@@ -255,7 +255,7 @@ which is why nobody noticed.
       > `git show origin/main:<path>` after a fetch. `jobshot` (a Deployment) and
       > `portfoliost-sheets-sync` (an on-demand jobshot Job, no CronJob) stay out
       > of this array — `index.ts` already appends sheets-sync separately.
-- [ ] **Add `schedule` and `suspended` to `JobVersion`**, read from
+- [x] **Add `schedule` and `suspended` to `JobVersion`**, read from
       `cj.spec.schedule` / `cj.spec.suspend`, so the System tab can render
       `impl: "job"` rows as *Job · Scheduled* / *Job · Suspended* instead of a
       single green "Job" badge that reads as "running".
@@ -263,17 +263,23 @@ which is why nobody noticed.
       > shape is `ServiceVersion` in `src/api/admin.ts` and in the contracts
       > spec — check whether `ServiceVersion` already tolerates the extra fields
       > before widening it, and add them there if it does not.
-- [ ] **New test file** `src/jobs-version.test.ts` — there is none today. Assert
+      > It does not, and it is hand-written: `ServiceVersion` is a local
+      > interface in `src/api/admin.ts`, **not** in the contracts
+      > `openapi.yaml` (`grep ServiceVersion ../portfoliost-contracts` finds
+      > nothing), so the two extra optional fields were added there and nowhere
+      > else. `index.ts:55` was spreading the job rows field-by-field and would
+      > have dropped them silently.
+- [x] **New test file** `src/jobs-version.test.ts` — there is none today. Assert
       that `CRONJOBS` equals the eleven names above, and that
       `listJobVersions()` against a stubbed `listNamespacedCronJob` returns a row
       per name that exists, skips a name that does not, and never invents one.
       > The "skips a name that does not exist" case is the behaviour that hid
       > the dead `fxsync` entry: it is correct and it is also why the array can
       > rot unnoticed. Lock it deliberately rather than by accident.
-- [ ] **Tests**: `npm run test` green in `portfoliost-admin`; `npm run build`
+- [x] **Tests**: `npm run test` green in `portfoliost-admin`; `npm run build`
       green in `portfoliost` (the `ServiceVersion` type change flows into
       `SystemInfoView.vue`).
-- [ ] **Commit** `fix(admin): resync the System tab CronJob list and show suspension`
+- [x] **Commit** `fix(admin): resync the System tab CronJob list and show suspension`
 
 ### 80.2 — A guard, so the next drift is a failing test and not an eyeball
 
@@ -283,10 +289,10 @@ shared and every discovered CronJob would need an ownership rule that is itself
 a hardcoded list. The cost of that choice is drift, so the list needs a
 tripwire.
 
-- [ ] **Add a captured fixture** of the portfoliost-owned CronJobs — name,
+- [x] **Add a captured fixture** of the portfoliost-owned CronJobs — name,
       schedule, suspend flag, image tag, capture date — as
       `src/cronjobs.fixture.json`, and a test asserting `CRONJOBS` matches it.
-- [ ] **Add `scripts/check-cronjobs.mjs`** that reads the live namespace with
+- [x] **Add `scripts/check-cronjobs.mjs`** that reads the live namespace with
       `kubectl get cronjobs -n pfire -o json`, filters to the fixture's names,
       and exits non-zero on any difference in name / schedule / suspend; with
       `--refresh` it rewrites the fixture instead.
@@ -297,10 +303,14 @@ tripwire.
       > is a tripwire, not automation. Wiring it into CI against the live cluster
       > is the follow-up that would make it self-firing, and it needs a
       > kubeconfig in CI.
-- [ ] **Tests**: `npm run test` green; `node scripts/check-cronjobs.mjs` run
+- [x] **Tests**: `npm run test` green; `node scripts/check-cronjobs.mjs` run
       against the live cluster exits 0 with the fixture as captured on 2026-10-02
       (i.e. the filter does not drag the shared-namespace jobs in).
-- [ ] **Commit** `test(admin): guard the CronJob list against cluster drift`
+      > Verified both directions: exits 0 on the capture, and exits 1 on an
+      > injected `fxsync` schedule change, a `stooq-importer` suspend flip, and a
+      > fixture name that is no longer in the namespace. `npm run check:cronjobs`
+      > is a script alias for it.
+- [x] **Commit** `test(admin): guard the CronJob list against cluster drift`
 
 ### 80.3 — Topology graph: same drift, plus an edge that points at the wrong owner
 
@@ -309,11 +319,13 @@ hand-written `job: { schedule, suspended, purpose }` metadata — no live probe,
 by design: kube-state-metrics exposes no "last run succeeded" signal for a
 CronJob, so the honest wording is "what the manifest declares".
 
-- [ ] **Replace the `portfoliost-wallets-fxsync` node with
+- [x] **Replace the `portfoliost-wallets-fxsync` node with
       `portfoliost-instruments-fxsync`** and re-point its edge at
       `portfoliost-instruments` (`Updates FX rates`, `10 17 * * *`, not
       suspended).
-- [ ] **Add three job nodes** with schedule / suspend / purpose metadata:
+      > Also `TopologyDetailsPanel.vue:75` keyed its admin-currencies quick-link
+      > on the dead node id, so the Currency Rates link died with it.
+- [x] **Add three job nodes** with schedule / suspend / purpose metadata:
       `portfoliost-instruments-corpbondsync` (`45 4 * * *` → instruments, the
       D80 corp-bond catalogue upsert deployed in §35),
       `portfoliost-instruments-fundcategorysync` (`15 5 * * *` → instruments,
@@ -324,26 +336,44 @@ CronJob, so the honest wording is "what the manifest declares".
       writer of `positions.market_value` in the scheduled pipeline since §76.1 —
       say so in the `purpose` text, it is the most consequential job in the
       namespace).
-- [ ] **Fix the FX edge owner**: `portfoliost-wallets → ecb` is labelled "FX
+- [x] **Fix the FX edge owner**: `portfoliost-wallets → ecb` is labelled "FX
       rates (via fxsync CronJob)", but wallets no longer owns FX. Move the edge
       to `portfoliost-instruments → ecb` (`fx_rates` lives there since §48.6a).
-- [ ] **Add `suspended: true` to `stooq-downloader` and `stooq-importer`**, both
+- [x] **Add `suspended: true` to `stooq-downloader` and `stooq-importer`**, both
       suspended in the cluster. Give all twelve job nodes a `purpose` string —
       the details panel renders it, and the three new ones have none.
-- [ ] **Update `tests/unit/modules/admin/topology-graph-definition.test.ts`** —
-      `EXPECTED_NODE_IDS` (39 → 41), `EXPECTED_EDGE_PAIRS` (47 → 49),
-      `areaNodes("jobs")` count (10 → 12), the vitest snapshot, and the
+      > **Thirteen, not twelve.** The step's arithmetic dropped the renamed node:
+      > a rename is one out *and* one in, so `10 − 1 (wallets-fxsync) + 1
+      > (instruments-fxsync) + 3 = 13`. `areaNodes("jobs")` measures 13.
+      > The three that had no `purpose` at all — `portfoliost-sheets-sync`,
+      > `stooq-downloader`, `stooq-importer`, `jobshot` — got one too, with
+      > `schedule: ""` for the two that are not CronJobs (sheets-sync is an
+      > on-demand jobshot Job, jobshot is a Deployment), so the details panel has
+      > no empty field.
+- [x] **Update `tests/unit/modules/admin/topology-graph-definition.test.ts`** —
+      `EXPECTED_NODE_IDS` (**39 → 42**), `EXPECTED_EDGE_PAIRS` (**47 → 50**),
+      `areaNodes("jobs")` count (10 → **13**), the vitest snapshot, and the
       "maps verified OpenST CronJobs" case.
-      > Counts: one node out, three in; one job edge out, three in, and the ECB
-      > edge changes source rather than count.
+      > Same slip as above: 39 + 3 new nodes + 1 for the rename = 42, and the ECB
+      > edge changes source without changing the count.
       > `loadTopologyLayout` applies a stored layout only on an exact id-set
       > match, so adding and removing node ids invalidates every saved
       > `pfire.topology-layout.v1` position and users get the fresh dagre pass on
       > first load. That is the intended behaviour, not something to work around.
-- [ ] **Tests**: `npm run test` and `npm run test:e2e` green
+- [x] **Tests**: `npm run test` and `npm run test:e2e` green
       (`tests/e2e/topology.spec.ts:112` asserts the OpenST job nodes are mapped
       and inspectable — check whether it enumerates ids).
-- [ ] **Commit** `fix(spa): resync topology job nodes with the cluster`
+      > It enumerates ids, and it does not — it only covers the openst four, which
+      > did not change. What the three extra nodes *did* break is
+      > `topology.spec.ts:348` and `:373`: a taller graph pushes the
+      > external-services lane header to y≈821, below the 720px viewport, so
+      > `mouse.down()` at the measured coordinates landed outside the window and
+      > the drag silently never started. `laneBox()` now parks the element at a
+      > fixed viewport spot (`scrollIntoView({ block: "center" })`) before
+      > measuring, which also makes before/after measurements comparable after a
+      > click that scrolled on its own. The underlying "canvas taller than the
+      > window" problem is §80.5's `mission-canvas` height.
+- [x] **Commit** `fix(spa): resync topology job nodes with the cluster`
 
 ### 80.4 — Nodes sized to be read
 
