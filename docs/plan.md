@@ -497,7 +497,7 @@ and this cannot be deferred until a better provider arrives.
 Not a defect in our code, but it constrains §79.3 and §79.2 and should not be
 rediscovered from scratch. Recorded 2026-10-02 against the live `FMP_API_KEY`.
 
-- [ ] **Record the FMP tier boundary in `docs/openst-coverage.md`** next to the
+- [x] **Record the FMP tier boundary in `docs/openst-coverage.md`** next to the
       existing provider notes, so nobody re-adds FMP as a European fallback.
       > `openst/CLAUDE.md` and `cachest/CLAUDE.md` already treat
       > `docs/openst-coverage.md` as the record of what each provider actually
@@ -512,7 +512,18 @@ rediscovered from scratch. Recorded 2026-10-02 against the live `FMP_API_KEY`.
       > separate live defect — **check which base URL it uses before writing
       > this note**, do not assume.
       > Tests: none needed, doc-only, verified by re-running the three probes.
-- [ ] **Commit** `docs(instruments): record FMP plan tier boundary for non-US statements`
+      > Re-probed 2026-10-02 rather than trusting the section above it: all
+      > three `/stable` statement endpoints 402 for SAP.DE / PKO.WA / MC.PA and
+      > 200 for AAPL, and every `/api/v3/*` call 403s. The conditional in the
+      > note above — whether openbb's fmp provider still calls `/api/v3` —
+      > resolves to **no**: `models/income_statement.py:240`,
+      > `models/cash_flow.py:286` and `models/balance_sheet.py:358` all
+      > hard-code `/stable`, so there is no live defect to log there.
+      > One correction to the plan's text: `/stable/search-symbol` takes
+      > `query=`, not `symbol=`. With `query=PKO.WA` it returns 200 and the
+      > WSE listing; the plan's claim that symbol resolution works for European
+      > listings holds, its implied parameter name did not.
+- [x] **Commit** `docs(instruments): record FMP plan tier boundary for non-US statements`
 
 ---
 

@@ -89,6 +89,40 @@ provider/openst route is involved.
 
 ## Provider quirks worth remembering
 
+- **fmp: statements are US-only on the current plan** (verified 2026-10-02
+  against the live `FMP_API_KEY`, plan §79.4). All three statement endpoints on
+  `/stable` return **HTTP 402** — *"Premium Query Parameter: 'Special Endpoint :
+  This value set for 'symbol' is not available under your current subscription"* —
+  for `SAP.DE`, `PKO.WA` and `MC.PA`, and **200** for `AAPL`:
+
+  | endpoint | AAPL | SAP.DE | PKO.WA | MC.PA |
+  |---|---|---|---|---|
+  | `/stable/income-statement` | 200 | 402 | 402 | 402 |
+  | `/stable/balance-sheet-statement` | 200 | 402 | 402 | 402 |
+  | `/stable/cash-flow-statement` | 200 | 402 | 402 | 402 |
+
+  **Do not re-add FMP as a European fallback.** `yfinance` is the only source of
+  European statements in the chain, and §79.3 had to fix the mapper's key
+  vocabulary because of it: openbb's FMP models declare typed fields and emit the
+  same snake_case names everywhere, while openbb's yfinance models declare only
+  `fiscal_period` / `fiscal_year` / `period_ending` and pass every line item
+  through verbatim under yfinance's own, listing-dependent names.
+- **fmp: the legacy `/api/v3/*` tier is dead for this key** (2026-10-02). Every
+  `/api/v3/*` call returns **403** *"Legacy Endpoint : Due to Legacy endpoints
+  being no longer supported"* — including `search-symbol`. openbb's fmp provider
+  is on `/stable` only: `models/income_statement.py:240`,
+  `models/cash_flow.py:286` and `models/balance_sheet.py:358` all hard-code
+  `https://financialmodelingprep.com/stable/…`. Only the legacy
+  `utils/helpers.py:95` (`/api/v{version}/`) still builds a v3 URL, and nothing
+  on the statement path reaches it.
+- **fmp: symbol resolution and statement data are gated separately.** A
+  successful `search-symbol` is **not** evidence the statements are available.
+  `/stable/search-symbol?query=PKO.WA` returns 200 and resolves the listing
+  (`{"symbol": "PKO.WA", "currency": "PLN", "exchangeFullName": "Warsaw Stock
+  Exchange"}`), and `query=SAP.DE` likewise — while the statement endpoints for
+  the same symbols 402. The parameter is `query`, not `symbol`;
+  `?symbol=PKO&exchange=WSE` returns 400 *"Invalid or missing query parameter -
+  query"*.
 - **intrinio**: nearly all probes fail with "Results not found" despite valid key —
   research key entitlements before adding it to any fallback chain beyond dividends.
 - **nasdaq**: provider arg-shape mismatch for calendars in 4.7.1 (validation error).
