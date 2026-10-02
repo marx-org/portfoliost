@@ -171,322 +171,6 @@ pressing Recompute. Admin → Jobs → "Sync sheet" (not "Wipe & Reimport").
 
 ---
 
-## 81. Drawdowns and annualization both ignore cash flows (2026-10-02)
-
-Three defects in portfolio performance measurement, all live in PROD — two in
-`portfoliost-wallets`, one in the `portfoliost` SPA. Found while choosing which
-performance metrics to display; none is a speculative improvement, and each one
-makes a number on screen wrong today. §81.1 is the serious one: it is also a
-deviation from our own spec (`docs/proposals/portfolios-module.md:386` says
-`annualizedReturn` comes *from TWR*, and the code never sees a TWR). §81.3 is the
-same root cause as §81.1, reproduced in the frontend, on the Performance tab's
-own Drawdown card.
-
-`GET /api/portfolios/:id/risk-metrics` (`src/routes/portfolios.ts:1453`) selects
-`snapshotDate`, `value`, `cumulativeTwr`, `cumulativeMwr`, then hands
-`computeRiskMetrics` the **raw `value`** column (`src/routes/portfolios.ts:1484`
-→ `:1491`). `computeRiskMetrics` derives every daily return from that series via
-`dailyLogReturns` (`src/services/riskMetrics.ts:21-31`), which takes
-`log(values[i] / values[i-1])` and knows nothing about `net_flow` — even though
-`net_flow` sits in the same table and is selected two lines away for the TWR
-column. Note that the two metrics on this route that *are* correct
-(`moneyWeightedReturn` at `:1488`, and the monthly bars from `buildMonthlyReturns`
-at `:156`) read the pre-computed `cumulative_twr`/`cumulative_mwr` columns. The
-split is what makes this look plausible in the UI.
-
-### 81.1 — `computeRiskMetrics` is fed raw `value`, so every deposit counts as a return
-
-One deposit day moves `value` with no market move behind it, and
-`dailyLogReturns` books the whole jump as a portfolio return. A €50k deposit into
-a €50k portfolio with flat prices logs `log(100/50) = 69.3%` for that day. From
-there:
-
-| Metric | Source | How the flow contaminates it |
-| --- | --- | --- |
-| `volatility` | `riskMetrics.ts:53` | The 69.3% observation is fed through `√252`, so deposits dominate σ |
-| `sharpeRatio` | `riskMetrics.ts:81` | Numerator (mean daily return) inflated by flow days, denominator by the same |
-| `sortinoRatio` | `riskMetrics.ts:101` | Same, and the deposit lands in `Math.min(r - dailyRf, 0)` as 0 — never counted as downside |
-| `winRate` | `riskMetrics.ts:131` | Every deposit day is a "win"; reads high |
-| `maxDrawdown` | `riskMetrics.ts:63` | A deposit **during** a drawdown resets the peak, so real drawdowns are truncated — 100 → 50 → deposit 100 → 150 → 75 is a true −75% flow-neutral drawdown but reports −50% |
-| `calmarRatio` | `riskMetrics.ts:119` | Inherits both: `annualizedReturn / abs(maxDrawdown)` |
-| `periodReturnPercent` | `riskMetrics.ts:155` | `(last/first − 1)` on raw values — reads deposited capital as profit |
-
-The fix is to stop deriving returns from `value` and instead build the
-**flow-neutral daily sub-period return series** the snapshots already support:
-
-```
-HPR_t = V_t / (V_{t-1} + netFlow_t) − 1        // t = 1 … n−1
-```
-
-This is the same expression `buildTwr` uses (`returnColumns.ts:35`) — reuse it
-rather than re-deriving it, so the risk metrics and the chart cannot drift apart.
-Chain the `HPR`s into an index (start 1.0) and feed **that** to `maxDrawdown`;
-feed the `HPR` array itself to `annualizedVolatility`, `sharpeRatio`,
-`sortinoRatio` and `winRate` (they currently re-derive log returns internally,
-so they should take returns, not values). `periodReturnPercent` becomes
-`index_last − 1`. Do **not** read the stored `cumulative_twr` column as the
-index: it is rounded to 2 dp (`returnColumns.ts:38`), which is ~1 bp of
-quantisation per day and far too coarse for a daily σ.
-
-- [x] **Export the daily flow-neutral return series** as a single named function
-      in `src/services/returnColumns.ts` (next to `buildTwr`, sharing its
-      per-day expression), and have `buildTwr` consume it so there is one
-      implementation of the sub-period return.
-- [x] **Change the risk-metric functions to take the prepared series**:
-      `maxDrawdown(index)` / `annualizedVolatility(returns)` /
-      `sharpeRatio(returns)` / `sortinoRatio(returns)` / `winRate(returns)` /
-      `periodReturnPercent(index)`, and `computeRiskMetrics` to select `netFlow`
-      alongside `value` at `src/routes/portfolios.ts:1470-1475` and prepare both
-      series once.
-      > Every existing case in `src/services/riskMetrics.test.ts` (40 `it()`s
-      > across 10 describes) passes a *value* array with no flows. A signature
-      > change means they all need rewriting to the new input shape, which is the
-      > bulk of this step — do it as one mechanical pass, then add the flow cases
-      > below. `src/routes/risk-metrics.test.ts` (9 cases) seeds `netFlow: "0"`
-      > and will keep passing unchanged.
-- [x] **Add the flow tests that would have caught this** — for each of
-      `volatility`, `sharpe`, `sortino`, `winRate`, `maxDrawdown`,
-      `periodReturnPercent`: a portfolio that receives one large deposit
-      mid-window with **flat** prices must return the *same* metric as the same
-      series with the deposit removed (this is the invariant that was violated),
-      and a `calmar` case where a deposit during a drawdown no longer truncates
-      it.
-- [x] **Tests**: `npm run test` green in `portfoliost-wallets`; `npm run build`
-      (tsc) green.
-- [x] **Commit** `fix(wallets): derive risk metrics from flow-neutral returns, not raw value`
-
-### 81.2 — `annualizedReturn` annualizes calendar days with a trading-day exponent
-
-Independent of §81.1 and wrong even for a portfolio with no flows at all.
-
-`annualizedReturn` (`riskMetrics.ts:143-151`) computes
-`(V_last / V_first) ** (TRADING_DAYS / n) − 1` where `n = values.length − 1`.
-`TRADING_DAYS` is `252` (`riskMetrics.ts:14`), but `n` counts **calendar** days:
-the snapshot series is built from `calendarDays(from, to)`
-(`src/services/backfill.ts:1079` → `:471-481`), which emits every day including
-weekends and holidays. So the exponent is wrong by a factor of 365/252 ≈ 1.45
-wherever the window is measured in days rather than years.
-
-The error is largest exactly where it does the most damage — a one-year window
-gives `n ≈ 365`, exponent `252/365 = 0.690`, so a genuine **+10.0%** year is
-reported as **+6.8%**. It inverts at short windows: a 91-point quarter gives
-`n = 90`, exponent `252/90 = 2.80`, so **+5.0%** in three months is reported as
-**+14.6%** annualized where the correct figure is **+21.9%**. That last one is
-the "small profit inflated into a large percentage" failure in its purest form,
-and it needs no deposits at all — any portfolio with a flat three months of
-returns is being annualized this way.
-
-> **Corrected 2026-10-02 during implementation.** This paragraph originally read
-> "a quarter gives `n ≈ 91`, exponent `252/91 = 2.77`, so +5.0% in three months
-> is reported as **+14.5%** annualized" and implied +5.0% was the correct
-> answer. It is not: annualizing a quarterly return to a yearly rate is supposed
-> to exceed it. 14.6% *was* the old code's output; the corrected exponent
-> (`365/90`) gives +21.9%. Measured in `riskMetrics.test.ts`
-> ("annualizes a 91-day +5% quarter to ~+21.9%, not ~+14.6%"), which pins both
-> numbers so neither can drift again.
-
-The basis is also the wrong construct even once the exponent is corrected:
-annualizing `V_last / V_first` measures the growth of the *value*, which grows
-when you deposit. Per `portfolios-module.md:386` it must come from TWR over
-**elapsed years**, i.e. from the flow-neutral index §81.1 builds:
-
-```
-annualized = (index_last / index_first) ** (365 / calendarDays) − 1
-```
-
-using calendar days in both the exponent numerator and the step count, which is
-the only self-consistent pairing given the series is calendar-daily.
-
-> **Implementation note.** Reading the dates rather than `index.length − 1` also
-> matters for a *sparse* series: 100 points on a 4-day stride span 396 elapsed
-> days, and a point-count exponent reads that +9.2% as +27.5%. Pinned in
-> `riskMetrics.test.ts` ("reads elapsed days off the dates, so a sparse series is
-> not read as daily").
->
-> `TRADING_DAYS` stays at 252 for `annualizedVolatility` / `sharpeRatio` /
-> `sortinoRatio`. Those scale a per-day dispersion by `√(periods per year)`
-> rather than converting a measured span, so a trading-day σ is the comparable
-> unit — and unlike the exponent, the √-scaling does not depend on how many
-> points the series happens to have. See §81.4 for what that unit costs on a
-> calendar-daily series.
->
-> `daysBetween` in `returnColumns.ts` is now exported and is the single
-> date-difference implementation: `annualizedReturn` and
-> `annualizedReturnWithheldReason` both call it, so the 90-day predicate cannot
-> drift from the exponent.
-
-- [x] **Rewrite `annualizedReturn`** to take the flow-neutral index and the dates,
-      annualizing over `365 / calendarDays` instead of `252 / n`.
-- [x] **Add the regression test for the exponent**: a 365-point series rising
-      exactly 10% must annualize to ~10%, not ~6.8%. Plus a 91-point series to
-      pin the quarterly case (+5% in 91 days must read ~+21.9%, not ~+14.6% —
-      corrected, see above), a sparse-series case, and a case with one mid-window
-      deposit asserting the annualized figure is unchanged by it.
-- [x] **Tests**: `npm run test` green in `portfoliost-wallets` (559 tests); `npm
-      run build` (tsc) green.
-- [x] **Commit** `fix(wallets): annualize over elapsed calendar years from TWR`
-
-### 81.3 — `currentDrawdownPercent` in the SPA takes its peak over raw `value`
-
-The same defect as §81.1, in the SPA, on the Performance tab's own Drawdown card.
-Found while working out how to extend that tab; it is on screen today.
-
-`currentDrawdownPercent` (`src/modules/portfolios/PortfolioPerformanceTab.vue:176-182`)
-is computed client-side from `seriesValues` (`:174`), which is
-`performance.timeSeries[].value` — the **raw portfolio value**, with no flow
-adjustment:
-
-```
-const max = Math.max(...values)
-return (values[values.length - 1] / max - 1) * 100
-```
-
-Every external cash flow raises the running maximum, so the denominator is
-"peak including money that was never at risk". A deposit made during a drawdown
-therefore **shrinks the reported Current Drawdown**, and the amount it shrinks it
-by is the deposit: 100 → 50 → deposit 100 → 150 → 75 is a true −75% flow-neutral
-drawdown and reports −50% here. The card's Max Drawdown tile
-(`:184-190`) reads `riskMetrics.maxDrawdown` from the backend, so after §81.1
-both tiles on that card become correct and consistent — but until then the two
-tiles disagree with each other, which is visible on one screen.
-
-The fix uses data the SPA already has: `timeSeries[]` also carries
-`cumulativeTwr` (`src/routes/portfolios.ts:1277`), which is exactly the
-flow-neutral index this peak should be taken over. Prefer that over recomputing a
-TWR chain in the SPA — the index is pre-computed and rounded to 2 dp
-(`returnColumns.ts:38`), which is ample for a peak lookup and not ample for a
-daily σ. Do **not** import the backend's TWR builder into the SPA; if a future
-card needs the daily return series rather than the index, add it to the
-`analytics` payload instead.
-
-- [x] **Recompute `currentDrawdownPercent` over `cumulativeTwr`**, falling back to
-      the existing raw-`value` path when the series has no TWR column (a
-      pre-migration snapshot row), so the card still renders rather than blanking.
-- [x] **Add the component test** that pins the defect: a `timeSeries` of
-      `[{value:100, cumulativeTwr:100},{value:50, cumulativeTwr:50},{value:150, cumulativeTwr:50},{value:75, cumulativeTwr:25}]`
-      must report **−50%**, not −75% — and a no-flow series must report the same
-      number as before, so the fallback and the TWR path agree.
-      > `currentDrawdownPercent` is a module-local `computed` in a `<script setup>`
-      > SFC, so it is not directly testable today. Extract the arithmetic to a
-      > named export alongside the other shared maths (`docs/COMPONENTS.md`) and
-      > import it back, which is the same treatment §79.1 gave `cell()`.
-- [x] **Tests**: `npm run test` green in `portfoliost` (vitest unit) and
-      `npm run build` (includes `vue-tsc --noEmit`) green. Add the tile to the
-      existing Performance tab e2e rather than a new spec — one assertion that a
-      seeded flow-bearing portfolio's Current Drawdown matches its Max Drawdown's
-      peak-to-trough is enough to catch a regression.
-      > **Plan correction.** The step assumed the compose seed carries a
-      > flow-bearing portfolio. It does not: `SELECT count(DISTINCT net_flow)`
-      > over `portfolios.value_snapshots` returns 1 for every seeded portfolio and
-      > `max(abs(net_flow))` is 0, so `value` and `cumulative_twr` are exactly
-      > proportional and *no* seeded portfolio can tell the two paths apart. The
-      > e2e therefore splices a flow-bearing `timeSeries` into the analytics
-      > response with `page.route()` (and stubs `risk-metrics` to match, so the
-      > cross-tile comparison is like-for-like). Verified it fails against the old
-      > raw-value implementation and passes against this one.
-- [x] **Commit** `fix(spa): take the current-drawdown peak over the TWR index`
-
-### 81.4 — `√252` understates annualised volatility on a calendar-daily series (CLOSED — 2026-10-02)
-
-Found while implementing §81.2 and **deliberately left out of it**: §81.2's
-defect is a unit mismatch in an *exponent*, this one is a unit mismatch in a
-*√-scaling*, and they have opposite fixes. Bundling them would have made the
-§81.2 commit change three displayed numbers for a reason unrelated to its stated
-bug. Raising it rather than quietly doing it.
-
-`TRADING_DAYS` (252) survives §81.2 and is still applied to a **calendar-daily**
-series at `riskMetrics.ts:56` (`annualizedVolatility`), `:88` (`sharpeRatio`)
-and `:112` (`sortinoRatio`). The series carries a point for every calendar day
-with weekend/holiday **carry-forward** prices (`backfill.ts:487`), so ~104 of
-every 365 daily returns are exactly 0. Two compounding errors:
-
-1. Those zero days damp the daily σ by `√(261/365)` ≈ 0.846 — the dispersion is
-   diluted across days on which nothing could move.
-2. `√252` then scales a *calendar*-daily σ by a *trading*-day count, a factor
-   `√(252/365)` ≈ 0.831 low.
-
-Measured on a synthetic 365-day series of 261 real returns with a true daily σ of
-0.549% plus 104 flat days (2026-10-02):
-
-| | annualised σ |
-| --- | --- |
-| reported today (`sd_cal × √252`) | 7.37% |
-| `sd_cal × √365` | 8.87% |
-| true (`sd_real × √261`) | 8.87% |
-
-So volatility reads **~17% low**, and Sharpe and Sortino inherit it (both are
-`excessMean / sd × √TRADING_DAYS`, so the ratio of annualised σ to annualised
-excess return is off by the same ~17% — Sharpe and Sortino are understated
-together and stay internally consistent with each other, but not with the
-annualised return that §81.2 now reports correctly).
-
-The fix is one constant in three places, and note that `√365` is not a
-compromise: it is **exactly** right here, because `√(261/365)` × `√365` =
-`√261`. The flat weekend days are already doing the damping the trading-day
-count assumes.
-
-**The open question is comparability, not correctness.** `√252` is the
-near-universal convention for annualising a *trading-day* σ, and example-service and
-most published Sharpe ratios use it. Changing it moves three numbers on the Risk
-tab by ~17% with no accompanying correction to the rest of the industry. So the
-choice is:
-
-- **Correct the maths** (→ `√365`, one constant, three call sites, numbers move
-  ~17%) and document that our Sharpe is annualised on a calendar-daily basis;
-  or
-- **Keep `√252`** and document the convention as the price of being comparable
-  with example-service and with published figures.
-
-Note that *not* choosing is a real answer too — it leaves `annualizedReturn` on
-a 365-day exponent (measured span) beside a `√252`-scaled σ (trading-day
-convention), which is defensible because the two constructs genuinely differ but
-should at least be written down rather than left to look like an oversight.
-
-> **Decided 2026-10-02: use 365.** The user chose correctness over
-> comparability with example-service and with published Sharpe figures, which quote √252.
-> `TRADING_DAYS` is deleted from `riskMetrics.ts`; `DAYS_PER_YEAR = 365` now
-> serves both the §81.2 exponent and these three √-scalings.
->
-> The daily risk-free rate moved with it (`0.05/252` → `0.05/365`), because the
-> mean return it is subtracted from is a calendar-daily mean. Leaving it at
-> `/252` would have subtracted a *trading*-daily rate from a calendar-daily mean
-> — a unit mismatch of the same kind this step exists to remove, and it is why
-> Sharpe rose 25% rather than the 20% volatility rose.
->
-> Measured on the seeded Top10 portfolio (1Y, live compose stack):
-
-> | metric | before (√252) | after (√365) |
-> | --- | --- | --- |
-> | `volatility` | 0.1414 | 0.1702 (+20.4% = √(365/252)) |
-> | `sharpeRatio` | 2.71 | 3.40 |
-> | `sortinoRatio` | 3.10 | 3.90 |
-> | `calmarRatio`, `maxDrawdown`, `winRate`, `periodReturnPercent` | — | unchanged |
->
-> **The benchmark is deliberately left on √252.** `backfill.ts:442` annualises
-> benchmark volatility from provider price bars, which are trading days only —
-> verified 2026-10-02 on `instruments.price_bars_all`: 0 weekend bars, Mon–Fri
-> ~10.9k rows each. √252 is correct for that series, so portfolio and benchmark
-> now use *different* constants, each right for its own series. The module
-> docstring previously claimed they shared one convention; it now explains the
-> asymmetry, because "why do these two disagree?" is the obvious next question.
-
-- [x] **Decide** which way the Risk tab goes, with the user. → **365** (above).
-- [x] Replace `√TRADING_DAYS` with `√DAYS_PER_YEAR` in
-      `annualizedVolatility` / `sharpeRatio` / `sortinoRatio`, and the daily
-      risk-free divisor with it; delete the now-unused `TRADING_DAYS`.
-- [x] Add the `sd_real × √261` table above as a unit test
-      ("recovers the true annualised σ of a calendar-daily series with flat
-      weekends"), asserting √365 lands within 0.1% of the truth and √252 lands
-      17% low.
-- [x] Re-check the Risk tab e2e for hardcoded expectations — there are none;
-      `PortfolioRiskTab.vue` only renders what the API returns, so no spec
-      changed.
-- [x] Document why `backfill.ts` keeps √252, in the `riskMetrics.ts` module note.
-- [x] **Tests**: `npm run test` green in `portfoliost-wallets` (560);
-      `npm run build` (tsc) green. SPA `test:mock` 235 ✓, `test:e2e` 119 ✓ / 1
-      pre-existing failure (`portfolios.spec.ts:289`).
-- [x] **Commit** `fix(wallets): annualise portfolio sigma on 365 days, not 252`
-
 
 ## 82. Performance tab: overview tiles & per-year returns (D85–D89)
 
@@ -944,3 +628,177 @@ Written this way because §81.1 made `computeRiskMetrics` **pure** — it takes
       `main` → GHA bumps `v*` → pin in the homelab helmrelease → Flux applies →
       verify with kubectl).
 - [ ] Commit `test(spa): cover the cumulative performance tab in e2e`
+
+## 84. Accounts balance tab — per-account value, deposits and P/L table (D84)
+
+Source: the `Konto` summary block of the source spreadsheet (columns M–S). The
+ten `Konto` values are the ten **portfolios** in PROD — verified 2026-10-02:
+`IB` is the only renamed account (`IBKR`), the other nine match by name. The row
+unit is a portfolio, not a wallet, so no new entity is introduced and no join to
+the sheet's own catalog is needed.
+
+Column semantics, as the spreadsheet defines them:
+
+| # | Column | Definition | Payload field |
+|---|---|---|---|
+| 1 | Account | portfolio name | `name` |
+| 2 | Investments | instruments' current value | `instrumentsValue` |
+| 3 | Free cash | current free cash, not invested | `cashValue` |
+| 4 | Total | 2 + 3 | `totalValue` |
+| 5 | Deposits | inflow − outflow **± transfer** to the account | `totalInvested` |
+| 6 | P/L | 4 − 5 | derived |
+| 7 | Return % | 6 / 5 | `returnPercentage` |
+
+**Every field is already on `PortfolioTotalMetrics.portfolioBreakdown`, so this
+section adds no contract field, no backend route and no new endpoint.** Column 6
+is the derivation the store already performs at `stores/portfolios.ts:219`; this
+tab reuses it rather than writing a second copy.
+
+Two properties of the payload make the table exact rather than approximate, and
+both are load-bearing — do not "simplify" either away:
+
+- **Column 4 = column 2 + column 3 holds to the cent.** `portfolios.ts:350-351`
+  rounds `instrumentsValue` and `cashValue` *first* and sets `totalValue` from
+  the rounded parts (`:367-369`), so the contract's promise is literally kept.
+- **Column 5 already includes transfers.** The breakdown reads the denormalized
+  `portfolios.totalInvested` column, written by `externalCashInvested`
+  (`cashLedger.ts:329`) = Σ DEPOSIT − Σ WITHDRAWAL **± TRANSFER legs**. Verified
+  arithmetically on IBKR in PROD: deposits ≈ 15.9k PLN, withdrawals −121 130 PLN,
+  net transfers +69 420,89 EUR, summing at an implied ~4,43 PLN/EUR to the
+  202 750,68 the endpoint returns. A deposits-only basis could not produce it.
+
+Including transfers in the basis is what makes `Total − Deposits` an identity.
+Excluding them would leave the two columns on different conventions — `cashValue`
+is a *balance* and must count an own-account transfer that arrived, while a
+transfers-free *flow* basis would not — and the P/L of such a row would silently
+contain that transfer.
+
+Recorded decisions (resolved with the user):
+
+- **New tab, first in the strip, and the landing page.** `Accounts balance` at
+  `/en/investments/accounts-balance`; `/` and the sidebar point at it.
+  `/en/investments` keeps working, so no existing deep link or e2e breaks.
+- **Exactly these seven columns plus a bold Σ footer.** No share-of-total column
+  (`weight` is already on the cards), no per-row unpriced/stale marker.
+- **Rows are links** to `/en/portfolios/:id/holdings`.
+- **One repo, `portfoliost`.** The provider tier (openst → cachest → instruments)
+  does not apply: no new data source, no scraping, no `config.yaml` route.
+- **Ordering vs §83:** §83.6 also edits `InvestmentsTabs.vue` and adds a tab after
+  `Portfolios`. No conflict — the strip ends up Accounts balance → Portfolios →
+  Performance → Transactions → Watchlists — but land whichever lands first and let
+  the other edit the same array.
+
+### 84.1 — Refresh the stale `/total-metrics` mock seed
+
+`mocks/shared/data/raw/portfolios_total_metrics.json` does not satisfy the
+contract today: its single row carries `portfolioId` / `portfolioName` /
+`originalValue` / `convertedGainLoss` and has no `name`, `instrumentsValue`,
+`cashValue`, `weight` or `unpricedPositions`. The new table needs real rows to
+render in unit and e2e tests, and it is the only source the mock route reads
+(`mocks/portfolios/index.js:266-269`).
+
+- [ ] Rewrite the seed to the current `PortfolioTotalMetrics` shape with ≥3 rows
+ whose arithmetic holds (`totalValue == instrumentsValue + cashValue`), one
+ **negative `cashValue`** row and one **`totalInvested: 0`** row, so the table's
+      edge cases are covered by tests rather than only in PROD.
+      > Pick the two edge rows from real behaviour: PROD's XTB has cash −24,26 and
+      > deposits 0 today, which is exactly the pair that must render `—` for
+      > Return % and keep a signed cash figure.
+- [ ] **Tests**: `npm run test:mock` green; the existing breakdown cases in
+      `tests/unit/modules/portfolios/InvestmentsView.test.ts:393-492` still pass
+      against the new seed.
+- [ ] Commit `test(mock): refresh the total-metrics seed to the current contract shape`
+
+### 84.2 — `AccountsBalanceView` + route + tab + landing
+
+- [ ] Add `{ path: "investments/accounts-balance", name: "accounts-balance",
+      component: () => import("@/modules/portfolios/AccountsBalanceView.vue") }`
+      to the `/en` children (`src/router/index.ts:45-65`) and repoint the `/`
+      redirect (`:9`) at it. `/en/investments` stays untouched.
+- [ ] Prepend the tab to `InvestmentsTabs.vue:8-24`
+      (`label: "Accounts balance"`, `match: startsWith(...)`) so the strip reads
+      Accounts balance → Portfolios → Transactions → Watchlists on all four views
+      that render it (`InvestmentsView.vue:325`, `TransactionsView.vue:13`,
+      `CashTransactionsView.vue:15`, `WatchlistsView.vue:94`).
+- [ ] Add the new route name to `SidebarNav.vue` `isActive` (`:77-86`) — the
+      function enumerates route names explicitly, so without this the sidebar item
+      goes dark on the new landing page.
+- [ ] New `src/modules/portfolios/AccountsBalanceView.vue`: the seven columns
+      above, sortable on every one (click toggles asc/desc, numeric compare, default
+      Total desc), each row a `router-link` to `/en/portfolios/:id/holdings`, and a
+      bold Σ footer row.
+- [ ] **Call `store.fetchAll()` in `onMounted`,** as `WatchlistsView.vue:26` does.
+      The store is per-route state, so landing straight on this tab finds it empty;
+      this adds no new *endpoint* (`fetchAll` already fetches `/api/portfolios` and
+      `/api/portfolios/total-metrics`, `stores/portfolios.ts:20-36`) but it does
+      need the fetch.
+- [ ] Read **`store.totalMetrics.portfolioBreakdown` only.** P/L is
+      `totalValue − totalInvested`; Return % is `row.returnPercentage` with the same
+      `(totalValue − invested) / invested × 100` fallback the store already applies
+      at `stores/portfolios.ts:219-225`, because the field is optional in the
+      contract and a response omitting it would otherwise render blank.
+- [ ] Put the row derivation and the sort comparator in an exported pure function
+      in a plain `<script>` block (`docs/COMPONENTS.md` — "shared math"), so the
+      unit test exercises the arithmetic without mounting.
+- [ ] Convert every money column through
+      `useDisplayConversion(() => store.totalMetrics?.baseCurrency)`
+      (`composables/useDisplayConversion.ts:22`) — the same aggregate base the
+      dashboard tiles use, so the Σ footer and the "Total value" tile are one
+      number by construction. `convert()` returns `null` while the rate resolves:
+      render `—`, never `0`.
+- [ ] Format through `src/utils/format.ts` (`formatCurrency`, `formatSignedCurrency`,
+      `formatPercent`); money cells `tabular-nums`. Two rendering rules the data
+      forces: a `totalInvested <= 0` row renders `—` for Return % (0/0 is not a
+      number and the route returns `0`, not `NaN`), and a negative `cashValue`
+      keeps its sign — it must not be clamped, per `openapi.yaml:1201`.
+- [ ] `data-testid="accounts-balance"` with `-row`, `-account`, `-investments`,
+      `-cash`, `-total`, `-deposits`, `-gain`, `-return` and `-totals`.
+- [ ] **Tests**: new `tests/unit/modules/portfolios/AccountsBalanceView.test.ts` —
+      rows render the payload; a negative cash row keeps its sign; a
+      `totalInvested: 0` row renders `—` for Return %; column 6 equals
+      `totalValue − totalInvested` and column 7 equals `6 / 5`; the footer Σ
+      equals Σ rows and equals `toDisplay(totalMetrics.totalValue)`; sorting
+      toggles both directions; a display-currency switch re-renders the money
+      columns without a remount (mirror `InvestmentsView.test.ts:275-330`).
+- [ ] **Tests**: `npm run build` (includes `vue-tsc --noEmit`) + `npm run test` green.
+- [ ] Commit `feat(spa): add the Accounts balance tab`
+
+### 84.3 — E2E + full local gate
+
+- [ ] New `tests/e2e/accounts-balance.spec.ts`: `/` lands on the tab; the tab is
+      first in the strip; all seven headers render; column 6 equals column 4 minus
+      column 5 on a seeded row; the Σ footer's Total equals the Portfolios page's
+      `tile-total-value` after the same conversion; switching the display currency
+      to USD re-renders the money columns; a row click reaches
+      `/en/portfolios/:id/holdings`.
+- [ ] `docker compose up -d --build` (rebuild `portfoliost` after the SPA change),
+      then `docker compose restart gateway` — per `portfoliost/AGENTS.md` a
+      recreated upstream leaves nginx holding a stale IP and the symptom is a
+      misleading 404, not a 502.
+- [ ] **Tests**: `npm run build && npm run test && npm run test:mock && npm run test:e2e`
+      all green.
+- [ ] Commit `test(e2e): cover the Accounts balance tab`
+
+### 84.4 — PROD release + sheet cross-check (homelab skill)
+
+- [ ] Push `portfoliost` `main`; GHA builds `ghcr.io/marx2/portfoliost`. Verify the
+      real tag with `gh release list --repo Marx2/portfoliost` before pinning —
+      never tag by hand.
+- [ ] Pin it in
+      `~/prv/homelab/homelab/cluster/apps/pfire/portfoliost/app/helmrelease.yaml`,
+      commit + push the homelab repo, wait ~1 min for Flux, then
+      `export KUBECONFIG=$HOME/.kube/homylab-tailscale`, namespace `pfire`.
+- [ ] Verify in PROD with the persistent Playwright daemon (`.pi/skills/playwright`,
+      already authenticated against `portfoliost.k.homylab.com`):
+      - Σ footer Total == the dashboard "Total value" tile;
+      - the Deposits column reproduces the sheet's `Wpłata` **exactly** on the five
+        accounts where the sheet and the sync still agree — PPK 74 443,29 · PPO
+        97 485,29 · Obligacje PKO SA Beata 115 000,00 · IKE Beata 132 099,00 · IKE
+        Marek 54 548,00 (all confirmed in PROD 2026-10-02). That equality is the
+        strongest available proof the basis means the same thing in both systems.
+      - IBKR and Equate+ are **expected** to differ from the sheet (192 468,70 and
+        21 379,79 there, against 202 750,68 and 23 901,40 in PROD): the sheet's own
+        deposit ledger has drifted from what the sync imported. Record the PROD
+        figures; do not treat the gap as a defect of this tab.
+- [ ] Archive §84 into `plan-archive.md` once the PROD check passes.
+- [ ] Commit `chore(homelab): pin the accounts-balance release`

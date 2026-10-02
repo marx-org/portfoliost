@@ -18552,3 +18552,127 @@ they go through `queryMapByLabel`, which is why this one query was missed.
 - [x] **Commit** `fix(admin): resolve cachest provider latency through the label fallback`
 
 ---
+---
+---
+
+## 81. Drawdowns and annualization both ignore cash flows (2026-10-02)
+
+**Deployed to PROD 2026-10-02** — `portfoliost-wallets` v1.1.118 → **v1.1.119**,
+SPA v1.0.350 → **v1.0.352** (skipped v1.0.351, which was docs-only: the §80
+archive commit, no `src/` change). Homelab commit `0444edd`. Both wallets pins
+moved together — the app Deployment and the `snapshotsync` CronJob run the same
+image, and a skew would leave the nightly snapshot job on the code that produced
+the wrong columns.
+
+PROD was the right place to measure this: it has real cash flows (398 snapshot
+rows carrying 709,710 across 10 portfolios), whereas the compose seed has
+`net_flow = 0` everywhere and so cannot tell the flow-neutral path from the raw
+one at all.
+
+### PROD verification
+
+Risk-metrics before (wallets v1.1.118) → after (v1.1.119), same portfolios,
+same auth:
+
+| portfolio | window | metric | before | after |
+| --- | --- | --- | --- | --- |
+| NN TFI PPK | ALL | `periodReturnPercent` | **28692.61** | **129.52** |
+| NN TFI PPK | ALL | `volatility` | 0.356 | 0.124 |
+| NN TFI PPK | ALL | `maxDrawdown` | −0.143 | **−0.2806** |
+| NN TFI PPK | ALL | `annualizedReturn` | 0.777 | 0.130 |
+| NN TFI PPK | ALL | `sortinoRatio` | 7.26 | 0.92 |
+| IBKR | ALL | `periodReturnPercent` | **6633.52** | **−1.28** |
+| IBKR | ALL | `maxDrawdown` | −0.2954 | −0.4407 |
+| IBKR | ALL | `sharpeRatio` | 0.76 | −0.14 |
+| Equate+ | 1Y | `periodReturnPercent` | **82.46** | **−18.69** |
+| Equate+ | 1Y | `sharpeRatio` | 0.20 | **−0.83** |
+| Equate+ | 1Y | `volatility` | 1.809 | 0.266 |
+
+Three things this table settles that the unit tests could not:
+
+1. **A 28,692% period return and a 6,633% one were on screen.** Both were
+   deposits booked as profit. §81.1 removes them.
+2. **Drawdowns were being truncated, not just over-stated.** NN TFI PPK's real
+   drawdown is −28.1%, not −14.3%: the deposits were resetting the running peak
+   halfway through. IBKR ALL was −29.5% reported against −44.1% real.
+3. **Two portfolios flipped Sharpe's sign.** Equate+ went +0.20 → −0.83 and IBKR
+   ALL +0.76 → −0.14. Equate+ is the clearer tell: before the fix, its
+   `periodReturnPercent` was **+82.46%** while its `moneyWeightedReturn` was
+   **−23.57%** — two independent measures of the same portfolio disagreeing in
+   sign, which is exactly what "€ came out, not in" looks like. After the fix
+   they agree: −18.69% and −23.57%. The two measures agreeing is the real proof
+   the series is now flow-neutral; the individual numbers moving is just
+   arithmetic catching up.
+
+§81.2's exponent was verified independently in PROD rather than trusted: for
+every portfolio, the years implied by `(1 + periodReturnPercent/100)` and
+`annualizedReturn` must equal the elapsed span of the series.
+
+| portfolio | span | implied years | actual years |
+| --- | --- | --- | --- |
+| NN TFI PPK | 2483 pts, 2482 d | 6.798 | 6.800 |
+| Equate+ | 2704 pts, 2703 d | 7.407 | 7.405 |
+| IBKR | 1663 pts, 1662 d | 4.594 | 4.553 |
+
+IBKR's residual is not drift: `annualizedReturn` is rounded to 4 dp and its
+value is −0.0028, so with a near-zero numerator the implied years is extremely
+sensitive. Every 1Y window returns `annualizedReturn` numerically equal to
+`periodReturnPercent`, which is the 365/365 case and a further check that the
+exponent is 365 and not 252.
+
+UI verified in PROD after the rollout: Equate+'s Drawdown card reads Max −37.00%
+/ Current −20.30% — the current drawdown shallower than the maximum, which is the
+§81.3 property that the two tiles are finally on one series. Risk tab tiles
+render with **zero console errors**.
+
+### What §81.4 deliberately traded away
+
+`volatility`, `sharpeRatio` and `sortinoRatio` now annualise on 365 days, so our
+figures are **not comparable** with example-service or with published Sharpe ratios, which
+quote √252. User decision 2026-10-02, recorded because it is a choice and not a
+correction: on the compose Top10 portfolio this moved volatility 0.1414 → 0.1702
+(+20.4% = √(365/252)), Sharpe 2.71 → 3.40, Sortino 3.10 → 3.90.
+
+The benchmark volatility in `backfill.ts` keeps √252 — correctly, because it
+reads provider price bars, which are trading days only (verified on
+`instruments.price_bars_all`: 0 weekend bars, Mon–Fri ~10.9k rows each). So the
+portfolio and its benchmark now use *different* constants, each right for its own
+series. If someone later "fixes" that asymmetry by making them match, they will
+break the benchmark side.
+
+### Two plan errors found while implementing, both corrected in place
+
+- **§81.2's quarterly example was wrong.** It read "a quarter gives `n ≈ 91`,
+  exponent `252/91 = 2.77`, so +5.0% in three months is reported as +14.5%
+  annualized", implying +5.0% was correct. It is not: annualising a quarterly
+  return to a yearly rate is *supposed* to exceed it. 14.6% was the **old**
+  code's output; the corrected exponent gives **+21.9%**. Both are now pinned in
+  `riskMetrics.test.ts` so neither can drift again.
+- **§81.3's e2e premise was wrong.** It assumed the compose seed carries a
+  flow-bearing portfolio. `SELECT count(DISTINCT net_flow)` returns 1 for every
+  seeded portfolio and `max(abs(net_flow))` is 0, so `value` and
+  `cumulative_twr` are exactly proportional and *no* seeded portfolio can tell
+  the two paths apart. The e2e now splices a flow-bearing series into the
+  analytics response with `page.route()`, and was verified to fail against the
+  old raw-value implementation and pass against the new one.
+
+### The §81.1 invariant is narrower than the plan claimed
+
+"A deposit mid-window returns the same metric as the same series with the
+deposit removed" holds **only where no price moves after the flow**. End-of-day
+values cannot recover a daily return against a capital base that changed, and the
+same €3 on €51,017 genuinely is a smaller return than on €1,017 — the post-deposit
+portfolio really is less volatile in percentage terms. The tests now state this
+instead of asserting an invariance that does not exist.
+
+### Adjacent defect found, NOT fixed — not planned
+
+`PortfolioRiskTab.vue` passes `volatility` and `maxDrawdown` to `formatPercent`
+without scaling, so the Risk tab renders them **100× too small** (`-0.37%` for a
+−37% drawdown, `0.27%` for 26.6% volatility). The contract declares both as a
+bare `number` with no unit, and the payload mixes units — `volatility` and
+`maxDrawdown` are fractions while `winRate` and `periodReturnPercent` are
+percents. `PortfolioPerformanceTab.vue` compensates with an explicit `v * 100`
+and a comment; the Risk tab does not. Pre-existing, not caused by §81 (the
+pre-deploy value 1.809 would have rendered `1.81%`).
+
