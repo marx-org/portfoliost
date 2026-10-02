@@ -27,6 +27,40 @@ const income = computed(() => data.value?.financialHighlights.incomeStatement ??
 const balance = computed(() => data.value?.financialHighlights.balanceSheet ?? [])
 const cashFlow = computed(() => data.value?.financialHighlights.cashFlow ?? [])
 
+/**
+ * §79.2 — what the three cards are denominated in, and where it came from.
+ *
+ * The statements used to render with no currency at all, so a GPW name in PLN
+ * and a US name in USD looked identical. The label sits on the CARD rather than
+ * in each cell, because repeating a symbol on thirty values is noise, not
+ * clarity — and a per-cell symbol would also be wrong for the growth and margin
+ * columns, which are ratios and carry no currency whatever.
+ *
+ * `estimated` is spelled out rather than reduced to "approx": the distinction is
+ * between "the upstream said EUR" and "we resolved EUR from the venue", and a
+ * reader comparing these numbers against a broker has to know which.
+ */
+const currencyLabel = computed(() => {
+  const ccy = data.value?.currency
+  if (!ccy) return "Currency unknown"
+  if (data.value?.currencySource === "estimated") return `${ccy} (estimated)`
+  if (data.value?.currencySource === "provider") return ccy
+  return ccy
+})
+
+/** The named providers behind the three statements, or null when they agree. */
+const sourceLabel = computed(() => {
+  const sources = data.value?.sources
+  if (!sources) return null
+  const named = [sources.incomeStatement, sources.balanceSheet, sources.cashFlow].filter(
+    (p): p is string => typeof p === "string" && p.length > 0,
+  )
+  // No attribution survived the hop (a body cached before the envelope existed),
+  // or every statement came from the same place — neither is worth a marker.
+  if (named.length === 0 || named.length === 3 && new Set(named).size === 1) return null
+  return named
+})
+
 const trendChartOptions = computed(() => ({
   chart: { type: "bar" as const, height: 280, toolbar: { show: false } },
   colors: ["#2563eb", "#16a34a"],
@@ -49,6 +83,15 @@ const trendChartOptions = computed(() => ({
     <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading fundamentals...</p>
 
     <template v-if="!loading && !error && data">
+      <p
+        v-if="sourceLabel"
+        class="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-300"
+        data-testid="fundamentals-mixed-sources"
+      >
+        These statements come from more than one provider ({{ sourceLabel.join(", ") }}), so they may
+        not share a currency or a basis.
+      </p>
+
       <div class="card p-6">
         <h2 class="mb-4 text-base font-semibold">Revenue vs Net Income - {{ symbol }}</h2>
         <component :is="'apexchart'" v-if="income.length" :options="trendChartOptions" :series="trendChartOptions.series" />
@@ -56,7 +99,10 @@ const trendChartOptions = computed(() => ({
       </div>
 
       <div class="card p-6">
-        <h2 class="mb-3 text-base font-semibold">Income Statement</h2>
+        <div class="mb-3 flex items-baseline justify-between gap-3">
+          <h2 class="text-base font-semibold">Income Statement</h2>
+          <span class="shrink-0 text-xs text-slate-500 dark:text-slate-400" data-testid="fundamentals-currency">{{ currencyLabel }}</span>
+        </div>
         <div class="overflow-x-auto">
           <table class="w-full min-w-[760px] text-sm">
             <thead>
@@ -92,7 +138,10 @@ const trendChartOptions = computed(() => ({
       </div>
 
       <div class="card p-6">
-        <h2 class="mb-3 text-base font-semibold">Balance Sheet</h2>
+        <div class="mb-3 flex items-baseline justify-between gap-3">
+          <h2 class="text-base font-semibold">Balance Sheet</h2>
+          <span class="shrink-0 text-xs text-slate-500 dark:text-slate-400" data-testid="fundamentals-currency">{{ currencyLabel }}</span>
+        </div>
         <div class="overflow-x-auto">
           <table class="w-full min-w-[820px] text-sm">
             <thead>
@@ -128,7 +177,10 @@ const trendChartOptions = computed(() => ({
       </div>
 
       <div class="card p-6">
-        <h2 class="mb-3 text-base font-semibold">Cash Flow</h2>
+        <div class="mb-3 flex items-baseline justify-between gap-3">
+          <h2 class="text-base font-semibold">Cash Flow</h2>
+          <span class="shrink-0 text-xs text-slate-500 dark:text-slate-400" data-testid="fundamentals-currency">{{ currencyLabel }}</span>
+        </div>
         <div class="overflow-x-auto">
           <table class="w-full min-w-[880px] text-sm">
             <thead>
