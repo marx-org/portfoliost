@@ -893,6 +893,55 @@ and the shape is unchanged.
       workload. → Already flat, and now measured rather than assumed. The
       screenshot-of-the-curve deliverable is replaced by the two tables above,
       which are the same thing with numbers attached.
+      > **DONE 2026-10-02, and it produced the clean single-walk number §73.5 was
+      > blocked on — while REFUTING the mechanism §73.4 landed on.** Every figure
+      > below is from a pod whose rss was still at the floor, so no walk had
+      > allocated anything before the one being measured.
+      >
+      > | walk | result | time | dRSS |
+      > |---|---|---|---|
+      > | cold floor, no traffic | — | — | **~366–367 MiB** |
+      > | `/equity/profile/AAPL` | **200**, 2 974 B | 0.64 s | **+5.24 MiB** |
+      > | `/equity/profile/VTR.V` (real ticker, no profile) | 404 | **4.13 s** | **+24.61 MiB** |
+      > | `/equity/profile/ZZQX9.FAKE` (matches nothing) | 404 | 0.90 s | +2.71 MiB |
+      > | `/equity/profile/ZZQY8.FAKE` (new nonsense symbol) | 404 | 0.81 s | +2.66 MiB |
+      > | `ZZQY8.FAKE` again (negative-cached) | 404 | **0.00 s** | +0.03 MiB |
+      >
+      > **This inverts §73.4's mechanism, and the inversion is the finding.**
+      > §73.4 concluded the peak is "the FAILED multi-provider walk, paid once per
+      > newly-unresolvable symbol", and read the two OOMKills on `CREC.PS`,
+      > `CREO.L`, `CREX`, `CRET.ST` as "failing to resolve anything" being the
+      > expensive path. The measurement says the opposite:
+      >
+      > - A symbol that **matches nothing** is the **cheapest** failure: 2.7 MiB,
+      >   under a second. It is rejected locally and never walks a chain.
+      > - A **real ticker no provider carries** is the **most expensive thing in
+      >   the service**: **24.61 MiB and 4.13 s** — nearly 5× a successful walk.
+      > - A **successful** walk is 5.24 MiB.
+      >
+      > **So the cost tracks how far the chain gets, not whether it fails.** A
+      > nonsense ticker never starts; a plausible one walks every provider and
+      > returns nothing. §73.4's remedy survives this and is in fact *better*
+      > supported by it — "check local reference before falling through to a
+      > provider chain" targets exactly the expensive case, since that is the one
+      > where local evidence said plausible and the chain was walked anyway.
+      >
+      > **The negative cache is confirmed working**: the repeat of the same symbol
+      > cost 0.03 MiB and 0.00 s. And the per-new-symbol cost does **not
+      > compound** (2.71 then 2.66) — consistent with §73.4's high-water reading
+      > and still not a leak.
+      >
+      > **Two process notes, because both produced a wrong number first.**
+      > - **Uptime is the wrong guard for "cold".** A pod 536 s old with rss at the
+      >   floor has walked nothing; requiring a low uptime threw away a valid
+      >   baseline. The guard used is now **rss against the floor**.
+      > - **The first attempt reported `+0.0 MiB` for every walk** because it
+      >   called `/equity/logo?symbol=…`, which **does not exist** — the routes are
+      >   path-parameter (`/equity/profile/{ticker}`), so all three calls 404'd in
+      >   0.0 s having allocated nothing. A table of `0.0` from requests that never
+      >   ran is the same failure as the weekend-as-holes count: a plausible
+      >   measurement of nothing. Every row above is verified `200`/`404` **with its
+      >   body**, and the `200` row asserts `OK=True` before the number is printed.
 - [ ] Then reconsider the limit downward once the curve is flat — 2Gi is
       headroom for bursts, not a target to keep.
       > **CORRECTION, and it is against my own measurement from two
@@ -919,6 +968,31 @@ and the shape is unchanged.
       > from a freshly-started pod**, so the per-walk peak is a number rather
       > than a difference between two already-elevated baselines. Until that
       > exists, leave the limit alone.
+      >
+      > **UPDATE 2026-10-02 — the experiment is done, and it is still not enough
+      > to lower the limit. The missing number is not the per-walk cost, it is what
+      > production actually reaches.**
+      >
+      > From a cold pod (§73.4's closeout, above): floor ~367 MiB, a successful walk
+      > **5.24 MiB**, the most expensive failure **24.61 MiB**. With
+      > `UPSTREAM_MAX_INFLIGHT = 8` the arithmetic a burst implies is roughly
+      > `367 + 8 x 25 ≈ 570–670 MiB` — which is *below* the 700 MiB that killed both
+      > pods, and would argue for putting the limit back near there.
+      >
+      > **I am not making that change, because the arithmetic does not match
+      > production.** §73.4 observed the two live replicas at **1101 MiB and
+      > 1368 MiB** with zero restarts in 19 h. Single cold walks of 5–25 MiB cannot
+      > explain a working set of 1.1–1.4 GiB, and the gap is roughly 500–800 MiB.
+      > Either a real sweep is far wider than 8 concurrent walks, or per-walk cost
+      > under sustained concurrency is much higher than a single isolated walk, or
+      > something contributes that this experiment does not touch.
+      >
+      > **So the box stays open and the limit stays at 2 Gi**, which is the
+      > honest position: the per-walk cost is now a measured number rather than a
+      > guess, and it is the *aggregate* that remains unexplained. Closing this on
+      > the cold-walk figure alone would repeat the mistake this section has
+      > already corrected twice — reading a number measured under one set of
+      > conditions as if it held under all of them.
 - [ ] Add an alert on `container_memory_working_set_bytes` growth rate, so the
       next leak is caught by a trend rather than by an OOMKill.
       > **Now clearly worth having, and for a different reason than §73
