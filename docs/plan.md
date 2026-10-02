@@ -749,7 +749,7 @@ The only step that makes the tab possible. Everything after it is presentation.
 Written this way because §81.1 made `computeRiskMetrics` **pure** — it takes
 `(returns, dates)` and nothing else. After §83.2 the route already holds both.
 
-- [ ] **Populate the already-declared `performance.*` risk fields inline on
+- [x] **Populate the already-declared `performance.*` risk fields inline on
       `/merged`** — `maxDrawdown`, `sharpeRatio`, `sortinoRatio`, `calmarRatio`,
       `volatility`, `winRate` — by calling
       `computeRiskMetrics(buildDailyReturns(aggValues, aggFlows), aggDates)`
@@ -771,17 +771,28 @@ Written this way because §81.1 made `computeRiskMetrics` **pure** — it takes
       > keep the ratios-as-fractions form the Risk tab already shows. Writing the
       > risk-metrics form onto `/merged` would put the same contract field at two
       > magnitudes on one response, which is the defect §82.1's comment records.
-- [ ] **Do not add a Max Drawdown tile to the aggregate tab** beyond the one the
+- [x] **Do not add a Max Drawdown tile to the aggregate tab** beyond the one the
       Drawdown card already renders. Per D89, risk *ratios* stay on the Risk tab;
       the aggregate has no Risk tab, so drawdown is the only one of these that
       travels, and it travels because the existing card needs it.
-- [ ] Test: the §81.3 fixture on the aggregate path — `cumulativeTwr` of
+- [x] Test: the §81.3 fixture on the aggregate path — `cumulativeTwr` of
       `{100, 50, 150, 75}` reports **−75%**, not −50%, and
       `currentDrawdownPercent` (which the card calls for Current) agrees with
       `maxDrawdown` on the peak-to-trough leg.
-- [ ] Tests: `npm run test` green in `portfoliost-wallets`; `npm run build` green.
-- [ ] Commit `feat(wallets): return aggregate risk metrics on the merged series`
+- [x] Tests: `npm run test` green in `portfoliost-wallets`; `npm run build` green.
+- [x] Commit `feat(wallets): return aggregate risk metrics on the merged series`
 
+
+> Landed in `portfoliost-wallets@afb993c`: `buildMergedPerformance` now calls
+> `computeRiskMetrics(buildDailyReturns(values, flows), dates)` and copies `maxDrawdown`,
+> `sharpeRatio`, `sortinoRatio`, `calmarRatio`, `volatility`, `winRate` onto `performance`.
+> No new route, no contract change — every key was already declared at
+> `openapi.yaml:1484-1491`. `annualizedReturn` is deliberately NOT copied from the risk
+> result: that field is a FRACTION and §83.2's is the analytics PERCENT, so the last box's
+> unit rule is enforced by the code rather than by a reviewer's memory.
+> The §81.3 fixture on the aggregate path reports **−75%**, and the emitted index peaks at
+> 100 and ends at 25, which is what `currentDrawdownPercent` reads for the Current tile.
+> 579 tests green, `tsc` clean.
 ### 83.5 — Cross-portfolio performers: one contract addition and a bulk route
 
 - [ ] **Contracts:** add `GET /api/portfolios/positions` → `{ positions: Position[] }`,
