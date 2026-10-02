@@ -204,7 +204,7 @@ The only backend change in this section. `annualizedReturn` and
 (`portfolios.ts:1343-1360`). The SPA therefore has nothing to render a TWR p.a.
 tile from.
 
-- [ ] **Compute the TWR p.a. in the analytics route** from the already-selected
+- [x] **Compute the TWR p.a. in the analytics route** from the already-selected
       `cumulativeTwr` column, annualising over elapsed calendar days:
       `(twr_last / 100) ** (365 / calendarDays(first, last)) − 1`, expressed as a
       **percentage** to match every sibling in `performance.*`
@@ -215,20 +215,51 @@ tile from.
       > Reuse §81.2's `annualizedReturn(values, dates)` if it accepts the TWR
       > index by then — one implementation, and this step becomes a two-line
       > call. Do not add a third annualizer if it does not.
-- [ ] **Return `annualizedReturn: null` plus a reason** when the span is under a
+      > Landed as a two-line call to §81.2's `annualizedReturn`. `cumulative_twr`
+      > is stored on a 100 base, but the function takes a ratio `iN / i0`, so the
+      > stored index is passed unscaled. Rows with a NULL `cumulative_twr` are
+      > `flatMap`-dropped, never coerced to 0 — a 0 in the index is a −100% day.
+- [x] **Return `annualizedReturn: null` plus a reason** when the span is under a
       full year, rather than annualising a partial window. Reuse the existing
       `annualizedReturnWithheldReason` (`src/services/riskMetrics.ts:176-188`)
       as the single source of truth for the predicate so the Risk tab and this
       tile cannot disagree about the same window. The reason string travels in
       the already-declared `annualizedReturnWithheldReason` field — **no new
       vocabulary, no `openapi.yaml` edit.**
-- [ ] **Test the arithmetic in the route test** (`src/routes/analytics.test.ts`):
+      > **The two clauses of this bullet conflicted** — "under a full year"
+      > (365 days) and "reuse the existing predicate" (≥60 points AND ≥90 days)
+      > are different gates, and a one-quarter series falls between them. User
+      > decision 2026-10-02: the shared predicate wins. A full-year gate here
+      > would have made this tile print `—` for every sub-year portfolio while
+      > the Risk tab printed a number for the same window — the exact
+      > disagreement this bullet exists to prevent. So the tile annualises a
+      > quarter, as the Risk tab already does.
+      > **Unit split, also user-confirmed:** `performance.annualizedReturn` is a
+      > **percent** (13.04) and `/risk-metrics`'s `annualizedReturn` is a
+      > **fraction** (0.1304) — one contract field name, two units. Kept, because
+      > the percent is what `performance.*`'s siblings speak, and recorded in a
+      > comment at the call site because §81's archive already flagged this
+      > payload's mixed units as a defect.
+- [x] **Test the arithmetic in the route test** (`src/routes/analytics.test.ts`):
       a 365-point series with `cumulativeTwr` rising 100 → 110 must return
       `annualizedReturn: 10`, and a 91-point series must return `null` with the
       reason set, not a larger number.
-- [ ] **Tests**: `npm run test` green in `portfoliost-wallets`; `npm run build`
+      > Two corrections to this fixture, both because the plan's numbers did not
+      > survive contact with `daysBetween`:
+      > **366** points (not 365) is what returns exactly `10`. A point count is
+      > not a day count: 365 daily points span 364 days, so the exponent is
+      > 365/364 and the answer is **10.03**, not 10. Both are now pinned — the
+      > 10.03 case exists so nobody "simplifies" the exponent back to 1.
+      > The 91-point series now asserts the **number** `(1.1 ** (365/90) − 1)×100`
+      > rather than `null`, per the decision above; it still fails loudly if the
+      > withholding gate ever moves back to a full year. The withheld cases are
+      > 59 points and 80 points / 79 days.
+- [x] **Tests**: `npm run test` green in `portfoliost-wallets`; `npm run build`
       (tsc) green.
-- [ ] **Commit** `feat(wallets): return the flow-neutral annualized return in analytics`
+      > 568/568. One flake on the first run — `internal.test.ts:432` timed out at
+      > 5000ms under full-suite load, passes in isolation and on a clean re-run.
+      > FX service-token test, no relation to this step.
+- [x] **Commit** `feat(wallets): return the flow-neutral annualized return in analytics`
 
 ### 82.2 — Overview tiles card
 
