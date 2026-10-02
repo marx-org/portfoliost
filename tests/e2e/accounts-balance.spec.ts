@@ -78,7 +78,11 @@ test("the accounts balance tab is the landing page, and its rows add up", async 
   const strip = page.getByRole("navigation", { name: "Investment sections" }).getByRole("link")
   await expect(strip.first()).toHaveText("Accounts balance")
   await expect(strip.first()).toHaveAttribute("href", "/en/investments/accounts-balance")
-  await expect(strip).toHaveText(["Accounts balance", "Portfolios", "Transactions", "Watchlists"])
+  // §83.6 — the strip grew a tab: "Performance" sits after "Portfolios" because it
+  // summarises exactly what those cards summarise. The list is asserted in full
+  // on purpose — a new tab that lands in the wrong PLACE is invisible to a
+  // "contains" check.
+  await expect(strip).toHaveText(["Accounts balance", "Portfolios", "Performance", "Transactions", "Watchlists"])
 
   // The table is behind `store.fetchAll()` (the store is per-route state), so
   // wait for it rather than reading the DOM while the view still says "Loading".

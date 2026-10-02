@@ -84,13 +84,13 @@ test("the Yearly view is available on ALL and reconciles to the Net gain tile", 
   await expect(yearly).toBeEnabled()
   await yearly.click()
 
-  const total = page.getByTestId("total-perf-returns-yearly-total-gain")
-  await expect(total).toBeVisible({ timeout: 30_000 })
+  const total = await page.getByTestId("total-perf-returns-yearly-total-gain").innerText()
+  await expect(page.getByTestId("total-perf-returns-yearly-total-gain")).toBeVisible({ timeout: 30_000 })
 
   // The Σ footer is the same number as the Net gain tile by construction (both
   // ride `convert()`), so a divergence is a real inconsistency.
   const gain = await page.getByTestId("total-perf-overview-net-gain").innerText()
-  expect(total.innerText()).toBe(gain)
+  expect(total).toBe(gain)
 
   // …and a shorter window holds no full calendar year, so Yearly disables itself.
   await chartCard(page).getByRole("button", { name: "1Y" }).click()
