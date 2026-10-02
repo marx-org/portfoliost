@@ -6,6 +6,10 @@ export interface ServiceVersion {
   version: string
   impl: "real" | "mock" | "unknown" | "job"
   image?: string
+  /** cron expression, for `impl: "job"` rows backed by a CronJob (§80.1) */
+  schedule?: string
+  /** true when the CronJob is suspended — it must not read as "running" */
+  suspended?: boolean
 }
 
 // Contract-typed admin user (from @marx2/contracts /api/admin/users).

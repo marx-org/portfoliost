@@ -36,10 +36,17 @@ onMounted(() => {
 })
 onUnmounted(() => clearInterval(timer))
 
-function implBadge(impl: string) {
-  if (impl === "real") return { label: "Deployment", class: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400" }
-  if (impl === "mock") return { label: "Mock", class: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" }
-  if (impl === "job") return { label: "Job", class: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" }
+function implBadge(svc: ServiceVersion) {
+  if (svc.impl === "real") return { label: "Deployment", class: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400" }
+  if (svc.impl === "mock") return { label: "Mock", class: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" }
+  // A green "Job" badge read as "running". Three of the pfire CronJobs are
+  // suspended, and jobshot is a Deployment rather than a schedule — so say
+  // which, from the schedule/suspend the endpoint now reports (§80.1).
+  if (svc.impl === "job") {
+    if (!svc.schedule) return { label: "Job", class: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" }
+    if (svc.suspended) return { label: "Job · Suspended", class: "bg-slate-200 text-slate-700 dark:bg-slate-600/40 dark:text-slate-300" }
+    return { label: "Job · Scheduled", class: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" }
+  }
   return { label: "Unreachable", class: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" }
 }
 
@@ -62,12 +69,15 @@ function displayRef(svc: ServiceVersion) {
         <div>
           <div class="font-medium text-slate-900 dark:text-slate-100">{{ svc.service }}</div>
           <div class="text-sm text-slate-500 dark:text-slate-400">{{ displayRef(svc) }}</div>
+          <div v-if="svc.schedule" class="font-mono text-xs text-slate-400 dark:text-slate-500">
+            {{ svc.schedule }}<span v-if="svc.suspended"> · suspended</span>
+          </div>
         </div>
         <span
           class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
-          :class="implBadge(svc.impl).class"
+          :class="implBadge(svc).class"
         >
-          {{ implBadge(svc.impl).label }}
+          {{ implBadge(svc).label }}
         </span>
       </div>
     </div>
