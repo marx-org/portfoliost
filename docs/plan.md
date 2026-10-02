@@ -269,29 +269,50 @@ full-width Timing line: Net gain, Net invested, XIRR, TWR p.a., Timing =
 `XIRR − TWR p.a.` with a plain-language reading ("adding money helped" / "adding
 money hurt").
 
-- [ ] **Add the card** reading `store.analytics.performance` only —
+- [x] **Add the card** reading `store.analytics.performance` only —
       `totalReturn`, `totalInvested`, `moneyWeightedReturn`, `annualizedReturn`,
       `annualizedReturnWithheldReason`. **No new API call**: all five are on the
       payload the tab already holds. Absent or `null` renders `—`, never `0`.
-- [ ] **Convert the money tiles through the existing display-currency path** —
+      > Also reads `moneyWeightedReturnWithheldReason` — already declared, already
+      > returned, and the only thing that explains an XIRR `—`. Both withheld
+      > reasons render as plain text ("not enough history yet"), so an em-dash is
+      > never a mystery. A test asserts `getPortfolioAnalytics` is NOT called.
+- [x] **Convert the money tiles through the existing display-currency path** —
       reuse the `useDisplayConversion` / `chartRate` pair already built at
       `:251-264` rather than adding a sixth conversion copy, so switching the
       display currency re-converts the tiles in place without a re-mount.
-- [ ] **Render the Timing line defensively**: it is a difference of two rates,
+      > Same composable instance, `convert()` rather than `chartRate` directly —
+      > §66.3 rule 1: `convert()` returns `null` while the rate is unknown, so
+      > the tile prints `—` instead of a 1:1 guess (§67.2's bug). Covered by a
+      > test that shows `—` when the rate fails to resolve. The two rate tiles
+      > (XIRR, TWR p.a.) are deliberately **not** converted — a percentage is not
+      > money, and there is a test asserting a 4× rate does not reach them.
+- [x] **Render the Timing line defensively**: it is a difference of two rates,
       so it is only meaningful when both are present. Hide the whole line when
       either input is withheld, and never print a difference against `null`.
-- [ ] **Reuse the Drawdown card's tile markup** (`:334-343`) for the four tiles
+      > `?? null`, never `?? 0`. Four states are tested: both present, XIRR
+      > withheld, TWR p.a. withheld, both withheld. Threshold ±1 pp per D85.
+- [x] **Reuse the Drawdown card's tile markup** (`:334-343`) for the four tiles
       so the tab does not grow a second visual dialect, and give the card the
       `data-testid="perf-overview"` prefix with `-net-gain`, `-net-invested`,
       `-xirr`, `-twr-pa`, `-timing` on the tiles.
-- [ ] **Tests**: extend
+      > The Timing tile lives INSIDE the `<dl>` as a `sm:col-span-2` item rather
+      > than a sibling block — a `<dt>` outside a `<dl>` is invalid HTML, and the
+      > plan's "full-width Timing line" reads as a tile that spans both columns,
+      > not as a different element.
+- [x] **Tests**: extend
       `tests/unit/modules/portfolios/PortfolioPerformanceTab.test.ts` — assert
       the tiles render the payload values, that `annualizedReturn: null` with a
       reason renders `—` and hides the Timing line, and that a display-currency
       switch re-renders the money tiles without remount (mirroring the existing
       §48.6e B3 cases at `:113`). `npm run build` (includes `vue-tsc --noEmit`)
       green.
-- [ ] **Commit** `feat(spa): add the performance overview tiles`
+      > The file did not exist — created, 13 cases. `:113` referred to a
+      > `PortfolioPerformanceTab.test.ts` that was never written, so the §48.6e B3
+      > shape was taken from its real home, the sibling tests in
+      > `tests/e2e/performance-display-currency.spec.ts`. 546/546 SPA unit tests,
+      > build green (vue-tsc included).
+- [x] **Commit** `feat(spa): add the performance overview tiles`
 
 ### 82.3 — `Monthly | Yearly` toggle on the Returns Chart, with TWR % and Gain
 

@@ -257,7 +257,7 @@ const portfolioCcy = computed(() => {
 // still renders (values are left unscaled) but the LABEL now falls back to the
 // portfolio's own currency via displayCurrencyOr() — §66.3's rule 2, which is
 // what the composable exists to enforce.
-const { rate: chartRate, displayCurrencyOr } = useDisplayConversion(() => portfolioCcy.value)
+const { rate: chartRate, displayCurrencyOr, convert } = useDisplayConversion(() => portfolioCcy.value)
 const chartCcy = computed(() => displayCurrencyOr() ?? undefined)
 
 const chartSeries = computed(() => {
@@ -282,10 +282,103 @@ const chartBenchmarks = computed(() => {
     timeSeries: (b.timeSeries ?? []).map((p) => ({ ...p, value: (p.value ?? 0) * rate })),
   }))
 })
+
+// ---------------------------------------------------------------------------
+// §82.2 / D85 — the overview card: five tiles answering two questions
+// ---------------------------------------------------------------------------
+// "How much more cash than I put in?" (tiles 1–4) and "was that because the
+// investments worked or because I timed the money well?" (tile 5).
+//
+// Every field is already on the payload this tab holds — this is a READ, not a
+// fetch. `annualizedReturn` / `annualizedReturnWithheldReason` arrived in
+// §82.1; before that the contract declared them and nothing returned them.
+const perf = computed(() => store.analytics?.performance ?? null)
+
+// The two money tiles ride the SAME conversion as the chart series below them —
+// the fifth copy of this path is §67.2's bug (plotting native values under a
+// foreign symbol), and §66.3 rule 1 is why `convert()` is used rather than a
+// bare `× rate`: no rate yet means no number, never a guess.
+const netGain = computed(() => convert(perf.value?.totalReturn))
+const netInvested = computed(() => convert(perf.value?.totalInvested))
+
+// Rates, not money — currency-independent, so deliberately NOT converted. A
+// converted percentage is a category error, and dividing by a rate would be worse.
+const xirr = computed(() => perf.value?.moneyWeightedReturn ?? null)
+const xirrWithheld = computed(() => perf.value?.moneyWeightedReturnWithheldReason ?? null)
+const twrPa = computed(() => perf.value?.annualizedReturn ?? null)
+const twrPaWithheld = computed(() => perf.value?.annualizedReturnWithheldReason ?? null)
+
+// §82.2 — Timing is a DIFFERENCE of two rates, so it exists only when both
+// inputs do. `?? null` (never `?? 0`) is the whole point: a withheld TWR p.a.
+// must not turn into a confident "your timing was worth +13%".
+const TIMING_NEUTRAL_PP = 1
+const timing = computed(() => {
+  if (xirr.value == null || twrPa.value == null) return null
+  const delta = xirr.value - twrPa.value
+  return {
+    delta,
+    // Any tighter threshold would be precision these two figures do not support.
+    reading:
+      delta > TIMING_NEUTRAL_PP
+        ? "adding money helped"
+        : delta < -TIMING_NEUTRAL_PP
+          ? "adding money hurt"
+          : "timing was roughly neutral",
+  }
+})
+
+/** Sign colouring for a rate/money tile. Absent stays neutral, never "green 0%". */
+function signClass(value: number | null): string {
+  if (value == null || value === 0) return ""
+  return value > 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+}
+
+/** Plain-language rendering of the contract's withheld reasons. */
+function withheldText(reason: string | null | undefined): string {
+  if (reason === "insufficient_history") return "not enough history yet"
+  if (reason === "invalid_data") return "history contains gaps"
+  return "not available"
+}
 </script>
 
 <template>
   <div class="space-y-6">
+    <div class="card p-6" data-testid="perf-overview">
+      <h2 class="mb-3 text-base font-semibold">Overview</h2>
+      <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div class="rounded-lg bg-slate-50 dark:bg-slate-800/50 p-4">
+          <dt class="text-sm text-slate-500 dark:text-slate-400">Net gain</dt>
+          <dd class="mt-1 text-xl font-semibold tabular-nums" :class="signClass(netGain)" data-testid="perf-overview-net-gain">{{ formatSignedCurrency(netGain, chartCcy) }}</dd>
+        </div>
+        <div class="rounded-lg bg-slate-50 dark:bg-slate-800/50 p-4">
+          <dt class="text-sm text-slate-500 dark:text-slate-400">Net invested</dt>
+          <dd class="mt-1 text-xl font-semibold tabular-nums" data-testid="perf-overview-net-invested">{{ formatSignedCurrency(netInvested, chartCcy) }}</dd>
+        </div>
+        <div class="rounded-lg bg-slate-50 dark:bg-slate-800/50 p-4">
+          <dt class="text-sm text-slate-500 dark:text-slate-400">XIRR</dt>
+          <dd class="mt-1 text-xl font-semibold tabular-nums" :class="signClass(xirr)" data-testid="perf-overview-xirr">{{ formatPercent(xirr, 2, true) }}</dd>
+          <p v-if="xirr == null" class="mt-1 text-xs text-slate-400 dark:text-slate-500">{{ withheldText(xirrWithheld) }}</p>
+        </div>
+        <div class="rounded-lg bg-slate-50 dark:bg-slate-800/50 p-4">
+          <dt class="text-sm text-slate-500 dark:text-slate-400">TWR p.a.</dt>
+          <dd class="mt-1 text-xl font-semibold tabular-nums" :class="signClass(twrPa)" data-testid="perf-overview-twr-pa">{{ formatPercent(twrPa, 2, true) }}</dd>
+          <p v-if="twrPa == null" class="mt-1 text-xs text-slate-400 dark:text-slate-500">{{ withheldText(twrPaWithheld) }}</p>
+        </div>
+
+        <div
+          v-if="timing"
+          class="rounded-lg bg-slate-50 dark:bg-slate-800/50 p-4 sm:col-span-2"
+          data-testid="perf-overview-timing"
+        >
+          <dt class="text-sm text-slate-500 dark:text-slate-400">Timing (XIRR − TWR p.a.)</dt>
+          <dd class="mt-1 flex flex-wrap items-baseline gap-2">
+            <span class="text-xl font-semibold tabular-nums" :class="signClass(timing.delta)">{{ formatPercent(timing.delta, 2, true) }}</span>
+            <span class="text-sm text-slate-500 dark:text-slate-400">{{ timing.reading }}</span>
+          </dd>
+        </div>
+      </dl>
+    </div>
+
     <div class="card p-6">
       <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 class="text-base font-semibold">Performance Chart: {{ chartCcy }}</h2>
