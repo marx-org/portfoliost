@@ -77,6 +77,9 @@ function isActive(item: { to: unknown; label: string }): boolean {
   if (name === "investments") {
     const currentName = router.currentRoute.value.name as string | undefined
     return (
+      // §84 — `accounts-balance` is the `/` landing page and the first tab, so
+      // without this the item goes dark on the page the user lands on.
+      currentName === "accounts-balance" ||
       currentName === "investments" ||
       currentName === "transactions" ||
       currentName === "transactions-cash" ||
@@ -151,7 +154,7 @@ function selectTheme(value: ThemePreference) {
     >
       <!-- Logo + collapse toggle -->
       <div class="flex items-center border-b border-slate-200 dark:border-slate-700/60" :class="isCollapsed ? 'justify-center py-4' : 'px-4 py-5'">
-        <router-link to="/en/investments" class="flex items-center gap-2 min-w-0" :title="isCollapsed ? 'Portfoliost' : undefined">
+        <router-link to="/en/investments/accounts-balance" class="flex items-center gap-2 min-w-0" :title="isCollapsed ? 'Portfoliost' : undefined">
           <img src="/favicon.svg" alt="Portfoliost" class="h-7 w-7 shrink-0" />
           <span v-if="!isCollapsed" class="truncate text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-100">Portfoliost</span>
         </router-link>

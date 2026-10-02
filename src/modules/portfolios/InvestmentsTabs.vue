@@ -7,6 +7,12 @@ const currentPath = route?.path ?? (typeof window !== "undefined" ? window.locat
 
 const tabs = [
   {
+    // §84 — first in the strip, and the landing page `/` points at.
+    label: "Accounts balance",
+    to: "/en/investments/accounts-balance",
+    match: (path: string) => path.startsWith("/en/investments/accounts-balance"),
+  },
+  {
     label: "Portfolios",
     to: "/en/investments",
     match: (path: string) => path === "/en/investments",

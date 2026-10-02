@@ -5,8 +5,10 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     {
+      // §84 — the account-level summary (`Konto`) is the landing page. The
+      // redirect is a path, not a name, so it cannot drift from the route below.
       path: "/",
-      redirect: "/en/investments",
+      redirect: "/en/investments/accounts-balance",
     },
     {
       path: "/login",
@@ -45,6 +47,13 @@ const router = createRouter({
           path: "investments",
           name: "investments",
           component: () => import("@/modules/portfolios/InvestmentsView.vue"),
+        },
+        {
+          // §84 — new tab, first in the strip, and the `/` landing page.
+          // `/en/investments` stays a working route, so no deep link breaks.
+          path: "investments/accounts-balance",
+          name: "accounts-balance",
+          component: () => import("@/modules/portfolios/AccountsBalanceView.vue"),
         },
         {
           path: "investments/transactions",
