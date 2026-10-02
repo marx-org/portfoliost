@@ -309,6 +309,14 @@ async function laneBox(locator: import("@playwright/test").Locator): Promise<{ x
   return { x: box!.x, y: box!.y }
 }
 
+/** The lane's position in graph coordinates, from vue-flow's inline transform. */
+async function laneGraphPos(locator: import("@playwright/test").Locator): Promise<{ x: number; y: number }> {
+  const transform = await locator.evaluate((el) => (el as HTMLElement).style.transform)
+  const m = /translate\((-?[\d.]+)px,\s*(-?[\d.]+)px\)/.exec(transform)
+  expect(m, `lane transform "${transform}"`).not.toBeNull()
+  return { x: Number(m![1]), y: Number(m![2]) }
+}
+
 function intersects(a: { x: number; y: number; width: number; height: number }, b: { x: number; y: number; width: number; height: number }): boolean {
   const ox = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x)
   const oy = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y)
@@ -435,7 +443,10 @@ test("moved lanes persist across a reload", async ({ page }) => {
   await page.mouse.down()
   await page.mouse.move(hb.x + 40 + 100, hb.y + hb.height / 2, { steps: 8 })
   await page.mouse.up()
-  const afterDrag = await laneBox(external)
+  // Compare graph coordinates, not screen pixels: the drag can move the lane far
+  // enough sideways that the next measurement scrolls, and a persisted position
+  // is a graph-space fact.
+  const afterDrag = await laneGraphPos(external)
   expect(afterDrag.x).toBeGreaterThan(40)
 
   await page.reload()
@@ -443,7 +454,7 @@ test("moved lanes persist across a reload", async ({ page }) => {
   await page.getByRole("link", { name: "Topology" }).click()
   await expect(page).toHaveURL(/\/en\/admin\/topology/)
 
-  const restored = await laneBox(laneNode(page, "external-services"))
+  const restored = await laneGraphPos(laneNode(page, "external-services"))
   expect(Math.abs(restored.x - afterDrag.x)).toBeLessThan(2)
   expect(Math.abs(restored.y - afterDrag.y)).toBeLessThan(2)
 })

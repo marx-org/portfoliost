@@ -76,7 +76,7 @@ export const MIN_RENDERED_SIZES: Record<NodeArea, { width: number; height: numbe
   "data-providers": { width: 54, height: 34 },
 }
 
-const LANE_PADDING = 32
+export const LANE_PADDING = 32
 /** Minimum separation kept between two lanes after packing. */
 const LANE_GAP = 16
 
@@ -136,20 +136,25 @@ export function nearOverlap(a: Rect, b: Rect, gap: number): boolean {
 }
 
 /**
- * Deterministic greedy pack: process areas top-down (by raw y, then definition
- * order) and push each lane straight down until it clears every already-placed
- * lane by at least LANE_GAP. Result lanes are pairwise disjoint. Horizontal
- * positions are untouched, preserving the left-to-right column reading.
+ * Deterministic greedy pack: process areas left-to-right (by raw x, then
+ * definition order) and push each lane straight right until it clears every
+ * already-placed lane by at least LANE_GAP. Result lanes are pairwise disjoint.
+ *
+ * The pack axis is horizontal so a wide screen is used: the graph reads
+ * left-to-right (rankdir "RL"), and stacking five areas downward instead made a
+ * tall column that `fitView` — which fits both axes — had to zoom out to
+ * satisfy, shrinking every box (§80.5). Vertical positions are untouched, which
+ * is what preserves the reading order within a rank.
  */
 export function packAreas(raw: Record<NodeArea, Rect>): Record<NodeArea, { x: number; y: number }> {
-  const order = NODE_AREAS.slice().sort((a, b) => raw[a].y - raw[b].y || NODE_AREAS.indexOf(a) - NODE_AREAS.indexOf(b))
+  const order = NODE_AREAS.slice().sort((a, b) => raw[a].x - raw[b].x || NODE_AREAS.indexOf(a) - NODE_AREAS.indexOf(b))
   const placed: Rect[] = []
   const out = {} as Record<NodeArea, { x: number; y: number }>
   for (const area of order) {
     let px = raw[area].x
-    let py = raw[area].y
+    const py = raw[area].y
     while (placed.some((p) => nearOverlap({ ...raw[area], x: px, y: py }, p, LANE_GAP))) {
-      py += 24
+      px += 24
     }
     placed.push({ ...raw[area], x: px, y: py })
     out[area] = { x: px - raw[area].x, y: py - raw[area].y }

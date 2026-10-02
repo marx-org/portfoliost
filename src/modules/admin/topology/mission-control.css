@@ -59,7 +59,7 @@
 .mission-toolbar .mission-area[aria-pressed="true"] { color: var(--area-color); background: #1c2b41; border-color: #35445c; }
 .mission-toolbar .mission-area[aria-pressed="false"] { color: #8194af; background: transparent; }
 .mission-area[aria-pressed="false"]::before { background: #54657c; }
-.mission-canvas { position: relative; height: clamp(540px, calc(100vh - 430px), 1000px); }
+.mission-canvas { position: relative; height: clamp(380px, calc(100vh - 430px), 760px); }
 .mission-empty { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(330px, 90%); text-align: center; padding: 25px; border: 1px solid #2c405c; border-radius: 14px; background: #0b172bee; box-shadow: 0 20px 50px #0004; }
 .mission-empty > span { display: block; color: #7dd3fc; font-size: 32px; }
 .mission-empty strong { display: block; font-size: 17px; }

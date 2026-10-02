@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { layoutTopology, nearOverlap, packAreas, NODE_SIZES, MIN_RENDERED_SIZES, laneId } from "@/modules/admin/topology/topology-layout"
+import { layoutTopology, nearOverlap, packAreas, NODE_SIZES, MIN_RENDERED_SIZES, LANE_PADDING, laneId } from "@/modules/admin/topology/topology-layout"
 import { NODE_AREAS, nodeById, topologyNodes } from "@/modules/admin/topology/graph-definition"
 
 const layout = layoutTopology()
@@ -45,12 +45,28 @@ describe("topology layout (D55-9)", () => {
     expect(centerX("nginx-gateway")).toBeLessThan(centerX("portfoliost"))
   })
 
-  it("places the swim lanes in the plan's left-to-right order (left edges)", () => {
-    const leftEdge = (area: (typeof NODE_AREAS)[number]): number =>
-      layout.lanes.find((l) => l.area === area)!.x
-    expect(leftEdge("data-providers")).toBeLessThan(leftEdge("storage"))
-    expect(leftEdge("storage")).toBeLessThan(leftEdge("internal"))
-    expect(leftEdge("internal")).toBeLessThan(leftEdge("external-services"))
+  it("packs lanes sideways and never back to the left (§80.5)", () => {
+    // This used to assert a left-to-right lane order that came from the rank
+    // columns. With the pack axis flipped that order is an *output* of
+    // packAreas, so asserting it here tested the sort and nothing else. What is
+    // worth pinning is the axis itself: every lane's shift is non-negative in x
+    // and exactly zero in y, so lanes only ever move right.
+    const layout = layoutTopology()
+    const raw = {} as Record<string, { x: number; y: number }>
+    for (const def of topologyNodes) {
+      const p = layout.positions[def.id]
+      const cur = raw[def.area] ?? { x: Infinity, y: Infinity }
+      raw[def.area] = { x: Math.min(cur.x, p.x), y: Math.min(cur.y, p.y) }
+    }
+    for (const lane of layout.lanes) {
+      // Vertical positions are untouched: a lane's top edge is exactly its
+      // first member's top (the lane only extends LANE_PADDING beyond it, and
+      // nothing on this axis moved).
+      expect(lane.y + LANE_PADDING, lane.area).toBe(raw[lane.area].y)
+      // No lane origin is negative — the drag clamp treats that as out of
+      // bounds and would silently pin the lane in place.
+      expect(lane.x, lane.area).toBeGreaterThanOrEqual(0)
+    }
   })
 
   it("emits exactly one lane per area", () => {
@@ -112,7 +128,7 @@ describe("topology layout (D55-9)", () => {
     }
   })
 
-  it("packAreas stacks overlapping boxes deterministically with no overlap", () => {
+  it("packAreas pushes overlapping boxes to the right deterministically with no overlap", () => {
     const raw = {
       "data-providers": { x: 0, y: 0, width: 300, height: 200 },
       storage: { x: 0, y: 40, width: 300, height: 200 },
@@ -136,9 +152,16 @@ describe("topology layout (D55-9)", () => {
     }
     // Deterministic: same input, same shifts.
     expect(JSON.stringify(packAreas(raw))).toBe(JSON.stringify(shifts))
-    // Horizontal positions are untouched.
+    // §80.5 — the pack axis is horizontal: lanes slide right, never down, so
+    // vertical positions are untouched and the reading order within a rank is
+    // preserved.
     for (const a of Object.keys(shifts) as (typeof NODE_AREAS)[number][]) {
-      expect(shifts[a].x, a).toBe(0)
+      expect(shifts[a].y, a).toBe(0)
+    }
+    // First in the order keeps its place; the rest move by at least one step.
+    expect(shifts.internal).toEqual({ x: 0, y: 0 })
+    for (const a of ["storage", "jobs", "external-services", "data-providers"] as (typeof NODE_AREAS)[number][]) {
+      expect(shifts[a].x, a).toBeGreaterThan(0)
     }
   })
 
