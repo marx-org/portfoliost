@@ -595,6 +595,7 @@ function onPickerSaved() {
       <PriceChart
         :symbol="chartPosition.symbol"
         :portfolio-id="id"
+        :portfolio-name="store.detail?.name ?? null"
         :default-show-transactions="true"
       />
     </div>

@@ -374,6 +374,28 @@ describe("PriceChart", () => {
     expect(typeof points[0].tooltip).toBe("undefined")
   })
 
+  it("falls back to the owning portfolio's name when a row carries none", async () => {
+    // A portfolio-scoped /transactions response leaves `portfolioName` empty
+    // on some rows; the panel showed the raw UUID.
+    const d = makeHistory().timestamps
+    mockedGetPortfolioTransactions.mockResolvedValue(
+      makeTxPage([
+        { ...makeTx({ id: "t1", type: "BUY", executedAt: new Date(d[0] * 1000).toISOString() }), portfolioName: "" },
+      ]),
+    )
+    const wrapper = mountChart({ portfolioId: "p1", portfolioName: "IBKR", defaultShowTransactions: true })
+    await flushPromises()
+    const vm = wrapper.vm as unknown as {
+      chartOptions: { annotations: { points: Array<{ id: string }> } }
+      selectMarker: (id: string) => void
+    }
+    vm.selectMarker(vm.chartOptions.annotations.points[0].id)
+    await flushPromises()
+    const panel = wrapper.find('[data-testid="chart-tx-details"]')
+    expect(panel.text()).toContain("IBKR")
+    expect(panel.text()).not.toContain("p1")
+  })
+
   it("closes the marker panel when the close button is used", async () => {
     const d = makeHistory().timestamps
     const wrapper = await mountTxChart([
@@ -412,7 +434,7 @@ describe("PriceChart", () => {
     // The holdings view passes defaultShowTransactions, so the box renders
     // ticked on mount. Nothing fetched them: markers and FIFO lines stayed
     // invisible until the timeframe changed or the box was cycled.
-    const wrapper = mountChart({ portfolioId: "p1", defaultShowTransactions: true })
+    const wrapper = await mountChart({ portfolioId: "p1", portfolioName: "IBKR", defaultShowTransactions: true })
     await flushPromises()
     expect(mockedGetPortfolioTransactions).toHaveBeenCalled()
     expect((wrapper.vm as unknown as { transactions: unknown[] }).transactions.length).toBe(1)

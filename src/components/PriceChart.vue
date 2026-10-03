@@ -21,6 +21,10 @@ const props = defineProps<{
    * chart titles. Optional: the chart still resolves its own axis currency from
    * /history; the prop only avoids a second fetch for the title. */
   currency?: string | null
+  /** The owning portfolio's name, for the transaction panel's account column:
+   * a portfolio-scoped /transactions response carries `portfolioName` only
+   * sometimes, and the raw id is no use to a reader. */
+  portfolioName?: string | null
 }>()
 
 type Timeframe = "1D" | "5D" | "1W" | "1M" | "3M" | "6M" | "1Y" | "3Y" | "5Y" | "10Y" | "YTD" | "MAX"
@@ -752,6 +756,14 @@ const selectedMarker = computed(() =>
 /** The trades behind the clicked marker, for the panel under the chart. */
 const selectedTransactions = computed<Transaction[]>(() => selectedMarker.value?.txs ?? [])
 
+/** What to print in the panel's account column. A portfolio-scoped transaction
+ * list leaves `portfolioName` empty, so without this the panel showed a UUID. */
+function accountOf(tx: Transaction): string {
+  if (tx.portfolioName) return tx.portfolioName
+  const fromStore = portfolioStore.portfolios.find((p) => p.id === tx.portfolioId)?.name
+  return fromStore ?? props.portfolioName ?? tx.portfolioId
+}
+
 // A remount redraws every marker, so a selection pointing at a marker that no
 // longer exists has to go with it.
 watch(chartKey, () => {
@@ -1102,7 +1114,7 @@ function downloadCsv(): void {
           <span :class="txType(tx) === 'BUY' ? 'font-medium text-green-600 dark:text-green-400' : 'font-medium text-red-600 dark:text-red-400'">
             {{ txType(tx) === "BUY" ? "Buy" : "Sell" }}
           </span>
-          <span>{{ tx.portfolioName ?? tx.portfolioId }}</span>
+          <span>{{ accountOf(tx) }}</span>
           <span>{{ formatNumber(tx.quantity) }} @ {{ formatCurrency(tx.price, tx.priceCurrency) }}</span>
           <span>= {{ formatCurrency(tx.totalAmount, tx.currency) }}</span>
           <span v-if="tx.fees">fee {{ formatCurrency(tx.fees, tx.currency) }}</span>
