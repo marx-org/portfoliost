@@ -1208,22 +1208,22 @@ The remaining four kinds. Each is a different source, which is why they are one
 step rather than four: no single one of them is a change of behaviour on its own,
 and four near-empty commits would be noise.
 
-- [ ] **Crypto** (`kind: "crypto"`) — `name`←`name`,
+- [x] **Crypto** (`kind: "crypto"`) — `name`←`name`,
       `exchange`←`exchange`, `icoDate`←`ico_date`,
       `circulatingSupply`←`circulating_supply`, `totalSupply`←`total_supply`.
       `quoteCurrency` comes from the profile's existing `currency`, not from the
       key-facts row. **No `marketCap`, `rank`, `ath` or `atl` keys** — FMP does not
       carry them (§86.1) and a permanently-null field is a permanent dash.
-- [ ] **ETF** (`kind: "etf"`) — `category` ← the `ticker_reference` row's
+- [x] **ETF** (`kind: "etf"`) — `category` ← the `ticker_reference` row's
       `etfCategory`. This is the value already mapped to `finnhubIndustry` at
       `routes/instruments.ts:446`; prefer reading `etfCategory` from the same
       reference `ref` the route already holds rather than re-querying.
-- [ ] **Fund** (`kind: "fund"`) — `categoryCode` only, and only when the
+- [x] **Fund** (`kind: "fund"`) — `categoryCode` only, and only when the
       reference row is an `ANALIZY::` listing key; `null` for a `TFI::` row.
       Verified shapes: `ANALIZY::ARK01` / `ARK01` / `Erste Akcji Polskich`, and
       `TFI::NNEP65.TFI` / `NNEP65.TFI`, whose `isin` is empty and whose aliases
       carry the human name. One field, and the page says so.
-- [ ] **Stock** (`kind: "stock"`) — `sector`←`gicsSector`,
+- [x] **Stock** (`kind: "stock"`) — `sector`←`gicsSector`,
       `industry`←`gicsIndustry`, `employees`←`employeeTotal`, `ceo`, plus
       `ipo`←`ipo`, `sharesOutstanding`←`shareOutstanding`,
       `marketCap`←`marketCapitalization`. Pure relocation: every value is already
@@ -1236,13 +1236,22 @@ and four near-empty commits would be noise.
       > let the route pass the enriched profile in; a `toStockKeyFacts` that
       > re-reads the provider row would return the dashes this section is
       > removing.
-- [ ] Tests in `translate.test.ts` for each of the four, including: a crypto row
+- [x] Tests in `translate.test.ts` for each of the four, including: a crypto row
       with null supplies → `null` not `0`; an ETF with `etf_category: "Fixed
       Income"` → `category: "Fixed Income"`; a fund on a `TFI::` key →
       `categoryCode: null`; a stock with a null `ceo` → `ceo: null` and the key
       still present.
-- [ ] Tests: `npm test` and `npm run build` green.
-- [ ] Commit `feat(instruments): translate crypto, ETF, fund and stock key facts`
+- [x] Tests: `npm test` and `npm run build` green.
+- [x] Commit `feat(instruments): translate crypto, ETF, fund and stock key facts`
+      > `f16b27b`. The stock kind is the one that shaped the design: it reads the
+      > **built profile**, because `gicsSector`/`gicsIndustry` are null in the raw
+      > translation and only the route's reference pass fills them. So an equity
+      > keeps `keyFacts: null` inside the translator and §86.8 recomputes it after
+      > its fill — chosen over emitting a stale `sector: null` directly beneath a
+      > profile that is about to say Technology. `toKeyFacts` is exported for that
+      > call. The dispatcher also keeps the pre-§86 behaviour for an unsynced
+      > symbol: no kind from the reference table still means the bond kinds are
+      > recognised from the row itself.
 
 ### 86.8 — instruments: dispatch the profile by asset class
 
