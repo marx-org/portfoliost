@@ -100,8 +100,13 @@ test("the accounts balance tab is the landing page, and its rows add up", async 
   ])
 
   // Column 4 = column 2 + column 3, and column 6 = column 4 − column 5, on the row.
-  await expect(page.getByTestId("accounts-balance-row")).toHaveCount(1)
-  const row = page.getByTestId("accounts-balance-row").first()
+  //
+  // Scoped to the Top10 row rather than asserting the account list has exactly
+  // one row: what this test checks is that Top10's arithmetic adds up, and the
+  // global count made it fail on any machine where another spec had left a
+  // throwaway portfolio behind (several do, and they clean up best-effort).
+  const row = page.getByTestId("accounts-balance-row").filter({ hasText: "Top10" })
+  await expect(row).toHaveCount(1)
   await expect(row.getByTestId("accounts-balance-account")).toContainText("Top10")
   const [investments, cash, total, deposits, gain] = await Promise.all([
     amount(row.getByTestId("accounts-balance-investments")),

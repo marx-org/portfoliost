@@ -731,7 +731,7 @@ regression — but the request's scope ("bond, fund, etc") makes it visible.
 
 ### 85.8 — Docs, Example service parity, and the full suite
 
-- [ ] **`docs/COMPONENTS.md`** — under "TickerBadge (the instrument identity
+- [x] **`docs/COMPONENTS.md`** — under "TickerBadge (the instrument identity
       block)", record that a badge on a portfolio-, charting-, admin- or
       share-page surface is expected to be wrapped in
       `researchRoute(sym, route.fullPath)`, and that dialogs use the
@@ -740,12 +740,17 @@ regression — but the request's scope ("bond, fund, etc") makes it visible.
       reachable from a portfolio page should be reachable by link.
       Re-verify the existing invariant still holds:
       `grep -rn "/api/logos/" src` → `TickerBadge.vue` and `RecentSearchesBar.vue` only.
-- [ ] **Playwright side by side** against `app.example-service.ai` at the same viewport
+      > **The invariant caught me.** My §85.6 comment in `BondCatalogueView.vue`
+      > quoted the logo route, which added a third `grep` match and broke a
+      > documented checkable invariant. Both mentions were reworded to describe
+      > the route without spelling it. Verified: the grep returns exactly the two
+      > expected files.
+- [x] **Playwright side by side** against `app.example-service.ai` at the same viewport
       for the four surfaces this changes: Holdings → Performance (Top/Bottom
       Performers), Portfolio → Dividends, Charting chips, and a watchlist. This
       is the step that decides the §85.4 chip question; record the comparison in
       the commit body.
-- [ ] **E2E for the newly linked surfaces** in `tests/e2e/research.spec.ts`,
+- [x] **E2E for the newly linked surfaces** in `tests/e2e/research.spec.ts`,
       reusing the `Go back` describe block at `:270` so every new entry point
       proves the `from` round-trip, not just the navigation: Top Performers
       (extend `tests/e2e/top-performers-currency.spec.ts:26`, which already
@@ -753,18 +758,54 @@ regression — but the request's scope ("bond, fund, etc") makes it visible.
       (`tests/e2e/dividends.spec.ts:115`), a news card
       (`portfolios.spec.ts:77`), the dialogs (open → click badge → back), and
       the chart modal.
-- [ ] **Regression net on the existing specs** that locate badges by role, so
+- [x] **Regression net on the existing specs** that locate badges by role, so
       a link does not break a locator: `research.spec.ts:259`
       (`getByRole("button", { name: "MSFT" })` — the search modal is untouched,
       assert it still passes), `portfolios.spec.ts:72-74`
       (`getByRole("link", { name: "META" })`) and `:77-104`
       (`getByTestId("ticker-badge")` on the news cards).
-- [ ] **Full suite:** `npm run build` (includes `vue-tsc --noEmit`),
+- [x] **Full suite:** `npm run build` (includes `vue-tsc --noEmit`),
       `npm run test`, `npm run test:mock`, `npm run test:e2e` against
       `docker compose up -d --build`. Rebuild the `portfoliost` container after
       the frontend changes and **restart the gateway** afterwards, or only
       wallets-routed paths will 404 for the wrong reason (`AGENTS.md`).
-- [ ] Commit `test(spa): cover ticker-to-research links in e2e and document the rule`
+      > **625/625 unit (77 files), build clean, 242/242 mock, all §85 e2e green**
+      > (research 25, charting 4, public-share 1, dividends, parity-portfolios).
+      >
+      > The **full** e2e run is not green, and the causes are all pre-existing
+      > and outside §85 — this suite is **not idempotent** against the shared
+      > local Postgres, and degrades a little more on every run:
+      > - `portfolios.spec.ts:292` — proven pre-existing: stashes `src/`,
+      >   rebuilds, identical failure (a `/^KO /` search result never appears).
+      > - `portfolios.spec.ts:378` and `:406` — the sector/`<th>` groupings only
+      >   see **page 1** of Top10's transactions, and `portfolios.spec.ts:200`
+      >   buys 5 META into Top10 on every run and never cleans up. META is
+      >   Communication Services, so Technology (8 rows) is pushed off page 1
+      >   (20 rows) and the group vanishes. Confirmed by dumping the rendered
+      >   groups: `COMMUNICATION SERVICES 14`, `SEMICONDUCTORS 6` — 20 of 30.
+      > - `accounts-balance.spec.ts:60` — asserted a global row count of 1
+      >   against a DB holding 23 leftover `E2E*` portfolios.
+      > - `settings.spec.ts:11` — `getByRole("link", { name: "Settings" })`
+      >   without `exact: true` collided with leftover portfolios named
+      >   `E2E CashLegSettings <ts>`.
+      >
+      > Fixed the two that are safe and in the spirit of a regression net:
+      > `accounts-balance` now scopes to the Top10 row (which is what the test
+      > claims to check) instead of asserting the user owns one portfolio; and
+      > `settings` uses `exact: true`. Also added the missing cleanup to
+      > `cash-leg-on-trade.spec.ts`, which was leaking a portfolio per run — the
+      > direct cause of the `settings` collision.
+      >
+      > **Not fixed, deliberately:** `portfolios.spec.ts:378/406` would need
+      > either a Top10 cleanup or an assertion that tolerates pagination, and
+      > both are judgement calls about another spec's intent. Also found, and
+      > left alone: `wallets`' portfolio-delete guard returns
+      > `"portfolio has open positions"` while the positions endpoint reports
+      > the same positions `isOpen: false, quantity: 0` — those 3 portfolios
+      >   cannot be deleted through the API. The real remedy for all of this is
+      >   a DB reset (`docker compose run --rm mock-db-seed`), which is the
+      >   user's call because it touches their local data.
+- [x] Commit `test(spa): cover ticker-to-research links in e2e and document the rule`
 
 ---
 

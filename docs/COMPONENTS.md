@@ -103,6 +103,43 @@ data it already has (or nothing, and the block degrades).
   `Stock`, not `(US) Stock` (§61.5 replaced two `assetLabel()` helpers that
   did exactly that guess).
 
+### A badge is expected to be a link (§85)
+
+A badge on a portfolio, charting, admin or share-page surface is expected to
+wrap the research route:
+
+```vue
+<router-link :to="researchRoute(symbol, route.fullPath)"><TickerBadge … /></router-link>
+```
+
+`researchRoute()` (`src/utils/research.ts`) is the **only** sanctioned way into
+research — one route, one `from` convention. Never hand-build the URL, and never
+give `TickerBadge` a `to` prop: it is documented as fetching nothing and each
+call site passes the data it has, so a router-coupled prop would break its
+no-router unit mounts. §85 added call sites to that helper; it introduced no
+second way to build a link.
+
+Pass `route.fullPath` as `from` so the research header's "Go back" returns to
+the page the user is on. `researchBackTarget` honours exactly two prefixes —
+`/en/` and `/public/` — and falls back to `/en/investments` for anything else,
+including a protocol-relative or absolute URL.
+
+**Inside a dialog, do not use `router-link`.** A link navigates without closing
+the dialog it sits in, leaving the research page under a live overlay. Emit and
+push instead — `emit("close")` first, then `router.push(researchRoute(...))` —
+reusing the `view-chart` event those files already have. `from` is the page
+*behind* the modal, because the route is unchanged while a modal is open.
+
+Two surfaces are deliberately exempt, and both are judgement calls worth
+re-reading before "fixing" them: a symbol with no research page stays clickable
+(the `/:symbol/profile` bond fallback and the "Limited data availability" banner
+cover most of them), and a navigation target is never placed inside a
+destructive confirmation.
+
+**Check, when you add a surface:** if a badge is reachable from a portfolio page,
+it should be reachable by link too. A badge that renders with no `<a>` around it
+and no click handler is the defect this rule exists to catch.
+
 ## Tests
 
 - Unit: `tests/unit/**` mirrors `src/` (vitest + `@vue/test-utils` + pinia env

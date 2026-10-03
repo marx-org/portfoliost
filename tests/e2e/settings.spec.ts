@@ -11,7 +11,11 @@ async function login(page: import("@playwright/test").Page) {
 test("settings: sidebar links and tabs navigate", async ({ page }) => {
   await login(page)
 
-  await page.getByRole("link", { name: "Settings" }).click()
+  // `exact: true` is load-bearing: without it this matches any link whose
+  // accessible name CONTAINS "Settings", and e2e specs that leave throwaway
+  // portfolios named e.g. "E2E CashLegSettings 1791018094209" behind make it a
+  // strict-mode violation. Playwright's own disambiguation suggests this form.
+  await page.getByRole("link", { name: "Settings", exact: true }).click()
   await expect(page).toHaveURL(/\/en\/settings\/profile/)
   await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible()
 

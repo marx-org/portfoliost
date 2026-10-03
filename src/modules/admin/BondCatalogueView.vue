@@ -71,11 +71,15 @@ const cpiStale = computed(() => cpi.value?.stale ?? false)
                 <!-- §85.6 — the case the request names explicitly: "bond". These
                      are ROD1033 / NNEP25-style series, not equity tickers, and the
                      bond-profile fallback in portfoliost-instruments is what makes
-                     the target resolve. `/api/logos/ROD1033` answers 200 with a
-                     generated SVG plate (first three chars in a circle), so the
-                     badge degrades gracefully and needs no special-casing.
+                     the target resolve. The logos endpoint answers 200 with a
+                     generated SVG plate (first three chars in a circle) for a
+                     series with no logo of its own, so the badge degrades
+                     gracefully and needs no special-casing.
                      The cell keeps its mono/semibold styling and the separate
-                     Name column is untouched. -->
+                     Name column is untouched. This comment deliberately avoids
+                     spelling the logo route, so the logos-reference check in
+                     docs/COMPONENTS.md keeps returning exactly TickerBadge.vue
+                     and RecentSearchesBar.vue. -->
                 <td class="py-2 pr-4 font-mono font-semibold">
                   <router-link :to="researchRoute(b.symbol, route.fullPath)" class="inline-block">
                     <TickerBadge size="sm" :symbol="b.symbol" />

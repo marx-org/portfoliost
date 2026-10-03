@@ -333,4 +333,91 @@ test.describe("research \"Go back\" returns to the origin page (60.3)", () => {
     await page.goto("/en/research/AAPL/overview")
     await expect(backLink(page)).toHaveAttribute("href", "/en/investments")
   })
+
+  // §85 — the Dividend History symbol cell's round-trip lives in
+  // `dividends.spec.ts`, not here: that spec is the one that actually records a
+  // dividend, so it is the only place a dividends row exists to click. The
+  // legacy `history[]` shape renders a plain badge by design (§85.2), and the
+  // seeded Top10 portfolio has no dividend rows at all.
+
+  // ── §85 — every surface this section newly linked, proving the `from`
+  // round-trip rather than just that a link exists. An href proves the link;
+  // landing on research AND coming back to the right page proves `from`.
+
+  test("§85 Top Performers badge: back returns to the performance tab", async ({ page }) => {
+    await login(page)
+    await page.getByRole("link", { name: /Top10/ }).click()
+    await expect(page).toHaveURL(/\/en\/portfolios\/[^/]+\/holdings/)
+    const pid = new URL(page.url()).pathname.split("/")[3]
+    const perfPath = `/en/portfolios/${pid}/performance`
+    await page.goto(perfPath)
+    await expect(page.getByRole("heading", { name: "Top Performers" })).toBeVisible({ timeout: 20000 })
+
+    const card = page.locator('[class*="card"]').filter({ has: page.getByRole("heading", { name: "Top Performers" }) })
+    await card.locator("li a[href^='/en/research/']").first().click()
+    await expect(page).toHaveURL(/\/en\/research\//)
+    await expect(backLink(page)).toHaveAttribute("href", perfPath)
+
+    await backLink(page).click()
+    await expect(page).toHaveURL(new RegExp(`${perfPath}$`))
+  })
+
+  test("§85 news card badge: back returns to the news tab", async ({ page }) => {
+    await login(page)
+    await page.getByRole("link", { name: /Top10/ }).click()
+    await expect(page).toHaveURL(/\/en\/portfolios\/[^/]+\/holdings/)
+    const pid = new URL(page.url()).pathname.split("/")[3]
+    const newsPath = `/en/portfolios/${pid}/news`
+    await page.goto(newsPath)
+    await page.waitForSelector("article a[href^='/en/research/']", { timeout: 20000 })
+
+    await page.locator("article a[href^='/en/research/']").first().click()
+    await expect(page).toHaveURL(/\/en\/research\//)
+    await expect(backLink(page)).toHaveAttribute("href", newsPath)
+
+    await backLink(page).click()
+    await expect(page).toHaveURL(new RegExp(`${newsPath}$`))
+  })
+
+  test("§85 dialog badge: closes the dialog, then back returns to the page behind it", async ({ page }) => {
+    // The emit-then-push path. Two things to prove: the dialog is GONE once
+    // research is open (a router-link would leave it mounted underneath), and
+    // `from` is the page behind the modal, not the modal's own route.
+    await login(page)
+    await page.getByRole("link", { name: /Top10/ }).click()
+    await expect(page).toHaveURL(/\/en\/portfolios\/[^/]+\/holdings/)
+    const holdingsPath = new URL(page.url()).pathname
+
+    const row = page.locator("tbody tr").first()
+    await row.getByRole("button", { name: "Position actions" }).click()
+    await page.getByRole("button", { name: "Dividend" }).click()
+    await expect(page.getByRole("dialog", { name: "Record Dividend" })).toBeVisible()
+
+    await page.getByRole("dialog", { name: "Record Dividend" }).locator(".cursor-pointer").click()
+    await expect(page).toHaveURL(/\/en\/research\//)
+    // The dialog unmounted rather than sitting under the research page.
+    await expect(page.getByRole("dialog", { name: "Record Dividend" })).toHaveCount(0)
+    await expect(backLink(page)).toHaveAttribute("href", holdingsPath)
+  })
+
+  test("§85 chart modal badge: back returns to the holdings tab", async ({ page }) => {
+    await login(page)
+    await page.getByRole("link", { name: /Top10/ }).click()
+    await expect(page).toHaveURL(/\/en\/portfolios\/[^/]+\/holdings/)
+    const holdingsPath = new URL(page.url()).pathname
+
+    const row = page.locator("tbody tr").first()
+    await row.getByRole("button", { name: "Position actions" }).click()
+    await page.getByRole("button", { name: "View chart" }).click()
+    await expect(page.getByTestId("ticker-badge").first()).toBeVisible()
+
+    // The modal's badge is display-only (no link): the modal is a full-screen
+    // overlay, so there is nothing to close first and §85 deliberately left it
+    // unlinked. Navigate from the modal's own "View chart"-adjacent route
+    // instead — via the holdings row, which is the linked path.
+    await page.getByRole("button", { name: "Close" }).click()
+    await page.locator("tbody tr a[href^='/en/research/']").first().click()
+    await expect(page).toHaveURL(/\/en\/research\//)
+    await expect(backLink(page)).toHaveAttribute("href", holdingsPath)
+  })
 })

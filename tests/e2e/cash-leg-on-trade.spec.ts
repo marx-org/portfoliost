@@ -209,6 +209,12 @@ test.describe("§87.5 — cash leg on trade", () => {
     await row.getByRole("button", { name: "Position actions" }).click()
     await page.getByRole("button", { name: "Buy", exact: true }).click()
     await expect(page.getByTestId("add-position-cash-leg")).toBeChecked()
+
+    // Clean up like the sibling tests above. Without this every full-suite run
+    // leaks a portfolio whose name contains "Settings", which turns
+    // settings.spec.ts's getByRole("link", { name: "Settings" }) into a
+    // strict-mode violation — an order-dependent failure in an unrelated spec.
+    await request.delete(`${GATEWAY}/api/portfolios/${pid}`, { headers: a })
   })
 
   test("the flag defaults ON for a kontо the importer always funds (name-seeded)", async ({ request }) => {
@@ -224,6 +230,10 @@ test.describe("§87.5 — cash leg on trade", () => {
     expect(other.cashLegOnTrade).toBe(false)
     // clean up so a re-run does not collide on uq_portfolios_user_name
     await request.delete(`${GATEWAY}/api/portfolios/${xtb.id}`, { headers: a })
+    // `other` leaks too, and its name contains no "Settings" — but an
+    // ever-growing portfolio list is what made accounts-balance.spec.ts's
+    // global row count fail on a second run.
+    await request.delete(`${GATEWAY}/api/portfolios/${other.id}`, { headers: a })
   })
 
   test("INDEPENDENCE: an import row ignores the portfolio flag entirely", async ({ request }) => {

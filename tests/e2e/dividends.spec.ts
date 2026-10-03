@@ -119,6 +119,19 @@ test("record dividend nets the wallet and populates Dividends + Transactions Tax
   await expect(drow).toContainText("20")
   await expect(drow.getByTestId("dividend-net-AAPL")).toContainText("80")
 
+  // §85 — the symbol cell is now a link into research. Proved here rather than
+  // in research.spec.ts because this is the only spec that actually records a
+  // dividend: the seeded portfolio has no dividend rows, so elsewhere there is
+  // nothing to click. Asserted as the full round trip, because an href proves
+  // the link and only coming back proves `from` was carried.
+  const divPath = `/en/portfolios/${pid}/dividends`
+  const researchLink = drow.locator("a[href^='/en/research/']")
+  await expect(researchLink).toHaveAttribute("href", "/en/research/AAPL/overview?from=/en/portfolios/" + pid + "/dividends")
+  await researchLink.click()
+  await expect(page).toHaveURL(/\/en\/research\/AAPL\/overview/)
+  await page.getByTestId("research-back").click()
+  await expect(page).toHaveURL(new RegExp(`${divPath}$`))
+
   // Transactions tab shows the Tax column (DIVIDEND row present) with the net amount
   await page.goto(`/en/portfolios/${pid}/transactions`)
   await expect(page.getByTestId("table-th-tax")).toBeVisible({ timeout: 15000 })
