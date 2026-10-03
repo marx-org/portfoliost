@@ -20345,7 +20345,7 @@ Split by navigation mechanism, per the recorded decision above. Each site gets
       > `/en/research/%E2%80%94/overview` — a real link to nothing. **Guard the
       > wrap on a symbol that is neither empty nor `"—"`**, so the legacy table
       > renders its badge plain.
-      > Done in `PerformanceTabContent.vue` (both lists, `replaceAll` on the
+      > Applied in `PerformanceTabContent.vue` (both lists, `replaceAll` on the
       > identical badge block) — the §83.1 file, not the emptied wrapper. That
       > file's header comment claimed it mounts with "no route, no router"; it
       > now takes a `vue-router` mock, and the comment says so.
@@ -20526,7 +20526,7 @@ instead of pasting in a `<span>`.
       > `stock-chip` / `remove-stock`, not chip internals — a wrapping link
       > keeps all of them green. That is the reason to prefer a wrap here over
       > a DOM restructure.
-      > Done as a wrap, no `TickerBadge` in the pill: the geometry stays
+      > Kept as a wrap, no `TickerBadge` in the pill: the geometry stays
       > example-service's, and the sibling Remove button keeps its own handler.
 - [x] `ChartingView.vue:190` — the fundamentals-comparison `<th>` per stock
       becomes `TickerBadge size="sm" align="right"` inside a `<router-link>`,
