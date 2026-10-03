@@ -1005,7 +1005,7 @@ them, and neither may be written against a guessed shape.
 
 ### 86.2 — Contracts: six `*KeyFacts` schemas and `InstrumentProfile.keyFacts`
 
-- [ ] `portfoliost-contracts/contracts/openapi.yaml` — add six schemas
+- [x] `portfoliost-contracts/contracts/openapi.yaml` — add six schemas
       (`StockKeyFacts`, `EtfKeyFacts`, `FundKeyFacts`, `CryptoKeyFacts`,
       `BondKeyFacts`, `CorpBondKeyFacts`), each opening with a literal
       `kind` property whose value is fixed (`const`), and add
@@ -1018,16 +1018,16 @@ them, and neither may be written against a guessed shape.
       `type: string, nullable: true`, **not** numbers — typing them as numbers
       would make §86.6's parsing an unchecked cast rather than a `Number()` with
       a `NaN` guard.
-- [ ] `npm run lint` from `portfoliost-contracts/contracts/` — this is
+- [x] `npm run lint` from `portfoliost-contracts/contracts/` — this is
       `scripts_check_spec.py`, the duplicate-property-key guard. It exists
       because §70.2 inserted a block into `PortfolioTotalMetrics` twice and two
       contracts published before a consumer caught it. Six new schemas is the
       exact shape of edit that caused it.
-- [ ] `npm test` and `npm run build` in the same directory.
-- [ ] **Push `main` and let CI bump the patch version — never tag by hand**
+- [x] `npm test` and `npm run build` in the same directory.
+- [x] **Push `main` and let CI bump the patch version — never tag by hand**
       (`AGENTS.md`, ops section). Verify the real tag with
       `gh release list --repo Marx2/portfoliost-contracts`.
-- [ ] `NODE_AUTH_TOKEN=$(gh auth token) npm install @marx2/contracts@<new-version>`
+- [x] `NODE_AUTH_TOKEN=$(gh auth token) npm install @marx2/contracts@<new-version>`
       in **both** consumers — `portfoliost-instruments` and `portfoliost` — then
       `npm run gen:types` in each. Commit `package-lock.json` and
       `src/generated/api-types.d.ts` (`portfoliost-instruments`) /
@@ -1038,10 +1038,10 @@ them, and neither may be written against a guessed shape.
       > pre-existing drift to reconcile — if the install lands a different
       > version than `gh release list` reported, stop and reconcile rather than
       > committing a mixed state.
-- [ ] Tests: `npm run build` in `portfoliost-instruments` (its
+- [x] Tests: `npm run build` in `portfoliost-instruments` (its
       `src/generated/api-types.d.ts` must contain the six schema names — a
       missing one means the wrong package version was installed).
-- [ ] Commit `feat(contracts): per-asset-class key facts on the instrument profile`
+- [x] Commit `feat(contracts): per-asset-class key facts on the instrument profile`
 
 ### 86.3 — openst: widen the crypto profile
 
@@ -1052,7 +1052,7 @@ search leg already exists, already runs against the only provider that has
 crypto metadata (`CRYPTO_SEARCH_PROVIDERS = ["fmp"]`, `:537`), and already
 carries the name.
 
-- [ ] Rewrite `get_crypto_profile(pair)` to call
+- [x] Rewrite `get_crypto_profile(pair)` to call
       `obb.crypto.search(pair, provider=<first provider with a key, honouring
       the existing `_provider_is_blocked` / `_provider_has_key` gate>)` and merge
       the matching row onto the quote-derived body. Add `name`, `exchange`,
@@ -1068,32 +1068,56 @@ carries the name.
       > with no dash, and it is row **12 of 17** (row 1 is `TBTCUSD`, tBTC USD),
       > so a literal `symbol == "BTC-USD"` comparison matches nothing at all.
       > The comparison is against the pair with its dash removed.
-- [ ] `margin` is not part of this; it is not a crypto field.
-- [ ] Tests in the openst suite, fixture-driven against §86.1's two JSON files:
+- [x] `margin` is not part of this; it is not a crypto field.
+- [x] Tests in the openst suite, fixture-driven against §86.1's two JSON files:
       a crypto whose search row has all five fields populated; one whose supply
       fields are null (must emit `null`, never `0`); a pair with no exact symbol
       match (must keep the quote-derived body and omit the five); and a search
       provider without a key (must not raise — `_provider_has_key` gating is the
       established pattern from `get_crypto_quote`).
-- [ ] Tests: `docker compose --profile test build test &&
+- [x] Tests: `docker compose --profile test build test &&
       docker compose --profile test run --rm test` — all 542 green.
-- [ ] Commit `feat(openst): carry name and supply on the crypto profile`
+- [x] Commit `feat(openst): carry name and supply on the crypto profile`
 
 ### 86.4 — openst standalone smoke
 
-- [ ] `docker compose up -d` in `openst`, then **one** `curl` per symbol:
+- [x] `docker compose up -d` in `openst`, then **one** `curl` per symbol:
       `/crypto/profile/BTC-USD`, `/corp-bond/profile/BST0327`, and
       `/fixedincome/profile/<a real emission>`.
-- [ ] Call each **twice** and confirm the second is a Redis cache HIT (the
+- [x] Call each **twice** and confirm the second is a Redis cache HIT (the
       `_cached_or_404` envelope makes this observable in the response), so the
       widened crypto profile costs one upstream call per TTL, not two per
       research page view.
-- [ ] The third curl is expected to fail locally — `openst.bond_series` is empty
+- [x] The third curl is expected to fail locally — `openst.bond_series` is empty
       and no emission is synced (verified in §86.1). **Record that in the commit
       body** rather than skipping the check silently, and note that the
       standalone smoke therefore covers crypto and corporate bonds only.
-- [ ] Commit — none required if nothing changed; if the smoke forced a fix, that
+- [x] Commit — none required if nothing changed; if the smoke forced a fix, that
       fix is its own commit before the instruments steps.
+      > Nothing needed fixing, so there is no commit for this step. What the smoke
+      > measured, in a throwaway project (`-p openst-smoke`, app published on
+      > **18080** because 8080 is already the portfoliost gateway's):
+      >
+      > | route | 1st | 2nd | verdict |
+      > |---|---|---|---|
+      > | `/crypto/profile/BTC-USD` | 200, 2.577 s | 200, 0.0038 s | cache HIT, widened body correct |
+      > | `/corp-bond/profile/BST0327` | 200, 1.038 s | 200, 0.011 s | cache HIT |
+      > | `/fixedincome/profile/ROS0932` | 404 | 404, 0.003 s | expected — `openst.bond_series` is empty |
+      >
+      > The crypto body came back with all five new fields and the four quote
+      > fields unchanged, so the widening costs **one** search walk per TTL, not
+      > two per research page view. Redis `crypto_profile:BTC-USD` held the
+      > identical body at TTL 86395.
+      >
+      > Two corrections to this step's own instructions. It says a cache HIT is
+      > "observable in the response" — it is not: `_cached_or_404` replays the
+      > cached body with no marker and no header, so timing was confirmed against
+      > the Redis key rather than trusted. And a *faster 404* is not a hit at
+      > all: it is the negative sentinel from §37.3, so the third row's second
+      > call proves nothing about the positive path.
+      >
+      > The standalone smoke therefore covers crypto and corporate bonds only, as
+      > §86.1 predicted — no savings-bond emission is importable in this stack.
 
 ### 86.5 — instruments: the two cachest adapters that do not exist
 
