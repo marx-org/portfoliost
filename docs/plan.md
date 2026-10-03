@@ -1126,30 +1126,30 @@ Catalyst or crypto. Both upstream routes exist and are already cached by
 cachest, so **this step adds no cachest configuration** — it only makes the
 existing cache reachable.
 
-- [ ] `fetchCorpBondProfile(symbol)` → `${BASE_URL}/corp-bond/profile/{symbol}`,
+- [x] `fetchCorpBondProfile(symbol)` → `${BASE_URL}/corp-bond/profile/{symbol}`,
       modelled on `fetchBondProfile`. Same `UpstreamError` behaviour — the
       caller needs to distinguish "not a Catalyst bond" from "cachest is down",
       which is exactly why `fetchFundSearch` (`:54-61`) swallows 404 while
       `fetchBondProfile` does not.
-- [ ] `fetchCryptoProfile(pair)` → `${BASE_URL}/crypto/profile/{pair}`.
-- [ ] Tests in `src/adapters/`: each encodes the path with
+- [x] `fetchCryptoProfile(pair)` → `${BASE_URL}/crypto/profile/{pair}`.
+- [x] Tests in `src/adapters/`: each encodes the path with
       `encodeURIComponent` (assert on the exact URL, including a pair whose
       quote currency contains a character that must be escaped), and each turns
       a non-2xx into an `UpstreamError` carrying the status.
-- [ ] Tests: `npm test` green (`vitest run`, `src/routes/instruments.test.ts` is
+- [x] Tests: `npm test` green (`vitest run`, `src/routes/instruments.test.ts` is
       the file that will need its fetch mocks extended in §86.8).
-- [ ] Commit `feat(instruments): fetch the corporate-bond and crypto profiles`
+- [x] Commit `feat(instruments): fetch the corporate-bond and crypto profiles`
 
 ### 86.6 — instruments: `toKeyFacts`, bonds first
 
 Bonds are the headline of the request and the only class with two disjoint field
 sets, so they get their own step and their own commit.
 
-- [ ] `src/adapters/translate.ts` — add `toBondKeyFacts(row: Row, kind)` and
+- [x] `src/adapters/translate.ts` — add `toBondKeyFacts(row: Row, kind)` and
       `toCorpBondKeyFacts(row: Row)`, returning the §86.2 schemas. Every field
       reads through the existing `str` / `num` / `pick` helpers (`translate.ts:47-79`)
       so a provider change degrades to `null` rather than throwing.
-- [ ] **Savings bond** (source keys from `openbb_client.py:727-738`):
+- [x] **Savings bond** (source keys from `openbb_client.py:727-738`):
       `seriesCode`←`series_code`, `issueDate`←`issue_date`,
       `maturityDate`←`maturity_date`, `termMonths`←`term_months`,
       `rateRule`←`rate_rule`, `margin`←`margin`, `redemptionFee`←`fee_b`,
@@ -1158,7 +1158,7 @@ sets, so they get their own step and their own commit.
       > strings depending on the driver — `num()` handles both, and a
       > `termMonths` of `0` must survive as `0` rather than becoming `null`
       > (`num` already returns `0`; do not add a truthiness filter on top).
-- [ ] **Catalyst corporate bond** — the three string-shaped fields, pinned:
+- [x] **Catalyst corporate bond** — the three string-shaped fields, pinned:
       - `nominalValue` ← `nominal_value` (`"100.0"`) →
         `num()`, so a malformed value becomes `null` and never `NaN`.
       - `currentRate` ← `current_rate` (`"7.83%"`) → **strip the trailing `%`
@@ -1176,11 +1176,11 @@ sets, so they get their own step and their own commit.
       > **`margin` is deliberately absent** — the scraper never sets it
       > (`obligacje.py:62-68`) and the live payload has no such key. Its absence
       > is a decision recorded in this section, not an oversight.
-- [ ] Wire `toBondKeyFacts` into `toInstrumentProfile` (`:189-231`) for the
+- [x] Wire `toBondKeyFacts` into `toInstrumentProfile` (`:189-231`) for the
       existing `isBond` branch (`:198`), and into `toInstrumentDetail`
       (`:160-187`) only if `InstrumentDetail` grows the field — it has not been
       specified to, so **do not** touch it in this step.
-- [ ] Tests in `src/adapters/translate.test.ts` against the §86.1 fixtures:
+- [x] Tests in `src/adapters/translate.test.ts` against the §86.1 fixtures:
       savings bond with `rate_rule: "cpi_12m+margin"` → `kind: "bond"`,
       `margin: 2`, `fee_b` → `redemptionFee: 2`, `rateRule` passed through
       **untranslated**; `rate_rule: "fixed"` → `kind: "bond"` with the same
@@ -1190,8 +1190,17 @@ sets, so they get their own step and their own commit.
       `secured: "NIE"`, `status: "Notowane"`, and **no** `margin` key at all;
       a row missing `current_rate` entirely → `currentRate: null` without
       throwing; `"7.83"` without the `%` → `7.83`.
-- [ ] Tests: `npm test` and `npm run build` green.
-- [ ] Commit `feat(instruments): translate savings-bond and Catalyst key facts`
+- [x] Tests: `npm test` and `npm run build` green.
+- [x] Commit `feat(instruments): translate savings-bond and Catalyst key facts`
+      > `85464be`. Two deviations from the step as written, both recorded in the
+      > commit body: `toBondKeyFacts` takes **no** `kind` parameter (a savings-bond
+      > row is the `bond` kind by definition, and a parameter that can only hold one
+      > value is a lie in a signature), and the wiring needed a **new** discriminator
+      > rather than the existing `isBond` — `isBond` fires on
+      > `rate_rule`/`series_code`, which a Catalyst row does not have, so wiring into
+      > it alone would have left every Catalyst profile rendering dashes for fields
+      > the provider already sends. `isBond` itself is untouched: it also drives the
+      > PLN currency estimate, and widening it is a currency decision.
 
 ### 86.7 — instruments: `toKeyFacts` for crypto, ETF, fund, stock
 
