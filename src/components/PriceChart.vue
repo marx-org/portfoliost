@@ -259,7 +259,14 @@ onMounted(() => {
   // Plan §48.5c — warm the shared currency registry for the title selector.
   void currenciesStore.load()
   load("none")
-  if (showTransactions.value) void ensurePortfoliosLoaded()
+  // `defaultShowTransactions` (the holdings view passes true) starts the box
+  // ticked but never fetched: markers and the FIFO lines were silently absent
+  // until the user unticked/reticked the box or changed timeframe. Load them
+  // here so the ticked box means what it says.
+  if (showTransactions.value) {
+    void ensurePortfoliosLoaded()
+    void fetchTransactions()
+  }
 })
 watch(compare, (k) => {
   if (k !== loadedCompare.value) load(k)
@@ -498,7 +505,7 @@ const fifoReferenceLines = computed(() => {
   const startTs = timestamps.value[startIdx]
   const endTs = timestamps.value[n - 1]
 
-  const buyPrices: number[] = []
+  const tradePrices: number[] = []
   const lots: Array<{ qty: number; price: number }> = []
   let remainingQty = 0
   let totalCost = 0
@@ -508,8 +515,11 @@ const fifoReferenceLines = computed(() => {
     if (txTs < startTs || txTs > endTs) continue
 
     const type = txType(tx)
+    // Low/High bracket every price the account actually transacted at, so a
+    // SELL counts. They used to collect BUY prices only, which put a "High"
+    // line below a sell marker (TSM: sold at 101.75, line read 100.99).
+    if (type === "BUY" || type === "SELL") tradePrices.push(tx.price)
     if (type === "BUY") {
-      buyPrices.push(tx.price)
       lots.push({ qty: tx.quantity, price: tx.price })
       remainingQty += tx.quantity
       totalCost += tx.quantity * tx.price
@@ -539,10 +549,10 @@ const fifoReferenceLines = computed(() => {
     label: { borderColor: string; style: { color: string; background: string }; text: string }
   }> = []
 
-  if (buyPrices.length === 0) return lines
+  if (tradePrices.length === 0) return lines
 
-  const low = Math.min(...buyPrices)
-  const high = Math.max(...buyPrices)
+  const low = Math.min(...tradePrices)
+  const high = Math.max(...tradePrices)
 
   if (remainingQty > 0) {
     const avgCost = totalCost / remainingQty
@@ -628,7 +638,10 @@ const transactionAnnotations = computed(() => {
         const isBuy = txType(tx) === "BUY"
         const color = isBuy ? "#16a34a" : "#dc2626"
         points.push({
-          x: index,
+          // +1: ApexCharts' numeric x-axis is 1-based (see the xaxis note in
+          // chartOptions). The y is the bar's close — what the tooltip's date
+          // column is anchored to — while Low/High/Avg below are trade prices.
+          x: index + 1,
           y: lineValue,
           marker: { size: 5, fillColor: color, strokeColor: color, offsetY: i === 0 ? 0 : -8 * i },
           label: { borderColor: color, style: { color: "#fff", background: color }, text: isBuy ? "▲" : "▼" },
@@ -689,8 +702,26 @@ const chartOptions = computed(() => ({
   colors: mode.value === "Drawdowns" ? ["#dc2626", "#94a3b8"] : ["#2563eb", "#94a3b8"],
   series: series.value.data,
   xaxis: {
-    categories: series.value.dates,
-    labels: { show: !fullscreen.value, datetimeUTC: false },
+    // A numeric axis is load-bearing for the transaction markers, not a style
+    // choice. ApexCharts positions an annotation point by its `x` VALUE on the
+    // axis; on a *category* axis it first tries to match `x` against the
+    // category labels and, when nothing matches, uses the number as a raw pixel
+    // offset from the grid's left edge (`getX1X2` → `getStringX` falls through
+    // to the input). So a 0-based bar index rendered at `index` px: markers
+    // drifted right of their bar, and once the index exceeded the plot width
+    // ApexCharts clamped them to the right edge and dropped them as clipped —
+    // which is why a 10Y window showed no markers at all. Passing the category
+    // *string* instead does not rescue it either: the lookup needs a rendered
+    // `<text>` node for that category, and fullscreen sets `labels.show:false`.
+    // With `type:"numeric"` the axis itself spans 1..N, so `x: index + 1` maps
+    // correctly at any width, under zoom, with or without visible labels.
+    type: "numeric" as const,
+    labels: {
+      show: !fullscreen.value,
+      // Numeric x is a 1-based position in the sliced window; map it back to
+      // that bar's date label.
+      formatter: (v: number) => series.value.dates[Math.round(v) - 1] ?? "",
+    },
     tickAmount: Math.min(12, series.value.dates.length),
   },
   yaxis: {

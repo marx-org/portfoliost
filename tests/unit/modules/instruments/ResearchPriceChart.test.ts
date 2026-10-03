@@ -118,7 +118,15 @@ async function mountTxChart(txs: { id: string; type: string; executedAt: string;
 }
 
 function refLinesOf(wrapper: ReturnType<typeof mountChart>) {
-  return (wrapper.vm as unknown as { chartOptions: { annotations: { yaxis: Array<{ y: number; borderColor: string; strokeDashArray: number }> } } }).chartOptions.annotations.yaxis
+  return (
+    wrapper.vm as unknown as {
+      chartOptions: {
+        annotations: {
+          yaxis: Array<{ y: number; borderColor: string; strokeDashArray: number; label: { text: string } }>
+        }
+      }
+    }
+  ).chartOptions.annotations.yaxis
 }
 
 describe("PriceChart", () => {
@@ -243,9 +251,32 @@ describe("PriceChart", () => {
     const opts = (wrapper.vm as unknown as { chartOptions: { annotations: { points: unknown[] } } }).chartOptions
     expect(opts.annotations.points.length).toBe(1)
     const p = opts.annotations.points[0] as { x: number; marker: { fillColor: string; offsetY: number } }
-    expect(p.x).toBe(0)
+    // The x-axis is numeric and 1-based, so bar 0 is x=1. A raw 0-based index
+    // here is what ApexCharts used to read as a pixel offset from the grid's
+    // left edge (and then drop the marker once the index passed the width).
+    expect(p.x).toBe(1)
     expect(p.marker.offsetY).toBe(0)
     expect(p.marker.fillColor).toBe("#16a34a")
+  })
+
+  it("addresses the x-axis numerically, with dates only as tick labels", async () => {
+    const wrapper = await mountTxChart([])
+    const opts = (wrapper.vm as unknown as {
+      chartOptions: { xaxis: { type: string; categories?: unknown; labels: { formatter: (v: number) => string } } }
+      series: { dates: string[] }
+    })
+    const xaxis = opts.chartOptions.xaxis
+    // A category axis cannot place a numeric annotation x (see the note in
+    // chartOptions), so the axis must be numeric and carry no `categories`.
+    expect(xaxis.type).toBe("numeric")
+    expect(xaxis.categories).toBeUndefined()
+    const dates = opts.series.dates
+    expect(dates.length).toBeGreaterThan(0)
+    // Tick labels still read as dates, and out-of-range ticks stay blank.
+    expect(xaxis.labels.formatter(1)).toBe(dates[0])
+    expect(xaxis.labels.formatter(dates.length)).toBe(dates[dates.length - 1])
+    expect(xaxis.labels.formatter(0)).toBe("")
+    expect(xaxis.labels.formatter(dates.length + 5)).toBe("")
   })
 
   it("stacks multiple same-date transactions with vertical offsets", async () => {
@@ -277,6 +308,35 @@ describe("PriceChart", () => {
     expect(opts.yaxis.length).toBe(3)
   })
 
+  it("brackets Low/High with sell prices too, not buys only", async () => {
+    const ts = makeHistory().timestamps
+    const wrapper = await mountTxChart([
+      { id: "t1", type: "BUY", executedAt: new Date(ts[0] * 1000).toISOString(), quantity: 10, price: 180 },
+      { id: "t2", type: "SELL", executedAt: new Date(ts[1] * 1000).toISOString(), quantity: 5, price: 220 },
+    ])
+    const texts = refLinesOf(wrapper).map((l) => l.label.text)
+    // A sell above every buy used to be excluded, leaving "High $180.00" with a
+    // red marker sitting above it (TSM in PROD: sold 101.75, line read 100.99).
+    expect(texts).toContain("High $220.00")
+    expect(texts).toContain("Low $180.00")
+    expect(texts).not.toContain("High $180.00")
+  })
+
+  it("loads transactions on mount when the box starts ticked", async () => {
+    mockedGetPortfolioTransactions.mockResolvedValue(
+      makeTxPage([makeTx({ id: "t1", type: "BUY", executedAt: new Date(makeHistory().timestamps[0] * 1000).toISOString() })]),
+    )
+    // The holdings view passes defaultShowTransactions, so the box renders
+    // ticked on mount. Nothing fetched them: markers and FIFO lines stayed
+    // invisible until the timeframe changed or the box was cycled.
+    const wrapper = mountChart({ portfolioId: "p1", defaultShowTransactions: true })
+    await flushPromises()
+    expect(mockedGetPortfolioTransactions).toHaveBeenCalled()
+    expect((wrapper.vm as unknown as { transactions: unknown[] }).transactions.length).toBe(1)
+    const points = (wrapper.vm as unknown as { chartOptions: { annotations: { points: unknown[] } } }).chartOptions.annotations.points
+    expect(points.length).toBe(1)
+  })
+
   it("does not render markers outside the visible range", async () => {
     const future = new Date("2030-01-01T12:00:00Z").toISOString()
     const wrapper = await mountTxChart([{ id: "t1", type: "BUY", executedAt: future }])
@@ -291,7 +351,7 @@ describe("PriceChart", () => {
     const wrapper = await mountTxChart([{ id: "t1", type: "BUY", executedAt: gapDate }])
     const points = (wrapper.vm as unknown as { chartOptions: { annotations: { points: { x: number }[] } } }).chartOptions.annotations.points
     expect(points.length).toBe(1)
-    expect(points[0].x).toBe(2)
+    expect(points[0].x).toBe(3)
     const vm = wrapper.vm as unknown as {
       chartOptions: { tooltip: { custom: (args: { series: number[][]; dataPointIndex: number; w: { config: { series: { name: string }[] } } }) => string } }
     }
@@ -370,7 +430,8 @@ describe("PriceChart", () => {
     const lines = refLinesOf(wrapper)
     expect(lines.find((l) => l.borderColor === "#2563eb")).toBeUndefined()
     expect(lines.find((l) => l.borderColor === "#16a34a")!.y).toBe(100)
-    expect(lines.find((l) => l.borderColor === "#dc2626")!.y).toBe(100)
+    // High spans the sell too (150), not just the buy (100).
+    expect(lines.find((l) => l.borderColor === "#dc2626")!.y).toBe(150)
   })
 
   it("ignores transactions from other instruments for reference lines and markers", async () => {
