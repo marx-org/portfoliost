@@ -1258,7 +1258,7 @@ and four near-empty commits would be noise.
 This is where the Catalyst-bond 502 is actually fixed, and it replaces a probe
 order that costs a three-provider equity spin on every bond lookup.
 
-- [ ] `src/routes/instruments.ts` `/:symbol/profile` (`:390-467`) — resolve the
+- [x] `src/routes/instruments.ts` `/:symbol/profile` (`:390-467`) — resolve the
       asset class **first** from the local reference via the existing
       `assetTypeForSymbol` + `normalizeAssetType`, then fetch the matching
       provider profile: `bond` → `fetchBondProfile`, `corp_bond` →
@@ -1269,16 +1269,16 @@ order that costs a three-provider equity spin on every bond lookup.
       > `assetTypeForSymbol` read, including the `catch` that falls back to
       > `"stock"`. Two dispatchers reading the same column is cheap; a third
       > ordering convention is not.
-- [ ] **Keep today's probe order for a symbol the reference does not know.** A
+- [x] **Keep today's probe order for a symbol the reference does not know.** A
       null `assetType` means no sync has run, not that the symbol is an equity;
       falling back to the existing `fetchProfile` → `fetchBondProfile` cascade
       (`:453-464`) preserves current behaviour for unsynced symbols and is what
       stops this step from turning a WSE stock into a 404.
-- [ ] Leave the `/:symbol/detail` route (`:340-388`) on its existing path in
+- [x] Leave the `/:symbol/detail` route (`:340-388`) on its existing path in
       this step. It has the same dispatch problem, but `InstrumentDetail` has
       not been given `keyFacts`, so there is nothing to fix there yet — noted
       here so the omission is deliberate and recorded, not forgotten.
-- [ ] Extend `src/routes/instruments.test.ts` (the fetch mocks): a `BST0327`
+- [x] Extend `src/routes/instruments.test.ts` (the fetch mocks): a `BST0327`
       reference row with `asset_type: "corp_bond"` resolves through
       `fetchCorpBondProfile` and returns `kind: "corp_bond"` with `issuer`; a
       `BTC-USD` row with `asset_type: "crypto"` resolves through
@@ -1286,8 +1286,29 @@ order that costs a three-provider equity spin on every bond lookup.
       cascade; and — the regression this step exists for — a Catalyst bond whose
       equity profile **succeeds** with an empty frame must still be served as a
       bond, not as a stock.
-- [ ] Tests: `npm test` and `npm run build` green.
-- [ ] Commit `fix(instruments): dispatch the profile route by asset class`
+- [x] Tests: `npm test` and `npm run build` green.
+- [x] Commit `fix(instruments): dispatch the profile route by asset class`
+      > `aef1b87`. The Catalyst 502 is fixed and the regression is now a test: a
+      > Catalyst bond whose **equity** profile succeeds with a plausible row is
+      > still served as a bond. Two supporting changes were load-bearing rather than
+      > incidental, and both were found by tests written from this step's own
+      > examples:
+      >
+      > * `ticker_reference.listing_key` is now selected by `searchTickerReference`.
+      >   The fund kind cannot tell an `ANALIZY::` listing from a `TFI::` one without
+      >   it. It is the primary key, so it was always one column away.
+      > * The identity-block guard compared the reference ticker against
+      >   `symbol.split(".")[0]`, which **can never equal a dotted listing** — so a
+      >   `NNEP65.TFI` fund matched no reference row at all and got no ISIN, no
+      >   country and no key facts. The guard now also accepts the venue-qualified
+      >   spelling: an exact comparison against the symbol the lookup was made with,
+      >   so it can only add matches for symbols containing a dot, which today get no
+      >   enrichment whatsoever. This is a pre-existing identity bug that §86.7's fund
+      >   example exposed rather than created.
+      >
+      > The route tests run against a **real test db with real `ticker_reference`
+      > rows**. Mocking `assetTypeForSymbol` was tried first and broke nine
+      > pre-existing tests — a mock tests the switch, not the wiring.
 
 ### 86.9 — SPA: `KeyFactsCard` replaces the hard-coded card
 
