@@ -299,13 +299,74 @@ describe("PriceChart", () => {
       { id: "t1", type: "BUY", executedAt: iso, quantity: 10, price: 180 },
       { id: "t2", type: "SELL", executedAt: iso, quantity: 5, price: 200 },
     ])
-    const opts = (wrapper.vm as unknown as { chartOptions: { annotations: { points: { marker: { fillColor: string } }[]; yaxis: { y: number }[] } } }).chartOptions.annotations
+    const opts = (wrapper.vm as unknown as { chartOptions: { annotations: { points: { marker: { fillColor: string; strokeColor: string } }[]; yaxis: { y: number }[] } } }).chartOptions.annotations
     // Both transactions on the same date produce two markers (buys before sells).
     expect(opts.points.length).toBe(2)
     expect(opts.points[0].marker.fillColor).toBe("#16a34a")
-    expect(opts.points[1].marker.fillColor).toBe("#dc2626")
+    expect(opts.points[1].marker.strokeColor).toBe("#dc2626")
     // FIFO on the visible range yields Avg + Low/High lines.
     expect(opts.yaxis.length).toBe(3)
+  })
+
+  it("draws a plain dot per trade, with no square label above it", async () => {
+    const d = makeHistory().timestamps
+    const wrapper = await mountTxChart([
+      { id: "t1", type: "BUY", executedAt: new Date(d[0] * 1000).toISOString(), quantity: 2, price: 100 },
+      { id: "t2", type: "SELL", executedAt: new Date(d[1] * 1000).toISOString(), quantity: 1, price: 120 },
+    ])
+    const points = (wrapper.vm as unknown as {
+      chartOptions: { annotations: { points: Array<{ label?: unknown; marker: { size: number; fillColor: string; strokeColor: string } }> } }
+    }).chartOptions.annotations.points
+    expect(points.length).toBe(2)
+    // A `label` makes ApexCharts draw a filled box with a ▲/▼ glyph — the
+    // clutter that was on the plot. The marker alone is the dot.
+    for (const p of points) expect(p.label).toBeUndefined()
+    expect(points[0].marker.fillColor).toBe("#16a34a")
+    // Sells stay hollow, so the side does not rest on colour alone.
+    expect(points[1].marker.fillColor).toBe("transparent")
+    expect(points[1].marker.strokeColor).toBe("#dc2626")
+  })
+
+  it("opens the trades behind a marker on click, and closes on a second click", async () => {
+    const d = makeHistory().timestamps
+    const wrapper = await mountTxChart([
+      { id: "t1", type: "BUY", executedAt: new Date(d[0] * 1000).toISOString(), quantity: 2, price: 100 },
+      { id: "t2", type: "BUY", executedAt: new Date(d[0] * 1000).toISOString(), quantity: 3, price: 110 },
+    ])
+    const points = (wrapper.vm as unknown as {
+      chartOptions: { annotations: { points: Array<{ click: () => void; txs: Array<{ id: string }> }> } }
+    }).chartOptions.annotations.points
+    // Two trades on one bar share a marker: the panel lists both.
+    expect(points[0].txs.map((t) => t.id)).toEqual(["t1", "t2"])
+
+    points[0].click()
+    await flushPromises()
+    const panel = wrapper.find('[data-testid="chart-tx-details"]')
+    expect(panel.exists()).toBe(true)
+    // Account, volume and price — what a click is for.
+    expect(panel.text()).toContain("P1")
+    expect(panel.text()).toContain("2 @")
+    expect(panel.text()).toContain("3 @")
+
+    points[0].click()
+    await flushPromises()
+    expect(wrapper.find('[data-testid="chart-tx-details"]').exists()).toBe(false)
+  })
+
+  it("closes the marker panel when the close button is used", async () => {
+    const d = makeHistory().timestamps
+    const wrapper = await mountTxChart([
+      { id: "t1", type: "BUY", executedAt: new Date(d[0] * 1000).toISOString() },
+    ])
+    const points = (wrapper.vm as unknown as {
+      chartOptions: { annotations: { points: Array<{ click: () => void }> } }
+    }).chartOptions.annotations.points
+    points[0].click()
+    await flushPromises()
+    expect(wrapper.find('[data-testid="chart-tx-details"]').exists()).toBe(true)
+    await wrapper.find('[data-testid="chart-tx-details-close"]').trigger("click")
+    await flushPromises()
+    expect(wrapper.find('[data-testid="chart-tx-details"]').exists()).toBe(false)
   })
 
   it("brackets Low/High with sell prices too, not buys only", async () => {

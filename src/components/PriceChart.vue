@@ -641,34 +641,92 @@ const barDateTxMap = computed<Map<string, BarTxEntry[]>>(() => {
   return map
 })
 
-const transactionAnnotations = computed(() => {
+/** A bar's transactions, selected by clicking its marker. Null = nothing
+ * selected. Held per bar-date because several trades can share a bar. */
+const selectedTxDate = ref<string | null>(null)
+
+const BUY_COLOR = "#16a34a"
+const SELL_COLOR = "#dc2626"
+
+interface TxAnnotation {
+  x: number
+  y: number
+  marker: { size: number; fillColor: string; strokeColor: string; strokeWidth: number; offsetY: number }
+  /** ApexCharts hands this same object to `click` and to `tooltip.formatter`
+   * (`click.bind(this, annotationConfig)`), so the rows travel with the marker
+   * without a side map keyed by an id ApexCharts might renumber. */
+  txs: Transaction[]
+  click: () => void
+  tooltip: { enabled: boolean; formatter: (ctx: { annotation: TxAnnotation }) => string }
+}
+
+const transactionAnnotations = computed<TxAnnotation[]>(() => {
   if (!showTransactions.value) return []
-  const points: Array<{
-    x: number
-    y: number
-    marker: { size: number; fillColor: string; strokeColor: string; offsetY: number }
-    label: { borderColor: string; style: { color: string; background: string }; text: string }
-  }> = []
-  for (const entries of barDateTxMap.value.values()) {
+  const points: TxAnnotation[] = []
+  for (const [barDate, entries] of barDateTxMap.value) {
     for (const { index, group } of entries) {
       const lineValue = series.value.data[0]?.data?.[index]
       if (typeof lineValue !== "number") continue
       group.forEach((tx, i) => {
         const isBuy = txType(tx) === "BUY"
-        const color = isBuy ? "#16a34a" : "#dc2626"
+        // A plain dot, no square: a `label` here draws a filled box with a
+        // ▲/▼ glyph, which is what cluttered the plot. Sells stay hollow so the
+        // side does not rest on colour alone.
         points.push({
           // +1: ApexCharts' numeric x-axis is 1-based (see the xaxis note in
           // chartOptions). The y is the bar's close — what the tooltip's date
           // column is anchored to — while Low/High/Avg below are trade prices.
           x: index + 1,
           y: lineValue,
-          marker: { size: 5, fillColor: color, strokeColor: color, offsetY: i === 0 ? 0 : -8 * i },
-          label: { borderColor: color, style: { color: "#fff", background: color }, text: isBuy ? "▲" : "▼" },
+          marker: {
+            size: 6,
+            fillColor: isBuy ? BUY_COLOR : "transparent",
+            strokeColor: isBuy ? BUY_COLOR : SELL_COLOR,
+            strokeWidth: 2,
+            offsetY: i === 0 ? 0 : -8 * i,
+          },
+          txs: group,
+          click: () => {
+            selectedTxDate.value = selectedTxDate.value === barDate ? null : barDate
+          },
+          tooltip: {
+            enabled: true,
+            formatter: (ctx) => txSummaryHtml(ctx.annotation.txs, true),
+          },
         })
       })
     }
   }
   return points
+})
+
+/** One line per trade: side, volume, price, total. Used for the hover bubble
+ * and, with `withAccount`, for the click panel. */
+function txSummaryHtml(txs: Transaction[], withAccount: boolean): string {
+  const rows = txs
+    .map((tx) => {
+      const isBuy = txType(tx) === "BUY"
+      const fee = tx.fees ? ` <span class="opacity-70">(fee ${formatCurrency(tx.fees, tx.currency)})</span>` : ""
+      const account = withAccount && tx.portfolioName ? `<div class="opacity-70">${tx.portfolioName}</div>` : ""
+      return (
+        `<div>${account}${isBuy ? "Buy" : "Sell"} ${formatNumber(tx.quantity)}` +
+        ` @ ${formatCurrency(tx.price, tx.priceCurrency)}` +
+        ` = ${formatCurrency(tx.totalAmount, tx.currency)}${fee}</div>`
+      )
+    })
+    .join("")
+  return `<div class="price-chart-tooltip">${rows}</div>`
+}
+
+/** The rows behind the clicked marker, for the panel under the chart. */
+const selectedTransactions = computed<Transaction[]>(() =>
+  selectedTxDate.value ? (barDateTxMap.value.get(selectedTxDate.value)?.flatMap((e) => e.group) ?? []) : [],
+)
+
+// A remount redraws every marker, so a selection pointing at a marker that no
+// longer exists has to go with it.
+watch(chartKey, () => {
+  selectedTxDate.value = null
 })
 
 function tooltipCustom({ series, dataPointIndex, w }: {
@@ -968,6 +1026,51 @@ function downloadCsv(): void {
         <p v-else class="flex h-full items-center justify-center text-sm text-slate-500 dark:text-slate-400">No price history available.</p>
       </div>
     </template>
+
+    <!-- Clicked marker → the trades behind it. One instance for both surfaces
+         (it sits outside the fullscreen branch, like the watermark below), so
+         the panel and its testid cannot drift into two copies. -->
+    <div
+      v-if="selectedTransactions.length"
+      data-testid="chart-tx-details"
+      class="mt-3 flex items-start justify-between gap-3 rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-800/50"
+    >
+      <div class="min-w-0">
+        <div class="mb-1 font-semibold text-slate-700 dark:text-slate-200">{{ selectedTxDate }}</div>
+        <div
+          v-for="tx in selectedTransactions"
+          :key="tx.id"
+          class="flex flex-wrap gap-x-3 text-slate-600 dark:text-slate-300"
+        >
+          <span :class="txType(tx) === 'BUY' ? 'font-medium text-green-600 dark:text-green-400' : 'font-medium text-red-600 dark:text-red-400'">
+            {{ txType(tx) === "BUY" ? "Buy" : "Sell" }}
+          </span>
+          <span>{{ tx.portfolioName ?? tx.portfolioId }}</span>
+          <span>{{ formatNumber(tx.quantity) }} @ {{ formatCurrency(tx.price, tx.priceCurrency) }}</span>
+          <span>= {{ formatCurrency(tx.totalAmount, tx.currency) }}</span>
+          <span v-if="tx.fees">fee {{ formatCurrency(tx.fees, tx.currency) }}</span>
+        </div>
+      </div>
+      <button
+        type="button"
+        class="btn-ghost shrink-0 px-2 py-1"
+        aria-label="Close transaction details"
+        data-testid="chart-tx-details-close"
+        @click="selectedTxDate = null"
+      >
+        &times;
+      </button>
+    </div>
+
     <p class="mt-2 text-right text-xs text-slate-400 dark:text-slate-500">Powered by Example service</p>
   </div>
 </template>
+
+<style>
+/* The markers are clickable (they open the trades behind them), and ApexCharts
+   only sets a pointer cursor on legend markers. Not scoped: the nodes are drawn
+   by ApexCharts into this component's DOM, so they carry no scope attribute. */
+.apexcharts-point-annotation-marker {
+  cursor: pointer;
+}
+</style>
