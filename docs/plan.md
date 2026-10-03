@@ -964,12 +964,12 @@ Rules: one step = one commit; a step is marked `[x]` only after its tests pass
 No code. The point of this step is that §86.2 declares fields and §86.6 parses
 them, and neither may be written against a guessed shape.
 
-- [ ] `openst/tests/fixtures/bond/corp_bond_profile_BST0327.json` — save the
+- [x] `openst/tests/fixtures/bond/corp_bond_profile_BST0327.json` — save the
       verbatim body captured above (already verified reachable at
       `:8090/corp-bond/profile/BST0327`; the HTML that produces it is already
       committed at `openst/tests/fixtures/obligacje_bond_profile_BST0327.html`,
       so this JSON is the *parsed* form and must be regenerated, not hand-typed).
-- [ ] `openst/tests/fixtures/crypto/search_BTC-USD.json` — the raw
+- [x] `openst/tests/fixtures/crypto/search_BTC-USD.json` — the raw
       `obb.crypto.search("BTCUSD", provider="fmp")` response behind
       `/crypto/search`, so §86.3's assertions are made against a recorded shape
       rather than a live key. **Note in the commit body which of
@@ -977,10 +977,10 @@ them, and neither may be written against a guessed shape.
       non-null for `BTC-USD`** — FMP populates them for majors and may not for
       long-tail tokens, and that difference is the reason the contract fields are
       nullable.
-- [ ] `openst/tests/fixtures/crypto/profile_BTC-USD.json` — today's
+- [x] `openst/tests/fixtures/crypto/profile_BTC-USD.json` — today's
       four-field body, so §86.3's test proves the widening is additive rather
       than a replacement.
-- [ ] Record the savings-bond field set from
+- [x] Record the savings-bond field set from
       `openst/tests/fixtures/obligacjeskarbowe/ros.html` — that fixture already
       exists and is committed; what is new is asserting the parsed values. It
       carries `Seria:`, `Oprocentowanie:` and the literal prose
@@ -991,11 +991,17 @@ them, and neither may be written against a guessed shape.
       bond-series import has not been run in this compose stack. The fixture is
       therefore the source of truth for this step, and the commit body must say
       so rather than implying a live capture.
-- [ ] **Commit body carries the measured table** — one row per class, field →
+- [x] **Commit body carries the measured table** — one row per class, field →
       wire key → type (number / string / date) → nullable. §86.2's schema is
       transcribed from it, so a disagreement between the table and the schema is
       a reviewable diff.
-- [ ] Commit `chore(openst): capture the profile payloads key facts are built from`
+      > `openst` `04355eb`. The table found two things the steps below assumed
+      > wrong, both recorded in that commit body: FMP spells the pair
+      > **`BTCUSD`, not `BTC-USD`** (§86.3's exact match has to dash-normalise,
+      > or it matches nothing for every real pair), and the savings bond's
+      > `margin` / `fee_b` / `nominal` arrive as **strings** (`"2.00"`), not
+      > numbers, because `_plain` stringifies the `Decimal`.
+- [x] Commit `chore(openst): capture the profile payloads key facts are built from`
 
 ### 86.2 — Contracts: six `*KeyFacts` schemas and `InstrumentProfile.keyFacts`
 
@@ -1052,12 +1058,16 @@ carries the name.
       the matching row onto the quote-derived body. Add `name`, `exchange`,
       `ico_date`, `circulating_supply`, `total_supply`; keep `symbol`,
       `currency`, `price`, `date` exactly as they are.
-      > **Match on symbol, not on the first row returned.** The fetcher's
-      > `transform_data` filters with `str.contains(query, case=False)` and
-      > returns a list — `BTC` matches `BTC-USD` but the first hit is not
-      > guaranteed to be the pair asked for. Selecting `symbol == pair` and
-      > returning the body unchanged when there is no exact match is the
-      > difference between a fact and a plausible-looking wrong fact.
+      > **Match on symbol, not on the first row returned — and dash-normalise
+      > first.** The fetcher's `transform_data` filters with
+      > `str.contains(query, case=False)` and returns a list — `BTC` matches
+      > `BTC-USD` but the first hit is not guaranteed to be the pair asked for.
+      > Selecting `symbol == pair` and returning the body unchanged when there is
+      > no exact match is the difference between a fact and a plausible-looking
+      > wrong fact. §86.1 measured the sharper edge: FMP returns **`BTCUSD`**,
+      > with no dash, and it is row **12 of 17** (row 1 is `TBTCUSD`, tBTC USD),
+      > so a literal `symbol == "BTC-USD"` comparison matches nothing at all.
+      > The comparison is against the pair with its dash removed.
 - [ ] `margin` is not part of this; it is not a crypto field.
 - [ ] Tests in the openst suite, fixture-driven against §86.1's two JSON files:
       a crypto whose search row has all five fields populated; one whose supply
