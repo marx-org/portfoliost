@@ -1387,27 +1387,51 @@ order that costs a three-provider equity spin on every bond lookup.
 
 ### 86.10 — Stack smoke, e2e, docs, and the recorded gaps
 
-- [ ] `docker compose up -d redis openst cachest instruments`, curl each of
+- [x] `docker compose up -d redis openst cachest instruments`, curl each of
       `AAPL`, `SPY` (ETF), `BST0327`, `BTC-USD`, `ARK01` through the gateway at
       `:8080` and confirm a non-null `keyFacts` with the right `kind` on each.
+      > Measured through the gateway at `:8080` after `docker compose restart
+      > gateway` (nginx resolves each upstream once at config load, so a recreated
+      > `instruments` 404s through the gateway until the gateway restarts):
+      >
+      > | symbol | kind | notes |
+      > |---|---|---|
+      > | `AAPL` | `stock` | `sector` present — it came from the reference fill, i.e. the §86.7 recompute working end to end |
+      > | `SPY` | `etf` | `category: "Equity"` — a row the backend already filled and the UI used to discard |
+      > | `BST0327` | `corp_bond` | full Catalyst payload, `currentRate: 7.83` |
+      > | `BTC-USD` | `crypto` | `name` / `icoDate` / both supplies present |
+      > | `ARK01` | — | **404** — see the fourth recorded gap below |
+      >
+      > The crypto row came back with five nulls on the first attempt and full
+      > values on the second. Not a code fault: **both cache layers replayed a
+      > pre-upgrade body** — openst's `crypto_profile:BTC-USD` (24 h TTL) *and*
+      > cachest's `crypto:profile:BTC-USD`. After a crypto-profile deploy both
+      > keys have to be dropped or the widening looks like it did nothing.
       **`docker compose restart gateway` after any upstream recreate** or only
       instruments-routed paths will 404 for the wrong reason — nginx caches each
       upstream address for the life of the process and the symptom is a 404 from
       the wrong Hono service, not a 502 (`portfoliost/AGENTS.md`).
-- [ ] e2e in `tests/e2e/research.spec.ts`: a corporate bond, a crypto pair and an
-      ETF each render their own key facts. A bond lookup needs the reference row,
+- [x] e2e in `tests/e2e/research.spec.ts`: a corporate bond, a crypto pair and an
+      ETF each render their own key facts.
+      > Three cases added and passing: `SPY` (ETF), `BTC-USD` (crypto) and
+      > `BST0327` (corporate bond), each asserting its own labels *and* the
+      > absence of `CEO` / `Employees` — the rows the old card rendered as
+      > dashes. `BTC-USD` asserts `Bitcoin USD` appears **twice**: the identity
+      > block already carries a Name row and the crypto block carries the
+      > provider's name beside it. That duplication is inherent to a shared
+      > identity block plus a class block, so it is asserted rather than hidden. A bond lookup needs the reference row,
       so assert against the symbols the local sync actually produced — query
       `instruments.ticker_reference` for one `corp_bond` and one `crypto` row
       first, and **skip with a named reason rather than inventing a symbol** if
       the local sync has not run.
-- [ ] `npm run test:stack` green, then the full SPA gate: `npm run build`,
+- [x] `npm run test:stack` green, then the full SPA gate: `npm run build`,
       `npm run test`, `npm run test:mock`, `npm run test:e2e` against a rebuilt
       stack.
-- [ ] **`docs/COMPONENTS.md`** — add a `KeyFactsCard` entry under "Where things
+- [x] **`docs/COMPONENTS.md`** — add a `KeyFactsCard` entry under "Where things
       live": the shared-identity rows come from the profile, the kind-specific
       rows from `profile.keyFacts`, labels live in `KEY_FACT_ROWS` and nowhere
       else, and a new asset class is one schema plus one array entry.
-- [ ] **Record the three gaps this section deliberately does not close**, in the
+- [x] **Record the three gaps this section deliberately does not close**, in the
       commit body and in this section's archive note — not as new work:
       1. **Funds have no real key facts.** One field ships. The TFI detail
          importer — manager, category type, OPL/TER, risk class, recommended
@@ -1420,7 +1444,27 @@ order that costs a three-provider equity spin on every bond lookup.
       3. **`/:symbol/detail` (`routes/instruments.ts:340-388`) still uses the
          probe order.** Same dispatch as §86.8, deferred because
          `InstrumentDetail` has no `keyFacts` field yet.
-- [ ] Commit `docs(spa): document KeyFactsCard and record the remaining class gaps`
+      4. **Funds have no provider profile at all, so `FundKeyFacts` is
+         contract-only.** `GET /api/instruments/ARK01/profile` returns 404 — the
+         equity tier has no `ARK01` and the bond fallback misses too — and the
+         route 404s *before* the reference-table pass, so the fund key facts never
+         reach the page. The contract, the translator and the card row all exist
+         and are unit-tested; nothing can render them until a fund profile is
+         served. The obvious fix is a reference-only profile for classes the
+         provider does not serve, which changes the route's error path and is
+         therefore its own step rather than a tailwind on this one.
+      5. **§86.8's premise did not reproduce: there is no Catalyst 502.** The step
+         was written on the measurement that a Catalyst profile 502s, and it does
+         not — openst's `EquityProfileFetcher` dispatches Catalyst codes to
+         obligacje.pl *internally*, so `/equity/profile/BST0327` answers with the
+         full Catalyst payload and the route never reaches its 404. The dispatch
+         change is still correct and still worth having (an explicit corp-bond
+         tier, reference-driven classification, key facts, and no second probe
+         once a `corp_bond` reference row exists), but the 502 it claims to fix is
+         not a symptom anyone can reproduce. The local sync produces **zero**
+         `corp_bond` reference rows, so the reference-driven branch is covered by
+         route tests against real seeded rows rather than by live data.
+- [x] Commit `docs(spa): document KeyFactsCard and record the remaining class gaps`
 
 ---
 

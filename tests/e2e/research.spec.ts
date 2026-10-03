@@ -421,3 +421,59 @@ test.describe("research \"Go back\" returns to the origin page (60.3)", () => {
     await expect(backLink(page)).toHaveAttribute("href", holdingsPath)
   })
 })
+
+// ---------------------------------------------------------------------------
+// §86.10 — per-class key facts
+//
+// Symbols are the ones the local sync actually produced, not invented: the
+// reference table holds `CRYPTO::BTC-USD` and 16 530 ETF rows, and no
+// corp_bond row at all. BST0327 is still asserted because the Catalyst profile
+// resolves through the equity tier (openst's EquityProfileFetcher dispatches
+// Catalyst codes to obligacje.pl internally), which is measured, not assumed —
+// see the note in §86.10 about the 502 this section's premise predicted.
+// ---------------------------------------------------------------------------
+
+async function openResearchFor(page: import("@playwright/test").Page, symbol: string) {
+  await login(page)
+  await page.goto(`/en/research/${symbol}/overview`)
+  return page.locator("[data-testid='key-facts-card']")
+}
+
+test("§86: an ETF renders its own key facts, not the equity rows", async ({ page }) => {
+  const card = await openResearchFor(page, "SPY")
+
+  await expect(card).toBeVisible({ timeout: 20000 })
+  await expect(card.getByText("Category")).toBeVisible()
+  await expect(card.getByText("Equity")).toBeVisible()
+  // An ETF has no CEO and no employees — the rows that used to render as dashes.
+  await expect(card.getByText("CEO", { exact: true })).toHaveCount(0)
+  await expect(card.getByText("Employees", { exact: true })).toHaveCount(0)
+})
+
+test("§86: a crypto pair renders its own key facts", async ({ page }) => {
+  const card = await openResearchFor(page, "BTC-USD")
+
+  await expect(card).toBeVisible({ timeout: 20000 })
+  await expect(card.getByText("Circulating supply")).toBeVisible()
+  await expect(card.getByText("Total supply")).toBeVisible()
+  // Twice on purpose: the shared identity block already carries a Name row, and
+  // the crypto block carries the provider's own name beside it.
+  await expect(card.getByText("Bitcoin USD").first()).toBeVisible()
+  await expect(card.getByText("Bitcoin USD")).toHaveCount(2)
+  await expect(card.getByText("CEO", { exact: true })).toHaveCount(0)
+})
+
+test("§86: a Catalyst corporate bond renders its own key facts", async ({ page }) => {
+  const card = await openResearchFor(page, "BST0327")
+
+  await expect(card).toBeVisible({ timeout: 20000 })
+  await expect(card.getByText("Issuer")).toBeVisible()
+  await expect(card.getByText("Secured")).toBeVisible()
+  await expect(card.getByText("Coupon type")).toBeVisible()
+  await expect(card.getByText("Current rate")).toBeVisible()
+  // Provider strings verbatim, and the rate carries its unit exactly once.
+  await expect(card.getByText("NIE", { exact: true })).toBeVisible()
+  await expect(card.getByText("7.83%")).toBeVisible()
+  await expect(card.getByText("CEO", { exact: true })).toHaveCount(0)
+  await expect(card.getByText("Employees", { exact: true })).toHaveCount(0)
+})

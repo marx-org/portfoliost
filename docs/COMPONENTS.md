@@ -82,6 +82,36 @@ submit gating, and labels — never re-derive the formula inline.
   `RecentSearchesBar.vue` only; the latter is the one deliberate exception (a
   dense symbol-only chip bar, §61.9).
 
+## KeyFactsCard (per-asset-class key facts, §86)
+
+`src/modules/instruments/KeyFactsCard.vue` + `keyFactsRows.ts` — the research
+overview's Key Facts card. One component for six asset classes, because the old
+eight-row card was equity-shaped and rendered Sector, Industry, Employees and CEO
+as dashes for every bond, fund, ETF and crypto pair.
+
+- **Two blocks.** The shared identity rows (Name, Country + flag, ISIN, Exchange,
+  weburl link) come from the profile. The class-specific rows come from
+  `profile.keyFacts`, discriminated by `kind`.
+- **Labels live only in `KEY_FACT_ROWS`** (`keyFactsRows.ts`), one array per
+  `kind` — never in the template and never derived from a contract enum, the same
+  rule `ASSET_TYPE_LABELS` follows in `TickerBadge.vue`. **A new asset class is
+  one contract schema plus one array entry; the card does not change.**
+- The table is a separate module because `<script setup>` cannot export, and an
+  importable map is what makes the rule above enforceable.
+- **`margin` is labelled by `rateRule`**, not always "Margin": "Rate" under
+  `fixed`, "Inflation margin" under `cpi_12m+margin`, "NBP margin" under
+  `nbp_ref+margin`, "Rate" when absent. The same stored number is a rate in one
+  case and a spread in the others, so a fixed label states something false for
+  two of the three savings-bond families.
+- **Provider text renders verbatim** (`secured` is `NIE`, `status` is
+  `Notowane`, `couponType` is Polish). Only numbers and dates are formatted.
+- **No `keyFacts` falls back to the profile's own equity fields**
+  (`PROFILE_FIELD`), so a stock's card is unchanged whether or not the backend
+  classified it. Without that fallback an older instruments build would render a
+  *different*, emptier card.
+- The card hides itself when there is neither identity nor class-specific data —
+  the same degradation the neighbouring equity-only cards do with `v-if`.
+
 ## TickerBadge (the instrument identity block)
 
 `src/components/TickerBadge.vue` — one presentational component for every
