@@ -706,21 +706,26 @@ const txMarkers = computed<TxMarker[]>(() => {
 const txMarkersById = computed(() => new Map(txMarkers.value.map((m) => [m.id, m])))
 
 const transactionAnnotations = computed(() =>
-  txMarkers.value.map((m) => ({
-    id: m.id,
-    x: m.x,
-    y: m.y,
-    // A plain dot, no square: a `label` here draws a filled box with a ▲/▼
-    // glyph, which is what cluttered the plot. Sells stay hollow so the side
-    // does not rest on colour alone.
-    marker: {
-      size: 6,
-      fillColor: m.buy ? BUY_COLOR : "transparent",
-      strokeColor: m.buy ? BUY_COLOR : SELL_COLOR,
-      strokeWidth: 2,
-      offsetY: m.nth === 0 ? 0 : -8 * m.nth,
-    },
-  })),
+  txMarkers.value.map((m) => {
+    const color = m.buy ? BUY_COLOR : SELL_COLOR
+    return {
+      id: m.id,
+      x: m.x,
+      y: m.y,
+      // A plain solid dot, no square: a `label` here draws a filled box with a
+      // ▲/▼ glyph, which is what cluttered the plot. Both sides are solid and
+      // differ only in colour — example-service has no transaction markers to match, so
+      // this is our own call, and the panel spells out Buy/Sell in words for
+      // anyone who cannot separate the two hues.
+      marker: {
+        size: 6,
+        fillColor: color,
+        strokeColor: color,
+        strokeWidth: 2,
+        offsetY: m.nth === 0 ? 0 : -8 * m.nth,
+      },
+    }
+  }),
 )
 
 /** The marker the user clicked, or null. */

@@ -321,9 +321,10 @@ describe("PriceChart", () => {
     // A `label` makes ApexCharts draw a filled box with a ▲/▼ glyph — the
     // clutter that was on the plot. The marker alone is the dot.
     for (const p of points) expect(p.label).toBeUndefined()
+    // Both sides are solid; only the colour differs.
     expect(points[0].marker.fillColor).toBe("#16a34a")
-    // Sells stay hollow, so the side does not rest on colour alone.
-    expect(points[1].marker.fillColor).toBe("transparent")
+    expect(points[0].marker.strokeColor).toBe("#16a34a")
+    expect(points[1].marker.fillColor).toBe("#dc2626")
     expect(points[1].marker.strokeColor).toBe("#dc2626")
     // Each dot is addressable: ApexCharts copies `id` onto the node as a class,
     // which is how the click listener finds its way back to the trades.
