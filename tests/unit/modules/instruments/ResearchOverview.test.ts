@@ -2,6 +2,7 @@ import { flushPromises, mount } from "@vue/test-utils"
 import { describe, expect, it, vi } from "vitest"
 import ResearchOverview from "@/modules/instruments/ResearchOverview.vue"
 import * as instrumentsApi from "@/api/instruments"
+import { ApiError } from "@/api/client"
 import type { InstrumentsMetrics, InstrumentsOverviewMetrics, InstrumentsProfile, QuoteAapl } from "@/api/types"
 import type { components } from "../../../../generated/api-types"
 
@@ -228,6 +229,39 @@ describe("ResearchOverview", () => {
 
     expect(wrapper.find(".bg-red-50").exists()).toBe(true)
     expect(wrapper.find(".bg-red-50").text()).toContain("NotFound")
+  })
+
+  it("degrades to the coverage banner, not an error page, when the profile 404s", async () => {
+    // §78 — a fund category (`ING01W`) has no provider profile at all: the
+    // backend answered 404 with the cachest URL as its message, and this page
+    // treated that as fatal, so `v-if="!loading && !error"` blanked the whole
+    // body — including the quote and the NAV chart, which both work. A 404 is
+    // "this tier has no profile", not "this page cannot render".
+    mocked.getInstrumentProfile.mockRejectedValue(
+      new ApiError(404, {
+        error: "NotFound",
+        message: "upstream 404 for http://cachest:8080/equity/profile/ING01W",
+      }),
+    )
+    const wrapper = mountOverview()
+    await flushPromises()
+
+    expect(wrapper.find(".bg-red-50").exists()).toBe(false)
+    expect(wrapper.text()).not.toContain("cachest")
+    expect(wrapper.text()).toContain("Limited data availability")
+    // The quote is a separate request and still answered.
+    expect(wrapper.text()).toContain("307.56")
+  })
+
+  it("still fails the page when the profile errors with anything but a 404", async () => {
+    mocked.getInstrumentProfile.mockRejectedValue(
+      new ApiError(502, { error: "BadGateway", message: "upstream 502 for http://cachest:8080" }),
+    )
+    const wrapper = mountOverview()
+    await flushPromises()
+
+    expect(wrapper.find(".bg-red-50").exists()).toBe(true)
+    expect(wrapper.text()).toContain("upstream 502")
   })
 
   it("§47.5: no currency badge when the profile declares one (provider)", async () => {

@@ -477,3 +477,31 @@ test("§86: a Catalyst corporate bond renders its own key facts", async ({ page 
   await expect(card.getByText("CEO", { exact: true })).toHaveCount(0)
   await expect(card.getByText("Employees", { exact: true })).toHaveCount(0)
 })
+
+// ---------------------------------------------------------------------------
+// §78 — an analizy.pl fund category
+//
+// `ING01W` (ING Akcji W) is a fund category, not a listed line: it is priced from
+// /fund/history/{code} and has no provider profile in any tier, so the profile
+// route used to 404 with the cachest URL as the message and the overview blanked
+// on it. The catalogue row is the profile, and it carries the only field the fund
+// card has — the category code, which no upstream ever sends.
+// ---------------------------------------------------------------------------
+
+test("§78: a fund category renders its category code, not an upstream error", async ({ page }) => {
+  await login(page)
+  await page.goto("/en/research/ING01W/overview")
+
+  const card = page.locator("[data-testid='key-facts-card']")
+  await expect(card).toBeVisible({ timeout: 20000 })
+  await expect(card.getByText("Category code")).toBeVisible()
+  await expect(card.getByText("ING01W")).toBeVisible()
+  await expect(card.getByText("ING Akcji W")).toBeVisible()
+  // TickerBadge labels the class from the same profile field, beside the
+  // country the catalogue row carries: "(PL) Fund".
+  await expect(page.locator("[data-testid='overview-ticker']")).toContainText("(PL) Fund")
+  // A profile 404 is coverage, not a failure — the red banner must not appear,
+  // and the backend's cachest URL must never reach the page.
+  await expect(page.locator(".bg-red-50")).toHaveCount(0)
+  await expect(page.locator("body")).not.toContainText("cachest")
+})

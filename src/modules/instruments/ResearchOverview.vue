@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue"
 import { useRoute } from "vue-router"
 import * as instrumentsApi from "@/api/instruments"
+import { ApiError } from "@/api/client"
 import TickerBadge from "@/components/TickerBadge.vue"
 import StatGroup from "@/components/StatGroup.vue"
 import PriceChart from "@/components/PriceChart.vue"
@@ -49,7 +50,20 @@ onMounted(async () => {
   applyEpsMode("annual")
   irEvents.value = ir.status === "fulfilled" && Array.isArray(ir.value) ? (ir.value as unknown as IrEventsAapl) : []
   if (p.status === "rejected") {
-    error.value = p.reason instanceof Error ? p.reason.message : "Failed to load research data"
+    // A 404 profile means the provider tier has no profile for this symbol — a
+    // fund category (`ING01W`), a delisted line, an unsynced reference row — not
+    // that the page cannot be rendered. Treating it as fatal blanked the whole
+    // body (`v-if="!loading && !error"` below) and printed the backend's message,
+    // which for an upstream miss is the cachest URL itself. The quote and the
+    // price bars are separate requests and frequently do work, so this degrades
+    // to the same amber banner the page already uses for partial market data.
+    // Every other failure (502/503, network, a bare Error) stays fatal.
+    const notFound = p.reason instanceof ApiError && p.reason.status === 404
+    if (notFound) {
+      limitedCoverage.value = true
+    } else {
+      error.value = p.reason instanceof Error ? p.reason.message : "Failed to load research data"
+    }
   } else {
     // Provider tier has no market data for this market (e.g. WSE) — identity
     // data from the ticker reference is still shown.
@@ -221,7 +235,7 @@ const targetSpread = computed(() => {
       </svg>
       <span>
         <span class="font-medium">Limited data availability.</span>
-        Market data for this listing is not covered by our data providers yet — basic instrument facts below come from the ticker reference database.
+        Market data for this listing is not covered by our data providers yet<template v-if="profile"> — basic instrument facts below come from the ticker reference database</template>.
       </span>
     </div>
     <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading research data...</p>
