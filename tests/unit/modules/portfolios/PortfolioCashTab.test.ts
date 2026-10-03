@@ -23,6 +23,13 @@ vi.mock("@/api/portfolios", async (importOriginal) => {
     transferCash: vi.fn(),
     updateCashTransaction: vi.fn(),
     deleteCashTransaction: vi.fn(),
+    // The transfer modal calls store.fetchAll() on open, and fetchAll reads
+    // both of these. Left unmocked they were the real API functions, so the
+    // store's portfolio list was overwritten with whatever the network (or, in
+    // CI, nothing) returned — and PortfolioCashModals' transfer-target computed
+    // then threw on a non-array.
+    getPortfolios: vi.fn(),
+    getPortfolioTotalMetrics: vi.fn(),
   }
 })
 
@@ -65,6 +72,11 @@ async function mountTab(env = makeEnv()) {
 describe("PortfolioCashTab (§62.8)", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocked.getPortfolios.mockResolvedValue([
+      { id: "p1", name: "Portfolio 1", baseCurrency: "USD" },
+      { id: "p2", name: "Portfolio 2", baseCurrency: "USD" },
+    ] as never)
+    mocked.getPortfolioTotalMetrics.mockResolvedValue({} as never)
     mocked.getPortfolioCash.mockResolvedValue(cash() as never)
     mocked.getPortfolioCashHistory.mockResolvedValue({
       data: [{ date: "2026-01-01", balance: 700 }, { date: "2026-01-02", balance: 720 }],
