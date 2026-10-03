@@ -1,11 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue"
+import { useRoute } from "vue-router"
+import { researchRoute } from "@/utils/research"
+import TickerBadge from "@/components/TickerBadge.vue"
 import {
   fetchBondCatalogue,
   fetchCpiSeries,
   type BondCatalogueRow,
   type CpiSummary,
 } from "@/api/admin"
+
+const route = useRoute()
 
 const bonds = ref<BondCatalogueRow[]>([])
 const bondCount = ref(0)
@@ -63,7 +68,19 @@ const cpiStale = computed(() => cpi.value?.stale ?? false)
             </thead>
             <tbody>
               <tr v-for="b in bonds" :key="b.symbol" class="border-b border-slate-100 dark:border-slate-800">
-                <td class="py-2 pr-4 font-mono font-semibold">{{ b.symbol }}</td>
+                <!-- §85.6 — the case the request names explicitly: "bond". These
+                     are ROD1033 / NNEP25-style series, not equity tickers, and the
+                     bond-profile fallback in portfoliost-instruments is what makes
+                     the target resolve. `/api/logos/ROD1033` answers 200 with a
+                     generated SVG plate (first three chars in a circle), so the
+                     badge degrades gracefully and needs no special-casing.
+                     The cell keeps its mono/semibold styling and the separate
+                     Name column is untouched. -->
+                <td class="py-2 pr-4 font-mono font-semibold">
+                  <router-link :to="researchRoute(b.symbol, route.fullPath)" class="inline-block">
+                    <TickerBadge size="sm" :symbol="b.symbol" />
+                  </router-link>
+                </td>
                 <td class="py-2 pr-4">{{ b.name }}</td>
                 <td class="py-2 pr-4">{{ b.issueDate ?? "—" }}</td>
                 <td class="py-2 pr-4">{{ b.maturityDate ?? "—" }}</td>

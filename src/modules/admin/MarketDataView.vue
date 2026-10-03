@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue"
+import { useRoute } from "vue-router"
+import { researchRoute } from "@/utils/research"
+import TickerBadge from "@/components/TickerBadge.vue"
 import {
   fetchStooqImportLog,
   fetchSplitCandidates,
@@ -20,6 +23,7 @@ interface StooqLogEntry {
 const importLog = ref<Array<{ dataset: string; latestDate?: string | null; importedAt?: string | null; rowsDeleted?: number | null }>>([])
 const splitCandidates = ref<SplitCandidate[]>([])
 const overflow = ref<OverflowSummary | null>(null)
+const route = useRoute()
 const loading = ref(true)
 const error = ref<string | null>(null)
 
@@ -137,7 +141,16 @@ const historyCandidates = () => splitCandidates.value.filter(c => c.status !== "
           <tbody>
             <tr v-for="c in pendingCandidates()" :key="c.symbol + c.detectedAt"
                 class="border-b border-slate-100 dark:border-slate-800">
-              <td class="py-2 pr-4 font-mono font-semibold">{{ c.symbol }}</td>
+              <!-- §85.6 — operational table, so this link navigates away from a
+                   half-filled "Apply factor" form. The input state is not
+                   persisted today, so nothing is lost; noted here and in the
+                   commit body rather than shipped silently. No name on these
+                   rows, so the badge is logo + ticker. -->
+              <td class="py-2 pr-4 font-mono font-semibold">
+                <router-link :to="researchRoute(c.symbol, route.fullPath)" class="inline-block">
+                  <TickerBadge size="sm" :symbol="c.symbol" />
+                </router-link>
+              </td>
               <td class="py-2 pr-4">{{ c.detectedAt }}</td>
               <td class="py-2 pr-4">{{ c.lastStooqClose ?? '—' }}</td>
               <td class="py-2 pr-4">{{ c.firstOverflowClose ?? '—' }}</td>
@@ -184,7 +197,11 @@ const historyCandidates = () => splitCandidates.value.filter(c => c.status !== "
             <tbody>
               <tr v-for="c in historyCandidates()" :key="c.symbol + c.detectedAt"
                   class="border-b border-slate-100 dark:border-slate-800">
-                <td class="py-1 pr-4 font-mono">{{ c.symbol }}</td>
+                <td class="py-1 pr-4 font-mono">
+                  <router-link :to="researchRoute(c.symbol, route.fullPath)" class="inline-block">
+                    <TickerBadge size="sm" :symbol="c.symbol" />
+                  </router-link>
+                </td>
                 <td class="py-1 pr-4">{{ c.detectedAt }}</td>
                 <td class="py-1 pr-4">{{ c.suggestedFactor ?? 'ambiguous' }}</td>
                 <td class="py-1">{{ c.status }}</td>
@@ -209,7 +226,11 @@ const historyCandidates = () => splitCandidates.value.filter(c => c.status !== "
             <tbody>
               <tr v-for="s in overflow.topSymbols" :key="s.symbol"
                   class="border-b border-slate-100 dark:border-slate-800">
-                <td class="py-1 pr-4 font-mono">{{ s.symbol }}</td>
+                <td class="py-1 pr-4 font-mono">
+                  <router-link :to="researchRoute(s.symbol, route.fullPath)" class="inline-block">
+                    <TickerBadge size="sm" :symbol="s.symbol" />
+                  </router-link>
+                </td>
                 <td class="py-1">{{ s.rowCount.toLocaleString() }}</td>
               </tr>
               <tr v-if="overflow.topSymbols.length === 0">

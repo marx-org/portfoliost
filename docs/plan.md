@@ -654,7 +654,7 @@ instead of pasting in a `<span>`.
 
 ### 85.6 — Admin: bond catalogue and market data
 
-- [ ] `BondCatalogueView.vue:66` — `TickerBadge size="sm"` inside a
+- [x] `BondCatalogueView.vue:66` — `TickerBadge size="sm"` inside a
       `<router-link>`, keeping the existing `font-mono font-semibold` cell
       styling for the symbol and leaving the separate Name column at `:67`
       alone.
@@ -665,18 +665,27 @@ instead of pasting in a `<span>`.
       > `/api/logos/ROD1033`; confirm the logos endpoint returns a plate rather
       > than a broken image for series with no logo, and if it 404s, accept the
       > alt-text fallback rather than special-casing the badge.
-- [ ] `MarketDataView.vue:140` (pending split candidates), `:187` (history),
+- [x] `MarketDataView.vue:140` (pending split candidates), `:187` (history),
       `:212` (overflow summary) — same conversion. These carry no name, so the
       badge shows logo + ticker only.
       > These tables are operational, not navigational: a click now navigates
       > away from a half-filled "Apply factor" form at `:153-162`. That is
       > acceptable (the input state is not persisted today anyway) but it must
       > be **noted in the commit body**, not silently shipped.
-- [ ] Tests: new unit cases for the three `MarketDataView` tables and
+      > Noted in the commit body, and a test asserts the factor input and the
+      > Apply/Dismiss buttons are still there. The factor input is an *untyped*
+      > text input bound to `applyFactor[symbol]` — `input[type=number]` matches
+      > nothing, which cost one wrong assertion.
+- [x] Tests: new unit cases for the three `MarketDataView` tables and
       `BondCatalogueView` asserting each symbol cell is a `RouterLink` with the
       bare symbol in `params.symbol`.
-- [ ] Tests: `npm run build` and `npm run test` green.
-- [ ] Commit `feat(spa): link instrument symbols in the admin tables`
+      > Two new files, 9 cases: `tests/unit/modules/admin/MarketDataView.test.ts`
+      > (5 — pending splits, split history, overflow summary, `from` carried,
+      > controls intact) and `BondCatalogueView.test.ts` (4). Both needed a
+      > `vue-router` mock and the slot-rendering `RouterLink` stub.
+- [x] Tests: `npm run build` and `npm run test` green.
+      > 620/620 unit across 77 files, build clean, 242/242 `test:mock`.
+- [x] Commit `feat(spa): link instrument symbols in the admin tables`
 
 ### 85.7 — The venue-suffix wart, surfaced by this section
 
