@@ -1312,18 +1312,18 @@ order that costs a three-provider equity spin on every bond lookup.
 
 ### 86.9 — SPA: `KeyFactsCard` replaces the hard-coded card
 
-- [ ] New `src/modules/instruments/KeyFactsCard.vue` — feature-scoped, used by
+- [x] New `src/modules/instruments/KeyFactsCard.vue` — feature-scoped, used by
       one view, so it belongs in the module and not `src/components/`
       (`docs/COMPONENTS.md:17`). Props: `profile: InstrumentsProfile`. It
       renders the **shared identity block** (Name, Country with the flag image,
       ISIN, Exchange, plus the `weburl` link at `ResearchOverview.vue:326-334`)
       and then the **kind-specific block** from `profile.keyFacts`.
-- [ ] One `KEY_FACT_ROWS: Record<kind, ReadonlyArray<{ field: keyof …;
+- [x] One `KEY_FACT_ROWS: Record<kind, ReadonlyArray<{ field: keyof …;
       label: string }>>` map drives the second block, so a new field is one array
       entry and not a new `<dt>`. Labels live in exactly one place, the same way
       `ASSET_TYPE_LABELS` does in `TickerBadge.vue:8` — and for the same reason:
       the contract enums are not display strings.
-- [ ] **The `margin` label switch** — `bond` rows label `margin` as
+- [x] **The `margin` label switch** — `bond` rows label `margin` as
       **"Rate"** when `rateRule === "fixed"`, **"Inflation margin"** when
       `rateRule === "cpi_12m+margin"`, **"NBP margin"** when
       `rateRule === "nbp_ref+margin"`, and **"Rate"** when `rateRule` is null.
@@ -1331,7 +1331,7 @@ order that costs a three-provider equity spin on every bond lookup.
       number is a rate in one case and a spread in the others
       (`bond_series.py:228-246`), and a card that always says "Margin" states
       something false for two of the three savings-bond families.
-- [ ] Formatting, using the existing helpers in `src/utils/format.ts`:
+- [x] Formatting, using the existing helpers in `src/utils/format.ts`:
       `formatAmount` (`:30`) for `nominal` / `nominalValue` paired with
       `nominalCurrency`; `formatNumber` (`:41`) for `termMonths`,
       `circulatingSupply`, `totalSupply`; `formatCompact` (`:58`) for
@@ -1340,22 +1340,22 @@ order that costs a three-provider equity spin on every bond lookup.
       `secured`, `couponType`, `rateRule`, `exchange`, `category`,
       `categoryCode`, `name`. A null value renders the card's existing `"—"`
       (`ResearchOverview.vue:70-72`).
-- [ ] `ResearchOverview.vue:297-335` — delete the hard-coded card, mount
+- [x] `ResearchOverview.vue:297-335` — delete the hard-coded card, mount
       `<KeyFactsCard :profile="profile" />` in its place. **The `Key Facts`
       heading and the `card p-6` wrapper move into the new component** so the
       markup is identical and `tests/e2e/research.spec.ts:27`
       (`getByText("Key Facts")`) keeps passing unchanged.
-- [ ] **Hide the card when there is nothing to say.** A symbol with identity but
+- [x] **Hide the card when there is nothing to say.** A symbol with identity but
       no `keyFacts` (an unsynced WSE stock, a crypto pair whose search leg has no
       exact match) must not render a card of six dashes. The existing
       "Limited data availability" banner (`:217-225`) already covers that case;
       the card is `v-if`'d off `profile.keyFacts || sharedIdentityRows.length`.
-- [ ] **Do not touch** the Analyst Price Target card (`:263-295`), the
+- [x] **Do not touch** the Analyst Price Target card (`:263-295`), the
       "Latest Earnings Call" card (`:337-354`), or the "Key Statistics" block
       (`:371-383`). All three are equity-only and already degrade correctly —
       `v-if="metrics"` at `:371`, `v-if="latestEarningsCall"` at `:337`. They are
       the model this section follows, not part of it.
-- [ ] Tests in `tests/unit/modules/instruments/`: a new `KeyFactsCard.test.ts`
+- [x] Tests in `tests/unit/modules/instruments/`: a new `KeyFactsCard.test.ts`
       with one case per kind asserting the exact label set rendered —
       stock keeps all eight original rows, `corp_bond` renders Issuer / Series /
       Market / Status / Nominal / Nominal currency / Secured / Coupon type /
@@ -1366,12 +1366,24 @@ order that costs a three-provider equity spin on every bond lookup.
       the same savings-bond fixture rendered under `fixed` and under
       `cpi_12m+margin` asserts the label is **"Rate"** in one and
       **"Inflation margin"** in the other.
-- [ ] Extend `tests/unit/modules/instruments/ResearchOverview.test.ts`: the
+- [x] Extend `tests/unit/modules/instruments/ResearchOverview.test.ts`: the
       existing "renders the company profile fields" case (`:215`) must still pass
       unchanged — it is the proof that a stock's card is byte-identical after the
       move.
-- [ ] Tests: `npm run build`, `npm run test`, `npm run test:mock` green.
-- [ ] Commit `feat(spa): render per-class key facts on the research overview`
+- [x] Tests: `npm run build`, `npm run test`, `npm run test:mock` green.
+- [x] Commit `feat(spa): render per-class key facts on the research overview`
+      > `fdac51d`. Two placements differed from the step's wording, both recorded in
+      > the commit body: the row table lives in **`keyFactsRows.ts`** beside the card
+      > (`<script setup>` cannot export, and an importable map is what makes "a new
+      > class is one array entry" true), and the equity rows **fall back to the
+      > profile's own fields** when `keyFacts` is absent — otherwise an older
+      > instruments build or an unclassifiable symbol would render a *different* card.
+      > That fallback is also what keeps ResearchOverview's existing "renders the
+      > company profile fields" case passing untouched.
+      >
+      > `ipo`, `sharesOutstanding` and `marketCap` are in `StockKeyFacts` but are
+      > deliberately **not** on the card: Key Statistics already covers market data,
+      > and this step's acceptance is that a stock keeps its original eight rows.
 
 ### 86.10 — Stack smoke, e2e, docs, and the recorded gaps
 
