@@ -37,12 +37,19 @@ fi
 #    except the reference data. mock-db-seed re-inserts everything else
 #    (wallets + demo FX into instruments.fx_rates, portfolios, user prefs,
 #    ticker reference, openst no-price bonds).
+#
+#    `news_articles` is in the keep-list for a specific reason (2026-10-03): it is
+#    a provider-backed read-through cache, but GET /api/portfolios/:id/news is
+#    served by wallets and reads it WITHOUT triggering the sync — only
+#    GET /api/news/articles does that. So truncating it empties the news tab and
+#    nothing re-seeds it, which broke portfolios.spec.ts:77 and the research
+#    news specs. Like ticker_reference it is fixture data, not app state.
 TABLES=$(docker compose exec -T postgres psql -U portfoliost -d portfoliost -At \
   -c "select string_agg(quote_ident(table_schema) || '.' || quote_ident(table_name), ', ')
       from information_schema.tables
       where table_type = 'BASE TABLE'
         and table_schema in ('wallets','portfolios','instruments','openst','admin')
-        and table_name not in ('ticker_reference','exchange_reference','logos','schema_migrations')")
+        and table_name not in ('ticker_reference','exchange_reference','logos','schema_migrations','news_articles')")
 if [ -z "$TABLES" ]; then
   echo "no app-state tables found (is postgres up?)" >&2
   exit 1
