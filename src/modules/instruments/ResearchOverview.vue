@@ -7,6 +7,7 @@ import StatGroup from "@/components/StatGroup.vue"
 import PriceChart from "@/components/PriceChart.vue"
 import CurrencyWarningBadge from "@/components/CurrencyWarningBadge.vue"
 import ResearchSeasonality from "@/modules/instruments/ResearchSeasonality.vue"
+import KeyFactsCard from "@/modules/instruments/KeyFactsCard.vue"
 import type { InstrumentsMetrics, InstrumentsOverviewMetrics, InstrumentsProfile, IrEventsAapl, QuoteAapl } from "@/api/types"
 import { formatAmount, formatCompact, formatNumber, formatPercent } from "@/utils/format"
 import { researchSymbol } from "@/utils/research"
@@ -294,45 +295,9 @@ const targetSpread = computed(() => {
         <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">Current price: {{ formatAmount(targetSpread.current, instrCcy) }}</p>
       </div>
 
-      <div class="card p-6">
-        <h2 class="mb-3 text-base font-semibold">Key Facts</h2>
-        <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-          <dt class="text-slate-500 dark:text-slate-400">Name</dt>
-          <dd>{{ profile?.name }}</dd>
-          <dt class="text-slate-500 dark:text-slate-400">Sector</dt>
-          <dd>{{ profile?.gicsSector ?? "—" }}</dd>
-          <dt class="text-slate-500 dark:text-slate-400">Industry</dt>
-          <dd>{{ profile?.gicsIndustry ?? "—" }}</dd>
-          <dt class="text-slate-500 dark:text-slate-400">Country</dt>
-          <dd class="flex items-center gap-1.5">
-            <img
-              v-if="profile?.countryCode"
-              :src="`https://flagcdn.com/w40/${profile.countryCode.toLowerCase()}.png`"
-              :alt="profile.country ?? ''"
-              class="h-3 w-[18px] rounded-[1px] object-cover"
-              loading="lazy"
-            />
-            <span>{{ profile?.country ?? "—" }}</span>
-          </dd>
-          <dt class="text-slate-500 dark:text-slate-400">ISIN</dt>
-          <dd class="tabular-nums">{{ profile?.isin ?? "—" }}</dd>
-          <dt class="text-slate-500 dark:text-slate-400">Exchange</dt>
-          <dd>{{ profile?.exchange ?? "—" }}</dd>
-          <dt class="text-slate-500 dark:text-slate-400">Employees</dt>
-          <dd>{{ profile?.employeeTotal ? formatNumber(profile.employeeTotal, 0) : "—" }}</dd>
-          <dt class="text-slate-500 dark:text-slate-400">CEO</dt>
-          <dd>{{ profile?.ceo ?? "—" }}</dd>
-        </dl>
-        <a
-          v-if="profile?.weburl"
-          :href="profile.weburl"
-          target="_blank"
-          rel="noopener"
-          class="mt-3 inline-block text-sm text-blue-600 dark:text-blue-400 hover:underline"
-        >
-          {{ profile.weburl.replace(/^https?:\/\//, "") }}
-        </a>
-      </div>
+      <!-- §86 — the heading and the card wrapper live in the component, so the
+           markup is identical to the hard-coded block it replaces. -->
+      <KeyFactsCard v-if="profile" :profile="profile" />
 
       <div v-if="latestEarningsCall" class="card p-6">
         <div class="flex flex-wrap items-center justify-between gap-3">
