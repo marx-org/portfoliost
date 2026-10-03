@@ -566,7 +566,7 @@ instead of pasting in a `<span>`.
 
 ### 85.4 — Charting page: the chip links, the comparison headers get a badge
 
-- [ ] `ChartingView.vue:124-141` — wrap the chip's symbol + name in
+- [x] `ChartingView.vue:124-141` — wrap the chip's symbol + name in
       `<router-link :to="researchRoute(symbol, route.fullPath)">` with
       `class="min-w-0 truncate"`. **Keep the `rounded-full` pill and do not put
       a `TickerBadge` inside it**: a logo plate in a pill is not example-service's
@@ -579,18 +579,32 @@ instead of pasting in a `<span>`.
       > `stock-chip` / `remove-stock`, not chip internals — a wrapping link
       > keeps all of them green. That is the reason to prefer a wrap here over
       > a DOM restructure.
-- [ ] `ChartingView.vue:190` — the fundamentals-comparison `<th>` per stock
+      > Done as a wrap, no `TickerBadge` in the pill: the geometry stays
+      > example-service's, and the sibling Remove button keeps its own handler.
+- [x] `ChartingView.vue:190` — the fundamentals-comparison `<th>` per stock
       becomes `TickerBadge size="sm" align="right"` inside a `<router-link>`,
       matching `ResearchCompare.vue:56` exactly (that table is the same shape:
       `r.symbol` is optional, so guard `v-if="r.symbol"`). Drop the `uppercase`
       on those cells — an uppercase class applied to a company name is a bug
       the research table already documents against (`ResearchCompare.vue:48-51`).
-- [ ] Tests: `ChartingView.test.ts` gains a case asserting the chip's link
+      > Matches `ResearchCompare.vue` exactly, including the `v-if="r.symbol"`
+      > guard for the optional symbol. The `:key` moved to `r.symbol ?? r.name`
+      > so a null-symbol row still has a stable key, and `uppercase` moved off
+      > the row onto the `Stock` label alone.
+- [x] Tests: `ChartingView.test.ts` gains a case asserting the chip's link
       `to` is `research-overview` for `AAPL`; `tests/e2e/charting.spec.ts`
       gains a case clicking a chip and asserting
       `/\/en\/research\/[A-Z0-9.-]+\/overview/`.
-- [ ] Tests: `npm run build`, `npm run test`, and `npm run test:e2e` green.
-- [ ] Commit `feat(spa): link the charting chips and badge the comparison headers`
+      > Two unit cases (chip link; header badges + the `uppercase` split) and one
+      > e2e case that clicks a chip, asserts the research URL, then clicks "Go
+      > back" and asserts it lands on `/en/charting`. The round trip is the part
+      > that proves `from` was carried, not merely that an href exists.
+      > The suite needed a `vue-router` mock and a slot-rendering `RouterLink`
+      > stub; the existing stock-chip / remove-stock COUNT assertions were
+      > unaffected, which is what made the wrap safe here.
+- [x] Tests: `npm run build`, `npm run test`, and `npm run test:e2e` green.
+      > 607/607 unit across 74 files, build clean, `charting.spec.ts` 4/4.
+- [x] Commit `feat(spa): link the charting chips and badge the comparison headers`
 
 ### 85.5 — Public shared portfolio: the holdings table gets a linked badge
 

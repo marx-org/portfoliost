@@ -8,6 +8,15 @@ vi.mock("@/api/charting", () => ({
   getChartingPresets: vi.fn(),
 }))
 
+// §85.4 — the chips and the comparison headers link into research, so the view
+// reads `useRoute()` and renders `router-link`. No router in this suite, so both
+// are provided here; the link stub renders its slot so the Remove button inside
+// the chip survives.
+vi.mock("vue-router", () => ({
+  useRoute: () => ({ fullPath: "/en/investments/charting" }),
+  useRouter: () => ({ push: vi.fn() }),
+}))
+
 const mockedCompare = vi.mocked(getChartingCompare)
 const mockedPresets = vi.mocked(getChartingPresets)
 
@@ -17,7 +26,16 @@ function makeCompare(symbol: string, name: string, peRatio: number) {
 
 function mountView() {
   return mount(ChartingView, {
-    global: { stubs: { apexchart: true, InstrumentSearchModal: true } },
+    global: {
+      stubs: {
+        apexchart: true,
+        InstrumentSearchModal: true,
+        RouterLink: {
+          props: ["to"],
+          template: "<a data-testid='research-link' :data-to='JSON.stringify(to)'><slot /></a>",
+        },
+      },
+    },
   })
 }
 
@@ -79,8 +97,44 @@ describe("ChartingView", () => {
     expect(wrapper.text()).toContain("3/10 selected")
   })
 
-  it("changes the metric via the picker", async () => {
+  it("links each chip's symbol and name to that symbol's research page (§85.4)", async () => {
     const wrapper = mountView()
+    await flushPromises()
+    await wrapper.findComponent({ name: "InstrumentSearchModal" }).vm.$emit("add", "AAPL", "Apple Inc")
+    await wrapper.findComponent({ name: "InstrumentSearchModal" }).vm.$emit("add", "MSFT", "Microsoft Corp")
+    await flushPromises()
+
+    const links = wrapper.findAll('[data-testid="research-link"]')
+    // Chip link, then the two comparison headers.
+    expect(JSON.parse(links[0]!.attributes("data-to")!)).toEqual({
+      name: "research-overview",
+      params: { symbol: "AAPL" },
+      query: { from: "/en/investments/charting" },
+    })
+    // The chip keeps its symbol + name, and its Remove button is still there.
+    const chip = wrapper.get('[data-testid="stock-chip"]')
+    expect(chip.text()).toContain("AAPL")
+    expect(chip.find('[data-testid="remove-stock"]').exists()).toBe(true)
+  })
+
+  it("badges the comparison headers and keeps the row label uppercase (§85.4)", async () => {
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.findComponent({ name: "InstrumentSearchModal" }).vm.$emit("add", "AAPL", "Apple Inc")
+    await wrapper.findComponent({ name: "InstrumentSearchModal" }).vm.$emit("add", "MSFT", "Microsoft Corp")
+    await flushPromises()
+
+    const headers = wrapper.get('[data-testid="compare-chart"]').findAll("th")
+    // The metric label stays uppercase; the per-stock headers carry a badge and
+    // opt out of it, because `uppercase` on a company name is a bug.
+    expect(headers[0]!.classes()).toContain("uppercase")
+    for (const th of headers.slice(1)) {
+      expect(th.classes()).toContain("normal-case")
+      expect(th.find('[data-testid="ticker-badge"]').exists()).toBe(true)
+    }
+  })
+
+  it("changes the metric via the picker", async () => {    const wrapper = mountView()
     await flushPromises()
     await wrapper.findComponent({ name: "InstrumentSearchModal" }).vm.$emit("add", "AAPL", "Apple Inc")
     await wrapper.findComponent({ name: "InstrumentSearchModal" }).vm.$emit("add", "MSFT", "Microsoft Corp")

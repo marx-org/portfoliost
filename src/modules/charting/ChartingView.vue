@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue"
+import { useRoute } from "vue-router"
 import { getChartingCompare, getChartingPresets, type ChartingPreset } from "@/api/charting"
+import { researchRoute } from "@/utils/research"
 import type { components } from "@/api/types"
 import InstrumentSearchModal from "@/modules/instruments/InstrumentSearchModal.vue"
 import { COMPARE_METRICS } from "@/modules/instruments/compareMetrics"
+import TickerBadge from "@/components/TickerBadge.vue"
 
 type ResearchCompare = components["schemas"]["ResearchCompare"]
 
@@ -16,6 +19,7 @@ const items = ref<ResearchCompare[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
 const showSearch = ref(false)
+const route = useRoute()
 
 const metricDef = computed(() => COMPARE_METRICS.find((m) => m.key === metric.value) ?? COMPARE_METRICS[0])
 
@@ -127,8 +131,16 @@ onMounted(async () => {
           class="inline-flex items-center gap-2 rounded-full border border-slate-200 dark:border-slate-700/60 bg-slate-50 dark:bg-slate-800/50 py-1 pl-3 pr-1 text-sm font-medium text-slate-800 dark:text-slate-200"
           data-testid="stock-chip"
         >
-          {{ symbol }}
-          <span class="text-xs font-normal text-slate-500 dark:text-slate-400">{{ nameOf(symbol) }}</span>
+          <!-- §85.4 — the symbol + name become a link. The pill and the sibling
+               Remove button are untouched: this table's own e2e and unit specs
+               assert on COUNTS of stock-chip / remove-stock rather than chip
+               internals, which is what makes a wrap safe here and a DOM
+               restructure unnecessary. No TickerBadge in the pill — a logo plate
+               inside a rounded-full chip is not example-service's geometry. -->
+          <router-link :to="researchRoute(symbol, route.fullPath)" class="min-w-0 truncate hover:underline">
+            {{ symbol }}
+            <span class="text-xs font-normal text-slate-500 dark:text-slate-400">{{ nameOf(symbol) }}</span>
+          </router-link>
           <button
             type="button"
             class="flex h-5 w-5 items-center justify-center rounded-full text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700/70 hover:text-slate-700 dark:hover:text-slate-200"
@@ -185,10 +197,23 @@ onMounted(async () => {
         <div class="mt-4 overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
-              <tr class="border-b border-slate-200 dark:border-slate-700/60 text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                <th class="py-2 pr-3">Stock</th>
-                <th v-for="r in items" :key="r.symbol" class="px-3 py-2 text-right">{{ r.symbol }}</th>
-              </tr>
+            <tr class="border-b border-slate-200 dark:border-slate-700/60 text-left text-xs tracking-wide text-slate-500 dark:text-slate-400">
+              <!-- §85.4 — `uppercase` moved off the row: it is right for the
+                   "Stock" label and wrong for a company name, which is the same
+                   correction ResearchCompare.vue:48-51 already documents.
+                   `r.symbol` is optional, so the v-if guards the nullable case. -->
+              <th class="py-2 pr-3 uppercase">Stock</th>
+              <th v-for="r in items" :key="r.symbol ?? r.name" class="px-3 py-2 text-right normal-case tracking-normal">
+                <router-link
+                  v-if="r.symbol"
+                  :to="researchRoute(r.symbol, route.fullPath)"
+                  class="inline-block"
+                >
+                  <TickerBadge size="sm" align="right" :symbol="r.symbol" :name="r.name" />
+                </router-link>
+                <TickerBadge v-else size="sm" align="right" :symbol="''" :name="r.name" />
+              </th>
+            </tr>
             </thead>
             <tbody>
               <tr class="border-b border-slate-100 dark:border-slate-800">

@@ -57,6 +57,24 @@ test("charting adds stocks via search and compares them", async ({ page }) => {
   await expect(page.locator("th", { hasText: "MSFT" })).toBeVisible()
 })
 
+test("a chip links to its symbol's research page and comes back (§85.4)", async ({ page }) => {
+  await openCharting(page)
+
+  await page.getByTestId("preset-banks").click()
+  await expect(page.getByTestId("stock-chip")).toHaveCount(4)
+
+  // The chip's symbol + name is the link; its Remove button is not.
+  const chipLink = page.getByTestId("stock-chip").first().locator("a")
+  await expect(chipLink).toHaveAttribute("href", /\/en\/research\/[A-Z0-9.-]+\/overview/)
+
+  await chipLink.click()
+  await expect(page).toHaveURL(/\/en\/research\/[A-Z0-9.-]+\/overview/)
+
+  // "Go back" returns to the charting page, not to /en/investments.
+  await page.getByTestId("research-back").click()
+  await expect(page).toHaveURL(/\/en\/charting/)
+})
+
 test("charting switches metric and removes a stock", async ({ page }) => {
   await openCharting(page)
 
