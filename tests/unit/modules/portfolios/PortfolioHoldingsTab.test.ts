@@ -178,3 +178,65 @@ describe("PortfolioHoldingsTab — dividend action routing (§49.4)", () => {
     expect(apd.props("open")).toBe(false)
   })
 })
+
+// §85.3 — the full-screen chart modal's `<h2>` was the last place on this tab
+// where a symbol was bare text. It now carries a TickerBadge *beside* the
+// existing wording rather than replacing it: that `h2` is also the
+// role="heading" the e2e suite locates, so the text has to stay.
+//
+// The badge here is deliberately not a link. This is a full-screen overlay, not
+// a dialog sitting on top of the page — nothing needs closing first, so the
+// §85.2 emit-then-push reasoning does not apply, and a link inside it would be
+// the one place a research navigation has no way back.
+describe("PortfolioHoldingsTab — §85.3 chart-modal heading badge", () => {
+  async function openChartModal() {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const store = usePortfolioStore()
+    store.detail = { currency: "PLN" } as never
+    store.positions = [position()] as never
+    mockedPortfolios.getPortfolioPositions.mockResolvedValue([position()] as never)
+    const wrapper = mount(PortfolioHoldingsTab, {
+      global: {
+        plugins: [pinia],
+        stubs: {
+          RouterLink: { template: "<a><slot /></a>" },
+          PriceChart: { template: "<div data-testid='price-chart-stub' />" },
+        },
+      },
+    })
+    await flushPromises()
+
+    await wrapper.findAll("button[aria-label='Position actions']")[0].trigger("click")
+    const viewChart = [...wrapper.findAll("button")].find((b) => b.text() === "View chart")
+    expect(viewChart).toBeTruthy()
+    await viewChart!.trigger("click")
+    await flushPromises()
+    return wrapper
+  }
+
+  /** The chart modal's `<h2>` — not the "Pozycje"/"Positions" card heading. */
+  function chartModalHeading(wrapper: Awaited<ReturnType<typeof openChartModal>>) {
+    const heading = wrapper.findAll("h2").find((h) => h.text().includes("Synektik Sa"))
+    if (!heading) throw new Error("the chart modal did not open")
+    return heading
+  }
+
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+    mockedFx.getLatestRate.mockResolvedValue({ rate: 0.25, asOf: "2026-08-25" })
+  })
+
+  it("puts a TickerBadge in the heading, keeping the wording the e2e locates", async () => {
+    const heading = chartModalHeading(await openChartModal())
+    expect(heading.text()).toContain("SNT.WA — Synektik Sa")
+    expect(heading.find('[data-testid="ticker-badge"]').exists()).toBe(true)
+  })
+
+  it("does not link the badge and leaves the modal open", async () => {
+    const wrapper = await openChartModal()
+    expect(chartModalHeading(wrapper).find("a").exists()).toBe(false)
+    expect(wrapper.find('[data-testid="price-chart-stub"]').exists()).toBe(true)
+  })
+})

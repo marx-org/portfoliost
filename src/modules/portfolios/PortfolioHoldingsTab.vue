@@ -575,7 +575,21 @@ function onPickerSaved() {
 
     <div v-if="chartPosition" class="fixed inset-0 z-50 overflow-auto bg-white dark:bg-slate-900 p-6">
       <div class="mb-3 flex items-center justify-between">
-        <h2 class="text-base font-semibold">{{ chartPosition.symbol }} — {{ chartPosition.companyName }}</h2>
+        <h2 class="text-base font-semibold">
+          <!-- §85.3 — the badge joins the existing wording rather than replacing
+               it: this `h2` is also the `role="heading"` an e2e locates, so the
+               text has to stay. It is a full-screen modal, not a dialog over the
+               page, so `goResearch` (emit-then-push) is not in play here. -->
+          <TickerBadge
+            size="lg"
+            :symbol="chartPosition.symbol"
+            :name="chartPosition.companyName"
+            :country-code="chartPosition.country"
+            :asset-type="chartPosition.assetType"
+            class="align-middle"
+          />
+          <span class="align-middle">{{ chartPosition.symbol }} — {{ chartPosition.companyName }}</span>
+        </h2>
         <button type="button" class="btn-secondary text-sm" @click="chartPosition = null">Close</button>
       </div>
       <PriceChart

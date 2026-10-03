@@ -659,7 +659,12 @@ function convertedPnl(p: PortfolioPositions[number]): number | null {
               <th scope="col" class="py-2 pr-3 font-medium">Year</th>
               <th scope="col" class="py-2 pr-3 text-right font-medium">TWR %</th>
               <th scope="col" :class="benchmarkSymbol ? 'py-2 pr-3' : 'py-2'" class="text-right font-medium">Gain</th>
-              <th v-if="benchmarkSymbol" scope="col" class="py-2 pl-3 text-right font-medium" :data-testid="tid('perf-returns-yearly-excess-header')">vs {{ benchmarkSymbol }}</th>
+              <th v-if="benchmarkSymbol" scope="col" class="py-2 pl-3 text-right font-medium" :data-testid="tid('perf-returns-yearly-excess-header')">
+                <span class="text-xs font-normal normal-case">vs </span>
+                <router-link :to="researchRoute(benchmarkSymbol, route.fullPath)" class="inline-block align-middle">
+                  <TickerBadge size="sm" align="right" :symbol="benchmarkSymbol" />
+                </router-link>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -790,13 +795,25 @@ function convertedPnl(p: PortfolioPositions[number]): number | null {
                 @change="toggleDraftBenchmark(opt.symbol)"
               />
               <span class="text-sm text-slate-800 dark:text-slate-200">{{ opt.name }}</span>
-              <span class="ml-auto text-xs text-slate-400">{{ opt.symbol }}</span>
+              <!-- §85.3 — this row is a <label> wrapping the row's checkbox, so a
+                   plain link would toggle the benchmark as a side effect of
+                   navigating. `.prevent.stop` keeps the click off the label.
+                   The visible option NAME stays as-is: this row reads
+                   "SPDR S&P 500 — SPY", and researchRoute needs the symbol, so
+                   the badge belongs on this right-hand chip, not on the name. -->
+              <router-link
+                :to="researchRoute(opt.symbol, route.fullPath)"
+                class="ml-auto text-xs text-slate-400"
+                @click.prevent.stop
+              >{{ opt.symbol }}</router-link>
             </label>
           </div>
           <div v-if="customDraftBenchmarks.length" class="mt-2 space-y-1">
             <p class="text-xs font-medium text-slate-500 dark:text-slate-400">Custom</p>
             <div v-for="sym in customDraftBenchmarks" :key="sym" class="flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800/50">
-              <span class="text-sm text-slate-800 dark:text-slate-200">{{ sym }}</span>
+              <!-- §85.3 — no checkbox on this row, only a sibling Remove button,
+                   so this is a clean wrap with no propagation to stop. -->
+              <router-link :to="researchRoute(sym, route.fullPath)" class="text-sm text-slate-800 dark:text-slate-200">{{ sym }}</router-link>
               <button type="button" class="ml-2 text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300" aria-label="Remove benchmark" @click="removeDraftBenchmark(sym)">Remove</button>
             </div>
           </div>

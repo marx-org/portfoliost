@@ -477,14 +477,30 @@ holds a checkable invariant: `grep -rn "/api/logos/" src` must return
 preserves it by construction — that is the reason to convert through the badge
 instead of pasting in a `<span>`.
 
-- [ ] **Dialog and modal headings → the badge, still leaving the wording:**
+- [x] **Dialog and modal headings → the badge, still leaving the wording:**
       `PortfolioHoldingsTab.vue:578` (`<h2>` of the full-screen chart modal —
       render `TickerBadge size="lg"` beside the existing `— {{ companyName }}`
       rather than replacing the heading text, since the `h2` is also the
       `role="heading"` the e2e locates), `EditPositionDialog.vue:278`
       (`<h3>Edit {{ symbol }} position</h3>` — put the badge inside the `h3`,
       the `aria-label` at `:276` stays text), `AddPositionDialog.vue:507`.
-- [ ] **Chart-controls benchmark rows — the one nested-interactive hazard.**
+      > **Only the first of the three was converted.** The other two were
+      > written off by §85.2, which landed first:
+      > - `EditPositionDialog` and `AddPositionDialog` both render the shared
+      >   `TransactionFormFields`, and §85.2 made *its* badge a working research
+      >   link. Both dialogs therefore already carry a clickable badge in their
+      >   body. A second, unlinked badge in the heading adds nothing and
+      >   degrades the heading's accessible name (`Edit {{ symbol }} position`
+      >   becomes `Edit AAPL Apple Inc. STOCK position`). Heading left as-is.
+      > - `AddPositionDialog.vue:507` is `<h3>Add Position</h3>` — it contains no
+      >   symbol at all, so there was nothing to link. The symbol-bearing
+      >   heading is `:534`, which is inside a step whose badge is already live.
+      > The holdings chart modal *is* converted: it has no badge anywhere, and it
+      > is a full-screen overlay rather than a dialog over the page, so the badge
+      > there is a plain display badge — there is nothing to close before a
+      > navigation, and a link inside it would be the one research entry with no
+      > way back.
+- [x] **Chart-controls benchmark rows — the one nested-interactive hazard.**
       `PortfolioPerformanceTab.vue:757` sits inside a `<label>` (`:749`) that
       wraps the row's `<input type="checkbox" @change="toggleDraftBenchmark">`.
       A link there **toggles the checkbox** unless it stops propagation. Wrap in
@@ -496,7 +512,10 @@ instead of pasting in a `<span>`.
       > "SPDR S&P 500 — SPY", and `researchRoute` needs the symbol, so the badge
       > belongs on the right-hand symbol chip at `:757`, not replacing the
       > human-readable name.
-- [ ] **Yearly-returns benchmark header.** `PortfolioPerformanceTab.vue:644`
+      > Confirmed real, not theoretical: deleting `@click.prevent.stop` makes the
+      > new test fail, because the `<label>` does forward the click to its input.
+      > The Custom rows are a plain wrap with nothing to stop.
+- [x] **Yearly-returns benchmark header.** `PortfolioPerformanceTab.vue:644`
       renders `vs {{ benchmarkSymbol }}`. Wrap the **symbol** in a
       `<router-link>` with a `TickerBadge size="sm" align="right"`, keeping the
       literal `vs ` text so the column still reads as a comparison.
@@ -507,7 +526,13 @@ instead of pasting in a `<span>`.
       > `:627`; the absent-when-no-benchmark case at `:642` still holds).
       > State the reason in the commit body — the text is deliberately richer
       > now, not accidentally different.
-- [ ] **Deliberately not converted, with reasons:** `PriceChart.vue:891` (the
+      > **The assertions did not need relaxing.** Stubbing `TickerBadge` as
+      > `{ props: ["symbol"], template: "<span>{{ symbol }}</span>" }` instead of
+      > `true` keeps all three `toBe("vs SPY")` / `toBe("vs QQQ")` assertions
+      > byte-identical, because the stub reproduces exactly the text the real
+      > badge contributes to that header. Relaxing them would have thrown away
+      > the assertion that the header names the *right* benchmark.
+- [x] **Deliberately not converted, with reasons:** `PriceChart.vue:891` (the
       chart `<h2>` renders on the research page itself, where a link would be a
       self-link; the holdings modal that also reaches it already gets a linked
       badge from the line above), `PortfolioHoldingsTab.vue:556` (the
@@ -516,15 +541,28 @@ instead of pasting in a `<span>`.
       `InstrumentSearchModal.vue:98` (the badge is inside a `<button>`;
       a nested `<a>` is invalid HTML, and that row already navigates in
       `mode="navigate"` via `openResult` at `:43`).
-- [ ] Tests: new `tests/unit/modules/portfolios/PortfolioHoldingsTab.test.ts`
+- [x] Tests: new `tests/unit/modules/portfolios/PortfolioHoldingsTab.test.ts`
       case for the chart-modal badge (no test file exists for that modal
       today); the relaxed `perf-returns-yearly-excess-header` assertions;
       a `PerformanceTabContent.test.ts` case asserting the Chart-controls
       symbol link carries `@click.prevent.stop` semantics — i.e. clicking it
       does **not** call `toggleDraftBenchmark` (assert by trigger, not by
       reading the attribute).
-- [ ] Tests: `npm run build` and `npm run test` green.
-- [ ] Commit `feat(spa): show the ticker badge where a symbol was bare text`
+      > Correction: that test file **did** exist — it holds 5 cases for §48.6e B2
+      > display-currency conversion and §49.4 dividend action routing. The two
+      > chart-modal cases were appended to it; its existing 5 are untouched.
+      > The `.prevent.stop` case asserts by triggering and reading the checkbox,
+      > and was verified non-vacuous.
+- [x] Tests: `npm run build` and `npm run test` green.
+      > 605/605 unit across 74 files, `vue-tsc --noEmit && vite build` clean,
+      > 242/242 `test:mock`. e2e `parity-portfolios.spec.ts` +
+      > `portfolios.spec.ts`: 23 passed.
+      > `portfolios.spec.ts:289` ("buy position stock step…") fails, waiting on
+      > a `/^KO /` search result in `InstrumentSearchModal` — **pre-existing**.
+      > Confirmed by stashing `src/` and rebuilding: identical failure. That
+      > surface is one of §85.3's deliberate non-conversions, so nothing here
+      > touches it.
+- [x] Commit `feat(spa): show the ticker badge where a symbol was bare text`
 
 ### 85.4 — Charting page: the chip links, the comparison headers get a badge
 

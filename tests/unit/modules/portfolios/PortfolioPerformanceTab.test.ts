@@ -77,7 +77,13 @@ async function mountTab(env = makeEnv()) {
         apexchart: true,
         PortfolioPerformanceChart: { template: "<div data-testid='chart-stub' />" },
         InstrumentSearchModal: true,
-        TickerBadge: true,
+        // §85.3 — TickerBadge renders its symbol rather than being stubbed to
+        // nothing. The yearly-excess header is now "vs " + badge, so a blank
+        // stub would have silently gutted the three §82.4 header assertions
+        // below; rendering the symbol keeps their text byte-identical.
+        TickerBadge: { props: ["symbol"], template: "<span>{{ symbol }}</span>" },
+        // No router in this suite; render the slot so the badge survives.
+        RouterLink: { template: "<a><slot /></a>" },
       },
     },
   })

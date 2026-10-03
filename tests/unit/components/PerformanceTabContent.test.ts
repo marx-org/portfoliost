@@ -218,6 +218,29 @@ describe("PerformanceTabContent — §83.1 prop-driven tab body", () => {
     expect(link.find("ticker-badge-stub").exists()).toBe(true)
   })
 
+  it("does not toggle the benchmark checkbox when its symbol link is clicked (§85.3)", async () => {
+    // The Chart-controls row is a <label> wrapping the row's checkbox, so a
+    // plain link inside it toggles the benchmark as a side effect of navigating
+    // — the user adds a comparison by clicking a symbol. Asserted by triggering
+    // the click, not by reading the attribute: `.prevent.stop` is exactly the
+    // thing that has to survive a refactor, and only the behaviour proves it.
+    const wrapper = await mountContent({ selectedBenchmarks: [] })
+    await wrapper.get('[data-testid="perf-controls-customize"]').trigger("click")
+
+    const row = wrapper.findAll("label").find((l) => l.text().includes("S&P 500"))!
+    expect(row.exists()).toBe(true)
+    const checkbox = row.get('input[type="checkbox"]')
+    expect((checkbox.element as HTMLInputElement).checked).toBe(false)
+
+    await row.get("a").trigger("click")
+
+    // The click did not reach the label, so the checkbox is untouched…
+    expect((checkbox.element as HTMLInputElement).checked).toBe(false)
+    expect(wrapper.get('[data-testid="perf-controls-benchmarks"]').text()).toContain("None")
+    // …and the link still points at that symbol's research page.
+    expect(JSON.parse(row.get("a").attributes("data-to")!).params.symbol).toBe("SPY")
+  })
+
   it("prefixes every testid only when a prefix is passed", async () => {
     // The per-portfolio mount must keep its ids byte-identical — three existing
     // specs select on them.
