@@ -20213,3 +20213,1574 @@ Written this way because §81.1 made `computeRiskMetrics` **pure** — it takes
 > The XIRR tile is a different story, and it is why **§78.6** exists — that step
 > was folded into §78 ("Everything that needs YOU"), because the cause is §78.1 +
 > §78.2's missing ledger rows rather than anything in this section.
+
+---
+
+## 85. Every ticker is a link to its research page (2026-10-02)
+
+User request (no proposal file): *"Extend stock ticker to be clickable. Link
+should lead to research page for this stock (bond, fund, etc)."* — and, on
+follow-up, not only to add the missing links but to **put a `TickerBadge`
+where a symbol is still rendered as plain text** (Top/Bottom Performers,
+Dividend History, and the rest of that list).
+
+**Half of this already exists and must not be rebuilt.** §60.1–60.3 established
+the only sanctioned way into research — `researchRoute(symbol, route.fullPath)`
+(`src/utils/research.ts:14`) plus the `from` query param and
+`researchBackTarget` — and wired it at eight call sites. Four surfaces are
+already linked: the transactions table (`:390`), the holdings table
+(`PortfolioHoldingsTab.vue:417`), the calendar chips
+(`PortfolioCalendarTab.vue:218`) and the compare rows
+(`PortfolioCompareTab.vue:59`). §85 adds call sites to that same helper. It
+introduces no new route, no new component, and no second way to build a link.
+
+**The gap, measured.** An audit of every surface that shows a symbol found:
+
+- **9 files render a `TickerBadge` that is not inside a link** —
+  `TransactionFormFields.vue:59` (shared by the Add-Position stock step *and*
+  `EditPositionDialog.vue:321`), `AddPositionDialog.vue:555`,
+  `EditTransactionModal.vue:184`, `RecordDividendDialog.vue:124`,
+  `PortfolioDividendsTab.vue:98`, `PortfolioNewsTab.vue:62`,
+  `PortfolioPerformanceTab.vue:685` + `:708`, `ResearchCompare.vue:56`.
+- **10 files render a symbol as bare text** — the chart-modal `<h2>`
+  (`PortfolioHoldingsTab.vue:578`), the Edit-position (`EditPositionDialog.vue:278`)
+  and Add-position (`AddPositionDialog.vue:507`) dialog headings, the yearly
+  returns `vs {{ benchmarkSymbol }}` header (`:644`), both Chart-controls
+  benchmark lists (`:757`, `:763`), the Charting page chip and comparison
+  headers (`ChartingView.vue:130`, `:190`), the public share holdings table
+  (`PublicPortfolioView.vue:72`), and the admin bond-catalogue / market-data
+  symbol cells (`BondCatalogueView.vue:66`, `MarketDataView.vue:140`, `:187`,
+  `:212`).
+
+**Ordering: run §83 first.** §83.1 moves the Top/Bottom Performers block out of
+`PortfolioPerformanceTab.vue` into `PerformanceTabContent.vue`. §85.2/§85.3 edit
+those exact lines and the Chart-controls modal, so **apply them to
+`PerformanceTabContent.vue`, not to the file §83.1 empties.** Doing §85 first
+means doing the same four edits twice.
+
+Recorded decisions (resolved with the user):
+
+- **Mechanism: wrap the call site.** Add
+  `<router-link :to="researchRoute(sym, route.fullPath)">` around the badge,
+  exactly as `TransactionsTable.vue:390`, `PortfolioHoldingsTab.vue:417` and
+  `WatchlistsView.vue:128` already do. **No `to` prop on `TickerBadge`** — it
+  is documented as "fetches nothing" and each call site passes the data it has
+  (`docs/COMPONENTS.md`), and a router-coupled prop breaks its no-router unit
+  mounts. **No `TickerLink.vue` wrapper** either: 19 call sites do not justify a
+  fourth layer, and the wrapping is the pattern §60.2 already proved.
+- **Inside a modal, the badge does not use `router-link`.** `router-link`
+  navigates without closing the dialog it sits in, leaving the research page
+  under an unmounting overlay. Modal surfaces reuse the emit-then-push path
+  those files already have (`EditTransactionModal.goResearch` `:162`,
+  `AddPositionDialog.goResearch` `:463`, `PortfolioHoldingsTab.goResearch`
+  `:313`) — `emit("close")` first, then
+  `router.push(researchRoute(sym, route.fullPath))`. This is also why
+  `from` is the page *behind* the modal: the route is unchanged while a modal
+  is open.
+- **Scope: everywhere, including the public share page and the admin tables.**
+- **A symbol that has no research page stays clickable.** `/:symbol/profile`
+  already falls back to the bond profile (`portfoliost-instruments/src/routes/instruments.ts:366-375`)
+  and `ResearchOverview.vue:217` already renders a "Limited data availability"
+  banner for a symbol with identity but no market data. Only a total 404 leaves
+  the red error banner — that page is **left exactly as it is**, it is
+  pre-existing behaviour and not this section's business.
+
+Rules: one step = one commit; a step is marked `[x]` only after its tests pass
+(unit + e2e against the dockerized stack per `AGENTS.md`).
+
+### 85.1 — `researchBackTarget`: a second allowlisted internal prefix
+
+The one prerequisite, and it is tiny. The share page lives at
+`/public/portfolio/:shareId` (`router/index.ts:36-40`, `meta: { public: true }`),
+and `researchBackTarget` (`:28-32`) accepts only a `from` starting `/en/` — so a
+`from` passed from the share page would be **silently discarded** and "Go back"
+would land on `/en/investments` instead of the share.
+
+- [x] Accept two literal internal prefixes in `researchBackTarget`: `/en/` (as
+      today) and `/public/`. Nothing else changes — no scheme, no `//`, no
+      relative path can satisfy either, so the open-redirect property is
+      identical to what §60.1 established.
+      > Do **not** generalise this to "any path that starts with a slash".
+      > `/logout` and the catch-all `/:pathMatch(.*)*` are both single-segment
+      > or otherwise outside the two prefixes precisely so they cannot be used
+      > as a redirect target. Two named prefixes is the whole allowlist.
+      > `src/utils/research.ts` — `RESEARCH_BACK_PREFIXES = ["/en/", "/public/"]`,
+      > matched with `.some(startsWith)`. Tests pin the lookalikes: `/publicsomething`,
+      > `//public`, `/logout`, relative `public/…`, and the bare `"/en"` / `"/public"`
+      > (no trailing slash) all still fall back.
+- [x] Tests in `tests/unit/utils/research.test.ts`: `/public/portfolio/abc123`
+      passes through; `/publicsomething`, `//public`, `http://…`, `public/…`
+      (relative) and a non-string still fall back to `/en/investments` — the
+      trailing-slash shape matters, so `"/en"` alone must still be rejected.
+- [x] Tests: `npm run test` green.
+      > 590/590 unit (71 files), 242/242 `test:mock`, `npm run build`
+      > (vue-tsc + vite) clean. No `lint` script in this repo. The AbortError
+      > lines in the vitest output are the pre-existing happy-dom teardown
+      > noise, not failures.
+      > e2e `tests/e2e/research.spec.ts` against the rebuilt docker stack:
+      > 20 passed / 1 skipped — including all five §60.3 "Go back" tests, so
+      > the existing `/en/` origins are unregressed.
+- [x] Commit `feat(spa): let the research back link return to a shared portfolio`
+
+### 85.2 — The nine badges that render but do not link
+
+Split by navigation mechanism, per the recorded decision above. Each site gets
+`from = route.fullPath` so "Go back" returns to the page the user is on.
+
+- [x] **`<router-link>` wrap — surfaces with no dialog to close:**
+      `PortfolioDividendsTab.vue:98` (Symbol column; the `<tr>` at `:96` has no
+      click handler, so the cell is a clean slot), `PortfolioNewsTab.vue:62`
+      (article-card header; the sibling title `<a>` at `:73` is unaffected),
+      `PortfolioPerformanceTab.vue:685` and `:708` (Top/Bottom Performers `<li>`
+      — **in `PerformanceTabContent.vue`**, per the ordering note),
+      `ResearchCompare.vue:56` (peer column headers).
+      > `ResearchCompare.vue` gets the wrap on **peer columns only**. The
+      > primary column (`r.symbol === symbol`, blue at `:54`) must stay a plain
+      > badge: `researchRoute` hard-codes `research-overview`, so linking it
+      > would silently move the user off the Compare tab to the page they are
+      > already on. Its `r.symbol` is also nullable (`:63`) — guard `v-if` on
+      > `r.symbol`, which also skips the empty-string badge case.
+      > `PortfolioDividendsTab.vue:37` hardcodes `symbol: "—"` on the legacy
+      > `history[]` fallback path. `researchRoute("—")` would produce
+      > `/en/research/%E2%80%94/overview` — a real link to nothing. **Guard the
+      > wrap on a symbol that is neither empty nor `"—"`**, so the legacy table
+      > renders its badge plain.
+      > Done in `PerformanceTabContent.vue` (both lists, `replaceAll` on the
+      > identical badge block) — the §83.1 file, not the emptied wrapper. That
+      > file's header comment claimed it mounts with "no route, no router"; it
+      > now takes a `vue-router` mock, and the comment says so.
+      > `ResearchCompare.vue`: `v-if="r.symbol && r.symbol !== symbol"` folds
+      > both rules into the one condition, so the `v-else` badge keeps the
+      > original `:symbol="r.symbol ?? ''"` for the nullable case.
+- [x] **Emit-then-push — surfaces inside a dialog:**
+      `TransactionFormFields.vue:59` (shared identity block), `AddPositionDialog.vue:555`
+      (Option step), `EditTransactionModal.vue:184`, `RecordDividendDialog.vue:124`.
+      Reuse the `view-chart` event rather than adding a new one: in
+      `TransactionFormFields` make the badge `@click="emit('view-chart')"` —
+      the same thing the "View chart" text button at `:69` already does, and
+      `EditTransactionModal.goResearch` already pushes `researchRoute`.
+      > This is what gives **`EditPositionDialog.vue` research access at all**.
+      > It passes `:show-view-chart="false"` (`:332`) and has **no** `@view-chart`
+      > handler, so today that modal has no route into research whatsoever.
+      > Add `@view-chart="goResearch"` there — close the dialog, then
+      > `router.push(researchRoute(position.symbol, route.fullPath))` — and the
+      > badge is the only affordance the modal needs. The same applies to
+      > `AddPositionDialog`'s Option step (`:523` already wires `@view-chart`,
+      > so the badge reuses it) and to `RecordDividendDialog`, which needs a
+      > `goResearch` written because it has neither a button nor a handler.
+      > Do **not** make `TransactionFormFields` emit a second, parallel event
+      > for the badge. One event, two triggers, one code path.
+      > `AddPositionDialog` needed **no edit**: its Option step renders the
+      > shared `TransactionFormFields`, so the badge click arrives via the
+      > `@view-chart="goResearch"` it already had at `:550`.
+      > Both new `goResearch` functions (`RecordDividendDialog`,
+      > `EditPositionDialog`) use a bare `emit("close")`, **not** the local
+      > `close()` — `EditPositionDialog.close()` also emits `saved` and refetches
+      > positions, which is the save-and-refresh path and does not belong on a
+      > navigation. A test pins that `saved` is not emitted.
+      > `TickerBadge` is a single-root component, so `class="cursor-pointer"`
+      > and `@click` both fall through — no prop added, and no change to the
+      > "fetches nothing" contract in `docs/COMPONENTS.md`.
+- [x] Tests: `PortfolioNewsTab.test.ts:75` asserts the badge lives under
+      `article > div` — a `<a>` **inside** that div keeps it passing; do not
+      re-parent the badge. New cases: the Dividend History symbol cell renders
+      a link to `{ name: "research-overview", params: { symbol: "AAPL" } }` on
+      the `items[]` path and a **plain badge, no link**, on the legacy
+      `history[]` path (`PortfolioDividendsTab.test.ts`, new file);
+      `PortfolioPerformanceTab.test.ts` asserts the Top Performers badge is
+      clickable (it stubs `TickerBadge: true` at `:77` — the test must assert
+      the wrapping `RouterLink`'s `to`, not the badge); a new
+      `EditPositionDialog` case asserts the badge emits `view-chart` while
+      `show-view-chart` is false, and that `@view-chart` is handled.
+      > The performer case landed in `PerformanceTabContent.test.ts`, not
+      > `PortfolioPerformanceTab.test.ts` — §83.1 moved the block, so that is
+      > the file that owns the markup now. It needed a `vue-router` mock and a
+      > `RouterLink` stub that renders its slot (so the stubbed `TickerBadge`
+      > stays findable inside the link).
+      > `ResearchCompare` had no test file at all; it is the one surface with a
+      > **must-not-link** rule, so it got `tests/unit/modules/instruments/
+      > ResearchCompare.test.ts` (4 cases: peers linked, `from` carried, primary
+      > column plain, nullable symbol plain). `RecordDividendDialog.test.ts`
+      > gained the badge case and a hoisted `push` spy.
+      > RouterLink is asserted through a `data-to='JSON.stringify(to)'` stub
+      > attribute rather than `findComponent({ name: "RouterLink" })`, which
+      > finds nothing in a suite mounted without a router.
+      > `.at(0)` returns `T | undefined` under `noUncheckedIndexedAccess`, so
+      > the helpers assert a length first (`vue-tsc` runs as part of the build).
+      > `EditPositionDialog.test.ts` was verified **non-vacuous**: deleting
+      > `@view-chart="goResearch"` makes it fail.
+- [x] Tests: `npm run build` and `npm run test` green.
+      > 602/602 unit across 74 files (3 new files, 11 new cases),
+      > `vue-tsc --noEmit && vite build` clean, 242/242 `test:mock`.
+      > e2e `research.spec.ts` + `parity-portfolios.spec.ts` +
+      > `dividends.spec.ts` against the rebuilt stack: 27 passed, 1 skipped.
+- [x] Commit `feat(spa): link every ticker badge that renders without a link`
+
+### 85.3 — Badges where the symbol is still plain text
+
+`docs/COMPONENTS.md` requires instrument logos to go through `TickerBadge` and
+holds a checkable invariant: `grep -rn "/api/logos/" src` must return
+`TickerBadge.vue` and `RecentSearchesBar.vue` only. Every conversion below
+preserves it by construction — that is the reason to convert through the badge
+instead of pasting in a `<span>`.
+
+- [x] **Dialog and modal headings → the badge, still leaving the wording:**
+      `PortfolioHoldingsTab.vue:578` (`<h2>` of the full-screen chart modal —
+      render `TickerBadge size="lg"` beside the existing `— {{ companyName }}`
+      rather than replacing the heading text, since the `h2` is also the
+      `role="heading"` the e2e locates), `EditPositionDialog.vue:278`
+      (`<h3>Edit {{ symbol }} position</h3>` — put the badge inside the `h3`,
+      the `aria-label` at `:276` stays text), `AddPositionDialog.vue:507`.
+      > **Only the first of the three was converted.** The other two were
+      > written off by §85.2, which landed first:
+      > - `EditPositionDialog` and `AddPositionDialog` both render the shared
+      >   `TransactionFormFields`, and §85.2 made *its* badge a working research
+      >   link. Both dialogs therefore already carry a clickable badge in their
+      >   body. A second, unlinked badge in the heading adds nothing and
+      >   degrades the heading's accessible name (`Edit {{ symbol }} position`
+      >   becomes `Edit AAPL Apple Inc. STOCK position`). Heading left as-is.
+      > - `AddPositionDialog.vue:507` is `<h3>Add Position</h3>` — it contains no
+      >   symbol at all, so there was nothing to link. The symbol-bearing
+      >   heading is `:534`, which is inside a step whose badge is already live.
+      > The holdings chart modal *is* converted: it has no badge anywhere, and it
+      > is a full-screen overlay rather than a dialog over the page, so the badge
+      > there is a plain display badge — there is nothing to close before a
+      > navigation, and a link inside it would be the one research entry with no
+      > way back.
+- [x] **Chart-controls benchmark rows — the one nested-interactive hazard.**
+      `PortfolioPerformanceTab.vue:757` sits inside a `<label>` (`:749`) that
+      wraps the row's `<input type="checkbox" @change="toggleDraftBenchmark">`.
+      A link there **toggles the checkbox** unless it stops propagation. Wrap in
+      `<router-link>` **with `@click.prevent.stop`**, and use the same
+      `:to="researchRoute(opt.symbol, route.fullPath)"`.
+      `:763` (the Custom rows) has no checkbox and only a sibling Remove
+      `button`, so it is a clean wrap. Both are in `PerformanceTabContent.vue`.
+      > Keep the visible option **name** at `:756` as-is. That row is
+      > "SPDR S&P 500 — SPY", and `researchRoute` needs the symbol, so the badge
+      > belongs on the right-hand symbol chip at `:757`, not replacing the
+      > human-readable name.
+      > Confirmed real, not theoretical: deleting `@click.prevent.stop` makes the
+      > new test fail, because the `<label>` does forward the click to its input.
+      > The Custom rows are a plain wrap with nothing to stop.
+- [x] **Yearly-returns benchmark header.** `PortfolioPerformanceTab.vue:644`
+      renders `vs {{ benchmarkSymbol }}`. Wrap the **symbol** in a
+      `<router-link>` with a `TickerBadge size="sm" align="right"`, keeping the
+      literal `vs ` text so the column still reads as a comparison.
+      > This breaks an exact-text assertion: `PortfolioPerformanceTab.test.ts:597`
+      > asserts `perf-returns-yearly-excess-header` `toBe("vs SPY")`, and the
+      > badge appends the `(US) ETF` details line. Relax it to
+      > `toContain("vs")` + `toContain("SPY")` (cases at `:597`, `:617`,
+      > `:627`; the absent-when-no-benchmark case at `:642` still holds).
+      > State the reason in the commit body — the text is deliberately richer
+      > now, not accidentally different.
+      > **The assertions did not need relaxing.** Stubbing `TickerBadge` as
+      > `{ props: ["symbol"], template: "<span>{{ symbol }}</span>" }` instead of
+      > `true` keeps all three `toBe("vs SPY")` / `toBe("vs QQQ")` assertions
+      > byte-identical, because the stub reproduces exactly the text the real
+      > badge contributes to that header. Relaxing them would have thrown away
+      > the assertion that the header names the *right* benchmark.
+- [x] **Deliberately not converted, with reasons:** `PriceChart.vue:891` (the
+      chart `<h2>` renders on the research page itself, where a link would be a
+      self-link; the holdings modal that also reaches it already gets a linked
+      badge from the line above), `PortfolioHoldingsTab.vue:556` (the
+      Confirm-delete message — a navigation target inside a destructive
+      confirmation is a mis-click waiting to happen), and
+      `InstrumentSearchModal.vue:98` (the badge is inside a `<button>`;
+      a nested `<a>` is invalid HTML, and that row already navigates in
+      `mode="navigate"` via `openResult` at `:43`).
+- [x] Tests: new `tests/unit/modules/portfolios/PortfolioHoldingsTab.test.ts`
+      case for the chart-modal badge (no test file exists for that modal
+      today); the relaxed `perf-returns-yearly-excess-header` assertions;
+      a `PerformanceTabContent.test.ts` case asserting the Chart-controls
+      symbol link carries `@click.prevent.stop` semantics — i.e. clicking it
+      does **not** call `toggleDraftBenchmark` (assert by trigger, not by
+      reading the attribute).
+      > Correction: that test file **did** exist — it holds 5 cases for §48.6e B2
+      > display-currency conversion and §49.4 dividend action routing. The two
+      > chart-modal cases were appended to it; its existing 5 are untouched.
+      > The `.prevent.stop` case asserts by triggering and reading the checkbox,
+      > and was verified non-vacuous.
+- [x] Tests: `npm run build` and `npm run test` green.
+      > 605/605 unit across 74 files, `vue-tsc --noEmit && vite build` clean,
+      > 242/242 `test:mock`. e2e `parity-portfolios.spec.ts` +
+      > `portfolios.spec.ts`: 23 passed.
+      > `portfolios.spec.ts:289` ("buy position stock step…") fails, waiting on
+      > a `/^KO /` search result in `InstrumentSearchModal` — **pre-existing**.
+      > Confirmed by stashing `src/` and rebuilding: identical failure. That
+      > surface is one of §85.3's deliberate non-conversions, so nothing here
+      > touches it.
+- [x] Commit `feat(spa): show the ticker badge where a symbol was bare text`
+
+### 85.4 — Charting page: the chip links, the comparison headers get a badge
+
+- [x] `ChartingView.vue:124-141` — wrap the chip's symbol + name in
+      `<router-link :to="researchRoute(symbol, route.fullPath)">` with
+      `class="min-w-0 truncate"`. **Keep the `rounded-full` pill and do not put
+      a `TickerBadge` inside it**: a logo plate in a pill is not example-service's
+      geometry, and the chip already carries symbol + name. Confirm against
+      `app.example-service.ai` charting at the same viewport in this step's gate, and
+      switch to the badge if example-service shows a plate there. The sibling Remove
+      `button` (`:137`) keeps its own handler and is unaffected.
+      > `tests/e2e/charting.spec.ts:29/54/64/70-71` and
+      > `ChartingView.test.ts:52/65/68/78` assert on **counts** of
+      > `stock-chip` / `remove-stock`, not chip internals — a wrapping link
+      > keeps all of them green. That is the reason to prefer a wrap here over
+      > a DOM restructure.
+      > Done as a wrap, no `TickerBadge` in the pill: the geometry stays
+      > example-service's, and the sibling Remove button keeps its own handler.
+- [x] `ChartingView.vue:190` — the fundamentals-comparison `<th>` per stock
+      becomes `TickerBadge size="sm" align="right"` inside a `<router-link>`,
+      matching `ResearchCompare.vue:56` exactly (that table is the same shape:
+      `r.symbol` is optional, so guard `v-if="r.symbol"`). Drop the `uppercase`
+      on those cells — an uppercase class applied to a company name is a bug
+      the research table already documents against (`ResearchCompare.vue:48-51`).
+      > Matches `ResearchCompare.vue` exactly, including the `v-if="r.symbol"`
+      > guard for the optional symbol. The `:key` moved to `r.symbol ?? r.name`
+      > so a null-symbol row still has a stable key, and `uppercase` moved off
+      > the row onto the `Stock` label alone.
+- [x] Tests: `ChartingView.test.ts` gains a case asserting the chip's link
+      `to` is `research-overview` for `AAPL`; `tests/e2e/charting.spec.ts`
+      gains a case clicking a chip and asserting
+      `/\/en\/research\/[A-Z0-9.-]+\/overview/`.
+      > Two unit cases (chip link; header badges + the `uppercase` split) and one
+      > e2e case that clicks a chip, asserts the research URL, then clicks "Go
+      > back" and asserts it lands on `/en/charting`. The round trip is the part
+      > that proves `from` was carried, not merely that an href exists.
+      > The suite needed a `vue-router` mock and a slot-rendering `RouterLink`
+      > stub; the existing stock-chip / remove-stock COUNT assertions were
+      > unaffected, which is what made the wrap safe here.
+- [x] Tests: `npm run build`, `npm run test`, and `npm run test:e2e` green.
+      > 607/607 unit across 74 files, build clean, `charting.spec.ts` 4/4.
+- [x] Commit `feat(spa): link the charting chips and badge the comparison headers`
+
+### 85.5 — Public shared portfolio: the holdings table gets a linked badge
+
+- [x] `PublicPortfolioView.vue:72` — replace `<td>{{ p.symbol }}</td>` with a
+      `<router-link :to="researchRoute(p.symbol, route.fullPath)">` wrapping
+      `TickerBadge size="sm"`, keeping the `<td>`'s padding. Pass `from`
+      (`route.fullPath` is `/public/portfolio/:shareId`) — §85.1 is what makes
+      that survive `researchBackTarget`, and without it "Go back" drops the
+      share context entirely.
+      `PublicPortfolioShare.portfolio.positions[]` (`src/api/portfolios.ts:380`)
+      carries `symbol`; the badge's optional `name` / `countryCode` /
+      `assetType` are simply not passed, so the block degrades to logo + ticker,
+      which is the documented behaviour (`docs/COMPONENTS.md`).
+      > Confirmed at `src/api/portfolios.ts:416` — the share payload really is
+      > `{ symbol, quantity, marketValue, currentPrice }` and nothing else. The
+      > unit test asserts the three optional badge props are `undefined` rather
+      > than assuming it.
+- [x] **Say what actually happens to an unauthenticated visitor, in the commit
+      body.** `/en/research/:symbol/overview` is `meta: { requiresAuth: true }`,
+      so `router.beforeEach` (`router/index.ts:284-286`) bounces a logged-out
+      visitor to `/login?redirect=…`. For the owner, who is authenticated, it
+      works and "Go back" returns to the share. This is the accepted
+      consequence of putting research links on a public page — the alternative
+      is a share page whose tickers are the one thing a visitor cannot act on.
+      > A `<router-link>` renders as an `<a>` regardless of auth state, so it
+      > must not be conditionally hidden on `auth.isAuthenticated` — the SPA
+      > cannot know who holds the share, and hiding it would make the page
+      > differ per viewer.
+      > The e2e asserts the bounce rather than assuming it: logged out, the
+      > link lands on `/login?redirect=…`; signed in, it reaches research and
+      > "Go back" returns to `/public/portfolio/:shareId`. If the auth guard
+      > ever moves, that assertion fails and the change has to be deliberate.
+- [x] Tests: new `tests/unit/modules/settings/PublicPortfolioView.test.ts`
+      (no test file exists) asserting the holdings cell renders a
+      `RouterLink` whose `to` is
+      `{ name: "research-overview", params: { symbol: "SNT.WA" }, query: { from: "/public/portfolio/abc" } }`;
+      e2e in `tests/e2e/` for the share page asserting
+      `href="/en/research/SNT.WA/overview?from=…"` on the row.
+      > Four unit cases plus `tests/e2e/public-share.spec.ts` (new). The e2e
+      > reads the share id through the app's own token rather than hardcoding a
+      > seed: `page.request` inherits the Playwright baseURL, which is the SPA
+      > on :3000, but the SPA calls the API on the gateway (:8080) per
+      > `VITE_API_BASE_URL` — so the API base is an explicit, overridable const.
+      > Without that the request hits the SPA's HTML fallback and fails to parse.
+- [x] Tests: `npm run build`, `npm run test` green.
+- [x] Commit `feat(spa): link the tickers on a public shared portfolio`
+
+### 85.6 — Admin: bond catalogue and market data
+
+- [x] `BondCatalogueView.vue:66` — `TickerBadge size="sm"` inside a
+      `<router-link>`, keeping the existing `font-mono font-semibold` cell
+      styling for the symbol and leaving the separate Name column at `:67`
+      alone.
+      > **This is the case the request names explicitly — "bond".** The symbols
+      > here are `ROD1033` / `NNEP25`-style series, not equity tickers, and the
+      > bond profile fallback (`portfoliost-instruments/src/routes/instruments.ts:366-375`)
+      > is what makes the target resolve. `TickerBadge` requests
+      > `/api/logos/ROD1033`; confirm the logos endpoint returns a plate rather
+      > than a broken image for series with no logo, and if it 404s, accept the
+      > alt-text fallback rather than special-casing the badge.
+- [x] `MarketDataView.vue:140` (pending split candidates), `:187` (history),
+      `:212` (overflow summary) — same conversion. These carry no name, so the
+      badge shows logo + ticker only.
+      > These tables are operational, not navigational: a click now navigates
+      > away from a half-filled "Apply factor" form at `:153-162`. That is
+      > acceptable (the input state is not persisted today anyway) but it must
+      > be **noted in the commit body**, not silently shipped.
+      > Noted in the commit body, and a test asserts the factor input and the
+      > Apply/Dismiss buttons are still there. The factor input is an *untyped*
+      > text input bound to `applyFactor[symbol]` — `input[type=number]` matches
+      > nothing, which cost one wrong assertion.
+- [x] Tests: new unit cases for the three `MarketDataView` tables and
+      `BondCatalogueView` asserting each symbol cell is a `RouterLink` with the
+      bare symbol in `params.symbol`.
+      > Two new files, 9 cases: `tests/unit/modules/admin/MarketDataView.test.ts`
+      > (5 — pending splits, split history, overflow summary, `from` carried,
+      > controls intact) and `BondCatalogueView.test.ts` (4). Both needed a
+      > `vue-router` mock and the slot-rendering `RouterLink` stub.
+- [x] Tests: `npm run build` and `npm run test` green.
+      > 620/620 unit across 77 files, build clean, 242/242 `test:mock`.
+- [x] Commit `feat(spa): link instrument symbols in the admin tables`
+
+### 85.7 — The venue-suffix wart, surfaced by this section
+
+Found while auditing the call sites. **§60.2 kept this deliberately** ("keep the
+existing `.US` suffix handling"), so it is a decision to revisit, not a
+regression — but the request's scope ("bond, fund, etc") makes it visible.
+
+- [x] `AddPositionDialog.vue:463` appends `.US` to any symbol that lacks it:
+      `router.push(researchRoute(symbol.endsWith(".US") ? symbol : `${symbol}.US`, …))`.
+      A Polish position therefore produces `/en/research/SNT.WA.US/overview`.
+      It **resolves** — `venueFreeSymbol` (`portfoliost-instruments/src/adapters/symbol.ts:21-24`)
+      cuts at the last dot and `isSavingsBond` uses it — so this is a wrong-looking
+      URL, not a 404. Drop the suffixing and pass the symbol through.
+      > Only `AddPositionDialog` does this. Every other surface passes the
+      > symbol verbatim, so removing it makes the app consistent rather than
+      > changing behaviour anywhere else. Check the e2e regexes
+      > (`portfolios.spec.ts:213` and `research.spec.ts:327`) still match — they
+      > are written as `/(\.US)?/` precisely because this existed.
+      > **Verified in the backend, not assumed.** `providerSymbol()`
+      > (`portfoliost-instruments/src/adapters/symbol.ts:5-8`) strips only a
+      > trailing `.US`, and `venueFreeSymbol()` (`:21-24`) cuts at the LAST dot —
+      > so `SNT.WA.US` resolves to `SNT.WA` and this really was a wrong-looking
+      > URL rather than a 404, which is exactly why it survived §60.2.
+      > `research.spec.ts:327` turned out to have no `(\.US)?` — only
+      > `portfolios.spec.ts:213` did, and that path is the holdings row's
+      > "Research" item, which never suffixed. **Tightened** to an exact match,
+      > since the honest URL is now the only possible one.
+- [x] Tests: a case asserting `goResearch` for a `.WA` and a bare savings-bond
+      symbol produces the **unadorned** symbol in `params.symbol`; extend
+      `tests/unit/utils/research.test.ts` to record that `researchSymbol`
+      uppercases and **does not** strip venue suffixes — it never has, and the
+      strip is `venueFreeSymbol`'s job on the backend.
+      > Four cases in `FeeFxDialogs.test.ts` (`.WA`, bare `ROD1033`, plain
+      > `AAPL`, and `AAPL.US` kept rather than doubled) driving the real
+      > `goResearch` through the stock step's badge, plus one in
+      > `research.test.ts`. `FeeFxDialogs.test.ts`'s router mock needed a
+      > **hoisted** `push` spy — its per-call `vi.fn()` was unobservable.
+      > `openStockStep` grew a `symbol` parameter; its existing callers are
+      > unaffected because it defaults to `"AAPL.US"`.
+      > 625/625 unit across 77 files, build clean. e2e `portfolios.spec.ts` +
+      > `research.spec.ts`: 37 passed, 1 skipped, with the regex tightened.
+- [x] Commit `fix(spa): stop appending .US to research links from the position dialog`
+
+### 85.8 — Docs, Example service parity, and the full suite
+
+- [x] **`docs/COMPONENTS.md`** — under "TickerBadge (the instrument identity
+      block)", record that a badge on a portfolio-, charting-, admin- or
+      share-page surface is expected to be wrapped in
+      `researchRoute(sym, route.fullPath)`, and that dialogs use the
+      emit-then-push path instead (§85.2's reason: a `router-link` does not
+      close its dialog). Add the two-step **and check** to the section: a badge
+      reachable from a portfolio page should be reachable by link.
+      Re-verify the existing invariant still holds:
+      `grep -rn "/api/logos/" src` → `TickerBadge.vue` and `RecentSearchesBar.vue` only.
+      > **The invariant caught me.** My §85.6 comment in `BondCatalogueView.vue`
+      > quoted the logo route, which added a third `grep` match and broke a
+      > documented checkable invariant. Both mentions were reworded to describe
+      > the route without spelling it. Verified: the grep returns exactly the two
+      > expected files.
+- [x] **Playwright side by side** against `app.example-service.ai` at the same viewport
+      for the four surfaces this changes: Holdings → Performance (Top/Bottom
+      Performers), Portfolio → Dividends, Charting chips, and a watchlist. This
+      is the step that decides the §85.4 chip question; record the comparison in
+      the commit body.
+- [x] **E2E for the newly linked surfaces** in `tests/e2e/research.spec.ts`,
+      reusing the `Go back` describe block at `:270` so every new entry point
+      proves the `from` round-trip, not just the navigation: Top Performers
+      (extend `tests/e2e/top-performers-currency.spec.ts:26`, which already
+      locates the `SNT.WA` row by text), Dividend History
+      (`tests/e2e/dividends.spec.ts:115`), a news card
+      (`portfolios.spec.ts:77`), the dialogs (open → click badge → back), and
+      the chart modal.
+- [x] **Regression net on the existing specs** that locate badges by role, so
+      a link does not break a locator: `research.spec.ts:259`
+      (`getByRole("button", { name: "MSFT" })` — the search modal is untouched,
+      assert it still passes), `portfolios.spec.ts:72-74`
+      (`getByRole("link", { name: "META" })`) and `:77-104`
+      (`getByTestId("ticker-badge")` on the news cards).
+- [x] **Full suite:** `npm run build` (includes `vue-tsc --noEmit`),
+      `npm run test`, `npm run test:mock`, `npm run test:e2e` against
+      `docker compose up -d --build`. Rebuild the `portfoliost` container after
+      the frontend changes and **restart the gateway** afterwards, or only
+      wallets-routed paths will 404 for the wrong reason (`AGENTS.md`).
+      > **625/625 unit (77 files), build clean, 242/242 mock, all §85 e2e green**
+      > (research 25, charting 4, public-share 1, dividends, parity-portfolios).
+      >
+      > The **full** e2e run is not green, and the causes are all pre-existing
+      > and outside §85 — this suite is **not idempotent** against the shared
+      > local Postgres, and degrades a little more on every run:
+      > - `portfolios.spec.ts:292` — proven pre-existing: stashes `src/`,
+      >   rebuilds, identical failure (a `/^KO /` search result never appears).
+      > - `portfolios.spec.ts:378` and `:406` — the sector/`<th>` groupings only
+      >   see **page 1** of Top10's transactions, and `portfolios.spec.ts:200`
+      >   buys 5 META into Top10 on every run and never cleans up. META is
+      >   Communication Services, so Technology (8 rows) is pushed off page 1
+      >   (20 rows) and the group vanishes. Confirmed by dumping the rendered
+      >   groups: `COMMUNICATION SERVICES 14`, `SEMICONDUCTORS 6` — 20 of 30.
+      > - `accounts-balance.spec.ts:60` — asserted a global row count of 1
+      >   against a DB holding 23 leftover `E2E*` portfolios.
+      > - `settings.spec.ts:11` — `getByRole("link", { name: "Settings" })`
+      >   without `exact: true` collided with leftover portfolios named
+      >   `E2E CashLegSettings <ts>`.
+      >
+      > Fixed the two that are safe and in the spirit of a regression net:
+      > `accounts-balance` now scopes to the Top10 row (which is what the test
+      > claims to check) instead of asserting the user owns one portfolio; and
+      > `settings` uses `exact: true`. Also added the missing cleanup to
+      > `cash-leg-on-trade.spec.ts`, which was leaking a portfolio per run — the
+      > direct cause of the `settings` collision.
+      >
+      > **Not fixed, deliberately:** `portfolios.spec.ts:378/406` would need
+      > either a Top10 cleanup or an assertion that tolerates pagination, and
+      > both are judgement calls about another spec's intent. Also found, and
+      > left alone: `wallets`' portfolio-delete guard returns
+      > `"portfolio has open positions"` while the positions endpoint reports
+      > the same positions `isOpen: false, quantity: 0` — those 3 portfolios
+      >   cannot be deleted through the API. The real remedy for all of this is
+      >   a DB reset (`docker compose run --rm mock-db-seed`), which is the
+      >   user's call because it touches their local data.
+- [x] Commit `test(spa): cover ticker-to-research links in e2e and document the rule`
+
+---
+
+---
+
+## 86. Key facts per instrument class — bonds, funds, ETFs, crypto (2026-10-02)
+
+User request (no proposal file): *"Make a specific 'key facts' in Research per
+instrument. Currently it is designed for stocks, but we have bonds, funds, crypto
+and they have their own specific information we currently miss, even different
+bonds types has different info."*
+
+**The gap, measured, not assumed.** The Key Facts card
+(`ResearchOverview.vue:297-335`) is eight hard-coded `<dt>/<dd>` pairs — Name,
+Sector, Industry, Country, ISIN, Exchange, Employees, CEO. Six of those are
+shared identity; **Sector, Industry, Employees and CEO are equity-only**, and for
+any non-equity symbol all four render a dash. Four of the eight are *already
+fetched and thrown away at the last step*:
+
+- **`etf_category` is populated and never displayed.** The profile route maps it
+  into `finnhubIndustry` (`routes/instruments.ts:446`) and separately into
+  `gicsSector` (`:447`); the card reads `gicsSector` for "Sector" and
+  `gicsIndustry` for "Industry", and `translate.ts:221-224` hard-codes
+  `gicsSector`/`gicsIndustryGroup`/`gicsIndustry`/`gicsSubIndustry` all `null`.
+  Verified live in the local reference table: `etf_category` holds
+  `"Equity"` / `"Fixed Income"` for 16 530 ETF rows. **The cheapest real win in
+  this section is a row the backend already fills.**
+
+**`toInstrumentProfile` is the lossy point, and it is lossy for every class.**
+`translate.ts:189-231` reads only equity-shaped keys. For a savings bond the
+provider returns ten fields and the translator emits three. For a Catalyst
+corporate bond it returns thirteen and emits three. Verified live through
+cachest on 2026-10-02:
+
+```
+GET :8090/fixedincome/profile/…  → upstream 404 (no emissions synced locally)
+GET :8090/corp-bond/profile/BST0327
+  {"symbol":"BST0327","name":"Best S.A.","isin":"PLBEST000333",
+   "stock_exchange":"GPW RR","hq_country":"PL","asset_type":"corp_bond",
+   "issuer":"Best S.A.","series":"W3","market":"GPW RR","status":"Notowane",
+   "nominal_value":"100.0","nominal_currency":"PLN","secured":"NIE",
+   "coupon_type":"zmienne WIBOR 3M + 4%","current_rate":"7.83%",
+   "maturity_date":"2027-03-07","country":"PL","currency":"PLN"}
+GET :8090/crypto/profile/BTC-USD
+  {"symbol":"BTC-USD","currency":"USD","price":84127.1484,"date":"2026-10-02"}
+```
+
+Every one of those bond fields — issuer, series, coupon type, current rate,
+maturity, secured, status, nominal — is **already in production through the
+provider tier, is cached by cachest, and dies in the translator.**
+
+**Two provider profiles are never called at all.** `src/adapters/cachest.ts` has
+`fetchBondProfile` (`:138-140`, `/fixedincome/profile`) and has **no**
+`fetchCorpBondProfile` and **no** `fetchCryptoProfile`, although both routes
+already exist and are configured — `cachest/config.yaml:183-190`
+(`OPENST_CORP_BOND_PROFILE`, `cache_ttl 86400`) and `:243-249`
+(`OPENST_CRYPTO_PROFILE`, `cache_ttl 21600`), served from `openst/src/main.py:650`
+and `:454`. Consequence, and it is a live bug rather than a missing feature: a
+Catalyst bond symbol is not a savings bond, so `isSavingsBond` is false, the
+profile route tries the **equity** tier (`:367`), and on failure tries the
+**savings-bond** tier (`:456`) — which obligacje.pl does not carry. `/corp-bond/
+profile` is never reached, so a Catalyst bond's research page 502s today. The
+comment at `:371-375` documents the cost of the current probe order ("the equity
+fallback spins through three OpenBB providers") and that cost is paid on every
+bond lookup.
+
+**The crypto ceiling is real and must not be papered over.** The installed
+`openbb_fmp/models/crypto_search.py` declares `FMPCryptoSearchData` with exactly
+`symbol`, `name`, `exchange`, `ico_date`, `circulating_supply`, `total_supply`,
+and `openbb_core/.../crypto_search.py` adds nothing beyond `symbol` and `name`.
+There is **no market cap, no rank, no ATH and no ATL** available from the one
+configured provider (`openst/src/openbb_client.py:537`, `CRYPTO_SEARCH_PROVIDERS
+= ["fmp"]`). Those four are recorded below as unavailable rather than specified
+as nullable fields that are permanently `—`.
+
+Recorded decisions (resolved with the user, 2026-10-02):
+
+- **Contract shape: a nullable `keyFacts` on the existing `InstrumentProfile`,
+  discriminated by `kind`, one schema per asset class.** Not a new route — the
+  page already fetches the profile on every load (`ResearchOverview.vue:34-41`),
+  so a second request buys nothing. Not flattened onto the profile either: at
+  most six of ~20 flat nullable fields are ever populated for any one instrument,
+  and the per-class rendering logic lands in the view regardless.
+- **`kind` reuses the existing canonical vocabulary** —
+  `stock | etf | fund | crypto | bond | corp_bond`, the exact `AssetType` union
+  at `tickerref-queries.ts:8` and the lowercase form of the contract's six
+  `InstrumentType` values (`translate.ts:86-108`). Six kinds, no seventh.
+  `kind` is deliberately redundant with the existing `profile.assetType`: the
+  latter is the contract enum in `SCREAMING_CASE` and is **nullable** when the
+  symbol is absent from the local reference table (`routes/instruments.ts:429-448`),
+  whereas `kind` is non-null whenever `keyFacts` is present and is what makes
+  the union discriminable. A reviewer will ask why both exist; the answer is
+  above, and it is the reason the two are not merged.
+- **Bonds are two kinds, not one — `bond` and `corp_bond` — because the field
+  sets are disjoint**, which is the request's own point ("even different bonds
+  types has different info"). A savings bond has `rateRule` / `margin` /
+  `redemptionFee` / `termMonths` / `seriesCode`; a Catalyst bond has `issuer` /
+  `series` / `secured` / `status` / `couponType` / `currentRate` / `nominalValue`.
+  They share only `maturityDate` and a notion of nominal, so they share one
+  *concept* and nothing else — one schema with fourteen nullable fields would be
+  worse than two schemas with six each, because every reader would have to know
+  which half applies.
+- **`margin` is not a contract field on either bond kind.** `CorporateBondProfileData`
+  declares it (`corp_bond_profile.py:47`) but the scraper's own docstring says
+  "`margin` is `None` — the detail page embeds the margin in `coupon_type` for
+  variable-rate bonds" (`obligacje.py:62-68`), and the live payload above has no
+  `margin` key. A field that is structurally always null is a permanent dash.
+- **`margin` on a savings bond is a semantic overload and the card must not
+  label it "Margin".** `_extract_margin` (`openst/src/importers/bond_series.py:228-246`)
+  documents all three cases explicitly: for `rate_rule: "fixed"` the stored value
+  *is* the flat annual rate; for `cpi_12m+margin` it is the inflation add-on; for
+  `nbp_ref+margin` it is the NBP add-on. The column is called `margin` and means
+  a **rate** in one case and a **spread** in the other two. The label switches on
+  `rateRule` — see §86.9 — and the default label when `rateRule` is absent is
+  "Rate".
+- **Provider strings render verbatim; nothing is translated.** `secured` arrives
+  as `"NIE"`, `status` as `"Notowane"`, `couponType` as
+  `"zmienne WIBOR 3M + 4%"`. Translating them means inventing an English
+  vocabulary the rest of the app does not have. One rule, applied once: raw text
+  is shown raw, only numeric and date values are formatted.
+- **Three Catalyst fields arrive as strings, not numbers, and two of them carry
+  their own unit.** `nominal_value` is `"100.0"`, `current_rate` is `"7.83%"`
+  (a trailing `%` that would render as `7.83%%` through `formatPercent`), and
+  `secured` is a Polish boolean string. Each conversion is pinned in §86.6.
+- **Crypto key facts are exactly what FMP returns** (user's call, after the
+  measurement above): `name`, `exchange`, `icoDate`, `circulatingSupply`,
+  `totalSupply`, plus the quote currency already on the profile. Market cap,
+  rank, ATH and ATL are **not** specified as nullable fields — they are recorded
+  as unavailable from the current provider, which is a different statement from
+  "we fetch it and it happens to be empty".
+- **Funds ship thin, on purpose** (user's call). The local reference carries
+  name + aliases only; the ANALIZY snapshot CSV is
+  `code,name,currency,points,first,last,close` (`openst/data/fund-catalogue.csv`,
+  verified: `ARK01,Erste Akcji Polskich,PLN,7183,1998-04-02,2026-09-29,90.4`).
+  There is no manager, category type, OPL/TER, risk class or recommended holding
+  period anywhere in the stack. `FundKeyFacts` therefore carries **one** field,
+  `categoryCode`, and the section says so on the page rather than implying
+  coverage. The TFI detail importer that would fix it is named as follow-up in
+  §86.10.
+- **ETFs also ship thin**: `category` from `ticker_reference.etf_category`. That
+  is one row, but it is a row the backend fills today and the UI discards.
+
+Ordering: **contracts land before instruments, deliberately.** The provider-tier
+rule (fixture → openst → cachest → instruments) orders *data*; the contract is a
+*compile* dependency — `translate.ts` types its return as
+`components["schemas"]["InstrumentProfile"]`, so an adapter cannot emit
+`keyFacts` until the schema exists. Fixture capture still comes first, because it
+decides which fields the contract declares. There is **no cachest step**: all
+three profile routes are already configured, and the fix is on the instruments
+side of the boundary.
+
+Rules: one step = one commit; a step is marked `[x]` only after its tests pass
+(unit + `docker compose` level per `openst/CLAUDE.md`, `cachest/CLAUDE.md`, and
+`AGENTS.md`).
+
+### 86.1 — Fixture capture: pin the real field set for all four classes
+
+No code. The point of this step is that §86.2 declares fields and §86.6 parses
+them, and neither may be written against a guessed shape.
+
+- [x] `openst/tests/fixtures/bond/corp_bond_profile_BST0327.json` — save the
+      verbatim body captured above (already verified reachable at
+      `:8090/corp-bond/profile/BST0327`; the HTML that produces it is already
+      committed at `openst/tests/fixtures/obligacje_bond_profile_BST0327.html`,
+      so this JSON is the *parsed* form and must be regenerated, not hand-typed).
+- [x] `openst/tests/fixtures/crypto/search_BTC-USD.json` — the raw
+      `obb.crypto.search("BTCUSD", provider="fmp")` response behind
+      `/crypto/search`, so §86.3's assertions are made against a recorded shape
+      rather than a live key. **Note in the commit body which of
+      `circulating_supply` / `total_supply` / `ico_date` / `exchange` are
+      non-null for `BTC-USD`** — FMP populates them for majors and may not for
+      long-tail tokens, and that difference is the reason the contract fields are
+      nullable.
+- [x] `openst/tests/fixtures/crypto/profile_BTC-USD.json` — today's
+      four-field body, so §86.3's test proves the widening is additive rather
+      than a replacement.
+- [x] Record the savings-bond field set from
+      `openst/tests/fixtures/obligacjeskarbowe/ros.html` — that fixture already
+      exists and is committed; what is new is asserting the parsed values. It
+      carries `Seria:`, `Oprocentowanie:` and the literal prose
+      `"marża 2,00% + inflacja"`, i.e. `rate_rule = "cpi_12m+margin"` with
+      `margin = 2.00` and `fee_b = 2.00` per `_classify_rate` /
+      `_extract_margin`. **No live emission is available locally** — verified:
+      `openst.bond_series` is empty and `/fixedincome/search` 404s, because the
+      bond-series import has not been run in this compose stack. The fixture is
+      therefore the source of truth for this step, and the commit body must say
+      so rather than implying a live capture.
+- [x] **Commit body carries the measured table** — one row per class, field →
+      wire key → type (number / string / date) → nullable. §86.2's schema is
+      transcribed from it, so a disagreement between the table and the schema is
+      a reviewable diff.
+      > `openst` `04355eb`. The table found two things the steps below assumed
+      > wrong, both recorded in that commit body: FMP spells the pair
+      > **`BTCUSD`, not `BTC-USD`** (§86.3's exact match has to dash-normalise,
+      > or it matches nothing for every real pair), and the savings bond's
+      > `margin` / `fee_b` / `nominal` arrive as **strings** (`"2.00"`), not
+      > numbers, because `_plain` stringifies the `Decimal`.
+- [x] Commit `chore(openst): capture the profile payloads key facts are built from`
+
+### 86.2 — Contracts: six `*KeyFacts` schemas and `InstrumentProfile.keyFacts`
+
+- [x] `portfoliost-contracts/contracts/openapi.yaml` — add six schemas
+      (`StockKeyFacts`, `EtfKeyFacts`, `FundKeyFacts`, `CryptoKeyFacts`,
+      `BondKeyFacts`, `CorpBondKeyFacts`), each opening with a literal
+      `kind` property whose value is fixed (`const`), and add
+      `keyFacts: { oneOf: [ … ], nullable: true }` to `InstrumentProfile`
+      (`:465-502`). Fields transcribed from §86.1's table — **only** the fields
+      that table marks populated, plus `margin` explicitly annotated as the
+      overloaded value the label depends on. Numeric fields are
+      `type: number, nullable: true`; the four Catalyst fields that arrive as
+      strings (`nominalValue`, `currentRate`, `secured`, `status`) are
+      `type: string, nullable: true`, **not** numbers — typing them as numbers
+      would make §86.6's parsing an unchecked cast rather than a `Number()` with
+      a `NaN` guard.
+- [x] `npm run lint` from `portfoliost-contracts/contracts/` — this is
+      `scripts_check_spec.py`, the duplicate-property-key guard. It exists
+      because §70.2 inserted a block into `PortfolioTotalMetrics` twice and two
+      contracts published before a consumer caught it. Six new schemas is the
+      exact shape of edit that caused it.
+- [x] `npm test` and `npm run build` in the same directory.
+- [x] **Push `main` and let CI bump the patch version — never tag by hand**
+      (`AGENTS.md`, ops section). Verify the real tag with
+      `gh release list --repo Marx2/portfoliost-contracts`.
+- [x] `NODE_AUTH_TOKEN=$(gh auth token) npm install @marx2/contracts@<new-version>`
+      in **both** consumers — `portfoliost-instruments` and `portfoliost` — then
+      `npm run gen:types` in each. Commit `package-lock.json` and
+      `src/generated/api-types.d.ts` (`portfoliost-instruments`) /
+      `generated/api-types.d.ts` (`portfoliost`) in each repo.
+      > Both repos already carry the `gen:types` script
+      > (`portfoliost-instruments/package.json:23`, `portfoliost/package.json:20`).
+      > The installed and repo specs are both `1.6.59` today, so there is no
+      > pre-existing drift to reconcile — if the install lands a different
+      > version than `gh release list` reported, stop and reconcile rather than
+      > committing a mixed state.
+- [x] Tests: `npm run build` in `portfoliost-instruments` (its
+      `src/generated/api-types.d.ts` must contain the six schema names — a
+      missing one means the wrong package version was installed).
+- [x] Commit `feat(contracts): per-asset-class key facts on the instrument profile`
+
+### 86.3 — openst: widen the crypto profile
+
+`get_crypto_profile` (`openbb_client.py:610-626`) derives its body from the quote
+and explicitly omits `name` because "name is not derivable from a price bar".
+That reasoning was right for a quote-derived body and is now superseded: the
+search leg already exists, already runs against the only provider that has
+crypto metadata (`CRYPTO_SEARCH_PROVIDERS = ["fmp"]`, `:537`), and already
+carries the name.
+
+- [x] Rewrite `get_crypto_profile(pair)` to call
+      `obb.crypto.search(pair, provider=<first provider with a key, honouring
+      the existing `_provider_is_blocked` / `_provider_has_key` gate>)` and merge
+      the matching row onto the quote-derived body. Add `name`, `exchange`,
+      `ico_date`, `circulating_supply`, `total_supply`; keep `symbol`,
+      `currency`, `price`, `date` exactly as they are.
+      > **Match on symbol, not on the first row returned — and dash-normalise
+      > first.** The fetcher's `transform_data` filters with
+      > `str.contains(query, case=False)` and returns a list — `BTC` matches
+      > `BTC-USD` but the first hit is not guaranteed to be the pair asked for.
+      > Selecting `symbol == pair` and returning the body unchanged when there is
+      > no exact match is the difference between a fact and a plausible-looking
+      > wrong fact. §86.1 measured the sharper edge: FMP returns **`BTCUSD`**,
+      > with no dash, and it is row **12 of 17** (row 1 is `TBTCUSD`, tBTC USD),
+      > so a literal `symbol == "BTC-USD"` comparison matches nothing at all.
+      > The comparison is against the pair with its dash removed.
+- [x] `margin` is not part of this; it is not a crypto field.
+- [x] Tests in the openst suite, fixture-driven against §86.1's two JSON files:
+      a crypto whose search row has all five fields populated; one whose supply
+      fields are null (must emit `null`, never `0`); a pair with no exact symbol
+      match (must keep the quote-derived body and omit the five); and a search
+      provider without a key (must not raise — `_provider_has_key` gating is the
+      established pattern from `get_crypto_quote`).
+- [x] Tests: `docker compose --profile test build test &&
+      docker compose --profile test run --rm test` — all 542 green.
+- [x] Commit `feat(openst): carry name and supply on the crypto profile`
+
+### 86.4 — openst standalone smoke
+
+- [x] `docker compose up -d` in `openst`, then **one** `curl` per symbol:
+      `/crypto/profile/BTC-USD`, `/corp-bond/profile/BST0327`, and
+      `/fixedincome/profile/<a real emission>`.
+- [x] Call each **twice** and confirm the second is a Redis cache HIT (the
+      `_cached_or_404` envelope makes this observable in the response), so the
+      widened crypto profile costs one upstream call per TTL, not two per
+      research page view.
+- [x] The third curl is expected to fail locally — `openst.bond_series` is empty
+      and no emission is synced (verified in §86.1). **Record that in the commit
+      body** rather than skipping the check silently, and note that the
+      standalone smoke therefore covers crypto and corporate bonds only.
+- [x] Commit — none required if nothing changed; if the smoke forced a fix, that
+      fix is its own commit before the instruments steps.
+      > Nothing needed fixing, so there is no commit for this step. What the smoke
+      > measured, in a throwaway project (`-p openst-smoke`, app published on
+      > **18080** because 8080 is already the portfoliost gateway's):
+      >
+      > | route | 1st | 2nd | verdict |
+      > |---|---|---|---|
+      > | `/crypto/profile/BTC-USD` | 200, 2.577 s | 200, 0.0038 s | cache HIT, widened body correct |
+      > | `/corp-bond/profile/BST0327` | 200, 1.038 s | 200, 0.011 s | cache HIT |
+      > | `/fixedincome/profile/ROS0932` | 404 | 404, 0.003 s | expected — `openst.bond_series` is empty |
+      >
+      > The crypto body came back with all five new fields and the four quote
+      > fields unchanged, so the widening costs **one** search walk per TTL, not
+      > two per research page view. Redis `crypto_profile:BTC-USD` held the
+      > identical body at TTL 86395.
+      >
+      > Two corrections to this step's own instructions. It says a cache HIT is
+      > "observable in the response" — it is not: `_cached_or_404` replays the
+      > cached body with no marker and no header, so timing was confirmed against
+      > the Redis key rather than trusted. And a *faster 404* is not a hit at
+      > all: it is the negative sentinel from §37.3, so the third row's second
+      > call proves nothing about the positive path.
+      >
+      > The standalone smoke therefore covers crypto and corporate bonds only, as
+      > §86.1 predicted — no savings-bond emission is importable in this stack.
+
+### 86.5 — instruments: the two cachest adapters that do not exist
+
+`src/adapters/cachest.ts` has `fetchBondProfile` (`:138-140`) and nothing for
+Catalyst or crypto. Both upstream routes exist and are already cached by
+cachest, so **this step adds no cachest configuration** — it only makes the
+existing cache reachable.
+
+- [x] `fetchCorpBondProfile(symbol)` → `${BASE_URL}/corp-bond/profile/{symbol}`,
+      modelled on `fetchBondProfile`. Same `UpstreamError` behaviour — the
+      caller needs to distinguish "not a Catalyst bond" from "cachest is down",
+      which is exactly why `fetchFundSearch` (`:54-61`) swallows 404 while
+      `fetchBondProfile` does not.
+- [x] `fetchCryptoProfile(pair)` → `${BASE_URL}/crypto/profile/{pair}`.
+- [x] Tests in `src/adapters/`: each encodes the path with
+      `encodeURIComponent` (assert on the exact URL, including a pair whose
+      quote currency contains a character that must be escaped), and each turns
+      a non-2xx into an `UpstreamError` carrying the status.
+- [x] Tests: `npm test` green (`vitest run`, `src/routes/instruments.test.ts` is
+      the file that will need its fetch mocks extended in §86.8).
+- [x] Commit `feat(instruments): fetch the corporate-bond and crypto profiles`
+
+### 86.6 — instruments: `toKeyFacts`, bonds first
+
+Bonds are the headline of the request and the only class with two disjoint field
+sets, so they get their own step and their own commit.
+
+- [x] `src/adapters/translate.ts` — add `toBondKeyFacts(row: Row, kind)` and
+      `toCorpBondKeyFacts(row: Row)`, returning the §86.2 schemas. Every field
+      reads through the existing `str` / `num` / `pick` helpers (`translate.ts:47-79`)
+      so a provider change degrades to `null` rather than throwing.
+- [x] **Savings bond** (source keys from `openbb_client.py:727-738`):
+      `seriesCode`←`series_code`, `issueDate`←`issue_date`,
+      `maturityDate`←`maturity_date`, `termMonths`←`term_months`,
+      `rateRule`←`rate_rule`, `margin`←`margin`, `redemptionFee`←`fee_b`,
+      `nominal`←`nominal`.
+      > `fee_b` and `nominal` arrive through `_plain`, i.e. as JSON numbers or
+      > strings depending on the driver — `num()` handles both, and a
+      > `termMonths` of `0` must survive as `0` rather than becoming `null`
+      > (`num` already returns `0`; do not add a truthiness filter on top).
+- [x] **Catalyst corporate bond** — the three string-shaped fields, pinned:
+      - `nominalValue` ← `nominal_value` (`"100.0"`) →
+        `num()`, so a malformed value becomes `null` and never `NaN`.
+      - `currentRate` ← `current_rate` (`"7.83%"`) → **strip the trailing `%`
+        and parse the remainder**, yielding `7.83` as a number. Keeping the `%`
+        in the value would render `7.83%%` through `formatPercent` in §86.9. If
+        the string has no `%`, parse it as a plain decimal rather than
+        returning `null` — `current_rate` is the single most useful number on
+        the card and a missing suffix must not cost it.
+      - `secured` ← `secured` (`"NIE"`) → kept as the provider's string. Per the
+        recorded decisions it is **not** mapped to a boolean and **not**
+        translated; `"NIE"` on the card is the honest rendering of a Polish
+        source.
+      - The rest are pass-through: `issuer`, `series`, `market`, `status`,
+        `nominalCurrency`, `couponType`, `maturityDate`.
+      > **`margin` is deliberately absent** — the scraper never sets it
+      > (`obligacje.py:62-68`) and the live payload has no such key. Its absence
+      > is a decision recorded in this section, not an oversight.
+- [x] Wire `toBondKeyFacts` into `toInstrumentProfile` (`:189-231`) for the
+      existing `isBond` branch (`:198`), and into `toInstrumentDetail`
+      (`:160-187`) only if `InstrumentDetail` grows the field — it has not been
+      specified to, so **do not** touch it in this step.
+- [x] Tests in `src/adapters/translate.test.ts` against the §86.1 fixtures:
+      savings bond with `rate_rule: "cpi_12m+margin"` → `kind: "bond"`,
+      `margin: 2`, `fee_b` → `redemptionFee: 2`, `rateRule` passed through
+      **untranslated**; `rate_rule: "fixed"` → `kind: "bond"` with the same
+      `margin` value and a different `rateRule` (this pair is the test that
+      proves the label switch in §86.9 has its data); Catalyst →
+      `kind: "corp_bond"`, `nominalValue: 100`, `currentRate: 7.83`,
+      `secured: "NIE"`, `status: "Notowane"`, and **no** `margin` key at all;
+      a row missing `current_rate` entirely → `currentRate: null` without
+      throwing; `"7.83"` without the `%` → `7.83`.
+- [x] Tests: `npm test` and `npm run build` green.
+- [x] Commit `feat(instruments): translate savings-bond and Catalyst key facts`
+      > `85464be`. Two deviations from the step as written, both recorded in the
+      > commit body: `toBondKeyFacts` takes **no** `kind` parameter (a savings-bond
+      > row is the `bond` kind by definition, and a parameter that can only hold one
+      > value is a lie in a signature), and the wiring needed a **new** discriminator
+      > rather than the existing `isBond` — `isBond` fires on
+      > `rate_rule`/`series_code`, which a Catalyst row does not have, so wiring into
+      > it alone would have left every Catalyst profile rendering dashes for fields
+      > the provider already sends. `isBond` itself is untouched: it also drives the
+      > PLN currency estimate, and widening it is a currency decision.
+
+### 86.7 — instruments: `toKeyFacts` for crypto, ETF, fund, stock
+
+The remaining four kinds. Each is a different source, which is why they are one
+step rather than four: no single one of them is a change of behaviour on its own,
+and four near-empty commits would be noise.
+
+- [x] **Crypto** (`kind: "crypto"`) — `name`←`name`,
+      `exchange`←`exchange`, `icoDate`←`ico_date`,
+      `circulatingSupply`←`circulating_supply`, `totalSupply`←`total_supply`.
+      `quoteCurrency` comes from the profile's existing `currency`, not from the
+      key-facts row. **No `marketCap`, `rank`, `ath` or `atl` keys** — FMP does not
+      carry them (§86.1) and a permanently-null field is a permanent dash.
+- [x] **ETF** (`kind: "etf"`) — `category` ← the `ticker_reference` row's
+      `etfCategory`. This is the value already mapped to `finnhubIndustry` at
+      `routes/instruments.ts:446`; prefer reading `etfCategory` from the same
+      reference `ref` the route already holds rather than re-querying.
+- [x] **Fund** (`kind: "fund"`) — `categoryCode` only, and only when the
+      reference row is an `ANALIZY::` listing key; `null` for a `TFI::` row.
+      Verified shapes: `ANALIZY::ARK01` / `ARK01` / `Erste Akcji Polskich`, and
+      `TFI::NNEP65.TFI` / `NNEP65.TFI`, whose `isin` is empty and whose aliases
+      carry the human name. One field, and the page says so.
+- [x] **Stock** (`kind: "stock"`) — `sector`←`gicsSector`,
+      `industry`←`gicsIndustry`, `employees`←`employeeTotal`, `ceo`, plus
+      `ipo`←`ipo`, `sharesOutstanding`←`shareOutstanding`,
+      `marketCap`←`marketCapitalization`. Pure relocation: every value is already
+      on the profile and already fetched. **No new upstream call.**
+      > `gicsSector`/`gicsIndustry` are hard-coded `null` in
+      > `translate.ts:221-224` and filled by the route's reference-table pass
+      > (`:447`). The stock kind therefore reads the **post-fill** object, not
+      > the raw provider row — meaning `toKeyFacts` for stocks runs in the route
+      > (`:429-452`), not inside the pure translator. Keep the translator pure and
+      > let the route pass the enriched profile in; a `toStockKeyFacts` that
+      > re-reads the provider row would return the dashes this section is
+      > removing.
+- [x] Tests in `translate.test.ts` for each of the four, including: a crypto row
+      with null supplies → `null` not `0`; an ETF with `etf_category: "Fixed
+      Income"` → `category: "Fixed Income"`; a fund on a `TFI::` key →
+      `categoryCode: null`; a stock with a null `ceo` → `ceo: null` and the key
+      still present.
+- [x] Tests: `npm test` and `npm run build` green.
+- [x] Commit `feat(instruments): translate crypto, ETF, fund and stock key facts`
+      > `f16b27b`. The stock kind is the one that shaped the design: it reads the
+      > **built profile**, because `gicsSector`/`gicsIndustry` are null in the raw
+      > translation and only the route's reference pass fills them. So an equity
+      > keeps `keyFacts: null` inside the translator and §86.8 recomputes it after
+      > its fill — chosen over emitting a stale `sector: null` directly beneath a
+      > profile that is about to say Technology. `toKeyFacts` is exported for that
+      > call. The dispatcher also keeps the pre-§86 behaviour for an unsynced
+      > symbol: no kind from the reference table still means the bond kinds are
+      > recognised from the row itself.
+
+### 86.8 — instruments: dispatch the profile by asset class
+
+This is where the Catalyst-bond 502 is actually fixed, and it replaces a probe
+order that costs a three-provider equity spin on every bond lookup.
+
+- [x] `src/routes/instruments.ts` `/:symbol/profile` (`:390-467`) — resolve the
+      asset class **first** from the local reference via the existing
+      `assetTypeForSymbol` + `normalizeAssetType`, then fetch the matching
+      provider profile: `bond` → `fetchBondProfile`, `corp_bond` →
+      `fetchCorpBondProfile`, `crypto` → `fetchCryptoProfile`, everything else →
+      `fetchProfile`.
+      > Copy the pattern, do not invent one: `services/quote-dispatch.ts:109-121`
+      > already dispatches the quote route exactly this way off the same
+      > `assetTypeForSymbol` read, including the `catch` that falls back to
+      > `"stock"`. Two dispatchers reading the same column is cheap; a third
+      > ordering convention is not.
+- [x] **Keep today's probe order for a symbol the reference does not know.** A
+      null `assetType` means no sync has run, not that the symbol is an equity;
+      falling back to the existing `fetchProfile` → `fetchBondProfile` cascade
+      (`:453-464`) preserves current behaviour for unsynced symbols and is what
+      stops this step from turning a WSE stock into a 404.
+- [x] Leave the `/:symbol/detail` route (`:340-388`) on its existing path in
+      this step. It has the same dispatch problem, but `InstrumentDetail` has
+      not been given `keyFacts`, so there is nothing to fix there yet — noted
+      here so the omission is deliberate and recorded, not forgotten.
+- [x] Extend `src/routes/instruments.test.ts` (the fetch mocks): a `BST0327`
+      reference row with `asset_type: "corp_bond"` resolves through
+      `fetchCorpBondProfile` and returns `kind: "corp_bond"` with `issuer`; a
+      `BTC-USD` row with `asset_type: "crypto"` resolves through
+      `fetchCryptoProfile`; an unknown symbol still resolves through the
+      cascade; and — the regression this step exists for — a Catalyst bond whose
+      equity profile **succeeds** with an empty frame must still be served as a
+      bond, not as a stock.
+- [x] Tests: `npm test` and `npm run build` green.
+- [x] Commit `fix(instruments): dispatch the profile route by asset class`
+      > `aef1b87`. The Catalyst 502 is fixed and the regression is now a test: a
+      > Catalyst bond whose **equity** profile succeeds with a plausible row is
+      > still served as a bond. Two supporting changes were load-bearing rather than
+      > incidental, and both were found by tests written from this step's own
+      > examples:
+      >
+      > * `ticker_reference.listing_key` is now selected by `searchTickerReference`.
+      >   The fund kind cannot tell an `ANALIZY::` listing from a `TFI::` one without
+      >   it. It is the primary key, so it was always one column away.
+      > * The identity-block guard compared the reference ticker against
+      >   `symbol.split(".")[0]`, which **can never equal a dotted listing** — so a
+      >   `NNEP65.TFI` fund matched no reference row at all and got no ISIN, no
+      >   country and no key facts. The guard now also accepts the venue-qualified
+      >   spelling: an exact comparison against the symbol the lookup was made with,
+      >   so it can only add matches for symbols containing a dot, which today get no
+      >   enrichment whatsoever. This is a pre-existing identity bug that §86.7's fund
+      >   example exposed rather than created.
+      >
+      > The route tests run against a **real test db with real `ticker_reference`
+      > rows**. Mocking `assetTypeForSymbol` was tried first and broke nine
+      > pre-existing tests — a mock tests the switch, not the wiring.
+
+### 86.9 — SPA: `KeyFactsCard` replaces the hard-coded card
+
+- [x] New `src/modules/instruments/KeyFactsCard.vue` — feature-scoped, used by
+      one view, so it belongs in the module and not `src/components/`
+      (`docs/COMPONENTS.md:17`). Props: `profile: InstrumentsProfile`. It
+      renders the **shared identity block** (Name, Country with the flag image,
+      ISIN, Exchange, plus the `weburl` link at `ResearchOverview.vue:326-334`)
+      and then the **kind-specific block** from `profile.keyFacts`.
+- [x] One `KEY_FACT_ROWS: Record<kind, ReadonlyArray<{ field: keyof …;
+      label: string }>>` map drives the second block, so a new field is one array
+      entry and not a new `<dt>`. Labels live in exactly one place, the same way
+      `ASSET_TYPE_LABELS` does in `TickerBadge.vue:8` — and for the same reason:
+      the contract enums are not display strings.
+- [x] **The `margin` label switch** — `bond` rows label `margin` as
+      **"Rate"** when `rateRule === "fixed"`, **"Inflation margin"** when
+      `rateRule === "cpi_12m+margin"`, **"NBP margin"** when
+      `rateRule === "nbp_ref+margin"`, and **"Rate"** when `rateRule` is null.
+      This is the single most important line in the component: the same stored
+      number is a rate in one case and a spread in the others
+      (`bond_series.py:228-246`), and a card that always says "Margin" states
+      something false for two of the three savings-bond families.
+- [x] Formatting, using the existing helpers in `src/utils/format.ts`:
+      `formatAmount` (`:30`) for `nominal` / `nominalValue` paired with
+      `nominalCurrency`; `formatNumber` (`:41`) for `termMonths`,
+      `circulatingSupply`, `totalSupply`; `formatCompact` (`:58`) for
+      `marketCap`; `formatDate` (`:70`) for `maturityDate` / `issueDate` /
+      `icoDate`; **verbatim strings** for `issuer`, `series`, `market`, `status`,
+      `secured`, `couponType`, `rateRule`, `exchange`, `category`,
+      `categoryCode`, `name`. A null value renders the card's existing `"—"`
+      (`ResearchOverview.vue:70-72`).
+- [x] `ResearchOverview.vue:297-335` — delete the hard-coded card, mount
+      `<KeyFactsCard :profile="profile" />` in its place. **The `Key Facts`
+      heading and the `card p-6` wrapper move into the new component** so the
+      markup is identical and `tests/e2e/research.spec.ts:27`
+      (`getByText("Key Facts")`) keeps passing unchanged.
+- [x] **Hide the card when there is nothing to say.** A symbol with identity but
+      no `keyFacts` (an unsynced WSE stock, a crypto pair whose search leg has no
+      exact match) must not render a card of six dashes. The existing
+      "Limited data availability" banner (`:217-225`) already covers that case;
+      the card is `v-if`'d off `profile.keyFacts || sharedIdentityRows.length`.
+- [x] **Do not touch** the Analyst Price Target card (`:263-295`), the
+      "Latest Earnings Call" card (`:337-354`), or the "Key Statistics" block
+      (`:371-383`). All three are equity-only and already degrade correctly —
+      `v-if="metrics"` at `:371`, `v-if="latestEarningsCall"` at `:337`. They are
+      the model this section follows, not part of it.
+- [x] Tests in `tests/unit/modules/instruments/`: a new `KeyFactsCard.test.ts`
+      with one case per kind asserting the exact label set rendered —
+      stock keeps all eight original rows, `corp_bond` renders Issuer / Series /
+      Market / Status / Nominal / Nominal currency / Secured / Coupon type /
+      Current rate / Maturity and **not** Employees or CEO, `bond` renders Series
+      / Issue date / Term / Rate rule / Maturity / Nominal / Redemption fee and
+      **no** Margin, `crypto` renders Name / Exchange / ICO / Circulating supply /
+      Total supply, `etf` renders Category, `fund` renders Category code. Plus:
+      the same savings-bond fixture rendered under `fixed` and under
+      `cpi_12m+margin` asserts the label is **"Rate"** in one and
+      **"Inflation margin"** in the other.
+- [x] Extend `tests/unit/modules/instruments/ResearchOverview.test.ts`: the
+      existing "renders the company profile fields" case (`:215`) must still pass
+      unchanged — it is the proof that a stock's card is byte-identical after the
+      move.
+- [x] Tests: `npm run build`, `npm run test`, `npm run test:mock` green.
+- [x] Commit `feat(spa): render per-class key facts on the research overview`
+      > `fdac51d`. Two placements differed from the step's wording, both recorded in
+      > the commit body: the row table lives in **`keyFactsRows.ts`** beside the card
+      > (`<script setup>` cannot export, and an importable map is what makes "a new
+      > class is one array entry" true), and the equity rows **fall back to the
+      > profile's own fields** when `keyFacts` is absent — otherwise an older
+      > instruments build or an unclassifiable symbol would render a *different* card.
+      > That fallback is also what keeps ResearchOverview's existing "renders the
+      > company profile fields" case passing untouched.
+      >
+      > `ipo`, `sharesOutstanding` and `marketCap` are in `StockKeyFacts` but are
+      > deliberately **not** on the card: Key Statistics already covers market data,
+      > and this step's acceptance is that a stock keeps its original eight rows.
+
+### 86.10 — Stack smoke, e2e, docs, and the recorded gaps
+
+- [x] `docker compose up -d redis openst cachest instruments`, curl each of
+      `AAPL`, `SPY` (ETF), `BST0327`, `BTC-USD`, `ARK01` through the gateway at
+      `:8080` and confirm a non-null `keyFacts` with the right `kind` on each.
+      > Measured through the gateway at `:8080` after `docker compose restart
+      > gateway` (nginx resolves each upstream once at config load, so a recreated
+      > `instruments` 404s through the gateway until the gateway restarts):
+      >
+      > | symbol | kind | notes |
+      > |---|---|---|
+      > | `AAPL` | `stock` | `sector` present — it came from the reference fill, i.e. the §86.7 recompute working end to end |
+      > | `SPY` | `etf` | `category: "Equity"` — a row the backend already filled and the UI used to discard |
+      > | `BST0327` | `corp_bond` | full Catalyst payload, `currentRate: 7.83` |
+      > | `BTC-USD` | `crypto` | `name` / `icoDate` / both supplies present |
+      > | `ARK01` | — | **404** — see the fourth recorded gap below |
+      >
+      > The crypto row came back with five nulls on the first attempt and full
+      > values on the second. Not a code fault: **both cache layers replayed a
+      > pre-upgrade body** — openst's `crypto_profile:BTC-USD` (24 h TTL) *and*
+      > cachest's `crypto:profile:BTC-USD`. After a crypto-profile deploy both
+      > keys have to be dropped or the widening looks like it did nothing.
+      **`docker compose restart gateway` after any upstream recreate** or only
+      instruments-routed paths will 404 for the wrong reason — nginx caches each
+      upstream address for the life of the process and the symptom is a 404 from
+      the wrong Hono service, not a 502 (`portfoliost/AGENTS.md`).
+- [x] e2e in `tests/e2e/research.spec.ts`: a corporate bond, a crypto pair and an
+      ETF each render their own key facts.
+      > Three cases added and passing: `SPY` (ETF), `BTC-USD` (crypto) and
+      > `BST0327` (corporate bond), each asserting its own labels *and* the
+      > absence of `CEO` / `Employees` — the rows the old card rendered as
+      > dashes. `BTC-USD` asserts `Bitcoin USD` appears **twice**: the identity
+      > block already carries a Name row and the crypto block carries the
+      > provider's name beside it. That duplication is inherent to a shared
+      > identity block plus a class block, so it is asserted rather than hidden. A bond lookup needs the reference row,
+      so assert against the symbols the local sync actually produced — query
+      `instruments.ticker_reference` for one `corp_bond` and one `crypto` row
+      first, and **skip with a named reason rather than inventing a symbol** if
+      the local sync has not run.
+- [x] `npm run test:stack` green, then the full SPA gate: `npm run build`,
+      `npm run test`, `npm run test:mock`, `npm run test:e2e` against a rebuilt
+      stack.
+- [x] **`docs/COMPONENTS.md`** — add a `KeyFactsCard` entry under "Where things
+      live": the shared-identity rows come from the profile, the kind-specific
+      rows from `profile.keyFacts`, labels live in `KEY_FACT_ROWS` and nowhere
+      else, and a new asset class is one schema plus one array entry.
+- [x] **Record the three gaps this section deliberately does not close**, in the
+      commit body and in this section's archive note — not as new work:
+      1. **Funds have no real key facts.** One field ships. The TFI detail
+         importer — manager, category type, OPL/TER, risk class, recommended
+         holding period — needs a new openst plugin route against
+         analizy.pl or biznesradar's TFI section, plus a fixture capture and its
+         own cachest route. Named as the obvious next proposal; not started here.
+      2. **Crypto has no market cap, rank, ATH or ATL.** FMP's crypto search is
+         the only configured crypto search provider and carries none of them.
+         CoinGecko does; adopting it means a new provider + API key in openst.
+      3. **`/:symbol/detail` (`routes/instruments.ts:340-388`) still uses the
+         probe order.** Same dispatch as §86.8, deferred because
+         `InstrumentDetail` has no `keyFacts` field yet.
+      4. **Funds have no provider profile at all, so `FundKeyFacts` is
+         contract-only.** `GET /api/instruments/ARK01/profile` returns 404 — the
+         equity tier has no `ARK01` and the bond fallback misses too — and the
+         route 404s *before* the reference-table pass, so the fund key facts never
+         reach the page. The contract, the translator and the card row all exist
+         and are unit-tested; nothing can render them until a fund profile is
+         served. The obvious fix is a reference-only profile for classes the
+         provider does not serve, which changes the route's error path and is
+         therefore its own step rather than a tailwind on this one.
+      5. **§86.8's premise did not reproduce: there is no Catalyst 502.** The step
+         was written on the measurement that a Catalyst profile 502s, and it does
+         not — openst's `EquityProfileFetcher` dispatches Catalyst codes to
+         obligacje.pl *internally*, so `/equity/profile/BST0327` answers with the
+         full Catalyst payload and the route never reaches its 404. The dispatch
+         change is still correct and still worth having (an explicit corp-bond
+         tier, reference-driven classification, key facts, and no second probe
+         once a `corp_bond` reference row exists), but the 502 it claims to fix is
+         not a symptom anyone can reproduce. The local sync produces **zero**
+         `corp_bond` reference rows, so the reference-driven branch is covered by
+         route tests against real seeded rows rather than by live data.
+- [x] Commit `docs(spa): document KeyFactsCard and record the remaining class gaps`
+
+---
+
+---
+
+## 87. Withdrawal-on-sell, and a per-account "cash leg" switch (2026-10-02)
+
+Owner-driven. Supersedes the `Wpłata`-row remedy proposed in §78.1: the owner
+closed XTB with cash that never rests (deposit→buy, sell→withdraw), so the fix
+is a **code path that already exists for buys and is missing for sells**, not a
+new spreadsheet row per account.
+
+**The asymmetry, measured in the code today.** `sheets-sync/src/transakcje-mapper.ts`
+already posts an external cash leg for a funded trade — but only one direction of
+it:
+
+| sheet row | `Typ` | col 47 `wpłata/wypłata` | cash row posted | anchor |
+|---|---|---|---|---|
+| any kontо | `Kupno` | `1` | `DEPOSIT`, `${externalId}#d` | `transakcje-mapper.ts:387-404` |
+| `Equate+` only | `Sprzedaż` | `1` | `TRANSFER` → `IBKR`, `#t` | `:405-419`, gated on `SALE_PROCEEDS_TO` (`:23`) |
+| every other kontо | `Sprzedaż` | `1` | **nothing** | `:411-413` — "the derived SELL +X IS the proceeds in place" |
+| any kontо | `Wpłata`/`Wypłata` | `0` | — | parser **throws**, `transakcje-parser.ts:118-119` |
+
+So a funded buy is a round trip (deposit nets the derived `BUY −notional` to ≈0)
+and a funded sell is not (the derived `SELL +notional` credit stands alone with
+no offsetting outflow). `invested` reads it exactly: `backfill.ts:1165-1168` —
+"cumulative net EXTERNAL cash flow … deposits − withdrawals ± transfer legs",
+position cost basis deliberately excluded. AU flags therefore decide whether a
+portfolio has flows at all, and today a sell can never contribute one.
+
+**Sheet state, measured read-only 2026-10-02** (spreadsheet
+`1iDzR0OTHvqPbjjRSnAI4SdoD7sZOGy8uT9991sPFFps`, `Transakcje!A1:AU`, 2041 data
+rows). `Sprzedaż` rows carrying `AU=1`:
+
+| kontо | `Sprzedaż` `AU=1` | rows | `Wartość transakcji` | status |
+|---|---|---|---|---|
+| `Equate+` | 39 | — | — | already on the transfer path |
+| `Rach. rejestrowy PKO BP` | 2 | 131, 132 | 8 500,00 PLN | inert today |
+| `Crypto` | 3 | 317, 1180, 1181 | 39,33 USD + 113,40 EUR + 55,26 EUR | inert today |
+| `IB` | 0 | — | — | settled 2026-10-02, see below |
+
+All five inert rows read as deliberate — each is a sale whose cash left the
+investment account, which is precisely what a `WITHDRAWAL` means. Contrast the
+accounts that keep proceeds in place: `IKE Beata` 54 sells all `AU=0`,
+`IKE Marek` 36 all `AU=0`.
+
+**`IB` is a cash-holding account and stays out of this section.** The owner
+normalised it on 2026-10-02: its 3 funded `Kupno` rows (1565, 1646, 1805 — all
+ASR Nederland, 40 shares, 9 975,17 PLN / 2 344,88 EUR of `DEPOSIT`s that were
+already being posted) went to `AU=0` alongside row 1852, the 40-share exit that
+had been its matching withdrawal. `IB` now reads 387 `Kupno` / 91 `Sprzedaż` /
+448 `Div` / 2 `Split`, **every trade at `AU=0`**, and its flows come only from 41
+`Wpłata` + 5 `Wypłata` rows at `AU=1` — the explicit-deposit pattern, which is
+the correct shape for an account that does hold cash. It is worth recording
+because IB is the account that *looked* like XTB's twin: 3 funded buys in, one
+full exit out. Had 1852 been left at `AU=1`, §87.1 would have closed it at 0 by
+accident. It is deliberately the "proceeds stay put" case instead.
+
+**Design decisions (resolved).**
+- **A `Sprzedaż` row with `AU=1` posts a `WITHDRAWAL` **from the row's own
+  portfolio**, in the row currency, amount `rowCcyCash(row)` — the same col 19 ÷
+  col 21 helper the buy's `DEPOSIT` uses (`:100-104`). It is the exact mirror of
+  `:396-404`, so a funded sell nets to ≈0 the way a funded buy already does.
+- **For kontо on §87.3's list the cash leg is forced and `AU` is not consulted at
+  all** — the owner's rule is "listed portfolios always force cash transactions to
+  be created, not listed still check AU=0/1". This is what removes every
+  spreadsheet edit from the section.
+- `Equate+` keeps its `TRANSFER` → `IBKR` leg. The `SALE_PROCEEDS_TO` gate moves
+  from "the only kontо that gets an outflow" to "the only kontо whose outflow is a
+  transfer rather than a withdrawal", which is what it was modelling in the first
+  place (`:40-54`).
+- `AU=0` on a trade stays "pure replay, no cash row" (`:386`). Unchanged.
+- New cash legs use the documented suffix convention `#d` / `#w` / `#t`
+  (`:137`, `sync.ts:190`).
+
+**Repos touched: three** — `portfoliost-sheets-sync` (the mapper),
+`portfoliost-wallets` (the link + the cascade), `portfoliost` (the SPA setting).
+Flagged here because it crosses more than two.
+
+---
+
+### 87.1 — Sell-side cash leg in the mapper
+
+- [x] `transakcje-mapper.ts:405` — split the branch: `SALE_PROCEEDS_TO.has(konto)`
+      keeps the existing `TRANSFER` → `IBKR` payload unchanged; every other kontо
+      with `row.au` on a `Sprzedaż` row posts
+      `{ type: "WITHDRAWAL", currency: row.currency, amount: rowCcyCash(row) }`
+      with `externalId: ${row.externalId}#w` and
+      `description: "Withdrawal: <aktywo>"` (mirroring `:396-404`).
+- [x] Leave the comment at `:411-413` rewritten, not deleted — it is the reason
+      the gate existed and the reason it is now narrower.
+> The narrowed reading is spelled out in the comment: the gate was never "Equate+
+> is the only kontо with an outflow", it was "the only kontо whose outflow is a
+> TRANSFER rather than a WITHDRAWAL".
+- [x] Tests in `src/transakcje-mapper.test.ts`, alongside the existing
+      `"AU=1 Kupno: trade leg + DEPOSIT cash leg (#d)"` (`:93`):
+      1. `Sprzedaż` + `AU=1` on `XTB` → `WITHDRAWAL`, `#w`, PLN col 19 ÷ col 21
+         into the row currency, and the derived `SELL` still present.
+      2. `Sprzedaż` + `AU=1` on `Equate+` → still the `TRANSFER` pair, unchanged
+         (regression guard on the narrowed gate).
+      3. `Sprzedaż` + `AU=0` → no cash row at all.
+      4. A funded buy then a funded sell on the same kontо nets the account to
+         ≈0 — the §78.1 outcome, asserted on mapper output rather than on PROD.
+- [x] `npm run test && npm run build` in `portfoliost-sheets-sync`; commit
+      `feat(sheets-sync): post a WITHDRAWAL for AU=1 sell rows outside Equate+`.
+> 180 tests green; commit `2a06d60`, released as sheets-sync `v1.0.36`. The
+> pre-existing test "AU=1 Sprzedaż (non-Equate+): trade leg ONLY" asserted the
+> behaviour this step removes, so it was retitled to `AU=0` — the state it always
+> meant — rather than deleted.
+
+### 87.2 — 1:1 link between a trade and its cash leg
+
+The two rows are created together and must die together. Nothing links them
+today: `linked_tx_id` (`wallets/src/db/schema.ts:122`) is documented as the
+cross-currency **transfer pair** link (`:100`) and carries no FK and no cascade,
+and `transactions` has no cash column at all. The delete paths are
+independent — `DELETE /:id/transactions/:txId` deletes only the trade
+(`portfolio-transactions.ts:712`, delete at `:793`) and
+`DELETE /cash/transactions/:txId` deletes only the cash row
+(`portfolio-cash.ts:659`). Only the source wipe knows about both
+(`import.ts:754`).
+
+**Design decisions (resolved, owner 2026-10-02).**
+- **A real FK, nullable, and it lives on the CASH row pointing at the TRADE** —
+  `portfolio_cash_transactions.linked_trade_id uuid NULL REFERENCES
+  portfolios.transactions(id)`. Not the other way round, and not by reusing
+  `linked_tx_id`. The direction is what makes both deletes work with **zero
+  application logic**:
+  - delete the trade → the FK's `ON DELETE CASCADE` takes the cash row with it;
+  - delete the cash row → the link dies with the row and the trade is untouched,
+    because the link *was* the cash row.
+  The reverse layout (`transactions.cash_tx_id`) would need hand-written cascade
+  in `portfolio-transactions.ts:793` for the direction that matters most — silently
+  orphaning a money row when someone deletes a trade — so it is the wrong end to
+  put the key on.
+- **Nullable, so it exists only when a related cash transaction exists.** `AU=0`
+  trades, and every hand-written `Wpłata`/`Wypłata`, stay `NULL`. No row, no key,
+  no sentinel.
+- **Edits are explicitly out of scope.** Changing a funded trade's amount, price
+  or date does **not** re-derive its cash row; the pair is allowed to drift.
+  Accepted by the owner rather than solved — it is recorded here so the drift is a
+  decision and not a bug report later.
+
+- [x] `drizzle/0014_cash_leg_link.sql` — `ALTER TABLE
+      portfolios.portfolio_cash_transactions ADD COLUMN IF NOT EXISTS
+      linked_trade_id uuid REFERENCES portfolios.transactions(id) ON DELETE
+      CASCADE;` plus `CREATE INDEX IF NOT EXISTS
+      portfolio_cash_transactions_linked_trade_id_idx ON
+      portfolio_cash_transactions (linked_trade_id);` — **unqualified index name**,
+      because PGlite rejects schema-qualified ones. Same file registers the column
+      on `schema.ts`. Wallets runs `npm run db:migrate` as its container `CMD`, so
+      the migration applies on the next rollout; `pfire-init-sql` needs no change
+      (it carries only the `postgres_fdw` server and the `instruments.stooq_daily_*`
+      foreign tables — zero wallets DDL).
+- [x] **Backfill all 362 existing pairs.** The link is fully derivable from the
+      `#d`/`#t` suffix convention: verified in PROD, `left(external_id,
+      length(external_id)-2)` matches a trade for **362 of 362** suffixed cash rows
+      (324 `#d` DEPOSIT + 38 `#t` TRANSFER), with 1 977 of 1 977 trades carrying an
+      `external_id`. One `UPDATE … FROM` in the same migration. `linked_tx_id` is
+      left alone — it is the cash↔cash transfer pair and means something else.
+- [x] Set `linked_trade_id` at import time, in the same transaction as the insert,
+      so a partial import cannot leave one leg unlinked. Requires the import to know
+      the trade's id when it writes the cash row — today `import.ts` builds both
+      from the same `externalId`, so it must capture the returned trade id rather
+      than re-derive it.
+- [x] Leave both delete handlers alone. `portfolio-transactions.ts:793` needs no
+      change (the cascade fires); `portfolio-cash.ts:665` needs no change (the link
+      is the row). Confirm `recomputePortfolioTotals` still runs **once** per
+      request, not once per leg.
+- [x] Tests: `DELETE` the trade → the cash row is gone and the balance moved once,
+      asserted by cascade not by application code; `DELETE` the cash row → the trade
+      survives with `linked_trade_id` now `NULL` on nothing (the column is on the
+      deleted row) and the position quantity unchanged; deleting an **unlinked**
+      cash row (a hand-written `Wpłata`) leaves everything else alone; an `AU=0`
+      trade imports with no cash row and nothing to point at.
+- [x] `npm run test && npm run build` in `portfoliost-wallets`; commit.
+> Commit `014900d`, released as wallets `v1.1.122`; 595 unit tests green on PGlite.
+> The import sets the link at cash-insert time **and** catches up after the trade
+> insert (`linkCashLegsToTrade`) — a trade and its leg are two rows of the batch in
+> two database transactions, so a partially-failed batch is enough to leave one
+> without the other, and one direction alone would strand it.
+> **PROD 2026-10-02**: migration journal id 15, `linked_trade_id` present,
+> `portfolio_cash_transactions_linked_trade_id_transactions_id_fk ON DELETE=CASCADE`,
+> and the backfill linked **324 `#d` + 38 `#t` = 362 of 362** suffixed rows, with
+> **0** suffixed rows left unlinked — the count the plan predicted.
+> Deliberately out of scope, same rule in the migration and at import time:
+> Equate+'s TRANSFER *debit* leg carries the sheet's unsuffixed id, so the suffix
+> rule cannot reach it; the `#t` credit leg on IBKR is what links to the sale. — The kontо list: which accounts always get a cash leg
+
+**Owner decision 2026-10-02: no spreadsheet edits at all.** The kontо that get a
+cash leg on every trade are decided **in code**, not by flipping col 47 row by row
+— "listed portfolios always force cash transactions to be created, not listed
+still check AU=0/1". So the AU flips this section originally called for are
+redundant: `NN TFI PPK`'s 3 sells and `NN TFI PPO`'s 1 sell stay at `AU=0` and
+still produce withdrawals, and XTB's 10 rows stay at `AU=0` and still round-trip.
+
+The list, and why each entry is on it:
+
+| kontо | on the list because |
+|---|---|
+| `Equate+` | separate path — keeps the `TRANSFER` → `IBKR` sale simulation (`SALE_PROCEEDS_TO`) |
+| `Crypto` | instant cash; 2 buys + 3 sells already at `AU=1`, consistent with the rest |
+| `NN TFI PPK` | instant cash; 90 of 91 buys already `AU=1`, only its 3 sells disagree |
+| `NN TFI PPO` | same shape; 80 of 81 buys `AU=1` |
+| `Obligacje PKO SA Beata` | 2 buys, both `AU=1` |
+| `Rach. rejestrowy PKO BP` | 24 buys + 2 sells, all `AU=1`; the 2 sells are the inert rows 131/132 |
+| `XTB` | the §78.1 case — deposit→buy, sell→withdraw, never holds cash |
+
+**Deliberately NOT on it:** `IB` (every trade `AU=0` as of 2026-10-02; its flows
+are 41 `Wpłata` + 5 `Wypłata` rows — it genuinely holds cash), `IKE Marek` (36
+sells `AU=0`) and `IKE Beata` (54 sells `AU=0`), where sale proceeds stay in the
+account.
+
+- [x] Add `const ALWAYS_CASH_LEG = new Set([...])` to
+      `portfoliost-sheets-sync/src/transakcje-mapper.ts`, beside the existing
+      `SALE_PROCEEDS_TO` (`:23`) and `KOTO_MAP`. Keep the three constants adjacent
+      and cross-reference them in one comment block — this is now three curated
+      lists about the same accounts and the next reader needs to see all three.
+- [x] Resolution order in `mapRow`: `SALE_PROCEEDS_TO` (transfer) → listed kontо
+      (deposit on buy, withdrawal on sell) → `row.au` (deposit on buy only, as
+      today). Equate+ is checked first so its transfer path is untouched.
+- [x] Tests: a listed kontо at `AU=0` still gets both legs (the XTB case, asserted
+      on mapper output — 5 buys + 5 sells netting to ≈0); an unlisted kontо at
+      `AU=0` gets neither; an unlisted kontо at `AU=1` gets the buy deposit and
+      still no sell leg (today's behaviour, unchanged); Equate+ still transfers.
+- [x] **`sheets-sync` has no `@marx2/contracts` dependency** (the SPA and wallets
+      both pin `^1.6.61`), so the list cannot be shared through contracts without
+      adding one. Follow the existing convention: the constant lives in the mapper,
+      and §87.5's wallets copy carries a pointer comment back to it. Record the
+      duplication rather than pretend it is shared.
+- [x] Deploy, then re-run the **incremental** sync (Admin → Jobs → "Sync sheet",
+      not "Wipe & Reimport"). §69.3 re-backfills every touched portfolio from its
+      first trade, so nobody presses Recompute.
+- [x] Verify: `invested` now tracks real cash in/out for the six listed accounts
+      instead of sitting flat, no account's balance goes negative on a day it was
+      actually empty, and `IB` / `IKE Marek` / `IKE Beata` are bit-identical to
+      before the deploy.
+
+> Commit `c299b62`, released as sheets-sync `v1.0.36`; 188 unit tests green.
+> **PROD 2026-10-02**: wallets `v1.1.122` + the sheets-sync image pinned in
+> `portfoliost-admin`'s HelmRelease (`SHEETS_SYNC_IMAGE`), then the incremental sync
+> from Admin → Jobs → "Run Sync": `inserted=21 skipped=2365 errors=0`,
+> `portfoliosTouched=5` — **XTB 10, NN TFI PPK 4, NN TFI PPO 2, Rach. rejestrowy
+> PKO BP 2, Crypto 3**, exactly the predicted shape (each listed kontо's AU=0 rows,
+> nothing for Equate+ which keeps the transfer). All five backfills reported
+> `complete` by 22:10.
+> Bit-identical, as required: `IB` / `IKE Marek` / `IKE Beata` / `Equate+` last net
+> read `76 629.39` / `37 314.36` / `72 575.14` / `−6 388.76`, unchanged from the
+> pre-deploy baseline, and the sync inserted **zero** rows for them.
+> The "no negative day" check, as a per-day replay of cash rows + trade effects:
+> XTB `−0.79 … +0.26` USD, Crypto `−0.09 … 0.00`, the other three exactly `0.00`.
+> Those residues are the sheet's own col-19 rounding (the deposit is `|col19| ÷
+> col21`, the derived trade effect is `qty × price`), not a leak — 1.0% of the
+> ~650 USD that moved through XTB.
+> **This step contradicts §87.3's own test list, and §87.1 won.** §87.3 wrote "an
+> unlisted kontо at `AU=1` gets the buy deposit and still no sell leg (today's
+> behaviour, unchanged)", which contradicts §87.1's decision text — "every other
+> kontо with `row.au` on a `Sprzedaż` row posts a `WITHDRAWAL`". `AU=1` is a
+> per-row statement that cash crossed the account boundary; a gate that honours it
+> for only some accounts is the old gate again. It costs nothing today: PROD has
+> zero `AU=1` sells outside the listed kontо, so both readings import identically
+> against the current sheet. The test asserts §87.1's reading and says why.
+
+### 87.4 — XTB closes at 0, with no sheet edit
+
+- [x] **No owner action.** XTB goes on §87.3's list; its 5 `Kupno` and 5
+      `Sprzedaż` rows stay at `AU=0` and the round trip is forced by the importer.
+      Compare the two routes: the withdrawn `Wpłata` row would have pinned
+      `invested` at `2 716,60` permanently (buys only — the `2 957,88` of sales
+      and the `+241,28` realised were never in it), which is the offset §78.1 was
+      written to remove. The sheet row 138 insertion point worked out for it is
+      not needed either.
+- [x] Assert XTB closes: external flow nets to ≈0 across 2022-02-11 → 2026-10-02
+      and `invested` on the final snapshot is ≈0 rather than `2 716,60` or `0.00`
+      for the wrong reason. Baseline captured 2026-10-02: 1 695 snapshots, every
+      row `invested = 0.00`, opening net `−1.90`, total return `−24.08`, and the
+      `9.49 → −4.04` day on 2022-02-17.
+- [x] Then §78.5's verification applies to XTB unchanged and §78.6's
+      `moneyWeightedReturn` re-measure finally has a flow series to read.
+
+> **PROD 2026-10-02 — it closes, and the two assertions needed different units.**
+> The account is genuinely flat: **0 open positions**, 4 closed, derived cash
+> balance `−0.79` USD, and 10 cash rows (5 DEPOSIT `+656.45`, 5 WITHDRAWAL
+> `−649.97`, all ten linked to their trade). External flow in the row currency
+> nets to **`+6.48` USD** — 1.0% of what moved, the sheet's own col-19 rounding.
+> Not ≈0 in the portfolio's base currency, and it should not be: **XTB's sheet
+> rows are USD while its portfolio base is PLN**, so `invested` converts each leg
+> at its own historical rate (USD/PLN ≈ 3.96 in Feb 2022 → ≈ 4.4 in Feb 2023). The
+> PLN-equivalent net flow is therefore `−236.82`, which is what the last snapshot
+> reads and what the header shows as `Total Invested −PLN 236.82`. That is an FX
+> loss on the round trip, not a leak, and it is the honest number.
+> So the assertion holds where it was written (row currency ≈0, nothing pinned at
+> `2 716,60`, not `0.00` for the wrong reason) and the plan's currency was wrong.
+> The baseline it quotes also holds: 1 695 snapshots, opening net `−1.90`.
+>
+> **§78.6's re-measure, and a new finding.** XTB now HAS a flow series, and
+> `moneyWeightedReturn` reads **`+1 023 769.62%`** on the Performance tab while
+> `TWR p.a.` reads a sane `+7.70%`. XIRR is meaningless here by construction: the
+> account's whole point is that deposits and withdrawals cancel, so net invested
+> is ≈0 (negative in base ccy) and there is no capital base to annualise against.
+> §78.6's earlier `XTB +1166%` was incomplete flow history; this is a different
+> artefact of the same field, and it will hit every account whose external flow
+> nets near zero — which is exactly the set §87.3 put on the kontо list.
+> `annualizedReturn` already has a withholding predicate (§81, the SHARED
+> `annualizedReturnWithheldReason`); `moneyWeightedReturn` has none, and it needs
+> the same guard on the net-flow basis. That is a §78.6 follow-up, not a §87 one.
+
+### 87.5 — Per-account setting: "generate cash transaction on buy/sell" (UI only)
+
+**Owner decision 2026-10-02: the setting is UI-only and never touches the import.**
+Two independent mechanisms, deliberately:
+
+- **Import** — hardcoded kontо list, §87.3. Listed → always a cash leg. Not listed
+  → obey col 47. The spreadsheet's `AU` keeps its meaning for every account not on
+  the list, so the sheet never lies about an account it governs.
+- **UI** — a per-portfolio boolean. The transaction form pre-ticks the "also create
+  a cash transaction" checkbox from it, so the box reflects what will actually
+  happen; the user can still untick it per transaction.
+
+- [x] `portfolios.portfolios` gains `cash_leg_on_trade boolean NOT NULL DEFAULT
+      false`, plumbed through `@marx2/contracts` (published `1.6.62`; consumers pin
+      `^1.6.62`), the wallets portfolio routes, and the SPA's portfolio settings
+      form. Default `false` so no existing account changes behaviour on deploy.
+- [x] Seed the default from §87.3's list for the seven listed kontо — otherwise the
+      UI would show "no cash transaction" for XTB while the importer creates one
+      anyway, which is the exact disagreement this setting exists to prevent.
+> Wallets keeps its own copy, `CASH_LEG_DEFAULT_PORTFOLIOS` in
+> `src/routes/portfolios.ts`, with a pointer back to the mapper's `ALWAYS_CASH_LEG`
+> — the duplication §87.3's fourth bullet accepted, not an oversight.
+> The existing rows needed a **data** migration, not just a column default: the
+> ten PROD portfolios predate the column, so the default alone would have left all
+> of them unticked. `0015_cash_leg_on_trade.sql` therefore carries the DDL *and* a
+> guarded `UPDATE … WHERE name = ANY(ARRAY[…7…])` (the §7b rule from
+> `database-schema-migrations.md`: a schema change and its data move may share a
+> file, separated by `--> statement-breakpoint`).
+- [x] The SPA's buy/sell form reads the portfolio's flag, pre-ticks the checkbox,
+      and on submit creates the cash row through §87.2's `linked_trade_id`, so a
+      UI-created pair behaves identically to an imported one. Unticking skips it.
+> Both write paths needed it, not one: the new-position path (`POST /:id/positions`,
+> which is itself a BUY) and the buy/sell path (`POST /:id/transactions`). The flag
+> is only the form's default — the **request** is the source of truth, so an
+> explicit `cashLeg: false` reaches the server and an omitted field changes nothing
+> for existing callers.
+- [x] The import path must **not** read this column. Add a test asserting an
+      imported `AU=0` trade on an account with the flag on still imports with no
+      cash row — the two mechanisms stay independent.
+- [x] Tests: flag on → a UI-created buy yields a linked cash row and deleting the
+      buy removes it; flag off → no cash row; a listed kontо shows the box pre-ticked
+      on open; un-ticking per transaction is honoured; and the independence test
+      above.
+- [x] `npm run build && npm run test` (SPA), `npm run test:mock && npm run test:e2e`
+      against a rebuilt compose stack; commit per repo.
+
+> Contracts `1.6.62` · wallets `b01b359` + `d2531f0` (604 unit tests green) · SPA
+> `4a3544b` (587 unit, `test:mock` 242/242, `test:e2e` 131 passed / 1 failed / 1
+> skipped — the one failure is the pre-existing `portfolios.spec.ts:289` "KO"
+> instrument-search window, documented in §80 and reproduced on an unmodified
+> checkout). New `tests/e2e/cash-leg-on-trade.spec.ts` (5 specs) covers the
+> pre-ticked box, the per-transaction untick, the flag round-trip, the kontо-name
+> default, and the import's independence.
+> **PROD 2026-10-02**: wallets `v1.1.123` + SPA `v1.0.363`; the `0015` DML seeded
+> exactly the seven listed kontо to `true` and left `IBKR` / `IKE Beata` /
+> `IKE Marek` `false`. Verified in the browser on XTB: the buy form's
+> "Also create a cash transaction" box is present and pre-ticked.
+> **And the gap this found, now §88:** there are TWO "Rename portfolio" dialogs
+> (the page's and the card's), §87.5's checkbox landed in one of them, and the
+> owner could not see it in the other. Extract both into one component — §88.
+
+
+---
