@@ -136,6 +136,8 @@ export function yearlyTotals(rows: YearlyReturnRow[]): YearlyReturnTotals {
 // none of it is re-implemented per tab.
 import { computed, ref, watchEffect } from "vue"
 import { storeToRefs } from "pinia"
+import { useRoute } from "vue-router"
+import { researchRoute } from "@/utils/research"
 import type { PortfolioAnalytics, PortfolioPositions } from "@/api/types"
 import type { PortfolioAnalyticsTimeframe } from "@/api/portfolios"
 import { formatPercent, formatSignedCurrency } from "@/utils/format"
@@ -186,6 +188,8 @@ const emit = defineEmits<{
   "update:timeframe": [value: PortfolioAnalyticsTimeframe]
   recompute: []
 }>()
+
+const route = useRoute()
 
 /** `${tid}-${field}`, or the bare id when no prefix is passed. */
 function tid(id: string): string {
@@ -697,13 +701,15 @@ function convertedPnl(p: PortfolioPositions[number]): number | null {
         <ul v-else class="divide-y divide-slate-100 dark:divide-slate-800">
           <li v-for="p in performers.top" :key="p.id" class="flex items-center justify-between gap-3 py-2 text-sm">
             <div class="min-w-0">
-              <TickerBadge
-                size="sm"
-                :symbol="p.symbol"
-                :name="p.companyName"
-                :country-code="p.country"
-                :asset-type="p.assetType"
-              />
+              <router-link :to="researchRoute(p.symbol, route.fullPath)" class="inline-block">
+                <TickerBadge
+                  size="sm"
+                  :symbol="p.symbol"
+                  :name="p.companyName"
+                  :country-code="p.country"
+                  :asset-type="p.assetType"
+                />
+              </router-link>
               <!-- §83.5 — which portfolio this row came from. Omitted when null,
                    so the per-portfolio tab (whose whole page is that portfolio)
                    renders exactly what it always did. On the aggregate it is the
@@ -729,13 +735,15 @@ function convertedPnl(p: PortfolioPositions[number]): number | null {
         <ul v-else class="divide-y divide-slate-100 dark:divide-slate-800">
           <li v-for="p in performers.bottom" :key="p.id" class="flex items-center justify-between gap-3 py-2 text-sm">
             <div class="min-w-0">
-              <TickerBadge
-                size="sm"
-                :symbol="p.symbol"
-                :name="p.companyName"
-                :country-code="p.country"
-                :asset-type="p.assetType"
-              />
+              <router-link :to="researchRoute(p.symbol, route.fullPath)" class="inline-block">
+                <TickerBadge
+                  size="sm"
+                  :symbol="p.symbol"
+                  :name="p.companyName"
+                  :country-code="p.country"
+                  :asset-type="p.assetType"
+                />
+              </router-link>
               <p v-if="p.portfolioName" class="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400" :data-testid="tid(`perf-performer-portfolio-${p.id}`)">
                 {{ p.portfolioName }}
               </p>

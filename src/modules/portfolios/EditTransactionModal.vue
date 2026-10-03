@@ -181,12 +181,18 @@ import TickerBadge from "@/components/TickerBadge.vue"
       </div>
 
       <div class="mb-4 flex items-center gap-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50">
+        <!-- §85.2 — emit-then-push, same as the "View chart" button below.
+             `goResearch` closes the modal first, so the research page does not
+             open underneath a live overlay. `from` is the page behind the
+             modal: the route is unchanged while the dialog is open. -->
         <TickerBadge
           size="lg"
           :symbol="transaction.instrumentSymbol"
           :name="transaction.instrumentName"
           :country-code="transaction.country"
           :asset-type="transaction.assetType"
+          class="cursor-pointer"
+          @click="goResearch"
         />
         <div class="min-w-0 flex-1">
           <p v-if="isDividend" class="mt-1 text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500" data-testid="edit-tx-shares-held">

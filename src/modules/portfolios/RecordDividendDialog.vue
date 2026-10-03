@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue"
+import { useRoute, useRouter } from "vue-router"
 import { createPortfolioTransaction } from "@/api/portfolios"
+import { researchRoute } from "@/utils/research"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { useCurrenciesStore } from "@/stores/currencies"
 import FxRateFields from "@/components/FxRateFields.vue"
@@ -16,6 +18,8 @@ const emit = defineEmits<{ (e: "close"): void; (e: "saved"): void }>()
 
 const store = usePortfolioStore()
 const currenciesStore = useCurrenciesStore()
+const route = useRoute()
+const router = useRouter()
 
 const perShare = ref(false)
 const grossTotal = ref("")
@@ -101,6 +105,19 @@ async function submit(): Promise<void> {
     busy.value = false
   }
 }
+
+/**
+ * §85.2 — this dialog has neither a "View chart" button nor a `view-chart`
+ * handler, so the badge is its only route into research. Emit-then-push: close
+ * first, or the research page opens under a modal that is still mounted.
+ * `route.fullPath` is read before the close, and is the same either way — the
+ * route is unchanged while the dialog is open.
+ */
+function goResearch() {
+  if (!props.position) return
+  emit("close")
+  router.push(researchRoute(props.position.symbol, route.fullPath))
+}
 import TickerBadge from "@/components/TickerBadge.vue"
 </script>
 
@@ -121,12 +138,15 @@ import TickerBadge from "@/components/TickerBadge.vue"
       <div class="p-5">
         <div class="mb-4 rounded-xl border border-slate-200 p-3 dark:border-slate-700/60">
           <div class="flex items-center gap-3">
+            <!-- §85.2 — the only research affordance in this dialog. -->
             <TickerBadge
               size="lg"
               :symbol="position.symbol"
               :name="position.companyName"
               :country-code="position.country"
               :asset-type="position.assetType"
+              class="cursor-pointer"
+              @click="goResearch"
             />
           </div>
           <p class="mt-2 text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500" data-testid="dividend-shares-held">

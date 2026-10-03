@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue"
+import { useRoute, useRouter } from "vue-router"
+import { researchRoute } from "@/utils/research"
 import {
   createPortfolioTransaction,
   deletePortfolioTransaction,
@@ -23,6 +25,8 @@ const emit = defineEmits<{ (e: "close"): void; (e: "saved"): void }>()
 
 const store = usePortfolioStore()
 const currenciesStore = useCurrenciesStore()
+const route = useRoute()
+const router = useRouter()
 
 const transactions = ref<Tx[]>([])
 const loading = ref(false)
@@ -268,6 +272,23 @@ async function close() {
   await store.fetchPositions(props.portfolioId)
   emit("close")
 }
+
+/**
+ * §85.2 — this dialog passes `showViewChart=false`, so it renders no "View
+ * chart" button and had no route into research at all. The shared
+ * `TransactionFormFields` badge emits `view-chart`; handling it here is what
+ * turns that badge into the dialog's research affordance.
+ *
+ * Plain `emit("close")`, not `close()`: `close()` also emits `saved` and
+ * refetches positions, which is the save-and-refresh path and does not belong
+ * on a navigation. Read `route.fullPath` before closing — the route is the
+ * page behind the modal either way, since opening a dialog does not navigate.
+ */
+function goResearch() {
+  if (!props.position) return
+  emit("close")
+  router.push(researchRoute(props.position.symbol, route.fullPath))
+}
 </script>
 
 <template>
@@ -332,6 +353,7 @@ async function close() {
           :show-view-chart="false"
           v-model:form="newTx"
           @submit="addRow"
+          @view-chart="goResearch"
         >
           <template #footer>
             <div class="mt-3 flex items-center justify-end">

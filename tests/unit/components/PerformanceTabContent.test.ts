@@ -5,12 +5,20 @@ import PerformanceTabContent from "@/components/PerformanceTabContent.vue"
 import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
 import { getLatestRate } from "@/api/fx"
 
-// §83.1 — the tab body mounted directly, with no route, no store fetch and no
-// router: everything it used to reach for is a prop or an emit now. The
-// per-portfolio cases stay in PortfolioPerformanceTab.test.ts (they exercise the
-// wrapper's fetch/poll/recompute); this file covers the three things the
-// extraction itself puts at risk — the tiles reading PROPS, the withheld tile
-// hiding Timing, and the display-currency switch surviving without a remount.
+// §83.1 — the tab body mounted directly, with no store fetch and no router:
+// everything it used to reach for is a prop or an emit. The per-portfolio cases
+// stay in PortfolioPerformanceTab.test.ts (they exercise the wrapper's
+// fetch/poll/recompute); this file covers the three things the extraction itself
+// puts at risk — the tiles reading PROPS, the withheld tile hiding Timing, and
+// the display-currency switch surviving without a remount.
+// §85.2 adds one exception to "no router": the performer badges now link into
+// research, so the component reads `useRoute()` for `from`. The route is mocked
+// and RouterLink stubbed, and the test below asserts the wrapping link's `to`.
+
+vi.mock("vue-router", () => ({
+  useRoute: () => ({ fullPath: "/en/portfolios/p1/performance" }),
+  useRouter: () => ({ push: vi.fn() }),
+}))
 
 vi.mock("@/api/fx", () => ({ getLatestRate: vi.fn() }))
 const mockedRate = vi.mocked(getLatestRate)
@@ -65,6 +73,12 @@ async function mountContent(
         PortfolioPerformanceChart: { template: "<div data-testid='chart-stub' />" },
         InstrumentSearchModal: true,
         TickerBadge: true,
+        // §85.2 — assert the wrapping link's `to`, not the badge (which is
+        // stubbed to nothing). Rendering the slot keeps TickerBadge findable.
+        RouterLink: {
+          props: ["to"],
+          template: "<a data-testid='research-link' :data-to='JSON.stringify(to)'><slot /></a>",
+        },
       },
     },
   })
@@ -170,6 +184,38 @@ describe("PerformanceTabContent — §83.1 prop-driven tab body", () => {
     // line must disappear rather than render an empty row of text.
     const bare = await mountContent({ positions: [pos({ id: "a", portfolioName: null })] as never })
     expect(bare.find('[data-testid="perf-performer-portfolio-a"]').exists()).toBe(false)
+  })
+
+  it("links each performer badge to that symbol's research page (§85.2)", async () => {
+    // Top/Bottom Performers were the two surfaces the audit found rendering a
+    // TickerBadge with no way out of the page. Both lists get the same wrap, so
+    // one position is enough to prove it: it appears in the Top card.
+    const wrapper = await mountContent({
+      positions: [
+        {
+          id: "a",
+          symbol: "AAPL",
+          companyName: "Apple",
+          assetType: "STOCK",
+          instrumentCurrency: "USD",
+          isOpen: true,
+          unrealizedGainLoss: 100,
+          percentageChange: 10,
+          country: "US",
+        },
+      ] as never,
+    })
+
+    const links = wrapper.findAll('[data-testid="research-link"]')
+    expect(links.length).toBeGreaterThan(0)
+    const link = links[0]!
+    expect(JSON.parse(link.attributes("data-to")!)).toEqual({
+      name: "research-overview",
+      params: { symbol: "AAPL" },
+      query: { from: "/en/portfolios/p1/performance" },
+    })
+    // The badge is still inside the link, not re-parented beside it.
+    expect(link.find("ticker-badge-stub").exists()).toBe(true)
   })
 
   it("prefixes every testid only when a prefix is passed", async () => {

@@ -380,7 +380,7 @@ would land on `/en/investments` instead of the share.
 Split by navigation mechanism, per the recorded decision above. Each site gets
 `from = route.fullPath` so "Go back" returns to the page the user is on.
 
-- [ ] **`<router-link>` wrap — surfaces with no dialog to close:**
+- [x] **`<router-link>` wrap — surfaces with no dialog to close:**
       `PortfolioDividendsTab.vue:98` (Symbol column; the `<tr>` at `:96` has no
       click handler, so the cell is a clean slot), `PortfolioNewsTab.vue:62`
       (article-card header; the sibling title `<a>` at `:73` is unaffected),
@@ -398,7 +398,14 @@ Split by navigation mechanism, per the recorded decision above. Each site gets
       > `/en/research/%E2%80%94/overview` — a real link to nothing. **Guard the
       > wrap on a symbol that is neither empty nor `"—"`**, so the legacy table
       > renders its badge plain.
-- [ ] **Emit-then-push — surfaces inside a dialog:**
+      > Done in `PerformanceTabContent.vue` (both lists, `replaceAll` on the
+      > identical badge block) — the §83.1 file, not the emptied wrapper. That
+      > file's header comment claimed it mounts with "no route, no router"; it
+      > now takes a `vue-router` mock, and the comment says so.
+      > `ResearchCompare.vue`: `v-if="r.symbol && r.symbol !== symbol"` folds
+      > both rules into the one condition, so the `v-else` badge keeps the
+      > original `:symbol="r.symbol ?? ''"` for the nullable case.
+- [x] **Emit-then-push — surfaces inside a dialog:**
       `TransactionFormFields.vue:59` (shared identity block), `AddPositionDialog.vue:555`
       (Option step), `EditTransactionModal.vue:184`, `RecordDividendDialog.vue:124`.
       Reuse the `view-chart` event rather than adding a new one: in
@@ -416,7 +423,18 @@ Split by navigation mechanism, per the recorded decision above. Each site gets
       > `goResearch` written because it has neither a button nor a handler.
       > Do **not** make `TransactionFormFields` emit a second, parallel event
       > for the badge. One event, two triggers, one code path.
-- [ ] Tests: `PortfolioNewsTab.test.ts:75` asserts the badge lives under
+      > `AddPositionDialog` needed **no edit**: its Option step renders the
+      > shared `TransactionFormFields`, so the badge click arrives via the
+      > `@view-chart="goResearch"` it already had at `:550`.
+      > Both new `goResearch` functions (`RecordDividendDialog`,
+      > `EditPositionDialog`) use a bare `emit("close")`, **not** the local
+      > `close()` — `EditPositionDialog.close()` also emits `saved` and refetches
+      > positions, which is the save-and-refresh path and does not belong on a
+      > navigation. A test pins that `saved` is not emitted.
+      > `TickerBadge` is a single-root component, so `class="cursor-pointer"`
+      > and `@click` both fall through — no prop added, and no change to the
+      > "fetches nothing" contract in `docs/COMPONENTS.md`.
+- [x] Tests: `PortfolioNewsTab.test.ts:75` asserts the badge lives under
       `article > div` — a `<a>` **inside** that div keeps it passing; do not
       re-parent the badge. New cases: the Dividend History symbol cell renders
       a link to `{ name: "research-overview", params: { symbol: "AAPL" } }` on
@@ -427,8 +445,29 @@ Split by navigation mechanism, per the recorded decision above. Each site gets
       the wrapping `RouterLink`'s `to`, not the badge); a new
       `EditPositionDialog` case asserts the badge emits `view-chart` while
       `show-view-chart` is false, and that `@view-chart` is handled.
-- [ ] Tests: `npm run build` and `npm run test` green.
-- [ ] Commit `feat(spa): link every ticker badge that renders without a link`
+      > The performer case landed in `PerformanceTabContent.test.ts`, not
+      > `PortfolioPerformanceTab.test.ts` — §83.1 moved the block, so that is
+      > the file that owns the markup now. It needed a `vue-router` mock and a
+      > `RouterLink` stub that renders its slot (so the stubbed `TickerBadge`
+      > stays findable inside the link).
+      > `ResearchCompare` had no test file at all; it is the one surface with a
+      > **must-not-link** rule, so it got `tests/unit/modules/instruments/
+      > ResearchCompare.test.ts` (4 cases: peers linked, `from` carried, primary
+      > column plain, nullable symbol plain). `RecordDividendDialog.test.ts`
+      > gained the badge case and a hoisted `push` spy.
+      > RouterLink is asserted through a `data-to='JSON.stringify(to)'` stub
+      > attribute rather than `findComponent({ name: "RouterLink" })`, which
+      > finds nothing in a suite mounted without a router.
+      > `.at(0)` returns `T | undefined` under `noUncheckedIndexedAccess`, so
+      > the helpers assert a length first (`vue-tsc` runs as part of the build).
+      > `EditPositionDialog.test.ts` was verified **non-vacuous**: deleting
+      > `@view-chart="goResearch"` makes it fail.
+- [x] Tests: `npm run build` and `npm run test` green.
+      > 602/602 unit across 74 files (3 new files, 11 new cases),
+      > `vue-tsc --noEmit && vite build` clean, 242/242 `test:mock`.
+      > e2e `research.spec.ts` + `parity-portfolios.spec.ts` +
+      > `dividends.spec.ts` against the rebuilt stack: 27 passed, 1 skipped.
+- [x] Commit `feat(spa): link every ticker badge that renders without a link`
 
 ### 85.3 — Badges where the symbol is still plain text
 

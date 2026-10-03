@@ -4,6 +4,7 @@ import { useRoute } from "vue-router"
 import { getInstrumentPeers } from "@/api/instruments"
 import type { components } from "@/api/types"
 import TickerBadge from "@/components/TickerBadge.vue"
+import { researchRoute } from "@/utils/research"
 import { COMPARE_METRICS } from "./compareMetrics"
 
 const route = useRoute()
@@ -48,12 +49,33 @@ const rows = computed(() =>
                 <!-- The primary column keeps its blue highlight; the badge
                      supplies the rest of the identity block. `normal-case`
                      because the column header's `uppercase` is meant for the
-                     metric labels, not for a company name. -->
+                     metric labels, not for a company name.
+                     §85.2 — peer columns link to their own research page; the
+                     primary column stays plain, because `researchRoute`
+                     hard-codes the overview and linking it would move the user
+                     off this tab to the page they are already on. The `v-if`
+                     guards the nullable `r.symbol`, which also skips the
+                     empty-string badge. -->
                 <div
                   class="normal-case tracking-normal"
                   :class="r.symbol === symbol ? 'text-blue-700 dark:text-blue-400' : ''"
                 >
+                  <router-link
+                    v-if="r.symbol && r.symbol !== symbol"
+                    :to="researchRoute(r.symbol, route.fullPath)"
+                    class="inline-block"
+                  >
+                    <TickerBadge
+                      size="sm"
+                      align="right"
+                      :symbol="r.symbol"
+                      :name="r.name"
+                      :country-code="r.countryCode"
+                      :asset-type="r.assetType"
+                    />
+                  </router-link>
                   <TickerBadge
+                    v-else
                     size="sm"
                     align="right"
                     :symbol="r.symbol ?? ''"

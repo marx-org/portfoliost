@@ -55,13 +55,22 @@ import TickerBadge from "@/components/TickerBadge.vue"
     <div :data-testid="`${testid}-fields`">
       <div v-if="showHeader !== false" class="mb-4 flex items-center gap-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50">
         <!-- §61.9 — the shared identity block. It no longer defaults a missing
-             country to "US": `tickerDetails` omits the part it does not know. -->
+             country to "US": `tickerDetails` omits the part it does not know.
+             §85.2 — the badge is a research link. Inside a dialog it emits
+             `view-chart` rather than being a `router-link`, so the host closes
+             first and the research page is not left under a live overlay. That
+             is also what gives EditPositionDialog — which passes
+             `showViewChart=false` and so renders no button — its only route
+             into research. Same event as the "View chart" button below: one
+             code path, two triggers. -->
         <TickerBadge
           size="lg"
           :symbol="symbol"
           :name="name"
           :country-code="country"
           :asset-type="assetType"
+          class="cursor-pointer"
+          @click="emit('view-chart')"
         />
         <div class="flex-1">
         </div>

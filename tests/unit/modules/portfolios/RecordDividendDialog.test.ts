@@ -6,9 +6,13 @@ import { usePortfolioStore } from "@/stores/portfolios"
 import * as portfoliosApi from "@/api/portfolios"
 import { useCurrenciesStore } from "@/stores/currencies"
 
+// §85.2 — `push` is hoisted so the research-navigation test can assert on it;
+// the route also gained `fullPath`, which is what the badge passes as `from`.
+const { push } = vi.hoisted(() => ({ push: vi.fn() }))
+
 vi.mock("vue-router", () => ({
-  useRoute: () => ({ params: { id: "p1" } }),
-  useRouter: () => ({ push: vi.fn() }),
+  useRoute: () => ({ params: { id: "p1" }, fullPath: "/en/portfolios/p1/holdings" }),
+  useRouter: () => ({ push: (...args: unknown[]) => push(...args) }),
 }))
 
 vi.mock("@/api/portfolios", async (importOriginal) => {
@@ -70,6 +74,27 @@ describe("RecordDividendDialog (§49.4)", () => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
     mocked.createPortfolioTransaction.mockResolvedValue({} as never)
+  })
+
+  it("badge is the only route into research: it closes, then pushes the symbol (§85.2)", async () => {
+    // This dialog has no "View chart" button and no `view-chart` handler of its
+    // own, so before §85.2 the badge was inert. Emit-then-push, not router-link:
+    // the close has to happen first or research opens under a live overlay.
+    const w = await openDialog()
+    const badge = w.find(".cursor-pointer")
+    expect(badge.exists()).toBe(true)
+
+    await badge.trigger("click")
+
+    expect(push).toHaveBeenCalledWith({
+      name: "research-overview",
+      params: { symbol: "AAPL" },
+      query: { from: "/en/portfolios/p1/holdings" },
+    })
+    // Closing, but not "saving" — `saved` also refetches, which a navigation
+    // should not trigger.
+    expect(w.emitted("close")).toHaveLength(1)
+    expect(w.emitted("saved")).toBeUndefined()
   })
 
   it("defaults the receive date to today and shows no wallet picker (§62)", async () => {

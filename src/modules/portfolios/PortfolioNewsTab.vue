@@ -4,6 +4,7 @@ import { useRoute } from "vue-router"
 import { getPortfolioNews } from "@/api/portfolios"
 import { usePortfolioStore } from "@/stores/portfolios"
 import TickerBadge from "@/components/TickerBadge.vue"
+import { researchRoute } from "@/utils/research"
 import type { components } from "@/api/types"
 import type { PortfolioPositions } from "@/api/types"
 
@@ -59,13 +60,15 @@ function toneClass(tone: string | undefined): string {
           class="card flex flex-col p-5 transition-shadow hover:shadow-md"
         >
           <div class="mb-2 flex items-start justify-between gap-3">
-            <TickerBadge
-              size="sm"
-              :symbol="String(a.ticker)"
-              :name="positionFor(a.ticker)?.companyName"
-              :country-code="positionFor(a.ticker)?.country"
-              :asset-type="positionFor(a.ticker)?.assetType"
-            />
+            <router-link :to="researchRoute(String(a.ticker), route.fullPath)" class="shrink-0">
+              <TickerBadge
+                size="sm"
+                :symbol="String(a.ticker)"
+                :name="positionFor(a.ticker)?.companyName"
+                :country-code="positionFor(a.ticker)?.country"
+                :asset-type="positionFor(a.ticker)?.assetType"
+              />
+            </router-link>
             <span v-if="(a.sentiment as Record<string, unknown>)?.tone" class="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium capitalize" :class="toneClass((a.sentiment as Record<string, string>).tone)">
               {{ (a.sentiment as Record<string, string>).tone }}
             </span>

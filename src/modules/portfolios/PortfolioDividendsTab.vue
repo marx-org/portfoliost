@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue"
 import { useRoute } from "vue-router"
 import { getPortfolioDividends } from "@/api/portfolios"
 import TickerBadge from "@/components/TickerBadge.vue"
+import { researchRoute } from "@/utils/research"
 import type { components } from "@/api/types"
 
 type DividendItem = NonNullable<components["schemas"]["DividendsData"]["items"]>[number]
@@ -51,6 +52,15 @@ function fmt(n: number | null | undefined, currency?: string): string {
   const value = n ?? 0
   return `${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}${currency ? ` ${currency}` : ""}`
 }
+
+/**
+ * §85.2 — the legacy `history[]` path has no symbol (`mapLegacy` hardcodes the
+ * em-dash placeholder), so those rows keep a plain badge. Linking them would
+ * produce a real link to `/en/research/%E2%80%94/overview`.
+ */
+function isResearchLinkable(symbol: string): boolean {
+  return symbol !== "" && symbol !== "—"
+}
 </script>
 
 <template>
@@ -95,7 +105,21 @@ function fmt(n: number | null | undefined, currency?: string): string {
             <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
               <tr v-for="(d, i) in rows.slice(0, limit)" :key="`${d.symbol}-${d.date}-${i}`" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                 <td class="px-5 py-3 whitespace-nowrap">
+                  <router-link
+                    v-if="isResearchLinkable(d.symbol)"
+                    :to="researchRoute(d.symbol, route.fullPath)"
+                    class="block"
+                  >
+                    <TickerBadge
+                      size="sm"
+                      :symbol="d.symbol"
+                      :name="d.instrumentName"
+                      :country-code="d.country"
+                      :asset-type="d.assetType"
+                    />
+                  </router-link>
                   <TickerBadge
+                    v-else
                     size="sm"
                     :symbol="d.symbol"
                     :name="d.instrumentName"

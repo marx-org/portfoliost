@@ -41,7 +41,18 @@ async function mountTab(items: unknown[]) {
   } as never)
   const store = usePortfolioStore()
   store.positions = [META] as never
-  const w = mount(PortfolioNewsTab)
+  // §85.2 — RouterLink is stubbed because this suite mounts without a router.
+  // The stub renders its slot, so the badge stays where it was.
+  const w = mount(PortfolioNewsTab, {
+    global: {
+      stubs: {
+        RouterLink: {
+          props: ["to"],
+          template: "<a data-testid='research-link' :data-to='JSON.stringify(to)'><slot /></a>",
+        },
+      },
+    },
+  })
   await flushPromises()
   return w
 }
@@ -74,6 +85,19 @@ describe("PortfolioNewsTab — the shared identity block (§61.7)", () => {
     // badge and chip live in the same header row
     expect(w.get("article > div").find('[data-testid="ticker-badge"]').exists()).toBe(true)
     expect(w.get("article > div").find("span.capitalize").exists()).toBe(true)
+  })
+
+  it("wraps the badge in a link to that symbol's research page (§85.2)", async () => {
+    const w = await mountTab([article("META")])
+    const link = w.get('[data-testid="research-link"]')
+    expect(JSON.parse(link.attributes("data-to")!)).toEqual({
+      name: "research-overview",
+      params: { symbol: "META" },
+      query: { from: "/en/portfolios/p1/news" },
+    })
+    // The badge stays inside the link, and the link stays inside `article > div`
+    // — the wrap must not re-parent it, which the sentiment test also needs.
+    expect(link.find('[data-testid="ticker-badge"]').exists()).toBe(true)
   })
 
   it("fetches positions when the store is empty (the tab is directly routable)", async () => {
