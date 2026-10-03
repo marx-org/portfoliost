@@ -439,9 +439,28 @@ const fxCaveatNote = computed(() => fxCaveat(fxFrom.value, baseCurrency.value, w
 // final remount after the price-bars→history swap even when the currency is
 // unchanged (otherwise the trailing updateOptions strips the formatter and
 // the axis falls back to bare numbers).
+
+/**
+ * Annotations are drawn on mount only: ApexCharts re-renders them in
+ * `drawAxesAnnotations`, which `updateOptions` does not reach, so a chart that
+ * mounted before the transactions landed keeps an empty marker layer forever.
+ * That is why the markers showed in fullscreen (a fresh mount, keyed on
+ * `fs-${chartKey}`) and never in the inline chart. Serialising the payload we
+ * hand ApexCharts into the key makes the remount happen exactly when what is
+ * drawn changes — on toggle, on arrival, and on a portfolio/timeframe switch.
+ */
+const txAnnotationKey = computed(() => {
+  if (!showTransactions.value) return "-"
+  const points = transactionAnnotations.value
+    .map((p) => `${p.x}:${p.y.toFixed(4)}:${p.marker.offsetY}`)
+    .join(",")
+  const lines = fifoReferenceLines.value.map((l) => l.y.toFixed(4)).join(",")
+  return `${points}|${lines}`
+})
+
 const chartKey = computed(
   () =>
-    `${loadedCompare.value}|${chartCurrency.value}|${dataVersion.value}|${axisUnit.value}|${mode.value}|${props.symbol}|${loadedCurrencyParam.value ?? ""}`,
+    `${loadedCompare.value}|${chartCurrency.value}|${dataVersion.value}|${axisUnit.value}|${mode.value}|${props.symbol}|${loadedCurrencyParam.value ?? ""}|${txAnnotationKey.value}`,
 )
 
 // Stable axis state for the y-axis label formatter closure. The formatter is

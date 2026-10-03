@@ -337,6 +337,27 @@ describe("PriceChart", () => {
     expect(points.length).toBe(1)
   })
 
+  it("remounts when the annotations change, because updateOptions never draws them", async () => {
+    const d = makeHistory().timestamps
+    mockedGetPortfolioTransactions.mockResolvedValue(
+      makeTxPage([makeTx({ id: "t1", type: "BUY", executedAt: new Date(d[0] * 1000).toISOString() })]),
+    )
+    // Annotations are drawn on mount only, so the key must carry them: a chart
+    // mounted before the transactions land would otherwise keep an empty
+    // marker layer — which is how the markers showed in fullscreen (a fresh
+    // mount) and never inline.
+    const key = (w: ReturnType<typeof mountChart>) => (w.vm as unknown as { chartKey: string }).chartKey
+    const before = key(mountChart({ portfolioId: "p1", defaultShowTransactions: true }))
+    const wrapper = mountChart({ portfolioId: "p1", defaultShowTransactions: true })
+    await flushPromises()
+    const after = key(wrapper)
+    expect(after).not.toBe(before)
+    // Unticking clears them again, so the key returns to its empty form.
+    await wrapper.find('input[type="checkbox"]').setValue(false)
+    await flushPromises()
+    expect(key(wrapper)).not.toBe(after)
+  })
+
   it("does not render markers outside the visible range", async () => {
     const future = new Date("2030-01-01T12:00:00Z").toISOString()
     const wrapper = await mountTxChart([{ id: "t1", type: "BUY", executedAt: future }])
