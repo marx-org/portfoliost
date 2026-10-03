@@ -210,7 +210,10 @@ test("position actions menu: buy updates quantity, research navigates, remove is
 
   await targetRow.getByRole("button", { name: "Position actions" }).click()
   await page.getByRole("button", { name: "Research" }).click()
-  await expect(page).toHaveURL(new RegExp(`/en/research/${targetSymbol}(\\.US)?/overview`))
+  // No `(\.US)?` here any more: the holdings row's "Research" item always passed
+  // the symbol verbatim, and §85.7 removed the one dialog that suffixed, so the
+  // URL is now the honest symbol and this asserts that exactly.
+  await expect(page).toHaveURL(new RegExp(`/en/research/${targetSymbol}/overview`))
 
   await page.goBack()
   await expect(page).toHaveURL(/\/en\/portfolios\/.*\/holdings/)

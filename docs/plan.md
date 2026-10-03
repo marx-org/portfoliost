@@ -693,7 +693,7 @@ Found while auditing the call sites. **§60.2 kept this deliberately** ("keep th
 existing `.US` suffix handling"), so it is a decision to revisit, not a
 regression — but the request's scope ("bond, fund, etc") makes it visible.
 
-- [ ] `AddPositionDialog.vue:463` appends `.US` to any symbol that lacks it:
+- [x] `AddPositionDialog.vue:463` appends `.US` to any symbol that lacks it:
       `router.push(researchRoute(symbol.endsWith(".US") ? symbol : `${symbol}.US`, …))`.
       A Polish position therefore produces `/en/research/SNT.WA.US/overview`.
       It **resolves** — `venueFreeSymbol` (`portfoliost-instruments/src/adapters/symbol.ts:21-24`)
@@ -704,12 +704,30 @@ regression — but the request's scope ("bond, fund, etc") makes it visible.
       > changing behaviour anywhere else. Check the e2e regexes
       > (`portfolios.spec.ts:213` and `research.spec.ts:327`) still match — they
       > are written as `/(\.US)?/` precisely because this existed.
-- [ ] Tests: a case asserting `goResearch` for a `.WA` and a bare savings-bond
+      > **Verified in the backend, not assumed.** `providerSymbol()`
+      > (`portfoliost-instruments/src/adapters/symbol.ts:5-8`) strips only a
+      > trailing `.US`, and `venueFreeSymbol()` (`:21-24`) cuts at the LAST dot —
+      > so `SNT.WA.US` resolves to `SNT.WA` and this really was a wrong-looking
+      > URL rather than a 404, which is exactly why it survived §60.2.
+      > `research.spec.ts:327` turned out to have no `(\.US)?` — only
+      > `portfolios.spec.ts:213` did, and that path is the holdings row's
+      > "Research" item, which never suffixed. **Tightened** to an exact match,
+      > since the honest URL is now the only possible one.
+- [x] Tests: a case asserting `goResearch` for a `.WA` and a bare savings-bond
       symbol produces the **unadorned** symbol in `params.symbol`; extend
       `tests/unit/utils/research.test.ts` to record that `researchSymbol`
       uppercases and **does not** strip venue suffixes — it never has, and the
       strip is `venueFreeSymbol`'s job on the backend.
-- [ ] Commit `fix(spa): stop appending .US to research links from the position dialog`
+      > Four cases in `FeeFxDialogs.test.ts` (`.WA`, bare `ROD1033`, plain
+      > `AAPL`, and `AAPL.US` kept rather than doubled) driving the real
+      > `goResearch` through the stock step's badge, plus one in
+      > `research.test.ts`. `FeeFxDialogs.test.ts`'s router mock needed a
+      > **hoisted** `push` spy — its per-call `vi.fn()` was unobservable.
+      > `openStockStep` grew a `symbol` parameter; its existing callers are
+      > unaffected because it defaults to `"AAPL.US"`.
+      > 625/625 unit across 77 files, build clean. e2e `portfolios.spec.ts` +
+      > `research.spec.ts`: 37 passed, 1 skipped, with the regex tightened.
+- [x] Commit `fix(spa): stop appending .US to research links from the position dialog`
 
 ### 85.8 — Docs, Example service parity, and the full suite
 

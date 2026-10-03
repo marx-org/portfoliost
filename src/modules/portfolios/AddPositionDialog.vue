@@ -487,7 +487,15 @@ function close() {
 function goResearch() {
   const symbol = stockForm.value.symbol
   close()
-  if (symbol) router.push(researchRoute(symbol.endsWith(".US") ? symbol : `${symbol}.US`, route.fullPath))
+  // §85.7 — pass the symbol through verbatim. This used to append ".US" to
+  // anything that lacked it, so a Warsaw position produced
+  // /en/research/SNT.WA.US/overview. That resolved rather than 404ing —
+  // providerSymbol() strips only a trailing ".US" and venueFreeSymbol() cuts at
+  // the last dot — which is exactly why it survived: a wrong-looking URL that
+  // still worked. It was the only surface doing this, so removing it makes the
+  // app consistent instead of changing behaviour anywhere else, and a
+  // bookmarked or shared research URL stops carrying a venue it does not have.
+  if (symbol) router.push(researchRoute(symbol, route.fullPath))
 }
 
 defineExpose({ pendingMarketPrice })

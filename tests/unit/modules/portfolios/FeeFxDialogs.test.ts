@@ -8,9 +8,13 @@ import { usePortfolioStore } from "@/stores/portfolios"
 import * as portfoliosApi from "@/api/portfolios"
 import { useCurrenciesStore } from "@/stores/currencies"
 
+// §85.7 — `push` is hoisted so the research-navigation cases can assert on the
+// exact route object; a per-call `vi.fn()` would be unobservable from outside.
+const { push } = vi.hoisted(() => ({ push: vi.fn() }))
+
 vi.mock("vue-router", () => ({
-  useRoute: () => ({ params: { id: "p1" } }),
-  useRouter: () => ({ push: vi.fn() }),
+  useRoute: () => ({ params: { id: "p1" }, fullPath: "/en/portfolios/p1/holdings" }),
+  useRouter: () => ({ push: (...args: unknown[]) => push(...args) }),
 }))
 
 vi.mock("@/api/portfolios", async (importOriginal) => {
@@ -68,7 +72,7 @@ const registry = [
   { code: "PLN", name: "Polish Zloty", symbol: "zł", minorUnits: 2, popular: true },
 ]
 
-async function openStockStep(env = makeEnv()) {
+async function openStockStep(env = makeEnv(), symbol = "AAPL.US") {
   const wrapper = mount(AddPositionDialog, {
     props: { open: false, portfolioId: "p1" },
     global: { plugins: [env.pinia] },
@@ -79,7 +83,7 @@ async function openStockStep(env = makeEnv()) {
   await wrapper.find('[data-testid="add-position-instrument"]').trigger("click")
   // the stock step opens only after a search result is chosen
   ;(wrapper.findComponent({ name: "InstrumentSearchModal" }).vm as unknown as { $emit: (e: string, ...a: unknown[]) => void })
-    .$emit("add", "AAPL.US", "Apple Inc")
+    .$emit("add", symbol, "Test Co")
   await flushPromises()
   // await the async market-price fetch triggered by onSearchAdd
   const vm = wrapper.vm as unknown as { pendingMarketPrice: Promise<void> | null }
@@ -87,6 +91,49 @@ async function openStockStep(env = makeEnv()) {
   await flushPromises()
   return wrapper
 }
+
+// §85.7 — goResearch used to append ".US" to any symbol lacking it, so a Warsaw
+// position produced /en/research/SNT.WA.US/overview. That resolved rather than
+// 404ing (providerSymbol strips a trailing ".US"; venueFreeSymbol cuts at the
+// last dot), which is why it survived — a wrong-looking URL that still worked.
+describe("AddPositionDialog — §85.7 research link carries the bare symbol", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+    mocked.createPortfolioPosition.mockResolvedValue({} as never)
+  })
+
+  /** Click the stock step's Research affordance and return what was pushed. */
+  async function researchTargetFor(symbol: string) {
+    const wrapper = await openStockStep(makeEnv(), symbol)
+    const badge = wrapper.find(".cursor-pointer")
+    expect(badge.exists()).toBe(true)
+    await badge.trigger("click")
+    expect(push).toHaveBeenCalledTimes(1)
+    return push.mock.calls[0]![0] as { name: string; params: { symbol: string }; query?: { from: string } }
+  }
+
+  it("does not append .US to a venue-suffixed symbol", async () => {
+    const to = await researchTargetFor("SNT.WA")
+    expect(to.params.symbol).toBe("SNT.WA")
+    expect(to.query).toEqual({ from: "/en/portfolios/p1/holdings" })
+  })
+
+  it("does not append .US to a bare retail savings-bond emission", async () => {
+    const to = await researchTargetFor("ROD1033")
+    expect(to.params.symbol).toBe("ROD1033")
+  })
+
+  it("leaves a plain US symbol alone", async () => {
+    const to = await researchTargetFor("AAPL")
+    expect(to.params.symbol).toBe("AAPL")
+  })
+
+  it("keeps an existing .US suffix rather than doubling it", async () => {
+    const to = await researchTargetFor("AAPL.US")
+    expect(to.params.symbol).toBe("AAPL.US")
+  })
+})
 
 describe("AddPositionDialog — fee currency & fx disclosure (§10.3)", () => {
   beforeEach(() => {

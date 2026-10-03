@@ -5,6 +5,18 @@ describe("researchSymbol", () => {
   it("uppercases the symbol", () => {
     expect(researchSymbol("sap")).toBe("SAP")
   })
+
+  it("does not strip or add a venue suffix", () => {
+    // §85.7 — researchSymbol never rewrites venues, and must not start now.
+    // Stripping is `venueFreeSymbol`'s job on the backend (portfoliost-instruments
+    // src/adapters/symbol.ts), which cuts at the LAST dot; `providerSymbol` there
+    // strips only a trailing ".US". Duplicating either rule here would make the
+    // URL disagree with what the instruments service resolves.
+    expect(researchSymbol("snt.wa")).toBe("SNT.WA")
+    expect(researchSymbol("SNT.WA.US")).toBe("SNT.WA.US")
+    expect(researchSymbol("aapl")).toBe("AAPL")
+    expect(researchSymbol("rod1033")).toBe("ROD1033")
+  })
 })
 
 describe("researchRoute", () => {
