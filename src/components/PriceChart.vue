@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue"
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { getHistory, getPriceBars } from "@/api/instruments"
 import type { HistoryCompareSeries } from "@/api/instruments"
 import { getAllTransactions, getPortfolioTransactions } from "@/api/portfolios"
@@ -267,6 +267,15 @@ onMounted(() => {
     void ensurePortfoliosLoaded()
     void fetchTransactions()
   }
+  // The markers are drawn by ApexCharts on its own schedule; watch for them.
+  if (chartRoot.value) {
+    markerObserver = new MutationObserver(bindMarkerClicks)
+    markerObserver.observe(chartRoot.value, { childList: true, subtree: true })
+  }
+})
+onBeforeUnmount(() => {
+  markerObserver?.disconnect()
+  markerObserver = null
 })
 watch(compare, (k) => {
   if (k !== loadedCompare.value) load(k)
@@ -641,93 +650,141 @@ const barDateTxMap = computed<Map<string, BarTxEntry[]>>(() => {
   return map
 })
 
-/** A bar's transactions, selected by clicking its marker. Null = nothing
- * selected. Held per bar-date because several trades can share a bar. */
-const selectedTxDate = ref<string | null>(null)
-
 const BUY_COLOR = "#16a34a"
 const SELL_COLOR = "#dc2626"
 
-interface TxAnnotation {
+/** Prefix of the class ApexCharts copies from `annotations.points[].id` onto the
+ * marker node. That class is the way back from the DOM to a trade list — and it
+ * has to be the DOM, because a `click` or `tooltip.formatter` put in the config
+ * does not survive: vue3-apexcharts sends every options change through
+ * `JSON.parse(JSON.stringify(options))` before `updateOptions`, which drops both
+ * functions and makes ApexCharts redraw the markers without them. */
+const TX_MARKER_CLASS = "tx-marker-"
+
+interface TxMarker {
+  id: string
+  barDate: string
+  txs: Transaction[]
   x: number
   y: number
-  marker: { size: number; fillColor: string; strokeColor: string; strokeWidth: number; offsetY: number }
-  /** ApexCharts hands this same object to `click` and to `tooltip.formatter`
-   * (`click.bind(this, annotationConfig)`), so the rows travel with the marker
-   * without a side map keyed by an id ApexCharts might renumber. */
-  txs: Transaction[]
-  click: () => void
-  tooltip: { enabled: boolean; formatter: (ctx: { annotation: TxAnnotation }) => string }
+  buy: boolean
+  /** Position among the trades sharing this bar, for the vertical stagger. */
+  nth: number
 }
 
-const transactionAnnotations = computed<TxAnnotation[]>(() => {
+/** One entry per marker: the trades on a bar, and where the dot goes. */
+const txMarkers = computed<TxMarker[]>(() => {
   if (!showTransactions.value) return []
-  const points: TxAnnotation[] = []
+  const out: TxMarker[] = []
   for (const [barDate, entries] of barDateTxMap.value) {
     for (const { index, group } of entries) {
       const lineValue = series.value.data[0]?.data?.[index]
       if (typeof lineValue !== "number") continue
       group.forEach((tx, i) => {
-        const isBuy = txType(tx) === "BUY"
-        // A plain dot, no square: a `label` here draws a filled box with a
-        // ▲/▼ glyph, which is what cluttered the plot. Sells stay hollow so the
-        // side does not rest on colour alone.
-        points.push({
+        out.push({
           // +1: ApexCharts' numeric x-axis is 1-based (see the xaxis note in
           // chartOptions). The y is the bar's close — what the tooltip's date
           // column is anchored to — while Low/High/Avg below are trade prices.
+          id: `${TX_MARKER_CLASS}${barDate}-${i}`,
+          barDate,
+          txs: group,
           x: index + 1,
           y: lineValue,
-          marker: {
-            size: 6,
-            fillColor: isBuy ? BUY_COLOR : "transparent",
-            strokeColor: isBuy ? BUY_COLOR : SELL_COLOR,
-            strokeWidth: 2,
-            offsetY: i === 0 ? 0 : -8 * i,
-          },
-          txs: group,
-          click: () => {
-            selectedTxDate.value = selectedTxDate.value === barDate ? null : barDate
-          },
-          tooltip: {
-            enabled: true,
-            formatter: (ctx) => txSummaryHtml(ctx.annotation.txs, true),
-          },
+          buy: txType(tx) === "BUY",
+          nth: i,
         })
       })
     }
   }
-  return points
+  return out
 })
 
-/** One line per trade: side, volume, price, total. Used for the hover bubble
- * and, with `withAccount`, for the click panel. */
-function txSummaryHtml(txs: Transaction[], withAccount: boolean): string {
-  const rows = txs
-    .map((tx) => {
-      const isBuy = txType(tx) === "BUY"
-      const fee = tx.fees ? ` <span class="opacity-70">(fee ${formatCurrency(tx.fees, tx.currency)})</span>` : ""
-      const account = withAccount && tx.portfolioName ? `<div class="opacity-70">${tx.portfolioName}</div>` : ""
-      return (
-        `<div>${account}${isBuy ? "Buy" : "Sell"} ${formatNumber(tx.quantity)}` +
-        ` @ ${formatCurrency(tx.price, tx.priceCurrency)}` +
-        ` = ${formatCurrency(tx.totalAmount, tx.currency)}${fee}</div>`
-      )
-    })
-    .join("")
-  return `<div class="price-chart-tooltip">${rows}</div>`
+const txMarkersById = computed(() => new Map(txMarkers.value.map((m) => [m.id, m])))
+
+const transactionAnnotations = computed(() =>
+  txMarkers.value.map((m) => ({
+    id: m.id,
+    x: m.x,
+    y: m.y,
+    // A plain dot, no square: a `label` here draws a filled box with a ▲/▼
+    // glyph, which is what cluttered the plot. Sells stay hollow so the side
+    // does not rest on colour alone.
+    marker: {
+      size: 6,
+      fillColor: m.buy ? BUY_COLOR : "transparent",
+      strokeColor: m.buy ? BUY_COLOR : SELL_COLOR,
+      strokeWidth: 2,
+      offsetY: m.nth === 0 ? 0 : -8 * m.nth,
+    },
+  })),
+)
+
+/** The marker the user clicked, or null. */
+const selectedMarkerId = ref<string | null>(null)
+
+function selectMarker(id: string): void {
+  selectedMarkerId.value = selectedMarkerId.value === id ? null : id
+  paintSelectedMarker()
 }
 
-/** The rows behind the clicked marker, for the panel under the chart. */
-const selectedTransactions = computed<Transaction[]>(() =>
-  selectedTxDate.value ? (barDateTxMap.value.get(selectedTxDate.value)?.flatMap((e) => e.group) ?? []) : [],
+/** Ring the selected dot, so the panel below has a visible anchor. Done on the
+ * nodes directly: the selection is not chart state, so it must not feed back
+ * into `chartOptions` and cost a remount. */
+function paintSelectedMarker(): void {
+  const root = chartRoot.value
+  if (!root) return
+  for (const el of root.querySelectorAll(".apexcharts-point-annotation-marker")) {
+    const id = markerIdOf(el)
+    el.classList.toggle("tx-marker-selected", id !== null && id === selectedMarkerId.value)
+  }
+}
+
+function markerIdOf(el: Element): string | null {
+  for (const cls of el.classList) {
+    if (cls.startsWith(TX_MARKER_CLASS) && cls !== "tx-marker-selected") return cls
+  }
+  return null
+}
+
+const selectedMarker = computed(() =>
+  selectedMarkerId.value ? (txMarkersById.value.get(selectedMarkerId.value) ?? null) : null,
 )
+/** The trades behind the clicked marker, for the panel under the chart. */
+const selectedTransactions = computed<Transaction[]>(() => selectedMarker.value?.txs ?? [])
 
 // A remount redraws every marker, so a selection pointing at a marker that no
 // longer exists has to go with it.
 watch(chartKey, () => {
-  selectedTxDate.value = null
+  selectedMarkerId.value = null
 })
+
+/**
+ * Bind a click handler to every marker ApexCharts has drawn.
+ *
+ * The handlers are attached here rather than through `annotations.points[].click`
+ * because that config value cannot survive: vue3-apexcharts hands `updateOptions`
+ * a `JSON.parse(JSON.stringify(options))` copy, so on the first redraw after a
+ * remount ApexCharts repaints the markers from a config with no functions in it.
+ * The marker carries its `id` as a class name, which is what identifies it.
+ *
+ * ApexCharts draws asynchronously, so an observer picks the nodes up whenever
+ * they appear; `bound` keeps it to one listener per node.
+ */
+const chartRoot = ref<HTMLElement | null>(null)
+const boundMarkers = new WeakSet<Element>()
+let markerObserver: MutationObserver | null = null
+
+function bindMarkerClicks(): void {
+  const root = chartRoot.value
+  if (!root) return
+  for (const el of root.querySelectorAll(".apexcharts-point-annotation-marker")) {
+    if (boundMarkers.has(el)) continue
+    const id = markerIdOf(el)
+    if (!id) continue
+    boundMarkers.add(el)
+    el.addEventListener("click", () => selectMarker(id))
+  }
+}
 
 function tooltipCustom({ series, dataPointIndex, w }: {
   series: number[][]
@@ -850,7 +907,7 @@ function downloadCsv(): void {
 </script>
 
 <template>
-  <div class="card p-6">
+  <div ref="chartRoot" class="card p-6">
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
       <h2 class="flex items-center gap-2 text-base font-semibold">
         Price Chart
@@ -1036,7 +1093,7 @@ function downloadCsv(): void {
       class="mt-3 flex items-start justify-between gap-3 rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-800/50"
     >
       <div class="min-w-0">
-        <div class="mb-1 font-semibold text-slate-700 dark:text-slate-200">{{ selectedTxDate }}</div>
+        <div class="mb-1 font-semibold text-slate-700 dark:text-slate-200">{{ selectedMarker?.barDate }}</div>
         <div
           v-for="tx in selectedTransactions"
           :key="tx.id"
@@ -1056,7 +1113,7 @@ function downloadCsv(): void {
         class="btn-ghost shrink-0 px-2 py-1"
         aria-label="Close transaction details"
         data-testid="chart-tx-details-close"
-        @click="selectedTxDate = null"
+        @click="selectedMarkerId = null"
       >
         &times;
       </button>
@@ -1072,5 +1129,11 @@ function downloadCsv(): void {
    by ApexCharts into this component's DOM, so they carry no scope attribute. */
 .apexcharts-point-annotation-marker {
   cursor: pointer;
+}
+
+/* The clicked dot, so the panel below has a visible anchor. */
+.apexcharts-point-annotation-marker.tx-marker-selected {
+  stroke: #0f172a;
+  stroke-width: 3;
 }
 </style>

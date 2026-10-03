@@ -315,7 +315,7 @@ describe("PriceChart", () => {
       { id: "t2", type: "SELL", executedAt: new Date(d[1] * 1000).toISOString(), quantity: 1, price: 120 },
     ])
     const points = (wrapper.vm as unknown as {
-      chartOptions: { annotations: { points: Array<{ label?: unknown; marker: { size: number; fillColor: string; strokeColor: string } }> } }
+      chartOptions: { annotations: { points: Array<{ label?: unknown; id: string; marker: { size: number; fillColor: string; strokeColor: string } }> } }
     }).chartOptions.annotations.points
     expect(points.length).toBe(2)
     // A `label` makes ApexCharts draw a filled box with a ▲/▼ glyph — the
@@ -325,21 +325,27 @@ describe("PriceChart", () => {
     // Sells stay hollow, so the side does not rest on colour alone.
     expect(points[1].marker.fillColor).toBe("transparent")
     expect(points[1].marker.strokeColor).toBe("#dc2626")
+    // Each dot is addressable: ApexCharts copies `id` onto the node as a class,
+    // which is how the click listener finds its way back to the trades.
+    expect(points[0].id).toMatch(/^tx-marker-\d{4}-\d{2}-\d{2}-\d$/)
+    expect(points[0].id).not.toBe(points[1].id)
   })
 
-  it("opens the trades behind a marker on click, and closes on a second click", async () => {
+  it("opens the trades behind a marker, and closes on a second click", async () => {
     const d = makeHistory().timestamps
     const wrapper = await mountTxChart([
       { id: "t1", type: "BUY", executedAt: new Date(d[0] * 1000).toISOString(), quantity: 2, price: 100 },
       { id: "t2", type: "BUY", executedAt: new Date(d[0] * 1000).toISOString(), quantity: 3, price: 110 },
     ])
-    const points = (wrapper.vm as unknown as {
-      chartOptions: { annotations: { points: Array<{ click: () => void; txs: Array<{ id: string }> }> } }
-    }).chartOptions.annotations.points
-    // Two trades on one bar share a marker: the panel lists both.
-    expect(points[0].txs.map((t) => t.id)).toEqual(["t1", "t2"])
+    const vm = wrapper.vm as unknown as {
+      chartOptions: { annotations: { points: Array<{ id: string }> } }
+      selectMarker: (id: string) => void
+    }
+    // Two trades on one bar share a dot: the panel lists both.
+    expect((wrapper.vm as unknown as { txMarkers: Array<{ txs: Array<{ id: string }> }> }).txMarkers[0].txs.map((t) => t.id))
+      .toEqual(["t1", "t2"])
 
-    points[0].click()
+    vm.selectMarker(vm.chartOptions.annotations.points[0].id)
     await flushPromises()
     const panel = wrapper.find('[data-testid="chart-tx-details"]')
     expect(panel.exists()).toBe(true)
@@ -348,9 +354,24 @@ describe("PriceChart", () => {
     expect(panel.text()).toContain("2 @")
     expect(panel.text()).toContain("3 @")
 
-    points[0].click()
+    vm.selectMarker(vm.chartOptions.annotations.points[0].id)
     await flushPromises()
     expect(wrapper.find('[data-testid="chart-tx-details"]').exists()).toBe(false)
+  })
+
+  it("does not put a click handler in the chart config, which cannot survive", async () => {
+    const d = makeHistory().timestamps
+    const wrapper = await mountTxChart([
+      { id: "t1", type: "BUY", executedAt: new Date(d[0] * 1000).toISOString() },
+    ])
+    const points = (wrapper.vm as unknown as {
+      chartOptions: { annotations: { points: Array<Record<string, unknown>> } }
+    }).chartOptions.annotations.points
+    // vue3-apexcharts hands updateOptions a JSON copy of the options, so a
+    // function here is dropped on the first redraw and the marker is repainted
+    // with no click handler at all. The listener is bound to the node instead.
+    expect(points[0].click).toBeUndefined()
+    expect(typeof points[0].tooltip).toBe("undefined")
   })
 
   it("closes the marker panel when the close button is used", async () => {
@@ -358,10 +379,11 @@ describe("PriceChart", () => {
     const wrapper = await mountTxChart([
       { id: "t1", type: "BUY", executedAt: new Date(d[0] * 1000).toISOString() },
     ])
-    const points = (wrapper.vm as unknown as {
-      chartOptions: { annotations: { points: Array<{ click: () => void }> } }
-    }).chartOptions.annotations.points
-    points[0].click()
+    const vm = wrapper.vm as unknown as {
+      chartOptions: { annotations: { points: Array<{ id: string }> } }
+      selectMarker: (id: string) => void
+    }
+    vm.selectMarker(vm.chartOptions.annotations.points[0].id)
     await flushPromises()
     expect(wrapper.find('[data-testid="chart-tx-details"]').exists()).toBe(true)
     await wrapper.find('[data-testid="chart-tx-details-close"]').trigger("click")

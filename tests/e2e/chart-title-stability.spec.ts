@@ -76,6 +76,38 @@ test("plot box is stable across transactions + comparison toggles (SNT.WA)", asy
  * exactly (options.chart.height honored), never the apexcharts "auto"
  * golden-ratio fallback that overflows the card.
  */
+test("clicking a transaction marker opens that trade's details", async ({ page }) => {
+  await login(page)
+  await page.goto("/en/research/SNT.WA/overview")
+
+  await expect(page.getByRole("heading", { name: "Price Chart" })).toBeVisible({ timeout: 20000 })
+  await page.getByRole("checkbox", { name: "Transactions" }).check()
+
+  // The click cannot go through `annotations.points[].click`: vue3-apexcharts
+  // hands updateOptions a JSON copy of the options, so the function is dropped
+  // on the next redraw and the dot is repainted inert. This asserts the real
+  // path — a listener bound to the marker node — survives a later redraw too.
+  const marker = page.locator(".apexcharts-point-annotation-marker").first()
+  await expect(marker).toBeVisible({ timeout: 20000 })
+  await marker.click()
+  const panel = page.getByTestId("chart-tx-details")
+  await expect(panel).toBeVisible()
+  // Account, volume and price.
+  await expect(panel).toContainText("Top10")
+  await expect(panel).toContainText("400 @")
+
+  // A chart option changes (the comparison), which redraws every marker.
+  await page.getByText("Add comparison").click()
+  await page.getByText("S&P 500").click()
+  await expect(page.getByText(/currencies differ \(PLN vs USD\)/)).toBeVisible({ timeout: 20000 })
+  await page.waitForTimeout(1000)
+
+  await marker.click()
+  await expect(panel).toBeVisible()
+  await page.getByTestId("chart-tx-details-close").click()
+  await expect(panel).toBeHidden()
+})
+
 test("price chart svg height matches the fixed 380px wrapper (AAPL)", async ({ page }) => {
   await login(page)
   await page.goto("/en/research/AAPL/overview")
