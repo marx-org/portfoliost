@@ -608,7 +608,7 @@ instead of pasting in a `<span>`.
 
 ### 85.5 — Public shared portfolio: the holdings table gets a linked badge
 
-- [ ] `PublicPortfolioView.vue:72` — replace `<td>{{ p.symbol }}</td>` with a
+- [x] `PublicPortfolioView.vue:72` — replace `<td>{{ p.symbol }}</td>` with a
       `<router-link :to="researchRoute(p.symbol, route.fullPath)">` wrapping
       `TickerBadge size="sm"`, keeping the `<td>`'s padding. Pass `from`
       (`route.fullPath` is `/public/portfolio/:shareId`) — §85.1 is what makes
@@ -618,7 +618,11 @@ instead of pasting in a `<span>`.
       carries `symbol`; the badge's optional `name` / `countryCode` /
       `assetType` are simply not passed, so the block degrades to logo + ticker,
       which is the documented behaviour (`docs/COMPONENTS.md`).
-- [ ] **Say what actually happens to an unauthenticated visitor, in the commit
+      > Confirmed at `src/api/portfolios.ts:416` — the share payload really is
+      > `{ symbol, quantity, marketValue, currentPrice }` and nothing else. The
+      > unit test asserts the three optional badge props are `undefined` rather
+      > than assuming it.
+- [x] **Say what actually happens to an unauthenticated visitor, in the commit
       body.** `/en/research/:symbol/overview` is `meta: { requiresAuth: true }`,
       so `router.beforeEach` (`router/index.ts:284-286`) bounces a logged-out
       visitor to `/login?redirect=…`. For the owner, who is authenticated, it
@@ -629,14 +633,24 @@ instead of pasting in a `<span>`.
       > must not be conditionally hidden on `auth.isAuthenticated` — the SPA
       > cannot know who holds the share, and hiding it would make the page
       > differ per viewer.
-- [ ] Tests: new `tests/unit/modules/settings/PublicPortfolioView.test.ts`
+      > The e2e asserts the bounce rather than assuming it: logged out, the
+      > link lands on `/login?redirect=…`; signed in, it reaches research and
+      > "Go back" returns to `/public/portfolio/:shareId`. If the auth guard
+      > ever moves, that assertion fails and the change has to be deliberate.
+- [x] Tests: new `tests/unit/modules/settings/PublicPortfolioView.test.ts`
       (no test file exists) asserting the holdings cell renders a
       `RouterLink` whose `to` is
       `{ name: "research-overview", params: { symbol: "SNT.WA" }, query: { from: "/public/portfolio/abc" } }`;
       e2e in `tests/e2e/` for the share page asserting
       `href="/en/research/SNT.WA/overview?from=…"` on the row.
-- [ ] Tests: `npm run build`, `npm run test` green.
-- [ ] Commit `feat(spa): link the tickers on a public shared portfolio`
+      > Four unit cases plus `tests/e2e/public-share.spec.ts` (new). The e2e
+      > reads the share id through the app's own token rather than hardcoding a
+      > seed: `page.request` inherits the Playwright baseURL, which is the SPA
+      > on :3000, but the SPA calls the API on the gateway (:8080) per
+      > `VITE_API_BASE_URL` — so the API base is an explicit, overridable const.
+      > Without that the request hits the SPA's HTML fallback and fails to parse.
+- [x] Tests: `npm run build`, `npm run test` green.
+- [x] Commit `feat(spa): link the tickers on a public shared portfolio`
 
 ### 85.6 — Admin: bond catalogue and market data
 

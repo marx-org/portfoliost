@@ -2,6 +2,8 @@
 import { onMounted, ref } from "vue"
 import { useRoute } from "vue-router"
 import { getPublicPortfolioShare } from "@/api/portfolios"
+import { researchRoute } from "@/utils/research"
+import TickerBadge from "@/components/TickerBadge.vue"
 import type { PublicPortfolioShare } from "@/api/portfolios"
 
 const route = useRoute()
@@ -69,7 +71,26 @@ const totalValue = () =>
             </thead>
             <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
               <tr v-for="p in data.portfolio.positions" :key="p.symbol">
-                <td class="px-6 py-2 font-medium text-slate-900 dark:text-slate-100">{{ p.symbol }}</td>
+                <!-- §85.5 — the share's tickers link to research, with the share
+                     page as `from`. §85.1 is what lets `researchBackTarget`
+                     honour that: without the `/public/` prefix the `from` would
+                     be discarded and "Go back" would drop the share context.
+
+                     The link is deliberately NOT hidden on auth state. A
+                     router-link renders an <a> either way, and the SPA cannot
+                     know who holds the share — hiding it would make the page
+                     differ per viewer. A logged-out visitor follows it to
+                     /login?redirect=…; the owner, who is signed in, lands on
+                     the research page and can come straight back.
+
+                     The share schema carries only `symbol`, so the badge
+                     degrades to logo + ticker, which is its documented
+                     behaviour for a missing name/country/assetType. -->
+                <td class="px-6 py-2 font-medium text-slate-900 dark:text-slate-100">
+                  <router-link :to="researchRoute(p.symbol, route.fullPath)" class="inline-block">
+                    <TickerBadge size="sm" :symbol="p.symbol" />
+                  </router-link>
+                </td>
                 <td class="px-6 py-2 text-right text-slate-600 dark:text-slate-300">{{ p.quantity }}</td>
                 <td v-if="showValues()" class="px-6 py-2 text-right text-slate-600 dark:text-slate-300">{{ money.format(p.currentPrice) }}</td>
                 <td v-if="showValues()" class="px-6 py-2 text-right text-slate-900 dark:text-slate-100">{{ money.format(p.marketValue) }}</td>
