@@ -13,8 +13,8 @@ also still has `[ ]` work; fully finished steps are archived)
 
 **Start at [§78 — Everything that needs YOU](#78-everything-that-needs-you-2026-10-01).**
 It is the only section whose items block other work, and the only one I cannot
-progress on my own: three spreadsheet edits and two decisions. Everything else
-here is mine to pick up.
+always progress on my own: one spreadsheet edit, one CI decision, and a batch of
+manual `CONVERT` entries. Everything else here is mine to pick up.
 
 ---
 
@@ -25,13 +25,17 @@ only the portfolio owner can take — three are edits to the source spreadsheet,
 is a decision. Nothing here is a queue I can grind through, and each one blocks
 work that is otherwise ready.
 
-**Two of the four are now closed (2026-10-02), and one of them moved.** §78.1
-(XTB's funding) was answered by the owner and is superseded by **§87** — XTB never
+**All four are now accounted for — three closed, and one moved.** §78.1 (XTB's
+funding) was answered by the owner and is superseded by **§87** — XTB never
 holds cash, so the fix is a sell-side cash leg in the importer plus an `AU` flip on
 its ten trade rows, not a `Wpłata` row. §78.3's decision was accepted: the six
-bonds' pre-sale history is unrecoverable. What remains for you is **§78.2** (the
-IKE Marek `Gotówka` series, and the IKE Beata rows) and **§78.4** (the CI
-decision). §78.5 and §78.6 stay parked until §78.2 lands.
+bonds' pre-sale history is unrecoverable. §78.2 was re-measured on 2026-10-03 and
+**its premise was wrong** — there are no missing rows on any of the three
+accounts, so it is no longer a spreadsheet item at all; the resolution is a new
+cash-transaction type in **§89**, which is mine to build. §78.4 was decided and
+built on 2026-10-04: the tests now run in all five GHA builds. What remains for
+you is the manual `CONVERT` entries in §89.7.
+§78.5 and §78.6 stay parked until §89 lands.
 
 **Everything below this line needs no `--wipe`.** The wipe ran today at 14:16 UTC
 and the incremental import reports `inserted=0 skipped=2368`, so the database is
@@ -91,10 +95,12 @@ every row in the sheet, not just this one.
       > makes correct. A column would only make the recon cross-checkable for this
       > one account.
 
-### 78.2 — IBKR / IKE Marek / IKE Beata: the Transakcje rows are missing, not Gotówka
+### 78.2 — IBKR / IKE Marek / IKE Beata: no missing rows — re-measured, premise corrected (2026-10-03)
 
-§63.4 replaced the old per-day report with one comparable number per account, and
-that is where this stands (measured today, unchanged since this afternoon):
+§63.4 replaced the old per-day report with one comparable number per account.
+Re-measured on PROD 2026-10-03 (sheets-sync `v1.0.36`, run `inserted=21
+skipped=2365 errors=0`; derived side re-read live from `GET
+/internal/cash-balances?asOf=2026-09-29`; sheet's last dated row 2026-09-29):
 
 | account | derived | sheet's last row | Δ | direction |
 |---|---|---|---|---|
@@ -102,37 +108,69 @@ that is where this stands (measured today, unchanged since this afternoon):
 | IKE Beata | 4 442,52 | 3 032,89 | **+1 409,63** | same |
 | IKE Marek | 961,87 | 4 951,85 | **−3 989,98** | **reverse** — the sheet has ~4k the app does not |
 
-**This is two different problems wearing one number, which is why it cannot be
-closed by watching a figure approach zero.** IBKR and IKE Beata are missing
-`Transakcje` inflow/outflow rows. IKE Marek is the opposite: the sheet's balance
-runs ~4k *ahead* of what the ledger can explain, so something is recorded there
-that the app never saw.
+**Byte-identical to §63.4's first run on 2026-10-01.** No owner action has
+landed, and the premise this section was written on — "the `Transakcje` rows
+are missing" — is wrong for all three accounts. Full evidence, including what
+each Gotówka column actually measures, is in
+[proposals/portfolio-cash-tracing.md](proposals/portfolio-cash-tracing.md) §3;
+the resolution is **§89**.
 
-Note the old report's numbers were meaningless — it reported `recon =
-−368,300.77` on IBKR, which was never a balance but the sheet's own `cashFlow`
-column replayed onto a `Gotówka` anchor the flows do not belong to, summed over
-full history. A check reporting a figure about itself.
-
-- [ ] Add the missing Transakcje rows for IBKR and IKE Beata
-      > **Then:** I re-run the dry sync and confirm both deltas fall toward zero.
-      > **The IBKR half is measured against a sheet that has since changed
-      > (2026-10-02)** and its `+18 734,93` cannot be closed by what moved. The
-      > owner normalised all three of IB's `AU=1` trades to `AU=0` — rows 1565,
-      > 1646, 1805 (3 funded `Kupno`s, 9 975,17 PLN / 2 344,88 EUR of `DEPOSIT`s
-      > that were genuinely being posted) and row 1852, the 40-share ASRNL exit
-      > that was already inert. Those three buys were the only IB rows posting any
-      > cash, so the gap can shrink by at most 9 975,17 and still stands at
-      > ≥ `+8 759,76`; flipping 1852 changed nothing because the sell branch was
-      > already inert outside `Equate+` (§87.1). Re-measure before chasing this
-      > one — the number above is arithmetic on a prior measurement, not a fresh
-      > reading.
-- [ ] **IKE Marek is the one to look at first** — a *negative* Δ means the sheet
-      records money the app has no record of. That is not a missing row; it is a
-      row whose `Typ`/`Aktywo` the importer does not read as a deposit. Give me
-      the Gotówka series for that account and I will find which row it is rather
-      than you hunting for it.
-      > This is the single most useful thing in this section: it is the one item
-      > where I can do the work once you hand me the numbers.
+- [x] Add the missing Transakcje rows for IBKR and IKE Beata
+      > **Withdrawn 2026-10-03 — the premise was wrong, so no row is missing.**
+      > **IBKR's inflows are not missing — §69 drops them on purpose.** The 37
+      > no-op `Wpłata Gotówka IB` rows in the sync log are
+      > `isDuplicateTransferFunding` hits (`transakcje-mapper.ts:239`): the
+      > broker's own record of the Equate+ SAP sale proceeds landing, kept once
+      > as the synthesized `Equate+ → IBKR` TRANSFER pair instead of twice. The
+      > owner confirmed that model in §69 and it is working as designed, so no
+      > spreadsheet edit closes IBKR's Δ.
+      >
+      > **IKE Beata's half is the same defect as IKE Marek's** (§89): its PLN
+      > leg is `+47 429,70` against the sheet's `3 032,89`, i.e. **+44 396,81**,
+      > because the sheet records no FX-conversion rows and the importer debits
+      > each buy in its own currency. The `+1 409,63` headline is two ~±42k
+      > errors nearly cancelling, not a small gap. A `Wpłata` row cannot express
+      > it.
+      >
+      > **The AU-flip arithmetic in the note this replaces was wrong in
+      > mechanism, not just in number.** `externalIdOf`
+      > (`transakcje-parser.ts:28-31`) hashes cols 2,3,4,5,20,21 and **not**
+      > col 47 (`AU`), so a `#d` leg's `external_id` is unchanged by a flag flip;
+      > and the sync is insert-only. The three `Buy: ASR Nederland NV` `#d`
+      > DEPOSITs (2 344,88 EUR) are still in PROD and IBKR's derived is unmoved
+      > at 24 741,35 — the gap did not shrink by the predicted ≤9 975,17 and
+      > does not stand at `+8 759,76`. Closing it needs a wipe or a targeted
+      > delete, never a re-sync. Corollary: the id is a content hash, so editing
+      > a sheet row **orphans** the old imported row and inserts a new one.
+- [x] **IKE Marek is the one to look at first** — a *negative* Δ means the sheet
+      records money the app has no record of.
+      > **Answered 2026-10-03: there is no such row, and that is the finding.**
+      > All four legs re-derived from `portfolios.transactions` and matching to
+      > the penny — PLN `+43 425,30`, EUR `−2 883,46`, GBP `−3 154,49`, USD
+      > `−3 592,67` — so the PLN leg is **+38 473,45** over the sheet's
+      > `4 951,85` while the foreign legs are ≈**−42 463,43** of purchases that
+      > were never funded. The `Gotówka` column is a single-PLN cash ledger and
+      > the grid has no conversion rows, so the PLN that left the account to buy
+      > EUR/GBP/USD is invisible. What is absent is a whole class of movement,
+      > not one row — which is why the section's own framing could not close.
+      >
+      > **Do not act on the sheet row numbers cited in §78.2 or §87.** Read live
+      > from the sheet: row **1565** is a `Wpłata "Gotówka IB"` at `AU=1`, not a
+      > funded `Kupno`; **1646** is `Kupno "CubeSmart"`; **1805** is a `Div`; and
+      > **1852** is `Kupno "Agree Realty Corp"`, 2026-04-15, qty 4, USD. §87's
+      > substance still holds (IB: 387 `Kupno` / 91 `Sprzedaż` / 448 `Div` /
+      > 2 `Split`, every trade `AU=0`, flows from 41 `Wpłata` + 5 `Wypłata`) —
+      > only the indices are wrong. Cite `Typ` + date + `Aktywo`, which is stable
+      > under row insertion.
+      >
+      > **And the metric could not have told you either.** 143/302 IBKR,
+      > 81/130 IKE Marek and 86/137 IKE Beata "gap days" carry no `Transakcje`
+      > row at all — the column moves anyway, because it is a whole-account PLN
+      > figure that revalues daily. Only 5 of the 58 cash rows line up with a
+      > clean step in their column on their own date, and the report sums `Wpłata`
+      > col 19 without flipping its sign (the sheet writes it negative), so every
+      > contribution day is scored as a withdrawal of twice the amount. That is
+      > §89.1, and it lands first by owner decision.
 
 ### 78.3 — Six PL government bonds 404 upstream. Decide: hunt, or accept and label.
 
@@ -161,10 +199,55 @@ build + push; the Dockerfile runs `npm run build` (tsc) but not the suite.
 Wallets' entire CI history has two workflow names. So the suite has only ever run
 on this machine.
 
-- [ ] **Add `npm test` (and `npm run test:mock` where the repo has one) on every
+- [x] **Add `npm test` (and `npm run test:mock` where the repo has one) on every
       PR, for all five repos**
+      > Decided 2026-10-04: always run the tests in the GHA builds. Each repo's
+      > `.github/workflows/docker-image.yml` gained a `test` job — checkout →
+      > `setup-node` 22 → `npm ci` → `npm run build` → `npm run test`, with
+      > `portfoliost` additionally running `npm run test:mock` — and `build` now
+      > reads `needs: [test, release]`, so a red suite blocks the image push on
+      > both pull_request and push. `portfoliost-sheets-sync` already carried
+      > exactly this job and was the shape copied, which is why the five
+      > workflows stayed byte-identical to each other.
+      > The one delta from that precedent is
+      > `NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}` on the job, which
+      > sheets-sync does not need: all five interpolate it in `.npmrc` for
+      > `@marx2/contracts`, and the lockfile's `resolved` tarball answers 401
+      > unauthenticated and 302 with a token, so `npm ci` cannot succeed without
+      > it. `npm ci --dry-run` does *not* catch this — it resolves the tree
+      > without fetching a tarball, so it passes with no token at all.
+      > Gate before the commit, all local: portfoliost 651, wallets 604,
+      > instruments 555, users-auth 35, admin 105 tests green; `npm run build`
+      > green in all five; `npm run test:mock` 242 checks, 0 failed (it spawns
+      > its own in-process gateway on port 4099, so it needs no compose stack).
+      > **GHA then found what the local gate could not.** The first run was
+      > green in wallets, instruments, users-auth and admin, and red in
+      > `portfoliost` — reporting `78 passed` and *still* exiting 1, because two
+      > unhandled rejections took the exit code down. The unit suite had been
+      > passing only because this machine runs the compose stack: `VITE_API_BASE_URL`
+      > is unset in CI, happy-dom resolves the relative `/api/...` against its
+      > default `localhost:3000`, and an unawaited `getUserProfile` rejection
+      > surfaced as an unhandled error. Fixed in `6f35de5` — a `fetch` stub in
+      > `tests/unit/setup.ts`, plus `getPortfolios`/`getPortfolioTotalMetrics`
+      > added to `PortfolioCashTab.test.ts`'s mock, whose factory spread
+      > `...actual` and so left the real API function to overwrite the store's
+      > list with `{}`. Second run: `test`, `release` and `build` all green, 78
+      > files / 651 tests and 242 mock checks inside GHA.
+      > Reproduced and verified locally without touching the running stack, by
+      > pointing the base URL at a dead port
+      > (`VITE_API_BASE_URL=http://127.0.0.1:1 npm test`): exit 1 before the
+      > fix, exit 0 after. Worth remembering that a suite can be *fully green*
+      > and still fail the job.
+      > Cost of the copied shape: a red run burns a version. On the failed push
+      > `release` succeeded and `build` was skipped, so `v1.0.377` exists as a
+      > Release with no image in ghcr while `v1.0.376` and `v1.0.378` both have
+      > one. Gating `release` on `test` too would close that.
+      > `docker-image-mock.yml` deliberately keeps no test
+      > job: same repo and same triggers as `docker-image.yml`, so a second copy
+      > would run the suite twice per PR, and cross-workflow gating would need
+      > `workflow_run`.
 
-### 78.5 — Then verify, once the rows land
+### 78.5 — Then verify, once §89's entries land
 
 **Folded in from §65.1, which had no open work of its own left.** The two halves were
 split the wrong way round: the owner's action and the check that confirms it are one
@@ -177,9 +260,17 @@ says. Adding rows and re-running the *incremental* sync is sufficient — §69.3
 re-backfills every portfolio the import touched, from the first trade, with nobody
 pressing Recompute. Admin → Jobs → "Sync sheet" (not "Wipe & Reimport").
 
+**The §78.2 half no longer arrives as sheet rows.** Per D4 the conversions are
+entered by hand in the cash dialog (§89.7), so there is no sync to re-run for them
+and no `do dodania` column to paste from — the deltas below move because a
+`CONVERT` row was added to the portfolio, not because Transakcje changed.
+
 - [ ] **Re-run the Gotówka recon and confirm all three deltas move toward zero**
       > §65.1. Today: IBKR **+18 734,93**, IKE Beata **+1 409,63**, IKE Marek
-      > **−3 989,98**. IKE Marek's sign is the interesting one — see §78.2.
+      > **−3 989,98**. **IBKR's is not expected to reach zero and must not be the
+      > gate** — §78.2 measured its inflows as deliberately modelled (§69), so it
+      > is a known modelling difference, not an error to close. What must move is
+      > the IKE pair, and only once §89.2 has said what the comparison is worth.
 - [ ] **Assert 0 row errors and that the synthetic `#d`/`#t` legs still dedupe on a
       second run**
       > §65.1. Both held on the 2026-10-01 run (`errors=0`, all 2,368 skipped,
@@ -230,8 +321,11 @@ The pattern is unambiguous: the two portfolios whose TWR p.a. is small (IBKR
 *in total*. XIRR can exceed the simple return only if the money arrived late in
 the window — and it did, because the deposit history is incomplete.
 
-**This is not a new defect, and not a rendering one.** It is §78.2 (IBKR / IKE Marek /
-IKE Beata missing ledger rows) and §78.1 (XTB's missing `Wpłata`) reaching the
+**This is not a new defect, and not a rendering one.** It is §78.2 — whose
+2026-10-03 re-measurement found the IKE accounts' PLN leg inflated by the full
+cost of an unfunded foreign book (≈±40k each, see
+[proposals/portfolio-cash-tracing.md](proposals/portfolio-cash-tracing.md) §3.2)
+— and §78.1 (XTB's missing `Wpłata`) reaching the
 money-weighted column: `net_flow` is
 written from `dailyExternalFlows` (`backfill.ts:1344`), so a portfolio whose
 early deposits are missing has a flow series that starts too late, and XIRR
@@ -248,7 +342,7 @@ was never checked in PROD.** It is the same false-assumption class that made §8
       correct: the aggregate's money-weighted return of a set of portfolios with
       incomplete ledgers is wrong in the same way, and for the same reason. Any
       clamp or sanity filter applied only here would make the two tabs disagree.
-- [ ] **Land §78.1 + §78.2, then re-measure this table.** The prediction is that
+- [ ] **Land §87 + §89, then re-measure this table.** The prediction is that
       XIRR collapses toward TWR p.a. for the portfolios whose deposits are
       restored. If it does not, the cause is the solver (Newton roots on
       one-sided flow histories, cf. §53.1's `MAX_ABS_XIRR` guard and its
@@ -259,7 +353,7 @@ was never checked in PROD.** It is the same false-assumption class that made §8
       simple return" — §83.2's note keeps that parity rather than inventing a
       reason the per-portfolio route does not send. Until §78 lands, the cheapest
       honest improvement is a one-line caveat on the Overview card naming the
-      known §78.1/§78.2 data gap, the same way §83.6 (archived) states the FX caveat.
+      known §89 data gap, the same way §83.6 (archived) states the FX caveat.
 - [ ] Test: the PROD table above becomes the regression fixture — assert that a
       portfolio whose flow series starts on the same day as its first snapshot
       reports an XIRR within a sane band of its TWR p.a. The unit tests that
@@ -398,3 +492,212 @@ already exists on `Portfolio` and `CreatePortfolioRequest` (§87.5).
       whole of the pattern today.
 - [ ] Archive §88 on its own pass — §87 was archived 2026-10-03, and §88 is the
       only section left of §85–§88; commit.
+
+---
+
+## 89. `CONVERT` + `ADJUSTMENT`: two cash-transaction types, and a recon that can be believed (2026-10-03)
+
+The resolution of §78.2, which its 2026-10-03 re-measurement turned into a
+modelling problem rather than a spreadsheet one. Evidence and the full decision
+record: [proposals/portfolio-cash-tracing.md](proposals/portfolio-cash-tracing.md)
+§3 (findings) and §4 (decisions D1–D7).
+
+**Repos touched: four** — `portfoliost-contracts`, `portfoliost-wallets`,
+`portfoliost-sheets-sync`, `portfoliost`. Flagged up front because it crosses
+more than two; the shape was the owner's explicit call (a new cash-transaction
+type that the UI must cover).
+
+**The finding that shapes all of it.** The IKE Marek / IKE Beata / IBKR Δ is not
+missing rows. Their foreign-currency legs are unfunded — IKE Marek is
+`+43 425,30` PLN against a sheet that says `4 951,85`, and `−2 883,46 EUR /
+−3 154,49 GBP / −3 592,67 USD` of purchases the sheet never funded. The
+`Gotówka` column is a single-PLN cash ledger, the `Transakcje` grid records no
+FX-conversion rows, and the importer debits each buy in its own currency. A
+conversion inside one portfolio is not expressible today because `TRANSFER`
+requires `toPortfolioName` that "must exist and **differ** from the source
+portfolio" (`openapi.yaml:2301`). Hence a new type.
+
+**Design decisions (owner, 2026-10-03).** Recorded here rather than as open
+questions; each step below is the source of truth for the one it covers.
+
+- **`CONVERT`** — a new member of the `ImportPortfolioCashTx.type` enum
+  alongside `DEPOSIT`/`WITHDRAWAL`/`TRANSFER` (`openapi.yaml:2289`), carrying
+  `fromCurrency`, `toCurrency`, `fromAmount`, `toAmount` and a rate on **one**
+  row, from which wallets derives both legs linked as a pair. Two correlated
+  rows was rejected: it puts two entries in every cash list and lets the pair
+  drift. (D2, D3)
+- **Recorded manually, in the UI.** The importer invents nothing. `externalIdOf`
+  (`transakcje-parser.ts:28-31`) hashes content, not `AU`, and the sync is
+  insert-only — so an inferred row would orphan-and-insert rather than
+  reconcile. (D4)
+- **Available on every portfolio**, not gated behind a per-portfolio switch;
+  converting currencies is real for any account holding more than one. (D5)
+- **`ADJUSTMENT`** — moves one chosen currency's balance by a signed delta,
+  mandatory reason. `cashBalances` is a pure replay, so a delta is the only
+  shape implementable without a stored balance; an absolute "set the balance to
+  X" would be a delta at write time anyway. **It counts toward `invested`
+  according to its sign**, like an inflow or outflow — knowingly the
+  non-conservative choice, and §78.6 records the cost: a flow series wrong in
+  shape distorts XIRR badly, and an adjustment that moves the denominator can
+  mask or amplify it. Accepted; 89.5 pins it with a test so it cannot change by
+  accident. (D6)
+- **The history is reconstructed as `CONVERT`, not as adjustments.** Both ship;
+  `ADJUSTMENT` is the escape hatch when the number is known but the story is
+  not. Chosen over closing the gap with a handful of adjustments because the
+  reconstructed history is self-documenting. (D7)
+
+Rules: one step = one commit; a step is marked `[x]` only after its tests pass.
+
+---
+
+### 89.1 — Make the gap report correct and tested, and measure the columns' own noise
+
+- [ ] Fix the sign bug: `scripts/gotowka-gap-report.ts:78` sums raw
+      `Przepływ gotówki` into `flows`, but the sheet writes `Wpłata` **negative**
+      (row 101 `−15 777,00 zł`) and `Wypłata` positive (row 865
+      `+20 850,00 zł`), so every contribution day is scored as a withdrawal of
+      twice the amount. Normalise by `Typ` before summing.
+- [ ] Move the arithmetic out of `scripts/` into `src/gotowka-gap.ts` (pure:
+      `flows`, per-day column deltas, gap rows) and leave
+      `scripts/gotowka-gap-report.ts` a thin I/O shell. Reason it must move:
+      `vitest.config.ts` sets no `include`, so the default glob matches no
+      script and the report has had **no** test since 2026-09-25 — which is how
+      a sign error survived a full month and a 580-row report.
+- [ ] Fixture from the live grid, committed: a `Gotówka` column with a
+      contribution day and two cash-event-free days, and the two `Wpłata`/
+      `Wypłata` rows above. Assert the sign normalisation **and** assert that a
+      day with no cash row is reported as a gap rather than silently skipped —
+      that is the 143/302 · 81/130 · 86/137 finding, and it is the report's
+      actual subject.
+- [ ] Measure each tracked column's noise floor (the Σ|Δ| attributable to days
+      with no cash event) and print it in the report header next to Σ BRAKUJE,
+      so a reader can see whether a Δ is inside the column's own volatility.
+- [ ] Tests: `src/gotowka-gap.test.ts` green; `npm run test && npm run build`;
+      commit `fix(sheets-sync): normalise Wpłata sign in the Gotówka gap report`.
+
+### 89.2 — Say what each tracked column is compared against
+
+- [ ] `src/gotowka-recon.ts`: the eight `Gotówka` columns are whole accounts
+      stated in PLN and partition exactly — `Suma` == Σ(cols 1..8) and
+      `Suma brokerzy` == IKE Marek + IKE Beata + IB on **333/333** dated rows.
+      `derived free-cash` versus a whole-account figure is not like-for-like.
+      Record that as the schema's stated meaning in the file header, and compare
+      `derived − sheet` only alongside 89.1's noise floor so a Δ inside the
+      column's volatility cannot read as a discrepancy.
+- [ ] `GOTOWKA_TOL.IB` stays ±50 PLN and the two IKE stay ±10 — the values the
+      operator's seen — but state in the comment that the threshold is now
+      advisory against a measured noise floor, not a correctness bound.
+- [ ] Tests: extend `src/gotowka-recon.test.ts` (17 today) with a column whose
+      last row sits inside its own noise and assert the line is **not** raised;
+      keep the existing as-of-date and missing-credential properties green.
+
+### 89.3 — Contract: `CONVERT` and `ADJUSTMENT`
+
+- [ ] `portfoliost-contracts/contracts/openapi.yaml`:
+      `ImportPortfolioCashTx.type` enum (`:2289`) gains `CONVERT` and
+      `ADJUSTMENT`; `ImportPortfolioCashTx` gains nullable `fromCurrency`,
+      `toCurrency`, `toAmount` (required iff `CONVERT`), and
+      `adjustmentReason` (required iff `ADJUSTMENT`).
+- [ ] `RecentCashTransaction.type` stays a plain `string` and `displayLabel`
+      already exists, so the read path needs no enum change — assert that in the
+      spec test rather than assuming it.
+- [ ] Follow the AGENTS.md contract workflow exactly: edit → push `main` → CI
+      bumps the patch version → verify with
+      `gh release list --repo Marx2/portfoliost-contracts` →
+      `NODE_AUTH_TOKEN=$(gh auth token) npm install @marx2/contracts@<new>` in
+      each consumer → `npm run gen:types` in `portfoliost` and
+      `portfoliost-instruments`. Never hand-edit `package.json`'s version.
+- [ ] Tests: contracts `npm test && npm run build && npm run lint` green; commit
+      and let CI release.
+
+### 89.4 — Wallets: `ADJUSTMENT` and the `CONVERT` delta in the replay
+
+- [ ] `src/db/schema.ts`: `ck_pctx_type` gains both values; `CONVERT` needs
+      `from_currency` / `to_currency` / `to_amount` columns, `ADJUSTMENT` needs
+      `adjustment_reason`. Generate the migration with `npm run db:generate` —
+      **never hand-write migration files** (KB
+      `pfire/portfoliost-wallets/drizzle-migration-workflow`).
+- [ ] `src/services/cashLedger.ts`: `cashBalances` emits **two** deltas for a
+      `CONVERT` row — `−fromAmount` in `fromCurrency`, `+toAmount` in
+      `toCurrency` — so one stored row replays as a real conversion and the two
+      currencies cannot disagree. This is the whole reason D3 chose one row.
+      `dailyExternalFlows` picks up `ADJUSTMENT` signed as sent (D6).
+- [ ] `src/routes/portfolio-cash.ts`: the per-type sign clamp (`:48`) must not
+      apply to `CONVERT`, which carries two magnitudes; `displayLabel` becomes
+      `Convert` / `Adjustment`; the edit path re-derives both legs; a
+      `CONVERT` whose `fromCurrency` equals its `toCurrency` is rejected, and so
+      is one whose amounts are not both positive.
+- [ ] Tests: `cashLedger.test.ts` — a funded `CONVERT` moves the two currencies
+      and leaves the base-currency total equal to the rate-consistent difference;
+      a same-currency `CONVERT` is rejected at the route; an `ADJUSTMENT` with a
+      negative amount lands as a negative `net_flow`. Full `npm run test &&
+      npm run build`; commit
+      `feat(wallets): CONVERT and ADJUSTMENT cash transactions`.
+
+### 89.5 — Pin `ADJUSTMENT`'s effect on `invested` (D6), before any UI ships
+
+- [ ] Assert in `backfill.ts`'s `net_flow` computation that an `ADJUSTMENT`
+      enters `dailyExternalFlows` with its sign, and that therefore a positive
+      adjustment raises `invested` and a negative one lowers it.
+- [ ] Assert the consequence D6 knowingly accepts, so it cannot be discovered
+      later as a bug: a portfolio whose only flow is an adjustment reports an
+      `invested` that no deposit supports, and its XIRR is correspondingly
+      meaningless. The test names that as the intended behaviour.
+- [ ] Tests: commit
+      `test(wallets): pin ADJUSTMENT's signed contribution to invested`.
+
+### 89.6 — SPA: both types in the cash dialog and the cash table
+
+- [ ] `src/components/CashTransactionsTable.vue`: `TYPE_LABELS` (`:260`) gains
+      `CONVERT` → "Convert FX" and `ADJUSTMENT` → "Adjustment"; a `CONVERT` row
+      renders both currencies (`fromAmount fromCurrency → toAmount toCurrency`)
+      rather than one amount and a currency, which the current
+      `<td>{{ typeLabel(tx) }}</td>` (`:411`) layout has no column for.
+- [ ] `src/modules/portfolios/PortfolioCashModals.vue`: add the two actions.
+      `CONVERT` needs two amounts, two currency pickers and a rate; `ADJUSTMENT`
+      needs one signed amount, one currency and a **required** reason. Reuse
+      `useCurrenciesStore` for the pickers — never hardcode a currency list —
+      and follow `docs/COMPONENTS.md` for testid prefixes and the
+      `update:x` emit pattern.
+- [ ] `src/api/portfolios.ts`: the client types come from
+      `components["schemas"]` (regenerated in 89.3), not hand-written shapes.
+- [ ] Tests: unit coverage for both dialogs (required reason blocks submit;
+      same-currency convert blocks submit), and the `CashTransactionsTable`
+      rendering of a `CONVERT` row's two amounts. `npm run build && npm run test
+      && npm run test:mock`, then `docker compose up -d --build && docker
+      compose up -d --force-recreate gateway` (the gateway caches upstream IPs)
+      and `npm run test:e2e`; commit
+      `feat(spa): convert-FX and adjustment cash transactions`.
+
+### 89.7 — Reconstruct the history as `CONVERT`, and re-measure
+
+- [ ] **Owner action.** For IKE Marek, IKE Beata and IBKR, enter the `CONVERT`
+      rows for the historical PLN→FX movements behind the unfunded legs measured
+      on 2026-10-03 (IKE Marek: PLN leg `+43 425,30` against a sheet reading
+      `4 951,85`, foreign legs `−2 883,46 EUR / −3 154,49 GBP / −3 592,67 USD`;
+      IKE Beata's PLN leg `+47 429,70` against `3 032,89`; IBKR's
+      `−39 041,46 USD / −4 337,85 CAD / −4 075,56 SEK / −255,74 SGD`). Each row
+      records a rate the sheet's own col 21 carries, so the history is
+      self-documenting (D7). `ADJUSTMENT` is the fallback only where the rate is
+      genuinely unrecoverable, and its reason field must say so.
+- [ ] Then re-run the gap report and the import recon, and record the new Δ per
+      account. **IBKR's residual is not expected to reach zero** — §78.2 measured
+      its inflows as deliberately modelled (§69) — so the assertion is that the
+      IKE pair moves, and IBKR is reported, not gated.
+- [ ] Update `proposals/portfolio-cash-tracing.md` §3 with the post-`CONVERT`
+      numbers and §5 with what closed, and drop the retired sheet row numbers
+      (§3.5) in favour of `Typ` + date + `Aktywo`.
+- [ ] Only then unblock §78.5 and §78.6.
+
+### 89.8 — Closeout
+
+- [ ] `docs/COMPONENTS.md`: add both dialogs to the portfolios reference, and
+      record the rule this section exists because of — *a cash movement the
+      ledger cannot express becomes a new transaction type, and the type's
+      effect on `invested` is a decision that must be pinned by a test, not a
+      consequence left to the replay*.
+- [ ] Sweep for the same shape: any other place that assumes
+      `DEPOSIT | WITHDRAWAL | TRANSFER` is exhaustive — grep
+      `TRANSFER` across the SPA, wallets and sheets-sync for unguarded enum
+      switches — and record what the sweep finds.
+- [ ] Archive §89 on its own pass; commit.
