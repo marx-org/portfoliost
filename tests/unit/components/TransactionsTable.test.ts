@@ -125,3 +125,66 @@ describe("TransactionsTable — §49.5 dividend tax column + notes", () => {
     expect(note.attributes("title")).toBe("withholding 10%")
   })
 })
+
+describe("TransactionsTable — an in-kind transfer is not a payment", () => {
+  it("shows the quantity that moved custody, never a cash amount", async () => {
+    // `totalAmount` on a transfer row is quantity x the source lot's cost — a
+    // NOTIONAL. Rendering it as money would invent a payment that never happened.
+    vi.mocked(portfoliosApi.getPortfolioTransactions).mockResolvedValue({
+      items: [tx({ type: "TRANSFER_OUT", quantity: 5, price: 10, totalAmount: 50 })],
+      total: 1, page: 1, totalPages: 1,
+    } as never)
+    const wrapper = await mountTable()
+    const moved = wrapper.find('[data-testid="transfer-moved-quantity"]')
+    expect(moved.exists()).toBe(true)
+    expect(moved.text()).toContain("5")
+    // $50.00 is the notional and must not appear anywhere as an amount.
+    expect(moved.text()).not.toContain("$50")
+    expect(wrapper.text()).not.toContain("$50.00")
+  })
+
+  it("labels both transfer directions readably", async () => {
+    vi.mocked(portfoliosApi.getPortfolioTransactions).mockResolvedValue({
+      items: [
+        tx({ type: "TRANSFER_OUT", quantity: 5, totalAmount: 50 }),
+        tx({ type: "TRANSFER_IN", quantity: 5, totalAmount: 50 }),
+      ],
+      total: 2, page: 1, totalPages: 1,
+    } as never)
+    const wrapper = await mountTable()
+    expect(wrapper.text()).toContain("Transfer out")
+    expect(wrapper.text()).toContain("Transfer in")
+    // Never the mechanical capitalisation the old label produced.
+    expect(wrapper.text()).not.toContain("TransferOut")
+  })
+
+  it("does not style a transfer as a trade — violet/teal, never green or red", async () => {
+    vi.mocked(portfoliosApi.getPortfolioTransactions).mockResolvedValue({
+      items: [
+        tx({ type: "TRANSFER_OUT", totalAmount: 50 }),
+        tx({ type: "TRANSFER_IN", totalAmount: 50 }),
+      ],
+      total: 2, page: 1, totalPages: 1,
+    } as never)
+    const wrapper = await mountTable()
+    expect(wrapper.find("span.bg-violet-50").exists()).toBe(true)
+    expect(wrapper.find("span.bg-teal-50").exists()).toBe(true)
+    // A BUY in the same page still uses green, so this asserts the palette is
+    // additive rather than the whole table changing.
+    expect(wrapper.find("span.bg-green-50").exists()).toBe(false)
+  })
+
+  it("a transfer row contributes 0 to a group subtotal, not its notional cost", async () => {
+    vi.mocked(portfoliosApi.getPortfolioTransactions).mockResolvedValue({
+      items: [
+        tx({ type: "TRANSFER_OUT", quantity: 5, totalAmount: 5000 }),
+        tx({ type: "TRANSFER_IN", quantity: 5, totalAmount: 5000 }),
+      ],
+      total: 2, page: 1, totalPages: 1,
+    } as never)
+    const wrapper = await mountTable()
+    // 10000 of notional cost between the two legs would dominate any total shown.
+    expect(wrapper.text()).not.toContain("10,000")
+    expect(wrapper.text()).not.toContain("$5,000")
+  })
+})

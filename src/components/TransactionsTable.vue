@@ -203,12 +203,25 @@ function pageNumbers(): (number | "…")[] {
 
 // ── Amount helpers ────────────────────────────────────────────────────
 
+// A transfer moves an instrument, not money. Its `totalAmount` is quantity x the
+// source lot's cost — a NOTIONAL, not a cash movement — so feeding it into the
+// amount column would fabricate a payment that never happened, and would also
+// corrupt `groupSubtotal`, which sums this. Every cash figure here is therefore
+// forced to 0 for the transfer pair and the cell renders "—" instead.
+const TRANSFER_TYPES = new Set(["TRANSFER_OUT", "TRANSFER_IN"])
+
+function isTransfer(type: string): boolean {
+  return TRANSFER_TYPES.has(type.toUpperCase())
+}
+
 function amountOf(tx: Tx): number {
+  if (isTransfer(tx.type)) return 0
   const gross = (tx.totalAmount ?? 0) + (tx.fees ?? 0)
   return tx.type.toUpperCase() === "BUY" ? -gross : gross
 }
 
 function convertedAmountOf(tx: Tx): number | null {
+  if (isTransfer(tx.type)) return null
   if (tx.convertedTotalAmount == null) return null
   const gross = (tx.convertedTotalAmount ?? 0) + (tx.convertedFees ?? 0)
   return tx.type.toUpperCase() === "BUY" ? -gross : gross
@@ -225,11 +238,24 @@ function typeClass(type: string): string {
   if (t === "BUY")      return "bg-green-50 dark:bg-green-500/15 text-green-700 dark:text-green-400"
   if (t === "SELL")     return "bg-red-50 dark:bg-red-500/15 text-red-600 dark:text-red-400"
   if (t === "DIVIDEND") return "bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400"
+  // Custody changed hands. Violet rather than green/red so it is never read as a
+  // trade: nothing was bought, nothing was sold, and no cash moved.
+  if (t === "TRANSFER_OUT") return "bg-violet-50 dark:bg-violet-500/15 text-violet-700 dark:text-violet-400"
+  if (t === "TRANSFER_IN")  return "bg-teal-50 dark:bg-teal-500/15 text-teal-700 dark:text-teal-400"
   return "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
 }
 
+const TYPE_LABELS: Record<string, string> = {
+  BUY: "Buy",
+  SELL: "Sell",
+  DIVIDEND: "Dividend",
+  EXPIRATION: "Expiration",
+  TRANSFER_OUT: "Transfer out",
+  TRANSFER_IN: "Transfer in",
+}
+
 function typeLabel(type: string): string {
-  return type.charAt(0) + type.slice(1).toLowerCase()
+  return TYPE_LABELS[type.toUpperCase()] ?? type.charAt(0) + type.slice(1).toLowerCase()
 }
 
 // ── Edit / Delete ─────────────────────────────────────────────────────
@@ -442,12 +468,22 @@ const colCount = computed(() =>
                 <span v-else class="text-slate-400">—</span>
               </td>
 
-              <!-- Amount -->
+              <!-- Amount. A transfer shows the quantity that changed custody, never a cash
+                   figure — its `totalAmount` is a notional cost, and rendering it
+                   as a payment would invent money that never moved. -->
               <td
                 class="px-5 py-3 text-right font-medium tabular-nums"
-                :class="amountOf(tx) < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-700 dark:text-green-400'"
+                :class="isTransfer(tx.type)
+                  ? 'text-violet-600 dark:text-violet-400'
+                  : amountOf(tx) < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-700 dark:text-green-400'"
               >
+                <span
+                  v-if="isTransfer(tx.type)"
+                  class="text-xs font-normal"
+                  data-testid="transfer-moved-quantity"
+                >{{ tx.quantity }} {{ tx.instrumentCurrency ?? tx.currency }}</span>
                 <DualCurrencyCell
+                  v-else
                   :primary="amountOf(tx)"
                   :primary-currency="tx.currency"
                   :converted="convertedAmountOf(tx)"

@@ -8,7 +8,7 @@ import { useTransactionForm, type TransactionFormFields } from "@/composables/us
 
 export interface TransactionFormModel extends TransactionFormFields {
   date: string
-  type?: "BUY" | "SELL"
+  type?: "BUY" | "SELL" | "DIVIDEND"
 }
 
 const props = withDefaults(defineProps<{
