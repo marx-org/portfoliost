@@ -186,18 +186,38 @@ Gap report today, against the §2.1 baseline of 580 rows:
 | IKE Marek | 130 | 81 | +12 686,64 PLN |
 | IKE Beata | 137 | 86 | +120 355,32 PLN |
 
-### 3.1 IBKR's "missing inflows" are not missing — they are dropped on purpose
+### 3.1 IBKR's "missing inflows" were dropped on purpose — that mechanism is now retired
 
-The sync log's 37 no-op `Wpłata Gotówka IB` rows are `isDuplicateTransferFunding`
+> **Superseded 2026-10-05 by pfire-docs#26.** Read this section for the history.
+
+The sync log's 37 no-op `Wpłata Gotówka IB` rows were `isDuplicateTransferFunding`
 hits (`src/transakcje-mapper.ts:239`, §69). They are the broker's own record
-of the Equate+ SAP sale proceeds landing, and the importer keeps the
+of the Equate+ SAP sale proceeds landing, and the importer kept the
 synthesized `Equate+ → IBKR` TRANSFER pair instead so the same money is not
 credited twice. IBKR's only deposits in the ledger are two rows
 (49,99 + 912,55 USD) plus one `#d` (0,099 USD).
 
-§69 records the owner confirming this model. It is working as designed, so
-IBKR's Δ is a **modelling difference**, not a data gap, and no spreadsheet
-edit closes it.
+§69 records the owner confirming this model. It was working as designed, so
+IBKR's Δ was a **modelling difference**, not a data gap, and no spreadsheet
+edit closed it.
+
+**What changed.** The premise was a workaround, stated at
+`plan-archive.md:9552-9588`: the arrival was a duplicate *because* the transfer
+had to be simulated as cash, because there was no stock-transfer primitive. That
+primitive now exists. An Equate+ `Sprzedaż` emits a `TRANSFER_OUT` of the shares
+plus a `SELL` booked **on IBKR**, with no cash row at all — so there is no cash
+arrival left to duplicate, and `isDuplicateTransferFunding`,
+`transferFundingByKey`, the `Wpłata` drop and the read-only `diagnose-dedup.ts`
+CLI are all deleted rather than flagged. A suppression that can no longer fire is
+noise, and §69 already cost a month to a sign bug in a rule that fired 0/53 times
+in production.
+
+The gain is now booked **once, on IBKR**, against Equate+'s original cost. The
+old model realised it on Equate+ *and* again at the IBKR sale.
+
+**Numbers after the change belong here** once the wipe and reimport have run —
+they cannot be filled in before it, and are recorded in pfire-docs#33's
+verification checklist rather than guessed at.
 
 ### 3.2 The IKE Δ is a near-cancellation of two ~40k errors, not a small gap
 

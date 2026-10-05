@@ -63,6 +63,38 @@ export function dividendTotals(perShare, grossTotal, perShareGross, quantity, ta
 Parents call it in a `computed` and reuse the result for payload building,
 submit gating, and labels — never re-derive the formula inline.
 
+## Transaction types: a movement the ledger cannot express becomes a new type
+
+When the ledger cannot express a movement, it gets a new transaction type — and
+**the type's effect on `invested` is a decision pinned by a test, not a
+consequence left to the replay.**
+
+`TRANSFER_OUT` / `TRANSFER_IN` are the worked example. Three rules the UI follows,
+each because violating it invents data:
+
+1. **A type with no cash movement must not render a cash amount.**
+   `TransactionsTable`'s `amountOf` / `convertedAmountOf` return `0` for the
+   transfer pair and the Amount cell shows `data-testid="transfer-moved-quantity"`
+   instead. A transfer row's `totalAmount` is `quantity × the source lot's cost` —
+   a **notional**. Signing it like a trade renders a payment that never happened
+   *and* feeds `groupSubtotal`, so it dominates any total shown.
+2. **A type that is neither a buy nor a sale gets neither colour.** Green/red mean
+   bought/sold; custody change is violet/teal. Dressing it as a trade is the exact
+   misreading the type exists to prevent.
+3. **A type the interactive route cannot build is rejected, not half-handled.**
+   `POST /portfolios/:id/transactions` returns 422 `UnsupportedTransactionType` for
+   `TRANSFER_OUT`, `TRANSFER_IN` and `EXPIRATION`, because its cash leg maps
+   anything non-`BUY` to a `WITHDRAWAL`. Recording a transfer is **import-only for
+   now**; a UI entry point needs the counterparty and the FIFO draw.
+
+`PriceChart` deliberately plots no marker for a transfer: its markers mean "a
+trade happened at this market price", and a transfer's `price` is a lot's cost, not
+a market print.
+
+Cost basis and return neutrality for a transfer are decided in
+pfire-docs#26; the lot provenance this UI does not yet display is
+pfire-docs#35.
+
 ## Styling
 
 - Tailwind utilities plus the shared component classes in `src/styles/main.css`:

@@ -122,6 +122,24 @@ from `Wartość transakcji (PLN)` / unit price. Keep `wallet_transactions.curren
 `exchangeRate` + `rateSource=manual` consistent with fees-and-custom-fx D28/D29.
 Cross-wallet legs (Equate+ → IBKR cash) use `transferFxRate`/`linkedTxId` (D22).
 
+> **Superseded 2026-10-05 (pfire-docs#26).** Those cross-wallet *cash* legs no
+> longer exist. An Equate+ `Sprzedaż` now emits a **`TRANSFER_OUT`** of the shares
+> plus a **`SELL` booked on IBKR**, and **no cash row at all** — what
+> `transferFxRate`/`linkedTxId` described was the simulation the transfer type
+> replaced. The cash *table* is untouched; `DEPOSIT`/`WITHDRAWAL`/`TRANSFER` remain
+> §89's unmerged domain.
+>
+> Two rules that row now follows, both owner-decided:
+> - **`AU` (col 47) is not consulted.** A `Sprzedaż` on Equate+ is a transfer at
+>   `AU=0` and `AU=1` alike, the same rule §87.3 applies to the kontо on
+>   `ALWAYS_CASH_LEG`. No spreadsheet edit was needed — the `SALE_PROCEEDS_TO` gate
+>   already existed and only what it produces changed.
+> - **Send quantity, never `Wartość transakcji`.** That column is the sale
+>   *proceeds*; using it as `price` would corrupt the receiving basis, because
+>   wallets derives the price FIFO from the real source lots. `externalIdOf` is
+>   untouched — it hashes date/typ/aktywo/quantity/currency/rate, so row identity
+>   is stable however many per-lot pairs the server derives.
+
 ### Parsing rules
 
 - Decimal: strip NBSP + ASCII space, strip ` zł`, replace `,` → `.`, parse float.
