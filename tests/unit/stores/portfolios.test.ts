@@ -21,7 +21,7 @@ function summary() {
       type: "regular",
       currency: "USD",
       walletId: "w1",
-      totalInvested: 1000,
+      capitalBasis: 1000,
       currentValue: 1200,
       isPublic: false,
       isMarginEnabled: false,
@@ -41,7 +41,7 @@ function summary() {
         closedPositions: 0,
         realizedGainLoss: 0,
         unrealizedGainLoss: 200,
-        totalInvested: 1000,
+        capitalBasis: 1000,
         income: 0,
         returnBasis: 1000,
         externalCapitalReturnPercent: 20,
@@ -77,7 +77,7 @@ describe("portfolios store", () => {
     mocked.getPortfolios.mockResolvedValue(summary())
     mocked.getPortfolioTotalMetrics.mockResolvedValue({
       totalValue: 1200,
-      totalInvested: 1000,
+      capitalBasis: 1000,
       totalGainLoss: 200,
       returnPercentage: 20,
       baseCurrency: "USD",

@@ -39,7 +39,7 @@ function summary() {
       strategy: "GROWTH",
       type: "regular",
       baseCurrency: "USD",
-      totalInvested: 1000,
+      capitalBasis: 1000,
       currentValue: 1200,
       isPublic: false,
       isMarginEnabled: false,
@@ -59,7 +59,7 @@ function summary() {
         closedPositions: 0,
         realizedGainLoss: 0,
         unrealizedGainLoss: 200,
-        totalInvested: 1000,
+        capitalBasis: 1000,
         income: 0,
         returnBasis: 1000,
         externalCapitalReturnPercent: 20,
@@ -109,7 +109,7 @@ describe("InvestmentsView", () => {
     mocked.getPortfolios.mockResolvedValue(summary())
     mocked.getPortfolioTotalMetrics.mockResolvedValue({
       totalValue: 1200,
-      totalInvested: 1000,
+      capitalBasis: 1000,
       totalGainLoss: 200,
       returnPercentage: 20,
       baseCurrency: "USD",
@@ -147,7 +147,7 @@ describe("InvestmentsView", () => {
       instrumentsValue: 800,
       cashValue: 400,
       totalValue: 1200,
-      totalInvested: 1000,
+      capitalBasis: 1000,
       baseCurrency: "USD",
       portfolioBreakdown: [],
       cashBreakdown: [],
@@ -175,13 +175,13 @@ describe("InvestmentsView", () => {
 
   it("derives gain/loss and return from the same pair as the tiles (§68.4)", async () => {
     // deliberately inconsistent response fields: the tiles and the derived pair
-    // must come from (totalValue, totalInvested), not from totalGainLoss /
+    // must come from (totalValue, capitalBasis), not from totalGainLoss /
     // returnPercentage, or they could disagree.
     mocked.getPortfolioTotalMetrics.mockResolvedValue({
       instrumentsValue: 800,
       cashValue: 400,
       totalValue: 1200,
-      totalInvested: 1000,
+      capitalBasis: 1000,
       totalGainLoss: 999999,
       returnPercentage: 55555,
       baseCurrency: "USD",
@@ -203,7 +203,7 @@ describe("InvestmentsView", () => {
       instrumentsValue: 0,
       cashValue: -1200,
       totalValue: -1200,
-      totalInvested: 0,
+      capitalBasis: 0,
       baseCurrency: "USD",
       portfolioBreakdown: [],
       cashBreakdown: [],
@@ -218,7 +218,7 @@ describe("InvestmentsView", () => {
   it("renders the investment and cash sections with the portfolio-native cash total (§62)", async () => {
     mocked.getPortfolioTotalMetrics.mockResolvedValue({
       totalValue: 1200,
-      totalInvested: 1000,
+      capitalBasis: 1000,
       totalGainLoss: 200,
       returnPercentage: 20,
       baseCurrency: "USD",
@@ -296,7 +296,7 @@ describe("InvestmentsView", () => {
 describe("§70.2: price completeness and freshness", () => {
   const setMetrics = (over: Record<string, unknown> = {}) => {
     mocked.getPortfolioTotalMetrics.mockResolvedValue({
-      instrumentsValue: 800, cashValue: 400, totalValue: 1200, totalInvested: 1000,
+      instrumentsValue: 800, cashValue: 400, totalValue: 1200, capitalBasis: 1000,
       baseCurrency: "USD", portfolioBreakdown: [], cashBreakdown: [],
       ...over,
     } as never)
@@ -342,12 +342,12 @@ it("badges a card whose portfolio has unpriced positions, once metrics arrive", 
   const pfs = await summary()
   mocked.getPortfolios.mockResolvedValue(pfs)
   mocked.getPortfolioTotalMetrics.mockResolvedValue({
-    instrumentsValue: 100, cashValue: 0, totalValue: 100, totalInvested: 100,
+    instrumentsValue: 100, cashValue: 0, totalValue: 100, capitalBasis: 100,
     baseCurrency: "PLN", cashBreakdown: [],
     unpricedPositions: 3,
     portfolioBreakdown: [
       { id: pfs[0].id, name: pfs[0].name, instrumentsValue: 100, cashValue: 0,
-        totalValue: 100, totalInvested: 100, unpricedPositions: 3, priceAsOf: null, priceSource: null },
+        totalValue: 100, capitalBasis: 100, unpricedPositions: 3, priceAsOf: null, priceSource: null },
     ],
   } as never)
   const w = mountView()
@@ -385,12 +385,12 @@ describe("§63.3: the cards sum to the headline", () => {
       { ...pfs[0], cash: { total: 96.23, baseCurrency: "USD", balances: [{ currency: "USD", balance: 96.23 }] } },
     ] as never)
     mocked.getPortfolioTotalMetrics.mockResolvedValue({
-      instrumentsValue: 1000, cashValue: 96.23, totalValue: 1096.23, totalInvested: 1000,
+      instrumentsValue: 1000, cashValue: 96.23, totalValue: 1096.23, capitalBasis: 1000,
       baseCurrency: "USD", cashBreakdown: [],
       unpricedPositions: 0,
       portfolioBreakdown: [
         { id: pfs[0].id, name: pfs[0].name, instrumentsValue: 1000, cashValue: 96.23,
-          totalValue: 1096.23, totalInvested: 1000, returnPercentage: 9.62,
+          totalValue: 1096.23, capitalBasis: 1000, returnPercentage: 9.62,
           unpricedPositions: 0, priceAsOf: null, priceSource: "quote" },
       ],
     } as never)
@@ -419,12 +419,12 @@ describe("§63.3: the cards sum to the headline", () => {
     )
     const breakdown = rows.map((r) => ({
       id: r.id, name: r.name, instrumentsValue: r.live, cashValue: 0,
-      totalValue: r.live, totalInvested: 1000, returnPercentage: 0,
+      totalValue: r.live, capitalBasis: 1000, returnPercentage: 0,
       unpricedPositions: 0, priceAsOf: null, priceSource: "quote",
     }))
     const total = breakdown.reduce((s, r) => s + r.totalValue, 0)
     mocked.getPortfolioTotalMetrics.mockResolvedValue({
-      instrumentsValue: total, cashValue: 0, totalValue: total, totalInvested: 3000,
+      instrumentsValue: total, cashValue: 0, totalValue: total, capitalBasis: 3000,
       baseCurrency: "USD", cashBreakdown: [], unpricedPositions: 0,
       portfolioBreakdown: breakdown,
     } as never)
@@ -443,7 +443,7 @@ describe("§63.3: the cards sum to the headline", () => {
     const pfs = await summary()
     mocked.getPortfolios.mockResolvedValue(pfs)
     mocked.getPortfolioTotalMetrics.mockResolvedValue({
-      instrumentsValue: 0, cashValue: 0, totalValue: 0, totalInvested: 0,
+      instrumentsValue: 0, cashValue: 0, totalValue: 0, capitalBasis: 0,
       baseCurrency: null, cashBreakdown: [], portfolioBreakdown: [],
     } as never)
     const w = mountView()

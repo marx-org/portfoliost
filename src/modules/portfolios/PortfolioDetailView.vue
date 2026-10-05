@@ -102,7 +102,7 @@ const summary = computed(() => {
   return {
     ...m,
     totalValue: m.totalValue * rate,
-    totalInvested: m.totalInvested * rate,
+    capitalBasis: m.capitalBasis * rate,
     unrealizedGainLoss: m.unrealizedGainLoss * rate,
     realizedGain: m.realizedGain * rate,
     cumulativeDividends: m.cumulativeDividends * rate,
@@ -226,7 +226,7 @@ async function submitDelete() {
         </div>
         <div class="card p-4">
           <p class="text-sm text-slate-500 dark:text-slate-400">Total Invested</p>
-          <p class="mt-1 text-xl font-semibold tabular-nums">{{ summaryPending ? "—" : formatCurrency(summary.totalInvested, displayCurrency) }}</p>
+          <p class="mt-1 text-xl font-semibold tabular-nums">{{ summaryPending ? "—" : formatCurrency(summary.capitalBasis, displayCurrency) }}</p>
         </div>
         <div class="card p-4">
           <p class="text-sm text-slate-500 dark:text-slate-400">Return</p>

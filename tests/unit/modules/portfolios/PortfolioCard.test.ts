@@ -35,7 +35,7 @@ const PORTFOLIO = {
   // would make the currency assertion untestable rather than wrong.
   baseCurrency: "PLN",
   currentValue: 100,
-  totalInvested: 100,
+  capitalBasis: 100,
   metrics: { totalReturn: 0, openPositions: 1, unrealizedGainLoss: 0 },
 } as never
 

@@ -44,7 +44,7 @@ function analytics(overrides: Record<string, unknown> = {}) {
         { date: "2026-01-02", value: 1200, invested: 900, cumulativeTwr: 110 },
       ],
       totalValue: 1200,
-      totalInvested: 900,
+      capitalBasis: 900,
       totalReturn: 300,
       totalReturnPercent: 33.33,
       monthlyReturns: [{ month: "2026-01", returnPercent: 10 }],
@@ -179,7 +179,7 @@ describe("PortfolioPerformanceTab — §82.2 overview tiles", () => {
     const env = makeEnv()
     usePortfolioStore().analytics = analytics({
       totalReturn: undefined,
-      totalInvested: undefined,
+      capitalBasis: undefined,
       moneyWeightedReturn: undefined,
       annualizedReturn: undefined,
       annualizedReturnWithheldReason: undefined,
@@ -428,7 +428,7 @@ describe("PortfolioPerformanceTab — §82.3 Monthly | Yearly toggle", () => {
         ...analytics().performance,
         timeSeries: WORKED,
         totalReturn: 13240,
-        totalInvested: INVESTED,
+        capitalBasis: INVESTED,
         totalValue: INVESTED + 13240,
       },
     } as never

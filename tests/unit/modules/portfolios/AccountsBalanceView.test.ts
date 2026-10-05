@@ -50,22 +50,22 @@ function breakdown() {
   return [
     {
       id: "p1", name: "Top10",
-      instrumentsValue: 100000, cashValue: 9984.34, totalValue: 109984.34, totalInvested: 98083.4,
+      instrumentsValue: 100000, cashValue: 9984.34, totalValue: 109984.34, capitalBasis: 98083.4,
       returnPercentage: 12.13,
     },
     {
       id: "p2", name: "IKE Marek",
-      instrumentsValue: 41000, cashValue: 2270.14, totalValue: 43270.14, totalInvested: 45000,
+      instrumentsValue: 41000, cashValue: 2270.14, totalValue: 43270.14, capitalBasis: 45000,
       returnPercentage: -3.84,
     },
     {
       id: "p3", name: "XTB",
-      instrumentsValue: 0, cashValue: -24.26, totalValue: -24.26, totalInvested: 0,
+      instrumentsValue: 0, cashValue: -24.26, totalValue: -24.26, capitalBasis: 0,
       returnPercentage: 0,
     },
     {
       id: "p4", name: "IBKR",
-      instrumentsValue: 62000, cashValue: 15818.68, totalValue: 77818.68, totalInvested: 74300,
+      instrumentsValue: 62000, cashValue: 15818.68, totalValue: 77818.68, capitalBasis: 74300,
     },
   ]
 }
@@ -77,7 +77,7 @@ function metrics(over: Record<string, unknown> = {}) {
     instrumentsValue: sum("instrumentsValue"),
     cashValue: sum("cashValue"),
     totalValue: sum("totalValue"),
-    totalInvested: sum("totalInvested"),
+    capitalBasis: sum("capitalBasis"),
     baseCurrency: "USD",
     cashBreakdown: [],
     unpricedPositions: 0,
@@ -317,9 +317,9 @@ describe("§84 shared math", () => {
   it("accountsBalanceTotals returns the ratio of the summed money, not a sum of ratios", () => {
     const rows = accountsBalanceRows(breakdown())
     const totals = accountsBalanceTotals(rows)
-    const invested = rows.reduce((s, r) => s + r.totalInvested, 0)
+    const invested = rows.reduce((s, r) => s + r.capitalBasis, 0)
     const gain = rows.reduce((s, r) => s + r.gainLoss, 0)
-    expect(totals.totalInvested).toBeCloseTo(invested, 2)
+    expect(totals.capitalBasis).toBeCloseTo(invested, 2)
     expect(totals.gainLoss).toBeCloseTo(gain, 2)
     expect(totals.returnPercentage).toBeCloseTo((gain / invested) * 100, 10)
     // …which is NOT the mean of the rows' own returns.

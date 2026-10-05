@@ -33,7 +33,7 @@ const { convert: toDisplay } = useDisplayConversion(
 )
 
 // §68.4 — Total Gain/Loss and Total Return are now DERIVED from the same
-// (totalValue, totalInvested) pair the tiles show, in the aggregate base currency
+// (totalValue, capitalBasis) pair the tiles show, in the aggregate base currency
 // and only then converted — which is what the backend does, so converting first
 // and subtracting would drift by the rounding. Previously all six figures were
 // read independently off the response and could disagree.
@@ -66,11 +66,11 @@ const priceNote = computed(() => {
 const derived = computed(() => {
   const tm = store.totalMetrics
   const totalValue = tm?.totalValue ?? 0
-  const totalInvested = tm?.totalInvested ?? 0
-  const gainLoss = totalValue - totalInvested
+  const capitalBasis = tm?.capitalBasis ?? 0
+  const gainLoss = totalValue - capitalBasis
   return {
     gainLoss,
-    returnPercentage: totalInvested > 0 ? (gainLoss / totalInvested) * 100 : 0,
+    returnPercentage: capitalBasis > 0 ? (gainLoss / capitalBasis) * 100 : 0,
   }
 })
 
@@ -277,7 +277,7 @@ async function submitCreate() {
         <div class="card p-5" data-testid="tile-invested">
           <p class="text-sm text-slate-500 dark:text-slate-400">Total invested</p>
           <p class="mt-1 text-2xl font-semibold tabular-nums" data-testid="tile-invested-value">
-            {{ formatCurrency(toDisplay(store.totalMetrics.totalInvested), displayCurrency) }}
+            {{ formatCurrency(toDisplay(store.totalMetrics.capitalBasis), displayCurrency) }}
           </p>
         </div>
         <div class="card p-5" data-testid="tile-gainloss">

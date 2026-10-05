@@ -18,9 +18,11 @@ export interface AccountsBalanceRow {
   instrumentsValue: number
   cashValue: number
   totalValue: number
-  /** `totalInvested` — the §62 `externalCashInvested` basis, transfers included. */
-  totalInvested: number
-  /** `totalValue − totalInvested`. */
+  /** `capitalBasis` — capital at risk: external contributions PLUS the cost of anything
+   * transferred in or out (§41/S3). NOT the `externalCashInvested` figure, which is
+   * reported separately as `externalContributions` and excludes in-kind transfers. */
+  capitalBasis: number
+  /** `totalValue − capitalBasis`. */
   gainLoss: number
   /** `null` when nothing was put in — 0/0 is not a number, and the route answers `0`. */
   returnPercentage: number | null
@@ -33,29 +35,29 @@ type BreakdownRow = {
   instrumentsValue: number
   cashValue: number
   totalValue: number
-  totalInvested: number
+  capitalBasis: number
   returnPercentage?: number
 }
 
 /**
  * One row per portfolio. `returnPercentage` is read off the payload and only
  * derived when absent — it is optional in the contract, and a response that omits
- * it must not render a blank cell. A non-positive `totalInvested` yields `null`
+ * it must not render a blank cell. A non-positive `capitalBasis` yields `null`
  * (rendered as an em dash) rather than a division by zero.
  */
 export function accountsBalanceRows(rows: BreakdownRow[]): AccountsBalanceRow[] {
   return rows.map((r) => {
-    const gainLoss = r.totalValue - r.totalInvested
+    const gainLoss = r.totalValue - r.capitalBasis
     return {
       id: r.id,
       name: r.name,
       instrumentsValue: r.instrumentsValue,
       cashValue: r.cashValue,
       totalValue: r.totalValue,
-      totalInvested: r.totalInvested,
+      capitalBasis: r.capitalBasis,
       gainLoss,
       returnPercentage:
-        r.totalInvested > 0 ? (r.returnPercentage ?? (gainLoss / r.totalInvested) * 100) : null,
+        r.capitalBasis > 0 ? (r.returnPercentage ?? (gainLoss / r.capitalBasis) * 100) : null,
     }
   })
 }
@@ -65,7 +67,7 @@ export type AccountsBalanceSortKey =
   | "instrumentsValue"
   | "cashValue"
   | "totalValue"
-  | "totalInvested"
+  | "capitalBasis"
   | "gainLoss"
   | "returnPercentage"
 
@@ -104,16 +106,16 @@ export function accountsBalanceTotals(rows: AccountsBalanceRow[]): AccountsBalan
   const sum = (pick: (r: AccountsBalanceRow) => number) =>
     Math.round(rows.reduce((s, r) => s + pick(r), 0) * 100) / 100
   const gainLoss = sum((r) => r.gainLoss)
-  const totalInvested = sum((r) => r.totalInvested)
+  const capitalBasis = sum((r) => r.capitalBasis)
   return {
     id: "",
     name: "",
     instrumentsValue: sum((r) => r.instrumentsValue),
     cashValue: sum((r) => r.cashValue),
     totalValue: sum((r) => r.totalValue),
-    totalInvested,
+    capitalBasis,
     gainLoss,
-    returnPercentage: totalInvested > 0 ? (gainLoss / totalInvested) * 100 : null,
+    returnPercentage: capitalBasis > 0 ? (gainLoss / capitalBasis) * 100 : null,
   }
 }
 </script>
@@ -161,7 +163,7 @@ const columns: Array<{ key: AccountsBalanceSortKey; label: string; testid: strin
   { key: "instrumentsValue", label: "Investments", testid: "investments", align: "text-right" },
   { key: "cashValue", label: "Free cash", testid: "cash", align: "text-right" },
   { key: "totalValue", label: "Total", testid: "total", align: "text-right" },
-  { key: "totalInvested", label: "Deposits", testid: "deposits", align: "text-right" },
+  { key: "capitalBasis", label: "Deposits", testid: "deposits", align: "text-right" },
   { key: "gainLoss", label: "P/L", testid: "gain", align: "text-right" },
   { key: "returnPercentage", label: "Return %", testid: "return", align: "text-right" },
 ]
@@ -310,7 +312,7 @@ onMounted(async () => {
                  balance, not a clamped zero (openapi.yaml:1201). -->
             <td class="px-5 py-2.5 text-right tabular-nums" data-testid="accounts-balance-cash">{{ money(row.cashValue) }}</td>
             <td class="px-5 py-2.5 text-right font-semibold tabular-nums" data-testid="accounts-balance-total">{{ money(row.totalValue) }}</td>
-            <td class="px-5 py-2.5 text-right tabular-nums" data-testid="accounts-balance-deposits">{{ money(row.totalInvested) }}</td>
+            <td class="px-5 py-2.5 text-right tabular-nums" data-testid="accounts-balance-deposits">{{ money(row.capitalBasis) }}</td>
             <td
               class="px-5 py-2.5 text-right font-medium tabular-nums"
               :class="row.gainLoss >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
@@ -333,7 +335,7 @@ onMounted(async () => {
             <td class="px-5 py-2.5 text-right tabular-nums" data-testid="accounts-balance-totals-investments">{{ money(totals.instrumentsValue) }}</td>
             <td class="px-5 py-2.5 text-right tabular-nums" data-testid="accounts-balance-totals-cash">{{ money(totals.cashValue) }}</td>
             <td class="px-5 py-2.5 text-right tabular-nums" data-testid="accounts-balance-totals-total">{{ money(totals.totalValue) }}</td>
-            <td class="px-5 py-2.5 text-right tabular-nums" data-testid="accounts-balance-totals-deposits">{{ money(totals.totalInvested) }}</td>
+            <td class="px-5 py-2.5 text-right tabular-nums" data-testid="accounts-balance-totals-deposits">{{ money(totals.capitalBasis) }}</td>
             <td
               class="px-5 py-2.5 text-right tabular-nums"
               :class="totals.gainLoss >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"

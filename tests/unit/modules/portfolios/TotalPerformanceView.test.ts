@@ -58,7 +58,7 @@ describe("TotalPerformanceView", () => {
     mocked.getPortfolios.mockResolvedValue([] as never)
     mocked.getPortfolioTotalMetrics.mockResolvedValue({
       totalValue: 1200,
-      totalInvested: 1000,
+      capitalBasis: 1000,
       baseCurrency: "USD",
       portfolioBreakdown: [],
     } as never)

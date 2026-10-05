@@ -59,7 +59,7 @@ const DETAIL = {
 
 const METRICS = {
   totalValue: 119190,
-  totalInvested: 115000,
+  capitalBasis: 115000,
   simpleReturnPercent: 3.64,
   investmentReturnPercent: 3.64,
   currencyImpactPercent: 0,

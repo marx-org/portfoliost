@@ -26,7 +26,7 @@ const props = defineProps<{
     totalValue: number
     instrumentsValue: number
     cashValue: number
-    totalInvested: number
+    capitalBasis: number
     returnPercentage: number
   } | null
 }>()
@@ -63,7 +63,7 @@ const cardValue = computed(() => {
       totalValue: v.totalValue,
       instrumentsValue: v.instrumentsValue,
       cashValue: v.cashValue,
-      totalInvested: v.totalInvested,
+      capitalBasis: v.capitalBasis,
       returnPercentage: v.returnPercentage,
     }
   }
@@ -74,7 +74,7 @@ const cardValue = computed(() => {
     totalValue: Number(current),
     instrumentsValue: Number(current) - (cash == null ? 0 : Number(cash)),
     cashValue: cash == null ? 0 : Number(cash),
-    totalInvested: Number(props.portfolio.totalInvested ?? 0),
+    capitalBasis: Number(props.portfolio.capitalBasis ?? 0),
     returnPercentage: Number(props.portfolio.metrics?.totalReturn ?? 0),
   }
 })
@@ -562,7 +562,7 @@ async function exportPositions(format: "csv" | "xml" | "json") {
       </div>
       <div>
         <p class="text-xs text-slate-500 dark:text-slate-400">Invested</p>
-        <p class="font-medium tabular-nums" data-testid="card-invested">{{ formatCurrency(convert(cardValue?.totalInvested), displayCurrencyOr()) }}</p>
+        <p class="font-medium tabular-nums" data-testid="card-invested">{{ formatCurrency(convert(cardValue?.capitalBasis), displayCurrencyOr()) }}</p>
       </div>
       <div>
         <p class="text-xs text-slate-500 dark:text-slate-400">Return</p>

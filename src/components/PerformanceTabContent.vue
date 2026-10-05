@@ -285,7 +285,7 @@ const perf = computed(() => props.analytics?.performance ?? null)
 // foreign symbol), and §66.3 rule 1 is why `convert()` is used rather than a
 // bare `× rate`: no rate yet means no number, never a guess.
 const netGain = computed(() => convert(perf.value?.totalReturn))
-const netInvested = computed(() => convert(perf.value?.totalInvested))
+const netInvested = computed(() => convert(perf.value?.capitalBasis))
 
 // Rates, not money — currency-independent, so deliberately NOT converted. A
 // converted percentage is a category error, and dividing by a rate would be worse.

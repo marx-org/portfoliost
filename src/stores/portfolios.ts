@@ -201,7 +201,7 @@ export interface PortfolioCardValue {
   totalValue: number
   instrumentsValue: number
   cashValue: number
-  totalInvested: number
+  capitalBasis: number
   returnPercentage: number
 }
 
@@ -215,13 +215,13 @@ export function usePortfolioValues() {
       // for the same reason the aggregate derives it: two independent figures for
       // one ratio drift, and `returnPercentage` is optional in the contract, so
       // reading it alone would leave the card blank on a response that omits it.
-      const invested = row.totalInvested
+      const invested = row.capitalBasis
       const gain = row.totalValue - invested
       map.set(row.id, {
         totalValue: row.totalValue,
         instrumentsValue: row.instrumentsValue,
         cashValue: row.cashValue,
-        totalInvested: invested,
+        capitalBasis: invested,
         returnPercentage: row.returnPercentage ?? (invested > 0 ? (gain / invested) * 100 : 0),
       })
     }

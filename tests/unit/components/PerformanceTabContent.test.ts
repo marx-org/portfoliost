@@ -33,7 +33,7 @@ function analytics(overrides: Record<string, unknown> = {}) {
         { date: "2026-01-02", value: 1200, invested: 900, cumulativeTwr: 110 },
       ],
       totalValue: 1200,
-      totalInvested: 900,
+      capitalBasis: 900,
       totalReturn: 300,
       totalReturnPercent: 33.33,
       monthlyReturns: [{ month: "2026-01", returnPercent: 10 }],
