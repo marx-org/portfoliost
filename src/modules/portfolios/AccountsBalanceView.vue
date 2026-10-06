@@ -276,45 +276,9 @@ onMounted(async () => {
     <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-400">{{ error }}</p>
     <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading accounts...</p>
 
-    <!--
-        §84.9 — the nested scroll region, and why `max-h` and not `h`.
-
-        This wrapper is `overflow-x-auto`, which per CSS Overflow 3 makes its
-        computed `overflow-y` `auto` too. It is therefore a VERTICAL scroll
-        container whose height is its content height — so a `sticky top-0` header
-        has no scroll port to stick to, and simply scrolls away. Measured: header
-        `top` never changed before this, and could not.
-
-        `max-h-[70vh]` gives it the scroll port. MAX-h, not `h`: with a fixed
-        height a short account list would leave an empty band under the footer.
-        With `max-h` the wrapper is content-height until the list is long enough
-        to overflow, so the scrollbar simply does not exist for a short list.
-
-        The cost is real and worth stating: once the list IS long, this is a
-        second scroll region on a page that already scrolls, and a second
-        scrollbar can capture the wheel. At the realistic account count (~4-9
-        rows, ~450px of content) 70vh does not bite, so today the cost is latent
-        and only the benefit is live. Revisit if the account count grows a lot.
-
-        The header cells need `z-20`: a sticky element with no z-index paints in
-        DOM order, and <tbody> comes after <thead>, so body rows paint over it.
-      -->
-      <div v-else-if="rows.length" class="card max-h-[70vh] overflow-auto">
-        §84.7 — small screens. The table has a natural width of ~905px (six `px-5`
-        money columns plus `tabular-nums`) and `min-w-full` puts no floor under it,
-        so below ~930px of viewport the table simply overflows and the reader scrolls
-        horizontally. A `min-w-[…]` floor would do nothing here — the natural width
-        already exceeds any phone. So this step goes the OTHER way: tighten padding
-        and the type scale below `sm` to CUT the width, which is the only thing that
-        reduces the distance a number is from the name it belongs to.
-
-        Desktop is untouched: `text-sm` and `px-5` are the `sm:` values.
-      -->
+    <div v-else-if="rows.length" class="card max-h-[70vh] overflow-auto">
       <table class="min-w-full text-xs sm:text-sm" data-testid="accounts-balance">
         <thead>
-          <!-- The header band is OPAQUE, not a tint: the Account header cell below is
-               sticky and needs a background that content cannot show through. Same
-               reason the pinned body cells carry their own opaque background. -->
           <tr class="border-b border-slate-200 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500 sm:text-xs dark:border-slate-700/60 dark:bg-slate-800 dark:text-slate-400">
             <th
               v-for="col in columns"
@@ -324,10 +288,6 @@ onMounted(async () => {
               :class="[
                 col.align,
                 'sticky top-0 z-20 cursor-pointer select-none hover:text-slate-900 dark:hover:text-slate-100',
-                // §84.5 — the Account column is pinned, so its header is pinned too
-                // (z-30 sits above the body cells' z-10, as in TransactionsTable).
-                // The min-w floor matches the body cell's, so a wide header label
-                // and a narrow one still put the column edge in the same place.
                 col.key === 'name'
                   ? 'sticky left-0 top-0 z-30 min-w-[9rem] bg-slate-50 shadow-[-1px_0_0_0_#e2e8f0] sm:min-w-0 dark:bg-slate-800 dark:shadow-[-1px_0_0_0_#334155]'
                   : '',
@@ -342,14 +302,6 @@ onMounted(async () => {
           </tr>
         </thead>
         <tbody>
-          <!--
-            `group` + `even:` striping + `hover:`. The load-bearing detail: Tailwind
-            emits `odd:`/`even:` BEFORE `hover:`/`group-hover:` in the stylesheet, so
-            hover wins over the stripe with no `!important`. Do not "fix" that with
-            `!important` — it works. The corollary is why the hover tints are BLUE
-            and not slate: `hover:bg-slate-50` over an already-slate-50 even row is
-            invisible, which would read as hover being broken on half the rows.
-          -->
           <tr
             v-for="row in rows"
             :key="row.id"
@@ -357,23 +309,10 @@ onMounted(async () => {
             data-testid="accounts-balance-row"
             @click="openRow($event, row)"
           >
-            <!--
-              §84.5 — the pinned Account cell. Its background is OPAQUE and it is the
-              SAME on every row (not striped): it has to be opaque so scrolled-under
-              text cannot bleed through it, and it has to carry its own `group-hover:`
-              because the row's hover tint sits behind this cell's own background.
-              The 1px right shadow is the separator that makes the pinned edge legible.
-            -->
             <td
               class="sticky left-0 z-10 min-w-[9rem] bg-slate-100 px-3 py-3.5 font-medium text-slate-900 break-words shadow-[-1px_0_0_0_#e2e8f0] group-hover:bg-blue-100 group-focus-within:bg-blue-100 sm:min-w-0 sm:px-5 sm:py-2.5 dark:bg-slate-800 dark:text-slate-100 dark:shadow-[-1px_0_0_0_#334155] dark:group-hover:bg-slate-700 dark:group-focus-within:bg-slate-700"
               data-testid="accounts-balance-account"
             >
-              <!--
-                A real <a>, deliberately (see openRow's bail-out): focusable,
-                middle-clickable, announced as a link. The focus-visible ring is
-                not redundant with the row's focus-within tint — the tint alone
-                fails anyone who cannot distinguish blue-50 from slate-100.
-              -->
               <router-link
                 :to="{ name: 'portfolio-holdings', params: { id: row.id } }"
                 class="rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 focus-visible:ring-offset-slate-100 dark:focus-visible:ring-blue-400 dark:focus-visible:ring-offset-slate-800"
@@ -403,26 +342,8 @@ onMounted(async () => {
             </td>
           </tr>
         </tbody>
-        <!--
-          §84.6 — the Σ band. The reader reconciles this row against the Total value
-          tile on /en/investments, so it has to read as a deliberate band rather than
-          as the last row. A 2px rule plus a font-weight was not enough.
-
-          NOT sticky, deliberately: the wrapper is `overflow-x-auto`, which makes its
-          computed `overflow-y` `auto`, so it is a vertical scroll container whose
-          height is its content height — `sticky bottom-0` inside it has no scroll
-          port to stick to. Making it stick needs a height-constrained wrapper, i.e.
-          a nested scroll region; that is #69's trade-off to settle, not this step's.
-
-          The band is OPAQUE (not a /NN tint) for the same reason the pinned Account
-          cells are: it abuts their separator shadow, and a translucent band would
-          let the last body row show through it.
-        -->
         <tfoot class="border-t-2 border-slate-300 text-base dark:border-slate-600">
           <tr class="bg-slate-100 font-semibold dark:bg-slate-800" data-testid="accounts-balance-totals">
-            <!-- Pinned and opaque for the same reason as the body Account cells — the
-                 Σ row must not be the one row whose label scrolls out from under the
-                 numbers. z-30, above the body cells' z-10: this is the last thing drawn. -->
             <td
               class="sticky left-0 z-30 bg-slate-100 px-3 py-3.5 sm:px-5 sm:py-2.5 shadow-[-1px_0_0_0_#e2e8f0] dark:bg-slate-800 dark:shadow-[-1px_0_0_0_#334155]"
             >
