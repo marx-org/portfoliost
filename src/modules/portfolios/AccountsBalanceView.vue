@@ -273,8 +273,30 @@ onMounted(async () => {
     <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-400">{{ error }}</p>
     <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading accounts...</p>
 
-    <div v-else-if="rows.length" class="card overflow-x-auto">
-      <!--
+    <!--
+        §84.9 — the nested scroll region, and why `max-h` and not `h`.
+
+        This wrapper is `overflow-x-auto`, which per CSS Overflow 3 makes its
+        computed `overflow-y` `auto` too. It is therefore a VERTICAL scroll
+        container whose height is its content height — so a `sticky top-0` header
+        has no scroll port to stick to, and simply scrolls away. Measured: header
+        `top` never changed before this, and could not.
+
+        `max-h-[70vh]` gives it the scroll port. MAX-h, not `h`: with a fixed
+        height a short account list would leave an empty band under the footer.
+        With `max-h` the wrapper is content-height until the list is long enough
+        to overflow, so the scrollbar simply does not exist for a short list.
+
+        The cost is real and worth stating: once the list IS long, this is a
+        second scroll region on a page that already scrolls, and a second
+        scrollbar can capture the wheel. At the realistic account count (~4-9
+        rows, ~450px of content) 70vh does not bite, so today the cost is latent
+        and only the benefit is live. Revisit if the account count grows a lot.
+
+        The header cells need `z-20`: a sticky element with no z-index paints in
+        DOM order, and <tbody> comes after <thead>, so body rows paint over it.
+      -->
+      <div v-else-if="rows.length" class="card max-h-[70vh] overflow-auto">
         §84.7 — small screens. The table has a natural width of ~905px (six `px-5`
         money columns plus `tabular-nums`) and `min-w-full` puts no floor under it,
         so below ~930px of viewport the table simply overflows and the reader scrolls
@@ -298,13 +320,13 @@ onMounted(async () => {
               class="px-3 py-3.5 font-medium sm:px-5 sm:py-2.5"
               :class="[
                 col.align,
-                'cursor-pointer select-none hover:text-slate-900 dark:hover:text-slate-100',
+                'sticky top-0 z-20 cursor-pointer select-none hover:text-slate-900 dark:hover:text-slate-100',
                 // §84.5 — the Account column is pinned, so its header is pinned too
                 // (z-30 sits above the body cells' z-10, as in TransactionsTable).
                 // The min-w floor matches the body cell's, so a wide header label
                 // and a narrow one still put the column edge in the same place.
                 col.key === 'name'
-                  ? 'sticky left-0 z-30 min-w-[9rem] bg-slate-50 shadow-[-1px_0_0_0_#e2e8f0] sm:min-w-0 dark:bg-slate-800 dark:shadow-[-1px_0_0_0_#334155]'
+                  ? 'sticky left-0 top-0 z-30 min-w-[9rem] bg-slate-50 shadow-[-1px_0_0_0_#e2e8f0] sm:min-w-0 dark:bg-slate-800 dark:shadow-[-1px_0_0_0_#334155]'
                   : '',
               ]"
               :aria-sort="sortKey === col.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined"

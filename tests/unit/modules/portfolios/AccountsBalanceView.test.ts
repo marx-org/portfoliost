@@ -376,8 +376,35 @@ describe("§84.5 readability styling", () => {
     expect(account.classes()).toContain("z-30")
     expect(account.classes()).toContain("bg-slate-50")
     expect(account.classes()).toContain("dark:bg-slate-800")
-    // Only the Account column is pinned; the money columns scroll.
-    for (const th of heads.slice(1)) expect(th.classes()).not.toContain("sticky")
+    // The money headers are sticky VERTICALLY (§84.9) but must not be pinned
+    // horizontally — that is what makes the Account column the only fixed one.
+    for (const th of heads.slice(1)) {
+      expect(th.classes()).toContain("sticky")
+      expect(th.classes()).toContain("top-0")
+      expect(th.classes()).not.toContain("left-0")
+    }
+  })
+
+  it("pins the header band vertically so column labels survive a long list", async () => {
+    const w = mountView()
+    await flushPromises()
+
+    const wrap = w.get('[data-testid="accounts-balance"]').element.parentElement!
+    const wrapCls = wrap.className
+    // `overflow-x-auto` alone gives the wrapper a computed overflow-y of auto,
+    // but its height is its content height, so a sticky header has no scroll port
+    // to stick to. `max-h` supplies one. MAX-h, not `h`: with `h` a short list
+    // would leave an empty band under the footer.
+    expect(wrapCls).toContain("max-h-[70vh]")
+    expect(wrapCls).toContain("overflow-auto")
+    expect(wrapCls).not.toMatch(/(^|\s)h-\[/)
+
+    // A sticky element with no z-index paints in DOM order and <tbody> comes
+    // after <thead>, so body rows would paint OVER the pinned header.
+    for (const th of w.findAll("thead th")) {
+      expect(th.classes()).toContain("top-0")
+      expect(th.classes()).toContain("z-20")
+    }
   })
 
   it("pins the footer's Total label too, so it is never the one row that scrolls away", async () => {
