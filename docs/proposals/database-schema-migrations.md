@@ -83,7 +83,7 @@ All seeding runs from `portfoliost/mocks/db-seed/` via a dedicated compose one-s
 | `users_auth` | `user_preferences` | `users-auth` | `drizzle_users_auth` | single table; identity lives in JWT |
 | `wallets` | `fx_rates`, `fx_sync_state`, `wallet_transactions`, `wallets` | `wallets` | `drizzle_wallets` | demo FX rows are seed, not schema |
 | `portfolios` | `portfolios`, `positions`, `transactions`, `shares`, `value_snapshots`, `portfolio_backfill_metadata`, `labels`, `position_labels`, `transaction_labels`, `wallet_transaction_labels` | `wallets` (module owns both schemas, D6) | `drizzle_wallets` | one journal covers both schemas |
-| `instruments` | `ticker_reference`, `exchange_reference`, `logos`, `price_bars`, `price_bar_metadata`, `split_adjustments`, `split_candidates`, `price_bars_all` (view) | `instruments` | `drizzle_instruments` | view + stooq FDW refs are module DDL |
+| `instruments` | `ticker_reference`, `exchange_reference`, `logos`, `price_bars`, `price_bar_metadata`, `split_adjustments`, `split_candidates`, `news_articles`, `fx_rates`, `fx_sync_state`, `fundamentals_statements`, `fundamentals_metrics`, `fundamentals_fetch_state`, `price_bars_all` (view) | `instruments` | `drizzle_instruments` | view + stooq FDW refs are module DDL. `fx_*` moved here from wallets (§48.6a); `fundamentals_*` added by #51, migration `0004` |
 | `admin` | `job_run` | `admin` | `drizzle_admin` | |
 | `stooq_daily_*` (8 foreign tables) | — | **none (infra)** | — | `postgres_fdw` foreign tables: cluster = `pfire-init-sql` ConfigMap; compose = `pricebars-sim` stand-in. Read-only for all modules |
 | `drizzle_<module>` journals | `__drizzle_migrations` | respective module | — | auto-created by `drizzle-kit migrate` |
