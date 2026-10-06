@@ -21,11 +21,11 @@ async function login(page: import("@playwright/test").Page) {
 
 async function openTopology(page: import("@playwright/test").Page) {
   await login(page)
-  // Navigate via the sidebar (client-side) rather than page.goto: a full reload
-  // races the router guard against App.vue's async fetchMe(), which would treat
-  // the admin group as not-yet-known and bounce to /en/investments.
-  await page.getByRole("link", { name: "Admin" }).click()
-  await page.getByRole("link", { name: "Topology" }).click()
+  // A full reload, not a click-through: this used to race the router guard
+  // against the async /auth/me and bounce to /en/investments, which is why the
+  // nav had to be clicked here. §36 fixed the guard, so the hard load is the
+  // honest way in and the regression guard for it.
+  await page.goto("/en/admin/topology")
   await expect(page).toHaveURL(/\/en\/admin\/topology/)
 }
 

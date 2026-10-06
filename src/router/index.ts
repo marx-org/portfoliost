@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from "vue-router"
+import type { RouteLocationNormalized, RouteLocationRaw } from "vue-router"
 import { useAuthStore } from "@/stores/auth"
 
 const router = createRouter({
@@ -287,8 +288,29 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach((to) => {
+export type AuthGuardResult = true | RouteLocationRaw
+
+/**
+ * Exported as a plain function so it can be unit-tested against a fabricated
+ * target, instead of driving a real router through every lazy route to reach
+ * one decision.
+ */
+export const authGuard = async (to: RouteLocationNormalized): Promise<AuthGuardResult> => {
   const auth = useAuthStore()
+  if (to.meta.admin) {
+    // §36 — `isAdmin` is three-state, and "groups not known yet" is exactly the
+    // state the guard runs in on a hard load: `user` is null until the async
+    // /auth/me resolves. Await it instead of reading unknown as "not an admin",
+    // which bounced every /en/admin/* deep link, refresh and bookmark to
+    // /en/investments with no error and no way back.
+    const hydrated = await auth.hydrateUser()
+    if (!hydrated && auth.isAuthenticated) {
+      // Authenticated, but the groups are unknowable (backend unreachable). The
+      // dashboard is the wrong place to land — it drops the requested path — so
+      // route through login, which carries it in ?redirect.
+      return { name: "login", query: { redirect: to.fullPath } }
+    }
+  }
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     return { name: "login", query: { redirect: to.fullPath } }
   }
@@ -299,6 +321,8 @@ router.beforeEach((to) => {
     return { name: "investments" }
   }
   return true
-})
+}
+
+router.beforeEach(authGuard)
 
 export default router

@@ -35,7 +35,7 @@ function makeResponse(): AuthResponse {
   }
 }
 
-function makeMe(): AuthMe {
+function makeMe(groups?: string[]): AuthMe {
   return {
     user: {
       id: "00000000-0000-4000-8000-000000000001",
@@ -46,6 +46,7 @@ function makeMe(): AuthMe {
       createdAt: "2026-08-01T10:00:00.000Z",
       updatedAt: "2026-08-01T10:00:00.000Z",
       lastLoginAt: "2026-08-11T09:00:00.000Z",
+      groups,
     },
   }
 }
@@ -54,6 +55,10 @@ describe("auth store", () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     localStorage.clear()
+    // Clear call counts between tests: the hydration assertions below count
+    // /auth/me requests, which would otherwise accumulate across the suite.
+    // clearAllMocks keeps mock implementations (buildEndSessionUrl) intact.
+    vi.clearAllMocks()
     // Default: OIDC configured, like production. Individual tests override.
     window.__OIDC_CONFIG__ = { issuerUrl: "https://pocket-id.test" }
   })
@@ -93,6 +98,61 @@ describe("auth store", () => {
     const store = useAuthStore()
     await store.fetchMe()
     expect(store.user?.email).toBe("demo@example.com")
+  })
+
+  // §36 — isAdmin is three-state. Collapsing "not loaded yet" into `false` is
+  // what made the router guard bounce every /en/admin/* deep link on a hard
+  // load, before the first /auth/me had resolved.
+  it("reports isAdmin as unknown until the user is loaded", () => {
+    localStorage.setItem("portfoliost_token", "mock-token")
+    const store = useAuthStore()
+    expect(store.isAuthenticated).toBe(true)
+    expect(store.isAdmin).toBeNull()
+  })
+
+  it("reports isAdmin true for the admin group, false without it", async () => {
+    mocked.fetchMe.mockResolvedValueOnce(makeMe(["portfoliost_admin"]))
+    localStorage.setItem("portfoliost_token", "mock-token")
+    const store = useAuthStore()
+    await store.hydrateUser()
+    expect(store.isAdmin).toBe(true)
+
+    mocked.fetchMe.mockResolvedValueOnce(makeMe(["portfoliost_user"]))
+    store.user = null
+    await store.hydrateUser()
+    expect(store.isAdmin).toBe(false)
+  })
+
+  it("knows isAdmin immediately after a login, with no extra fetch", async () => {
+    mocked.login.mockResolvedValue({ ...makeResponse(), user: { ...makeResponse().user, groups: ["portfoliost_admin"] } })
+    const store = useAuthStore()
+    await store.login("demo@example.com", "example-service-mock")
+    expect(store.isAdmin).toBe(true)
+    expect(mocked.fetchMe).not.toHaveBeenCalled()
+  })
+
+  it("hydrates once and shares the request between concurrent callers", async () => {
+    mocked.fetchMe.mockResolvedValue(makeMe(["portfoliost_admin"]))
+    localStorage.setItem("portfoliost_token", "mock-token")
+    const store = useAuthStore()
+    await Promise.all([store.hydrateUser(), store.hydrateUser(), store.hydrateUser()])
+    expect(mocked.fetchMe).toHaveBeenCalledTimes(1)
+  })
+
+  it("resolves false rather than rejecting when hydration fails", async () => {
+    mocked.fetchMe.mockRejectedValue(new NetworkError())
+    localStorage.setItem("portfoliost_token", "mock-token")
+    const store = useAuthStore()
+    await expect(store.hydrateUser()).resolves.toBe(false)
+    // Still unknown — the caller decides, and the session is untouched.
+    expect(store.isAdmin).toBeNull()
+    expect(store.isAuthenticated).toBe(true)
+  })
+
+  it("does not call /auth/me without a session", async () => {
+    const store = useAuthStore()
+    await expect(store.hydrateUser()).resolves.toBe(false)
+    expect(mocked.fetchMe).not.toHaveBeenCalled()
   })
 
   it("clears state on logout even if the API call fails", async () => {

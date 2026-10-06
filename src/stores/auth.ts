@@ -10,9 +10,47 @@ export const useAuthStore = defineStore("auth", () => {
   const user = ref<AuthUser | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
+  /** In-flight hydrateUser(), shared by every caller — see below. */
+  let hydration: Promise<boolean> | null = null
 
   const isAuthenticated = computed(() => Boolean(token.value))
-  const isAdmin = computed(() => user.value?.groups?.includes("portfoliost_admin") ?? false)
+
+  /**
+   * Three-state on purpose (§36): `true` admin, `false` not an admin, `null`
+   * groups not known yet.
+   *
+   * `user` starts null and is only filled by an async /auth/me call, so on a
+   * hard load it is null for as long as that request takes. Collapsing that to
+   * `false` is what made every /en/admin/* deep link, refresh and bookmark
+   * bounce to /en/investments: the router guard runs before the first /auth/me
+   * resolves and read "unknown" as "no".
+   */
+  const isAdmin = computed(() => {
+    if (!user.value) return null
+    return user.value.groups?.includes("portfoliost_admin") ?? false
+  })
+
+  /**
+   * Load `user` for an existing session, at most once and at most one request
+   * in flight. Resolves true when the groups are known.
+   *
+   * Never rejects: the caller decides what an unknown user means. The router
+   * guard awaits this before judging `/en/admin/*`; App.vue awaits it for
+   * everything else. Deduplicated so a deep link does not fetch twice (guard +
+   * App.vue both fire on a hard load).
+   */
+  function hydrateUser(): Promise<boolean> {
+    if (!token.value) return Promise.resolve(false)
+    if (!hydration) {
+      hydration = fetchMe()
+        .then(() => true)
+        .catch(() => false)
+        .finally(() => {
+          hydration = null
+        })
+    }
+    return hydration
+  }
 
   // A network failure mid-login usually means the browser holds state from an
   // old session (stale token, dead backend). Force-logout locally so the next
@@ -133,6 +171,7 @@ export const useAuthStore = defineStore("auth", () => {
     login,
     loginWithCode,
     fetchMe,
+    hydrateUser,
     logout,
     refreshSession,
   }
