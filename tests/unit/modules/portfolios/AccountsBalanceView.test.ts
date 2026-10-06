@@ -379,6 +379,32 @@ describe("§84.5 readability styling", () => {
     expect(label.classes()).toContain("bg-slate-100")
     expect(label.classes()).toContain("dark:bg-slate-800")
   })
+
+  it("renders the Σ row as an opaque band, one step up from the body rows", async () => {
+    const w = mountView()
+    await flushPromises()
+
+    const row = w.get('[data-testid="accounts-balance-totals"]')
+    const cls = row.classes()
+    // Opaque, not a tint: the band abuts the pinned Account cell's separator and a
+    // translucent band would let the last body row show through it.
+    expect(cls).toContain("bg-slate-100")
+    expect(cls).toContain("dark:bg-slate-800")
+    expect(cls.filter((c) => /^bg-slate-\d+\/\d+$/.test(c))).toHaveLength(0)
+    expect(cls).toContain("font-semibold")
+    // A type step above the table's own text-sm, so the band is heavier than a row.
+    expect(row.element.closest("tfoot")!.className).toContain("text-base")
+
+    // The label reads as a caption for the band, not as a peer of the figures.
+    const label = row.findAll("td")[0]
+    expect(label.text()).toBe("Total")
+    expect(label.get("span").classes()).toEqual(
+      expect.arrayContaining(["text-xs", "uppercase", "tracking-wide"]),
+    )
+    // No "band overlaps the last row" assertion here: jsdom reports every
+    // getBoundingClientRect() as 0, so such a check passes unconditionally and
+    // only looks like a guard. It is verified in a real browser instead.
+  })
 })
 
 /**

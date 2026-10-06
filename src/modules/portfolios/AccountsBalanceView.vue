@@ -359,16 +359,35 @@ onMounted(async () => {
             </td>
           </tr>
         </tbody>
-        <tfoot class="border-t-2 border-slate-200 font-semibold dark:border-slate-700/60">
-          <tr data-testid="accounts-balance-totals">
+        <!--
+          §84.6 — the Σ band. The reader reconciles this row against the Total value
+          tile on /en/investments, so it has to read as a deliberate band rather than
+          as the last row. A 2px rule plus a font-weight was not enough.
+
+          NOT sticky, deliberately: the wrapper is `overflow-x-auto`, which makes its
+          computed `overflow-y` `auto`, so it is a vertical scroll container whose
+          height is its content height — `sticky bottom-0` inside it has no scroll
+          port to stick to. Making it stick needs a height-constrained wrapper, i.e.
+          a nested scroll region; that is #69's trade-off to settle, not this step's.
+
+          The band is OPAQUE (not a /NN tint) for the same reason the pinned Account
+          cells are: it abuts their separator shadow, and a translucent band would
+          let the last body row show through it.
+        -->
+        <tfoot class="border-t-2 border-slate-300 text-base dark:border-slate-600">
+          <tr class="bg-slate-100 font-semibold dark:bg-slate-800" data-testid="accounts-balance-totals">
             <!-- Pinned and opaque for the same reason as the body Account cells — the
                  Σ row must not be the one row whose label scrolls out from under the
-                 numbers. -->
-            <td class="sticky left-0 z-10 bg-slate-100 px-5 py-2.5 text-slate-900 shadow-[-1px_0_0_0_#e2e8f0] dark:bg-slate-800 dark:text-slate-100 dark:shadow-[-1px_0_0_0_#334155]">Total</td>
-            <td class="px-5 py-2.5 text-right tabular-nums" data-testid="accounts-balance-totals-investments">{{ money(totals.instrumentsValue) }}</td>
-            <td class="px-5 py-2.5 text-right tabular-nums" data-testid="accounts-balance-totals-cash">{{ money(totals.cashValue) }}</td>
-            <td class="px-5 py-2.5 text-right tabular-nums" data-testid="accounts-balance-totals-total">{{ money(totals.totalValue) }}</td>
-            <td class="px-5 py-2.5 text-right tabular-nums" data-testid="accounts-balance-totals-deposits">{{ money(totals.capitalBasis) }}</td>
+                 numbers. z-30, above the body cells' z-10: this is the last thing drawn. -->
+            <td
+              class="sticky left-0 z-30 bg-slate-100 px-5 py-2.5 shadow-[-1px_0_0_0_#e2e8f0] dark:bg-slate-800 dark:shadow-[-1px_0_0_0_#334155]"
+            >
+              <span class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Total</span>
+            </td>
+            <td class="px-5 py-2.5 text-right tabular-nums text-slate-900 dark:text-slate-100" data-testid="accounts-balance-totals-investments">{{ money(totals.instrumentsValue) }}</td>
+            <td class="px-5 py-2.5 text-right tabular-nums text-slate-900 dark:text-slate-100" data-testid="accounts-balance-totals-cash">{{ money(totals.cashValue) }}</td>
+            <td class="px-5 py-2.5 text-right tabular-nums text-slate-900 dark:text-slate-100" data-testid="accounts-balance-totals-total">{{ money(totals.totalValue) }}</td>
+            <td class="px-5 py-2.5 text-right tabular-nums text-slate-900 dark:text-slate-100" data-testid="accounts-balance-totals-deposits">{{ money(totals.capitalBasis) }}</td>
             <td
               class="px-5 py-2.5 text-right tabular-nums"
               :class="totals.gainLoss >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
@@ -376,7 +395,13 @@ onMounted(async () => {
             >
               {{ gain(totals.gainLoss) }}
             </td>
-            <td class="px-5 py-2.5 text-right tabular-nums" data-testid="accounts-balance-totals-return">{{ percent(totals.returnPercentage) }}</td>
+            <td
+              class="px-5 py-2.5 text-right tabular-nums"
+              :class="totals.returnPercentage === null ? 'text-slate-900 dark:text-slate-100' : totals.returnPercentage >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
+              data-testid="accounts-balance-totals-return"
+            >
+              {{ percent(totals.returnPercentage) }}
+            </td>
           </tr>
         </tfoot>
       </table>
