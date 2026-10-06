@@ -292,6 +292,96 @@ describe("AccountsBalanceView", () => {
 })
 
 /**
+ * §84.5 — the readability styling. Class-level assertions, because the properties
+ * that matter here are not observable in jsdom: there is no layout engine, so
+ * "is the Account column actually pinned" and "is its background opaque" cannot
+ * be measured here. They are asserted as classes, and the real proof is the
+ * Playwright measurement in tests/e2e/accounts-balance.spec.ts.
+ */
+describe("§84.5 readability styling", () => {
+  beforeEach(() => {
+    pinia = createPinia()
+    setActivePinia(pinia)
+    localStorage.removeItem("portfoliost_display_currency")
+    const store = useCurrenciesStore()
+    store.currencies = [{ code: "USD", name: "US Dollar", symbol: "$", minorUnits: 2, popular: true }]
+    store.loaded = true
+    vi.clearAllMocks()
+    mocked.getPortfolios.mockResolvedValue([] as never)
+    mocked.getPortfolioTotalMetrics.mockResolvedValue(metrics() as never)
+    mockedFx.getLatestRate.mockResolvedValue({ rate: 0.9, asOf: "2026-10-02" })
+    vi.mocked(preferencesApi.getUserPreferences).mockResolvedValue({} as never)
+    vi.mocked(preferencesApi.patchUserPreferences).mockResolvedValue({} as never)
+  })
+
+  it("stipes every second row, in both themes", async () => {
+    const w = mountView()
+    await flushPromises()
+
+    const cls = w.find('[data-testid="accounts-balance-row"]').classes()
+    // Both steps are needed: even:/dark:even: is the light/dark pair for one stripe.
+    expect(cls).toContain("even:bg-slate-50/60")
+    expect(cls).toContain("dark:even:bg-slate-800/60")
+    // The stripe must not be the hover tint, or hover is invisible on striped rows.
+    expect(cls).toContain("hover:bg-blue-50/70")
+    expect(cls).not.toContain("hover:bg-slate-50")
+  })
+
+  it("pins the Account column with an OPAQUE background and a right separator", async () => {
+    const w = mountView()
+    await flushPromises()
+
+    for (const cell of w.findAll('[data-testid="accounts-balance-account"]')) {
+      const cls = cell.classes()
+      expect(cls).toContain("sticky")
+      expect(cls).toContain("left-0")
+      // Opaque on both sides — a translucent pinned cell lets scrolled text bleed
+      // through, which is the classic silent failure of this technique.
+      expect(cls).toContain("bg-slate-100")
+      expect(cls).toContain("dark:bg-slate-800")
+      // Not a /NN alpha tint, which is what "opaque" has to mean here.
+      expect(cls.filter((c) => /^bg-slate-\d+\/\d+$/.test(c))).toHaveLength(0)
+      expect(cls).toContain("shadow-[-1px_0_0_0_#e2e8f0]")
+      expect(cls).toContain("dark:shadow-[-1px_0_0_0_#334155]")
+      // The row's hover tint sits behind this cell's own background, so the cell
+      // must carry its own.
+      expect(cls).toContain("group-hover:bg-blue-100")
+    }
+  })
+
+  it("pins the Account header cell above the body cells", async () => {
+    const w = mountView()
+    await flushPromises()
+
+    const heads = w.findAll("thead th")
+    expect(heads).toHaveLength(7)
+    // Every header cell declares its column, and the Account one is pinned at z-30
+    // so it stays above the z-10 body cells it overlaps while scrolling.
+    for (const th of heads) expect(th.attributes("scope")).toBe("col")
+
+    const account = heads[0]
+    expect(account.classes()).toContain("sticky")
+    expect(account.classes()).toContain("left-0")
+    expect(account.classes()).toContain("z-30")
+    expect(account.classes()).toContain("bg-slate-50")
+    expect(account.classes()).toContain("dark:bg-slate-800")
+    // Only the Account column is pinned; the money columns scroll.
+    for (const th of heads.slice(1)) expect(th.classes()).not.toContain("sticky")
+  })
+
+  it("pins the footer's Total label too, so it is never the one row that scrolls away", async () => {
+    const w = mountView()
+    await flushPromises()
+
+    const label = w.get('[data-testid="accounts-balance-totals"]').findAll("td")[0]
+    expect(label.classes()).toContain("sticky")
+    expect(label.classes()).toContain("left-0")
+    expect(label.classes()).toContain("bg-slate-100")
+    expect(label.classes()).toContain("dark:bg-slate-800")
+  })
+})
+
+/**
  * The pure math, exercised without mounting (docs/COMPONENTS.md "shared math").
  */
 describe("§84 shared math", () => {

@@ -276,12 +276,24 @@ onMounted(async () => {
     <div v-else-if="rows.length" class="card overflow-x-auto">
       <table class="min-w-full text-sm" data-testid="accounts-balance">
         <thead>
-          <tr class="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500 dark:border-slate-700/60 dark:text-slate-400">
+          <!-- The header band is OPAQUE, not a tint: the Account header cell below is
+               sticky and needs a background that content cannot show through. Same
+               reason the pinned body cells carry their own opaque background. -->
+          <tr class="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:border-slate-700/60 dark:bg-slate-800 dark:text-slate-400">
             <th
               v-for="col in columns"
               :key="col.key"
+              scope="col"
               class="px-5 py-2.5 font-medium"
-              :class="[col.align, 'cursor-pointer select-none hover:text-slate-900 dark:hover:text-slate-100']"
+              :class="[
+                col.align,
+                'cursor-pointer select-none hover:text-slate-900 dark:hover:text-slate-100',
+                // §84.5 — the Account column is pinned, so its header is pinned too
+                // (z-30 sits above the body cells' z-10, as in TransactionsTable).
+                col.key === 'name'
+                  ? 'sticky left-0 z-30 bg-slate-50 shadow-[-1px_0_0_0_#e2e8f0] dark:bg-slate-800 dark:shadow-[-1px_0_0_0_#334155]'
+                  : '',
+              ]"
               :aria-sort="sortKey === col.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined"
             >
               <button type="button" class="inline-flex items-center gap-1" @click="toggleSort(col.key)">
@@ -292,14 +304,32 @@ onMounted(async () => {
           </tr>
         </thead>
         <tbody>
+          <!--
+            `group` + `even:` striping + `hover:`. The load-bearing detail: Tailwind
+            emits `odd:`/`even:` BEFORE `hover:`/`group-hover:` in the stylesheet, so
+            hover wins over the stripe with no `!important`. Do not "fix" that with
+            `!important` — it works. The corollary is why the hover tints are BLUE
+            and not slate: `hover:bg-slate-50` over an already-slate-50 even row is
+            invisible, which would read as hover being broken on half the rows.
+          -->
           <tr
             v-for="row in rows"
             :key="row.id"
-            class="cursor-pointer border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
+            class="group cursor-pointer border-b border-slate-100 even:bg-slate-50/60 hover:bg-blue-50/70 dark:border-slate-800 dark:even:bg-slate-800/60 dark:hover:bg-slate-700/60"
             data-testid="accounts-balance-row"
             @click="openRow($event, row)"
           >
-            <td class="px-5 py-2.5 font-medium text-slate-900 dark:text-slate-100" data-testid="accounts-balance-account">
+            <!--
+              §84.5 — the pinned Account cell. Its background is OPAQUE and it is the
+              SAME on every row (not striped): it has to be opaque so scrolled-under
+              text cannot bleed through it, and it has to carry its own `group-hover:`
+              because the row's hover tint sits behind this cell's own background.
+              The 1px right shadow is the separator that makes the pinned edge legible.
+            -->
+            <td
+              class="sticky left-0 z-10 bg-slate-100 px-5 py-2.5 font-medium text-slate-900 shadow-[-1px_0_0_0_#e2e8f0] group-hover:bg-blue-100 dark:bg-slate-800 dark:text-slate-100 dark:shadow-[-1px_0_0_0_#334155] dark:group-hover:bg-slate-700"
+              data-testid="accounts-balance-account"
+            >
               <router-link
                 :to="{ name: 'portfolio-holdings', params: { id: row.id } }"
                 class="hover:underline"
@@ -331,7 +361,10 @@ onMounted(async () => {
         </tbody>
         <tfoot class="border-t-2 border-slate-200 font-semibold dark:border-slate-700/60">
           <tr data-testid="accounts-balance-totals">
-            <td class="px-5 py-2.5 text-slate-900 dark:text-slate-100">Total</td>
+            <!-- Pinned and opaque for the same reason as the body Account cells — the
+                 Σ row must not be the one row whose label scrolls out from under the
+                 numbers. -->
+            <td class="sticky left-0 z-10 bg-slate-100 px-5 py-2.5 text-slate-900 shadow-[-1px_0_0_0_#e2e8f0] dark:bg-slate-800 dark:text-slate-100 dark:shadow-[-1px_0_0_0_#334155]">Total</td>
             <td class="px-5 py-2.5 text-right tabular-nums" data-testid="accounts-balance-totals-investments">{{ money(totals.instrumentsValue) }}</td>
             <td class="px-5 py-2.5 text-right tabular-nums" data-testid="accounts-balance-totals-cash">{{ money(totals.cashValue) }}</td>
             <td class="px-5 py-2.5 text-right tabular-nums" data-testid="accounts-balance-totals-total">{{ money(totals.totalValue) }}</td>
