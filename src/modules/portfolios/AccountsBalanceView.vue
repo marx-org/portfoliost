@@ -252,7 +252,10 @@ onMounted(async () => {
         </button>
         <template v-if="showCurrencyMenu">
           <div class="fixed inset-0 z-20" @click="showCurrencyMenu = false"></div>
-          <div class="absolute right-0 z-30 mt-1 w-44 rounded-lg border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700/60 dark:bg-slate-900">
+          <div
+              class="absolute right-0 z-30 mt-1 w-44 rounded-lg border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700/60 dark:bg-slate-900"
+              data-testid="display-currency-menu"
+            >
             <button
               v-for="c in currencies"
               :key="c"
