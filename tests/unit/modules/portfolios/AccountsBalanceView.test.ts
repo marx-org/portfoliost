@@ -1,4 +1,5 @@
 import { flushPromises, mount } from "@vue/test-utils"
+import { createMemoryHistory, createRouter, type Router } from "vue-router"
 import { createPinia, setActivePinia, type Pinia } from "pinia"
 import { useCurrenciesStore } from "@/stores/currencies"
 import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
@@ -33,6 +34,8 @@ const mocked = vi.mocked(portfoliosApi)
 const mockedFx = vi.mocked(fxApi)
 
 let pinia: Pinia
+/** The router `useRouter()` hands the view, so a test can assert on its pushes. */
+let router: Router
 
 /**
  * The PROD shape of the ten-account block, in miniature: the four cases the table
@@ -87,9 +90,17 @@ function metrics(over: Record<string, unknown> = {}) {
 }
 
 function mountView() {
+  // A real (memory) router, so `useRouter()` is not undefined — without it the
+  // row-click path in openRow would throw rather than be observable. RouterLink
+  // stays stubbed so the Account cell still renders a bare <a>, which is what
+  // openRow's closest("a") bail-out depends on.
+  router = createRouter({
+    history: createMemoryHistory(),
+    routes: [{ path: "/", name: "portfolio-holdings", component: { template: "<div />" } }],
+  })
   return mount(AccountsBalanceView, {
     global: {
-      plugins: [pinia],
+      plugins: [pinia, router],
       stubs: { RouterLink: { template: "<a><slot /></a>" } },
     },
   })
@@ -461,6 +472,93 @@ describe("§84.7 small-screen density", () => {
     // information needed to tell two accounts apart.
     expect(cls).toContain("break-words")
     expect(cls).not.toContain("truncate")
+  })
+})
+
+/**
+ * §84.8 — touch targets and keyboard focus.
+ */
+describe("§84.8 touch targets and focus", () => {
+  beforeEach(() => {
+    pinia = createPinia()
+    setActivePinia(pinia)
+    localStorage.removeItem("portfoliost_display_currency")
+    const store = useCurrenciesStore()
+    store.currencies = [{ code: "USD", name: "US Dollar", symbol: "$", minorUnits: 2, popular: true }]
+    store.loaded = true
+    vi.clearAllMocks()
+    mocked.getPortfolios.mockResolvedValue([] as never)
+    mocked.getPortfolioTotalMetrics.mockResolvedValue(metrics() as never)
+    mockedFx.getLatestRate.mockResolvedValue({ rate: 0.9, asOf: "2026-10-02" })
+    vi.mocked(preferencesApi.getUserPreferences).mockResolvedValue({} as never)
+    vi.mocked(preferencesApi.patchUserPreferences).mockResolvedValue({} as never)
+  })
+
+  it("grows the hit area on touch and restores the desktop padding at sm", async () => {
+    const w = mountView()
+    await flushPromises()
+
+    // py-3.5 below sm, py-2.5 at sm, so desktop keeps its original 41px row.
+    // 3.5 and not 3: measured, py-3 gives a 41px SINGLE-LINE row — under the 44px
+    // touch minimum — and short account names ("Top10") are exactly the rows that
+    // stay single-line. py-3.5 measures 45px. Only vertical, so the width saved
+    // in §84.7 is untouched.
+    for (const td of w.findAll("tbody td")) {
+      expect(td.classes()).toContain("py-3.5")
+      expect(td.classes()).toContain("sm:py-2.5")
+    }
+  })
+
+  it("tints the row on keyboard focus, matching hover", async () => {
+    const w = mountView()
+    await flushPromises()
+
+    const row = w.find('[data-testid="accounts-balance-row"]')
+    const cls = row.classes()
+    // The Account link is the row's only focusable element, so without this a
+    // keyboard user sees focus on the link alone and not on its row.
+    expect(cls).toContain("focus-within:bg-blue-50/70")
+    expect(cls).toContain("dark:focus-within:bg-slate-700/60")
+    // Same tint as hover, so pointer and keyboard agree on what "this row" means.
+    expect(cls).toContain("hover:bg-blue-50/70")
+
+    // The pinned cell needs its own, for the same reason it needs group-hover:.
+    const acc = row.get('[data-testid="accounts-balance-account"]').classes()
+    expect(acc).toContain("group-focus-within:bg-blue-100")
+    expect(acc).toContain("dark:group-focus-within:bg-slate-700")
+  })
+
+  it("gives the Account link a focus-visible ring, not just a row tint", async () => {
+    const w = mountView()
+    await flushPromises()
+
+    const link = rowByName(w, "Top10").get("a")
+    const cls = link.classes()
+    // A row tint alone fails anyone who cannot distinguish blue-50 from slate-100.
+    expect(cls).toContain("focus-visible:ring-2")
+    expect(cls.some((c) => c.startsWith("focus-visible:ring-"))).toBe(true)
+    // Still a real anchor: middle-click and "announced as a link" depend on it.
+    expect(link.element.tagName).toBe("A")
+  })
+
+  it("navigates once from a money cell, and not at all from the Account link", async () => {
+    const w = mountView()
+    await flushPromises()
+    const push = vi.spyOn(router, "push")
+
+    await rowByName(w, "Top10").get('[data-testid="accounts-balance-total"]').trigger("click")
+    expect(push).toHaveBeenCalledTimes(1)
+    expect(push).toHaveBeenCalledWith({
+      name: "portfolio-holdings",
+      params: { id: expect.any(String) },
+    })
+    push.mockClear()
+
+    // The Account cell holds a real <a> that navigates itself, so openRow must
+    // bail out — otherwise the row click and the anchor would both push and the
+    // user would get two navigations. Asserted on the row handler's own push.
+    await rowByName(w, "Top10").get("a").trigger("click")
+    expect(push).not.toHaveBeenCalled()
   })
 })
 

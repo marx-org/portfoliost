@@ -295,7 +295,7 @@ onMounted(async () => {
               v-for="col in columns"
               :key="col.key"
               scope="col"
-              class="px-3 py-2.5 font-medium sm:px-5"
+              class="px-3 py-3.5 font-medium sm:px-5 sm:py-2.5"
               :class="[
                 col.align,
                 'cursor-pointer select-none hover:text-slate-900 dark:hover:text-slate-100',
@@ -328,7 +328,7 @@ onMounted(async () => {
           <tr
             v-for="row in rows"
             :key="row.id"
-            class="group cursor-pointer border-b border-slate-100 even:bg-slate-50/60 hover:bg-blue-50/70 dark:border-slate-800 dark:even:bg-slate-800/60 dark:hover:bg-slate-700/60"
+            class="group cursor-pointer border-b border-slate-100 even:bg-slate-50/60 hover:bg-blue-50/70 focus-within:bg-blue-50/70 dark:border-slate-800 dark:even:bg-slate-800/60 dark:hover:bg-slate-700/60 dark:focus-within:bg-slate-700/60"
             data-testid="accounts-balance-row"
             @click="openRow($event, row)"
           >
@@ -340,31 +340,37 @@ onMounted(async () => {
               The 1px right shadow is the separator that makes the pinned edge legible.
             -->
             <td
-              class="sticky left-0 z-10 min-w-[9rem] bg-slate-100 px-3 py-2.5 font-medium text-slate-900 break-words shadow-[-1px_0_0_0_#e2e8f0] group-hover:bg-blue-100 sm:min-w-0 sm:px-5 dark:bg-slate-800 dark:text-slate-100 dark:shadow-[-1px_0_0_0_#334155] dark:group-hover:bg-slate-700"
+              class="sticky left-0 z-10 min-w-[9rem] bg-slate-100 px-3 py-3.5 font-medium text-slate-900 break-words shadow-[-1px_0_0_0_#e2e8f0] group-hover:bg-blue-100 group-focus-within:bg-blue-100 sm:min-w-0 sm:px-5 sm:py-2.5 dark:bg-slate-800 dark:text-slate-100 dark:shadow-[-1px_0_0_0_#334155] dark:group-hover:bg-slate-700 dark:group-focus-within:bg-slate-700"
               data-testid="accounts-balance-account"
             >
+              <!--
+                A real <a>, deliberately (see openRow's bail-out): focusable,
+                middle-clickable, announced as a link. The focus-visible ring is
+                not redundant with the row's focus-within tint — the tint alone
+                fails anyone who cannot distinguish blue-50 from slate-100.
+              -->
               <router-link
                 :to="{ name: 'portfolio-holdings', params: { id: row.id } }"
-                class="hover:underline"
+                class="rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 focus-visible:ring-offset-slate-100 dark:focus-visible:ring-blue-400 dark:focus-visible:ring-offset-slate-800"
               >
                 {{ row.name }}
               </router-link>
             </td>
-            <td class="px-3 py-2.5 sm:px-5 text-right tabular-nums" data-testid="accounts-balance-investments">{{ money(row.instrumentsValue) }}</td>
+            <td class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right tabular-nums" data-testid="accounts-balance-investments">{{ money(row.instrumentsValue) }}</td>
             <!-- §84 — a negative cash balance keeps its sign. It is a margin
                  balance, not a clamped zero (openapi.yaml:1201). -->
-            <td class="px-3 py-2.5 sm:px-5 text-right tabular-nums" data-testid="accounts-balance-cash">{{ money(row.cashValue) }}</td>
-            <td class="px-3 py-2.5 sm:px-5 text-right font-semibold tabular-nums" data-testid="accounts-balance-total">{{ money(row.totalValue) }}</td>
-            <td class="px-3 py-2.5 sm:px-5 text-right tabular-nums" data-testid="accounts-balance-deposits">{{ money(row.capitalBasis) }}</td>
+            <td class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right tabular-nums" data-testid="accounts-balance-cash">{{ money(row.cashValue) }}</td>
+            <td class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right font-semibold tabular-nums" data-testid="accounts-balance-total">{{ money(row.totalValue) }}</td>
+            <td class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right tabular-nums" data-testid="accounts-balance-deposits">{{ money(row.capitalBasis) }}</td>
             <td
-              class="px-3 py-2.5 sm:px-5 text-right font-medium tabular-nums"
+              class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right font-medium tabular-nums"
               :class="row.gainLoss >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
               data-testid="accounts-balance-gain"
             >
               {{ gain(row.gainLoss) }}
             </td>
             <td
-              class="px-3 py-2.5 sm:px-5 text-right tabular-nums"
+              class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right tabular-nums"
               :class="row.returnPercentage === null ? '' : row.returnPercentage >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
               data-testid="accounts-balance-return"
             >
@@ -393,23 +399,23 @@ onMounted(async () => {
                  Σ row must not be the one row whose label scrolls out from under the
                  numbers. z-30, above the body cells' z-10: this is the last thing drawn. -->
             <td
-              class="sticky left-0 z-30 bg-slate-100 px-3 py-2.5 sm:px-5 shadow-[-1px_0_0_0_#e2e8f0] dark:bg-slate-800 dark:shadow-[-1px_0_0_0_#334155]"
+              class="sticky left-0 z-30 bg-slate-100 px-3 py-3.5 sm:px-5 sm:py-2.5 shadow-[-1px_0_0_0_#e2e8f0] dark:bg-slate-800 dark:shadow-[-1px_0_0_0_#334155]"
             >
               <span class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Total</span>
             </td>
-            <td class="px-3 py-2.5 sm:px-5 text-right tabular-nums text-slate-900 dark:text-slate-100" data-testid="accounts-balance-totals-investments">{{ money(totals.instrumentsValue) }}</td>
-            <td class="px-3 py-2.5 sm:px-5 text-right tabular-nums text-slate-900 dark:text-slate-100" data-testid="accounts-balance-totals-cash">{{ money(totals.cashValue) }}</td>
-            <td class="px-3 py-2.5 sm:px-5 text-right tabular-nums text-slate-900 dark:text-slate-100" data-testid="accounts-balance-totals-total">{{ money(totals.totalValue) }}</td>
-            <td class="px-3 py-2.5 sm:px-5 text-right tabular-nums text-slate-900 dark:text-slate-100" data-testid="accounts-balance-totals-deposits">{{ money(totals.capitalBasis) }}</td>
+            <td class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right tabular-nums text-slate-900 dark:text-slate-100" data-testid="accounts-balance-totals-investments">{{ money(totals.instrumentsValue) }}</td>
+            <td class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right tabular-nums text-slate-900 dark:text-slate-100" data-testid="accounts-balance-totals-cash">{{ money(totals.cashValue) }}</td>
+            <td class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right tabular-nums text-slate-900 dark:text-slate-100" data-testid="accounts-balance-totals-total">{{ money(totals.totalValue) }}</td>
+            <td class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right tabular-nums text-slate-900 dark:text-slate-100" data-testid="accounts-balance-totals-deposits">{{ money(totals.capitalBasis) }}</td>
             <td
-              class="px-3 py-2.5 sm:px-5 text-right tabular-nums"
+              class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right tabular-nums"
               :class="totals.gainLoss >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
               data-testid="accounts-balance-totals-gain"
             >
               {{ gain(totals.gainLoss) }}
             </td>
             <td
-              class="px-3 py-2.5 sm:px-5 text-right tabular-nums"
+              class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right tabular-nums"
               :class="totals.returnPercentage === null ? 'text-slate-900 dark:text-slate-100' : totals.returnPercentage >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
               data-testid="accounts-balance-totals-return"
             >
