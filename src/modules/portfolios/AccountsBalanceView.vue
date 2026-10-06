@@ -274,24 +274,37 @@ onMounted(async () => {
     <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading accounts...</p>
 
     <div v-else-if="rows.length" class="card overflow-x-auto">
-      <table class="min-w-full text-sm" data-testid="accounts-balance">
+      <!--
+        §84.7 — small screens. The table has a natural width of ~905px (six `px-5`
+        money columns plus `tabular-nums`) and `min-w-full` puts no floor under it,
+        so below ~930px of viewport the table simply overflows and the reader scrolls
+        horizontally. A `min-w-[…]` floor would do nothing here — the natural width
+        already exceeds any phone. So this step goes the OTHER way: tighten padding
+        and the type scale below `sm` to CUT the width, which is the only thing that
+        reduces the distance a number is from the name it belongs to.
+
+        Desktop is untouched: `text-sm` and `px-5` are the `sm:` values.
+      -->
+      <table class="min-w-full text-xs sm:text-sm" data-testid="accounts-balance">
         <thead>
           <!-- The header band is OPAQUE, not a tint: the Account header cell below is
                sticky and needs a background that content cannot show through. Same
                reason the pinned body cells carry their own opaque background. -->
-          <tr class="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:border-slate-700/60 dark:bg-slate-800 dark:text-slate-400">
+          <tr class="border-b border-slate-200 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500 sm:text-xs dark:border-slate-700/60 dark:bg-slate-800 dark:text-slate-400">
             <th
               v-for="col in columns"
               :key="col.key"
               scope="col"
-              class="px-5 py-2.5 font-medium"
+              class="px-3 py-2.5 font-medium sm:px-5"
               :class="[
                 col.align,
                 'cursor-pointer select-none hover:text-slate-900 dark:hover:text-slate-100',
                 // §84.5 — the Account column is pinned, so its header is pinned too
                 // (z-30 sits above the body cells' z-10, as in TransactionsTable).
+                // The min-w floor matches the body cell's, so a wide header label
+                // and a narrow one still put the column edge in the same place.
                 col.key === 'name'
-                  ? 'sticky left-0 z-30 bg-slate-50 shadow-[-1px_0_0_0_#e2e8f0] dark:bg-slate-800 dark:shadow-[-1px_0_0_0_#334155]'
+                  ? 'sticky left-0 z-30 min-w-[9rem] bg-slate-50 shadow-[-1px_0_0_0_#e2e8f0] sm:min-w-0 dark:bg-slate-800 dark:shadow-[-1px_0_0_0_#334155]'
                   : '',
               ]"
               :aria-sort="sortKey === col.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined"
@@ -327,7 +340,7 @@ onMounted(async () => {
               The 1px right shadow is the separator that makes the pinned edge legible.
             -->
             <td
-              class="sticky left-0 z-10 bg-slate-100 px-5 py-2.5 font-medium text-slate-900 shadow-[-1px_0_0_0_#e2e8f0] group-hover:bg-blue-100 dark:bg-slate-800 dark:text-slate-100 dark:shadow-[-1px_0_0_0_#334155] dark:group-hover:bg-slate-700"
+              class="sticky left-0 z-10 min-w-[9rem] bg-slate-100 px-3 py-2.5 font-medium text-slate-900 break-words shadow-[-1px_0_0_0_#e2e8f0] group-hover:bg-blue-100 sm:min-w-0 sm:px-5 dark:bg-slate-800 dark:text-slate-100 dark:shadow-[-1px_0_0_0_#334155] dark:group-hover:bg-slate-700"
               data-testid="accounts-balance-account"
             >
               <router-link
@@ -337,21 +350,21 @@ onMounted(async () => {
                 {{ row.name }}
               </router-link>
             </td>
-            <td class="px-5 py-2.5 text-right tabular-nums" data-testid="accounts-balance-investments">{{ money(row.instrumentsValue) }}</td>
+            <td class="px-3 py-2.5 sm:px-5 text-right tabular-nums" data-testid="accounts-balance-investments">{{ money(row.instrumentsValue) }}</td>
             <!-- §84 — a negative cash balance keeps its sign. It is a margin
                  balance, not a clamped zero (openapi.yaml:1201). -->
-            <td class="px-5 py-2.5 text-right tabular-nums" data-testid="accounts-balance-cash">{{ money(row.cashValue) }}</td>
-            <td class="px-5 py-2.5 text-right font-semibold tabular-nums" data-testid="accounts-balance-total">{{ money(row.totalValue) }}</td>
-            <td class="px-5 py-2.5 text-right tabular-nums" data-testid="accounts-balance-deposits">{{ money(row.capitalBasis) }}</td>
+            <td class="px-3 py-2.5 sm:px-5 text-right tabular-nums" data-testid="accounts-balance-cash">{{ money(row.cashValue) }}</td>
+            <td class="px-3 py-2.5 sm:px-5 text-right font-semibold tabular-nums" data-testid="accounts-balance-total">{{ money(row.totalValue) }}</td>
+            <td class="px-3 py-2.5 sm:px-5 text-right tabular-nums" data-testid="accounts-balance-deposits">{{ money(row.capitalBasis) }}</td>
             <td
-              class="px-5 py-2.5 text-right font-medium tabular-nums"
+              class="px-3 py-2.5 sm:px-5 text-right font-medium tabular-nums"
               :class="row.gainLoss >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
               data-testid="accounts-balance-gain"
             >
               {{ gain(row.gainLoss) }}
             </td>
             <td
-              class="px-5 py-2.5 text-right tabular-nums"
+              class="px-3 py-2.5 sm:px-5 text-right tabular-nums"
               :class="row.returnPercentage === null ? '' : row.returnPercentage >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
               data-testid="accounts-balance-return"
             >
@@ -380,23 +393,23 @@ onMounted(async () => {
                  Σ row must not be the one row whose label scrolls out from under the
                  numbers. z-30, above the body cells' z-10: this is the last thing drawn. -->
             <td
-              class="sticky left-0 z-30 bg-slate-100 px-5 py-2.5 shadow-[-1px_0_0_0_#e2e8f0] dark:bg-slate-800 dark:shadow-[-1px_0_0_0_#334155]"
+              class="sticky left-0 z-30 bg-slate-100 px-3 py-2.5 sm:px-5 shadow-[-1px_0_0_0_#e2e8f0] dark:bg-slate-800 dark:shadow-[-1px_0_0_0_#334155]"
             >
               <span class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Total</span>
             </td>
-            <td class="px-5 py-2.5 text-right tabular-nums text-slate-900 dark:text-slate-100" data-testid="accounts-balance-totals-investments">{{ money(totals.instrumentsValue) }}</td>
-            <td class="px-5 py-2.5 text-right tabular-nums text-slate-900 dark:text-slate-100" data-testid="accounts-balance-totals-cash">{{ money(totals.cashValue) }}</td>
-            <td class="px-5 py-2.5 text-right tabular-nums text-slate-900 dark:text-slate-100" data-testid="accounts-balance-totals-total">{{ money(totals.totalValue) }}</td>
-            <td class="px-5 py-2.5 text-right tabular-nums text-slate-900 dark:text-slate-100" data-testid="accounts-balance-totals-deposits">{{ money(totals.capitalBasis) }}</td>
+            <td class="px-3 py-2.5 sm:px-5 text-right tabular-nums text-slate-900 dark:text-slate-100" data-testid="accounts-balance-totals-investments">{{ money(totals.instrumentsValue) }}</td>
+            <td class="px-3 py-2.5 sm:px-5 text-right tabular-nums text-slate-900 dark:text-slate-100" data-testid="accounts-balance-totals-cash">{{ money(totals.cashValue) }}</td>
+            <td class="px-3 py-2.5 sm:px-5 text-right tabular-nums text-slate-900 dark:text-slate-100" data-testid="accounts-balance-totals-total">{{ money(totals.totalValue) }}</td>
+            <td class="px-3 py-2.5 sm:px-5 text-right tabular-nums text-slate-900 dark:text-slate-100" data-testid="accounts-balance-totals-deposits">{{ money(totals.capitalBasis) }}</td>
             <td
-              class="px-5 py-2.5 text-right tabular-nums"
+              class="px-3 py-2.5 sm:px-5 text-right tabular-nums"
               :class="totals.gainLoss >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
               data-testid="accounts-balance-totals-gain"
             >
               {{ gain(totals.gainLoss) }}
             </td>
             <td
-              class="px-5 py-2.5 text-right tabular-nums"
+              class="px-3 py-2.5 sm:px-5 text-right tabular-nums"
               :class="totals.returnPercentage === null ? 'text-slate-900 dark:text-slate-100' : totals.returnPercentage >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
               data-testid="accounts-balance-totals-return"
             >

@@ -408,6 +408,63 @@ describe("§84.5 readability styling", () => {
 })
 
 /**
+ * §84.7 — small-screen density. Only the base (unprefixed) values are assertable
+ * here: jsdom has no viewport, so it never applies an `sm:` variant and cannot tell
+ * you whether the desktop is unchanged. The before/after widths are measured in a
+ * real browser instead.
+ */
+describe("§84.7 small-screen density", () => {
+  beforeEach(() => {
+    pinia = createPinia()
+    setActivePinia(pinia)
+    localStorage.removeItem("portfoliost_display_currency")
+    const store = useCurrenciesStore()
+    store.currencies = [{ code: "USD", name: "US Dollar", symbol: "$", minorUnits: 2, popular: true }]
+    store.loaded = true
+    vi.clearAllMocks()
+    mocked.getPortfolios.mockResolvedValue([] as never)
+    mocked.getPortfolioTotalMetrics.mockResolvedValue(metrics() as never)
+    mockedFx.getLatestRate.mockResolvedValue({ rate: 0.9, asOf: "2026-10-02" })
+    vi.mocked(preferencesApi.getUserPreferences).mockResolvedValue({} as never)
+    vi.mocked(preferencesApi.patchUserPreferences).mockResolvedValue({} as never)
+  })
+
+  it("keeps the desktop metrics as the sm: values, so only narrow screens shrink", async () => {
+    const w = mountView()
+    await flushPromises()
+
+    // Every cell carries the phone value UNPREFIXED and the desktop value at sm:,
+    // so the change can only ever make the table narrower, never wider.
+    for (const td of w.findAll("tbody td")) {
+      expect(td.classes()).toContain("px-3")
+      expect(td.classes()).toContain("sm:px-5")
+    }
+    const table = w.get('[data-testid="accounts-balance"]')
+    expect(table.classes()).toContain("text-xs")
+    expect(table.classes()).toContain("sm:text-sm")
+    // A min-w FLOOR would be pointless here — the table's natural width (~905px)
+    // already exceeds any phone — so the intent is the opposite: cut the width.
+    expect(table.classes()).not.toContain("min-w-[680px]")
+  })
+
+  it("floors the Account column on a phone and lets the floor go at sm", async () => {
+    const w = mountView()
+    await flushPromises()
+
+    const cls = w.find('[data-testid="accounts-balance-account"]').classes()
+    // 9rem on a phone so the pinned column cannot be squeezed to a stub.
+    expect(cls).toContain("min-w-[9rem]")
+    // …and released at sm:. A floor that also applied at desktop/tablet made the
+    // natural width WORSE (904.6 → 992.5px), so it is explicitly reset there.
+    expect(cls).toContain("sm:min-w-0")
+    // Wrapping, never truncation: a truncated account name hides exactly the
+    // information needed to tell two accounts apart.
+    expect(cls).toContain("break-words")
+    expect(cls).not.toContain("truncate")
+  })
+})
+
+/**
  * The pure math, exercised without mounting (docs/COMPONENTS.md "shared math").
  */
 describe("§84 shared math", () => {
