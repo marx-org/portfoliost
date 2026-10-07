@@ -64,7 +64,11 @@ function candidateKey(c: SplitCandidate) {
 
 function providerRatio(c: SplitCandidate) {
   if (!c.providerNumerator || !c.providerDenominator) return null
-  return `${c.providerNumerator}:${c.providerDenominator}`
+  const compact = (value: string) => {
+    const number = Number(value)
+    return Number.isFinite(number) ? String(number) : value
+  }
+  return `${compact(c.providerNumerator)}:${compact(c.providerDenominator)}`
 }
 
 async function apply(c: SplitCandidate) {
@@ -236,7 +240,9 @@ const historyCandidates = () => splitCandidates.value.filter(c => c.status !== "
                 </td>
                 <td class="py-1 pr-4">{{ c.effectiveDate ?? '—' }}</td>
                 <td class="py-1 pr-4">{{ c.detectedAt }}</td>
-                <td class="py-1 pr-4">{{ providerRatio(c) ?? 'ambiguous' }}</td>
+                <td class="py-1 pr-4" :title="c.provider ? `OpenST factor: ${c.providerFactor ?? '—'}; observed ratio: ${c.ratio ?? '—'}; source: ${c.provider}` : `Observed ratio: ${c.ratio ?? '—'}`">
+                  {{ providerRatio(c) ?? 'ambiguous' }}
+                </td>
                 <td class="py-1">{{ c.status }}</td>
               </tr>
             </tbody>

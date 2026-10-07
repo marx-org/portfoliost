@@ -110,4 +110,18 @@ describe("MarketDataView — §85.6 symbol cells link to research", () => {
     expect(wrapper.findAll("button").some((b) => b.text() === "Apply")).toBe(true)
     expect(wrapper.findAll("button").some((b) => b.text() === "Dismiss")).toBe(true)
   })
+
+  it("shows compact provider ratios and keeps provider evidence in a history tooltip", async () => {
+    const applied = {
+      ...(CANDIDATE as unknown as object),
+      status: "applied",
+      provider: "fmp",
+      providerNumerator: "2.00000000",
+      providerDenominator: "1.00000000",
+      providerFactor: "2.00000000",
+    } as never
+    const wrapper = await mountView([applied])
+    expect(wrapper.text()).toContain("2:1")
+    expect(wrapper.find('td[title*="OpenST factor"]').attributes("title")).toContain("fmp")
+  })
 })
