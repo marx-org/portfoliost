@@ -31,10 +31,12 @@ vi.mock("@/api/admin", async (importOriginal) => {
 const CANDIDATE = {
   symbol: "AAPL",
   detectedAt: "2026-09-01",
+  effectiveDate: "2026-08-31",
   lastStooqClose: "100",
   firstOverflowClose: "50",
   ratio: "2",
   suggestedFactor: "2",
+  providerFactor: "2",
   status: "pending",
 } as never
 

@@ -33,6 +33,7 @@ const EXPECTED_NODE_IDS = [
   "portfoliost-instruments-corpbondsync",
   "portfoliost-instruments-fundcategorysync",
   "portfoliost-instruments-fxsync",
+  "portfoliost-instruments-splitsync",
   "portfoliost-instruments-tickersync",
   "portfoliost-sheets-sync",
   "portfoliost-wallets-snapshotsync",
@@ -69,6 +70,9 @@ const EXPECTED_EDGE_PAIRS = [
   ["cachest", "fmp"],
   ["cachest", "openst"],
   ["cachest", "redis"],
+  ["portfoliost-instruments-splitsync", "cachest"],
+  ["portfoliost-instruments-splitsync", "portfoliost-instruments"],
+  ["portfoliost-instruments-splitsync", "portfoliost-wallets"],
   ["nginx-gateway", "portfoliost-admin"],
   ["nginx-gateway", "portfoliost-instruments"],
   ["nginx-gateway", "portfoliost-users-auth"],
@@ -145,7 +149,7 @@ describe("topology graph definition (D55-3)", () => {
     expect(NODE_AREAS).toHaveLength(5)
     expect(areaNodes("internal")).toHaveLength(6)
     expect(areaNodes("storage")).toHaveLength(2)
-    expect(areaNodes("jobs")).toHaveLength(13)
+    expect(areaNodes("jobs")).toHaveLength(14)
     expect(areaNodes("external-services")).toHaveLength(5)
     expect(areaNodes("data-providers")).toHaveLength(16)
   })
@@ -224,7 +228,7 @@ describe("topology graph definition (D55-3)", () => {
     expect(downstreamOf("nginx-gateway").sort()).toEqual(["portfoliost-admin", "portfoliost-instruments", "portfoliost-users-auth", "portfoliost-wallets"])
     expect(upstreamOf("portfoliost-users-auth").sort()).toEqual(["nginx-gateway", "pocketid", "portfoliost-admin", "portfoliost-instruments", "portfoliost-wallets"])
     expect(upstreamOf("jobshot").sort()).toEqual(["portfoliost-admin"])
-    expect(edgesForNode("cachest")).toHaveLength(7)
+    expect(edgesForNode("cachest")).toHaveLength(8)
     expect(edgesForNode("scanst")).toHaveLength(0)
   })
 })

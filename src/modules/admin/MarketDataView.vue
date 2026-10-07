@@ -32,6 +32,12 @@ const applyDate = ref<Record<string, string>>({})
 const actionBusy = ref<Record<string, boolean>>({})
 const actionResult = ref<Record<string, string>>({})
 
+function setCandidateDates(candidates: SplitCandidate[]) {
+  for (const candidate of candidates) {
+    if (candidate.effectiveDate) applyDate.value[candidateKey(candidate)] = candidate.effectiveDate
+  }
+}
+
 onMounted(async () => {
   loading.value = true
   error.value = null
@@ -43,6 +49,7 @@ onMounted(async () => {
     ])
     importLog.value = log
     splitCandidates.value = candidates
+    setCandidateDates(candidates)
     overflow.value = ov
   } catch (e) {
     error.value = e instanceof Error ? e.message : "Failed to load market data"
@@ -77,6 +84,7 @@ async function apply(c: SplitCandidate) {
     await applySplitCandidate(c.symbol, f, effectiveDate)
     actionResult.value[key] = "Applied"
     splitCandidates.value = await fetchSplitCandidates()
+    setCandidateDates(splitCandidates.value)
   } catch {
     actionResult.value[key] = "Error"
   } finally {
@@ -91,6 +99,7 @@ async function dismiss(c: SplitCandidate) {
     await dismissSplitCandidate(c.symbol)
     actionResult.value[key] = "Dismissed"
     splitCandidates.value = await fetchSplitCandidates()
+    setCandidateDates(splitCandidates.value)
   } catch {
     actionResult.value[key] = "Error"
   } finally {

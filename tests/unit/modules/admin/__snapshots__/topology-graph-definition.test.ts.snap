@@ -164,6 +164,18 @@ exports[`topology graph definition (D55-3) > snapshots node IDs and edge pairs 1
       "portfoliost-instruments",
     ],
     [
+      "portfoliost-instruments-splitsync",
+      "cachest",
+    ],
+    [
+      "portfoliost-instruments-splitsync",
+      "portfoliost-instruments",
+    ],
+    [
+      "portfoliost-instruments-splitsync",
+      "portfoliost-wallets",
+    ],
+    [
       "portfoliost-instruments-tickersync",
       "portfoliost-instruments",
     ],
@@ -232,6 +244,7 @@ exports[`topology graph definition (D55-3) > snapshots node IDs and edge pairs 1
     "portfoliost-instruments-corpbondsync",
     "portfoliost-instruments-fundcategorysync",
     "portfoliost-instruments-fxsync",
+    "portfoliost-instruments-splitsync",
     "portfoliost-instruments-tickersync",
     "portfoliost-sheets-sync",
     "portfoliost-users-auth",
