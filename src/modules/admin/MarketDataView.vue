@@ -71,6 +71,14 @@ function providerRatio(c: SplitCandidate) {
   return `${compact(c.providerNumerator)}:${compact(c.providerDenominator)}`
 }
 
+function heuristicRatio(c: SplitCandidate) {
+  if (!c.suggestedFactor) return null
+  const factor = Number(c.suggestedFactor)
+  if (!Number.isFinite(factor) || factor <= 0) return null
+  const compact = (value: number) => Number.isInteger(value) ? String(value) : value.toFixed(4).replace(/0+$/, "").replace(/\.$/, "")
+  return factor >= 1 ? `${compact(factor)}:1 (heuristic)` : `1:${compact(1 / factor)} (heuristic)`
+}
+
 async function apply(c: SplitCandidate) {
   const key = candidateKey(c)
   const f = Number(applyFactor.value[key] ?? c.providerFactor)
@@ -188,13 +196,13 @@ const historyCandidates = () => splitCandidates.value.filter(c => c.status !== "
                <td class="py-2 pr-4">{{ c.detectedAt }}</td>
               <td class="py-2 pr-4">{{ c.lastStooqClose ?? '—' }}</td>
               <td class="py-2 pr-4">{{ c.firstOverflowClose ?? '—' }}</td>
-               <td class="py-2 pr-4" :title="c.provider ? `OpenST factor: ${c.providerFactor ?? '—'}; observed ratio: ${c.ratio ?? '—'}` : `Observed ratio: ${c.ratio ?? '—'}`">
-                 {{ providerRatio(c) ?? 'ambiguous' }}
+               <td class="py-2 pr-4" :title="c.provider ? `OpenST factor: ${c.providerFactor ?? '—'}; observed ratio: ${c.ratio ?? '—'}` : `Heuristic factor: ${c.suggestedFactor ?? '—'}; observed ratio: ${c.ratio ?? '—'}`">
+                 {{ providerRatio(c) ?? heuristicRatio(c) ?? 'ambiguous' }}
                </td>
                <td class="py-2 pr-4">
                  <input
                    v-model="applyFactor[candidateKey(c)]"
-                   :placeholder="c.providerFactor ?? 'quantity factor'"
+                   :placeholder="c.providerFactor ?? (c.suggestedFactor ? String(1 / Number(c.suggestedFactor)) : 'quantity factor')"
                    :aria-label="`Quantity factor for ${c.symbol}`"
                    class="input w-24 text-xs"
                  />
