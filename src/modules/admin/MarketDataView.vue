@@ -182,23 +182,26 @@ const historyCandidates = () => splitCandidates.value.filter(c => c.status !== "
                   <TickerBadge size="sm" :symbol="c.symbol" />
                 </router-link>
               </td>
-               <td class="py-2 pr-4">{{ c.effectiveDate ?? '—' }}</td>
+               <td class="py-2 pr-4">
+                 <input v-model="applyDate[candidateKey(c)]" type="date" :aria-label="`Effective date for ${c.symbol}`" class="input w-36 text-xs" />
+               </td>
                <td class="py-2 pr-4">{{ c.detectedAt }}</td>
               <td class="py-2 pr-4">{{ c.lastStooqClose ?? '—' }}</td>
               <td class="py-2 pr-4">{{ c.firstOverflowClose ?? '—' }}</td>
                <td class="py-2 pr-4" :title="c.provider ? `OpenST factor: ${c.providerFactor ?? '—'}; observed ratio: ${c.ratio ?? '—'}` : `Observed ratio: ${c.ratio ?? '—'}`">
                  {{ providerRatio(c) ?? 'ambiguous' }}
                </td>
-               <td class="py-2 pr-4">{{ c.providerFactor ?? '—' }}</td>
+               <td class="py-2 pr-4">
+                 <input
+                   v-model="applyFactor[candidateKey(c)]"
+                   :placeholder="c.providerFactor ?? 'quantity factor'"
+                   :aria-label="`Quantity factor for ${c.symbol}`"
+                   class="input w-24 text-xs"
+                 />
+               </td>
                <td class="py-2">
                  <div class="flex items-center gap-2">
-                   <input v-model="applyDate[candidateKey(c)]" type="date" :placeholder="c.effectiveDate ?? 'effective date'" class="input w-36 text-xs" />
-                   <input
-                     v-model="applyFactor[candidateKey(c)]"
-                     :placeholder="c.providerFactor ?? 'quantity factor'"
-                     class="input w-24 text-xs"
-                   />
-                  <button
+                   <button
                     class="btn-primary text-xs"
                      :disabled="actionBusy[candidateKey(c)]"
                      @click="apply(c)"
