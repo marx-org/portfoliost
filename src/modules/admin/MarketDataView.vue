@@ -254,7 +254,7 @@ const historyCandidates = () => splitCandidates.value.filter(c => c.status !== "
                 <td class="py-1 pr-4" :title="c.provider ? `OpenST factor: ${c.providerFactor ?? '—'}; observed ratio: ${c.ratio ?? '—'}; source: ${c.provider}` : `Observed ratio: ${c.ratio ?? '—'}`">
                   {{ providerRatio(c) ?? 'ambiguous' }}
                 </td>
-                <td class="py-1">{{ c.status }}</td>
+                <td class="py-1" :title="`Applied: ${c.appliedAt ?? '—'}; source: ${c.provider ?? 'manual'}; evidence: ${c.evidence ? 'available' : '—'}`">{{ c.status }}</td>
               </tr>
             </tbody>
           </table>
