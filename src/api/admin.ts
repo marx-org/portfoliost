@@ -57,8 +57,8 @@ export function fetchSplitCandidates(): Promise<SplitCandidate[]> {
   return http.get<SplitCandidate[]>("/api/admin/market-data/split-candidates")
 }
 
-export function applySplitCandidate(symbol: string, factor: number): Promise<{ ok: boolean }> {
-  return http.post<{ ok: boolean }>(`/api/admin/market-data/split-candidates/${encodeURIComponent(symbol)}/apply`, { factor })
+export function applySplitCandidate(symbol: string, factor: number, effectiveDate: string): Promise<{ ok: boolean }> {
+  return http.post<{ ok: boolean }>(`/api/admin/market-data/split-candidates/${encodeURIComponent(symbol)}/apply`, { factor, effectiveDate })
 }
 
 export function dismissSplitCandidate(symbol: string): Promise<{ ok: boolean }> {

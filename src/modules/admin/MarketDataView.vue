@@ -28,6 +28,7 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 
 const applyFactor = ref<Record<string, string>>({})
+const applyDate = ref<Record<string, string>>({})
 const actionBusy = ref<Record<string, boolean>>({})
 const actionResult = ref<Record<string, string>>({})
 
@@ -50,34 +51,50 @@ onMounted(async () => {
   }
 })
 
-async function apply(symbol: string) {
-  const f = Number(applyFactor.value[symbol])
-  if (!Number.isFinite(f) || f <= 0) {
-    actionResult.value[symbol] = "Invalid factor"
+function candidateKey(c: SplitCandidate) {
+  return `${c.symbol}:${c.effectiveDate ?? c.detectedAt}`
+}
+
+function providerRatio(c: SplitCandidate) {
+  if (!c.providerNumerator || !c.providerDenominator) return null
+  return `${c.providerNumerator}:${c.providerDenominator}`
+}
+
+async function apply(c: SplitCandidate) {
+  const key = candidateKey(c)
+  const f = Number(applyFactor.value[key] ?? c.providerFactor)
+  const effectiveDate = applyDate.value[key] ?? c.effectiveDate
+  if (!effectiveDate) {
+    actionResult.value[key] = "Effective date required"
     return
   }
-  actionBusy.value[symbol] = true
+  if (!Number.isFinite(f) || f <= 0) {
+    actionResult.value[key] = "Invalid quantity factor"
+    return
+  }
+  actionBusy.value[key] = true
   try {
-    await applySplitCandidate(symbol, f)
-    actionResult.value[symbol] = "Applied"
+    await applySplitCandidate(c.symbol, f, effectiveDate)
+    actionResult.value[key] = "Applied"
     splitCandidates.value = await fetchSplitCandidates()
   } catch {
-    actionResult.value[symbol] = "Error"
+    actionResult.value[key] = "Error"
   } finally {
-    actionBusy.value[symbol] = false
+    actionBusy.value[key] = false
   }
 }
 
-async function dismiss(symbol: string) {
-  actionBusy.value[symbol] = true
+async function dismiss(c: SplitCandidate) {
+  const key = candidateKey(c)
+  actionBusy.value[key] = true
   try {
-    await dismissSplitCandidate(symbol)
-    actionResult.value[symbol] = "Dismissed"
+    await dismissSplitCandidate(c.symbol)
+    actionResult.value[key] = "Dismissed"
     splitCandidates.value = await fetchSplitCandidates()
   } catch {
-    actionResult.value[symbol] = "Error"
+    actionResult.value[key] = "Error"
   } finally {
-    actionBusy.value[symbol] = false
+    actionBusy.value[key] = false
   }
 }
 
@@ -130,16 +147,17 @@ const historyCandidates = () => splitCandidates.value.filter(c => c.status !== "
           <thead>
             <tr class="border-b border-slate-200 dark:border-slate-700 text-left text-xs text-slate-500 dark:text-slate-400">
               <th class="pb-2 pr-4">Symbol</th>
+              <th class="pb-2 pr-4">Effective</th>
               <th class="pb-2 pr-4">Detected</th>
               <th class="pb-2 pr-4">Last Stooq Close</th>
               <th class="pb-2 pr-4">First Overflow Close</th>
-              <th class="pb-2 pr-4">Ratio</th>
-              <th class="pb-2 pr-4">Suggested</th>
+              <th class="pb-2 pr-4">Split ratio</th>
+              <th class="pb-2 pr-4">Quantity factor</th>
               <th class="pb-2">Actions</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="c in pendingCandidates()" :key="c.symbol + c.detectedAt"
+            <tr v-for="c in pendingCandidates()" :key="candidateKey(c)"
                 class="border-b border-slate-100 dark:border-slate-800">
               <!-- §85.6 — operational table, so this link navigates away from a
                    half-filled "Apply factor" form. The input state is not
@@ -151,29 +169,33 @@ const historyCandidates = () => splitCandidates.value.filter(c => c.status !== "
                   <TickerBadge size="sm" :symbol="c.symbol" />
                 </router-link>
               </td>
-              <td class="py-2 pr-4">{{ c.detectedAt }}</td>
+               <td class="py-2 pr-4">{{ c.effectiveDate ?? '—' }}</td>
+               <td class="py-2 pr-4">{{ c.detectedAt }}</td>
               <td class="py-2 pr-4">{{ c.lastStooqClose ?? '—' }}</td>
               <td class="py-2 pr-4">{{ c.firstOverflowClose ?? '—' }}</td>
-              <td class="py-2 pr-4">{{ c.ratio ? Number(c.ratio).toFixed(4) : '—' }}</td>
-              <td class="py-2 pr-4">{{ c.suggestedFactor ?? 'ambiguous' }}</td>
-              <td class="py-2">
-                <div class="flex items-center gap-2">
-                  <input
-                    v-model="applyFactor[c.symbol]"
-                    :placeholder="c.suggestedFactor ?? 'factor'"
-                    class="input w-24 text-xs"
-                  />
+               <td class="py-2 pr-4" :title="c.provider ? `OpenST factor: ${c.providerFactor ?? '—'}; observed ratio: ${c.ratio ?? '—'}` : `Observed ratio: ${c.ratio ?? '—'}`">
+                 {{ providerRatio(c) ?? 'ambiguous' }}
+               </td>
+               <td class="py-2 pr-4">{{ c.providerFactor ?? '—' }}</td>
+               <td class="py-2">
+                 <div class="flex items-center gap-2">
+                   <input v-model="applyDate[candidateKey(c)]" type="date" :placeholder="c.effectiveDate ?? 'effective date'" class="input w-36 text-xs" />
+                   <input
+                     v-model="applyFactor[candidateKey(c)]"
+                     :placeholder="c.providerFactor ?? 'quantity factor'"
+                     class="input w-24 text-xs"
+                   />
                   <button
                     class="btn-primary text-xs"
-                    :disabled="actionBusy[c.symbol]"
-                    @click="apply(c.symbol)"
+                     :disabled="actionBusy[candidateKey(c)]"
+                     @click="apply(c)"
                   >Apply</button>
                   <button
                     class="btn-secondary text-xs"
-                    :disabled="actionBusy[c.symbol]"
-                    @click="dismiss(c.symbol)"
+                     :disabled="actionBusy[candidateKey(c)]"
+                     @click="dismiss(c)"
                   >Dismiss</button>
-                  <span v-if="actionResult[c.symbol]" class="text-xs text-slate-500">{{ actionResult[c.symbol] }}</span>
+                   <span v-if="actionResult[candidateKey(c)]" class="text-xs text-slate-500">{{ actionResult[candidateKey(c)] }}</span>
                 </div>
               </td>
             </tr>
@@ -189,21 +211,23 @@ const historyCandidates = () => splitCandidates.value.filter(c => c.status !== "
             <thead>
               <tr class="border-b border-slate-200 dark:border-slate-700 text-left">
                 <th class="pb-1 pr-4">Symbol</th>
+                <th class="pb-1 pr-4">Effective</th>
                 <th class="pb-1 pr-4">Detected</th>
-                <th class="pb-1 pr-4">Suggested</th>
+                <th class="pb-1 pr-4">Split ratio</th>
                 <th class="pb-1">Status</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="c in historyCandidates()" :key="c.symbol + c.detectedAt"
+                <tr v-for="c in historyCandidates()" :key="candidateKey(c)"
                   class="border-b border-slate-100 dark:border-slate-800">
                 <td class="py-1 pr-4 font-mono">
                   <router-link :to="researchRoute(c.symbol, route.fullPath)" class="inline-block">
                     <TickerBadge size="sm" :symbol="c.symbol" />
                   </router-link>
                 </td>
+                <td class="py-1 pr-4">{{ c.effectiveDate ?? '—' }}</td>
                 <td class="py-1 pr-4">{{ c.detectedAt }}</td>
-                <td class="py-1 pr-4">{{ c.suggestedFactor ?? 'ambiguous' }}</td>
+                <td class="py-1 pr-4">{{ providerRatio(c) ?? 'ambiguous' }}</td>
                 <td class="py-1">{{ c.status }}</td>
               </tr>
             </tbody>
