@@ -11,6 +11,7 @@ const tabs = [
   { name: "admin-jobs",        label: "Jobs" },
   { name: "admin-market-data", label: "Market Data" },
   { name: "admin-bond-catalogue", label: "Bond Catalogue" },
+  { name: "admin-listing-overrides", label: "Listing Overrides" },
 ]
 </script>
 

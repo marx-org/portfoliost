@@ -18,6 +18,37 @@ export type UsersResponse = components["schemas"]["AdminUserListResponse"]
 export type SplitCandidate = components["schemas"]["SplitCandidate"]
 export type OverflowSummary = components["schemas"]["OverflowSummary"]
 
+export interface ListingOverride {
+  listingKey: string
+  ticker: string
+  exchange: string
+  quoteCurrency: string
+  assetType: string
+  status: "active" | "disabled"
+  rationale: string
+  provenance: string
+  sourceVersion: string
+  createdAt: string
+  updatedAt: string
+  upstreamPresent: boolean
+  tickerConflict: boolean
+  precedence: "curated"
+}
+
+export interface ListingOverridesResponse {
+  items: ListingOverride[]
+  pagination: { total: number; page: number; per_page: number; total_pages: number }
+}
+
+export interface ListingOverrideHistoryEntry {
+  id: number
+  listingKey: string
+  action: string
+  snapshot: unknown
+  actor: string
+  createdAt: string
+}
+
 export interface SystemVersionsResponse {
   services: ServiceVersion[]
   fetchedAt: string
@@ -67,6 +98,27 @@ export function dismissSplitCandidate(symbol: string): Promise<{ ok: boolean }> 
 
 export function fetchOverflowSummary(): Promise<OverflowSummary> {
   return http.get<OverflowSummary>("/api/admin/market-data/overflow-summary")
+}
+
+export function fetchListingOverrides(params?: Record<string, string>): Promise<ListingOverridesResponse> {
+  const qs = params ? "?" + new URLSearchParams(params).toString() : ""
+  return http.get<ListingOverridesResponse>(`/api/admin/listing-overrides${qs}`)
+}
+
+export function createListingOverride(input: Omit<ListingOverride, "listingKey" | "sourceVersion" | "createdAt" | "updatedAt" | "upstreamPresent" | "tickerConflict" | "precedence">): Promise<ListingOverride> {
+  return http.post<ListingOverride>("/api/admin/listing-overrides", input)
+}
+
+export function updateListingOverride(listingKey: string, input: Omit<ListingOverride, "listingKey" | "sourceVersion" | "createdAt" | "updatedAt" | "upstreamPresent" | "tickerConflict" | "precedence">): Promise<ListingOverride> {
+  return http.put<ListingOverride>(`/api/admin/listing-overrides/${encodeURIComponent(listingKey)}`, input)
+}
+
+export function disableListingOverride(listingKey: string): Promise<ListingOverride> {
+  return http.post<ListingOverride>(`/api/admin/listing-overrides/${encodeURIComponent(listingKey)}/disable`, {})
+}
+
+export function fetchListingOverrideHistory(listingKey: string): Promise<{ items: ListingOverrideHistoryEntry[] }> {
+  return http.get<{ items: ListingOverrideHistoryEntry[] }>(`/api/admin/listing-overrides/${encodeURIComponent(listingKey)}/history`)
 }
 
 export function fetchStooqImportLog(): Promise<Array<components["schemas"]["StooqImportLogEntry"]>> {

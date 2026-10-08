@@ -277,6 +277,12 @@ const router = createRouter({
               component: () => import("@/modules/admin/TopologyView.vue"),
               meta: { admin: true },
             },
+            {
+              path: "listing-overrides",
+              name: "admin-listing-overrides",
+              component: () => import("@/modules/admin/ListingOverridesView.vue"),
+              meta: { admin: true },
+            },
           ],
         },
       ],
