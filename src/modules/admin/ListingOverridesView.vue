@@ -5,9 +5,11 @@ import {
   disableListingOverride,
   fetchListingOverrideHistory,
   fetchListingOverrides,
+  previewListingOverride,
   updateListingOverride,
   type ListingOverride,
   type ListingOverrideHistoryEntry,
+  type ListingOverridePreview,
 } from "@/api/admin"
 
 type OverrideForm = {
@@ -41,6 +43,27 @@ const loading = ref(true)
 const saving = ref(false)
 const error = ref<string | null>(null)
 const formError = ref<string | null>(null)
+const preview = ref<ListingOverridePreview | null>(null)
+const previewError = ref<string | null>(null)
+
+// #97 — show the upstream currency, conflict and precedence BEFORE saving, so
+// an operator decides with the override's precedence over upstream in view.
+async function refreshPreview() {
+  const ticker = form.value.ticker.trim()
+  const exchange = form.value.exchange.trim()
+  if (!ticker || !exchange) {
+    preview.value = null
+    previewError.value = null
+    return
+  }
+  try {
+    preview.value = await previewListingOverride(ticker, exchange)
+    previewError.value = null
+  } catch (e) {
+    preview.value = null
+    previewError.value = e instanceof Error ? e.message : "Failed to preview override"
+  }
+}
 
 async function load() {
   loading.value = true
@@ -69,12 +92,15 @@ function edit(item: ListingOverride) {
     provenance: item.provenance,
   }
   formError.value = null
+  void refreshPreview()
 }
 
 function resetForm() {
   editingKey.value = null
   form.value = emptyForm()
   formError.value = null
+  preview.value = null
+  previewError.value = null
 }
 
 async function save() {
@@ -148,14 +174,24 @@ onMounted(load)
       </div>
       <p v-if="formError" class="text-sm text-red-600 dark:text-red-400">{{ formError }}</p>
       <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div><label for="override-ticker" class="label">Ticker</label><input id="override-ticker" v-model="form.ticker" class="input" required data-testid="override-ticker" /></div>
-        <div><label for="override-exchange" class="label">Venue</label><input id="override-exchange" v-model="form.exchange" class="input" required data-testid="override-exchange" /></div>
+        <div><label for="override-ticker" class="label">Ticker</label><input id="override-ticker" v-model="form.ticker" class="input" required data-testid="override-ticker" @blur="refreshPreview" /></div>
+        <div><label for="override-exchange" class="label">Venue</label><input id="override-exchange" v-model="form.exchange" class="input" required data-testid="override-exchange" @blur="refreshPreview" /></div>
         <div><label for="override-currency" class="label">Quote currency</label><input id="override-currency" v-model="form.quoteCurrency" class="input" maxlength="3" required data-testid="override-currency" /></div>
         <div><label for="override-asset-type" class="label">Asset type</label><input id="override-asset-type" v-model="form.assetType" class="input" required data-testid="override-asset-type" /></div>
       </div>
       <div class="grid gap-3 sm:grid-cols-2">
         <div><label for="override-rationale" class="label">Rationale</label><textarea id="override-rationale" v-model="form.rationale" class="input min-h-20" required data-testid="override-rationale" /></div>
         <div><label for="override-provenance" class="label">Provenance</label><textarea id="override-provenance" v-model="form.provenance" class="input min-h-20" required data-testid="override-provenance" /></div>
+      </div>
+      <div v-if="preview" class="rounded border border-slate-200 p-3 text-xs dark:border-slate-700" data-testid="listing-overrides-preview">
+        <div class="font-semibold">Precedence: <span class="text-blue-700 dark:text-blue-300">{{ preview.precedence }}</span></div>
+        <div class="mt-1 flex flex-wrap gap-2">
+          <span v-if="preview.upstreamPresent" class="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700">upstream row{{ preview.upstreamCurrency ? ` (${preview.upstreamCurrency})` : "" }}</span>
+          <span v-else class="rounded bg-slate-100 px-1.5 py-0.5 text-slate-600 dark:bg-slate-800 dark:text-slate-300">no upstream row</span>
+          <span v-if="preview.tickerConflict" class="rounded bg-red-50 px-1.5 py-0.5 text-red-700">ticker collision across venues</span>
+          <span v-if="preview.existingOverride" class="rounded bg-blue-50 px-1.5 py-0.5 text-blue-700">existing override ({{ preview.existingOverride.status }})</span>
+        </div>
+        <p v-if="preview.upstreamPresent" class="mt-1 text-slate-500">Saving replaces the upstream value for this venue; the upstream row itself is left untouched.</p>
       </div>
       <div class="flex items-center justify-end gap-2">
         <button type="submit" class="btn-primary" :disabled="saving" data-testid="override-save">{{ saving ? "Saving..." : editingKey ? "Save changes" : "Add override" }}</button>

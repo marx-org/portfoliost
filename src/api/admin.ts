@@ -18,36 +18,13 @@ export type UsersResponse = components["schemas"]["AdminUserListResponse"]
 export type SplitCandidate = components["schemas"]["SplitCandidate"]
 export type OverflowSummary = components["schemas"]["OverflowSummary"]
 
-export interface ListingOverride {
-  listingKey: string
-  ticker: string
-  exchange: string
-  quoteCurrency: string
-  assetType: string
-  status: "active" | "disabled"
-  rationale: string
-  provenance: string
-  sourceVersion: string
-  createdAt: string
-  updatedAt: string
-  upstreamPresent: boolean
-  tickerConflict: boolean
-  precedence: "curated"
-}
-
-export interface ListingOverridesResponse {
-  items: ListingOverride[]
-  pagination: { total: number; page: number; per_page: number; total_pages: number }
-}
-
-export interface ListingOverrideHistoryEntry {
-  id: number
-  listingKey: string
-  action: string
-  snapshot: unknown
-  actor: string
-  createdAt: string
-}
+// Contract-typed curated listing overrides (#97). The shapes are generated
+// components, so a backend change that drops or renames a field fails here.
+export type ListingOverride = components["schemas"]["AdminListingOverride"]
+export type ListingOverrideInput = components["schemas"]["AdminListingOverrideInput"]
+export type ListingOverridePreview = components["schemas"]["AdminListingOverridePreview"]
+export type ListingOverridesResponse = components["schemas"]["AdminListingOverridesResponse"]
+export type ListingOverrideHistoryEntry = components["schemas"]["AdminListingOverrideHistoryEntry"]
 
 export interface SystemVersionsResponse {
   services: ServiceVersion[]
@@ -105,11 +82,11 @@ export function fetchListingOverrides(params?: Record<string, string>): Promise<
   return http.get<ListingOverridesResponse>(`/api/admin/listing-overrides${qs}`)
 }
 
-export function createListingOverride(input: Omit<ListingOverride, "listingKey" | "sourceVersion" | "createdAt" | "updatedAt" | "upstreamPresent" | "tickerConflict" | "precedence">): Promise<ListingOverride> {
+export function createListingOverride(input: ListingOverrideInput): Promise<ListingOverride> {
   return http.post<ListingOverride>("/api/admin/listing-overrides", input)
 }
 
-export function updateListingOverride(listingKey: string, input: Omit<ListingOverride, "listingKey" | "sourceVersion" | "createdAt" | "updatedAt" | "upstreamPresent" | "tickerConflict" | "precedence">): Promise<ListingOverride> {
+export function updateListingOverride(listingKey: string, input: ListingOverrideInput): Promise<ListingOverride> {
   return http.put<ListingOverride>(`/api/admin/listing-overrides/${encodeURIComponent(listingKey)}`, input)
 }
 
@@ -119,6 +96,11 @@ export function disableListingOverride(listingKey: string): Promise<ListingOverr
 
 export function fetchListingOverrideHistory(listingKey: string): Promise<{ items: ListingOverrideHistoryEntry[] }> {
   return http.get<{ items: ListingOverrideHistoryEntry[] }>(`/api/admin/listing-overrides/${encodeURIComponent(listingKey)}/history`)
+}
+
+export function previewListingOverride(ticker: string, exchange: string): Promise<ListingOverridePreview> {
+  const qs = new URLSearchParams({ ticker, exchange }).toString()
+  return http.get<ListingOverridePreview>(`/api/admin/listing-overrides/preview?${qs}`)
 }
 
 export function fetchStooqImportLog(): Promise<Array<components["schemas"]["StooqImportLogEntry"]>> {
