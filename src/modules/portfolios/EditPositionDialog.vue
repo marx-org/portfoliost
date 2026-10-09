@@ -110,11 +110,12 @@ async function load() {
           instrumentCurrency: props.position.instrumentCurrency ?? "",
           assetType: props.position.assetType ?? "STOCK",
           exchangeRate: 1,
-          isGift: false,
-          synthesizedOpeningLot: false,
           executedAt: props.position.openedAt ?? new Date().toISOString(),
           createdAt: props.position.openedAt ?? new Date().toISOString(),
-          displayCurrency: props.position.instrumentCurrency ?? "",
+          displayCurrency:
+            store.portfolios.find((p) => p.id === props.portfolioId)?.baseCurrency ??
+            props.position.instrumentCurrency ??
+            "",
           convertedTotalAmount: (props.position.quantity ?? 0) * (props.position.averageCostBasis ?? 0),
           convertedPrice: props.position.averageCostBasis ?? 0,
           convertedFees: 0,
