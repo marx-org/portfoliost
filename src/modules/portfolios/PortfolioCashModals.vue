@@ -37,7 +37,6 @@ const amount = ref<number>(0)
 const currency = ref("")
 const description = ref("")
 const transactionDate = ref(new Date().toISOString().slice(0, 10))
-const paymentMethod = ref("bank_transfer")
 const toPortfolioId = ref("")
 const fees = ref<number>(0)
 const feesType = ref<"fixed" | "pct">("fixed")
@@ -146,7 +145,6 @@ watch(
         currency.value = baseCurrency.value
         description.value = ""
         transactionDate.value = new Date().toISOString().slice(0, 10)
-        paymentMethod.value = "bank_transfer"
         toPortfolioId.value = ""
         fees.value = 0
         feesType.value = "fixed"
@@ -238,7 +236,6 @@ async function submit() {
         currency: currency.value,
         description: description.value || undefined,
         transactionDate: transactionDate.value || undefined,
-        paymentMethod: paymentMethod.value,
         ...feeFx,
       })
     } else {
@@ -357,16 +354,6 @@ const submitLabel = computed(() => (props.action === "deposit" ? "Deposit" : pro
             </template>
           </FxRateFields>
         </template>
-
-        <div v-if="action === 'withdraw'" class="sm:col-span-2">
-          <label for="pc-payment" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Payment Method</label>
-          <select id="pc-payment" v-model="paymentMethod" class="input" data-testid="pc-payment">
-            <option value="bank_transfer">Bank Transfer</option>
-            <option value="card">Card</option>
-            <option value="wire">Wire</option>
-            <option value="paypal">PayPal</option>
-          </select>
-        </div>
 
         <div class="sm:col-span-2">
           <label for="pc-description" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Description (Optional)</label>

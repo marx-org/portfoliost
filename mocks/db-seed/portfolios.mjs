@@ -136,10 +136,10 @@ export async function seedPortfolios(sql) {
     // (otherwise it is -totalInvested, which is meaningless for a funded book).
     await tx`
       INSERT INTO portfolios.portfolio_cash_transactions
-        (user_id, portfolio_id, type, amount, currency, status, description, transaction_date, rate_source)
+        (user_id, portfolio_id, type, amount, currency, description, transaction_date, rate_source)
       VALUES
         (${SEED_USER_ID}, ${SEED_PORTFOLIO_ID}, ${"DEPOSIT"},
-         ${(totalInvested + 5000).toFixed(8)}, ${"USD"}, ${"completed"},
+         ${(totalInvested + 5000).toFixed(8)}, ${"USD"},
          ${"Opening funding"}, ${"2026-08-01"}, ${"automatic"})
     `
 
