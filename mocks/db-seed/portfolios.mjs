@@ -95,19 +95,25 @@ export async function seedPortfolios(sql) {
          ${SEED_SHARE_PRIVACY}::jsonb, ${createdAt}, ${updatedAt})
     `
 
-    // Positions
+    // Positions (#115). Ownership is the many-to-many position_portfolios
+    // membership, so positions no longer carry portfolio_id; the loop writes the
+    // membership row alongside each position.
     for (const pos of SEED_POSITIONS) {
       await tx`
         INSERT INTO portfolios.positions
-          (id, user_id, portfolio_id, symbol, company_name, asset_type,
+          (id, user_id, symbol, company_name, asset_type,
            quantity, average_cost_basis, instrument_currency, purchase_currency,
            sector, industry, country, is_open, opened_at, created_at, updated_at)
         VALUES
-          (${pos.id}, ${SEED_USER_ID}, ${SEED_PORTFOLIO_ID}, ${pos.symbol},
+          (${pos.id}, ${SEED_USER_ID}, ${pos.symbol},
            ${pos.companyName}, ${"STOCK"},
            ${pos.quantity.toFixed(8)}, ${pos.averageCostBasis.toFixed(8)},
            ${pos.instrumentCurrency ?? "USD"}, ${pos.instrumentCurrency ?? "USD"}, ${pos.sector}, ${pos.industry}, ${pos.country},
            true, ${posOpenedAt}, ${createdAt}, ${updatedAt})
+      `
+      await tx`
+        INSERT INTO portfolios.position_portfolios (position_id, portfolio_id)
+        VALUES (${pos.id}, ${SEED_PORTFOLIO_ID})
       `
     }
 
