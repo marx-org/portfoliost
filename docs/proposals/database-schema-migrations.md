@@ -81,8 +81,8 @@ All seeding runs from `portfoliost/mocks/db-seed/` via a dedicated compose one-s
 | Schema / object | Owned tables | Owning container | Journal schema | Notes |
 | --- | --- | --- | --- | --- |
 | `users_auth` | `user_preferences` | `users-auth` | `drizzle_users_auth` | single table; identity lives in JWT |
-| `wallets` | `fx_rates`, `fx_sync_state`, `wallet_transactions`, `wallets` | `wallets` | `drizzle_wallets` | demo FX rows are seed, not schema |
-| `portfolios` | `portfolios`, `positions`, `transactions`, `shares`, `value_snapshots`, `portfolio_backfill_metadata`, `labels`, `position_labels`, `transaction_labels`, `wallet_transaction_labels` | `wallets` (module owns both schemas, D6) | `drizzle_wallets` | one journal covers both schemas |
+| `wallets` | `sync_runs` | `wallets` | `drizzle_wallets` | §62: the wallet-era tables are gone; the schema is kept for the import sync-run ledger only |
+| `portfolios` | `portfolios`, `positions`, `position_portfolios`, `transactions`, `portfolio_cash_transactions`, `split_events`, `shares`, `value_snapshots`, `portfolio_backfill_metadata`, `labels`, `position_labels`, `transaction_labels`, `portfolio_cash_transaction_labels` | `wallets` (module owns both schemas, D6) | `drizzle_wallets` | one journal covers both schemas |
 | `instruments` | `ticker_reference`, `exchange_reference`, `logos`, `price_bars`, `price_bar_metadata`, `split_adjustments`, `split_candidates`, `news_articles`, `fx_rates`, `fx_sync_state`, `fundamentals_statements`, `fundamentals_metrics`, `fundamentals_fetch_state`, `price_bars_all` (view) | `instruments` | `drizzle_instruments` | view + stooq FDW refs are module DDL. `fx_*` moved here from wallets (§48.6a); `fundamentals_*` added by #51, migration `0004` |
 | `admin` | `job_run` | `admin` | `drizzle_admin` | |
 | `stooq_daily_*` (8 foreign tables) | — | **none (infra)** | — | `postgres_fdw` foreign tables: cluster = `pfire-init-sql` ConfigMap; compose = `pricebars-sim` stand-in. Read-only for all modules |
@@ -93,6 +93,7 @@ All seeding runs from `portfoliost/mocks/db-seed/` via a dedicated compose one-s
 
 - **Drizzle Kit `0.31.10`** (`drizzle-kit generate` / `migrate`) + **drizzle-orm `0.45.2`**, dialect `postgresql`.
 - Schema is the contract: `src/db/schema.ts` → `pgSchema("<module>")` tables; migrations generated to `drizzle/<NNNN>_<name>.sql` with `drizzle/meta/_journal.json` + snapshots.
+- Every table and every column must have a meaningful description in both the owning source schema and PostgreSQL metadata (`COMMENT ON TABLE` / `COMMENT ON COLUMN`). Descriptions must explain purpose, ownership, units or currency, nullability semantics, and relationships where those are not self-evident.
 - Unit tests replay the real migrations on **PGlite** (`@electric-sql/pglite`) — the squashed baseline must be PGlite-clean, so statements are separated by `--> statement-breakpoint`.
 - `DATABASE_URL` drives the target; `drizzle.config.ts` sets `out: "./drizzle"` and `migrations.schema: "drizzle_<module>"` in every module.
 - Seeds in the mock run against the same Postgres via the `postgres` driver (raw SQL — the current module seed code already uses it, not drizzle).
@@ -175,6 +176,7 @@ Rejected alternative: reuse the `instruments` image as the ticker loader (the `p
 2. DDL not expressible in `schema.ts` (views, triggers, extensions) → `npx drizzle-kit generate --custom`, hand-write the SQL, separate statements with `--> statement-breakpoint`.
 3. Never touch another module's schema (D6) — a migration may only modify the owning module's tables.
 4. Wire fields stay camelCase (D29).
+5. Add or update table and column descriptions in the same migration as the schema change. Verify PostgreSQL comments with `obj_description` and `col_description` in the owning module's schema tests.
 
 ### 7b. Future data migrations (this is how DML joins the chain later)
 
