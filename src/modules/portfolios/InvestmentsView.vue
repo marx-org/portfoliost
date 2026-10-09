@@ -82,22 +82,6 @@ const freshnessById = usePortfolioFreshness()
 // 1,944.85 PLN disagreement across the ten cards on 2026-10-01.
 const valuesById = usePortfolioValues()
 
-const strategies = [
-  { value: "GROWTH", label: "Growth" },
-  { value: "VALUE", label: "Value" },
-  { value: "DIVIDEND_GROWTH", label: "Dividend Growth" },
-  { value: "INCOME", label: "Income" },
-  { value: "SPECIAL_SITUATIONS", label: "Special Situations" },
-  { value: "INDEX_INVESTING", label: "Index Investing" },
-  { value: "HEDGING", label: "Hedging" },
-  { value: "MOMENTUM", label: "Momentum" },
-  { value: "TECHNICAL_TRADING", label: "Technical Trading" },
-  { value: "MANAGED", label: "Managed" },
-  { value: "DEFENSIVE", label: "Defensive" },
-  { value: "AGGRESSIVE", label: "Aggressive" },
-  { value: "BALANCED", label: "Balanced" },
-]
-
 // §62 — the "Cash balance" card is the portfolio-native cash position:
 // `totalMetrics.cashValue` (already converted to the totalMetrics base currency)
 // re-expressed into the display currency, with per-currency shares from
@@ -122,7 +106,7 @@ watchEffect(() => {
     .sort((a, b) => b.pct - a.pct)
 })
 const showCreate = ref(false)
-const newPortfolio = ref({ name: "", description: "", strategy: "GROWTH", currency: "USD" })
+const newPortfolio = ref({ name: "", description: "", currency: "USD" })
 const creating = ref(false)
 const createError = ref<string | null>(null)
 
@@ -165,10 +149,9 @@ async function submitCreate() {
     await store.createPortfolio({
       name: newPortfolio.value.name.trim(),
       description: newPortfolio.value.description.trim() || undefined,
-      strategy: newPortfolio.value.strategy,
       currency: newPortfolio.value.currency,
     })
-    newPortfolio.value = { name: "", description: "", strategy: "GROWTH", currency: "USD" }
+    newPortfolio.value = { name: "", description: "", currency: "USD" }
     showCreate.value = false
   } catch (err) {
     createError.value = err instanceof Error ? err.message : "Failed to create portfolio"
@@ -363,13 +346,7 @@ async function submitCreate() {
           <input id="portfolio-name" v-model="newPortfolio.name" type="text" required class="input mb-4" placeholder="e.g. Long-term growth" />
           <label for="portfolio-description" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Description</label>
           <textarea id="portfolio-description" v-model="newPortfolio.description" rows="2" class="input mb-4" placeholder="Optional"></textarea>
-          <div class="mb-4 grid grid-cols-2 gap-3">
-            <div>
-              <label for="portfolio-strategy" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Strategy</label>
-              <select id="portfolio-strategy" v-model="newPortfolio.strategy" class="input">
-                <option v-for="s in strategies" :key="s.value" :value="s.value">{{ s.label }}</option>
-              </select>
-            </div>
+          <div class="mb-4">
             <div>
               <label for="portfolio-currency" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Currency</label>
               <select id="portfolio-currency" v-model="newPortfolio.currency" class="input">

@@ -53,7 +53,6 @@ const totalValue = () =>
         <div class="card p-6">
           <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-100">{{ data.share.displayName || data.portfolio.name }}</h1>
           <p v-if="showValues()" class="mt-1 text-sm text-slate-500 dark:text-slate-400">Total value: <span class="font-semibold text-slate-900 dark:text-slate-100">{{ money.format(totalValue()) }}</span></p>
-          <p class="mt-1 text-xs text-slate-400 dark:text-slate-500">{{ data.portfolio.strategy }} strategy</p>
         </div>
 
         <div v-if="showHoldings() && data.portfolio.positions.length" class="card mt-6 overflow-hidden p-0">

@@ -185,7 +185,7 @@ Create a portfolio, add a position, then delete it:
 ```sh
 CID=$(curl -s -X POST http://localhost:4010/api/portfolios \
   -H "Authorization: Bearer mock-dev-token" -H 'content-type: application/json' \
-  -d '{"name":"Demo","strategy":"GROWTH","currency":"USD"}' \
+  -d '{"name":"Demo","currency":"USD"}' \
   | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])')
 
 curl -X POST "http://localhost:4010/api/portfolios/$CID/positions" \

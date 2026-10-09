@@ -70,18 +70,19 @@ export async function seedPortfolios(sql) {
   let insertedSnapshots = 0
 
   await sql.begin(async tx => {
-    // Portfolio (wallet entity dropped in §62.2 — no wallet_id / currency column)
+    // Portfolio (wallet entity dropped in §62.2 — no wallet_id / currency column;
+    // strategy / type / margin rates dropped in #113)
     await tx`
       INSERT INTO portfolios.portfolios
-        (id, user_id, name, description, strategy, type, base_currency,
+        (id, user_id, name, description, base_currency,
          total_invested, current_value, is_public, is_margin_enabled,
-         margin_rate, maintenance_margin_rate, created_at, updated_at)
+         created_at, updated_at)
       VALUES
         (${SEED_PORTFOLIO_ID}, ${SEED_USER_ID}, ${"Top10"},
          ${"Top10 big US stocks with best ghrowth potential, rebalanced monthly"},
-         ${"GROWTH"}, ${"regular"}, ${"USD"},
+         ${"USD"},
          ${totalInvested.toFixed(8)}, ${totalInvested.toFixed(8)},
-         false, false, ${"0.5000"}, ${"0.2500"}, ${createdAt}, ${updatedAt})
+         false, false, ${createdAt}, ${updatedAt})
     `
 
     // Shared link (parity with mock seeded share for Top10)

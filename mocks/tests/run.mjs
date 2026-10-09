@@ -530,7 +530,7 @@ async function main() {
   check("portfolios.risk-metrics", risk.status === 200 && "sharpeRatio" in risk.json, `got ${risk.status}`)
 
   // ── Portfolios: mutation lifecycle ──────────────────────────
-  const created = await request("/portfolios", { method: "POST", token, body: { name: "TEST_TMP", description: "created by contract tests", strategy: "GROWTH", currency: "USD" } })
+  const created = await request("/portfolios", { method: "POST", token, body: { name: "TEST_TMP", description: "created by contract tests", currency: "USD" } })
   check("portfolios.create → 201", created.status === 201 && created.json.name === "TEST_TMP", `got ${created.status}`)
   const cid = created.json.id
   const createdGet = await request(`/portfolios/${cid}`, { token })

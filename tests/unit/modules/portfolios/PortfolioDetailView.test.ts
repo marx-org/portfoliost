@@ -47,7 +47,6 @@ const txt = (w: { text: () => string }) => w.text().replace(/\u00a0/g, " ")
 const DETAIL = {
   id: "p1",
   name: "Obligacje PKO SA Beata",
-  strategy: "GROWTH",
   description: null,
   currency: "PLN",
   baseCurrency: "PLN",

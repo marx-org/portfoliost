@@ -436,9 +436,6 @@ async function exportPositions(format: "csv" | "xml" | "json") {
         <p class="text-xs text-slate-500 dark:text-slate-400">{{ portfolio.description || "No description" }}</p>
       </div>
       <div class="flex items-center gap-2" @click.stop>
-        <span class="shrink-0 rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-xs font-medium uppercase text-slate-600 dark:text-slate-300">
-          {{ portfolio.strategy }}
-        </span>
         <div class="relative">
           <button
             type="button"

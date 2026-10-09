@@ -28,7 +28,6 @@ const mockedPortfolios = vi.mocked(portfoliosApi)
 const PORTFOLIO = {
   id: "p1",
   name: "Test PF",
-  strategy: "GROWTH",
   description: null,
   // Every real portfolio has one, and §78.5's amount is denominated in it —
   // without it `formatCurrency` correctly falls back to a bare number, which

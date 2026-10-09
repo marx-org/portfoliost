@@ -74,7 +74,6 @@ async function load() {
 }
 
 const portfolioName = computed(() => store.detail?.name ?? store.portfolios.find((p) => p.id === id)?.name ?? "Portfolio")
-const strategy = computed(() => store.detail?.strategy ?? store.portfolios.find((p) => p.id === id)?.strategy ?? "—")
 const description = computed(() => store.detail?.description ?? store.portfolios.find((p) => p.id === id)?.description ?? "No description")
 
 // §48.6e B3 umbrella (B2 residual, 2026-09-23) — summaryMetrics are
@@ -187,7 +186,6 @@ async function submitDelete() {
         <div>
           <div class="flex items-center gap-3">
             <h1 class="text-2xl font-semibold">{{ portfolioName }}</h1>
-            <span class="rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-xs font-medium uppercase text-slate-600 dark:text-slate-300">{{ strategy }}</span>
           </div>
           <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ description }}</p>
         </div>

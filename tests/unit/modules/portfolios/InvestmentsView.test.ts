@@ -36,15 +36,11 @@ function summary() {
       userId: "u1",
       name: "Top10",
       description: "Big US growth stocks",
-      strategy: "GROWTH",
-      type: "regular",
       baseCurrency: "USD",
       capitalBasis: 1000,
       currentValue: 1200,
       isPublic: false,
       isMarginEnabled: false,
-      marginRate: 0.5,
-      maintenanceMarginRate: 0.25,
       createdAt: "2026-08-01T10:00:00.000Z",
       updatedAt: "2026-08-02T08:00:00.000Z",
       metrics: {
@@ -236,7 +232,6 @@ describe("InvestmentsView", () => {
     expect(wrapper.text()).toContain("Investment Portfolios")
     expect(wrapper.text()).toContain("Cash")
     expect(wrapper.text()).toContain("Top10")
-    expect(wrapper.text()).toContain("GROWTH")
     expect(wrapper.text()).toContain("10 open positions")
     expect(wrapper.text()).toContain("Total Balance")
     expect(wrapper.text()).toContain("$720.00")
@@ -259,7 +254,6 @@ describe("InvestmentsView", () => {
     expect(mocked.createPortfolio).toHaveBeenCalledWith({
       name: "My Portfolio",
       description: undefined,
-      strategy: "GROWTH",
       currency: "USD",
     })
   })

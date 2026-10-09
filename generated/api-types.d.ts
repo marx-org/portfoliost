@@ -3196,16 +3196,12 @@ export interface components {
             userId: string;
             name: string;
             description?: string | null;
-            strategy: string;
-            type: string;
             baseCurrency?: string;
             capitalBasis: number;
             currentValue: number;
             isPublic: boolean;
             cashLegOnTrade?: boolean;
             isMarginEnabled: boolean;
-            marginRate?: number | null;
-            maintenanceMarginRate?: number | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -3221,7 +3217,6 @@ export interface components {
         CreatePortfolioRequest: {
             name: string;
             description?: string | null;
-            strategy?: string;
             currency?: string;
             isPublic?: boolean;
             cashLegOnTrade?: boolean;

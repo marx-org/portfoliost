@@ -365,7 +365,6 @@ export function register(app) {
       portfolio: {
         id: portfolio.id,
         name: share.portfolioName || portfolio.name,
-        strategy: portfolio.strategy || "GROWTH",
         positions: positionsFor(share.portfolioId),
       },
     })
@@ -382,7 +381,7 @@ export function register(app) {
 
   app.post("/api/portfolios", (ctx) => {
     if (!requireAuth(ctx)) return
-    const { name, description, strategy = "GROWTH", currency = "USD", baseCurrency = "USD", isPublic = false, isMarginEnabled = false } = ctx.body || {}
+    const { name, description, currency = "USD", baseCurrency = "USD", isPublic = false, isMarginEnabled = false } = ctx.body || {}
     if (!name) {
       return ctx.res.status(422).json({ error: "ValidationError", message: "name is required", statusCode: 422 })
     }
@@ -393,16 +392,12 @@ export function register(app) {
       userId: ctx.user.id,
       name,
       description: description ?? null,
-      strategy,
-      type: "regular",
       currency,
       baseCurrency,
       totalInvested: 0,
       currentValue: 0,
       isPublic,
       isMarginEnabled,
-      marginRate: null,
-      maintenanceMarginRate: null,
       createdAt: now,
       updatedAt: now,
     }

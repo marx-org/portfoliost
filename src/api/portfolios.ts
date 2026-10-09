@@ -354,7 +354,6 @@ export async function getAllTransactions(
 export async function createPortfolio(input: {
   name: string
   description?: string
-  strategy?: string
   currency?: string
   isPublic?: boolean
 }): Promise<PortfolioDetail> {
@@ -412,7 +411,6 @@ export interface PublicPortfolioShare {
   portfolio: {
     id: string
     name: string
-    strategy: string
     positions: Array<{ symbol: string; quantity: number; marketValue: number; currentPrice: number }>
   }
 }
