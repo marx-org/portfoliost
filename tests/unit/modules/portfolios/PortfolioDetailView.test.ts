@@ -154,8 +154,8 @@ describe("PortfolioDetailView — §48.6e B3 umbrella: summary cards in the disp
 
     const rename = wrapper.findAll("button").find((button) => button.text() === "Rename")
     await rename!.trigger("click")
-    await wrapper.get("#rename-name").setValue("Updated portfolio")
-    await wrapper.get("#rename-currency").setValue("USD")
+    await wrapper.get("#portfolio-settings-name").setValue("Updated portfolio")
+    await wrapper.get("#portfolio-settings-currency").setValue("USD")
     await wrapper.get("form").trigger("submit")
 
     expect(mockedPortfolios.updatePortfolio).toHaveBeenCalledWith("p1", {

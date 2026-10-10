@@ -7,6 +7,7 @@ import { formatCurrency, formatNumber, formatPercent } from "@/utils/format"
 import { useDisplayConversion } from "@/composables/useDisplayConversion"
 import type { PortfolioAnalyticsTimeframe } from "@/api/portfolios"
 import type { PortfoliosSummaries } from "@/api/types"
+import PortfolioSettingsDialog, { type PortfolioSettingsPayload } from "@/modules/portfolios/PortfolioSettingsDialog.vue"
 
 const props = defineProps<{
   portfolio: PortfoliosSummaries[number]
@@ -134,13 +135,6 @@ const unpricedAmountLabel = computed(() =>
 )
 
 const showRename = ref(false)
-const renameName = ref(props.portfolio.name)
-// §87.5 — the SAME setting as the portfolio page's settings dialog. There are two
-// "Rename portfolio" dialogs in the app (this card and PortfolioDetailView) and
-// they used to be the same dialog; adding the switch to only one of them left a
-// portfolio's cash-leg behaviour editable from one route and invisible from the
-// other, which is worse than not having it at all.
-const renameCashLeg = ref(false)
 const renameBusy = ref(false)
 const renameError = ref<string | null>(null)
 
@@ -343,21 +337,15 @@ function goToDetail() {
 
 function openRename() {
   openMenu.value = false
-  renameName.value = props.portfolio.name
-  renameCashLeg.value = props.portfolio.cashLegOnTrade ?? false
   renameError.value = null
   showRename.value = true
 }
 
-async function submitRename() {
-  if (!renameName.value.trim()) return
+async function submitRename(settings: PortfolioSettingsPayload) {
   renameBusy.value = true
   renameError.value = null
   try {
-    await updatePortfolio(props.portfolio.id, {
-      name: renameName.value.trim(),
-      cashLegOnTrade: renameCashLeg.value,
-    })
+    await updatePortfolio(props.portfolio.id, settings)
     showRename.value = false
     await store.fetchAll()
     notice.value = "Portfolio renamed"
@@ -658,44 +646,16 @@ async function exportPositions(format: "csv" | "xml" | "json") {
       </div>
     </div>
 
-    <div
-      v-if="showRename"
-      class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
-      @click.self="showRename = false"
-    >
-      <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Rename portfolio" @click.stop>
-        <h3 class="mb-4 text-base font-semibold">Portfolio settings</h3>
-        <form @submit.prevent="submitRename">
-          <label for="portfolio-name" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Name</label>
-          <input id="portfolio-name" v-model="renameName" type="text" required class="input mb-4" />
-          <!-- §87.5 — UI ONLY, and identical to the portfolio page's copy: pre-ticks
-               the buy/sell form's cash checkbox. It does not govern the Google Sheets
-               import, which uses its own kontо list. -->
-          <label class="mb-4 flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
-            <input
-              id="card-cash-leg-on-trade"
-              v-model="renameCashLeg"
-              type="checkbox"
-              class="mt-0.5"
-              data-testid="card-cash-leg-on-trade"
-            />
-            <span>
-              Generate a cash transaction on buy/sell
-              <span class="block text-xs text-slate-500 dark:text-slate-400">
-                Pre-ticks the cash checkbox on the buy/sell form. Sheet imports are unaffected.
-              </span>
-            </span>
-          </label>
-          <p v-if="renameError" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ renameError }}</p>
-          <div class="flex justify-end gap-2">
-            <button type="button" class="btn-ghost" @click="showRename = false">Cancel</button>
-            <button type="submit" class="btn-primary" :disabled="renameBusy || !renameName.trim()">
-              {{ renameBusy ? "Saving..." : "Save" }}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <PortfolioSettingsDialog
+      :open="showRename"
+      :name="portfolio.name"
+      :base-currency="portfolio.baseCurrency ?? ''"
+      :cash-leg-on-trade="portfolio.cashLegOnTrade ?? false"
+      :busy="renameBusy"
+      :error="renameError"
+      @close="showRename = false"
+      @submit="submitRename"
+    />
 
     <div
       v-if="showDeleteConfirm"

@@ -9,21 +9,21 @@ import { storeToRefs } from "pinia"
 import { deletePortfolio, updatePortfolio } from "@/api/portfolios"
 import { formatCurrency, formatPercent, formatSignedCurrency } from "@/utils/format"
 import AddPositionDialog from "@/modules/portfolios/AddPositionDialog.vue"
+import PortfolioSettingsDialog, { type PortfolioSettingsPayload } from "@/modules/portfolios/PortfolioSettingsDialog.vue"
 
 const route = useRoute()
 const router = useRouter()
 const store = usePortfolioStore()
 const displayCurrencyStore = useDisplayCurrencyStore()
+const currenciesStore = useCurrenciesStore()
+if (!currenciesStore.loaded) void currenciesStore.load()
 const id = String(route.params.id)
 const loading = ref(true)
 const error = ref<string | null>(null)
 
-// D26: registry-fed selector
-const currenciesStore = useCurrenciesStore()
-if (!currenciesStore.loaded) void currenciesStore.load()
-const currencies = computed(() => currenciesStore.options.map((c) => c.code))
 const { currency: displayCurrency } = storeToRefs(displayCurrencyStore)
 const showCurrencyMenu = ref(false)
+const currencies = computed(() => currenciesStore.options.map((currency) => currency.code))
 
 const tabs = [
   { name: "portfolio-holdings", label: "Holdings" },
@@ -43,9 +43,6 @@ const tabs = [
 // "Rename portfolio" — tests/e2e/parity-portfolios.spec.ts:87 selects the dialog by
 // that name, and a renamed label is a gratuitous e2e break for no user gain.
 const showRename = ref(false)
-const renameName = ref("")
-const renameCurrency = ref("")
-const renameCashLeg = ref(false)
 const renameBusy = ref(false)
 const renameError = ref<string | null>(null)
 
@@ -114,25 +111,15 @@ function gainClass(value: number | undefined): string {
 }
 
 function openRename() {
-  renameName.value = portfolioName.value
-  renameCurrency.value = store.detail?.baseCurrency ?? ""
-  // §87.5 — default the box from the portfolio's own flag, so it reflects what
-  // will actually happen rather than asking the user to remember.
-  renameCashLeg.value = store.detail?.cashLegOnTrade ?? false
   renameError.value = null
   showRename.value = true
 }
 
-async function submitRename() {
-  if (!renameName.value.trim()) return
+async function submitRename(settings: PortfolioSettingsPayload) {
   renameBusy.value = true
   renameError.value = null
   try {
-    await updatePortfolio(id, {
-      name: renameName.value.trim(),
-      baseCurrency: renameCurrency.value,
-      cashLegOnTrade: renameCashLeg.value,
-    })
+    await updatePortfolio(id, settings)
     showRename.value = false
     await Promise.all([store.fetchAll(), store.fetchDetail(id)])
   } catch (err) {
@@ -273,49 +260,16 @@ async function submitDelete() {
       <router-view />
     </template>
 
-    <div
-      v-if="showRename"
-      class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
-      @click.self="showRename = false"
-    >
-      <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Rename portfolio">
-        <h3 class="mb-4 text-base font-semibold">Portfolio settings</h3>
-        <form @submit.prevent="submitRename">
-          <label for="rename-name" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Name</label>
-          <input id="rename-name" v-model="renameName" type="text" required class="input mb-4" />
-          <label for="rename-currency" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Base currency</label>
-          <select id="rename-currency" v-model="renameCurrency" required class="input mb-4">
-            <option v-for="currency in currencies" :key="currency" :value="currency">{{ currency }}</option>
-          </select>
-          <!-- §87.5 — UI ONLY. The buy/sell form pre-ticks its "also create a cash
-               transaction" box from this, so the two surfaces cannot disagree. It
-               deliberately does not govern the Google Sheets import, which uses its
-               own kontо list — changing this must never change what a sheet imports. -->
-          <label class="mb-4 flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
-            <input
-              id="cash-leg-on-trade"
-              v-model="renameCashLeg"
-              type="checkbox"
-              class="mt-0.5"
-              data-testid="cash-leg-on-trade"
-            />
-            <span>
-              Generate a cash transaction on buy/sell
-              <span class="block text-xs text-slate-500 dark:text-slate-400">
-                Pre-ticks the cash checkbox on the buy/sell form. Sheet imports are unaffected.
-              </span>
-            </span>
-          </label>
-          <p v-if="renameError" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ renameError }}</p>
-          <div class="flex justify-end gap-2">
-            <button type="button" class="btn-ghost" @click="showRename = false">Cancel</button>
-            <button type="submit" class="btn-primary" :disabled="renameBusy || !renameName.trim()">
-              {{ renameBusy ? "Saving..." : "Save" }}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <PortfolioSettingsDialog
+      :open="showRename"
+      :name="portfolioName"
+      :base-currency="store.detail?.baseCurrency ?? ''"
+      :cash-leg-on-trade="store.detail?.cashLegOnTrade ?? false"
+      :busy="renameBusy"
+      :error="renameError"
+      @close="showRename = false"
+      @submit="submitRename"
+    />
 
     <div
       v-if="showDeleteConfirm"
