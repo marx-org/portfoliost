@@ -44,6 +44,7 @@ const tabs = [
 // that name, and a renamed label is a gratuitous e2e break for no user gain.
 const showRename = ref(false)
 const renameName = ref("")
+const renameCurrency = ref("")
 const renameCashLeg = ref(false)
 const renameBusy = ref(false)
 const renameError = ref<string | null>(null)
@@ -114,6 +115,7 @@ function gainClass(value: number | undefined): string {
 
 function openRename() {
   renameName.value = portfolioName.value
+  renameCurrency.value = store.detail?.baseCurrency ?? ""
   // §87.5 — default the box from the portfolio's own flag, so it reflects what
   // will actually happen rather than asking the user to remember.
   renameCashLeg.value = store.detail?.cashLegOnTrade ?? false
@@ -126,7 +128,11 @@ async function submitRename() {
   renameBusy.value = true
   renameError.value = null
   try {
-    await updatePortfolio(id, { name: renameName.value.trim(), cashLegOnTrade: renameCashLeg.value })
+    await updatePortfolio(id, {
+      name: renameName.value.trim(),
+      baseCurrency: renameCurrency.value,
+      cashLegOnTrade: renameCashLeg.value,
+    })
     showRename.value = false
     await Promise.all([store.fetchAll(), store.fetchDetail(id)])
   } catch (err) {
@@ -277,6 +283,10 @@ async function submitDelete() {
         <form @submit.prevent="submitRename">
           <label for="rename-name" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Name</label>
           <input id="rename-name" v-model="renameName" type="text" required class="input mb-4" />
+          <label for="rename-currency" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Base currency</label>
+          <select id="rename-currency" v-model="renameCurrency" required class="input mb-4">
+            <option v-for="currency in currencies" :key="currency" :value="currency">{{ currency }}</option>
+          </select>
           <!-- §87.5 — UI ONLY. The buy/sell form pre-ticks its "also create a cash
                transaction" box from this, so the two surfaces cannot disagree. It
                deliberately does not govern the Google Sheets import, which uses its

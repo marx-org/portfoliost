@@ -16,6 +16,8 @@ vi.mock("@/api/portfolios", async (importOriginal) => {
   return {
     ...actual,
     getPortfolioDetail: vi.fn(),
+    getPortfolios: vi.fn(),
+    getPortfolioTotalMetrics: vi.fn(),
     getPortfolioSummaryMetrics: vi.fn(),
     getPortfolioPositions: vi.fn(),
     getPortfolioAnalytics: vi.fn(),
@@ -31,7 +33,14 @@ vi.mock("@/api/fx", () => ({
 // The detail view warms the currency registry on mount (D26) — keep it inert.
 vi.mock("@/api/client", () => ({
   http: {
-    get: vi.fn(async (url: string) => (url.includes("/api/currencies") ? { currencies: [] } : null)),
+    get: vi.fn(async (url: string) =>
+      url.includes("/api/currencies")
+        ? { currencies: [
+            { code: "PLN", name: "Polish zloty", symbol: "PLN", minorUnits: 2, popular: true },
+            { code: "USD", name: "US dollar", symbol: "$", minorUnits: 2, popular: true },
+          ] }
+        : null,
+    ),
   },
 }))
 
@@ -78,6 +87,8 @@ async function mountDetail(display: string) {
   setActivePinia(pinia)
   useDisplayCurrencyStore().currency = display
   mockedPortfolios.getPortfolioDetail.mockResolvedValue(DETAIL)
+  mockedPortfolios.getPortfolios.mockResolvedValue([])
+  mockedPortfolios.getPortfolioTotalMetrics.mockResolvedValue({ totalValue: 0, capitalBasis: 0 } as never)
   mockedPortfolios.getPortfolioSummaryMetrics.mockResolvedValue(METRICS)
   mockedPortfolios.getPortfolioPositions.mockResolvedValue([])
   mockedPortfolios.getPortfolioAnalytics.mockResolvedValue({
@@ -135,5 +146,22 @@ describe("PortfolioDetailView — §48.6e B3 umbrella: summary cards in the disp
 
     expect(wrapper.text()).toContain("$29,797.50")
     expect(txt(wrapper)).not.toContain("PLN 119,190.00")
+  })
+
+  it("submits the edited base currency with portfolio settings", async () => {
+    const wrapper = await mountDetail("PLN")
+    await flushPromises()
+
+    const rename = wrapper.findAll("button").find((button) => button.text() === "Rename")
+    await rename!.trigger("click")
+    await wrapper.get("#rename-name").setValue("Updated portfolio")
+    await wrapper.get("#rename-currency").setValue("USD")
+    await wrapper.get("form").trigger("submit")
+
+    expect(mockedPortfolios.updatePortfolio).toHaveBeenCalledWith("p1", {
+      name: "Updated portfolio",
+      baseCurrency: "USD",
+      cashLegOnTrade: false,
+    })
   })
 })
