@@ -155,3 +155,26 @@ export function runPriceAudit(tolerance?: number): Promise<PriceAuditRunResponse
 export function getPriceAuditStatus(): Promise<PriceAuditStatusResponse> {
   return http.get<PriceAuditStatusResponse>("/api/admin/jobs/price-audit/status")
 }
+
+// -- Cash audit ---------------------------------------------------------------
+
+export interface CashAuditRunResponse {
+  jobName: string
+  namespace: string
+  status: string
+}
+
+export interface CashAuditStatusResponse {
+  jobName: string
+  status: "Running" | "Succeeded" | "Failed" | "NotFound" | "Unknown" | string
+  details: unknown
+  startedAt?: string | null
+}
+
+export function runCashAudit(): Promise<CashAuditRunResponse> {
+  return http.post<CashAuditRunResponse>("/api/admin/jobs/cash-audit/run", {})
+}
+
+export function getCashAuditStatus(): Promise<CashAuditStatusResponse> {
+  return http.get<CashAuditStatusResponse>("/api/admin/jobs/cash-audit/status")
+}

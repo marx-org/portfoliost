@@ -15,6 +15,8 @@ import {
   type SheetsSyncLogEntry,
   runPriceAudit,
   getPriceAuditStatus,
+  runCashAudit,
+  getCashAuditStatus,
 } from "@/api/adminJobs"
 
 // ── Dataset metadata ──────────────────────────────────────────────────────────
@@ -99,6 +101,19 @@ async function loadLog() {
     }
   } catch {
     // transient — the run buttons still work
+  }
+
+  try {
+    const cashStatus = await getCashAuditStatus()
+    if (cashStatus.startedAt) cashAudit.value.startedAt = cashStatus.startedAt
+    if (cashStatus.status === "Succeeded") cashAudit.value.phase = "succeeded"
+    else if (cashStatus.status === "Failed") cashAudit.value.phase = "failed"
+    else if (cashStatus.status === "Running") {
+      cashAudit.value.phase = "running"
+      startCashAuditPolling()
+    }
+  } catch {
+    // transient — the run button still works
   }
 }
 
@@ -316,6 +331,69 @@ async function runAudit() {
   }
 }
 
+// -- Cash audit ---------------------------------------------------------------
+
+const cashAudit = ref<{
+  phase: AuditPhase
+  errorMsg: string | null
+  startedAt: string | null
+}>({ phase: "idle", errorMsg: null, startedAt: null })
+
+let cashAuditPoller: ReturnType<typeof setInterval> | null = null
+
+function stopCashAuditPolling() {
+  if (cashAuditPoller !== null) {
+    clearInterval(cashAuditPoller)
+    cashAuditPoller = null
+  }
+}
+
+function startCashAuditPolling() {
+  stopCashAuditPolling()
+  cashAuditPoller = setInterval(() => pollCashAuditStatus(), 30_000)
+}
+
+async function pollCashAuditStatus() {
+  try {
+    const status = await getCashAuditStatus()
+    if (status.startedAt) cashAudit.value.startedAt = status.startedAt
+    if (status.status === "Running") {
+      cashAudit.value.phase = "running"
+    } else if (status.status === "Failed") {
+      cashAudit.value.phase = "failed"
+      cashAudit.value.errorMsg = "Cash audit job failed. Check cluster logs."
+      stopCashAuditPolling()
+    } else if (cashAudit.value.phase === "running") {
+      cashAudit.value.phase = "succeeded"
+      stopCashAuditPolling()
+    }
+  } catch {
+    // transient — keep polling
+  }
+}
+
+async function runCashReconciliation() {
+  const a = cashAudit.value
+  a.errorMsg = null
+  try {
+    await runCashAudit()
+    a.phase = "running"
+    a.startedAt = new Date().toISOString()
+    startCashAuditPolling()
+  } catch (e) {
+    a.phase = "failed"
+    a.errorMsg = e instanceof Error ? e.message : "Failed to start cash audit"
+  }
+}
+
+function cashAuditBadge(): { label: string; cls: string } | null {
+  const a = cashAudit.value
+  if (a.phase === "running") return { label: "Running", cls: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" }
+  if (a.phase === "succeeded") return { label: "Succeeded", cls: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" }
+  if (a.phase === "failed") return { label: "Failed", cls: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" }
+  return null
+}
+
 function auditBadge(): { label: string; cls: string } | null {
   const a = audit.value
   if (a.phase === "running")   return { label: "Running",   cls: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" }
@@ -415,6 +493,7 @@ onUnmounted(() => {
   for (const dataset of STOOQ_DATASETS) stopPolling(dataset)
   stopSheetsPolling()
   stopAuditPolling()
+  stopCashAuditPolling()
 })
 </script>
 
@@ -486,6 +565,54 @@ onUnmounted(() => {
                 Wipe &amp; re-import
               </button>
             </div>
+          </div>
+
+          <div
+            class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
+            data-testid="job-card-cash-audit"
+          >
+            <div class="mb-3 flex items-start justify-between gap-4">
+              <div>
+                <div class="font-medium text-slate-900 dark:text-slate-100">Cash audit</div>
+                <div class="mt-0.5 font-mono text-xs text-slate-400 dark:text-slate-500">
+                  dated Gotówka balances vs wallets replay
+                </div>
+              </div>
+              <span
+                v-if="cashAuditBadge()"
+                class="inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
+                :class="cashAuditBadge()!.cls"
+              >
+                {{ cashAuditBadge()!.label }}
+              </span>
+            </div>
+
+            <p class="mb-3 text-xs text-slate-500 dark:text-slate-400">
+              Read-only audit of every dated sheet snapshot, including the stock-only
+              Equate+ cash invariant. Manual timing and FX differences are reported,
+              not silently normalized.
+            </p>
+
+            <div class="mb-3 text-xs text-slate-500 dark:text-slate-400">
+              <span v-if="cashAudit.startedAt">Last run: {{ formatDate(cashAudit.startedAt) }}</span>
+              <span v-else>Never run</span>
+            </div>
+
+            <div
+              v-if="cashAudit.errorMsg"
+              class="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-700/50 dark:bg-red-900/20 dark:text-red-400"
+            >
+              {{ cashAudit.errorMsg }}
+            </div>
+
+            <button
+              class="btn-primary shrink-0"
+              :disabled="cashAudit.phase === 'running'"
+              data-testid="cash-audit-run-btn"
+              @click="runCashReconciliation"
+            >
+              {{ cashAudit.phase === "running" ? "Running…" : "Run cash audit" }}
+            </button>
           </div>
         </div>
       </section>

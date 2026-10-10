@@ -1,7 +1,7 @@
 import { flushPromises, mount } from "@vue/test-utils"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import JobsView from "@/modules/admin/JobsView.vue"
-import { getStooqImportLog, getSheetsSyncLog, runPriceAudit, getPriceAuditStatus } from "@/api/adminJobs"
+import { getStooqImportLog, getSheetsSyncLog, runPriceAudit, getPriceAuditStatus, runCashAudit, getCashAuditStatus } from "@/api/adminJobs"
 
 vi.mock("@/api/adminJobs", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/api/adminJobs")>()
@@ -11,12 +11,19 @@ vi.mock("@/api/adminJobs", async (importOriginal) => {
     getSheetsSyncLog: vi.fn(),
     runPriceAudit: vi.fn(),
     getPriceAuditStatus: vi.fn(),
+    runCashAudit: vi.fn(),
+    getCashAuditStatus: vi.fn(),
   }
 })
 
 const mockedLog = vi.mocked(getStooqImportLog)
 const mockedSheetsLog = vi.mocked(getSheetsSyncLog)
-const mocks = { runPriceAudit: vi.mocked(runPriceAudit), status: vi.mocked(getPriceAuditStatus) }
+const mocks = {
+  runPriceAudit: vi.mocked(runPriceAudit),
+  status: vi.mocked(getPriceAuditStatus),
+  runCashAudit: vi.mocked(runCashAudit),
+  cashStatus: vi.mocked(getCashAuditStatus),
+}
 
 const EXPECTED_DATASETS = [
   "daily_world",
@@ -36,9 +43,11 @@ describe("JobsView", () => {
     mockedSheetsLog.mockResolvedValue({ startedAt: null, status: null, mode: null })
     mocks.runPriceAudit.mockResolvedValue({ jobName: "portfoliost-price-audit", namespace: "pfire", status: "Running" })
     mocks.status.mockResolvedValue({ jobName: "portfoliost-price-audit", status: "NotFound", details: null })
+    mocks.runCashAudit.mockResolvedValue({ jobName: "portfoliost-cash-audit", namespace: "pfire", status: "Running" })
+    mocks.cashStatus.mockResolvedValue({ jobName: "portfoliost-cash-audit", status: "NotFound", details: null })
   })
 
-  it("renders a card per stooq dataset + the Google Sheets and price-audit cards", async () => {
+  it("renders a card per stooq dataset + the Google Sheets, price, and cash-audit cards", async () => {
     const wrapper = mount(JobsView)
     await flushPromises()
 
@@ -49,7 +58,8 @@ describe("JobsView", () => {
     // §72 — the audit is a Job like any other, so it belongs on this panel. Its
     // absence was the reason the backend route alone was not enough.
     expect(wrapper.find('[data-testid="job-card-price-audit"]').exists()).toBe(true)
-    expect(wrapper.findAll("[data-testid^='job-card-']")).toHaveLength(EXPECTED_DATASETS.length + 2)
+    expect(wrapper.find('[data-testid="job-card-cash-audit"]').exists()).toBe(true)
+    expect(wrapper.findAll("[data-testid^='job-card-']")).toHaveLength(EXPECTED_DATASETS.length + 3)
     wrapper.unmount()
   })
 
@@ -72,6 +82,18 @@ describe("JobsView", () => {
     await flushPromises()
     expect(wrapper.find('[data-testid="job-card-price-audit"]').text()).toContain("Never run")
     expect(wrapper.find('[data-testid="job-card-price-audit"]').text()).not.toContain("Succeeded")
+    wrapper.unmount()
+  })
+
+  it("cash audit: the run button starts the read-only reconciliation", async () => {
+    const wrapper = mount(JobsView)
+    await flushPromises()
+
+    await wrapper.find('[data-testid="cash-audit-run-btn"]').trigger("click")
+    await flushPromises()
+
+    expect(mocks.runCashAudit).toHaveBeenCalledOnce()
+    expect(wrapper.find('[data-testid="cash-audit-run-btn"]').text()).toContain("Running")
     wrapper.unmount()
   })
 
