@@ -136,6 +136,18 @@ exports[`topology graph definition (D55-3) > snapshots node IDs and edge pairs 1
       "postgres",
     ],
     [
+      "portfoliost-cash-audit",
+      "google-sheets",
+    ],
+    [
+      "portfoliost-cash-audit",
+      "jobshot",
+    ],
+    [
+      "portfoliost-cash-audit",
+      "portfoliost-wallets",
+    ],
+    [
       "portfoliost-instruments",
       "cachest",
     ],
@@ -240,6 +252,7 @@ exports[`topology graph definition (D55-3) > snapshots node IDs and edge pairs 1
     "polygon",
     "portfoliost",
     "portfoliost-admin",
+    "portfoliost-cash-audit",
     "portfoliost-instruments",
     "portfoliost-instruments-corpbondsync",
     "portfoliost-instruments-fundcategorysync",
