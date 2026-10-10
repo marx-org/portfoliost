@@ -36,6 +36,7 @@ const EXPECTED_NODE_IDS = [
   "portfoliost-instruments-splitsync",
   "portfoliost-instruments-tickersync",
   "portfoliost-sheets-sync",
+  "portfoliost-cash-audit",
   "portfoliost-wallets-snapshotsync",
   "stooq-downloader",
   "stooq-importer",
@@ -110,6 +111,9 @@ const EXPECTED_EDGE_PAIRS = [
   ["portfoliost-instruments-tickersync", "portfoliost-instruments"],
   ["portfoliost-sheets-sync", "google-sheets"],
   ["portfoliost-sheets-sync", "portfoliost-wallets"],
+  ["portfoliost-cash-audit", "google-sheets"],
+  ["portfoliost-cash-audit", "portfoliost-wallets"],
+  ["portfoliost-cash-audit", "jobshot"],
   ["portfoliost-users-auth", "postgres"],
   ["portfoliost-wallets", "portfoliost-users-auth"],
   ["portfoliost-wallets", "postgres"],
@@ -149,7 +153,7 @@ describe("topology graph definition (D55-3)", () => {
     expect(NODE_AREAS).toHaveLength(5)
     expect(areaNodes("internal")).toHaveLength(6)
     expect(areaNodes("storage")).toHaveLength(2)
-    expect(areaNodes("jobs")).toHaveLength(14)
+    expect(areaNodes("jobs")).toHaveLength(15)
     expect(areaNodes("external-services")).toHaveLength(5)
     expect(areaNodes("data-providers")).toHaveLength(16)
   })
@@ -227,7 +231,7 @@ describe("topology graph definition (D55-3)", () => {
   it("computes upstream/downstream neighbours correctly", () => {
     expect(downstreamOf("nginx-gateway").sort()).toEqual(["portfoliost-admin", "portfoliost-instruments", "portfoliost-users-auth", "portfoliost-wallets"])
     expect(upstreamOf("portfoliost-users-auth").sort()).toEqual(["nginx-gateway", "pocketid", "portfoliost-admin", "portfoliost-instruments", "portfoliost-wallets"])
-    expect(upstreamOf("jobshot").sort()).toEqual(["portfoliost-admin"])
+    expect(upstreamOf("jobshot").sort()).toEqual(["portfoliost-admin", "portfoliost-cash-audit"])
     expect(edgesForNode("cachest")).toHaveLength(8)
     expect(edgesForNode("scanst")).toHaveLength(0)
   })
