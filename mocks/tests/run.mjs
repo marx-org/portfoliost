@@ -516,11 +516,23 @@ async function main() {
       feedMsft.json.items.every((t) => t.instrumentSymbol === "MSFT"),
     `got ${feedMsft.status} total ${feedMsft.json.total} expected ${expectedMsft}`,
   )
+  const feedCompany = await request("/portfolios/transactions?page=1&limit=100&search=microsoft", { token })
+  check(
+    "portfolios.transactions feed company-name search",
+    feedCompany.status === 200 && feedCompany.json.total >= 1 && feedCompany.json.items.every((t) => String(t.instrumentName ?? "").toLowerCase().includes("microsoft")),
+    `got ${feedCompany.status} total ${feedCompany.json.total}`,
+  )
   const pidMsft = await request(`/portfolios/${pid}/transactions?page=1&limit=100&instrumentSymbol=msft`, { token })
   check(
     "portfolios.transactions per-portfolio instrumentSymbol filter (case-insensitive)",
     pidMsft.status === 200 && pidMsft.json.total === 1 && pidMsft.json.items[0].instrumentSymbol === "MSFT",
     `got ${pidMsft.status} total ${pidMsft.json.total}`,
+  )
+  const pidCompany = await request(`/portfolios/${pid}/transactions?page=1&limit=100&search=microsoft`, { token })
+  check(
+    "portfolios.transactions per-portfolio company-name search",
+    pidCompany.status === 200 && pidCompany.json.total === 1 && pidCompany.json.items[0].instrumentSymbol === "MSFT",
+    `got ${pidCompany.status} total ${pidCompany.json.total}`,
   )
   const pidNone = await request(`/portfolios/${pid}/transactions?page=1&limit=100&instrumentSymbol=aapl`, { token })
   check("portfolios.transactions instrumentSymbol no match → empty", pidNone.status === 200 && pidNone.json.total === 0, `got ${pidNone.status} total ${pidNone.json.total}`)

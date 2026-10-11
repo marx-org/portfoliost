@@ -1,4 +1,5 @@
 import { requireAuth } from "../lib/auth.js"
+import { labelsForTransaction, matchesLabelFilter } from "../labels.js"
 import { resolveFeeFx } from "../lib/demo-fx.js"
 import { loadJson, loadRaw, loadResearch, normalize } from "../lib/data.js"
 import { paginatePage, uuid, nowIso } from "../lib/http.js"
@@ -137,10 +138,10 @@ function heldPositions(id) {
 }
 
 function enrichTx(tx) {
-  if (tx.sector && tx.country) return tx
+  if (tx.sector && tx.country) return { ...tx, labels: labelsForTransaction(tx.id) }
   const position = positionsFor(tx.portfolioId).find((p) => p.symbol === tx.instrumentSymbol)
   if (position && position.sector && position.country) {
-    return { ...tx, sector: position.sector, country: position.country }
+    return { ...tx, sector: position.sector, country: position.country, labels: labelsForTransaction(tx.id) }
   }
   const research = loadResearch(tx.instrumentSymbol)
   if (research) {
@@ -148,9 +149,10 @@ function enrichTx(tx) {
       ...tx,
       sector: research.overview.sector || "Other",
       country: research.overview.country || "Other",
+      labels: labelsForTransaction(tx.id),
     }
   }
-  return { ...tx, sector: tx.sector || "Other", country: tx.country || "Other" }
+  return { ...tx, sector: tx.sector || "Other", country: tx.country || "Other", labels: labelsForTransaction(tx.id) }
 }
 
 function allTransactions() {
@@ -169,6 +171,19 @@ function filterTransactionsBySymbol(items, symbol) {
   if (!symbol) return items
   const q = String(symbol).toUpperCase()
   return items.filter((t) => String(t.instrumentSymbol ?? "").toUpperCase() === q)
+}
+
+function filterTransactionsBySearch(items, search) {
+  if (!search || !String(search).trim()) return items
+  const q = String(search).trim().toLowerCase()
+  return items.filter((t) =>
+    String(t.instrumentSymbol ?? "").toLowerCase().includes(q) ||
+    String(t.instrumentName ?? "").toLowerCase().includes(q),
+  )
+}
+
+function filterTransactionsByLabels(items, raw) {
+  return items.filter((tx) => matchesLabelFilter(tx.id, raw))
 }
 
 function filterTransactions(items, symbol) {
@@ -373,9 +388,13 @@ export function register(app) {
   app.get("/api/portfolios/transactions", (ctx) => {
     if (!requireAuth(ctx)) return
     let data = allTransactions()
+    data = { items: filterTransactionsByLabels(data.items, ctx.query.labels), total: 0 }
+    data.total = data.items.length
     if (ctx.query.instrumentSymbol) {
       data = filterTransactions(data.items, ctx.query.instrumentSymbol)
     }
+    data = { items: filterTransactionsBySearch(data.items, ctx.query.search), total: 0 }
+    data.total = data.items.length
     ctx.res.json(transactionsPage(ctx, data))
   })
 
@@ -562,6 +581,8 @@ export function register(app) {
   app.get("/api/portfolios/:id/transactions", (ctx) => {
     if (!requireAuth(ctx)) return
     let data = portfolioTransactions(ctx.params.id)
+    data = { items: filterTransactionsByLabels(data.items, ctx.query.labels), total: 0 }
+    data.total = data.items.length
     if (ctx.query.type) {
       const want = String(ctx.query.type).toUpperCase()
       const items = data.items.filter((t) => String(t.type ?? "").toUpperCase() === want)
@@ -574,6 +595,8 @@ export function register(app) {
     if (ctx.query.instrumentSymbol) {
       data = filterTransactions(data.items, ctx.query.instrumentSymbol)
     }
+    data = { items: filterTransactionsBySearch(data.items, ctx.query.search), total: 0 }
+    data.total = data.items.length
     ctx.res.json(transactionsPage(ctx, data))
   })
 

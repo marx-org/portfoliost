@@ -8,6 +8,7 @@ import { loadRaw } from "../lib/data.js"
 import { paginatePage, uuid, nowIso } from "../lib/http.js"
 import { currenciesPayload, resolveFeeFx, DEMO_RATES } from "../lib/demo-fx.js"
 import { convert } from "@marx2/contracts/fx"
+import { labelsForCashTransaction, matchesCashLabelFilter } from "../labels.js"
 
 const CASH_LABELS = { DEPOSIT: "Deposit", WITHDRAWAL: "Withdrawal", TRANSFER: "Transfer" }
 
@@ -116,6 +117,8 @@ function toRow(portfolioId, t) {
     portfolioId,
     portfolioName: portfolioName(portfolioId),
     type,
+    instrumentSymbol: merged.instrumentSymbol ?? null,
+    instrumentName: merged.instrumentName ?? null,
     displayLabel: merged.displayLabel ?? CASH_LABELS[type] ?? type,
     amount: Number(merged.amount) || 0,
     currency: merged.currency,
@@ -134,7 +137,7 @@ function toRow(portfolioId, t) {
     balanceAfter: merged.balanceAfter ?? null,
     isInternalTransfer: Boolean(merged.isInternalTransfer),
     reference: merged.reference ?? null,
-    labels: merged.labels ?? [],
+    labels: labelsForCashTransaction(merged.id),
   }
 }
 // Recent feed row: amount is a signed string (contract `RecentCashTransaction.amount`).
@@ -292,8 +295,21 @@ function sortCashRows(items, fields, sortBy, sortOrder) {
   })
 }
 
+function filterCashRows(items, search) {
+  if (!search || !String(search).trim()) return items
+  const q = String(search).trim().toLowerCase()
+  return items.filter((row) =>
+    String(row.instrumentSymbol ?? "").toLowerCase().includes(q) ||
+    String(row.instrumentName ?? "").toLowerCase().includes(q),
+  )
+}
+
+function filterCashRowsByLabels(items, raw) {
+  return items.filter((row) => matchesCashLabelFilter(row.id, raw))
+}
+
 function recentPage(ctx) {
-  const items = sortCashRows(allRecent(), RECENT_SORT_FIELDS, ctx.query.sortBy, ctx.query.sortOrder)
+  const items = sortCashRows(filterCashRowsByLabels(filterCashRows(allRecent(), ctx.query.search), ctx.query.labels), RECENT_SORT_FIELDS, ctx.query.sortBy, ctx.query.sortOrder)
   const limit = Number(ctx.query.limit) || 10
   const page = Number(ctx.query.page) || 1
   const total = items.length
@@ -348,7 +364,7 @@ export function register(app) {
 
   app.get("/api/portfolios/:id/cash/transactions", (ctx) => {
     if (!requireAuth(ctx)) return
-    const rows = liveRows(ctx.params.id).map((t) => toRow(ctx.params.id, t))
+    const rows = filterCashRowsByLabels(filterCashRows(liveRows(ctx.params.id).map((t) => toRow(ctx.params.id, t)), ctx.query.search), ctx.query.labels)
     const sorted = sortCashRows(rows, CASH_TX_SORT_FIELDS, ctx.query.sortBy, ctx.query.sortOrder)
     ctx.res.json(paginatePage(ctx.query.page, ctx.query.limit, sorted, sorted.length))
   })
