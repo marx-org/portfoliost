@@ -6,9 +6,21 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import PortfolioCard from "@/modules/portfolios/PortfolioCard.vue"
 import * as portfoliosApi from "@/api/portfolios"
 
+const routerPush = vi.fn()
+
 vi.mock("vue-router", () => ({
   useRoute: () => ({ params: {} }),
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: routerPush }),
+}))
+
+vi.mock("@/api/client", () => ({
+  http: {
+    get: vi.fn(async (url: string) =>
+      url.includes("/api/currencies")
+        ? { currencies: [{ code: "PLN", name: "Polish zloty", symbol: "PLN", minorUnits: 2, popular: true }] }
+        : null,
+    ),
+  },
 }))
 
 vi.mock("@/api/portfolios", async (importOriginal) => {
@@ -88,6 +100,19 @@ const key = (w: ReturnType<typeof mount>) => (w.vm as unknown as { chartKey: str
 describe("PortfolioCard sparkline (§53.3)", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+  })
+
+  it("cancelling settings does not navigate to the portfolio detail", async () => {
+    mockedPortfolios.getPortfolioAnalytics.mockResolvedValue(analytics([], "complete"))
+    const w = await mountCard()
+
+    await w.find('[aria-label="Portfolio actions"]').trigger("click")
+    await w.findAll("button").find((button) => button.text() === "Edit")!.trigger("click")
+    await flushPromises()
+    await w.find("#portfolio-settings-name").trigger("click")
+    await w.findAll("button").find((button) => button.text() === "Cancel")!.trigger("click")
+
+    expect(routerPush).not.toHaveBeenCalled()
   })
 
   it("remount key changes when the series fingerprint changes (timeframe swap)", async () => {

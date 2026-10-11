@@ -54,6 +54,7 @@ function submit() {
   <div
     v-if="open"
     class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
+    @click.stop
     @click.self="emit('close')"
   >
     <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Rename portfolio">
