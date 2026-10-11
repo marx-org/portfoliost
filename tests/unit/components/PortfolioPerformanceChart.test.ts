@@ -115,6 +115,19 @@ describe("PortfolioPerformanceChart (§41.1)", () => {
     expect(chartOptions(w).series[1].data.map(([, v]) => v)).toEqual([0])
   })
 
+  it("anchors the benchmark after a zero-valued pre-investment point", () => {
+    const w = mount(PortfolioPerformanceChart, {
+      props: {
+        timeSeries: [ts("2024-01-01", 0), ts("2024-01-02", 500)],
+        benchmarks: [
+          { name: "S&P 500", timeSeries: [{ date: "2024-01-01", value: 100 }, { date: "2024-01-02", value: 110 }] },
+        ],
+      },
+      global: { stubs: { apexchart: true } },
+    })
+    expect(chartOptions(w).series[1].data.map(([, v]) => v)).toEqual([500, 550])
+  })
+
   it("applies a custom line colour for the combined chart", () => {
     const w = mount(PortfolioPerformanceChart, {
       props: {

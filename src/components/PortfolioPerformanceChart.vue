@@ -34,7 +34,9 @@ function rebaseBenchmark(
   benchmark: Array<{ date?: string; value?: number }>,
   portfolio: PerformancePoint[],
 ): Array<{ date?: string; value?: number }> {
-  const portfolioStart = portfolio.find((p) => typeof p.value === "number")?.value
+  // ALL can include the pre-investment history, whose first value is zero.
+  // Scaling an index by that point would flatten the entire benchmark.
+  const portfolioStart = portfolio.find((p) => typeof p.value === "number" && p.value > 0)?.value
   const benchmarkStart = benchmark.find((p) => typeof p.value === "number")?.value
   if (portfolioStart == null || benchmarkStart == null || benchmarkStart === 0) return benchmark
 
