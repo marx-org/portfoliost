@@ -30,6 +30,20 @@ interface BenchmarkSeries {
   timeSeries?: Array<{ date?: string; value?: number }>
 }
 
+function rebaseBenchmark(
+  benchmark: Array<{ date?: string; value?: number }>,
+  portfolio: PerformancePoint[],
+): Array<{ date?: string; value?: number }> {
+  const portfolioStart = portfolio.find((p) => typeof p.value === "number")?.value
+  const benchmarkStart = benchmark.find((p) => typeof p.value === "number")?.value
+  if (portfolioStart == null || benchmarkStart == null || benchmarkStart === 0) return benchmark
+
+  return benchmark.map((p) => ({
+    ...p,
+    value: ((p.value ?? 0) / benchmarkStart) * portfolioStart,
+  }))
+}
+
 const props = withDefaults(
   defineProps<{
     timeSeries: PerformancePoint[]
@@ -199,7 +213,10 @@ const seriesData = computed(() => {
       : []),
     ...benchmarks.map((b) => ({
       name: b.name || b.symbol || "Benchmark",
-      data: (b.timeSeries ?? []).map((p) => [new Date(p.date ?? "").getTime(), p.value ?? 0]),
+      // The API benchmark is an index starting at 100. Rebase it to the
+      // portfolio's first absolute value so it remains visible on the same
+      // currency axis without changing the API value used for return math.
+      data: rebaseBenchmark(b.timeSeries ?? [], props.timeSeries).map((p) => [new Date(p.date ?? "").getTime(), p.value ?? 0]),
     })),
   ]
 })
