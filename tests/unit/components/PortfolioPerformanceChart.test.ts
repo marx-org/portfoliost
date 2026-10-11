@@ -5,9 +5,9 @@ import PortfolioPerformanceChart from "@/components/PortfolioPerformanceChart.vu
 const ts = (date: string, value = 100) => ({ date, value })
 
 type ChartOptions = {
-  series: Array<{ name: string; data: [number, number][] }>
-  yaxis: { labels: { formatter: (v: number) => string } }
-  tooltip: { y: { formatter: (v: number) => string } }
+  series: Array<{ name: string; data: [number, number | null][]; yaxisIndex?: number }>
+  yaxis: Array<{ show?: boolean; labels: { formatter: (v: number) => string } }>
+  tooltip: { y: { formatter: (v: number, opts: { seriesIndex?: number }) => string } }
   colors: string[]
   stroke: { dashArray: number[] }
 }
@@ -37,21 +37,22 @@ describe("PortfolioPerformanceChart (§41.1)", () => {
       global: { stubs: { apexchart: true } },
     })
     const opts = chartOptions(w)
-    expect(opts.yaxis.labels.formatter(94000)).toMatch(/\$/)
-    expect(opts.yaxis.labels.formatter(94000)).toMatch(/K/i)
+    expect(opts.yaxis[0].labels.formatter(94000)).toMatch(/\$/)
+    expect(opts.yaxis[0].labels.formatter(94000)).toMatch(/K/i)
   })
 
-  it("formats the tooltip as full currency (portfolio + benchmark)", () => {
+  it("formats the portfolio tooltip as full currency and the benchmark as % change", () => {
     const w = mount(PortfolioPerformanceChart, {
       props: {
         timeSeries: [ts("2026-07-01", 500)],
-        benchmarks: [{ name: "S&P 500", timeSeries: [{ date: "2026-07-01", value: 100.31 }] }],
+        benchmarks: [{ name: "S&P 500", timeSeries: [{ date: "2026-07-01", value: 100 }] }],
         currency: "USD",
       },
       global: { stubs: { apexchart: true } },
     })
     const opts = chartOptions(w)
-    expect(opts.tooltip.y.formatter(94508.33)).toBe("$94,508.33")
+    expect(opts.tooltip.y.formatter(94508.33, { seriesIndex: 0 })).toBe("$94,508.33")
+    expect(opts.tooltip.y.formatter(41.2, { seriesIndex: 1 })).toBe("+41.2%")
   })
 
   it("draws the 'Invested' line (same axis) when timeSeries carries invested", () => {
@@ -85,26 +86,99 @@ describe("PortfolioPerformanceChart (§41.1)", () => {
     expect(opts.series[0].name).toBe("Portfolio")
   })
 
-  it("overlays the benchmark on the same axis, grey dashed", () => {
+  it("plots the benchmark as % change since the window start on its own right axis", () => {
     const w = mount(PortfolioPerformanceChart, {
       props: {
         timeSeries: [ts("2026-07-01", 500), ts("2026-07-02", 94000)],
         benchmarks: [
-          { symbol: "SPY", name: "S&P 500", timeSeries: [{ date: "2026-07-01", value: 100 }, { date: "2026-07-02", value: 100.4 }] },
+          { symbol: "SPY", name: "S&P 500", timeSeries: [{ date: "2026-07-01", value: 100 }, { date: "2026-07-02", value: 110 }] },
         ],
       },
       global: { stubs: { apexchart: true } },
     })
     const opts = chartOptions(w)
-    // The indexed benchmark is rebased to the portfolio's starting value so it
-    // remains visible on the absolute currency axis.
+    // 100→110 index reads as 0%→+10%: dimensionless, independent of the
+    // portfolio's absolute scale.
     expect(opts.series).toHaveLength(2)
     expect(opts.series[1].name).toBe("S&P 500")
-    expect(opts.series[1].data.map(([, v]) => v)).toEqual([500, 502])
+    expect(opts.series[1].data.map(([, v]) => v)).toEqual([0, 10])
+    expect(opts.series[1].yaxisIndex).toBe(1)
+    expect(opts.yaxis).toHaveLength(2)
+    expect(opts.yaxis[1].show).toBe(true)
+    expect(opts.yaxis[1].labels.formatter(40)).toBe("+40%")
     expect(opts.stroke.dashArray).toEqual([0, 4])
   })
 
-  it("leaves a benchmark unchanged when its index has no usable starting value", () => {
+  it("keeps the benchmark visible when the portfolio starts near zero (ALL timeframe)", () => {
+    // The ALL window starts at the portfolio's inception (a few thousand
+    // against a 300k axis). Rebased onto that anchor the index looked flat;
+    // the % axis cannot be flattened by the portfolio's scale at all.
+    const w = mount(PortfolioPerformanceChart, {
+      props: {
+        timeSeries: [
+          ts("2022-07-01", 0),
+          ts("2022-07-02", 4700),
+          ts("2026-10-10", 280000),
+        ],
+        benchmarks: [
+          {
+            name: "S&P 500",
+            timeSeries: [
+              { date: "2022-07-01", value: 100 },
+              { date: "2022-07-02", value: 101 },
+              { date: "2026-10-10", value: 140 },
+            ],
+          },
+        ],
+      },
+      global: { stubs: { apexchart: true } },
+    })
+    expect(chartOptions(w).series[1].data.map(([, v]) => v)).toEqual([0, 1, 40])
+  })
+
+  it("renders negative benchmark moves as negative % on the right axis", () => {
+    const w = mount(PortfolioPerformanceChart, {
+      props: {
+        timeSeries: [ts("2026-07-01", 500)],
+        benchmarks: [
+          { name: "S&P 500", timeSeries: [{ date: "2026-07-01", value: 100 }, { date: "2026-07-02", value: 95 }] },
+        ],
+      },
+      global: { stubs: { apexchart: true } },
+    })
+    const opts = chartOptions(w)
+    expect(opts.series[1].data.map(([, v]) => v)).toEqual([0, -5])
+    expect(opts.tooltip.y.formatter(-5, { seriesIndex: 1 })).toBe("-5.0%")
+  })
+
+  it("keeps the Invested tooltip in currency and the benchmark (after it) in %", () => {
+    const w = mount(PortfolioPerformanceChart, {
+      props: {
+        timeSeries: [
+          { date: "2026-07-01", value: 500, invested: 400 },
+        ],
+        benchmarks: [{ name: "S&P 500", timeSeries: [{ date: "2026-07-01", value: 100 }] }],
+      },
+      global: { stubs: { apexchart: true } },
+    })
+    const opts = chartOptions(w)
+    expect(opts.series).toHaveLength(3)
+    expect(opts.series[2].yaxisIndex).toBe(1)
+    expect(opts.tooltip.y.formatter(90000, { seriesIndex: 1 })).toBe("$90,000.00")
+    expect(opts.tooltip.y.formatter(12.5, { seriesIndex: 2 })).toBe("+12.5%")
+  })
+
+  it("hides the right axis and plots no benchmark when none is selected", () => {
+    const w = mount(PortfolioPerformanceChart, {
+      props: { timeSeries: [ts("2026-07-01", 500)] },
+      global: { stubs: { apexchart: true } },
+    })
+    const opts = chartOptions(w)
+    expect(opts.series).toHaveLength(1)
+    expect(opts.yaxis[1].show).toBe(false)
+  })
+
+  it("plots an empty benchmark when its index has no usable starting value", () => {
     const w = mount(PortfolioPerformanceChart, {
       props: {
         timeSeries: [ts("2026-07-01", 500)],
@@ -112,20 +186,7 @@ describe("PortfolioPerformanceChart (§41.1)", () => {
       },
       global: { stubs: { apexchart: true } },
     })
-    expect(chartOptions(w).series[1].data.map(([, v]) => v)).toEqual([0])
-  })
-
-  it("anchors the benchmark after a zero-valued pre-investment point", () => {
-    const w = mount(PortfolioPerformanceChart, {
-      props: {
-        timeSeries: [ts("2024-01-01", 0), ts("2024-01-02", 500)],
-        benchmarks: [
-          { name: "S&P 500", timeSeries: [{ date: "2024-01-01", value: 100 }, { date: "2024-01-02", value: 110 }] },
-        ],
-      },
-      global: { stubs: { apexchart: true } },
-    })
-    expect(chartOptions(w).series[1].data.map(([, v]) => v)).toEqual([500, 550])
+    expect(chartOptions(w).series[1].data).toEqual([])
   })
 
   it("applies a custom line colour for the combined chart", () => {

@@ -361,13 +361,12 @@ const chartSeries = computed(() => {
   }))
 })
 
-// Benchmark overlays share the portfolio base currency — same rate.
+// Benchmark overlays are a flow-mirrored INDEX (starts at 100) — dimensionless.
+// The chart plots them as % change on their own right axis, so they must NOT be
+// scaled by the display-currency rate: an index has no currency, and scaling it
+// would only rotate the numbers without changing the shape.
 const chartBenchmarks = computed(() => {
-  const rate = chartRate.value ?? 1
-  return (props.analytics?.benchmarks ?? []).map((b) => ({
-    ...b,
-    timeSeries: (b.timeSeries ?? []).map((p) => ({ ...p, value: (p.value ?? 0) * rate })),
-  }))
+  return (props.analytics?.benchmarks ?? []).map((b) => ({ ...b }))
 })
 
 // Config-only options (no `series`) so a refresh takes the updateSeries() path
