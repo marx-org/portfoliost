@@ -96,11 +96,23 @@ describe("PortfolioPerformanceChart (§41.1)", () => {
       global: { stubs: { apexchart: true } },
     })
     const opts = chartOptions(w)
-    // Same axis: the raw indexed benchmark values are drawn on the absolute scale.
+    // The indexed benchmark is rebased to the portfolio's starting value so it
+    // remains visible on the absolute currency axis.
     expect(opts.series).toHaveLength(2)
     expect(opts.series[1].name).toBe("S&P 500")
-    expect(opts.series[1].data.map(([, v]) => v)).toEqual([100, 100.4])
+    expect(opts.series[1].data.map(([, v]) => v)).toEqual([500, 502])
     expect(opts.stroke.dashArray).toEqual([0, 4])
+  })
+
+  it("leaves a benchmark unchanged when its index has no usable starting value", () => {
+    const w = mount(PortfolioPerformanceChart, {
+      props: {
+        timeSeries: [ts("2026-07-01", 500)],
+        benchmarks: [{ name: "S&P 500", timeSeries: [{ date: "2026-07-01", value: 0 }] }],
+      },
+      global: { stubs: { apexchart: true } },
+    })
+    expect(chartOptions(w).series[1].data.map(([, v]) => v)).toEqual([0])
   })
 
   it("applies a custom line colour for the combined chart", () => {
