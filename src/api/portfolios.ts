@@ -217,12 +217,14 @@ export async function getPortfolioTransactions(
   positionId?: string,
   labelIds?: string[],
   instrumentSymbol?: GetPortfolioTransactionsQuery["instrumentSymbol"],
+  search?: string,
 ): Promise<PaginatedResponse<PortfolioTransactionsPage["items"][number]>> {
   const position = positionId ? `&positionId=${encodeURIComponent(positionId)}` : ""
   const labels = labelIds?.length ? `&labels=${encodeURIComponent(labelIds.join(","))}` : ""
   const symbol = instrumentSymbol ? `&instrumentSymbol=${encodeURIComponent(instrumentSymbol)}` : ""
+  const query = search?.trim() ? `&search=${encodeURIComponent(search.trim())}` : ""
   return http.get<PaginatedResponse<PortfolioTransactionsPage["items"][number]>>(
-    `/api/portfolios/${id}/transactions?page=${page}&limit=${limit}&sortBy=${sortBy}&sortOrder=${sortOrder}${position}${labels}${symbol}`,
+    `/api/portfolios/${id}/transactions?page=${page}&limit=${limit}&sortBy=${sortBy}&sortOrder=${sortOrder}${position}${labels}${symbol}${query}`,
   )
 }
 
@@ -296,10 +298,12 @@ export async function getPortfolioCashTransactions(
   labelIds?: string[],
   sortBy = "date",
   sortOrder: "asc" | "desc" = "desc",
+  search?: string,
 ): Promise<PaginatedResponse<CashTransaction>> {
   const labels = labelIds?.length ? `&labels=${encodeURIComponent(labelIds.join(","))}` : ""
+  const query = search?.trim() ? `&search=${encodeURIComponent(search.trim())}` : ""
   return http.get<PaginatedResponse<CashTransaction>>(
-    `/api/portfolios/${id}/cash/transactions?page=${page}&limit=${limit}&sortBy=${sortBy}&sortOrder=${sortOrder}${labels}` as string,
+    `/api/portfolios/${id}/cash/transactions?page=${page}&limit=${limit}&sortBy=${sortBy}&sortOrder=${sortOrder}${labels}${query}` as string,
   )
 }
 
@@ -321,10 +325,12 @@ export async function getRecentCashTransactions(
   sortBy?: GetRecentCashTransactionsQuery["sortBy"],
   sortOrder?: GetRecentCashTransactionsQuery["sortOrder"],
   labelIds?: string[],
+  search?: string,
 ): Promise<RecentCashTransactionsPage> {
   const labels = labelIds?.length ? `&labels=${encodeURIComponent(labelIds.join(","))}` : ""
+  const query = search?.trim() ? `&search=${encodeURIComponent(search.trim())}` : ""
   return http.get<RecentCashTransactionsPage>(
-    `/api/portfolios/cash/recent-transactions?page=${page}&limit=${limit}&sortBy=${sortBy ?? "date"}&sortOrder=${sortOrder ?? "desc"}${labels}` as string,
+    `/api/portfolios/cash/recent-transactions?page=${page}&limit=${limit}&sortBy=${sortBy ?? "date"}&sortOrder=${sortOrder ?? "desc"}${labels}${query}` as string,
   )
 }
 
@@ -343,11 +349,13 @@ export async function getAllTransactions(
   sortOrder: "asc" | "desc" = "desc",
   labelIds?: string[],
   instrumentSymbol?: GetAllTransactionsQuery["instrumentSymbol"],
+  search?: string,
 ): Promise<PaginatedResponse<PortfolioTransactionsPage["items"][number]>> {
   const labels = labelIds?.length ? `&labels=${encodeURIComponent(labelIds.join(","))}` : ""
   const symbol = instrumentSymbol ? `&instrumentSymbol=${encodeURIComponent(instrumentSymbol)}` : ""
+  const query = search?.trim() ? `&search=${encodeURIComponent(search.trim())}` : ""
   return http.get<PaginatedResponse<PortfolioTransactionsPage["items"][number]>>(
-    `/api/portfolios/transactions?page=${page}&limit=${limit}&sortBy=${sortBy}&sortOrder=${sortOrder}${labels}${symbol}`,
+    `/api/portfolios/transactions?page=${page}&limit=${limit}&sortBy=${sortBy}&sortOrder=${sortOrder}${labels}${symbol}${query}`,
   )
 }
 

@@ -14,6 +14,7 @@ import * as copilotModule from "../copilot/index.js"
 import * as fxModule from "../fx/index.js"
 import * as miscModule from "../misc/index.js"
 import * as adminModule from "../admin/index.js"
+import * as labelsModule from "../labels.js"
 import { authConfig } from "../lib/auth.js"
 
 const PORT = Number(process.env.PORT || 4010)
@@ -50,6 +51,7 @@ const modules = [
   fxModule,
   miscModule,
   adminModule,
+  labelsModule,
 ]
 for (const mod of modules) mod.register(app)
 

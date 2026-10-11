@@ -57,6 +57,7 @@ const sortBy    = ref("date")
 const sortOrder = ref<"asc" | "desc">("desc")
 
 const labelFilter  = ref<string[]>([])
+const searchFilter = ref("")
 const manageLabelsOpen = ref(false)
 const pickerOpen   = ref(false)
 const pickerTx     = ref<Tx | null>(null)
@@ -128,18 +129,15 @@ async function load(targetPage = page.value) {
   error.value   = null
   try {
     let res: { items: Tx[]; total: number; page: number; totalPages: number }
+    const search = searchFilter.value.trim()
     if (props.mode === "global") {
-      res = await getAllTransactions(targetPage, pageSize.value, sortBy.value, sortOrder.value, labelFilter.value.length ? labelFilter.value : undefined) as typeof res
+      res = search
+        ? await getAllTransactions(targetPage, pageSize.value, sortBy.value, sortOrder.value, labelFilter.value.length ? labelFilter.value : undefined, undefined, search) as typeof res
+        : await getAllTransactions(targetPage, pageSize.value, sortBy.value, sortOrder.value, labelFilter.value.length ? labelFilter.value : undefined) as typeof res
     } else {
-      res = await getPortfolioTransactions(
-        props.portfolioId!,
-        targetPage,
-        pageSize.value,
-        sortBy.value,
-        sortOrder.value,
-        undefined,
-        labelFilter.value.length ? labelFilter.value : undefined,
-      ) as typeof res
+      res = search
+        ? await getPortfolioTransactions(props.portfolioId!, targetPage, pageSize.value, sortBy.value, sortOrder.value, undefined, labelFilter.value.length ? labelFilter.value : undefined, undefined, search) as typeof res
+        : await getPortfolioTransactions(props.portfolioId!, targetPage, pageSize.value, sortBy.value, sortOrder.value, undefined, labelFilter.value.length ? labelFilter.value : undefined) as typeof res
     }
     transactions.value = res.items
     total.value        = res.total
@@ -154,7 +152,7 @@ async function load(targetPage = page.value) {
 
 onMounted(() => load())
 
-watch(labelFilter, () => load(1))
+watch([labelFilter, searchFilter], () => load(1))
 
 // ── Sort ──────────────────────────────────────────────────────────────
 
@@ -337,7 +335,20 @@ const colCount = computed(() =>
     </div>
 
     <div class="border-b border-slate-100 dark:border-slate-800 px-5 py-2">
-      <LabelFilterBar v-model="labelFilter" @manage="manageLabelsOpen = true" />
+      <div class="flex flex-wrap items-center gap-3">
+        <LabelFilterBar v-model="labelFilter" @manage="manageLabelsOpen = true" />
+        <label class="ml-auto flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+          <span class="sr-only">Filter by company name or ticker</span>
+          <input
+            v-model="searchFilter"
+            class="input !w-56 !py-1.5 !text-xs"
+            type="search"
+            placeholder="Company name or ticker"
+            aria-label="Filter by company name or ticker"
+            data-testid="transaction-search"
+          />
+        </label>
+      </div>
     </div>
 
     <!-- Notices -->

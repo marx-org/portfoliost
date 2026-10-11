@@ -19,7 +19,7 @@ vi.mock("@/api/portfolios", async (importOriginal) => {
   }
 })
 
-function tx(overrides: Record<string, unknown>) {
+function tx(overrides: Record<string, unknown> = {}) {
   return {
     id: "t-" + Math.random().toString(36).slice(2, 8),
     portfolioId: "p1",
@@ -65,6 +65,30 @@ async function mountTable() {
 }
 
 describe("TransactionsTable — §49.5 dividend tax column + notes", () => {
+  it("filters transactions by company name or ticker", async () => {
+    vi.mocked(portfoliosApi.getPortfolioTransactions).mockResolvedValue({
+      items: [tx()], total: 1, page: 1, totalPages: 1,
+    } as never)
+    const wrapper = await mountTable()
+    vi.mocked(portfoliosApi.getPortfolioTransactions).mockClear()
+
+    await wrapper.get('[data-testid="transaction-search"]').setValue("Apple")
+    await flushPromises()
+
+    expect(portfoliosApi.getPortfolioTransactions).toHaveBeenCalledWith(
+      "p1", 1, 20, "date", "desc", undefined, undefined, undefined, "Apple",
+    )
+  })
+
+  it("renders assigned labels in the overall transaction row", async () => {
+    vi.mocked(portfoliosApi.getPortfolioTransactions).mockResolvedValue({
+      items: [tx({ labels: [{ id: "l1", name: "Core", color: "#3b82f6" }] })],
+      total: 1, page: 1, totalPages: 1,
+    } as never)
+    const wrapper = await mountTable()
+    expect(wrapper.text()).toContain("Core")
+  })
+
   it("does not show the Tax column when the page has no DIVIDEND tax rows", async () => {
     vi.mocked(portfoliosApi.getPortfolioTransactions).mockResolvedValue({
       items: [tx({ type: "BUY" })],

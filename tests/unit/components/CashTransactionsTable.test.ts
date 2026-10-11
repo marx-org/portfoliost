@@ -133,6 +133,25 @@ describe("CashTransactionsTable — shared cash table (date column + sorting)", 
     expect(w.text()).toContain("Portfolio 1")
   })
 
+  it("filters cash transactions by company name or ticker", async () => {
+    const w = await mountTable({ mode: "global" })
+    mocked.getRecentCashTransactions.mockClear()
+
+    await w.get('[data-testid="cash-transaction-search"]').setValue("MSFT")
+    await flushPromises()
+
+    expect(mocked.getRecentCashTransactions).toHaveBeenLastCalledWith(1, 10, "date", "desc", undefined, "MSFT")
+  })
+
+  it("renders assigned labels in the overall cash row", async () => {
+    mocked.getRecentCashTransactions.mockResolvedValue({
+      data: [recentTx({ labels: [{ id: "l1", name: "Core", color: "#3b82f6" }] })],
+      meta: { total: 1, page: 1, limit: 10, totalPages: 1 },
+    } as never)
+    const w = await mountTable({ mode: "global" })
+    expect(w.text()).toContain("Core")
+  })
+
   it("both modes keep the unsortable Description column and the row actions", async () => {
     for (const mode of ["portfolio", "global"] as const) {
       const w = await mountTable({ mode })
