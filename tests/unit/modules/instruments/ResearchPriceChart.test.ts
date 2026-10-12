@@ -196,7 +196,6 @@ describe("PriceChart", () => {
     const text = wrapper.text()
     expect(text).toContain("Total Chg")
     expect(text).toContain("CAGR")
-    expect(text).toContain("Powered by Example service")
   })
 
   it("renders a Transactions checkbox that is unchecked by default", async () => {

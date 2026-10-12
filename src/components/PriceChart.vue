@@ -1136,7 +1136,6 @@ function downloadCsv(): void {
       </button>
     </div>
 
-    <p class="mt-2 text-right text-xs text-slate-400 dark:text-slate-500">Powered by Example service</p>
   </div>
 </template>
 
