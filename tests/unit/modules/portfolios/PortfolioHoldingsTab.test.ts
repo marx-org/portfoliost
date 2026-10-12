@@ -1,7 +1,7 @@
 import { flushPromises, mount } from "@vue/test-utils"
 import { createPinia, setActivePinia } from "pinia"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import PortfolioHoldingsTab from "@/modules/portfolios/PortfolioHoldingsTab.vue"
+import HoldingsTable from "@/components/HoldingsTable.vue"
 import { usePortfolioStore } from "@/stores/portfolios"
 import * as portfoliosApi from "@/api/portfolios"
 import * as fxApi from "@/api/fx"
@@ -68,7 +68,7 @@ async function mountTab(detail: { currency: string } | null, positions: never[])
   store.detail = detail as never
   store.positions = positions
   mockedPortfolios.getPortfolioPositions.mockResolvedValue(positions as never)
-  return mount(PortfolioHoldingsTab, {
+  return mount(HoldingsTable, {
     global: {
       plugins: [pinia],
       stubs: { RouterLink: { template: '<a href="#"><slot /></a>' } },
@@ -151,7 +151,7 @@ describe("PortfolioHoldingsTab — dividend action routing (§49.4)", () => {
     store.detail = { currency: "PLN" } as never
     store.positions = [position()] as never
     mockedPortfolios.getPortfolioPositions.mockResolvedValue([position()] as never)
-    return mount(PortfolioHoldingsTab, {
+    return mount(HoldingsTable, {
       global: {
         plugins: [pinia],
         stubs: { RouterLink: { template: '<a href="#"><slot /></a>' } },
@@ -196,7 +196,7 @@ describe("PortfolioHoldingsTab — §85.3 chart-modal heading badge", () => {
     store.detail = { currency: "PLN" } as never
     store.positions = [position()] as never
     mockedPortfolios.getPortfolioPositions.mockResolvedValue([position()] as never)
-    const wrapper = mount(PortfolioHoldingsTab, {
+    const wrapper = mount(HoldingsTable, {
       global: {
         plugins: [pinia],
         stubs: {
