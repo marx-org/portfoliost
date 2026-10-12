@@ -199,8 +199,12 @@ function buildChartOptions() {
     // Left axis: the portfolio (and Invested) in display currency.
     // Right axis: the benchmark index as % change since the window start.
     yaxis: [
-      { labels: { formatter: (v: number) => formatCompactCurrency(v, props.currency) } },
       {
+        seriesName: hasInv ? ["Portfolio", "Invested"] : ["Portfolio"],
+        labels: { formatter: (v: number) => formatCompactCurrency(v, props.currency) },
+      },
+      {
+        seriesName: benchmarks.map((b) => b.name || b.symbol || "Benchmark"),
         show: benchmarks.length > 0,
         opposite: true,
         labels: {
@@ -250,8 +254,6 @@ const seriesData = computed(() => {
     ...benchmarks.map((b) => ({
       name: b.name || b.symbol || "Benchmark",
       data: benchmarkPercentPoints(b.timeSeries ?? []),
-      // The benchmark lives on the right (percentage) axis — see the header.
-        yAxisIndex: 1,
     })),
   ]
 })
