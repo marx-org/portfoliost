@@ -78,11 +78,8 @@ test("the accounts balance tab is the landing page, and its rows add up", async 
   const strip = page.getByRole("navigation", { name: "Investment sections" }).getByRole("link")
   await expect(strip.first()).toHaveText("Accounts balance")
   await expect(strip.first()).toHaveAttribute("href", "/en/investments/accounts-balance")
-  // §83.6 — the strip grew a tab: "Performance" sits after "Portfolios" because it
-  // summarises exactly what those cards summarise. The list is asserted in full
-  // on purpose — a new tab that lands in the wrong PLACE is invisible to a
-  // "contains" check.
-  await expect(strip).toHaveText(["Accounts balance", "Portfolios", "Performance", "Transactions", "Watchlists"])
+  // The list is asserted in full so a tab that lands in the wrong place is visible.
+  await expect(strip).toHaveText(["Accounts balance", "Consolidated holdings", "Portfolios", "Performance", "Transactions", "Watchlists"])
 
   // The table is behind `store.fetchAll()` (the store is per-route state), so
   // wait for it rather than reading the DOM while the view still says "Loading".
@@ -133,6 +130,15 @@ test("the accounts balance tab is the landing page, and its rows add up", async 
   await page.goto("/en/investments/accounts-balance")
   await page.getByTestId("accounts-balance-row").first().getByTestId("accounts-balance-total").click()
   await expect(page).toHaveURL(new RegExp(`/en/portfolios/${top10!.id}/holdings`))
+})
+
+test("the consolidated holdings tab keeps portfolio context", async ({ page }) => {
+  await login(page)
+  await page.goto("/en/investments/holdings")
+
+  await expect(page.getByRole("heading", { name: "Consolidated holdings" })).toBeVisible()
+  await expect(page.locator("thead th").filter({ hasText: "Portfolio" })).toBeVisible({ timeout: 30_000 })
+  await expect(page.locator("tbody tr").filter({ hasText: "Top10" }).first()).toBeVisible()
 })
 
 test("the money columns follow the display currency, and switch back", async ({ page, request }) => {

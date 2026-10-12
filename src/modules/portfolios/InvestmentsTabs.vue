@@ -13,6 +13,11 @@ const tabs = [
     match: (path: string) => path.startsWith("/en/investments/accounts-balance"),
   },
   {
+    label: "Consolidated holdings",
+    to: "/en/investments/holdings",
+    match: (path: string) => path.startsWith("/en/investments/holdings"),
+  },
+  {
     label: "Portfolios",
     to: "/en/investments",
     match: (path: string) => path === "/en/investments",
