@@ -638,7 +638,7 @@ async function exportPositions(format: "csv" | "xml" | "json") {
     </div>
 
     <div class="mt-4 flex items-center justify-between gap-2 border-t border-slate-100 dark:border-slate-800 pt-3" @click.stop>
-      <button type="button" class="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline" data-testid="card-add-position" @click="emit('add-position')">Add Position</button>
+       <button v-if="!portfolio.isVirtual" type="button" class="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline" data-testid="card-add-position" @click="emit('add-position')">Add Position</button>
       <div class="flex gap-3 text-sm">
         <router-link :to="tabPath('performance')" class="text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400">Analytics</router-link>
         <router-link :to="tabPath('news')" class="text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400">News</router-link>
@@ -651,6 +651,8 @@ async function exportPositions(format: "csv" | "xml" | "json") {
       :name="portfolio.name"
       :base-currency="portfolio.baseCurrency ?? ''"
       :cash-leg-on-trade="portfolio.cashLegOnTrade ?? false"
+      :is-virtual="portfolio.isVirtual"
+      :label-id="portfolio.labelId"
       :busy="renameBusy"
       :error="renameError"
       @close="showRename = false"

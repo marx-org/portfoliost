@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watchEffect } from "vue"
+import { useRoute } from "vue-router"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
 import { useDisplayConversion } from "@/composables/useDisplayConversion"
 import { usePortfolioFreshness, usePortfolioValues } from "@/stores/portfolios"
 import { useCurrenciesStore } from "@/stores/currencies"
+import { useLabelsStore } from "@/stores/labels"
 import { storeToRefs } from "pinia"
 import { formatCurrency, formatPercent, formatSignedCurrency } from "@/utils/format"
 import InvestmentsTabs from "@/modules/portfolios/InvestmentsTabs.vue"
@@ -12,6 +14,7 @@ import PortfolioCard from "@/modules/portfolios/PortfolioCard.vue"
 import AddPositionDialog from "@/modules/portfolios/AddPositionDialog.vue"
 
 const store = usePortfolioStore()
+const route = useRoute()
 const loading = ref(true)
 const error = ref<string | null>(null)
 
@@ -19,6 +22,7 @@ const error = ref<string | null>(null)
 const currenciesStore = useCurrenciesStore()
 if (!currenciesStore.loaded) void currenciesStore.load()
 const currencies = computed(() => currenciesStore.options.map((c) => c.code))
+const labelsStore = useLabelsStore()
 const currencySymbol = (code: string) => currenciesStore.info(code)?.symbol ?? code
 const displayCurrencyStore = useDisplayCurrencyStore()
 const { currency: displayCurrency } = storeToRefs(displayCurrencyStore)
@@ -106,9 +110,23 @@ watchEffect(() => {
     .sort((a, b) => b.pct - a.pct)
 })
 const showCreate = ref(false)
-const newPortfolio = ref({ name: "", description: "", currency: "USD" })
+const newPortfolio = ref({ name: "", description: "", currency: "USD", isVirtual: false, labelId: "" })
 const creating = ref(false)
 const createError = ref<string | null>(null)
+const currentPath = () => route?.path ?? (typeof window !== "undefined" ? window.location.pathname : "")
+const portfolioTab = ref<"investment" | "virtual">(currentPath().includes("/virtual-portfolios") ? "virtual" : "investment")
+const visiblePortfolios = computed(() => store.portfolios.filter((portfolio) => Boolean(portfolio.isVirtual) === (portfolioTab.value === "virtual")))
+
+watchEffect(() => {
+  portfolioTab.value = currentPath().includes("/virtual-portfolios") ? "virtual" : "investment"
+})
+
+async function onVirtualChanged() {
+  if (newPortfolio.value.isVirtual && !labelsStore.labels.length) {
+    await labelsStore.fetchLabels().catch(() => {})
+  }
+  if (!newPortfolio.value.isVirtual) newPortfolio.value.labelId = ""
+}
 
 const showAddPosition = ref(false)
 const addPositionPortfolioId = ref("")
@@ -146,12 +164,14 @@ async function submitCreate() {
   creating.value = true
   createError.value = null
   try {
-    await store.createPortfolio({
+    const input = {
       name: newPortfolio.value.name.trim(),
       description: newPortfolio.value.description.trim() || undefined,
       currency: newPortfolio.value.currency,
-    })
-    newPortfolio.value = { name: "", description: "", currency: "USD" }
+      ...(newPortfolio.value.isVirtual ? { isVirtual: true, labelId: newPortfolio.value.labelId } : {}),
+    }
+    await store.createPortfolio(input)
+    newPortfolio.value = { name: "", description: "", currency: "USD", isVirtual: false, labelId: "" }
     showCreate.value = false
   } catch (err) {
     createError.value = err instanceof Error ? err.message : "Failed to create portfolio"
@@ -173,7 +193,7 @@ async function submitCreate() {
         </p>
       </div>
       <div class="flex items-center gap-2">
-        <div class="card flex items-center gap-2 px-3 py-1.5">
+        <div v-if="portfolioTab !== 'virtual'" class="card flex items-center gap-2 px-3 py-1.5">
           <span class="text-xs text-slate-500 dark:text-slate-400">Cash balance</span>
           <span class="text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100" data-testid="cash-balance">
             {{ formatCurrency(cashTotal, displayCurrency) }}
@@ -234,7 +254,7 @@ async function submitCreate() {
     <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-400">{{ error }}</p>
     <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading portfolios...</p>
 
-    <template v-if="store.totalMetrics">
+    <template v-if="store.totalMetrics && portfolioTab !== 'virtual'">
       <!-- §68 — cash is a first-class citizen. Four tiles, each labelled with what
            it is, in the order the user asked for. Total = Cash + Instruments, and
            the two derived figures come from the same pair. -->
@@ -291,7 +311,7 @@ async function submitCreate() {
          the Performance tab. Leaving it here would put the same curve on two
          adjacent pages, and only one of them would have the TWR, MWR, timing and
          drawdown numbers beside it. -->
-    <div class="card mb-6 flex flex-wrap items-center justify-between gap-3 p-6">
+    <div v-if="portfolioTab !== 'virtual'" class="card mb-6 flex flex-wrap items-center justify-between gap-3 p-6">
       <div>
         <h2 class="text-base font-semibold">Portfolio performance</h2>
         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
@@ -305,21 +325,21 @@ async function submitCreate() {
 
     <section v-if="!loading" class="mb-10">
       <div class="mb-4 flex items-center justify-between">
-        <h2 class="text-lg font-semibold">Investment Portfolios</h2>
-        <span v-if="store.portfolios.length" class="text-sm text-slate-500 dark:text-slate-400">{{ store.portfolios.length }}</span>
+        <h2 class="text-lg font-semibold">{{ portfolioTab === 'virtual' ? 'Virtual Portfolios' : 'Investment Portfolios' }}</h2>
+        <span v-if="visiblePortfolios.length" class="text-sm text-slate-500 dark:text-slate-400">{{ visiblePortfolios.length }}</span>
       </div>
 
-      <div v-if="store.portfolios.length" class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <PortfolioCard v-for="p in store.portfolios" :key="p.id" :portfolio="p" :freshness="freshnessById.get(p.id)" :value="valuesById.get(p.id)" @add-position="openAddPosition(p.id)" />
+      <div v-if="visiblePortfolios.length" class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <PortfolioCard v-for="p in visiblePortfolios" :key="p.id" :portfolio="p" :freshness="freshnessById.get(p.id)" :value="valuesById.get(p.id)" @add-position="openAddPosition(p.id)" />
       </div>
-      <p v-else-if="!error" class="text-sm text-slate-500 dark:text-slate-400">No investment portfolios yet.</p>
+      <p v-else-if="!error" class="text-sm text-slate-500 dark:text-slate-400">No {{ portfolioTab === 'virtual' ? 'virtual' : 'investment' }} portfolios yet.</p>
 
       <div class="mt-4">
         <button type="button" class="btn-secondary text-sm" @click="showCreate = true">Create Investment Portfolio</button>
       </div>
     </section>
 
-    <section v-if="!loading" class="mb-10">
+    <section v-if="!loading && portfolioTab !== 'virtual'" class="mb-10">
       <div class="mb-4 flex items-center justify-between">
         <div>
           <h2 class="text-lg font-semibold">Cash</h2>
@@ -346,6 +366,18 @@ async function submitCreate() {
           <input id="portfolio-name" v-model="newPortfolio.name" type="text" required class="input mb-4" placeholder="e.g. Long-term growth" />
           <label for="portfolio-description" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Description</label>
           <textarea id="portfolio-description" v-model="newPortfolio.description" rows="2" class="input mb-4" placeholder="Optional"></textarea>
+          <label class="mb-4 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+            <input v-model="newPortfolio.isVirtual" type="checkbox" data-testid="portfolio-virtual" @change="onVirtualChanged" />
+            Virtual portfolio
+          </label>
+          <div v-if="newPortfolio.isVirtual" class="mb-4">
+            <label for="portfolio-label" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Instrument label *</label>
+            <select id="portfolio-label" v-model="newPortfolio.labelId" class="input" required>
+              <option value="" disabled>Select a label</option>
+              <option v-for="label in labelsStore.labels" :key="label.id" :value="label.id">{{ label.name }}</option>
+            </select>
+            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Instruments carrying this label and their transactions appear in the portfolio.</p>
+          </div>
           <div class="mb-4">
             <div>
               <label for="portfolio-currency" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Currency</label>
@@ -357,7 +389,7 @@ async function submitCreate() {
           <p v-if="createError" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ createError }}</p>
           <div class="flex justify-end gap-2">
             <button type="button" class="btn-ghost" @click="showCreate = false">Cancel</button>
-            <button type="submit" class="btn-primary" :disabled="creating || !newPortfolio.name.trim()">
+            <button type="submit" class="btn-primary" :disabled="creating || !newPortfolio.name.trim() || (newPortfolio.isVirtual && !newPortfolio.labelId)">
               {{ creating ? "Creating..." : "Create" }}
             </button>
           </div>

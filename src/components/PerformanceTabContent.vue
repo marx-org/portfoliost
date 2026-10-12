@@ -149,7 +149,7 @@ import TickerBadge from "@/components/TickerBadge.vue"
 import InstrumentSearchModal from "@/modules/instruments/InstrumentSearchModal.vue"
 import PortfolioPerformanceChart from "@/components/PortfolioPerformanceChart.vue"
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   /** `/:id/analytics` or `/merged`, cast to the one `PortfolioAnalytics`. */
   analytics: PortfolioAnalytics | null
   /** `/:id/risk-metrics`, or whatever the aggregate path supplies. */
@@ -181,7 +181,9 @@ const props = defineProps<{
    * against a bank balance.
    */
   fxCaveat?: boolean
-}>()
+  /** Virtual portfolios are views over existing transactions, not cash books. */
+  showInvested?: boolean
+}>(), { showInvested: true })
 
 const emit = defineEmits<{
   "update:selectedBenchmarks": [value: string[]]
@@ -352,7 +354,7 @@ const chartSeries = computed(() => {
   return (props.analytics?.performance?.timeSeries ?? []).map((p) => ({
     ...p,
     value: (p.value ?? 0) * rate,
-    invested: p.invested != null ? p.invested * rate : null,
+    invested: props.showInvested !== false && p.invested != null ? p.invested * rate : null,
     // §78.5 — the withheld amount is in the same currency as `value`, so it has
     // to be scaled by the same display rate. Spreading `...p` carries the raw
     // number through, and leaving it unscaled would print the gap in PLN inside
@@ -527,7 +529,7 @@ function convertedPnl(p: PortfolioPositions[number]): number | null {
           <dt class="text-sm text-slate-500 dark:text-slate-400">Net gain</dt>
           <dd class="mt-1 text-xl font-semibold tabular-nums" :class="signClass(netGain)" :data-testid="tid('perf-overview-net-gain')">{{ formatSignedCurrency(netGain, chartCcy) }}</dd>
         </div>
-        <div class="rounded-lg bg-slate-50 dark:bg-slate-800/50 p-4">
+        <div v-if="props.showInvested" class="rounded-lg bg-slate-50 dark:bg-slate-800/50 p-4">
           <dt class="text-sm text-slate-500 dark:text-slate-400">Net invested</dt>
           <dd class="mt-1 text-xl font-semibold tabular-nums" :data-testid="tid('perf-overview-net-invested')">{{ formatSignedCurrency(netInvested, chartCcy) }}</dd>
         </div>
@@ -585,6 +587,7 @@ function convertedPnl(p: PortfolioPositions[number]): number | null {
         :recomputing="props.recomputing || props.backfillPending"
         :gap-symbols="props.analytics?.gapSymbols ?? null"
         :held-gap-symbols="props.analytics?.heldGapSymbols ?? null"
+        :show-invested="props.showInvested"
         :loading="props.loading"
         :height="300"
         @recompute="emit('recompute')"

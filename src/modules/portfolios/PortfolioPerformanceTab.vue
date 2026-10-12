@@ -95,6 +95,7 @@ async function handleRecompute() {
     :loading="store.analyticsLoading"
     :backfill-pending="backfillPending"
     :recomputing="recomputeBusy"
+    :show-invested="!store.detail?.isVirtual"
     @update:timeframe="changeTimeframe"
     @update:selected-benchmarks="(syms) => store.setBenchmarks(syms, id)"
     @recompute="handleRecompute"

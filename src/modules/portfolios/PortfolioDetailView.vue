@@ -25,9 +25,10 @@ const { currency: displayCurrency } = storeToRefs(displayCurrencyStore)
 const showCurrencyMenu = ref(false)
 const currencies = computed(() => currenciesStore.options.map((currency) => currency.code))
 
-const tabs = [
+const isVirtual = computed(() => Boolean(store.detail?.isVirtual))
+const tabs = computed(() => [
   { name: "portfolio-holdings", label: "Holdings" },
-  { name: "portfolio-cash", label: "Cash" },
+  ...(isVirtual.value ? [] : [{ name: "portfolio-cash", label: "Cash" }]),
   { name: "portfolio-transactions", label: "Transactions" },
   { name: "portfolio-performance", label: "Performance" },
   { name: "portfolio-allocation", label: "Allocation" },
@@ -36,7 +37,7 @@ const tabs = [
   { name: "portfolio-calendar", label: "Calendar" },
   { name: "portfolio-news", label: "News" },
   { name: "portfolio-compare", label: "Compare" },
-]
+])
 
 // §87.5 — the dialog is now "Portfolio settings": the name plus the UI-only
 // "generate a cash transaction on buy/sell" switch. The aria-label stays
@@ -205,7 +206,7 @@ async function submitDelete() {
             </template>
           </div>
           <button type="button" class="btn-secondary text-sm" @click="openRename">Rename</button>
-          <button type="button" class="btn-primary text-sm" @click="openAddPosition">Add Position</button>
+           <button v-if="!isVirtual" type="button" class="btn-primary text-sm" @click="openAddPosition">Add Position</button>
           <button type="button" class="btn-red-ghost text-sm" @click="openDelete">Delete</button>
         </div>
       </div>
@@ -265,6 +266,8 @@ async function submitDelete() {
       :name="portfolioName"
       :base-currency="store.detail?.baseCurrency ?? ''"
       :cash-leg-on-trade="store.detail?.cashLegOnTrade ?? false"
+      :is-virtual="isVirtual"
+      :label-id="store.detail?.labelId"
       :busy="renameBusy"
       :error="renameError"
       @close="showRename = false"

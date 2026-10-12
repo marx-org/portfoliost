@@ -30,11 +30,13 @@ const props = withDefaults(defineProps<{
   positions?: PortfolioPositions
   portfolioName?: string | null
   refresh?: () => void | Promise<void>
+  readonly?: boolean
 }>(), {
   mode: "portfolio",
   positions: undefined,
   portfolioName: null,
   refresh: undefined,
+  readonly: false,
 })
 
 const route = useRoute()
@@ -513,14 +515,14 @@ function onPickerSaved() {
                   <template v-if="openMenuId === pos.id">
                     <div class="fixed inset-0 z-20" @click="openMenuId = null"></div>
                     <div class="absolute right-0 z-30 mt-1 w-44 rounded-lg border border-slate-200 dark:border-slate-700/60 bg-white dark:bg-slate-900 py-1 shadow-lg">
-                      <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="openAction('buy', pos)">Buy</button>
-                      <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="openAction('sell', pos)">Sell</button>
-                      <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="openAction('dividend', pos)">Dividend</button>
-                      <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="openEditPosition(pos)">Edit position</button>
+                       <button v-if="!props.readonly" type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="openAction('buy', pos)">Buy</button>
+                       <button v-if="!props.readonly" type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="openAction('sell', pos)">Sell</button>
+                       <button v-if="!props.readonly" type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="openAction('dividend', pos)">Dividend</button>
+                       <button v-if="!props.readonly" type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="openEditPosition(pos)">Edit position</button>
                       <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="goResearch(pos)">Research</button>
                       <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="openChartView(pos)">View chart</button>
-                      <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="openLabelPicker(pos, $event)">Set labels...</button>
-                      <button type="button" class="block w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10" @click="openRemoveConfirm(pos)">Remove position</button>
+                       <button v-if="!props.readonly" type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="openLabelPicker(pos, $event)">Set labels...</button>
+                       <button v-if="!props.readonly" type="button" class="block w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10" @click="openRemoveConfirm(pos)">Remove position</button>
                     </div>
                   </template>
                 </div>
@@ -554,7 +556,7 @@ function onPickerSaved() {
       <p v-else class="px-5 py-6 text-sm text-slate-500 dark:text-slate-400">No open positions.</p>
     </div>
 
-    <AddPositionDialog
+    <AddPositionDialog v-if="!props.readonly"
       :open="positionAction !== null && positionAction.kind !== 'dividend'"
       :portfolio-id="actionPortfolioId"
       :position-action="apdAction"
@@ -562,7 +564,7 @@ function onPickerSaved() {
       @saved="onActionSaved"
     />
 
-    <RecordDividendDialog
+    <RecordDividendDialog v-if="!props.readonly"
       :open="positionAction?.kind === 'dividend'"
       :portfolio-id="actionPortfolioId"
       :position="positionAction?.kind === 'dividend' ? positionAction.position : null"
@@ -570,7 +572,7 @@ function onPickerSaved() {
       @saved="onActionSaved"
     />
 
-    <EditPositionDialog
+    <EditPositionDialog v-if="!props.readonly"
       :open="editPosition !== null"
       :portfolio-id="editPortfolioId"
       :position="editPosition"
@@ -578,7 +580,7 @@ function onPickerSaved() {
       @saved="onEditSaved"
     />
 
-    <ConfirmDeleteModal
+    <ConfirmDeleteModal v-if="!props.readonly"
       :open="!!removeTarget"
       title="Remove position"
       :message="removeTarget ? `This permanently deletes ${removeTarget.symbol} from this portfolio. This cannot be undone.` : ''"
@@ -590,8 +592,7 @@ function onPickerSaved() {
 
     <LabelManagerDialog :open="manageLabelsOpen" @close="manageLabelsOpen = false" />
 
-    <LabelPickerPopover
-      v-if="pickerPosition"
+    <LabelPickerPopover v-if="!props.readonly && pickerPosition"
       :open="pickerOpen"
       :entity-id="pickerPosition.id"
       entity-kind="position"

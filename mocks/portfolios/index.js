@@ -400,7 +400,7 @@ export function register(app) {
 
   app.post("/api/portfolios", (ctx) => {
     if (!requireAuth(ctx)) return
-    const { name, description, currency = "USD", baseCurrency = "USD", isPublic = false, isMarginEnabled = false } = ctx.body || {}
+    const { name, description, currency = "USD", baseCurrency = "USD", isPublic = false, isMarginEnabled = false, isVirtual = false, labelId = null } = ctx.body || {}
     if (!name) {
       return ctx.res.status(422).json({ error: "ValidationError", message: "name is required", statusCode: 422 })
     }
@@ -416,6 +416,8 @@ export function register(app) {
       totalInvested: 0,
       currentValue: 0,
       isPublic,
+      isVirtual: Boolean(isVirtual),
+      labelId: isVirtual ? labelId : null,
       isMarginEnabled,
       createdAt: now,
       updatedAt: now,

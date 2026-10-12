@@ -78,9 +78,10 @@ const props = withDefaults(
      * for IKE Beata, whose 7 flagged symbols had all been sold — the current
      * point was complete. A warning that is wrong about the number next to it is
      * worse than silence, because it is believed. */
-    heldGapSymbols?: string[] | null
+     heldGapSymbols?: string[] | null
+     showInvested?: boolean
   }>(),
-  { benchmarks: () => [], currency: "USD", color: "#3b82f6", backfillPending: false, loading: false, height: 300, recomputing: false, gapSymbols: null, heldGapSymbols: null },
+   { benchmarks: () => [], currency: "USD", color: "#3b82f6", backfillPending: false, loading: false, height: 300, recomputing: false, gapSymbols: null, heldGapSymbols: null, showInvested: true },
 )
 
 const emit = defineEmits<{ recompute: [] }>()
@@ -90,7 +91,7 @@ const toPoint = (p: PerformancePoint): [number, number] => [new Date(p.date ?? "
 // §cash-invested overlay — the "Invested" line (cumulative net money-in) is
 // only drawn when the caller passes it through, so it shows on the per-
 //portfolio performance chart AND the combined chart. Same currency as value.
-const hasInvested = computed(() => props.timeSeries.some((p) => p.invested != null))
+const hasInvested = computed(() => props.showInvested !== false && props.timeSeries.some((p) => p.invested != null))
 const INVESTED_COLOR = "#0ea5e9"
 
 // §63.8 / §72.30 — TWO different claims, and the component says the one that is

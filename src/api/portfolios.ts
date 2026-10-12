@@ -364,6 +364,8 @@ export async function createPortfolio(input: {
   description?: string
   currency?: string
   isPublic?: boolean
+  isVirtual?: boolean
+  labelId?: string
 }): Promise<PortfolioDetail> {
   return http.post<PortfolioDetail>("/api/portfolios", input)
 }

@@ -50,6 +50,11 @@ const router = createRouter({
           component: () => import("@/modules/portfolios/InvestmentsView.vue"),
         },
         {
+          path: "investments/virtual-portfolios",
+          name: "virtual-portfolios",
+          component: () => import("@/modules/portfolios/InvestmentsView.vue"),
+        },
+        {
           // §84 — new tab, first in the strip, and the `/` landing page.
           // `/en/investments` stays a working route, so no deep link breaks.
           path: "investments/accounts-balance",

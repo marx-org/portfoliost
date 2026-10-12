@@ -36,6 +36,7 @@ type Tx = GlobalTx & Partial<PortfolioTx>
 const props = defineProps<{
   mode: "global" | "portfolio"
   portfolioId?: string   // required when mode === "portfolio"
+  readonly?: boolean
 }>()
 
 const route = useRoute()
@@ -512,9 +513,10 @@ const colCount = computed(() =>
                 class="sticky right-0 z-10 bg-white px-5 py-3 shadow-[-1px_0_0_0_#e2e8f0] group-hover:bg-slate-50 dark:bg-slate-900 dark:shadow-[-1px_0_0_0_#334155] dark:group-hover:bg-slate-800"
               >
                 <div class="flex justify-end gap-1">
-                  <button type="button" class="btn-ghost px-2 py-1 text-xs" aria-label="Edit transaction" @click="openEdit(tx)">Edit</button>
-                  <button type="button" class="btn-ghost px-2 py-1 text-xs" aria-label="Set labels" @click="openLabelPicker(tx, $event)">Labels</button>
+                  <button v-if="!props.readonly" type="button" class="btn-ghost px-2 py-1 text-xs" aria-label="Edit transaction" @click="openEdit(tx)">Edit</button>
+                  <button v-if="!props.readonly" type="button" class="btn-ghost px-2 py-1 text-xs" aria-label="Set labels" @click="openLabelPicker(tx, $event)">Labels</button>
                   <button
+                    v-if="!props.readonly"
                     type="button"
                     class="btn-ghost px-2 py-1 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10"
                     aria-label="Delete transaction"
@@ -574,8 +576,8 @@ const colCount = computed(() =>
     </template>
 
     <!-- Modals -->
-    <EditTransactionModal :open="!!editing" :transaction="editing" @close="editing = null" @saved="onEditSaved" />
-    <ConfirmDeleteModal
+    <EditTransactionModal v-if="!props.readonly" :open="!!editing" :transaction="editing" @close="editing = null" @saved="onEditSaved" />
+    <ConfirmDeleteModal v-if="!props.readonly"
       :open="!!deleteTarget"
       message="Are you sure you want to delete this transaction? This action cannot be undone."
       :busy="deleteBusy"
@@ -586,8 +588,7 @@ const colCount = computed(() =>
 
     <LabelManagerDialog :open="manageLabelsOpen" @close="manageLabelsOpen = false" />
 
-    <LabelPickerPopover
-      v-if="pickerTx"
+    <LabelPickerPopover v-if="!props.readonly && pickerTx"
       :open="pickerOpen"
       :entity-id="pickerTx.id"
       :entity-kind="pickerKind"
