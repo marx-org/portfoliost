@@ -106,7 +106,6 @@ const totalValue = () =>
           <p class="text-sm text-slate-500 dark:text-slate-400">Holdings are hidden for this shared portfolio.</p>
         </div>
 
-        <p class="mt-6 text-center text-xs text-slate-400 dark:text-slate-500">Powered by Portfoliost</p>
       </template>
     </div>
   </div>
