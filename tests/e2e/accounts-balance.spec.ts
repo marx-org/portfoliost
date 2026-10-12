@@ -137,7 +137,7 @@ test("the consolidated holdings tab keeps portfolio context", async ({ page }) =
   await page.goto("/en/investments/holdings")
 
   await expect(page.getByRole("heading", { name: "Consolidated holdings" })).toBeVisible()
-  await expect(page.locator("thead th").filter({ hasText: "Portfolio" })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole("columnheader", { name: "Portfolio", exact: true })).toBeVisible({ timeout: 30_000 })
   await expect(page.locator("tbody tr").filter({ hasText: "Top10" }).first()).toBeVisible()
 })
 

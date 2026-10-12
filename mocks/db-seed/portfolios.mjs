@@ -117,22 +117,22 @@ export async function seedPortfolios(sql) {
       `
     }
 
-    // Transactions (all BUYs) — no wallet_id column (§62.2)
+    // Transactions (all BUYs) — derived portfolio metadata and legacy flags are
+    // no longer stored on this table.
     for (const t of SEED_TRANSACTIONS) {
       await tx`
         INSERT INTO portfolios.transactions
           (id, user_id, portfolio_id, position_id, type,
-           instrument_symbol, instrument_name, sector, country,
+           instrument_symbol, instrument_name,
            quantity, price, currency, instrument_currency, asset_type,
            fees, total_amount, exchange_rate, rate_source, fee_rate_source,
-           is_gift, synthesized_opening_lot, executed_at, created_at, updated_at)
+           executed_at, created_at, updated_at)
         VALUES
           (${t.id}, ${SEED_USER_ID}, ${SEED_PORTFOLIO_ID}, ${t.positionId},
            ${"BUY"}, ${t.instrumentSymbol}, ${t.instrumentName},
-           ${t.sector}, ${t.country},
            ${t.quantity.toFixed(8)}, ${t.price.toFixed(8)}, ${t.instrumentCurrency ?? "USD"}, ${t.instrumentCurrency ?? "USD"}, ${"STOCK"},
            ${"0"}, ${t.totalAmount.toFixed(8)}, ${"1"}, ${"automatic"}, ${"automatic"},
-           false, false, ${txExecutedAt}, ${createdAt}, ${updatedAt})
+           ${txExecutedAt}, ${createdAt}, ${updatedAt})
       `
     }
 
