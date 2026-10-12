@@ -251,7 +251,7 @@ const seriesData = computed(() => {
       name: b.name || b.symbol || "Benchmark",
       data: benchmarkPercentPoints(b.timeSeries ?? []),
       // The benchmark lives on the right (percentage) axis — see the header.
-      yaxisIndex: 1,
+        yAxisIndex: 1,
     })),
   ]
 })
