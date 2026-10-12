@@ -5,7 +5,7 @@ import PortfolioPerformanceChart from "@/components/PortfolioPerformanceChart.vu
 const ts = (date: string, value = 100) => ({ date, value })
 
 type ChartOptions = {
-  series: Array<{ name: string; data: [number, number | null][]; yaxisIndex?: number }>
+  series: Array<{ name: string; data: [number, number | null][]; yAxisIndex?: number }>
   yaxis: Array<{ show?: boolean; labels: { formatter: (v: number) => string } }>
   tooltip: { y: { formatter: (v: number, opts: { seriesIndex?: number }) => string } }
   colors: string[]
@@ -102,7 +102,7 @@ describe("PortfolioPerformanceChart (§41.1)", () => {
     expect(opts.series).toHaveLength(2)
     expect(opts.series[1].name).toBe("S&P 500")
     expect(opts.series[1].data.map(([, v]) => v)).toEqual([0, 10])
-    expect(opts.series[1].yaxisIndex).toBe(1)
+    expect(opts.series[1].yAxisIndex).toBe(1)
     expect(opts.yaxis).toHaveLength(2)
     expect(opts.yaxis[1].show).toBe(true)
     expect(opts.yaxis[1].labels.formatter(40)).toBe("+40%")
@@ -163,7 +163,7 @@ describe("PortfolioPerformanceChart (§41.1)", () => {
     })
     const opts = chartOptions(w)
     expect(opts.series).toHaveLength(3)
-    expect(opts.series[2].yaxisIndex).toBe(1)
+    expect(opts.series[2].yAxisIndex).toBe(1)
     expect(opts.tooltip.y.formatter(90000, { seriesIndex: 1 })).toBe("$90,000.00")
     expect(opts.tooltip.y.formatter(12.5, { seriesIndex: 2 })).toBe("+12.5%")
   })
