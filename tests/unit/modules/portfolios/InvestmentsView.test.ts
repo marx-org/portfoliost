@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import InvestmentsView from "@/modules/portfolios/InvestmentsView.vue"
 import * as portfoliosApi from "@/api/portfolios"
 import * as fxApi from "@/api/fx"
+import * as labelsApi from "@/api/labels"
 
 vi.mock("@/api/portfolios", async (importOriginal) => {
   const actual = await importOriginal<typeof portfoliosApi>()
@@ -24,8 +25,32 @@ vi.mock("@/api/fx", () => ({
   getLatestRate: vi.fn(),
 }))
 
+vi.mock("@/api/labels", async (importOriginal) => {
+  const actual = await importOriginal<typeof labelsApi>()
+  return { ...actual, getLabels: vi.fn() }
+})
+
+/**
+ * The view derives which tab it is on from the route path (`/virtual-portfolios`
+ * vs `/investments`). The real `useRoute()` returns `undefined` outside an app
+ * with a router, which is why the pre-existing tests fell back to
+ * `window.location.pathname`; mocking it lets a test choose the tab explicitly
+ * without touching global location state.
+ */
+const routeState = vi.hoisted(() => ({
+  path: "/en/investments",
+  fullPath: "/en/investments",
+  params: {} as Record<string, string>,
+}))
+
+vi.mock("vue-router", () => ({
+  useRoute: () => routeState,
+  useRouter: () => ({ push: vi.fn() }),
+}))
+
 const mocked = vi.mocked(portfoliosApi)
 const mockedFx = vi.mocked(fxApi)
+const mockedLabels = vi.mocked(labelsApi)
 
 let pinia: Pinia
 
@@ -90,6 +115,12 @@ function mountView() {
   })
 }
 
+/** Every test that does not pick a tab runs on the investment route. */
+beforeEach(() => {
+  routeState.path = "/en/investments"
+  routeState.fullPath = "/en/investments"
+})
+
 describe("InvestmentsView", () => {
   beforeEach(() => {
     pinia = createPinia()
@@ -101,7 +132,13 @@ describe("InvestmentsView", () => {
       { code: "USD", name: "US Dollar", symbol: "$", minorUnits: 2, popular: true },
     ]
     store.loaded = true
+    routeState.path = "/en/investments"
+    routeState.fullPath = "/en/investments"
     vi.clearAllMocks()
+    mockedLabels.getLabels.mockResolvedValue([
+      { id: "l1", name: "Growth", color: "#2563eb" },
+      { id: "l2", name: "Dividend", color: "#16a34a" },
+    ] as never)
     mocked.getPortfolios.mockResolvedValue(summary())
     mocked.getPortfolioTotalMetrics.mockResolvedValue({
       totalValue: 1200,
@@ -280,6 +317,148 @@ describe("InvestmentsView", () => {
     const link = wrapper.get('[data-testid="combined-chart-link"]')
     expect(link.attributes("href")).toBe("/en/investments/performance")
     expect(link.text()).toContain("Open performance")
+  })
+
+  /**
+   * §143 — virtual portfolios. The tab is chosen from the route, the create
+   * dialog grows a mandatory assigned-label selector only in virtual mode, and
+   * both tabs render the SAME card component.
+   */
+  describe("virtual portfolios", () => {
+    const VIRTUAL_PATH = "/en/investments/virtual-portfolios"
+
+    function headings(w: ReturnType<typeof mountView>): string[] {
+      return w.findAll("h2").map((h) => h.text())
+    }
+
+    async function openCreateDialog(w: ReturnType<typeof mountView>) {
+      await w.findAll("button").find((b) => b.text() === "Create Investment Portfolio")!.trigger("click")
+      await flushPromises()
+    }
+
+    function submitButton(w: ReturnType<typeof mountView>) {
+      return w.findAll("button").find((b) => b.text() === "Create")!
+    }
+
+    async function mountTab(path: string) {
+      routeState.path = path
+      routeState.fullPath = path
+      const w = mountView()
+      await flushPromises()
+      return w
+    }
+
+    const mixedPortfolios = () => [
+      { ...summary()[0], id: "p1", name: "Top10" },
+      { ...summary()[0], id: "v1", name: "Paper Tech", isVirtual: true, labelId: "l1", cashLegOnTrade: false },
+    ]
+
+    it("reveals the required label selector only while virtual, fetching labels on the toggle", async () => {
+      const w = await mountTab("/en/investments")
+      await openCreateDialog(w)
+
+      // Casual is the default: no label selector, and no labels request.
+      expect(w.find("#portfolio-label").exists()).toBe(false)
+      expect(mockedLabels.getLabels).not.toHaveBeenCalled()
+
+      await w.get('[data-testid="portfolio-virtual"]').setValue(true)
+      await flushPromises()
+      expect(w.find("#portfolio-label").exists()).toBe(true)
+      expect(mockedLabels.getLabels).toHaveBeenCalledTimes(1)
+      expect(w.get("#portfolio-label").text()).toContain("Growth")
+
+      // Toggling back to casual hides the selector…
+      await w.get('[data-testid="portfolio-virtual"]').setValue(false)
+      await flushPromises()
+      expect(w.find("#portfolio-label").exists()).toBe(false)
+
+      // …and re-enabling reuses the already-loaded labels rather than refetching.
+      await w.get('[data-testid="portfolio-virtual"]').setValue(true)
+      await flushPromises()
+      expect(w.find("#portfolio-label").exists()).toBe(true)
+      expect(mockedLabels.getLabels).toHaveBeenCalledTimes(1)
+    })
+
+    it("blocks virtual submit until a label is chosen, then sends the virtual payload", async () => {
+      mocked.createPortfolio.mockResolvedValue({ id: "v2" } as never)
+      const w = await mountTab("/en/investments")
+      await openCreateDialog(w)
+
+      await w.get("input[type=text]").setValue("Virtual Growth")
+      await w.get('[data-testid="portfolio-virtual"]').setValue(true)
+      await flushPromises()
+
+      expect(submitButton(w).attributes("disabled")).toBeDefined()
+
+      await w.get("#portfolio-label").setValue("l1")
+      await flushPromises()
+      expect(submitButton(w).attributes("disabled")).toBeUndefined()
+
+      await w.find("form").trigger("submit")
+      await flushPromises()
+      expect(mocked.createPortfolio).toHaveBeenCalledWith({
+        name: "Virtual Growth",
+        description: undefined,
+        currency: "USD",
+        isVirtual: true,
+        labelId: "l1",
+      })
+    })
+
+    it("clears a chosen label when virtual is switched off, so casual creation stays unchanged", async () => {
+      mocked.createPortfolio.mockResolvedValue({ id: "p2" } as never)
+      const w = await mountTab("/en/investments")
+      await openCreateDialog(w)
+      await w.get("input[type=text]").setValue("Casual Portfolio")
+
+      await w.get('[data-testid="portfolio-virtual"]').setValue(true)
+      await flushPromises()
+      await w.get("#portfolio-label").setValue("l1")
+      await flushPromises()
+      await w.get('[data-testid="portfolio-virtual"]').setValue(false)
+      await flushPromises()
+
+      expect(submitButton(w).attributes("disabled")).toBeUndefined()
+      await w.find("form").trigger("submit")
+      await flushPromises()
+      expect(mocked.createPortfolio).toHaveBeenCalledWith({
+        name: "Casual Portfolio",
+        description: undefined,
+        currency: "USD",
+      })
+    })
+
+    it("splits the page into investment and virtual tabs by route, reusing one card component", async () => {
+      mocked.getPortfolios.mockResolvedValue(mixedPortfolios() as never)
+
+      const investment = await mountTab("/en/investments")
+      expect(headings(investment)).toContain("Investment Portfolios")
+      expect(headings(investment)).not.toContain("Virtual Portfolios")
+      expect(investment.findAll('[data-testid="portfolio-card"]')).toHaveLength(1)
+      expect(investment.text()).toContain("Top10")
+      expect(investment.text()).not.toContain("Paper Tech")
+
+      const virtual = await mountTab(VIRTUAL_PATH)
+      expect(headings(virtual)).toContain("Virtual Portfolios")
+      expect(headings(virtual)).not.toContain("Investment Portfolios")
+      const cards = virtual.findAll('[data-testid="portfolio-card"]')
+      expect(cards).toHaveLength(1)
+      expect(virtual.text()).toContain("Paper Tech")
+      expect(virtual.text()).not.toContain("Top10")
+      // The virtual card is a re-render of PortfolioCard, not a parallel card.
+      expect(cards[0].find('[data-testid="card-value"]').exists()).toBe(true)
+    })
+
+    it("shows the virtual empty state and count when the collection is empty", async () => {
+      mocked.getPortfolios.mockResolvedValue(summary() as never)
+      const virtual = await mountTab(VIRTUAL_PATH)
+
+      expect(headings(virtual)).toContain("Virtual Portfolios")
+      expect(virtual.findAll('[data-testid="portfolio-card"]')).toHaveLength(0)
+      expect(virtual.text()).toContain("No virtual portfolios yet.")
+      // The non-virtual portfolio must not leak into the virtual tab.
+      expect(virtual.text()).not.toContain("Top10")
+    })
   })
 })
 

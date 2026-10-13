@@ -20,7 +20,7 @@ test("investments tabs switch between portfolios, transactions, and watchlists",
   await login(page)
 
   const tabs = page.getByRole("navigation", { name: "Investment sections" })
-  await expect(tabs.getByRole("link", { name: "Portfolios" })).toHaveClass(/border-blue-600/)
+  await expect(tabs.getByRole("link", { name: "Portfolios", exact: true })).toHaveClass(/border-blue-600/)
   await expect(page.getByRole("button", { name: "Import from Broker" })).toBeVisible()
 
   await tabs.getByRole("link", { name: "Transactions" }).click()
