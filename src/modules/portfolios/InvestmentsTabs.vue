@@ -1,9 +1,17 @@
 <script setup lang="ts">
+import { computed } from "vue"
 import { useRoute } from "vue-router"
 
 const route = useRoute()
 
-const currentPath = route?.path ?? (typeof window !== "undefined" ? window.location.pathname : "")
+// §143 — `/en/investments` and `/en/investments/virtual-portfolios` render the
+// SAME InvestmentsView, so Vue reuses the instance across the navigation and
+// this component is not re-created. A `const currentPath = route?.path` read
+// once at setup therefore pins the highlight to whatever tab was open on first
+// mount; a computed keeps it live, so the border follows the router.
+const currentPath = computed(
+  () => route?.path ?? (typeof window !== "undefined" ? window.location.pathname : ""),
+)
 
 const tabs = [
   {
