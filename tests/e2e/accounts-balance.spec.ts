@@ -79,7 +79,7 @@ test("the accounts balance tab is the landing page, and its rows add up", async 
   await expect(strip.first()).toHaveText("Accounts balance")
   await expect(strip.first()).toHaveAttribute("href", "/en/investments/accounts-balance")
   // The list is asserted in full so a tab that lands in the wrong place is visible.
-  await expect(strip).toHaveText(["Accounts balance", "Consolidated holdings", "Portfolios", "Performance", "Transactions", "Watchlists"])
+  await expect(strip).toHaveText(["Accounts balance", "Portfolios", "Virtual Portfolios", "Consolidated holdings", "Performance", "Transactions", "Watchlists"])
 
   // The table is behind `store.fetchAll()` (the store is per-route state), so
   // wait for it rather than reading the DOM while the view still says "Loading".
