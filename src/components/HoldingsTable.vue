@@ -103,18 +103,30 @@ function groupValue(pos: Position, mode: GroupMode): string {
   }
 }
 
+// §157 — client-side paging. The full filtered+sorted set drives the totals,
+// the group subtotals, the CSV export and the group header counts; only the
+// current page's slice renders as data rows. Paging and grouping both act on
+// the same list, so a group's subtotal and count stay correct even when only
+// some of its rows are on the current page.
+const pageSize = ref(20)
+const pageSizes = [10, 20, 50, 100]
+const page = ref(1)
+
 const groups = computed(() => {
-  if (groupBy.value === "none") return [{ label: "", items: positions.value }]
+  if (groupBy.value === "none") {
+    return [{ label: "", items: sorted.value, rows: pagedPositions.value }]
+  }
   const map = new Map<string, Position[]>()
-  for (const pos of positions.value) {
+  for (const pos of sorted.value) {
     const key = groupValue(pos, groupBy.value)
     const list = map.get(key) ?? []
     list.push(pos)
     map.set(key, list)
   }
+  const on = new Set(pagedPositions.value.map((p) => p.id))
   return [...map.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([label, items]) => ({ label, items }))
+    .map(([label, items]) => ({ label, items, rows: items.filter((p) => on.has(p.id)) }))
 })
 
 const colspan = computed(() => visibleColumns.value.length + 1 + (isGlobal.value ? 1 : 0))
@@ -127,16 +139,24 @@ interface ColumnDef {
   key: string
   label: string
   sortable: boolean
+  /** Fixed pixel width for the colgroup (`table-fixed`). Omitted = the column
+   *  is the flexible one (Symbol) that absorbs the remainder and truncates. */
+  width?: number
 }
 
+// Widths are the widest realistic single line of that column (dual-currency
+// value + P/L percent, measured in the browser) plus headroom, so `table-fixed`
+// never clips a number. Numeric cells use px-3 (not the table's px-5) to keep
+// the fixed total under the 1280px content width — only the Symbol column is
+// left flexible to absorb the remainder and truncate.
 const allColumns: ColumnDef[] = [
   { key: "symbol", label: "Symbol", sortable: true },
-  { key: "quantity", label: "Quantity", sortable: true },
-  { key: "avgCost", label: "Avg Cost", sortable: true },
-  { key: "price", label: "Price", sortable: true },
-  { key: "marketValue", label: "Market Value", sortable: true },
-  { key: "unrealized", label: "Unrealized P/L", sortable: true },
-  { key: "weight", label: "% of Portfolio", sortable: true },
+  { key: "quantity", label: "Quantity", sortable: true, width: 111 },
+  { key: "avgCost", label: "Avg Cost", sortable: true, width: 110 },
+  { key: "price", label: "Price", sortable: true, width: 84 },
+  { key: "marketValue", label: "Market Value", sortable: true, width: 148 },
+  { key: "unrealized", label: "Unrealized P/L", sortable: true, width: 146 },
+  { key: "weight", label: "% of Portfolio", sortable: true, width: 118 },
 ]
 
 const visibleColumns = ref<string[]>(allColumns.map((c) => c.key))
@@ -149,10 +169,33 @@ watch(labelFilter, () => {
   if (!isGlobal.value) void store.fetchPositions(id.value, labelFilter.value)
 })
 
+const searchFilter = ref("")
+
+// The full set of open positions matching the active label filter. This is the
+// set the "N open" count is measured over.
 const positions = computed(() => {
   const source = isGlobal.value ? (props.positions ?? []) : store.positions
-  const open = source.filter((p) => p.isOpen && (!isGlobal.value || !labelFilter.value.length || p.labels?.some((label) => labelFilter.value.includes(label.id))))
-  if (!sortKey.value) return open
+  return source.filter((p) => p.isOpen && (!isGlobal.value || !labelFilter.value.length || p.labels?.some((label) => labelFilter.value.includes(label.id))))
+})
+
+// The search-filtered set, matching ticker or company name (case-insensitive
+// substring, mirroring the transactions table's `searchFilter`). Applied
+// client-side on top of the already-fetched positions — no backend change.
+const searched = computed(() => {
+  const q = searchFilter.value.trim().toLowerCase()
+  if (!q) return positions.value
+  return positions.value.filter(
+    (p) =>
+      String(p.symbol ?? "").toLowerCase().includes(q) ||
+      String(p.companyName ?? "").toLowerCase().includes(q),
+  )
+})
+
+// The filtered+searched set in the current sort order. Paging, the totals and
+// the group subtotals are all measured over this, so a search narrows the whole
+// table (not just the visible page) and the numbers stay honest.
+const sorted = computed(() => {
+  if (!sortKey.value) return searched.value
   const valueOf = (p: Position, key: string): string | number => {
     switch (key) {
       case "quantity":
@@ -172,13 +215,55 @@ const positions = computed(() => {
     }
   }
   const dir = sortDir.value === "asc" ? 1 : -1
-  return [...open].sort((a, b) => {
+  return [...searched.value].sort((a, b) => {
     const av = valueOf(a, sortKey.value!)
     const bv = valueOf(b, sortKey.value!)
     if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir
     return String(av).localeCompare(String(bv)) * dir
   })
 })
+
+const totalPages = computed(() => Math.max(1, Math.ceil(sorted.value.length / pageSize.value)))
+
+// Keep the slice honest if the page is ever stale relative to the (shrunken)
+// sorted set — the watch below normally resets to page 1 on any filter change.
+const clampedPage = computed(() => Math.min(page.value, totalPages.value))
+
+const pagedPositions = computed(() => {
+  const start = (clampedPage.value - 1) * pageSize.value
+  return sorted.value.slice(start, start + pageSize.value)
+})
+
+// A filter, search or page-size change means the current page is meaningless —
+// fall back to the first page so a stale page never points at an empty slice.
+watch([labelFilter, searchFilter, pageSize], () => {
+  page.value = 1
+})
+
+function goToPage(p: number) {
+  if (p < 1 || p > totalPages.value || p === page.value) return
+  page.value = p
+}
+
+function onPageSizeChange(e: Event) {
+  pageSize.value = Number((e.target as HTMLSelectElement).value)
+}
+
+function pageNumbers(): (number | "…")[] {
+  const t = totalPages.value
+  if (t <= 7) return Array.from({ length: t }, (_, i) => i + 1)
+  const cur = clampedPage.value
+  const set = new Set<number>([1, t, cur - 1, cur, cur + 1])
+  const nums = [...set].filter((n) => n >= 1 && n <= t).sort((a, b) => a - b)
+  const out: (number | "…")[] = []
+  let prev = 0
+  for (const n of nums) {
+    if (n - prev > 1) out.push("…")
+    out.push(n)
+    prev = n
+  }
+  return out
+}
 
 function visibleColumnsDef(): ColumnDef[] {
   return allColumns.filter((c) => visibleColumns.value.includes(c.key))
@@ -207,8 +292,10 @@ function sortIndicator(key: string): string {
   return sortDir.value === "asc" ? "↑" : "↓"
 }
 
-const totalValue = computed(() => positions.value.reduce((s, p) => s + (p.marketValue || 0), 0))
-const totalUnrealized = computed(() => positions.value.reduce((s, p) => s + (p.unrealizedGainLoss || 0), 0))
+// Measured over the search-filtered set (not the raw open set), so the totals
+// track what a search is actually showing.
+const totalValue = computed(() => sorted.value.reduce((s, p) => s + (p.marketValue || 0), 0))
+const totalUnrealized = computed(() => sorted.value.reduce((s, p) => s + (p.unrealizedGainLoss || 0), 0))
 
 // §48.6e B2 — the backend's `converted*` position fields are denominated in
 // the portfolio BASE currency (wallets D21b), not the user's display
@@ -244,7 +331,9 @@ function gainClass(value: number | undefined): string {
 }
 
 function exportCsv() {
-  const rows = positions.value.map((p) =>
+  // Export the full filtered+searched set in the current sort order — not just
+  // the visible page — so a CSV reflects the active search/sort across pages.
+  const rows = sorted.value.map((p) =>
     [
       p.symbol,
       p.quantity,
@@ -377,7 +466,7 @@ function onPickerSaved() {
       <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-700/60 px-5 py-3">
         <div class="flex items-center gap-3">
           <h2 class="text-base font-semibold">Positions</h2>
-          <span class="text-sm text-slate-500 dark:text-slate-400">{{ positions.length }} open</span>
+          <span class="text-sm text-slate-500 dark:text-slate-400">{{ searched.length }} open</span>
         </div>
         <div class="flex items-center gap-2">
           <label class="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
@@ -406,22 +495,47 @@ function onPickerSaved() {
       </div>
 
       <div class="border-b border-slate-100 dark:border-slate-800 px-5 py-2">
-        <LabelFilterBar v-model="labelFilter" @manage="manageLabelsOpen = true" />
+        <div class="flex flex-wrap items-center gap-3">
+          <LabelFilterBar v-model="labelFilter" @manage="manageLabelsOpen = true" />
+          <label class="ml-auto flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+            <span class="sr-only">Filter by company name or ticker</span>
+            <input
+              v-model="searchFilter"
+              class="input !w-56 !py-1.5 !text-xs"
+              type="search"
+              placeholder="Company name or ticker"
+              aria-label="Filter by company name or ticker"
+              data-testid="holdings-search"
+            />
+          </label>
+        </div>
       </div>
 
       <p v-if="notice" class="border-b border-slate-100 dark:border-slate-800 bg-green-50 dark:bg-green-500/10 px-5 py-2 text-sm text-green-700 dark:text-green-400">{{ notice }}</p>
       <p v-if="noticeError" class="border-b border-slate-100 dark:border-slate-800 bg-red-50 dark:bg-red-500/10 px-5 py-2 text-sm text-red-700 dark:text-red-400">{{ noticeError }}</p>
 
-      <div v-if="positions.length" class="overflow-x-auto">
-        <table class="w-full text-sm">
+      <div v-if="sorted.length" class="overflow-x-auto" data-testid="holdings-table-wrap">
+        <table class="w-full table-fixed text-sm">
+          <!-- §157 — table-fixed with an explicit colgroup: the numeric columns
+               take a fixed share so a long company name inflates only the
+               flexible Symbol column (which truncates), never pushing the
+               Market Value column off-screen. -->
+          <colgroup>
+            <col v-if="isGlobal" style="width: 120px" />
+            <template v-for="col in visibleColumnsDef()" :key="col.key">
+              <col v-if="col.width" :style="{ width: `${col.width}px` }" />
+              <col v-else />
+            </template>
+            <col style="width: 56px" />
+          </colgroup>
           <thead>
             <tr class="border-b border-slate-100 dark:border-slate-800 text-left text-xs uppercase text-slate-500 dark:text-slate-400">
               <th v-if="isGlobal" class="px-5 py-2.5 font-medium">Portfolio</th>
               <th
                 v-for="col in visibleColumnsDef()"
                 :key="col.key"
-                class="px-5 py-2.5 font-medium"
-                :class="col.sortable ? 'cursor-pointer select-none hover:text-slate-900 dark:hover:text-slate-100' : ''"
+                class="py-2.5 font-medium"
+                :class="[col.width ? 'px-3' : 'px-5', col.sortable ? 'cursor-pointer select-none hover:text-slate-900 dark:hover:text-slate-100' : '']"
                 :aria-sort="sortKey === col.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined"
                 @click="toggleSort(col.key)"
               >
@@ -440,10 +554,13 @@ function onPickerSaved() {
                 <span class="font-normal text-slate-400 dark:text-slate-500">{{ g.items.length }}</span>
               </td>
             </tr>
-            <tr v-for="pos in g.items" :key="pos.id" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-              <td v-if="isGlobal" class="px-5 py-3 text-slate-700 dark:text-slate-200">{{ pos.portfolioName || pos.portfolioId }}</td>
+            <tr v-for="pos in g.rows" :key="pos.id" data-testid="holdings-row" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+              <td v-if="isGlobal" class="truncate px-5 py-3 text-slate-700 dark:text-slate-200">{{ pos.portfolioName || pos.portfolioId }}</td>
               <template v-if="visibleColumns.includes('symbol')">
-                <td class="px-5 py-3">
+                <!-- min-w-0 + overflow-hidden on the td: under table-fixed the
+                     column has a definite width, so the TickerBadge's inner
+                     truncate clips a long company name to an ellipsis here. -->
+                <td class="min-w-0 overflow-hidden px-5 py-3">
                   <router-link :to="researchRoute(pos.symbol, route.fullPath)" class="block">
                     <TickerBadge
                       :symbol="pos.symbol"
@@ -455,8 +572,8 @@ function onPickerSaved() {
                   <LabelChips v-if="pos.labels?.length" :labels="pos.labels" :max="4" class="mt-1" />
                 </td>
               </template>
-              <td v-if="visibleColumns.includes('quantity')" class="px-5 py-3 text-right tabular-nums">{{ formatNumber(pos.quantity, 0) }}</td>
-              <td v-if="visibleColumns.includes('avgCost')" class="px-5 py-3 text-right tabular-nums">
+              <td v-if="visibleColumns.includes('quantity')" class="whitespace-nowrap px-3 py-3 text-right tabular-nums">{{ formatNumber(pos.quantity, 0) }}</td>
+              <td v-if="visibleColumns.includes('avgCost')" class="whitespace-nowrap px-3 py-3 text-right tabular-nums">
                 <DualCurrencyCell
                   :primary="pos.averageCostBasis"
                   :primary-currency="pos.instrumentCurrency"
@@ -464,7 +581,7 @@ function onPickerSaved() {
                   :display-currency="displayCurrency"
                 />
               </td>
-              <td v-if="visibleColumns.includes('price')" class="px-5 py-3 text-right tabular-nums">
+              <td v-if="visibleColumns.includes('price')" class="whitespace-nowrap px-3 py-3 text-right tabular-nums">
                 <DualCurrencyCell
                   :primary="pos.currentPrice"
                   :primary-currency="pos.instrumentCurrency"
@@ -472,7 +589,7 @@ function onPickerSaved() {
                   :display-currency="displayCurrency"
                 />
               </td>
-              <td v-if="visibleColumns.includes('marketValue')" class="px-5 py-3 text-right tabular-nums">
+              <td v-if="visibleColumns.includes('marketValue')" class="whitespace-nowrap px-3 py-3 text-right tabular-nums">
                 <DualCurrencyCell
                   :primary="pos.marketValue"
                   :primary-currency="pos.instrumentCurrency"
@@ -488,7 +605,7 @@ function onPickerSaved() {
                   />
                 </p>
               </td>
-              <td v-if="visibleColumns.includes('unrealized')" class="px-5 py-3 text-right tabular-nums">
+              <td v-if="visibleColumns.includes('unrealized')" class="whitespace-nowrap px-3 py-3 text-right tabular-nums">
                 <DualCurrencyPnlCell
                   :primary="pos.unrealizedGainLoss"
                   :primary-currency="pos.instrumentCurrency"
@@ -497,7 +614,7 @@ function onPickerSaved() {
                   :percent="pos.percentageChange"
                 />
               </td>
-              <td v-if="visibleColumns.includes('weight')" class="px-5 py-3 text-right tabular-nums">{{ formatPercent(pos.percentOfPortfolio) }}</td>
+              <td v-if="visibleColumns.includes('weight')" class="whitespace-nowrap px-3 py-3 text-right tabular-nums">{{ formatPercent(pos.percentOfPortfolio) }}</td>
               <td class="px-5 py-3 text-right">
                 <div class="relative inline-block">
                   <button
@@ -530,30 +647,70 @@ function onPickerSaved() {
             </tr>
             <tr v-if="g.label" class="border-t border-slate-200 dark:border-slate-700/60 bg-slate-50 dark:bg-slate-800/50 font-medium">
               <td class="px-5 py-3 text-slate-500 dark:text-slate-400">{{ g.label }} subtotal</td>
-              <td v-if="visibleColumns.includes('quantity')" class="px-5 py-3"></td>
-              <td v-if="visibleColumns.includes('avgCost')" class="px-5 py-3"></td>
-              <td v-if="visibleColumns.includes('price')" class="px-5 py-3"></td>
-              <td v-if="visibleColumns.includes('marketValue')" class="px-5 py-3 text-right tabular-nums">{{ formatAmount(groupTotal(g.items) * (toDisplayRate ?? 1), totalsCcy) }}</td>
-              <td v-if="visibleColumns.includes('unrealized')" class="px-5 py-3 text-right tabular-nums">{{ formatSignedAmount(g.items.reduce((s, p) => s + (p.unrealizedGainLoss || 0), 0) * (toDisplayRate ?? 1), totalsCcy) }}</td>
-              <td v-if="visibleColumns.includes('weight')" class="px-5 py-3"></td>
+              <td v-if="visibleColumns.includes('quantity')" class="px-3 py-3"></td>
+              <td v-if="visibleColumns.includes('avgCost')" class="px-3 py-3"></td>
+              <td v-if="visibleColumns.includes('price')" class="px-3 py-3"></td>
+              <td v-if="visibleColumns.includes('marketValue')" class="px-3 py-3 text-right tabular-nums">{{ formatAmount(groupTotal(g.items) * (toDisplayRate ?? 1), totalsCcy) }}</td>
+              <td v-if="visibleColumns.includes('unrealized')" class="px-3 py-3 text-right tabular-nums">{{ formatSignedAmount(g.items.reduce((s, p) => s + (p.unrealizedGainLoss || 0), 0) * (toDisplayRate ?? 1), totalsCcy) }}</td>
+              <td v-if="visibleColumns.includes('weight')" class="px-3 py-3"></td>
               <td class="px-5 py-3"></td>
             </tr>
           </tbody>
           <tfoot v-if="groupBy === 'none'">
             <tr class="border-t border-slate-200 dark:border-slate-700/60 bg-slate-50 dark:bg-slate-800/50 font-medium">
               <td v-if="visibleColumns.includes('symbol')" class="px-5 py-3">Total</td>
-              <td v-if="visibleColumns.includes('quantity')" class="px-5 py-3"></td>
-              <td v-if="visibleColumns.includes('avgCost')" class="px-5 py-3"></td>
-              <td v-if="visibleColumns.includes('price')" class="px-5 py-3"></td>
-              <td v-if="visibleColumns.includes('marketValue')" class="px-5 py-3 text-right tabular-nums">{{ formatAmount(totalValueDisplay, totalsCcy) }}</td>
-              <td v-if="visibleColumns.includes('unrealized')" class="px-5 py-3 text-right tabular-nums" :class="gainClass(totalUnrealized)">{{ formatSignedAmount(totalUnrealizedDisplay, totalsCcy) }}</td>
-              <td v-if="visibleColumns.includes('weight')" class="px-5 py-3"></td>
+              <td v-if="visibleColumns.includes('quantity')" class="px-3 py-3"></td>
+              <td v-if="visibleColumns.includes('avgCost')" class="px-3 py-3"></td>
+              <td v-if="visibleColumns.includes('price')" class="px-3 py-3"></td>
+              <td v-if="visibleColumns.includes('marketValue')" class="px-3 py-3 text-right tabular-nums">{{ formatAmount(totalValueDisplay, totalsCcy) }}</td>
+              <td v-if="visibleColumns.includes('unrealized')" class="px-3 py-3 text-right tabular-nums" :class="gainClass(totalUnrealized)">{{ formatSignedAmount(totalUnrealizedDisplay, totalsCcy) }}</td>
+              <td v-if="visibleColumns.includes('weight')" class="px-3 py-3"></td>
               <td class="px-5 py-3"></td>
             </tr>
           </tfoot>
         </table>
       </div>
-      <p v-else class="px-5 py-6 text-sm text-slate-500 dark:text-slate-400">No open positions.</p>
+      <p v-else class="px-5 py-6 text-sm text-slate-500 dark:text-slate-400">
+        {{ positions.length ? "No positions match the current filters." : "No open positions." }}
+      </p>
+
+      <!-- §157 — client-side paginator, mirroring the transactions table. The
+           range counts the filtered+searched set; the Total row and group
+           subtotals above are measured over that same set, so they stay correct
+           on every page and while a filter is applied. -->
+      <div v-if="sorted.length" class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 dark:border-slate-700/60 px-5 py-3">
+        <p class="text-sm text-slate-500 dark:text-slate-400">
+          {{ (clampedPage - 1) * pageSize + 1 }}–{{ Math.min(clampedPage * pageSize, sorted.length) }} of {{ sorted.length }}
+        </p>
+        <div class="flex items-center gap-4">
+          <label class="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+            Rows per page
+            <select
+              class="input py-1"
+              :value="pageSize"
+              aria-label="Rows per page"
+              data-testid="holdings-page-size"
+              @change="onPageSizeChange"
+            >
+              <option v-for="s in pageSizes" :key="s" :value="s">{{ s }} per page</option>
+            </select>
+          </label>
+          <nav aria-label="Pagination" class="flex items-center gap-1">
+            <button type="button" class="btn-ghost px-2 py-1 text-xs" aria-label="First page" :disabled="clampedPage <= 1" @click="goToPage(1)">«</button>
+            <button type="button" class="btn-ghost px-2 py-1 text-xs" aria-label="Previous page" :disabled="clampedPage <= 1" @click="goToPage(clampedPage - 1)">‹</button>
+            <button
+              v-for="n in pageNumbers()" :key="n" type="button"
+              class="btn-ghost px-2 py-1 text-xs"
+              :class="n === clampedPage ? 'bg-slate-900 text-white dark:bg-slate-700' : ''"
+              :aria-current="n === clampedPage ? 'page' : undefined"
+              :disabled="n === '…'"
+              @click="goToPage(Number(n))"
+            >{{ n }}</button>
+            <button type="button" class="btn-ghost px-2 py-1 text-xs" aria-label="Next page" :disabled="clampedPage >= totalPages" @click="goToPage(clampedPage + 1)">›</button>
+            <button type="button" class="btn-ghost px-2 py-1 text-xs" aria-label="Last page" :disabled="clampedPage >= totalPages" @click="goToPage(totalPages)">»</button>
+          </nav>
+        </div>
+      </div>
     </div>
 
     <AddPositionDialog v-if="!props.readonly"
