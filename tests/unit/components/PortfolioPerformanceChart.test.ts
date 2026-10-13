@@ -327,6 +327,71 @@ describe("PortfolioPerformanceChart (§41.1)", () => {
     expect(warn.text()).not.toMatch(/value excludes/i)
   })
 })
+
+/**
+ * §149 — a virtual portfolio is a view over transactions that were already
+ * recorded elsewhere, so it has no invested (cumulative net money-in) of its
+ * own. The capability is a prop rather than a fork of the chart, and BOTH modes
+ * are asserted against the same invested-bearing series: the data is present in
+ * both mounts, so only `showInvested` decides the output.
+ */
+describe("PortfolioPerformanceChart (§149 — showInvested capability)", () => {
+  const withInvested = [
+    { date: "2026-07-01", value: 500, invested: 400 },
+    { date: "2026-07-02", value: 94000, invested: 90000 },
+  ]
+
+  it("defaults to drawing the Invested line, so casual portfolios are unchanged", () => {
+    const w = mount(PortfolioPerformanceChart, {
+      // no showInvested prop at all — the default path a casual mount takes
+      props: { timeSeries: withInvested },
+      global: { stubs: { apexchart: true } },
+    })
+    const opts = chartOptions(w)
+    expect(opts.series.map((s) => s.name)).toEqual(["Portfolio", "Invested"])
+    // The left axis names its series, so ApexCharts keeps the overlay on the
+    // currency axis and in the legend/tooltip rather than orphaning it.
+    expect(opts.yaxis[0].seriesName).toEqual(["Portfolio", "Invested"])
+    expect(opts.colors).toHaveLength(2)
+    expect(opts.stroke.dashArray).toEqual([0, 0])
+  })
+
+  it("omits the series, its axis name and its colour when the capability is off", () => {
+    const w = mount(PortfolioPerformanceChart, {
+      props: { timeSeries: withInvested, showInvested: false },
+      global: { stubs: { apexchart: true } },
+    })
+    const opts = chartOptions(w)
+    expect(opts.series).toHaveLength(1)
+    expect(opts.series[0].name).toBe("Portfolio")
+    expect(opts.yaxis[0].seriesName).toEqual(["Portfolio"])
+    // Nothing takes the Invested slot: the colour, the stroke width and the
+    // dash array all collapse to the single Portfolio line, so the withheld
+    // series is not re-rendered as a substitute.
+    expect(opts.colors).toHaveLength(1)
+    expect(opts.stroke.dashArray).toEqual([0])
+  })
+
+  it("gives the benchmark the slot Invested would have taken once it is off", () => {
+    // Slot arithmetic is what breaks if only the series is dropped: the tooltip
+    // decides currency vs % by slot index, so a benchmark must move into
+    // index 1 and the portfolio-index in front of it must not be read as one.
+    const w = mount(PortfolioPerformanceChart, {
+      props: {
+        timeSeries: withInvested,
+        showInvested: false,
+        benchmarks: [{ name: "S&P 500", timeSeries: [{ date: "2026-07-01", value: 100 }, { date: "2026-07-02", value: 110 }] }],
+      },
+      global: { stubs: { apexchart: true } },
+    })
+    const opts = chartOptions(w)
+    expect(opts.series.map((s) => s.name)).toEqual(["Portfolio", "S&P 500"])
+    expect(opts.yaxis[1].seriesName).toEqual(["S&P 500"])
+    // index 0 is the portfolio (currency), index 1 is the benchmark (%)
+    expect(opts.tooltip.y.formatter(500, { seriesIndex: 0 })).toBe("$500.00")
+    expect(opts.tooltip.y.formatter(10, { seriesIndex: 1 })).toBe("+10.0%")
+  })
+})
 /**
  * §78.5 — the warning has to carry the AMOUNT, not only the count.
  *

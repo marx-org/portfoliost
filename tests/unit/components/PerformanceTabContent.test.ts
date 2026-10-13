@@ -70,7 +70,14 @@ async function mountContent(
       plugins: [pinia],
       stubs: {
         apexchart: true,
-        PortfolioPerformanceChart: { template: "<div data-testid='chart-stub' />" },
+        // §149 — the capability has to reach the chart from the tab body, so
+        // the stub surfaces both props it decides the overlay with: the flag
+        // itself, and the `invested` value on the series it forwards.
+        PortfolioPerformanceChart: {
+          props: ["showInvested", "timeSeries"],
+          template:
+            "<div data-testid='chart-stub' :data-show-invested='String(showInvested)' :data-invested='String(timeSeries?.[0]?.invested)' />",
+        },
         InstrumentSearchModal: true,
         TickerBadge: true,
         // §85.2 — assert the wrapping link's `to`, not the badge (which is
@@ -136,6 +143,42 @@ describe("PerformanceTabContent — §83.1 prop-driven tab body", () => {
     expect(wrapper.get('[data-testid="perf-overview-net-gain"]').text()).toContain("€75")
     // Same DOM node: the component was updated, not torn down.
     expect(wrapper.get('[data-testid="perf-overview-net-gain"]').element).toBe(before)
+  })
+
+  /**
+   * §149 — a virtual portfolio has no invested book of its own, so the tab body
+   * has to withhold the Net invested tile AND stop forwarding `invested` to the
+   * chart. Both directions are asserted here; the chart-level behaviour of the
+   * flag lives in PortfolioPerformanceChart.test.ts.
+   */
+  it("§149 — hides Net invested and withholds the chart's invested data for a virtual portfolio", async () => {
+    const wrapper = await mountContent({ showInvested: false })
+    // the withheld tile is gone, not rendered as a zero or an em dash
+    expect(wrapper.find('[data-testid="perf-overview-net-invested"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="perf-overview"]').text()).not.toContain("Net invested")
+    // the tiles a virtual portfolio DOES support are all still there, with their
+    // real values: net gain, XIRR/TWR and the drawdown on the card below
+    expect(tile(wrapper, "net-gain")).toContain("300")
+    expect(tile(wrapper, "xirr")).toContain("14.50%")
+    expect(tile(wrapper, "twr-pa")).toContain("11.25%")
+    expect(wrapper.get('[data-testid="performance-max-drawdown"]').text()).toContain("10.00%")
+    // and the chart is told both ways: flag off, and the series carries no
+    // invested value that could be drawn as a substitute.
+    const chart = wrapper.get('[data-testid="chart-stub"]')
+    expect(chart.attributes("data-show-invested")).toBe("false")
+    expect(chart.attributes("data-invested")).toBe("null")
+  })
+
+  it("§149 — keeps Net invested and forwards the chart data for a casual portfolio", async () => {
+    const wrapper = await mountContent({ showInvested: true })
+    expect(tile(wrapper, "net-invested")).toContain("900")
+    const chart = wrapper.get('[data-testid="chart-stub"]')
+    expect(chart.attributes("data-show-invested")).toBe("true")
+    expect(chart.attributes("data-invested")).toBe("900")
+    // and that is the default mode — an unset prop is a casual mount
+    const casual = await mountContent()
+    expect(casual.get('[data-testid="chart-stub"]').attributes("data-show-invested")).toBe("true")
+    expect(tile(casual, "net-invested")).toContain("900")
   })
 
   it("emits update:timeframe instead of writing per-portfolio store state", async () => {
