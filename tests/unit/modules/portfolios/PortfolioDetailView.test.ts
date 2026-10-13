@@ -2,6 +2,7 @@ import { flushPromises, mount } from "@vue/test-utils"
 import { createPinia, setActivePinia } from "pinia"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import PortfolioDetailView from "@/modules/portfolios/PortfolioDetailView.vue"
+import PortfolioSettingsDialog from "@/modules/portfolios/PortfolioSettingsDialog.vue"
 import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
 import * as portfoliosApi from "@/api/portfolios"
 import * as fxApi from "@/api/fx"
@@ -82,11 +83,11 @@ const METRICS = {
   dayChangeDate: "2026-01-01T00:00:00.000Z",
 } as never
 
-async function mountDetail(display: string) {
+async function mountDetail(display: string, detailOverrides: Record<string, unknown> = {}) {
   const pinia = createPinia()
   setActivePinia(pinia)
   useDisplayCurrencyStore().currency = display
-  mockedPortfolios.getPortfolioDetail.mockResolvedValue(DETAIL)
+  mockedPortfolios.getPortfolioDetail.mockResolvedValue({ ...(DETAIL as Record<string, unknown>), ...detailOverrides } as never)
   mockedPortfolios.getPortfolios.mockResolvedValue([])
   mockedPortfolios.getPortfolioTotalMetrics.mockResolvedValue({ totalValue: 0, capitalBasis: 0 } as never)
   mockedPortfolios.getPortfolioSummaryMetrics.mockResolvedValue(METRICS)
@@ -163,5 +164,76 @@ describe("PortfolioDetailView — §48.6e B3 umbrella: summary cards in the disp
       baseCurrency: "USD",
       cashLegOnTrade: false,
     })
+  })
+})
+
+// §148 — a virtual portfolio is the SAME detail page as a casual one, minus the
+// cash ledger and every transaction/position mutation affordance. The single
+// source of that difference is `store.detail.isVirtual`, so each half is asserted
+// against the same mount: drop one, and the other should fail.
+describe("PortfolioDetailView — §148 virtual detail is read-only", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+    mockedFx.getLatestRate.mockResolvedValue({ rate: 0.25, asOf: "2026-08-25" })
+  })
+
+  const tabLabels = (wrapper: { get: (s: string) => { findAll: (s: string) => Array<{ text: () => string }> } }) =>
+    wrapper.get('nav[aria-label="Portfolio tabs"]').findAll("a").map((a) => a.text())
+
+  const hasAddPosition = (wrapper: { findAll: (s: string) => Array<{ text: () => string }> }) =>
+    wrapper.findAll("button").some((b) => b.text() === "Add Position")
+
+  it("virtual: drops the Cash tab but keeps every supported read-only tab", async () => {
+    const wrapper = await mountDetail("USD", { isVirtual: true })
+    await flushPromises()
+
+    expect(tabLabels(wrapper)).toEqual([
+      "Holdings",
+      "Transactions",
+      "Performance",
+      "Allocation",
+      "Risk Analysis",
+      "Dividends",
+      "Calendar",
+      "News",
+      "Compare",
+    ])
+  })
+
+  it("casual: keeps the Cash tab in the same position", async () => {
+    const wrapper = await mountDetail("USD", { isVirtual: false })
+    await flushPromises()
+
+    const labels = tabLabels(wrapper)
+    expect(labels).toContain("Cash")
+    // Second tab, immediately after Holdings — the ordering is part of parity.
+    expect(labels.slice(0, 3)).toEqual(["Holdings", "Cash", "Transactions"])
+  })
+
+  it("virtual: hides Add Position, keeps the portfolio-level Rename and Delete", async () => {
+    const wrapper = await mountDetail("USD", { isVirtual: true })
+    await flushPromises()
+
+    expect(hasAddPosition(wrapper)).toBe(false)
+    // The portfolio itself is still manageable — only the ledger is frozen.
+    expect(wrapper.findAll("button").some((b) => b.text() === "Rename")).toBe(true)
+    expect(wrapper.findAll("button").some((b) => b.text() === "Delete")).toBe(true)
+  })
+
+  it("casual: shows Add Position", async () => {
+    const wrapper = await mountDetail("USD", { isVirtual: false })
+    await flushPromises()
+
+    expect(hasAddPosition(wrapper)).toBe(true)
+  })
+
+  it("virtual: the settings dialog is told the portfolio is virtual, so the label is editable", async () => {
+    const wrapper = await mountDetail("USD", { isVirtual: true, labelId: "lbl-1" })
+    await flushPromises()
+
+    const settings = wrapper.findComponent(PortfolioSettingsDialog)
+    expect(settings.props("isVirtual")).toBe(true)
+    expect(settings.props("labelId")).toBe("lbl-1")
   })
 })

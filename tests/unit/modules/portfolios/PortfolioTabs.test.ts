@@ -3,6 +3,10 @@ import { createPinia, setActivePinia } from "pinia"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import PortfolioHoldingsTab from "@/modules/portfolios/PortfolioHoldingsTab.vue"
 import PortfolioTransactionsTab from "@/modules/portfolios/PortfolioTransactionsTab.vue"
+import AddPositionDialog from "@/modules/portfolios/AddPositionDialog.vue"
+import RecordDividendDialog from "@/modules/portfolios/RecordDividendDialog.vue"
+import EditPositionDialog from "@/modules/portfolios/EditPositionDialog.vue"
+import { usePortfolioStore } from "@/stores/portfolios"
 import * as portfoliosApi from "@/api/portfolios"
 
 vi.mock("vue-router", () => ({
@@ -211,5 +215,111 @@ describe("PortfolioTransactionsTab", () => {
     expect(wrapper.text()).toContain("META")
     expect(wrapper.text()).toContain("5,500.00")
     expect(mocked.getPortfolioTransactions).toHaveBeenCalledWith("p1", 1, 20, "date", "desc", undefined, undefined)
+  })
+})
+
+// §148 — the read-only rule lives in exactly one place per tab: `readonly` is
+// derived from `store.detail.isVirtual` (PortfolioHoldingsTab.vue:9,
+// PortfolioTransactionsTab.vue:12). Each pair below mounts the SAME component
+// with only that flag flipped, so a regression on either side fails here.
+const MUTATION_ACTIONS = ["Buy", "Sell", "Dividend", "Edit position", "Set labels...", "Remove position"]
+
+describe("PortfolioHoldingsTab — §148 virtual read-only", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+    mocked.getPortfolioPositions.mockResolvedValue([position() as never])
+  })
+
+  async function mountWith(isVirtual: boolean) {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    usePortfolioStore().detail = { currency: "USD", isVirtual } as never
+    const wrapper = mount(PortfolioHoldingsTab)
+    await flushPromises()
+    return wrapper
+  }
+
+  it("virtual: shows the holdings and only the read-only actions", async () => {
+    const wrapper = await mountWith(true)
+    expect(wrapper.text()).toContain("META")
+
+    await wrapper.get("button[aria-label='Position actions']").trigger("click")
+    // Research and View chart survive — the holding is not hidden, only frozen.
+    expect(wrapper.text()).toContain("Research")
+    expect(wrapper.text()).toContain("View chart")
+    for (const action of MUTATION_ACTIONS) {
+      expect(wrapper.findAll("button").some((b) => b.text() === action), action).toBe(false)
+    }
+    // The mutation dialogs are not even mounted.
+    expect(wrapper.findComponent(AddPositionDialog).exists()).toBe(false)
+    expect(wrapper.findComponent(RecordDividendDialog).exists()).toBe(false)
+    expect(wrapper.findComponent(EditPositionDialog).exists()).toBe(false)
+  })
+
+  it("casual: the same menu carries the mutation actions", async () => {
+    const wrapper = await mountWith(false)
+    await wrapper.get("button[aria-label='Position actions']").trigger("click")
+    for (const action of MUTATION_ACTIONS) {
+      expect(wrapper.findAll("button").some((b) => b.text() === action), action).toBe(true)
+    }
+    expect(wrapper.findComponent(AddPositionDialog).exists()).toBe(true)
+  })
+})
+
+describe("PortfolioTransactionsTab — §148 virtual read-only", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+    mocked.getPortfolioTransactions.mockResolvedValue({
+      items: [
+        {
+          id: "tx1",
+          portfolioId: "p1",
+          type: "BUY",
+          instrumentSymbol: "META",
+          instrumentName: "Meta Platforms Inc",
+          executedAt: "2026-08-02T00:00:00.000Z",
+          quantity: 10,
+          price: 550,
+          totalAmount: 5500,
+          currency: "USD",
+          displayCurrency: "USD",
+        },
+      ],
+      total: 1,
+      page: 1,
+      limit: 20,
+      totalPages: 1,
+      hasNext: false,
+      hasPrevious: false,
+    } as never)
+  })
+
+  async function mountWith(isVirtual: boolean) {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    usePortfolioStore().detail = { currency: "USD", isVirtual } as never
+    const wrapper = mount(PortfolioTransactionsTab)
+    await flushPromises()
+    return wrapper
+  }
+
+  it("virtual: keeps the transaction history visible with no mutation controls", async () => {
+    const wrapper = await mountWith(true)
+    // History is the source of holdings, so it has to stay readable…
+    expect(wrapper.text()).toContain("META")
+    expect(wrapper.text()).toContain("Buy")
+    // …but no row exposes a write.
+    expect(wrapper.find("button[aria-label='Edit transaction']").exists()).toBe(false)
+    expect(wrapper.find("button[aria-label='Set labels']").exists()).toBe(false)
+    expect(wrapper.find("button[aria-label='Delete transaction']").exists()).toBe(false)
+  })
+
+  it("casual: the same rows expose Edit / Labels / Delete", async () => {
+    const wrapper = await mountWith(false)
+    expect(wrapper.find("button[aria-label='Edit transaction']").exists()).toBe(true)
+    expect(wrapper.find("button[aria-label='Set labels']").exists()).toBe(true)
+    expect(wrapper.find("button[aria-label='Delete transaction']").exists()).toBe(true)
   })
 })

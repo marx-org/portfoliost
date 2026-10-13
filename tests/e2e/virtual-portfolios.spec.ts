@@ -192,3 +192,88 @@ test.describe("§143 the two-tab page across viewports", () => {
     })
   }
 })
+
+/** A single virtual portfolio, with its id, for the read-only assertions. */
+async function seedVirtualPortfolio(
+  request: APIRequestContext,
+  t: string,
+  labelId: string,
+): Promise<{ id: string; name: string }> {
+  const name = `Virtual RO ${Date.now()}-${Math.floor(Math.random() * 1e4)}`
+  const res = await request.post(`${GATEWAY}/api/portfolios`, {
+    headers: auth(t),
+    data: { name, description: "Paper trade", currency: "USD", isVirtual: true, labelId, cashLegOnTrade: true },
+  })
+  expect(res.ok()).toBeTruthy()
+  return { id: ((await res.json()) as { id: string }).id, name }
+}
+
+/**
+ * §148 — the detail page is read-only because the SERVER refuses every write, not
+ * because a button is hidden. The SPA is the same view minus cash; a direct API
+ * call is the only way to prove that hiding the buttons is not the enforcement.
+ */
+test.describe("§148 virtual detail is read-only and the API is authoritative", () => {
+  test("hides cash and write affordances, and the API refuses each write", async ({ page, request }) => {
+    const t = await token()
+    await clearVirtualPortfolios(request, t)
+    const label = await seedLabel(request, t)
+    const virtual = await seedVirtualPortfolio(request, t, label.id)
+
+    // The ROUTE: `page.goto` a deep link, so this is the real navigation, not a
+    // click that could hide a broken route.
+    await login(page)
+    await page.goto(`/en/portfolios/${virtual.id}/holdings`)
+
+    const tabs = page.getByRole("navigation", { name: "Portfolio tabs" })
+    await expect(tabs).toBeVisible()
+    await expect(tabs.getByRole("link", { name: "Holdings" })).toBeVisible()
+    await expect(tabs.getByRole("link", { name: "Transactions" })).toBeVisible()
+    // Cash is gone entirely, and the page exposes no add-position control.
+    await expect(tabs.getByRole("link", { name: "Cash", exact: true })).toHaveCount(0)
+    await expect(page.getByRole("button", { name: "Add Position", exact: true })).toHaveCount(0)
+
+    // The API, not the DOM: every mutation a hidden control would have issued is
+    // attempted directly and has to come back 409 ReadOnlyPortfolio.
+    const transfers = await request.get(`${GATEWAY}/api/portfolios`, { headers: auth(t) })
+    const target = ((await transfers.json()) as Array<{ id: string; isVirtual: boolean }>).find((p) => !p.isVirtual)
+    expect(target, "a casual portfolio is needed as a transfer target").toBeTruthy()
+
+    const writes = await Promise.all([
+      request.post(`${GATEWAY}/api/portfolios/${virtual.id}/positions`, {
+        headers: auth(t),
+        data: { symbol: "AAPL", quantity: 1 },
+      }),
+      request.post(`${GATEWAY}/api/portfolios/${virtual.id}/transactions`, {
+        headers: auth(t),
+        data: { type: "BUY", symbol: "AAPL", quantity: 1, price: 100 },
+      }),
+      request.patch(`${GATEWAY}/api/portfolios/${virtual.id}/positions/${crypto.randomUUID()}`, {
+        headers: auth(t),
+        data: { quantity: 2 },
+      }),
+      request.delete(`${GATEWAY}/api/portfolios/${virtual.id}/transactions/${crypto.randomUUID()}`, {
+        headers: auth(t),
+      }),
+      request.post(`${GATEWAY}/api/portfolios/${virtual.id}/cash/deposits`, {
+        headers: auth(t),
+        data: { amount: 100 },
+      }),
+      request.post(`${GATEWAY}/api/portfolios/${virtual.id}/cash/transfers`, {
+        headers: auth(t),
+        data: { amount: 100, currency: "USD", toPortfolioId: target!.id },
+      }),
+    ])
+
+    for (const res of writes) {
+      expect(res.status(), await res.text()).toBe(409)
+      expect(((await res.json()) as { error: string }).error).toBe("ReadOnlyPortfolio")
+    }
+
+    // Cash reads 404 rather than 200-with-nothing: that is why the tab is dropped,
+    // not merely hidden. The write above was refused before it could create a row.
+    const cash = await request.get(`${GATEWAY}/api/portfolios/${virtual.id}/cash`, { headers: auth(t) })
+    expect(cash.status()).toBe(404)
+    expect(((await cash.json()) as { error: string }).error).toBe("CashUnavailable")
+  })
+})
