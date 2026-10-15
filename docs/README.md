@@ -13,7 +13,7 @@ Ordered documentation index for the example-service.ai parity build.
 
 | File | Purpose |
 | --- | --- |
-| [api/example-service-real-api.yaml](api/example-service-real-api.yaml) | **Source of truth.** REST contract reverse-engineered from the live Example service API. The mock gateway (`mocks/gateway`, container `example-service-mock`) serves these paths; raw captures live in `discovery/raw/` and seed the mock via `scripts/regen-seed.mjs`. |
+| [api/example-service-real-api.yaml](api/example-service-real-api.yaml) | **Source of truth.** REST contract reverse-engineered from the live Example service API. The mock gateway (`mocks/gateway`, container `example-service-mock`) serves these paths; the mock is seeded by `mocks/shared/data/` (see `scripts/regen-seed.mjs`). |
 | [api/EXAMPLE_SERVICE_API.md](api/EXAMPLE_SERVICE_API.md) | Human-readable endpoint reference mirroring the real Example service API. |
 
 > Note: the earlier UI-inferred `example-service-openapi.yaml` draft was superseded by

@@ -4,10 +4,10 @@ info:
   version: 1.0.0
   description: |
     REST contract reverse-engineered from the live Example service API (https://app.example-service.ai)
-    on 2026-08-11 against the authenticated account
+    on 2026-08-11.
 
-    Source of truth: responses captured to `discovery/raw/*.json` (mirrored to
-    `mocks/shared/data/raw/*.json`) plus the seed generator `scripts/regen-seed.mjs`.
+    The mock is seeded from `mocks/shared/data/` (synthetic seed data, loaded at
+    runtime by `loadRaw`) — see `scripts/regen-seed.mjs`.
 
     Deviations from production (by design, for the local mock):
       - Auth is a custom REST flow (`POST /api/auth/login` + bearer token) instead of Supabase.

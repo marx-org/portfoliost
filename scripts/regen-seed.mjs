@@ -1,10 +1,9 @@
-import { mkdirSync, readdirSync, readFileSync, writeFileSync, copyFileSync, existsSync } from "node:fs"
+import { mkdirSync, readdirSync, writeFileSync } from "node:fs"
 import { join, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, "..")
-const RAW_SRC = join(ROOT, "discovery", "raw")
 const DATA_DIR = join(ROOT, "mocks", "shared", "data")
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -100,24 +99,26 @@ const BASE_PRICE = {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Step 1: copy raw captures
+// Step 1: raw seed files (canonical, committed)
+//
+// `mocks/shared/data/raw/*.json` ARE the seed — the mock server loads them at
+// runtime (loadRaw), so they are committed and curated by hand (or via PR),
+// not copied from a live-capture folder. The captures that once lived in
+// `discovery/raw/` were removed (personal data), leaving the curated synthetic
+// data here as the single source.
 // ─────────────────────────────────────────────────────────────────────────────
-function copyRawCaptures() {
-  const dest = join(DATA_DIR, "raw")
-  mkdirSync(dest, { recursive: true })
-  const files = readdirSync(RAW_SRC).filter((f) => f.endsWith(".json"))
-  for (const f of files) {
-    copyFileSync(join(RAW_SRC, f), join(dest, f))
-  }
-  writeFileSync(join(dest, "SOURCE.md"),
-`# Raw captures
+function refreshRawSource() {
+  const dir = join(DATA_DIR, "raw")
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, "SOURCE.md"),
+`# Seed data
 
-These files are byte-for-byte copies of responses captured from the real Example service
-API (https://app.example-service.ai) on 2026-08-11 against the authenticated account of
-Demo User. Do not edit manually — run \`node scripts/regen-seed.mjs\` to refresh
-them from \`discovery/raw/\`.
+Synthetic seed data for the mock Example service. The files in this folder are
+loaded at runtime by the mock server (\`loadRaw\` in \`mocks/lib/data.js\`); the
+CI \`test:mock\` job and the e2e suite depend on them, so edit by PR and run
+\`npm run test:mock\` after changes.
 `)
-  return files
+  return readdirSync(dir).filter((f) => f.endsWith(".json")).length
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -509,7 +510,7 @@ function synthLogos() {
 // ─────────────────────────────────────────────────────────────────────────────
 mkdirSync(DATA_DIR, { recursive: true })
 
-const rawFiles = copyRawCaptures()
+const rawFiles = refreshRawSource()
 
 const researchDir = join(DATA_DIR, "research")
 mkdirSync(researchDir, { recursive: true })

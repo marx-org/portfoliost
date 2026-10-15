@@ -391,8 +391,7 @@ async function main() {
     check(`portfolios${name}`, r.status === 200, `got ${r.status}`)
   }
   // §84.1 — `portfolios_total_metrics.json` is hand-authored, NOT a raw capture:
-  // the copy in discovery/raw is the 2026-08-11 example-service response, whose breakdown
-  // predates the §68 contract (portfolioId/portfolioName/originalValue, no name /
+  // its breakdown predates the §68 contract (portfolioId/portfolioName/originalValue, no name /
   // instrumentsValue / cashValue / weight). So its arithmetic is asserted here instead
   // of trusted — a fixture that stops satisfying the schema fails silently, because
   // the dashboard tile and the §84 accounts-balance table both render whatever the

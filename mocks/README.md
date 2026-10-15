@@ -160,12 +160,12 @@ mocks/shared/data/
 └── benchmarks.json
 ```
 
-- **Regenerate** the seed (re-copy captures + re-synthesize research):
+- **Regenerate** the seed (re-synthesize research, universe, benchmarks, logos):
   `node scripts/regen-seed.mjs`
 - **Regenerate types** from the data:
   `node scripts/gen-types.mjs` → `generated/api-types.d.ts`
-- Raw captures are never edited by hand — they are refreshed from
-  `discovery/raw/` (the live-capture folder) by the seed script.
+- The files in `mocks/shared/data/raw/` are the mock's seed data and are loaded
+  at runtime — edit them by PR and run `npm run test:mock` after changes.
 
 ## Tests
 

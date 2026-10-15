@@ -1,6 +1,6 @@
-# Raw captures
+# Seed data
 
-These files are byte-for-byte copies of responses captured from the real Example service
-API (https://app.example-service.ai) on 2026-08-11 against the authenticated account of
-Demo User. Do not edit manually — run `node scripts/regen-seed.mjs` to refresh
-them from `discovery/raw/`.
+Synthetic seed data for the mock Example service. The files in this folder are
+loaded at runtime by the mock server (`loadRaw` in `mocks/lib/data.js`); the
+CI `test:mock` job and the e2e suite depend on them, so edit by PR and run
+`npm run test:mock` after changes.
