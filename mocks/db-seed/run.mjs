@@ -8,7 +8,7 @@ import postgres from "postgres"
 import { seedFx } from "./fx.mjs"
 import { seedPortfolios } from "./portfolios.mjs"
 import { seedUserPreferences } from "./user-preferences.mjs"
-import { seedTickerReference } from "./ticker-reference.mjs"
+import { seedFundCatalogue, seedTickerReference } from "./ticker-reference.mjs"
 import { seedOpenstNoPriceBonds } from "./openst.mjs"
 
 const DATABASE_URL =
@@ -32,6 +32,7 @@ try {
 
   await seedUserPreferences(sql)
   await seedTickerReference(sql)
+  await seedFundCatalogue(sql)
   await seedOpenstNoPriceBonds(sql)
 
   console.log("[db-seed] done")

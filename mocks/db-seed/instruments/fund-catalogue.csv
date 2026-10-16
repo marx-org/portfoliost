@@ -1,0 +1,11 @@
+listing_key,ticker,exchange,name,asset_type,stock_sector,etf_category,country,country_code,isin,aliases
+ANALIZY::ING01W,ING01W,ANALIZY,ING Akcji W,fund,,,Poland,PL,,
+ANALIZY::ING01U,ING01U,ANALIZY,ING Akcji U,fund,,,Poland,PL,,
+ANALIZY::ING01T,ING01T,ANALIZY,ING Akcji T,fund,,,Poland,PL,,
+ANALIZY::ING01F,ING01F,ANALIZY,ING Akcji F,fund,,,Poland,PL,,
+ANALIZY::ARK01,ARK01,ANALIZY,Erste Akcji Polskich,fund,,,Poland,PL,,
+ANALIZY::SKR01,SKR01,ANALIZY,Skarbiec Akcji Polskich,fund,,,Poland,PL,,
+ANALIZY::VIG01,VIG01,ANALIZY,VIG / C-QUADRAT Konserwatywny B,fund,,,Poland,PL,,
+ANALIZY::QRS01,QRS01,ANALIZY,QUERCUS Agresywny,fund,,,Poland,PL,,
+ANALIZY::PCS05,PCS05,ANALIZY,PKO Obligacji Skarbowych Krótkoterminowy,fund,,,Poland,PL,,
+ANALIZY::AXA01,AXA01,ANALIZY,UNIQA Selektywny Akcji Polskich,fund,,,Poland,PL,,
