@@ -756,7 +756,7 @@ of the price tables.
   conversion index would only pay off if the plan regresses, which the test
   guards against.
 - `/history` + `/price` (provider-fetched rows, not the bars view) convert in
-  the service via `@marx2/contracts/fx` (D27) over the latest/`fxWindow` rates —
+  the service via `@marx-org/contracts/fx` (D27) over the latest/`fxWindow` rates —
   rate-only reads, same formula as the SQL join (an EX/unit test pins SQL and
   TS implementations equal against `crossRate`).
 - Consumers (wallets valuation/backfill) prefer the `?currency=` conversion over

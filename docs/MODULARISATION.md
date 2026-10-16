@@ -12,8 +12,8 @@ This document is the **procedure**.
 | Dimension | Pattern | users-auth example |
 | --- | --- | --- |
 | Module name | proposal D1 terms | `users-auth` |
-| GitHub repo | `Marx2/portfoliost-<module>` | `portfoliost-users-auth` |
-| Container image | `ghcr.io/marx2/portfoliost-<module>` | auto-derived by CI from repo name |
+| GitHub repo | `marx-org/portfoliost-<module>` | `portfoliost-users-auth` |
+| Container image | `ghcr.io/marx-org/portfoliost-<module>` | auto-derived by CI from repo name |
 | Compose service + container | `<module>` | `users-auth` |
 | K8s Kustomization/HelmRelease/controller/service | `portfoliost-<module>` | `portfoliost-users-auth` |
 | Env key (services.env / future ConfigMap) | `API_<MODULE>_URL` (upper snake, ONE key per module) | `API_USERS_AUTH_URL` |
@@ -38,7 +38,7 @@ reinvent.
 ## Checklist: extracting a new module `<module>`
 
 ### 1. Project scaffold
-- [ ] New GitHub repo `Marx2/portfoliost-<module>` (or extract code from an
+- [ ] New GitHub repo `marx-org/portfoliost-<module>` (or extract code from an
       existing monolith repo if it owns any — see git-history note below).
 - [ ] Copy skeleton from `portfoliost-users-auth`: `package.json`, `tsconfig`,
       `drizzle.config.ts`, `src/{index,server,auth,meta}.ts`, `src/db/*`,

@@ -6,7 +6,7 @@ Status: **accepted** (2026-08-22). Supersedes the KrakenD-based gateway assumpti
 
 The backend (`../portfoliost-users-auth`, Hono + Drizzle + Postgres) is currently a single deployable behind KrakenD, which routes `/api/*` to per-domain upstreams that all point at the example-service mock. The goal is to split it into coarse modules while keeping:
 
-- **example-service contract parity** — every module speaks the same `/api/...` shapes as the mock (types from `@marx2/contracts`).
+- **example-service contract parity** — every module speaks the same `/api/...` shapes as the mock (types from `@marx-org/contracts`).
 - **Coordinated switching** — flipping one module from mock to real must switch it *everywhere*: browser-facing routing and any backend module calling it internally.
 - **Simplicity** — no infrastructure the system does not actually use.
 
@@ -61,7 +61,7 @@ Each module validates the OIDC JWT locally (jose, JWKS from the issuer). No intr
 All modules share one Postgres instance for now. Each module owns its schema(s); **cross-module SQL access is banned** (enforced by scoping each module's Drizzle config to its own schemas). Intra-module multi-schema use is allowed — e.g. `portfolio-domain` owns both the portfolio and wallet schemas, so "buy stock" stays a single local DB transaction across them. If wallets ever split out, adopt outbox+saga then (trigger documented, not before).
 
 ### D7 — Inter-module communication: sync REST now, events later
-Cross-module reads/writes go through direct HTTP calls using thin typed clients built on `@marx2/contracts` (single swap point if anything changes). No broker yet: no fact has >1 consumer today, and sync REST is testable with existing vitest/e2e suites.
+Cross-module reads/writes go through direct HTTP calls using thin typed clients built on `@marx-org/contracts` (single swap point if anything changes). No broker yet: no fact has >1 consumer today, and sync REST is testable with existing vitest/e2e suites.
 
 Documented event candidates + adoption triggers:
 - `transaction.recorded` (wallet debit choreography) — when wallet becomes standalone or >1 consumer needs the fact.

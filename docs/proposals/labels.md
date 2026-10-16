@@ -209,13 +209,13 @@ Add a "Labels" multi-select filter chip bar to `PortfolioHoldingsTab.vue`, `Tran
 
 - New migration file in `portfoliost-wallets/src/db/migrations/` adding the four tables.
 - No new module; everything is within `portfoliost-wallets` (D53 -- extend, don't split).
-- Contract published via the standard `openapi.yaml` -> tag -> `@marx2/contracts` flow.
+- Contract published via the standard `openapi.yaml` -> tag -> `@marx-org/contracts` flow.
 
 ---
 
 ## Implementation plan
 
-- [ ] **1. Contract** -- add `Label`, `LabelInput` schemas + `labels` arrays to `Position`/`Transaction`/`CashTransaction`/`RecentCashTransaction` + new endpoints (incl. wallet-transaction set-labels) + filter query params in `openapi.yaml`; publish `@marx2/contracts` release
+- [ ] **1. Contract** -- add `Label`, `LabelInput` schemas + `labels` arrays to `Position`/`Transaction`/`CashTransaction`/`RecentCashTransaction` + new endpoints (incl. wallet-transaction set-labels) + filter query params in `openapi.yaml`; publish `@marx-org/contracts` release
 - [ ] **2. Backend: migration** -- create `labels`, `position_labels`, `transaction_labels`, `wallet_transaction_labels` tables + indexes
 - [ ] **3. Backend: labels CRUD** -- `src/routes/labels.ts` (GET/POST/PATCH/DELETE `/labels`)
 - [ ] **4. Backend: position labels** -- `src/routes/position-labels.ts` + serialize labels in `serializePosition()`
@@ -223,7 +223,7 @@ Add a "Labels" multi-select filter chip bar to `PortfolioHoldingsTab.vue`, `Tran
 - [ ] **6. Backend: wallet-transaction labels** -- `src/routes/wallet-transaction-labels.ts` + serialize labels in cash-transaction serializers
 - [ ] **7. Backend: filtering** -- wire `?labels=` query param into positions, portfolio-transactions and wallet-transactions listing handlers
 - [ ] **8. Backend: tests** -- PGLite unit tests for labels CRUD, set-labels (all three entity types), filtering, alphabetical ordering
-- [ ] **9. SPA: contract types** -- install bumped `@marx2/contracts`, run `gen:types`
+- [ ] **9. SPA: contract types** -- install bumped `@marx-org/contracts`, run `gen:types`
 - [ ] **10. SPA: labelColors utility** -- shared palette mapping (hex to Tailwind class pairs)
 - [ ] **11. SPA: LabelBadge component** -- shared badge component with `+N` overflow
 - [ ] **12. SPA: LabelManager dialog** -- CRUD UI for labels

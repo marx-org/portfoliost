@@ -22,7 +22,7 @@ Full `/api/instruments` surface per `docs/api/example-service-real-api.yaml`, al
 JWT-protected (D5) via the shared auth middleware pattern from users-auth
 (`POCKETID_ISSUER_URL` JWKS validation; `X-User-*` compose fallback). Module ships
 `/health`, `/__meta` (`impl: "real"`), `/internal/verify` per playbook. Repo
-`Marx2/portfoliost-instruments` (private), stack identical to users-auth
+`marx-org/portfoliost-instruments` (private), stack identical to users-auth
 (Hono + Drizzle + Postgres + PGlite + jose), naming per MODULARISATION.md:
 compose service `instruments`, k8s name `portfoliost-instruments`, env key
 `API_INSTRUMENTS_URL` (already reserved in `deploy/services.env`), Postgres schema
@@ -334,11 +334,11 @@ and the D81 price-bars dispatch without an openst roundtrip. Delisted bonds ling
   `.FIZ`, `.WA`, `BTC-USD`, `EDO0936` pass through untouched; bonds/crypto never
   enter stooq (overflow-only) and skip `checkSplitBoundary`.
 
-### D82 — contract & admin surface — **DONE 2026-09-19** (plan §25.5; `@marx2/contracts@1.6.26` with `InstrumentType` enum STOCK/ETF/BOND/CRYPTO/FUND/CORP_BOND wired to `InstrumentDetail.type` + `SearchResult.type`; admin `GET /api/admin/bond-catalogue/bond-series` + `/cpi` + SPA Bond Catalogue tab)
+### D82 — contract & admin surface — **DONE 2026-09-19** (plan §25.5; `@marx-org/contracts@1.6.26` with `InstrumentType` enum STOCK/ETF/BOND/CRYPTO/FUND/CORP_BOND wired to `InstrumentDetail.type` + `SearchResult.type`; admin `GET /api/admin/bond-catalogue/bond-series` + `/cpi` + SPA Bond Catalogue tab)
 
 - Reused contract shapes: bar/quote series need no changes. `InstrumentType`/detail
   `type` gains `fund | bond | corp_bond | crypto` so the SPA can label and route rows —
-  one `@marx2/contracts` patch bump (edit `openapi.yaml`, CI bump, reinstall, `gen:types`).
+  one `@marx-org/contracts` patch bump (edit `openapi.yaml`, CI bump, reinstall, `gen:types`).
 - Admin: bond catalogue and CPI import status visible in portfoliost-admin; `bond_series`
   and `cpi_12m` live in `openst` Postgres schema, not in instruments.
 - Homelab: PGO least-privilege user `openst` + schema `openst` created alongside
@@ -367,7 +367,7 @@ module as the price series. Recorded here as an instruments responsibility:
   currencies in prod); the daily incremental `fxsync` CronJob mirrors the old
   wallets spec (landed with the §48.6 deploy).
 - **Importer:** `src/services/fx-import.ts` (ported from wallets) —
-  frankfurter/ECB primary, `@marx2/contracts/fx` conventions (D27);
+  frankfurter/ECB primary, `@marx-org/contracts/fx` conventions (D27);
   `syncDaily`/`importHistory`/`backfillCurrency`.
 - **Endpoints (endpoints follow the data):** `GET /api/internal/fx-rates?from&to[&date]`
   (service-to-service, 10-day walk-back), `GET /api/currencies` (availability SoT
