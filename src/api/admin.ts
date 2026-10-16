@@ -12,7 +12,7 @@ export interface ServiceVersion {
   suspended?: boolean
 }
 
-// Contract-typed admin user (from @marx2/contracts /api/admin/users).
+// Contract-typed admin user (from @marx-org/contracts /api/admin/users).
 export type AdminUser = components["schemas"]["AdminUser"]
 export type UsersResponse = components["schemas"]["AdminUserListResponse"]
 export type SplitCandidate = components["schemas"]["SplitCandidate"]
@@ -31,11 +31,11 @@ export interface SystemVersionsResponse {
   fetchedAt: string
 }
 
-// Contract-typed admin FX rate listing (from @marx2/contracts /admin/currencies/rates).
+// Contract-typed admin FX rate listing (from @marx-org/contracts /admin/currencies/rates).
 export type FxRateItem = components["schemas"]["AdminFxRate"]
 export type FxRatesResponse = components["schemas"]["AdminFxRatesResponse"]
 
-// D55-4 — topology live overlay (from @marx2/contracts /admin/topology/*).
+// D55-4 — topology live overlay (from @marx-org/contracts /admin/topology/*).
 export type TopologyStatusResponse = components["schemas"]["TopologyStatusResponse"]
 export type TopologyTrafficResponse = components["schemas"]["TopologyTrafficResponse"]
 

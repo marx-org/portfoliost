@@ -2,12 +2,12 @@
 // wallet entity: cash now lives on portfolios (per-currency balances derived by
 // replaying the cash ledger). Mirrors the wallets backend's cash routes
 // (62.1) under `/api/portfolios/.../cash*` and `/api/portfolios/cash/...`.
-// Conversion math comes from the shared @marx2/contracts/fx helper (D27).
+// Conversion math comes from the shared @marx-org/contracts/fx helper (D27).
 import { requireAuth } from "../lib/auth.js"
 import { loadRaw } from "../lib/data.js"
 import { paginatePage, uuid, nowIso } from "../lib/http.js"
 import { currenciesPayload, resolveFeeFx, DEMO_RATES } from "../lib/demo-fx.js"
-import { convert } from "@marx2/contracts/fx"
+import { convert } from "@marx-org/contracts/fx"
 import { labelsForCashTransaction, matchesCashLabelFilter } from "../labels.js"
 
 const CASH_LABELS = { DEPOSIT: "Deposit", WITHDRAWAL: "Withdrawal", TRANSFER: "Transfer" }

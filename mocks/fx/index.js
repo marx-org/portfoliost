@@ -1,4 +1,4 @@
-import { crossRate } from "@marx2/contracts/fx"
+import { crossRate } from "@marx-org/contracts/fx"
 import { requireAuth } from "../lib/auth.js"
 import { DEMO_RATES, DEMO_FX_DATE } from "../lib/demo-fx.js"
 

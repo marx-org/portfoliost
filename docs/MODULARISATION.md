@@ -44,11 +44,11 @@ reinvent.
       `drizzle.config.ts`, `src/{index,server,auth,meta}.ts`, `src/db/*`,
       `Dockerfile`, `.github/workflows/docker-image.yml`.
 - [ ] Rebrand: package name, `/__meta` service string, server log line.
-- [ ] Implement endpoints against the mock contract (`@marx2/contracts`);
+- [ ] Implement endpoints against the mock contract (`@marx-org/contracts`);
       port handler logic from `mocks/` where applicable; unit tests green.
-- [ ] **Enforce `@marx2/contracts` types** (mandatory — see AGENTS.md):
+- [ ] **Enforce `@marx-org/contracts` types** (mandatory — see AGENTS.md):
   - Add `openapi-typescript@7` to `devDependencies`
-  - Add `"gen:types": "openapi-typescript node_modules/@marx2/contracts/openapi.yaml -o src/generated/api-types.d.ts"` script
+  - Add `"gen:types": "openapi-typescript node_modules/@marx-org/contracts/openapi.yaml -o src/generated/api-types.d.ts"` script
   - Run `npm run gen:types` → commits `src/generated/api-types.d.ts`
   - In every route file: `import type { components } from "../generated/api-types.js"`
   - Annotate every `c.json(...)` success response: `c.json(payload satisfies components["schemas"]["Foo"])`
@@ -134,7 +134,7 @@ distinguishing request through the gateway/host.
 
 ## Contract enforcement status
 
-All backend modules generate types from `@marx2/contracts` and annotate route
+All backend modules generate types from `@marx-org/contracts` and annotate route
 responses with `satisfies`. Shape drift is a **build error**.
 
 | Module | `src/generated/api-types.d.ts` | `satisfies` annotations |
@@ -160,7 +160,7 @@ routes.get("/foo", async (c) => {
 Rules:
 - Never hand-write a type that duplicates a contract schema — use `components["schemas"]["X"]` directly.
 - Use `satisfies`, not `as` — `as` suppresses errors, `satisfies` surfaces them.
-- Regenerate after every `@marx2/contracts` version bump: `npm run gen:types`.
+- Regenerate after every `@marx-org/contracts` version bump: `npm run gen:types`.
 
 ## Ops lessons learned (first extraction)
 

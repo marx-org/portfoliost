@@ -17,14 +17,14 @@
     "test:stack": "node scripts/instruments-stack-test.mjs",
     "mock:start": "node mocks/gateway/index.js",
     "mock:seed": "node scripts/regen-seed.mjs",
-    "gen:types": "openapi-typescript node_modules/@marx2/contracts/openapi.yaml -o generated/api-types.d.ts",
+    "gen:types": "openapi-typescript node_modules/@marx-org/contracts/openapi.yaml -o generated/api-types.d.ts",
     "test:stack:wallets": "node scripts/wallets-stack-test.mjs",
     "test:stack:portfolios": "node scripts/portfolios-stack-test.mjs",
     "test:stack:listing-overrides": "node scripts/listing-overrides-stack-test.mjs"
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.1.1",
-    "@marx2/contracts": "^1.6.73",
+    "@marx-org/contracts": "^1.6.77",
     "@vue-flow/core": "^1.48.2",
     "apexcharts": "^7.5.1",
     "pinia": "^2.1.7",
