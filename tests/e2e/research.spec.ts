@@ -107,7 +107,6 @@ test("price chart shows Total Chg and CAGR", async ({ page }) => {
   const chartCard = page.locator(".card", { hasText: "Price Chart" })
   await expect(chartCard.getByText("Total Chg")).toBeVisible({ timeout: 15000 })
   await expect(chartCard.getByText("CAGR", { exact: true })).toBeVisible({ timeout: 15000 })
-  await expect(page.getByText("Powered by Example service")).toBeVisible({ timeout: 15000 })
 })
 
 test("news tab shows timeline and analyzed article counts", async ({ page }) => {

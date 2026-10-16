@@ -12,9 +12,10 @@ import { expect, test } from "@playwright/test"
  *      would silently change what a spreadsheet produces, which is precisely what
  *      §87.5 keeps apart.
  *
- * The flag defaults ON for the seven kontо the importer always funds (wallets
- * `CASH_LEG_DEFAULT_PORTFOLIOS`), so these tests create throwaway portfolios by
- * name rather than relying on any PROD-shaped account.
+ * The flag is OFF by default for a newly created portfolio — wallets no longer
+ * seeds it from the portfolio name (import policy belongs to sheets-sync, which
+ * carries the cash legs explicitly in its payload) — so these tests create
+ * throwaway portfolios and set the flag explicitly where a test needs it on.
  */
 
 const GATEWAY = process.env.PORTFOLIOST_GATEWAY_URL || "http://localhost:8080"
@@ -145,11 +146,13 @@ test.describe("§87.5 — cash leg on trade", () => {
     await request.delete(`${GATEWAY}/api/portfolios/${pid}`, { headers: a })
   })
 
-  test("the CARD's settings dialog carries the same switch (two dialogs, one setting)", async ({ page, request }) => {
-    // Regression guard for the gap this found: the app has TWO "Rename portfolio"
-    // dialogs — the portfolio page's and the investments card's — and the switch
-    // was added to only one of them, so the setting was editable from one route
-    // and invisible from the other.
+  test("the CARD's settings dialog carries the same switch (one dialog, one testid)", async ({ page, request }) => {
+    // Regression guard for the gap this found: the app once had TWO "Rename
+    // portfolio" dialogs — the portfolio page's and the investments card's — and
+    // the switch was added to only one of them, so the setting was editable from
+    // one route and invisible from the other. §88 collapsed both into the single
+    // PortfolioSettingsDialog, which carries one `cash-leg-on-trade` testid, so a
+    // future edit that touches one surface and not the other cannot pass.
     const run = Date.now()
     const a = await auth(request)
     const post = mk(a, request)
@@ -163,7 +166,7 @@ test.describe("§87.5 — cash leg on trade", () => {
     await card.getByRole("button", { name: "Edit", exact: true }).click()
     const dialog = page.getByRole("dialog", { name: "Rename portfolio" })
     await expect(dialog).toBeVisible()
-    const flag = dialog.getByTestId("card-cash-leg-on-trade")
+    const flag = dialog.getByTestId("cash-leg-on-trade")
     await expect(flag).not.toBeChecked()
     await flag.check()
     await dialog.getByRole("button", { name: "Save" }).click()
@@ -217,23 +220,27 @@ test.describe("§87.5 — cash leg on trade", () => {
     await request.delete(`${GATEWAY}/api/portfolios/${pid}`, { headers: a })
   })
 
-  test("the flag defaults ON for a kontо the importer always funds (name-seeded)", async ({ request }) => {
+  test("a newly created portfolio does not inherit import policy from its name", async ({ request }) => {
     const a = await auth(request)
     const post = mk(a, request)
     const run = Date.now()
-    // wallets' CASH_LEG_DEFAULT_PORTFOLIOS is a copy of the importer's
-    // ALWAYS_CASH_LEG; a portfolio created under one of those exact names must not
-    // ship with the box unticked, or the UI would disagree with every import.
-    const xtb = await post("/api/portfolios", { name: "XTB", baseCurrency: "PLN" })
-    const other = await post("/api/portfolios", { name: `E2E NotOnList ${run}`, baseCurrency: "PLN" })
-    expect(xtb.cashLegOnTrade).toBe(true)
-    expect(other.cashLegOnTrade).toBe(false)
-    // clean up so a re-run does not collide on uq_portfolios_user_name
+    // The old §87.5 design name-seeded the UI switch: a portfolio created under a
+    // kontо the importer always funds (XTB, in sheets-sync's ALWAYS_CASH_LEG)
+    // started with the box ticked so the UI would not disagree with an import.
+    // That coupling was removed — sheets-sync is now the sole owner of import
+    // policy and carries the cash legs explicitly in its payload — so wallets no
+    // longer infers the flag from the name. A new portfolio is OFF by default,
+    // even one named like a kontо the importer funds, and an explicit value at
+    // creation is what turns it on.
+    const xtb = await post("/api/portfolios", { name: `E2E XTB ${run}`, baseCurrency: "PLN" })
+    const explicit = await post("/api/portfolios", { name: `E2E CashLegOn ${run}`, baseCurrency: "PLN", cashLegOnTrade: true })
+    expect(xtb.cashLegOnTrade).toBe(false)
+    expect(explicit.cashLegOnTrade).toBe(true)
+    // clean up so a re-run does not collide on uq_portfolios_user_name, and so
+    // the ever-growing portfolio list does not break a global row count in
+    // another spec (accounts-balance.spec.ts).
     await request.delete(`${GATEWAY}/api/portfolios/${xtb.id}`, { headers: a })
-    // `other` leaks too, and its name contains no "Settings" — but an
-    // ever-growing portfolio list is what made accounts-balance.spec.ts's
-    // global row count fail on a second run.
-    await request.delete(`${GATEWAY}/api/portfolios/${other.id}`, { headers: a })
+    await request.delete(`${GATEWAY}/api/portfolios/${explicit.id}`, { headers: a })
   })
 
   test("INDEPENDENCE: an import row ignores the portfolio flag entirely", async ({ request }) => {

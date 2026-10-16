@@ -152,3 +152,64 @@ export async function seedTickerReference(sql) {
   `, vParams)
   console.log(`[db-seed] exchange_reference: inserted ${venues.length} exchanges`)
 }
+
+/**
+ * Seed: a handful of analizy.pl fund-category rows into instruments.ticker_reference.
+ *
+ * The full 734-code catalogue is a live snapshot that the instruments service
+ * syncs from cachest in the cluster, but the local compose stack has no live
+ * upstream and the main ticker_reference seed skips once the table is non-empty
+ * (reset-mock-state.sh keeps the 62k reference rows across runs, so nothing ever
+ * re-seeds). A fund category is recognised ONLY by its `ANALIZY::` listing key —
+ * there is no symbol-shape test for it (a category code is indistinguishable from
+ * a dotless corp-bond code) — so without a row the §78 research page 404s and
+ * the Key Facts card never renders. This fixture seeds a representative set of
+ * real codes (the ING01 family the class-W build exists for, plus one per other
+ * prefix) so the fund-category profile and its `categoryCode` are exercised
+ * locally. Unconditional: the seed must land on both the fresh-bootstrap and the
+ * reset-mock-state paths, so it upserts rather than being gated on an empty table.
+ */
+export async function seedFundCatalogue(sql) {
+  const csvPath = resolve(__dirname, "instruments/fund-catalogue.csv")
+  const csv = await readFile(csvPath, "utf8")
+  const rows = parseCsv(csv).filter((r) => r.listing_key && r.ticker && r.exchange)
+  if (rows.length === 0) {
+    console.log("[db-seed] fund catalogue: fixture empty, skipping")
+    return
+  }
+  let total = 0
+  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+    const batch = rows.slice(i, i + BATCH_SIZE)
+    const { clause, params } = multiValues(batch.map((r) => [
+      r.listing_key,
+      r.ticker,
+      r.exchange,
+      r.name,
+      r.asset_type,
+      r.stock_sector || null,
+      r.etf_category || null,
+      r.country || null,
+      r.country_code || null,
+      r.isin || null,
+      r.aliases || null,
+    ]))
+    await sql.unsafe(`
+      INSERT INTO instruments.ticker_reference
+        (listing_key, ticker, exchange, name, asset_type, stock_sector, etf_category,
+         country, country_code, isin, aliases)
+      SELECT * FROM (VALUES ${clause})
+        AS t(listing_key, ticker, exchange, name, asset_type, stock_sector,
+          etf_category, country, country_code, isin, aliases)
+      ON CONFLICT (listing_key) DO UPDATE SET
+        ticker = EXCLUDED.ticker,
+        exchange = EXCLUDED.exchange,
+        name = EXCLUDED.name,
+        asset_type = EXCLUDED.asset_type,
+        country = EXCLUDED.country,
+        country_code = EXCLUDED.country_code,
+        updated_at = now()
+    `, params)
+    total += batch.length
+  }
+  console.log(`[db-seed] fund catalogue: upserted ${total} ANALIZY fund-category rows`)
+}
