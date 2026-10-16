@@ -173,3 +173,7 @@ All tests must pass before committing:
 ```sh
 npm run build && npm run test && npm run test:mock && npm run test:e2e
 ```
+
+## CI
+
+A push to `main` whose commit message contains the bracketed `ci-skip` token skips the image pipeline — the `test`, `release` and `build` jobs in `docker-image.yml`, and the `build-mock` job in `docker-image-mock.yml`. No suite run, no tag, no GitHub Release, no image. It exists for commits that change no image-relevant behaviour. The convention is documented fleet-wide in `pfire-docs` → `docs/ci-skip.md`. Pull-request runs are unaffected: the `pull_request` event payload has no `head_commit`, so the token only ever gates a push to `main`.
