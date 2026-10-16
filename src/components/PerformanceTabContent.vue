@@ -467,7 +467,7 @@ const performers = computed(() => {
 
 // §36 — P/L is denominated in each position's instrumentCurrency. When that
 // differs from the display currency, add a converted sub-line using the live
-// rate via @marx2/contracts/fx (D27). Rates are fetched once per distinct
+// rate via @marx-org/contracts/fx (D27). Rates are fetched once per distinct
 // instrument currency that differs from the display currency.
 // §48.6e B3 — ref (not snapshot): switching the display currency in place
 // must re-convert the chart + P/L sub-lines without a re-mount.

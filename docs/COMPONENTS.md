@@ -106,7 +106,7 @@ pfire-docs#35.
 - Currency code/symbol comes **only** from `useCurrenciesStore` (the
   `/api/currencies` registry) — never a hardcoded list; the input-prefix
   pattern is `ccySymbol = store.info(ccy)?.symbol ?? ccy`.
-- FX conversion math only via `@marx2/contracts/fx` (D27).
+- FX conversion math only via `@marx-org/contracts/fx` (D27).
 - **Instrument logos go through `TickerBadge`**, never a bare `<img>`. It owns
   the only `/api/logos/` reference in `src/`: a `rounded-[9px] object-contain`
   plate on `bg-slate-100 dark:bg-slate-800` (example-service's rounded square — *not* a

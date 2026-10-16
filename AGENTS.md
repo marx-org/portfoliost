@@ -9,14 +9,14 @@ Portfoliost-specific guidelines (parent `../AGENTS.md` has shared rules).
 - **Operate in example-service freely to explore flows.** It is allowed to make operations in `app.example-service.ai` (clicking, filling forms, adding positions, etc.) to inspect behavior — as long as you never modify the **Top10** portfolio. To experiment, create a throwaway test portfolio in example-service and do changes in it instead.
 - **Replace premium features with real content.** Where example-service gates a feature behind a premium plan, ship a working non-gated version with reasonable guessed content instead of a paywall (e.g. AI portfolio insights, statistics).
 - **Currency selectors are fed exclusively by the `/api/currencies` registry (`useCurrenciesStore`); never hardcode currency lists.**
-- FX conversion math must go through `@marx2/contracts/fx` — never re-implement cross-rate/settlement formulas locally (D27).
+- FX conversion math must go through `@marx-org/contracts/fx` — never re-implement cross-rate/settlement formulas locally (D27).
 
 ## Tech stack
 
 - **Component conventions: `docs/COMPONENTS.md`** — where components live, `testid` prefix + `update:x` emit pattern (no `defineModel` except `TransactionFormFields`' whole-form model), slots, shared-math exports, styling/currency rules, testid stability, test layout.
 - Vue 3 `<script setup lang="ts">` SFCs; Pinia stores; `vue-router`; Tailwind utility classes (`card`, `btn-primary`, `btn-secondary`, `btn-ghost`, `btn-danger`, `input`, `label`).
 - API client functions live in `src/api/<domain>.ts` with explicit return types.
-- **Contracts repo layout**: `../portfoliost-contracts/` — the OpenAPI spec is `../portfoliost-contracts/contracts/openapi.yaml`, but the npm `@marx2/contracts` package (package.json, vitest, build) lives one level down in `../portfoliost-contracts/contracts/`. Run `npm test` / `npm run lint` from there, not the repo root. Regenerated types land in `generated/api-types.d.ts` (`npm run gen:types`).
+- **Contracts repo layout**: `../portfoliost-contracts/` — the OpenAPI spec is `../portfoliost-contracts/contracts/openapi.yaml`, but the npm `@marx-org/contracts` package (package.json, vitest, build) lives one level down in `../portfoliost-contracts/contracts/`. Run `npm test` / `npm run lint` from there, not the repo root. Regenerated types land in `generated/api-types.d.ts` (`npm run gen:types`).
 
 ## Working guidelines
 

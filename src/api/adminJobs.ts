@@ -1,7 +1,7 @@
 import { http } from "./client"
 import type { components } from "../../generated/api-types"
 
-// ── Contract types (generated from @marx2/contracts openapi.yaml) ─────────────
+// ── Contract types (generated from @marx-org/contracts openapi.yaml) ─────────────
 
 export type StooqDataset            = components["schemas"]["StooqDataset"]
 export type StooqImportUploadResponse = components["schemas"]["StooqImportUploadResponse"]
@@ -96,7 +96,7 @@ export function getStooqImportLog(): Promise<StooqImportLogEntry[]> {
 
 // ── Google Sheets sync (plan §24.9) ──────────────────────────────────────────
 
-// The sheets-sync endpoints are not in the @marx2/contracts generated types yet;
+// The sheets-sync endpoints are not in the @marx-org/contracts generated types yet;
 // local mirrors of the admin backend responses (src/sheets-sync.ts).
 export interface SheetsSyncRunResponse {
   jobName: string

@@ -1,9 +1,9 @@
 // Interim FX source for the mock backend (fees-and-custom-fx proposal D25/D32).
 // Stands in for the instruments module's fx_rates table (§48 moved it out of wallets).
-// Conversion math comes from the shared @marx2/contracts/fx helper (D27) —
+// Conversion math comes from the shared @marx-org/contracts/fx helper (D27) —
 // the mock must never re-implement the formulas locally.
-import { convert, crossRate, resolveRate, settleFee } from "@marx2/contracts/fx"
-import { CURRENCIES } from "@marx2/contracts/currencies"
+import { convert, crossRate, resolveRate, settleFee } from "@marx-org/contracts/fx"
+import { CURRENCIES } from "@marx-org/contracts/currencies"
 
 export const DEMO_FX_DATE = "2026-08-22"
 

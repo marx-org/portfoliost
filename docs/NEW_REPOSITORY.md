@@ -61,14 +61,14 @@ repository this requires GitHub Team or Enterprise — see
 
 Only for Module-tier repositories and the app.
 
-- [ ] `@marx2/contracts` in dependencies
+- [ ] `@marx-org/contracts` in dependencies
 - [ ] `.npmrc` contains `@marx2:registry=https://npm.pkg.github.com`
 - [ ] `gen:types` script present, pointing at the **local** spec in the installed package:
   ```
   # module tier
-  openapi-typescript node_modules/@marx2/contracts/openapi.yaml -o src/generated/api-types.d.ts
+  openapi-typescript node_modules/@marx-org/contracts/openapi.yaml -o src/generated/api-types.d.ts
   # app
-  openapi-typescript node_modules/@marx2/contracts/openapi.yaml -o generated/api-types.d.ts
+  openapi-typescript node_modules/@marx-org/contracts/openapi.yaml -o generated/api-types.d.ts
   ```
 - [ ] `generated/api-types.d.ts` committed
 - [ ] Import types via `components["schemas"]["..."]` — never redeclare a shape locally
@@ -76,7 +76,7 @@ Only for Module-tier repositories and the app.
 To consume a new contracts version:
 
 - [ ] `gh release list --repo <owner>/portfoliost-contracts` — the version is written by CI, never by hand
-- [ ] `NODE_AUTH_TOKEN=$(gh auth token) npm install @marx2/contracts@<version>`
+- [ ] `NODE_AUTH_TOKEN=$(gh auth token) npm install @marx-org/contracts@<version>`
 - [ ] `npm run gen:types`
 - [ ] commit `package-lock.json` and the regenerated types
 

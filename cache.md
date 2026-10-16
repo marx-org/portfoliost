@@ -36,7 +36,7 @@ ran: `inserted=2012 skipped=7 errors=4 walletOnly=1 noOp=1`. User then asked:
 | portfoliost (SPA) | v1.0.165 | `adminJobs.ts`: runSheetsSync/getSheetsSyncStatus/getSheetsSyncLog; JobsView "Google Sheets" card (Run Sync + Wipe & re-import w/ window.confirm, badge, last-run line, 60 s poll, resume-on-reload). Full suite green: unit 282, mock 186, e2e 75 passed/1 skipped |
 | portfoliost-wallets | v1.1.36 | pushed 2 previously-unreleased commits: `feecddd` short-option keys (direction/optionType/contractSize) + `da733d6` zero-price BUY + sell drift clamp. 299 tests pass; tree clean; local=origin=da733d6. **Next release v1.1.37** |
 | portfoliost-sheets-sync | v1.0.1 | deployed & proven (fetches sheet, bootstraps, imports). **Needs v1.0.2 with sort + 1:1** |
-| @marx2/contracts | v1.6.22 (pushed) | `SourceWipeResponse.deleted` + `positions, portfolioTransactions, valueSnapshots, shares, portfolioBackfillMetadata, nulledWalletRefs` (optional ints). Commit feb262e → GHA publishes to GitHub Packages. **VERIFY publish: `gh release list --repo Marx2/portfoliost-contracts` + `npm view @marx2/contracts version --registry https://npm.pkg.github.com`** |
+| @marx-org/contracts | v1.6.22 (pushed) | `SourceWipeResponse.deleted` + `positions, portfolioTransactions, valueSnapshots, shares, portfolioBackfillMetadata, nulledWalletRefs` (optional ints). Commit feb262e → GHA publishes to GitHub Packages. **VERIFY publish: `gh release list --repo Marx2/portfoliost-contracts` + `npm view @marx-org/contracts version --registry https://npm.pkg.github.com`** |
 | homelab | main 0f9a52728 | all pushed: `portfoliost-sheets-sync/` (ks.yaml + app/{kustomization,sheets-sync-secrets}.yaml only — no HelmRelease/ConfigMap), pfire/kustomization entry, tmpl/cluster-secrets `PORTFOLIOST_GOOGLE_CLIENT_ID/SECRET/REFRESH_TOKEN` lines, sops re-encrypted (user ran encode.py), tag bumps: admin v1.0.44, SPA v1.0.165, wallets v1.1.36 (2 places: app + fxsing) |
 
 ## Verified facts (live debugging this session)
@@ -80,7 +80,7 @@ ran: `inserted=2012 skipped=7 errors=4 walletOnly=1 noOp=1`. User then asked:
 
 **Step 1 — wallets: complete wipe (v1.1.37)**
 1. Verify contracts v1.6.22 published (command above). If not, wait/retry; GHA does it.
-2. `~/prv/pfire/portfoliost-wallets`: `npm i @marx2/contracts@latest` (.npmrc → GitHub
+2. `~/prv/pfire/portfoliost-wallets`: `npm i @marx-org/contracts@latest` (.npmrc → GitHub
    Packages), `npm run gen:types`.
 3. Rewrite `routes.delete("/source/:externalSource")` in `src/routes/import.ts` (needs
    `inArray` import; schema imports `valueSnapshots, shares, portfolioBackfillMetadata`):
