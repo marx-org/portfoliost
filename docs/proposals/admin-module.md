@@ -16,8 +16,8 @@ The user profile already carries `groups: string[]` from the OIDC token (auth pr
 | Dimension | Value |
 | --- | --- |
 | Module name | `admin` |
-| Repo | `Marx2/portfoliost-admin` |
-| Image | `ghcr.io/marx2/portfoliost-admin` |
+| Repo | `marx-org/portfoliost-admin` |
+| Image | `ghcr.io/marx-org/portfoliost-admin` |
 | Compose service / container | `admin` |
 | K8s HelmRelease/controller | `portfoliost-admin` |
 | Env key | `API_ADMIN_URL` |

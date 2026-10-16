@@ -177,7 +177,7 @@ Reuse the existing instrument search component used by Add Position / watchlists
 Daily flow per transaction (`services/cashFlows.ts`, `dailyNetCashFlows`):
 - **BUY** → `+ (quantity × price + feesSettled)` — cash deployed into the market
 - **SELL** → `− (quantity × price − feesSettled)` — cash released from the market
-- Amounts are converted to the portfolio's **base currency** via the latest `fx_rates` snapshot (`convert` from `@marx2/contracts/fx`; rate=1 fallback), and aggregated per calendar day. `DIVIDEND` transactions are excluded (they neither deploy nor release capital in this model).
+- Amounts are converted to the portfolio's **base currency** via the latest `fx_rates` snapshot (`convert` from `@marx-org/contracts/fx`; rate=1 fallback), and aggregated per calendar day. `DIVIDEND` transactions are excluded (they neither deploy nor release capital in this model).
 
 Mirror construction (`buildBenchmarkSeries`):
 - Seed: at the window start, the portfolio's invested capital (`firstRow.invested`) is deployed into the benchmark at that day's close → `units(day0) = seed / close(day0)`.

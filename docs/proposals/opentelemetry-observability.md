@@ -35,24 +35,24 @@ The `/__meta` endpoint is **not replaced**. It serves a different purpose
 
 ---
 
-## D56-1 — Shared OTel helpers as `@marx2/otel` (new package in `portfoliost-contracts` monorepo)
+## D56-1 — Shared OTel helpers as `@marx-org/otel` (new package in `portfoliost-contracts` monorepo)
 
 The `portfoliost-contracts` repo is restructured into two independently-published
 packages that live as subfolders in the same repository:
 
 ```
 portfoliost-contracts/
-  contracts/          ← existing package (@marx2/contracts) — OpenAPI spec, fx, currencies
+  contracts/          ← existing package (@marx-org/contracts) — OpenAPI spec, fx, currencies
     openapi.yaml
     src/
       fx.ts
       currencies.ts
-    package.json      ← name: "@marx2/contracts"
+    package.json      ← name: "@marx-org/contracts"
     tsconfig.json
-  otel/               ← new package (@marx2/otel) — OTel bootstrap helpers
+  otel/               ← new package (@marx-org/otel) — OTel bootstrap helpers
     src/
       index.ts
-    package.json      ← name: "@marx2/otel"
+    package.json      ← name: "@marx-org/otel"
     tsconfig.json
   .github/
     workflows/
@@ -68,13 +68,13 @@ their respective subfolder change. They share the repo-level `.npmrc` and `.giti
 
 **`contracts/` subfolder** — no functional changes; this is purely a directory move:
 - `openapi.yaml`, `src/fx.ts`, `src/currencies.ts`, `src/fx.test.ts` move under `contracts/`
-- `contracts/package.json` retains `name: "@marx2/contracts"` and all existing exports
+- `contracts/package.json` retains `name: "@marx-org/contracts"` and all existing exports
 - `.github/workflows/release-contracts.yml` — identical logic to the current
   `release.yml` but scoped with `paths: ['contracts/**']` in the `on: push` trigger and
   `working-directory: contracts` on build/test steps
-- Consumer import paths (`@marx2/contracts`, `@marx2/contracts/fx`, `@marx2/contracts/currencies`) are **unchanged**
+- Consumer import paths (`@marx-org/contracts`, `@marx-org/contracts/fx`, `@marx-org/contracts/currencies`) are **unchanged**
 
-**`otel/` subfolder** — new package `@marx2/otel`:
+**`otel/` subfolder** — new package `@marx-org/otel`:
 
 1. `otel/src/index.ts` — shared, Hono-agnostic setup helpers:
    - `createResource(serviceName: string)` — builds an OTel `Resource` with
@@ -92,7 +92,7 @@ their respective subfolder change. They share the repo-level `.npmrc` and `.giti
 2. `otel/package.json`:
    ```json
    {
-     "name": "@marx2/otel",
+     "name": "@marx-org/otel",
      "version": "1.0.2",
      "type": "module",
      "exports": {
@@ -138,7 +138,7 @@ Applies to: `portfoliost-admin`, `portfoliost-wallets`, `portfoliost-instruments
 
 **New dependencies added to each service's `package.json`:**
 ```
-@marx2/otel
+@marx-org/otel
 @opentelemetry/sdk-node
 @opentelemetry/api
 @opentelemetry/exporter-prometheus
@@ -150,7 +150,7 @@ import-in-the-middle          ← required for ESM http instrumentation (see bel
 **New file per service: `src/instrumentation.ts`**
 
 ```typescript
-import { createSdk, buildMetricsRoute } from '@marx2/otel'
+import { createSdk, buildMetricsRoute } from '@marx-org/otel'
 import { PrometheusExporter } from '@opentelemetry/exporter-prometheus'
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node'
 import { RuntimeNodeInstrumentation } from '@opentelemetry/instrumentation-runtime-node'
@@ -323,11 +323,11 @@ The JS Prometheus exporter (≥ 0.200) emits the bare sanitised OTel name
 newer OpenMetrics convention. The Python exporter appends the unit into the name
 (`http_server_request_duration_seconds`), following the older Prometheus convention.
 
-To make all six services consistent, `@marx2/otel@1.0.2` adds two `ViewOptions` to
+To make all six services consistent, `@marx-org/otel@1.0.2` adds two `ViewOptions` to
 `createSdk` that rename the JS histograms before they reach the exporter:
 
 ```typescript
-// inside @marx2/otel src/index.ts
+// inside @marx-org/otel src/index.ts
 const HTTP_DURATION_VIEWS: ViewOptions[] = [
   { name: 'http.server.request.duration.seconds', instrumentName: 'http.server.request.duration' },
   { name: 'http.client.request.duration.seconds', instrumentName: 'http.client.request.duration' },
@@ -337,7 +337,7 @@ const HTTP_DURATION_VIEWS: ViewOptions[] = [
 
 `http.server.request.duration.seconds` sanitises to `http_server_request_duration_seconds`
 — identical to what Python emits. No per-service changes needed; upgrading
-`@marx2/otel` is sufficient.
+`@marx-org/otel` is sufficient.
 
 **Unified PromQL query (all 6 services):**
 ```promql
@@ -450,7 +450,7 @@ Once D56 is implemented:
 Each step is one commit after its test passes.
 
 - [x] **Step 1** — Restructure `portfoliost-contracts` repo: move existing files under `contracts/` subfolder; add `otel/` subfolder with `src/index.ts`, `package.json`, `tsconfig.json`; add separate GHA workflow `release-otel.yml`; update `release-contracts.yml` with path filter; bump both packages via CI
-  - _Test:_ TypeScript compiles in both subfolders (`npm run build` in `contracts/` and `otel/`); `@marx2/otel` importable; `@marx2/contracts` consumer imports unchanged
+  - _Test:_ TypeScript compiles in both subfolders (`npm run build` in `contracts/` and `otel/`); `@marx-org/otel` importable; `@marx-org/contracts` consumer imports unchanged
 - [x] **Step 2** — Add OTel deps + `src/instrumentation.ts` + `/metrics` route + pino logging to `portfoliost-admin`
   - _Test:_ Unit: `GET /metrics` returns `text/plain` with `http_server_request_duration`; health check passes
 - [x] **Step 3** — Same for `portfoliost-wallets`
@@ -467,7 +467,7 @@ Each step is one commit after its test passes.
   - _Test:_ Prometheus scrape targets show all 6 services as `UP` in `pfire` namespace
 - [x] **Step 9** — Fix ESM http instrumentation: add `src/iitm.ts` + `import-in-the-middle` dep to all 4 JS services; update Dockerfile CMD to `--import ./dist/iitm.js --import ./dist/instrumentation.js`; fix users-auth HelmRelease command override to include both preloads
   - _Test:_ `http_server_request_duration_seconds_count` appears in Prometheus for all 4 JS services after traffic
-- [x] **Step 10** — Align metric names: bump `@marx2/otel` to 1.0.2 with `ViewOptions` renaming JS histograms to `*.seconds`; update all 4 consumer repos; redeploy
+- [x] **Step 10** — Align metric names: bump `@marx-org/otel` to 1.0.2 with `ViewOptions` renaming JS histograms to `*.seconds`; update all 4 consumer repos; redeploy
   - _Test:_ `sum by (service)(rate(http_server_request_duration_seconds_count[5m]))` returns all 6 services
 - [x] **Step 11** — Update D55 proposal to reference D56 as prerequisite for richer traffic data
 
@@ -482,10 +482,10 @@ target. Both are kept.
 
 **Q: Shared OTel code — separate repo or contracts?**
 New `otel/` subfolder in the `portfoliost-contracts` monorepo, published as the
-independent package `@marx2/otel`. This keeps OTel helpers physically co-located
+independent package `@marx-org/otel`. This keeps OTel helpers physically co-located
 with the rest of the shared code (same repo, same `.npmrc`, same CI runner) while
-keeping the two packages cleanly separated: `@marx2/contracts` stays a lean
-OpenAPI + pure-function library with no runtime deps; `@marx2/otel` carries the
+keeping the two packages cleanly separated: `@marx-org/contracts` stays a lean
+OpenAPI + pure-function library with no runtime deps; `@marx-org/otel` carries the
 heavy OTel peer deps without polluting contracts consumers. Each subfolder has its
 own `package.json`, `tsconfig.json`, versioning, and release workflow.
 

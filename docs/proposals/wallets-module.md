@@ -21,8 +21,8 @@ fields are always `null`). This proposal makes multicurrency real:
 | Dimension | Value |
 | --- | --- |
 | Module name | `wallets` |
-| Repo | `Marx2/portfoliost-wallets` |
-| Image | `ghcr.io/marx2/portfoliost-wallets` |
+| Repo | `marx-org/portfoliost-wallets` |
+| Image | `ghcr.io/marx-org/portfoliost-wallets` |
 | Compose service / container | `wallets` |
 | K8s HelmRelease/controller | `portfoliost-wallets` |
 | Env key | `API_WALLETS_URL` |

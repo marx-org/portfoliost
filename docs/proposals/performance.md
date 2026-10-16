@@ -99,7 +99,7 @@ Every field this proposal needs is already declared in `openapi.yaml`:
 `/risk-metrics` and returned to a UI that displays none of them.
 
 Adding the two scalars to the analytics response is therefore a **wiring change,
-not a schema change** — no `openapi.yaml` edit, no `@marx2/contracts` release, no
+not a schema change** — no `openapi.yaml` edit, no `@marx-org/contracts` release, no
 `gen:types` run. That is deliberate: it keeps the section to two repos.
 
 ### D87 — `Monthly | Yearly` toggle on the Returns Chart

@@ -22,7 +22,7 @@ the SPA needs zero modal changes.
 
 | Dimension | Value |
 | --- | --- |
-| Repo | `Marx2/portfoliost-wallets` (existing) — new routers under `src/routes/portfolios/` |
+| Repo | `marx-org/portfoliost-wallets` (existing) — new routers under `src/routes/portfolios/` |
 | Container / compose service | `wallets` (unchanged) |
 | K8s HelmRelease | `portfoliost-wallets` (unchanged) |
 | Env keys consumed | existing `API_USERS_AUTH_URL` (prefs), **new `API_INSTRUMENTS_URL`** (quotes) on the wallets container |
@@ -38,7 +38,7 @@ Rationale:
    portfolio ledger row + wallet `INVEST` row + balance bump, no retry/dedupe protocol.
 2. **Fee/FX settlement logic already exists there.** `wallets/src/services/fee-fx.ts`
    (D28/D29 resolution: fixed vs pct, fee-currency default, manual-rate validation) and
-   `valuation.ts`/`fx-import.ts` (fx_rates access, carry-forward, `@marx2/contracts/fx`)
+   `valuation.ts`/`fx-import.ts` (fx_rates access, carry-forward, `@marx-org/contracts/fx`)
    are reused verbatim for portfolio transactions instead of being duplicated.
 3. **MODULARISATION naming holds**: one env key per module (`API_WALLETS_URL`) serving
    several path areas — the users-auth precedent (`/api/auth` + `/api/users`). The
@@ -48,7 +48,7 @@ Rationale:
    deployable; splitting it would recreate the cross-service consistency problem D19
    was designed around.
 
-Rejected alternative: a dedicated `Marx2/portfoliost-portfolios` repo — rejected because
+Rejected alternative: a dedicated `marx-org/portfoliost-portfolios` repo — rejected because
 of (1)+(2): it would need HTTP cash-movement pushes, duplicated fee-fx code, and a second
 deployment for what is one domain boundary drawn only by URL prefix.
 
@@ -281,7 +281,7 @@ Buy/sell/dividend write the wallet-side rows directly (same DB, same transaction
 
 The existing `uq_wtx_reference` unique index gives idempotency for free. When the
 portfolio has no `wallet_id` (or the wallet ccy ≠ tx ccy), the conversion uses
-`@marx2/contracts/fx` against `fx_rates` at write time and snapshots the rate on the
+`@marx-org/contracts/fx` against `fx_rates` at write time and snapshots the rate on the
 cash row. **No overdraft rejection for buys** (example-service lets cash go negative; parity wins
 — wallets withdrawals keep their own overdraft guard). Editing/deleting a portfolio
 transaction updates/removes the paired rows by `reference`, keeping both ledgers in
@@ -299,7 +299,7 @@ short-TTL in-memory cache):
   `percentOfPortfolio`.
 - Instruments unreachable/staleness overflow → serve last stored price with
   `priceSource: 'fallback'` (never fail the read).
-- Display-currency conversions use `@marx2/contracts/fx` + in-process `fx_rates`
+- Display-currency conversions use `@marx-org/contracts/fx` + in-process `fx_rates`
   (D27/D21) — no new FX infrastructure.
 - Logos for held-stocks come from the existing `/api/logos/:symbol` (already real).
 

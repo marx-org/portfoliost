@@ -158,7 +158,7 @@ File: `portfoliost-contracts/openapi.yaml`
   `"Filter by instrument symbol. Must be in canonical form: bare ticker for US listings (AAPL, SAP), Yahoo venue suffix for others (SAP.DE, SNT.WA). Case-insensitive exact match."`
 - Check whether `InstrumentSearchResult` has a `countryCode` field — if missing, add it (needed for Step 5 search UI enrichment).
 - Check whether `InstrumentDetail.id` has any `.US` format constraint — it should be a plain `string` (needed for Step 7).
-- Bump the patch version per the contracts workflow. Then in each consumer repo: `NODE_AUTH_TOKEN=$(gh auth token) npm install @marx2/contracts@<new-version>` and `npm run gen:types`.
+- Bump the patch version per the contracts workflow. Then in each consumer repo: `NODE_AUTH_TOKEN=$(gh auth token) npm install @marx-org/contracts@<new-version>` and `npm run gen:types`.
 
 Tests: `npm run build` in all consumer repos after installing the new contracts version.
 

@@ -12,9 +12,9 @@
 - **Transactions API**:
   - `getPortfolioTransactions(portfolioId, ...)` — `GET /api/portfolios/{id}/transactions`, filterable by `positionId` (`src/api/portfolios.ts:145`).
   - `getAllTransactions(...)` — `GET /api/portfolios/transactions`, all portfolios (`src/api/portfolios.ts:185`).
-  - Neither endpoint currently accepts an `instrumentSymbol` filter. Both return `components["schemas"]["Transaction"][]` from `@marx2/contracts`.
+  - Neither endpoint currently accepts an `instrumentSymbol` filter. Both return `components["schemas"]["Transaction"][]` from `@marx-org/contracts`.
 - **Transaction fields** used by this feature: `id`, `portfolioId`, `portfolioName`, `positionId`, `instrumentSymbol`, `type`, `quantity`, `price`, `fees`, `totalAmount`, `currency`, `executedAt`.
-- **Contract**: `portfoliost-contracts/openapi.yaml` is the source of truth. All changes to API shape must start there, be published as a new `@marx2/contracts` version, and be consumed via `npm install @marx2/contracts@<version>` + `npm run gen:types` before any frontend code references the new fields.
+- **Contract**: `portfoliost-contracts/openapi.yaml` is the source of truth. All changes to API shape must start there, be published as a new `@marx-org/contracts` version, and be consumed via `npm install @marx-org/contracts@<version>` + `npm run gen:types` before any frontend code references the new fields.
 - **Dividends**: out of scope — dividend transaction recording is not yet implemented and will be addressed in a separate proposal. Only `buy` and `sell` transaction types are handled here.
 
 ---
@@ -56,8 +56,8 @@ Both `GET /api/portfolios/transactions` (`getAllTransactions`) and `GET /api/por
 
 **Workflow** (must be done before any frontend code that uses the new param):
 1. Edit `portfoliost-contracts/openapi.yaml` — add `instrumentSymbol` param to both `getAllTransactions` and `getPortfolioTransactions` operations.
-2. Push to `main` → CI auto-bumps the patch version, creates a GitHub Release, publishes `@marx2/contracts@<new-version>`.
-3. In `portfoliost`: `NODE_AUTH_TOKEN=$(gh auth token) npm install @marx2/contracts@<new-version>` + `npm run gen:types` → commit updated `package-lock.json` and `generated/api-types.d.ts`.
+2. Push to `main` → CI auto-bumps the patch version, creates a GitHub Release, publishes `@marx-org/contracts@<new-version>`.
+3. In `portfoliost`: `NODE_AUTH_TOKEN=$(gh auth token) npm install @marx-org/contracts@<new-version>` + `npm run gen:types` → commit updated `package-lock.json` and `generated/api-types.d.ts`.
 4. In `portfoliost-wallets`: implement the filter in the route handler (`WHERE UPPER(instrument_symbol) = UPPER(?)`).
 5. In `portfoliost/mocks/portfolios/index.js`: add `if (ctx.query.instrumentSymbol) { ... filter by instrumentSymbol case-insensitively ... }` to both mock endpoints.
 
@@ -207,10 +207,10 @@ The `defaultShowTransactions` prop ensures the overlay opens pre-checked since s
 Each step = one commit. Mark `[x]` when done.
 
 ```
-[x] Step 1 — Contract: add `instrumentSymbol` query param to getAllTransactions and getPortfolioTransactions in openapi.yaml; publish new @marx2/contracts version
+[x] Step 1 — Contract: add `instrumentSymbol` query param to getAllTransactions and getPortfolioTransactions in openapi.yaml; publish new @marx-org/contracts version
 [x] Step 2 — Backend: implement `instrumentSymbol` WHERE filter in portfoliost-wallets route handler for both endpoints
 [x] Step 3 — Mock: add `instrumentSymbol` client-side filter to both mock endpoints in portfoliost/mocks/portfolios/index.js
-[x] Step 4 — Consumer update: npm install @marx2/contracts@<new-version> + npm run gen:types; add typed `instrumentSymbol?` param to getAllTransactions and getPortfolioTransactions in src/api/portfolios.ts; verify build
+[x] Step 4 — Consumer update: npm install @marx-org/contracts@<new-version> + npm run gen:types; add typed `instrumentSymbol?` param to getAllTransactions and getPortfolioTransactions in src/api/portfolios.ts; verify build
 [x] Step 5 — Extract shared component: copy ResearchPriceChart.vue → src/components/PriceChart.vue; add portfolioId/defaultShowTransactions/maxTransactions props; drop positionId; update ResearchOverview.vue import; delete old file; verify build
 [x] Step 6 — Add "Transactions" checkbox + portfolio selector (Research) + transaction fetch wiring (D3–D5)
 [x] Step 7 — Transaction markers: compute annotations.points from buy/sell transactions in visible range; integrate into chartOptions (D6)

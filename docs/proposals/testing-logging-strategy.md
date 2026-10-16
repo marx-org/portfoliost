@@ -201,7 +201,7 @@ Seed data should mirror what a real user would have — not exhaustive edge case
 
 ## Mock Status: Retired From Production
 
-**The mock is not deployed in the cluster.** In the Flux repo (`Marx2/homelab`), the
+**The mock is not deployed in the cluster.** In the Flux repo (`marx-org/homelab`), the
 `portfoliost` ingress routes every migrated path to a real module by explicit
 `path:` entry — there is no `/api` catch-all to a mock, and the `mocks` HelmRelease
 is deleted. Anything not listed falls through to the SPA.
