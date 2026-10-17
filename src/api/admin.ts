@@ -131,6 +131,7 @@ export interface CpiRow {
 export interface CpiSummary {
   rowCount: number
   stale: boolean
+  status: "fresh" | "stale" | "empty"
   lastDate: string | null
   ageDays: number | null
   rows: CpiRow[]

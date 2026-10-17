@@ -46,8 +46,9 @@ const NNEP = {
   margin: null,
 } as never
 
-async function mountView(rows: unknown[]) {
+async function mountView(rows: unknown[], cpi: unknown = null) {
   vi.mocked(adminApi.fetchBondCatalogue).mockResolvedValue({ count: rows.length, rows } as never)
+  vi.mocked(adminApi.fetchCpiSeries).mockResolvedValue(cpi as never)
   const wrapper = mount(BondCatalogueView, {
     global: {
       stubs: {
@@ -99,5 +100,34 @@ describe("BondCatalogueView — §85.6 bond series link to research", () => {
     const cell = wrapper.get('[data-testid="research-link"]').element.closest("td")
     expect(cell!.className).toContain("font-mono")
     expect(wrapper.text()).toContain("2033-05-01")
+  })
+
+  it("renders the real CPI age and supports manual refresh", async () => {
+    const cpi = {
+      rowCount: 1,
+      stale: true,
+      status: "stale",
+      lastDate: "2026-08-01",
+      ageDays: 77,
+      rows: [{ date: "2026-08-01", value: "3.5" }],
+    }
+    const wrapper = await mountView([ROD], cpi)
+
+    expect(wrapper.text()).toContain("77 days old")
+    expect(wrapper.text()).not.toContain("more than 40 days old")
+
+    await wrapper.get("button").trigger("click")
+    await flushPromises()
+    expect(adminApi.fetchCpiSeries).toHaveBeenCalledTimes(2)
+  })
+
+  it("renders a CPI read failure instead of a stale warning", async () => {
+    const wrapper = await mountView([ROD])
+    vi.mocked(adminApi.fetchCpiSeries).mockRejectedValue(new Error("Unable to read the OpenST CPI series"))
+    await wrapper.get("button").trigger("click")
+    await flushPromises()
+
+    expect(wrapper.text()).toContain("Unable to read the OpenST CPI series")
+    expect(wrapper.text()).not.toContain("CPI data is stale")
   })
 })
