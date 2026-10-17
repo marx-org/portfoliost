@@ -287,7 +287,18 @@ const perf = computed(() => props.analytics?.performance ?? null)
 // foreign symbol), and §66.3 rule 1 is why `convert()` is used rather than a
 // bare `× rate`: no rate yet means no number, never a guess.
 const netGain = computed(() => convert(perf.value?.totalReturn))
-const netInvested = computed(() => convert(perf.value?.capitalBasis))
+/**
+ * The aggregate endpoint on older wallets builds the same value under its
+ * legacy `totalInvested` name, so `capitalBasis` can be absent even though the
+ * final series point still carries the invested level. The series is part of
+ * the current contract and is the exact source used by the chart below; use
+ * its last point as a compatibility fallback rather than rendering a dash for
+ * a value the response already contains.
+ */
+const netInvested = computed(() => {
+  const invested = perf.value?.capitalBasis ?? perf.value?.timeSeries?.at(-1)?.invested
+  return convert(invested)
+})
 
 // Rates, not money — currency-independent, so deliberately NOT converted. A
 // converted percentage is a category error, and dividing by a rate would be worse.

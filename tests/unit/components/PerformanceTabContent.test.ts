@@ -114,6 +114,13 @@ describe("PerformanceTabContent — §83.1 prop-driven tab body", () => {
     expect(wrapper.get('[data-testid="performance-max-drawdown"]').text()).toContain("10.00%")
   })
 
+  it("uses the last invested series level when aggregate capitalBasis is absent", async () => {
+    const wrapper = await mountContent({
+      analytics: analytics({ capitalBasis: undefined }) as never,
+    })
+    expect(tile(wrapper, "net-invested")).toContain("900")
+  })
+
   it("renders — and hides Timing — when the TWR p.a. is withheld", async () => {
     // §82.2's rule: a withheld rate must not become a confident Timing reading,
     // because Timing is a difference of two rates and one of them is absent.
