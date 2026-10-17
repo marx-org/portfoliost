@@ -61691,7 +61691,7 @@ ZSE_ZW::ZECO,ZECO,ZSE_ZW,ZECO HOLDINGS LIMITED,Stock,Industrials,,Zimbabwe,ZW,ZW
 ZSE_ZW::ZIMP,ZIMP,ZSE_ZW,ZIMBABWE NEWSPAPERS (1980) LIMITED,Stock,Communication Services,,Zimbabwe,ZW,ZW0009011595,zimbabwe newspapers 1980|zimbabwe newspapers,ZW0009011595,primary_listing
 ZSE_ZW::ZIMR,ZIMR,ZSE_ZW,ZIMRE HOLDINGS LIMITED,Stock,Financials,,Zimbabwe,ZW,ZW0009011611,zimre holdings|zimre,ZW0009011611,primary_listing
 ZSE_ZW::ZSEH,ZSEH,ZSE_ZW,ZIMBABWE STOCK EXCHANGE HOLDINGS LIMITED,Stock,Financials,,Zimbabwe,ZW,ZW0009012494,zimbabwe stock exchange holdings|zimbabwe stock exchange,ZW0009012494,primary_listing
-CRYPTO::BTC-USD,BTC-USD,CRYPTO,Bitcoin,crypto,,,,,,btc|bitcoin,,primary_listing
+CRYPTO::BTC-USD,BTC-USD,CRYPTO,Bitcoin USD,crypto,,,,,,btc|bitcoin,,primary_listing
 CRYPTO::ETH-USD,ETH-USD,CRYPTO,Ethereum,crypto,,,,,,eth|ethereum,,primary_listing
 TFI::INGAKC.TFI,INGAKC.TFI,TFI,ING Akcji (ING Parasol FIO),fund,,,Poland,PL,,ing akcji,,primary_listing
 TFI::NNEP60.TFI,NNEP60.TFI,TFI,ING Emerytura 2060 (ING Emerytura SFIO),fund,,,Poland,PL,,ing emerytura 2060,,primary_listing

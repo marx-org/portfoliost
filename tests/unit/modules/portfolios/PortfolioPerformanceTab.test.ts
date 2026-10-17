@@ -180,6 +180,7 @@ describe("PortfolioPerformanceTab — §82.2 overview tiles", () => {
     usePortfolioStore().analytics = analytics({
       totalReturn: undefined,
       capitalBasis: undefined,
+      timeSeries: [],
       moneyWeightedReturn: undefined,
       annualizedReturn: undefined,
       annualizedReturnWithheldReason: undefined,
