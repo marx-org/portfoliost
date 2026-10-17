@@ -16,89 +16,109 @@ const bonds = ref<BondCatalogueRow[]>([])
 const bondCount = ref(0)
 const cpi = ref<CpiSummary | null>(null)
 const loading = ref(true)
-const error = ref<string | null>(null)
+const bondError = ref<string | null>(null)
+const cpiError = ref<string | null>(null)
 
-onMounted(async () => {
+async function load() {
   loading.value = true
-  error.value = null
-  try {
-    const [bondRes, cpiRes] = await Promise.all([
-      fetchBondCatalogue().catch(() => ({ count: 0, rows: [] as BondCatalogueRow[] })),
-      fetchCpiSeries().catch(() => null),
-    ])
-    bondCount.value = bondRes.count
-    bonds.value = bondRes.rows
-    cpi.value = cpiRes
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : "Failed to load bond catalogue"
-  } finally {
-    loading.value = false
+  bondError.value = null
+  cpiError.value = null
+
+  const [bondResult, cpiResult] = await Promise.allSettled([
+    fetchBondCatalogue(),
+    fetchCpiSeries(),
+  ])
+
+  if (bondResult.status === "fulfilled") {
+    bondCount.value = bondResult.value.count
+    bonds.value = bondResult.value.rows
+  } else {
+    bondError.value = bondResult.reason instanceof Error ? bondResult.reason.message : "Failed to load bond catalogue"
   }
+
+  if (cpiResult.status === "fulfilled") {
+    cpi.value = cpiResult.value
+  } else {
+    cpi.value = null
+    cpiError.value = cpiResult.reason instanceof Error ? cpiResult.reason.message : "Failed to load CPI data"
+  }
+
+  loading.value = false
+}
+
+onMounted(() => {
+  void load()
 })
 
-const cpiStale = computed(() => cpi.value?.stale ?? false)
+const cpiStale = computed(() => cpi.value?.status === "stale" || cpi.value?.stale === true)
 </script>
 
 <template>
   <div class="space-y-8">
-    <h1 class="text-xl font-semibold">Bond Catalogue</h1>
+    <div class="flex items-center justify-between gap-4">
+      <h1 class="text-xl font-semibold">Bond Catalogue</h1>
+      <button type="button" class="btn-secondary" :disabled="loading" @click="load">
+        {{ loading ? "Refreshing…" : "Refresh" }}
+      </button>
+    </div>
 
     <div v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading…</div>
-    <div v-else-if="error" class="text-sm text-red-600">{{ error }}</div>
-
     <template v-else>
       <!-- Savings-bond series (openst.bond_series) -->
       <div class="card p-6">
         <h2 class="mb-1 text-base font-semibold">Savings-Bond Emissions</h2>
-        <p class="mb-4 text-sm text-slate-500 dark:text-slate-400">
-          <span class="font-semibold">{{ bondCount.toLocaleString() }}</span> emissions in
-          <code class="font-mono text-xs">openst.bond_series</code>
-        </p>
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead>
-              <tr class="border-b border-slate-200 dark:border-slate-700 text-left text-xs text-slate-500 dark:text-slate-400">
-                <th class="pb-2 pr-4">Symbol</th>
-                <th class="pb-2 pr-4">Name</th>
-                <th class="pb-2 pr-4">Issue</th>
-                <th class="pb-2 pr-4">Maturity</th>
-                <th class="pb-2 pr-4">Rate Rule</th>
-                <th class="pb-2">Margin</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="b in bonds" :key="b.symbol" class="border-b border-slate-100 dark:border-slate-800">
-                <!-- §85.6 — the case the request names explicitly: "bond". These
-                     are ROD1033 / NNEP25-style series, not equity tickers, and the
-                     bond-profile fallback in portfoliost-instruments is what makes
-                     the target resolve. The logos endpoint answers 200 with a
-                     generated SVG plate (first three chars in a circle) for a
-                     series with no logo of its own, so the badge degrades
-                     gracefully and needs no special-casing.
-                     The cell keeps its mono/semibold styling and the separate
-                     Name column is untouched. This comment deliberately avoids
-                     spelling the logo route, so the logos-reference check in
-                     docs/COMPONENTS.md keeps returning exactly TickerBadge.vue
-                     and RecentSearchesBar.vue. -->
-                <td class="py-2 pr-4 font-mono font-semibold">
-                  <router-link :to="researchRoute(b.symbol, route.fullPath)" class="inline-block">
-                    <TickerBadge size="sm" :symbol="b.symbol" />
-                  </router-link>
-                </td>
-                <td class="py-2 pr-4">{{ b.name }}</td>
-                <td class="py-2 pr-4">{{ b.issueDate ?? "—" }}</td>
-                <td class="py-2 pr-4">{{ b.maturityDate ?? "—" }}</td>
-                <td class="py-2 pr-4">{{ b.rateRule ?? "—" }}</td>
-                <td class="py-2">{{ b.margin != null && b.margin !== "" ? Number(b.margin).toFixed(4) : "—" }}</td>
-              </tr>
-              <tr v-if="bonds.length === 0">
-                <td colspan="6" class="py-4 text-center text-slate-400 dark:text-slate-500">
-                  No bond series imported yet.
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <div v-if="bondError" class="text-sm text-red-600 dark:text-red-400">{{ bondError }}</div>
+        <template v-else>
+          <p class="mb-4 text-sm text-slate-500 dark:text-slate-400">
+            <span class="font-semibold">{{ bondCount.toLocaleString() }}</span> emissions in
+            <code class="font-mono text-xs">openst.bond_series</code>
+          </p>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-slate-200 dark:border-slate-700 text-left text-xs text-slate-500 dark:text-slate-400">
+                  <th class="pb-2 pr-4">Symbol</th>
+                  <th class="pb-2 pr-4">Name</th>
+                  <th class="pb-2 pr-4">Issue</th>
+                  <th class="pb-2 pr-4">Maturity</th>
+                  <th class="pb-2 pr-4">Rate Rule</th>
+                  <th class="pb-2">Margin</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="b in bonds" :key="b.symbol" class="border-b border-slate-100 dark:border-slate-800">
+                  <!-- §85.6 — the case the request names explicitly: "bond". These
+                       are ROD1033 / NNEP25-style series, not equity tickers, and the
+                       bond-profile fallback in portfoliost-instruments is what makes
+                       the target resolve. The logos endpoint answers 200 with a
+                       generated SVG plate (first three chars in a circle) for a
+                       series with no logo of its own, so the badge degrades
+                       gracefully and needs no special-casing.
+                       The cell keeps its mono/semibold styling and the separate
+                       Name column is untouched. This comment deliberately avoids
+                       spelling the logo route, so the logos-reference check in
+                       docs/COMPONENTS.md keeps returning exactly TickerBadge.vue
+                       and RecentSearchesBar.vue. -->
+                  <td class="py-2 pr-4 font-mono font-semibold">
+                    <router-link :to="researchRoute(b.symbol, route.fullPath)" class="inline-block">
+                      <TickerBadge size="sm" :symbol="b.symbol" />
+                    </router-link>
+                  </td>
+                  <td class="py-2 pr-4">{{ b.name }}</td>
+                  <td class="py-2 pr-4">{{ b.issueDate ?? "—" }}</td>
+                  <td class="py-2 pr-4">{{ b.maturityDate ?? "—" }}</td>
+                  <td class="py-2 pr-4">{{ b.rateRule ?? "—" }}</td>
+                  <td class="py-2">{{ b.margin != null && b.margin !== "" ? Number(b.margin).toFixed(4) : "—" }}</td>
+                </tr>
+                <tr v-if="bonds.length === 0">
+                  <td colspan="6" class="py-4 text-center text-slate-400 dark:text-slate-500">
+                    No bond series imported yet.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </template>
       </div>
 
       <!-- 12m CPI (openst.cpi_12m) -->
@@ -112,13 +132,14 @@ const cpiStale = computed(() => cpi.value?.stale ?? false)
             {{ cpi.ageDays ?? "—" }}d ago)
           </template>
         </p>
+        <div v-if="cpiError" class="mb-4 text-sm text-red-600 dark:text-red-400">{{ cpiError }}</div>
         <div
           v-if="cpiStale"
           class="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300"
         >
-          CPI data is stale — latest reading is more than 40 days old.
+          CPI data is stale — latest reading is {{ cpi?.ageDays }} days old.
         </div>
-        <template v-if="cpi">
+        <template v-if="cpi && !cpiError">
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
               <thead>
@@ -141,7 +162,7 @@ const cpiStale = computed(() => cpi.value?.stale ?? false)
             </table>
           </div>
         </template>
-        <p v-else class="text-sm text-slate-400 dark:text-slate-500">Unavailable.</p>
+        <p v-else-if="!cpiError" class="text-sm text-slate-400 dark:text-slate-500">Unavailable.</p>
       </div>
     </template>
   </div>

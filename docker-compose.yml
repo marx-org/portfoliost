@@ -43,6 +43,8 @@ services:
       POSTGRES_USER: portfoliost
       POSTGRES_PASSWORD: portfoliost
       POSTGRES_DB: portfoliost
+    volumes:
+      - ./docker/postgres/init-openst.sql:/docker-entrypoint-initdb.d/001-openst.sql:ro
     tmpfs:
       - /var/lib/postgresql/data
     healthcheck:
@@ -113,10 +115,7 @@ services:
         condition: service_healthy
     environment:
       REDIS_HOST: redis
-      # D79 — openst reuses the shared compose postgres (schema `openst` is
-      # created by its boot migration); ../openst/.env carries the standalone
-      # compose DATABASE_URL (openst/openst DB) which does not exist here.
-      DATABASE_URL: postgres://portfoliost:portfoliost@postgres:5432/portfoliost
+      DATABASE_URL: postgres://portfoliost:portfoliost@postgres:5432/openst
     env_file:
       - path: ../openst/.env
         required: false
@@ -225,6 +224,7 @@ services:
       API_OPENST_URL: http://openst:8080
       API_CACHEST_URL: http://cachest:8080
       DATABASE_URL: postgres://portfoliost:portfoliost@postgres:5432/portfoliost
+      OPENST_DATABASE_URL: postgres://portfoliost:portfoliost@postgres:5432/openst
       OIDC_ISSUER_URL: ${OIDC_ISSUER_URL:-http://gateway:8080}
       OIDC_CLIENT_ID: ${ADMIN_OIDC_CLIENT_ID:-}
       OIDC_CLIENT_SECRET: ${ADMIN_OIDC_CLIENT_SECRET:-}
@@ -249,6 +249,7 @@ services:
     build: { context: ".", dockerfile: Dockerfile.db-seed }
     environment:
       DATABASE_URL: postgres://portfoliost:portfoliost@postgres:5432/portfoliost
+      OPENST_DATABASE_URL: postgres://portfoliost:portfoliost@postgres:5432/openst
       SEED_PORTFOLIOS: "true"
     depends_on:
       postgres:   { condition: service_healthy }

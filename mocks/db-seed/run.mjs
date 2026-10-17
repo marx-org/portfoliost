@@ -17,7 +17,11 @@ const DATABASE_URL =
 
 const SEED_PORTFOLIOS = process.env.SEED_PORTFOLIOS !== "false"
 
+const OPENST_DATABASE_URL =
+  process.env.OPENST_DATABASE_URL || DATABASE_URL
+
 const sql = postgres(DATABASE_URL, { max: 3 })
+const openstSql = OPENST_DATABASE_URL === DATABASE_URL ? sql : postgres(OPENST_DATABASE_URL, { max: 3 })
 
 try {
   console.log("[db-seed] starting")
@@ -33,12 +37,13 @@ try {
   await seedUserPreferences(sql)
   await seedTickerReference(sql)
   await seedFundCatalogue(sql)
-  await seedOpenstNoPriceBonds(sql)
+  await seedOpenstNoPriceBonds(openstSql)
 
   console.log("[db-seed] done")
 } catch (err) {
   console.error("[db-seed] failed:", err)
   process.exit(1)
 } finally {
+  if (openstSql !== sql) await openstSql.end()
   await sql.end()
 }
