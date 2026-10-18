@@ -1,27 +1,22 @@
-# docs
+# Application documentation
 
-Ordered documentation index for the example-service.ai parity build.
+This directory contains documentation that must be reviewed with the
+`portfoliost` application in the same pull request.
 
-## Working docs
+## What belongs here
 
-| File | Purpose |
+| Path | Purpose |
 | --- | --- |
-| [plan.md](plan.md) | Long-running parity plan. Each step is implemented, verified (build + unit + mock + e2e), committed, then marked `[x]`. |
-| [APPLICATION_INVENTORY.md](APPLICATION_INVENTORY.md) | Application / feature inventory. |
+| [`api/`](api/) | API reference and the captured API contract used by the mock. |
+| [`migrations/`](migrations/) | Application/database migration notes and SQL. |
+| [`COMPONENTS.md`](COMPONENTS.md) | Vue component conventions and test layout. |
+| [`NEW_REPOSITORY.md`](NEW_REPOSITORY.md) | Portfoliost-specific repository setup companion. |
 
-## API
+## What belongs in `pfire-docs`
 
-| File | Purpose |
-| --- | --- |
-| [api/example-service-real-api.yaml](api/example-service-real-api.yaml) | **Source of truth.** REST contract reverse-engineered from the live Example service API. The mock gateway (`mocks/gateway`, container `example-service-mock`) serves these paths; the mock is seeded by `mocks/shared/data/` (see `scripts/regen-seed.mjs`). |
-| [api/EXAMPLE_SERVICE_API.md](api/EXAMPLE_SERVICE_API.md) | Human-readable endpoint reference mirroring the real Example service API. |
+Project-wide plans, proposals, exploration records, the application inventory,
+provider coverage, module tiers, and the generic repository setup checklist live
+in [`marx-org/pfire-docs/docs`](https://github.com/marx-org/pfire-docs/tree/main/docs).
 
-> Note: the earlier UI-inferred `example-service-openapi.yaml` draft was superseded by
-> `api/example-service-real-api.yaml` and removed. Keep contract updates in the real-api
-> YAML and this reference doc only.
-
-## Exploration captures
-
-[exploration/](exploration/) — screenshots and a11y snapshots of `app.example-service.ai`
-gathered while discovering the UI. Historical reference only; the browser-based
-parity workflow captures fresh snapshots under `.playwright-mcp/` (git-ignored).
+The project-level checklist is the first step for repository setup:
+[`pfire-docs/docs/NEW_REPOSITORY.md`](https://github.com/marx-org/pfire-docs/blob/main/docs/NEW_REPOSITORY.md).
