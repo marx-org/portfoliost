@@ -143,7 +143,7 @@ ran: `inserted=2012 skipped=7 errors=4 walletOnly=1 noOp=1`. User then asked:
   portfolio "IBKR" shows IB positions, etc.).
 
 **Step 5 — Closeout**
-- `docs/plan.md` §24.9: check all boxes; note (a) caller-JWT gotchas (raw token, PORTFOLIOST_
+- `pfire-docs/docs/plan.md` §24.9: check all boxes; note (a) caller-JWT gotchas (raw token, PORTFOLIOST_
   client-ID collision), (b) wallets v1.1.36/37 releases, (c) date-sort, (d) 1:1 model,
   (e) wipe completeness. Commit `docs(plan): mark 24.9 done — ...`.
 - Delete this cache.md.

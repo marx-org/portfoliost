@@ -49,8 +49,17 @@ npm run preview      # preview the build locally
 
 Backend modules live in separate projects, each producing its own container.
 `users-auth` (repo `../portfoliost-users-auth`) is the reference
-implementation. Conventions and the extraction checklist:
-[docs/MODULARISATION.md](docs/MODULARISATION.md).
+implementation. Project-wide conventions and the extraction checklist live in
+[`pfire-docs/docs/MODULARISATION.md`](https://github.com/marx-org/pfire-docs/blob/main/docs/MODULARISATION.md).
+
+## Documentation ownership
+
+Project-level plans, proposals, exploration records, the application inventory,
+provider coverage, and repository-wide setup belong in
+[`marx-org/pfire-docs`](https://github.com/marx-org/pfire-docs/tree/main/docs).
+Documentation that must change with this application stays in [`docs/`](docs/):
+the API reference, migrations, component conventions, and this repository's
+specific setup checklist.
 
 ## Architecture
 
