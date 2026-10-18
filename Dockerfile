@@ -1,5 +1,5 @@
 # ---- build stage ----
-FROM node:22-alpine AS build
+FROM public.ecr.aws/docker/library/node:22-alpine AS build
 
 WORKDIR /app
 
@@ -30,7 +30,7 @@ COPY mocks/shared/data/universe.json mocks/shared/data/universe.json
 RUN sed -i "s|\${NODE_AUTH_TOKEN}|${NODE_AUTH_TOKEN}|g" .npmrc && npm ci && rm .npmrc && npm run build
 
 # ---- serve stage ----
-FROM node:22-alpine
+FROM public.ecr.aws/docker/library/node:22-alpine
 
 RUN npm install -g serve
 
