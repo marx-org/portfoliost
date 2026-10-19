@@ -22,19 +22,15 @@ describe("SystemInfoView", () => {
     })
   })
 
-  // #172 — the SPA's own row is the one row it cannot read from the cluster, so
-  // its repository is written into the component. It carried the pre-migration
-  // `ghcr.io/marx2/` prefix after #13 repointed everything else, which made
-  // Admin → System show a path nobody pulls from while the HelmRelease said
-  // `ghcr.io/marx-org/`. This pins the prefix so a future move fails the build
-  // instead of silently reporting a stale registry.
+  // The SPA's own row is the one row it cannot read from the cluster, so its
+  // repository is written into the component. This pins it, so a registry move
+  // fails the build instead of silently reporting a stale path.
   it("reports its own image under the org path the HelmRelease deploys", async () => {
     const wrapper = mount(SystemInfoView)
     await flushPromises()
 
     const ref = wrapper.get('[data-testid="sys-ref-portfoliost"]').text()
     expect(ref).toBe(`ghcr.io/marx-org/portfoliost:${__APP_VERSION__}`)
-    expect(ref).not.toContain("marx2")
   })
 
   // The version and the image tag both come from `__APP_VERSION__`; if they ever
