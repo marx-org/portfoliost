@@ -7,11 +7,18 @@ const fetchedAt = ref("")
 const loading = ref(true)
 const error = ref<string | null>(null)
 
+// The SPA cannot read its own image ref from the cluster — the admin
+// `/system/versions` endpoint enumerates the other services, not this one — so
+// the repository is written here. It is the org path, matching the HelmRelease
+// that deploys this image; the pre-migration `ghcr.io/marx2/` prefix survived
+// here after #13 repointed the cluster, so the page contradicted the running
+// deployment. `SystemInfoView.test.ts` pins the prefix: a future move breaks the
+// test rather than silently reporting a path nobody pulls from.
 const spaEntry: ServiceVersion = {
   service: "portfoliost",
   version: __APP_VERSION__,
   impl: "real",
-  image: `ghcr.io/marx2/portfoliost:${__APP_VERSION__}`,
+  image: `ghcr.io/marx-org/portfoliost:${__APP_VERSION__}`,
 }
 
 const services = computed(() => [spaEntry, ...rawServices.value])
@@ -65,10 +72,13 @@ function displayRef(svc: ServiceVersion) {
         v-for="svc in services"
         :key="svc.service"
         class="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
+        :data-testid="`sys-row-${svc.service}`"
       >
         <div>
           <div class="font-medium text-slate-900 dark:text-slate-100">{{ svc.service }}</div>
-          <div class="text-sm text-slate-500 dark:text-slate-400">{{ displayRef(svc) }}</div>
+          <div class="text-sm text-slate-500 dark:text-slate-400" :data-testid="`sys-ref-${svc.service}`">
+            {{ displayRef(svc) }}
+          </div>
           <div v-if="svc.schedule" class="font-mono text-xs text-slate-400 dark:text-slate-500">
             {{ svc.schedule }}<span v-if="svc.suspended"> · suspended</span>
           </div>
