@@ -97,6 +97,18 @@ function tile(wrapper: Awaited<ReturnType<typeof mountContent>>, id: string) {
   return wrapper.get(`[data-testid="perf-overview-${id}"]`).text()
 }
 
+/**
+ * The symbols in a performer card, IN RENDER ORDER. Ordering is the whole
+ * subject of #171, so it is read back from the DOM rather than inferred.
+ */
+function cardRows(wrapper: Awaited<ReturnType<typeof mountContent>>, heading: string) {
+  const card = wrapper
+    .findAll(".card")
+    .find((c) => c.find("h2").exists() && c.find("h2").text() === heading)
+  if (!card) throw new Error(`no card headed ${heading}`)
+  return card.findAll("[data-symbol]").map((li) => li.attributes("data-symbol"))
+}
+
 describe("PerformanceTabContent — §83.1 prop-driven tab body", () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -311,5 +323,123 @@ describe("PerformanceTabContent — §83.1 prop-driven tab body", () => {
     expect(prefixed.find('[data-testid="total-performance-max-drawdown"]').exists()).toBe(true)
     // The templated per-year ids prefix the same way.
     expect(prefixed.find('[data-testid="total-perf-returns-yearly-hint"]').exists()).toBe(false)
+  })
+})
+
+/**
+ * #171 — Top/Bottom Performers ranked raw `unrealizedGainLoss`, which is in the
+ * position's OWN currency. On the live account that made PLW.WA (-PLN 1,559.92)
+ * the "worst" while CSN.L (-£1,399.13) sat third, purely because 1559.92 > 1399.13
+ * numerically. Converted at the real 2026-10-16 rates, CSN.L is about -$1,865.78
+ * against PLW.WA's -$401.69 — the actual worst by a wide margin. The rates below
+ * are the production values from /api/fx/latest, not invented ones.
+ */
+describe("PerformanceTabContent — #171 currency-aware performer ranking", () => {
+  const FX: Record<string, number> = {
+    "PLN/USD": 0.2575057,
+    "GBP/USD": 1.3335308,
+    "PLN/EUR": 0.24,
+    "GBP/EUR": 0.1,
+  }
+
+  const resolveRates = async (from: string, to: string) => {
+    const r = FX[`${from.toUpperCase()}/${to.toUpperCase()}`]
+    return r ? ({ rate: r, asOf: "2026-10-16" } as never) : (null as never)
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockedRate.mockImplementation(resolveRates)
+  })
+
+  const pos = (over: Record<string, unknown>) =>
+    ({
+      id: "p1",
+      symbol: "TEST",
+      companyName: "Test Co",
+      assetType: "STOCK",
+      instrumentCurrency: "USD",
+      isOpen: true,
+      unrealizedGainLoss: 0,
+      percentageChange: 0,
+      country: "US",
+      ...over,
+    }) as never
+
+  // The production trio, with the raw numbers that produced the wrong order.
+  const plw = () =>
+    pos({ id: "plw", symbol: "PLW.WA", instrumentCurrency: "PLN", unrealizedGainLoss: -1559.92 })
+  const csn = () =>
+    pos({ id: "csn", symbol: "CSN.L", instrumentCurrency: "GBP", unrealizedGainLoss: -1399.13 })
+  const are = () => pos({ id: "are", symbol: "ARE", instrumentCurrency: "USD", unrealizedGainLoss: -1058.6 })
+
+  it("ranks both cards by CONVERTED P/L, so CSN.L is worst rather than third", async () => {
+    const wrapper = await mountContent({ positions: [plw(), csn(), are()] as never })
+
+    // Raw numbers sort PLW first; converted USD reverses that completely.
+    expect(cardRows(wrapper, "Bottom Performers")).toEqual(["CSN.L", "ARE", "PLW.WA"])
+    // Both cards are cut from the same converted ordering, so Top is its mirror.
+    expect(cardRows(wrapper, "Top Performers")).toEqual(["PLW.WA", "ARE", "CSN.L"])
+
+    // And the sub-line that was missing on the live GBP row is now present,
+    // because the GBP rate is fetched for a position regardless of which card
+    // it lands on.
+    const csnRow = wrapper.get('[data-testid="perf-performer-row-csn"]')
+    expect(csnRow.text()).toContain("-£1,399.13")
+    expect(csnRow.text()).toContain("-$1,865")
+  })
+
+  it("fetches a rate for every open position's currency, not only the top card", async () => {
+    // Six large USD positions crowd CSN.L out of any Top-5 by raw value. Under
+    // the old `performers.top` scope its GBP rate was never requested, so it
+    // could never be converted, so it could never be ranked — a position locked
+    // out of both cards by its own absence from one of them.
+    const usdCrowd = Array.from({ length: 6 }, (_, i) =>
+      pos({ id: `u${i}`, symbol: `U${i}`, unrealizedGainLoss: 1000 - i }),
+    )
+    await mountContent({ positions: [...usdCrowd, csn()] as never })
+
+    expect(mockedRate).toHaveBeenCalledWith("GBP", "USD")
+  })
+
+  it("excludes and NAMES a position whose FX rate is unavailable, rather than silently ranking it", async () => {
+    // GBP has no rate — the pair cannot be resolved. Silently dropping CSN.L
+    // would leave a card that looks complete; coercing it to 0 would rank it as
+    // a flat position. Either way the user would be shown an ordering that
+    // quietly disagrees with the money.
+    mockedRate.mockImplementation(async (from: string, to: string) => {
+      if (from.toUpperCase() === "GBP") return null as never
+      return resolveRates(from, to)
+    })
+
+    const wrapper = await mountContent({ positions: [plw(), csn(), are()] as never })
+
+    expect(cardRows(wrapper, "Bottom Performers")).toEqual(["ARE", "PLW.WA"])
+    expect(cardRows(wrapper, "Top Performers")).toEqual(["PLW.WA", "ARE"])
+    expect(wrapper.find('[data-testid="perf-performer-row-csn"]').exists()).toBe(false)
+
+    // The exclusion is stated, with the symbol, the currency and the reason.
+    const note = wrapper.get('[data-testid="perf-performers-unranked-list"]').text()
+    expect(note).toContain("CSN.L")
+    expect(note).toContain("GBP")
+    expect(note).toContain("no rate available")
+  })
+
+  it("renders no caveat when every open position converts cleanly", async () => {
+    const wrapper = await mountContent({ positions: [plw(), csn(), are()] as never })
+    expect(wrapper.find('[data-testid="perf-performers-unranked"]').exists()).toBe(false)
+  })
+
+  it("re-ranks when the display currency changes, without a remount", async () => {
+    const wrapper = await mountContent({ positions: [plw(), csn()] as never })
+    expect(cardRows(wrapper, "Bottom Performers")).toEqual(["CSN.L", "PLW.WA"])
+
+    // In EUR the pair flips: PLN -374.38 against GBP -139.91, so PLW.WA becomes
+    // the worse of the two. A source-keyed rate cache would keep serving the
+    // USD rates here and leave the order stale.
+    useDisplayCurrencyStore().currency = "EUR"
+    await flushPromises()
+
+    expect(cardRows(wrapper, "Bottom Performers")).toEqual(["PLW.WA", "CSN.L"])
   })
 })

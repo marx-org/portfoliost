@@ -452,19 +452,6 @@ function excessPercent(row: YearlyReturnRow): number | null {
 // ---------------------------------------------------------------------------
 // Top / Bottom performers
 // ---------------------------------------------------------------------------
-function gainClass(value: number | undefined): string {
-  return (value ?? 0) >= 0 ? "text-green-600" : "text-red-600"
-}
-
-const performers = computed(() => {
-  const open = props.positions.filter((p) => p.isOpen)
-  const sorted = [...open].sort((a, b) => (b.unrealizedGainLoss ?? 0) - (a.unrealizedGainLoss ?? 0))
-  return {
-    top: sorted.slice(0, 5),
-    bottom: [...sorted].reverse().slice(0, 5),
-  }
-})
-
 // §36 — P/L is denominated in each position's instrumentCurrency. When that
 // differs from the display currency, add a converted sub-line using the live
 // rate via @marx-org/contracts/fx (D27). Rates are fetched once per distinct
@@ -474,35 +461,137 @@ const performers = computed(() => {
 const displayStore = useDisplayCurrencyStore()
 const { currency: displayCurrency } = storeToRefs(displayStore)
 
-// instrumentCurrency -> rate (1 unit of instrumentCcy in displayCurrency)
-const rateByCcy = ref<Record<string, number>>({})
+type Position = PortfolioPositions[number]
 
+// (source/target) pair -> rate (1 unit of source in target). A settled null is
+// a real ANSWER — the pair has no usable rate — and is kept distinct from "not
+// fetched yet" so a missing rate can be reported to the user instead of being
+// silently collapsed into 1:1.
+// Keyed by PAIR, not by source alone: a source-only map keeps serving the old
+// target's rate after the display currency changes, so the sub-lines and the
+// ranking would follow a currency the user is no longer looking at.
+const rateByPair = ref<Record<string, number | null>>({})
+// Pairs with a fetch in flight, so the caveat can say "rate loading" rather
+// than "rate unavailable" during the moment before the rate lands.
+const ratePending = ref<Set<string>>(new Set())
+
+const pairKey = (ccy: string, target: string) => `${ccy}/${target}`
+
+/**
+ * Every distinct foreign currency across ALL open positions — not just the rows
+ * that made it into a card. Scoping this fetch to `performers.top` was the
+ * second half of #171: a Bottom-card position in an unconverted currency could
+ * not be ranked, so its currency was never fetched, so it could never be
+ * ranked. The dependency is deliberately `props.positions`, NOT `performers` —
+ * the sort below depends on these rates, and a rate effect that read the sort
+ * would be circular. Reading `displayCurrency` here is what makes a currency
+ * switch re-fetch every pair against the NEW target.
+ */
 watchEffect(() => {
+  const dst = displayCurrency.value.toUpperCase()
   const wanted = new Set<string>()
-  for (const p of performers.value.top) {
+  for (const p of props.positions) {
+    if (!p.isOpen) continue
     const ccy = p.instrumentCurrency?.toUpperCase()
-    if (ccy && ccy !== displayCurrency.value.toUpperCase()) wanted.add(ccy)
+    if (ccy && ccy !== dst) wanted.add(ccy)
   }
   for (const ccy of wanted) {
-    if (rateByCcy.value[ccy]) continue
+    const key = pairKey(ccy, dst)
+    if (key in rateByPair.value || ratePending.value.has(key)) continue
+    ratePending.value.add(key)
     void (async () => {
-      const rate = await getLatestRate(ccy, displayCurrency.value)
-      if (rate && typeof rate.rate === "number" && rate.rate > 0) {
-        rateByCcy.value = { ...rateByCcy.value, [ccy]: rate.rate }
+      try {
+        const r = await getLatestRate(ccy, displayCurrency.value)
+        // getLatestRate(ccy, target).rate is a direct 1 ccy = rate `target`.
+        rateByPair.value = {
+          ...rateByPair.value,
+          [key]: r && typeof r.rate === "number" && r.rate > 0 ? r.rate : null,
+        }
+      } finally {
+        ratePending.value.delete(key)
       }
     })()
   }
 })
 
+/** The live rate for `ccy` against the CURRENT display currency, or null. */
+function rateFor(ccy: string): number | null {
+  return rateByPair.value[pairKey(ccy, displayCurrency.value.toUpperCase())] ?? null
+}
+
+/**
+ * The display-currency P/L used to RANK a position: its own value when it is
+ * already in the display currency, the converted value when a rate is known,
+ * and null while a foreign rate is pending or unavailable.
+ *
+ * Null is never coerced to 0 (the old `?? 0` in the comparator): that ranked a
+ * foreign loss as a flat position. A position we cannot put in the display
+ * currency is left OUT of the ordering and named in the caveat below, because
+ * a PLN number and a GBP number are not comparable no matter how they sort.
+ */
+function rankingPnl(p: Position): number | null {
+  if (p.unrealizedGainLoss == null) return null
+  const ccy = p.instrumentCurrency?.toUpperCase()
+  if (!ccy || ccy === displayCurrency.value.toUpperCase()) return p.unrealizedGainLoss
+  const rate = rateFor(ccy)
+  return rate == null ? null : p.unrealizedGainLoss * rate
+}
+
 /** P/L converted to the display currency (null when ccy matches or no rate). */
-function convertedPnl(p: PortfolioPositions[number]): number | null {
+function convertedPnl(p: Position): number | null {
   const ccy = p.instrumentCurrency?.toUpperCase()
   if (!ccy || p.unrealizedGainLoss == null) return null
   if (ccy === displayCurrency.value.toUpperCase()) return null
-  const rate = rateByCcy.value[ccy]
-  if (!rate) return null
-  // getLatestRate(ccy, displayCurrency).rate is a direct 1 ccy = rate display
+  const rate = rateFor(ccy)
+  if (rate == null) return null
   return p.unrealizedGainLoss * rate
+}
+
+/**
+ * Rank the OPEN positions by converted P/L. Both cards are cut from the same
+ * converted ordering — top is descending, bottom ascending — so a position can
+ * never be "worst" on one card and "best" on the other.
+ */
+const performers = computed(() => {
+  const ranked = props.positions
+    .filter((p) => p.isOpen)
+    .map((p) => ({ p, key: rankingPnl(p) }))
+    .filter((x): x is { p: Position; key: number } => x.key != null)
+  const take = (dir: -1 | 1) =>
+    [...ranked]
+      .sort((a, b) => (a.key - b.key) * dir)
+      .map((x) => x.p)
+      .slice(0, 5)
+  return { top: take(-1), bottom: take(1) }
+})
+
+/**
+ * Open positions excluded from BOTH cards, each with the reason it cannot be
+ * compared. Rendering this is what makes the exclusion explicit rather than a
+ * silent omission — the user is told the ranking is partial and why.
+ */
+const unrankable = computed(() => {
+  const dst = displayCurrency.value.toUpperCase()
+  return props.positions
+    .filter((p) => p.isOpen && rankingPnl(p) == null)
+    .map((p) => {
+      const ccy = p.instrumentCurrency?.toUpperCase()
+      const key = ccy ? pairKey(ccy, dst) : null
+      const reason = !ccy
+        ? "unknown currency"
+        : ratePending.value.has(key!)
+          ? "rate loading"
+          : "no rate available"
+      return { id: p.id, symbol: p.symbol, currency: ccy || "—", reason }
+    })
+})
+
+const unrankedSummary = computed(() =>
+  unrankable.value.map((u) => `${u.symbol} (${u.currency}: ${u.reason})`).join(", "),
+)
+
+function gainClass(value: number | undefined): string {
+  return (value ?? 0) >= 0 ? "text-green-600" : "text-red-600"
 }
 </script>
 
@@ -701,12 +790,33 @@ function convertedPnl(p: PortfolioPositions[number]): number | null {
       </p>
     </div>
 
+    <!-- #171 — the two cards are ranked on CONVERTED P/L, so a position whose
+         currency cannot be put in the display currency is left out of both.
+         Saying so is the difference between an honest partial ranking and a
+         silently missing row. Amber, not red: the data is incomplete, not wrong. -->
+    <div
+      v-if="unrankable.length"
+      class="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-500/10 dark:text-amber-400"
+      :data-testid="tid('perf-performers-unranked')"
+    >
+      <p>Performers are ranked by unrealized P/L converted to {{ displayCurrency }}.</p>
+      <p class="mt-1" :data-testid="tid('perf-performers-unranked-list')">
+        Not ranked — cannot be converted: {{ unrankedSummary }}
+      </p>
+    </div>
+
     <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
       <div class="card p-6">
         <h2 class="mb-3 text-base font-semibold">Top Performers</h2>
         <p v-if="!performers.top.length" class="text-sm text-slate-500 dark:text-slate-400">No open positions.</p>
         <ul v-else class="divide-y divide-slate-100 dark:divide-slate-800">
-          <li v-for="p in performers.top" :key="p.id" class="flex items-center justify-between gap-3 py-2 text-sm">
+          <li
+            v-for="p in performers.top"
+            :key="p.id"
+            class="flex items-center justify-between gap-3 py-2 text-sm"
+            :data-testid="tid(`perf-performer-row-${p.id}`)"
+            :data-symbol="p.symbol"
+          >
             <div class="min-w-0">
               <router-link :to="researchRoute(p.symbol, route.fullPath)" class="inline-block">
                 <TickerBadge
@@ -740,7 +850,13 @@ function convertedPnl(p: PortfolioPositions[number]): number | null {
         <h2 class="mb-3 text-base font-semibold">Bottom Performers</h2>
         <p v-if="!performers.bottom.length" class="text-sm text-slate-500 dark:text-slate-400">No open positions.</p>
         <ul v-else class="divide-y divide-slate-100 dark:divide-slate-800">
-          <li v-for="p in performers.bottom" :key="p.id" class="flex items-center justify-between gap-3 py-2 text-sm">
+          <li
+            v-for="p in performers.bottom"
+            :key="p.id"
+            class="flex items-center justify-between gap-3 py-2 text-sm"
+            :data-testid="tid(`perf-performer-row-${p.id}`)"
+            :data-symbol="p.symbol"
+          >
             <div class="min-w-0">
               <router-link :to="researchRoute(p.symbol, route.fullPath)" class="inline-block">
                 <TickerBadge
