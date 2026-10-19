@@ -9,11 +9,8 @@ const error = ref<string | null>(null)
 
 // The SPA cannot read its own image ref from the cluster — the admin
 // `/system/versions` endpoint enumerates the other services, not this one — so
-// the repository is written here. It is the org path, matching the HelmRelease
-// that deploys this image; the pre-migration `ghcr.io/marx2/` prefix survived
-// here after #13 repointed the cluster, so the page contradicted the running
-// deployment. `SystemInfoView.test.ts` pins the prefix: a future move breaks the
-// test rather than silently reporting a path nobody pulls from.
+// the repository is written here, and pinned by SystemInfoView.test.ts. Keep it
+// the org path the HelmRelease deploys.
 const spaEntry: ServiceVersion = {
   service: "portfoliost",
   version: __APP_VERSION__,
