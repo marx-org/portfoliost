@@ -114,11 +114,17 @@ describe("PerformanceTabContent — §83.1 prop-driven tab body", () => {
     expect(wrapper.get('[data-testid="performance-max-drawdown"]').text()).toContain("10.00%")
   })
 
-  it("uses the last invested series level when aggregate capitalBasis is absent", async () => {
+  it("reads net invested from the capitalBasis contract field", async () => {
     const wrapper = await mountContent({
-      analytics: analytics({ capitalBasis: undefined }) as never,
+      analytics: analytics({
+        capitalBasis: 850,
+        timeSeries: [
+          { date: "2026-01-01", value: 1000, invested: 900, cumulativeTwr: 100 },
+          { date: "2026-01-02", value: 1200, invested: 900, cumulativeTwr: 110 },
+        ],
+      }) as never,
     })
-    expect(tile(wrapper, "net-invested")).toContain("900")
+    expect(tile(wrapper, "net-invested")).toContain("850")
   })
 
   it("renders — and hides Timing — when the TWR p.a. is withheld", async () => {
