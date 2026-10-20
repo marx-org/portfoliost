@@ -8,6 +8,3 @@ tests
 playwright-report
 test-results
 *.log
-
-!node_modules/@marx2
-!node_modules/@marx2/contracts
