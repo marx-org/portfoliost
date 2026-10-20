@@ -3,8 +3,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.mock
-      args:
-        NODE_AUTH_TOKEN: ${NODE_AUTH_TOKEN:-}
+      secrets:
+        - source: node_auth_token
+          target: NODE_AUTH_TOKEN
     container_name: example-service-mock
     ports:
       - "4010:4010"
@@ -26,7 +27,9 @@ services:
         VITE_OIDC_ISSUER_URL: ${VITE_OIDC_ISSUER_URL:-http://localhost:4010}
         VITE_OIDC_CLIENT_ID: ${VITE_OIDC_CLIENT_ID:-mock-client}
         VITE_PASSWORD_LOGIN_ENABLED: ${VITE_PASSWORD_LOGIN_ENABLED:-true}
-        NODE_AUTH_TOKEN: ${NODE_AUTH_TOKEN:-}
+      secrets:
+        - source: node_auth_token
+          target: NODE_AUTH_TOKEN
     container_name: portfoliost
     ports:
       - "3000:80"
@@ -58,8 +61,9 @@ services:
     build:
       context: ../portfoliost-users-auth
       dockerfile: Dockerfile
-      args:
-        NODE_AUTH_TOKEN: ${NODE_AUTH_TOKEN:-}
+      secrets:
+        - source: node_auth_token
+          target: NODE_AUTH_TOKEN
     container_name: users-auth
     expose:
       - "3000"
@@ -143,8 +147,9 @@ services:
     build:
       context: ../portfoliost-wallets
       dockerfile: Dockerfile
-      args:
-        NODE_AUTH_TOKEN: ${NODE_AUTH_TOKEN:-}
+      secrets:
+        - source: node_auth_token
+          target: NODE_AUTH_TOKEN
     container_name: portfoliost-wallets
     ports:
       - "3002:3000"
@@ -165,8 +170,9 @@ services:
     build:
       context: ../portfoliost-instruments
       dockerfile: Dockerfile
-      args:
-        NODE_AUTH_TOKEN: ${NODE_AUTH_TOKEN:-}
+      secrets:
+        - source: node_auth_token
+          target: NODE_AUTH_TOKEN
     container_name: portfoliost-instruments
     expose:
       - "3000"
@@ -196,8 +202,9 @@ services:
     build:
       context: ../portfoliost-instruments
       dockerfile: Dockerfile
-      args:
-        NODE_AUTH_TOKEN: ${NODE_AUTH_TOKEN:-}
+      secrets:
+        - source: node_auth_token
+          target: NODE_AUTH_TOKEN
     command: ["node", "dist/scripts/price-bars-sim.js"]
     environment:
       DATABASE_URL: postgres://portfoliost:portfoliost@postgres:5432/portfoliost
@@ -212,8 +219,9 @@ services:
     build:
       context: ../portfoliost-admin
       dockerfile: Dockerfile
-      args:
-        NODE_AUTH_TOKEN: ${NODE_AUTH_TOKEN:-}
+      secrets:
+        - source: node_auth_token
+          target: NODE_AUTH_TOKEN
     container_name: portfoliost-admin
     expose:
       - "3000"
@@ -279,3 +287,7 @@ services:
       postgres: { condition: service_healthy }
       wallets:  { condition: service_healthy }
     restart: "no"
+
+secrets:
+  node_auth_token:
+    environment: NODE_AUTH_TOKEN

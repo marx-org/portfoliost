@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1
+
 # ---- build stage ----
 FROM public.ecr.aws/docker/library/node:22-alpine AS build
 
@@ -18,8 +20,6 @@ ENV VITE_OIDC_CLIENT_ID=$VITE_OIDC_CLIENT_ID
 ARG VITE_PASSWORD_LOGIN_ENABLED=""
 ENV VITE_PASSWORD_LOGIN_ENABLED=$VITE_PASSWORD_LOGIN_ENABLED
 
-ARG NODE_AUTH_TOKEN=""
-
 COPY package.json package-lock.json .npmrc ./
 COPY index.html vite.config.ts tailwind.config.js postcss.config.js tsconfig.json tsconfig.node.json ./
 COPY public/ public/
@@ -27,7 +27,10 @@ COPY src/ src/
 COPY generated/ generated/
 COPY mocks/shared/data/universe.json mocks/shared/data/universe.json
 
-RUN sed -i "s|\${NODE_AUTH_TOKEN}|${NODE_AUTH_TOKEN}|g" .npmrc && npm ci && rm .npmrc && npm run build
+RUN --mount=type=secret,id=NODE_AUTH_TOKEN,env=NODE_AUTH_TOKEN \
+    npm ci && \
+    rm -f .npmrc && \
+    npm run build
 
 # ---- serve stage ----
 FROM public.ecr.aws/docker/library/node:22-alpine
