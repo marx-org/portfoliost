@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---- build stage ----
-FROM public.ecr.aws/docker/library/node:22-alpine AS build
+FROM ghcr.io/marx-org/base-node:22-alpine@sha256:2be4359005a5800a6aa0bbb3236327132b12509cc4c345f5bccfe6b4b56ebe43 AS build
 
 WORKDIR /app
 
@@ -33,7 +33,7 @@ RUN --mount=type=secret,id=NODE_AUTH_TOKEN,env=NODE_AUTH_TOKEN \
     npm run build
 
 # ---- serve stage ----
-FROM public.ecr.aws/docker/library/node:22-alpine
+FROM ghcr.io/marx-org/base-node:22-alpine@sha256:2be4359005a5800a6aa0bbb3236327132b12509cc4c345f5bccfe6b4b56ebe43
 
 RUN npm install -g serve
 
