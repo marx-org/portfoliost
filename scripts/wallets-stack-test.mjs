@@ -13,14 +13,22 @@
  *
  * Usage: node scripts/wallets-stack-test.mjs [baseUrl]
  */
-const BASE = process.argv[2] ?? "http://localhost:3002"
+function localUrl(value, fallback) {
+  const url = new URL(value ?? fallback)
+  if (url.protocol !== "http:" || !["localhost", "127.0.0.1", "::1"].includes(url.hostname)) {
+    throw new Error("stack-test endpoints must target the local compose stack")
+  }
+  return url.origin
+}
+
+const BASE = localUrl(process.argv[2], "http://localhost:3002")
 
 let passed = 0
 const failures = []
 
 function check(name, cond, detail = "") {
   if (cond) passed++
-  else failures.push(`${name}${detail ? ` — ${detail}` : ""}`)
+  else failures.push(name)
 }
 
 async function req(path, { method = "GET", body, headers = {} } = {}) {

@@ -9,7 +9,15 @@ import { expect, test } from "@playwright/test"
 // symbols, so `stale: true` is expected (gap-fill attempted, circuit-breaker trips,
 // stale DB data served — this is the correct fallback).
 
-const GATEWAY = process.env.PORTFOLIOST_GATEWAY_URL || "http://localhost:8080"
+function localUrl(value: string | undefined, fallback: string): string {
+  const url = new URL(value || fallback)
+  if (url.protocol !== "http:" || !["localhost", "127.0.0.1", "::1"].includes(url.hostname)) {
+    throw new Error("E2E endpoints must target the local compose stack")
+  }
+  return url.origin
+}
+
+const GATEWAY = localUrl(process.env.PORTFOLIOST_GATEWAY_URL, "http://localhost:8080")
 
 async function getBearerToken(): Promise<string> {
   const MOCK_URL = process.env.PORTFOLIOST_MOCK_URL || "http://localhost:4010"

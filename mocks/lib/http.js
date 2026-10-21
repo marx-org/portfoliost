@@ -149,7 +149,7 @@ export function createApp() {
             res.setHeader("content-type", contentTypeFor(filePath))
             res.end(data)
           } catch (e) {
-            send(404, { error: "Not Found", message: String(e && e.message || e) })
+            send(404, { error: "Not Found" })
           }
         }
 
@@ -181,8 +181,8 @@ export function createApp() {
         try {
           await chosen.r.handler(ctx)
         } catch (e) {
-          console.error(`[mock] ${method} ${path} ->`, e)
-          if (!res.writableEnded) send(500, { error: "Internal Server Error", message: String((e && e.message) || e) })
+          console.error("[mock] handler error")
+          if (!res.writableEnded) send(500, { error: "Internal Server Error" })
         }
         return
       })

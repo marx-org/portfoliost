@@ -57,6 +57,5 @@ for (const mod of modules) mod.register(app)
 
 app.listen(PORT, HOST, () => {
   console.log(`[example-service-mock] listening on http://${HOST}:${PORT}`)
-  console.log(`[example-service-mock] login: POST /api/auth/login { "email": "${authConfig().email}", "password": "${authConfig().password}" }`)
-  console.log(`[example-service-mock] static bearer token: ${authConfig().staticToken}`)
+  console.log("[example-service-mock] login endpoint ready")
 })
