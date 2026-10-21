@@ -17,7 +17,7 @@ function localUrl(value, fallback) {
   return url.origin
 }
 
-const BASE = localUrl(process.argv[2], "http://localhost:3002")
+const BASE = localUrl("http://localhost:3002", "http://localhost:3002")
 
 let passed = 0
 const failures = []
