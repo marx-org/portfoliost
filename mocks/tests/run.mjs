@@ -18,8 +18,8 @@ function check(name, cond, detail = "") {
     passed++
   } else {
     failed++
-    failures.push(`${name} ${detail}`)
-    console.error(`  FAIL ${name} ${detail}`)
+    failures.push(name)
+    console.error(`  FAIL ${name}`)
   }
 }
 

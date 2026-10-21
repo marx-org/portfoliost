@@ -43,7 +43,7 @@ async function bearer(request: import("@playwright/test").APIRequestContext): Pr
  * and report a −103k loss as a +103k gain.
  */
 async function amount(locator: Locator): Promise<number> {
-  const text = (await locator.innerText()).replace(/ /g, " ").trim()
+  const text = (await locator.innerText()).trim()
   const m = text.match(/-?[\d,]+\.\d{2}/)
   if (!m) throw new Error(`no amount in "${text}"`)
   const value = Number(m[0].replace(/,/g, ""))

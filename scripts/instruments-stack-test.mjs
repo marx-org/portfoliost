@@ -10,7 +10,15 @@
 // Prereqs: docker compose up -d gateway (and, for real mode,
 // instruments openst cachest redis). Gateway listens on :8080.
 
-const GATEWAY = process.env.STACK_TEST_GATEWAY ?? "http://localhost:8080"
+function localUrl(value, fallback) {
+  const url = new URL(value ?? fallback)
+  if (url.protocol !== "http:" || !["localhost", "127.0.0.1", "::1"].includes(url.hostname)) {
+    throw new Error("stack-test endpoints must target the local compose stack")
+  }
+  return url.origin
+}
+
+const GATEWAY = localUrl("http://localhost:8080", "http://localhost:8080")
 const SYMBOL = process.env.STACK_TEST_SYMBOL ?? "AAPL"
 // WSE ticker — the long-tail case that motivated logos.md (mock 404'd on it)
 const STACK_TEST_LOGO_SYMBOL = process.env.STACK_TEST_LOGO_SYMBOL ?? "KTY.WA"

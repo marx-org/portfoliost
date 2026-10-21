@@ -19,8 +19,16 @@ import { expect, test, type APIRequestContext, type Page } from "@playwright/tes
  * between runs (`npm run test:e2e` resets it in `pretest`).
  */
 
-const MOCK = process.env.PORTFOLIOST_MOCK_URL || "http://localhost:4010"
-const GATEWAY = process.env.PORTFOLIOST_GATEWAY_URL || "http://localhost:8080"
+function localUrl(value: string | undefined, fallback: string): string {
+  const url = new URL(value || fallback)
+  if (url.protocol !== "http:" || !["localhost", "127.0.0.1", "::1"].includes(url.hostname)) {
+    throw new Error("E2E endpoints must target the local compose stack")
+  }
+  return url.origin
+}
+
+const MOCK = localUrl("http://localhost:4010", "http://localhost:4010")
+const GATEWAY = localUrl("http://localhost:8080", "http://localhost:8080")
 
 async function login(page: Page) {
   await page.goto("/login")
