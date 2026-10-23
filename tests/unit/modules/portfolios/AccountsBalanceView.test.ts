@@ -163,6 +163,22 @@ describe("AccountsBalanceView", () => {
     expect(num(top10.get('[data-testid="accounts-balance-deposits"]'))).toBe(98083.4)
   })
 
+  it("emphasizes the Total column header and values", async () => {
+    const w = mountView()
+    await flushPromises()
+
+    const totalHeader = w.findAll("thead th").find((th) => th.text().includes("Total"))!
+    expect(totalHeader.classes()).toEqual(
+      expect.arrayContaining(["font-semibold", "text-slate-700", "dark:text-slate-200"]),
+    )
+    expect(w.findAll("thead th")[0].classes()).not.toContain("font-semibold")
+
+    for (const row of w.findAll('[data-testid="accounts-balance-row"]')) {
+      expect(row.get('[data-testid="accounts-balance-total"]').classes()).toContain("font-semibold")
+    }
+    expect(w.get('[data-testid="accounts-balance-totals-total"]').classes()).toContain("font-semibold")
+  })
+
   /**
    * The two rules the data forces. Both were measured in PROD, and both fail
    * silently if they are "tidied up": a margin balance clamped to 0 reads as

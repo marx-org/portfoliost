@@ -284,9 +284,12 @@ onMounted(async () => {
               v-for="col in columns"
               :key="col.key"
               scope="col"
-              class="px-3 py-3.5 font-medium sm:px-5 sm:py-2.5"
+              class="px-3 py-3.5 sm:px-5 sm:py-2.5"
               :class="[
                 col.align,
+                col.key === 'totalValue'
+                  ? 'font-semibold text-slate-700 dark:text-slate-200'
+                  : 'font-medium',
                 'sticky top-0 z-20 cursor-pointer select-none hover:text-slate-900 dark:hover:text-slate-100',
                 col.key === 'name'
                   ? 'sticky left-0 top-0 z-30 min-w-[9rem] bg-slate-50 shadow-[-1px_0_0_0_#e2e8f0] sm:min-w-0 dark:bg-slate-800 dark:shadow-[-1px_0_0_0_#334155]'
@@ -351,7 +354,7 @@ onMounted(async () => {
             </td>
             <td class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right tabular-nums text-slate-900 dark:text-slate-100" data-testid="accounts-balance-totals-investments">{{ money(totals.instrumentsValue) }}</td>
             <td class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right tabular-nums text-slate-900 dark:text-slate-100" data-testid="accounts-balance-totals-cash">{{ money(totals.cashValue) }}</td>
-            <td class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right tabular-nums text-slate-900 dark:text-slate-100" data-testid="accounts-balance-totals-total">{{ money(totals.totalValue) }}</td>
+            <td class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right font-semibold tabular-nums text-slate-900 dark:text-slate-100" data-testid="accounts-balance-totals-total">{{ money(totals.totalValue) }}</td>
             <td class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right tabular-nums text-slate-900 dark:text-slate-100" data-testid="accounts-balance-totals-deposits">{{ money(totals.capitalBasis) }}</td>
             <td
               class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right tabular-nums"
