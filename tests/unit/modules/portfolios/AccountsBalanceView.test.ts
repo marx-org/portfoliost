@@ -169,14 +169,18 @@ describe("AccountsBalanceView", () => {
 
     const totalHeader = w.findAll("thead th").find((th) => th.text().includes("Total"))!
     expect(totalHeader.classes()).toEqual(
-      expect.arrayContaining(["font-semibold", "text-slate-700", "dark:text-slate-200"]),
+      expect.arrayContaining(["font-bold", "bg-blue-100/80", "dark:bg-blue-950/60", "border-x"]),
     )
     expect(w.findAll("thead th")[0].classes()).not.toContain("font-semibold")
 
     for (const row of w.findAll('[data-testid="accounts-balance-row"]')) {
-      expect(row.get('[data-testid="accounts-balance-total"]').classes()).toContain("font-semibold")
+      expect(row.get('[data-testid="accounts-balance-total"]').classes()).toEqual(
+        expect.arrayContaining(["font-bold", "bg-blue-50/50", "dark:bg-blue-950/30", "border-x"]),
+      )
     }
-    expect(w.get('[data-testid="accounts-balance-totals-total"]').classes()).toContain("font-semibold")
+    expect(w.get('[data-testid="accounts-balance-totals-total"]').classes()).toEqual(
+      expect.arrayContaining(["font-bold", "bg-blue-100/60", "dark:bg-blue-950/60", "border-x"]),
+    )
   })
 
   /**

@@ -288,7 +288,7 @@ onMounted(async () => {
               :class="[
                 col.align,
                 col.key === 'totalValue'
-                  ? 'font-semibold text-slate-700 dark:text-slate-200'
+                  ? 'border-x border-blue-200 bg-blue-100/80 font-bold text-slate-900 dark:border-blue-800 dark:bg-blue-950/60 dark:text-slate-100'
                   : 'font-medium',
                 'sticky top-0 z-20 cursor-pointer select-none hover:text-slate-900 dark:hover:text-slate-100',
                 col.key === 'name'
@@ -327,7 +327,7 @@ onMounted(async () => {
             <!-- §84 — a negative cash balance keeps its sign. It is a margin
                  balance, not a clamped zero (openapi.yaml:1201). -->
             <td class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right tabular-nums" data-testid="accounts-balance-cash">{{ money(row.cashValue) }}</td>
-            <td class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right font-semibold tabular-nums" data-testid="accounts-balance-total">{{ money(row.totalValue) }}</td>
+            <td class="border-x border-blue-100 bg-blue-50/50 px-3 py-3.5 text-right font-bold tabular-nums dark:border-blue-900 dark:bg-blue-950/30 sm:px-5 sm:py-2.5" data-testid="accounts-balance-total">{{ money(row.totalValue) }}</td>
             <td class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right tabular-nums" data-testid="accounts-balance-deposits">{{ money(row.capitalBasis) }}</td>
             <td
               class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right font-medium tabular-nums"
@@ -354,7 +354,7 @@ onMounted(async () => {
             </td>
             <td class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right tabular-nums text-slate-900 dark:text-slate-100" data-testid="accounts-balance-totals-investments">{{ money(totals.instrumentsValue) }}</td>
             <td class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right tabular-nums text-slate-900 dark:text-slate-100" data-testid="accounts-balance-totals-cash">{{ money(totals.cashValue) }}</td>
-            <td class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right font-semibold tabular-nums text-slate-900 dark:text-slate-100" data-testid="accounts-balance-totals-total">{{ money(totals.totalValue) }}</td>
+            <td class="border-x border-blue-200 bg-blue-100/60 px-3 py-3.5 text-right font-bold tabular-nums text-slate-900 dark:border-blue-800 dark:bg-blue-950/60 dark:text-slate-100 sm:px-5 sm:py-2.5" data-testid="accounts-balance-totals-total">{{ money(totals.totalValue) }}</td>
             <td class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right tabular-nums text-slate-900 dark:text-slate-100" data-testid="accounts-balance-totals-deposits">{{ money(totals.capitalBasis) }}</td>
             <td
               class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right tabular-nums"
