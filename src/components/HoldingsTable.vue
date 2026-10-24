@@ -51,6 +51,27 @@ function positionKey(position: Position): string {
   return `${position.portfolioId ?? id.value}\u0000${position.id}`
 }
 
+function optionPositionDetails(position: Position): string | null {
+  if (position.assetType?.toUpperCase() !== "OPTION") return null
+
+  const details: string[] = []
+  const direction = position.direction
+    ? position.direction.charAt(0).toUpperCase() + position.direction.slice(1).toLowerCase()
+    : ""
+  const optionType = position.optionType
+    ? position.optionType.charAt(0).toUpperCase() + position.optionType.slice(1).toLowerCase()
+    : ""
+  if (direction && optionType) details.push(`${direction} ${optionType}`)
+  else if (direction || optionType) details.push(direction || optionType)
+  if (position.strikePrice != null) {
+    details.push(`Strike ${formatAmount(position.strikePrice, position.instrumentCurrency)}`)
+  }
+  if (position.expirationDate) details.push(`Exp ${formatDate(position.expirationDate)}`)
+  if (position.contractSize != null) details.push(`×${formatNumber(position.contractSize, 0)}`)
+
+  return details.join(" · ") || "Option"
+}
+
 const openMenuId = ref<string | null>(null)
 const notice = ref<string | null>(null)
 const noticeError = ref<string | null>(null)
@@ -641,6 +662,11 @@ function onPickerSaved() {
                       :country-code="pos.country"
                       :asset-type="pos.assetType"
                     />
+                    <p
+                      v-if="optionPositionDetails(pos)"
+                      data-testid="holdings-option-details"
+                      class="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400"
+                    >{{ optionPositionDetails(pos) }}</p>
                   </router-link>
                   <span v-if="!pos.isOpen" class="mt-1 inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300">
                     Closed<span v-if="pos.closedAt"> · {{ formatDate(pos.closedAt) }}</span>

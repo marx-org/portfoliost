@@ -99,6 +99,60 @@ describe("HoldingsTable — §157 client-side search, paging and symbol scaling"
     expect(fixed).toHaveLength(9)
   })
 
+  it("distinguishes same-ticker option rows from stock rows in both modes", async () => {
+    const stock = position({ id: "sap-stock", symbol: "SAP.DE", companyName: "SAP SE", assetType: "STOCK" })
+    const option = position({
+      id: "sap-option",
+      symbol: "SAP.DE",
+      companyName: "SAP SE",
+      assetType: "OPTION",
+      direction: "SHORT",
+      optionType: "CALL",
+      contractSize: 100,
+      strikePrice: null,
+      expirationDate: null,
+    })
+
+    for (const mode of ["portfolio", "global"] as const) {
+      const wrapper = mountTable([stock, option], mode)
+      await flushPromises()
+
+      const matchingRows = rows(wrapper).filter((row) => row.text().includes("SAP.DE"))
+      expect(matchingRows).toHaveLength(2)
+      expect(matchingRows[0].get('[data-testid="ticker-badge-details"]').text()).toBe("Stock")
+      expect(matchingRows[0].find('[data-testid="holdings-option-details"]').exists()).toBe(false)
+      expect(matchingRows[1].get('[data-testid="ticker-badge-details"]').text()).toBe("Option")
+      expect(matchingRows[1].get('[data-testid="holdings-option-details"]').text()).toBe("Short Call · ×100")
+      expect(matchingRows[1].text()).not.toContain("Strike")
+      expect(matchingRows[1].text()).not.toContain("Exp ")
+
+      wrapper.unmount()
+    }
+  })
+
+  it("shows strike and expiry on option rows only when the API supplies them", async () => {
+    const wrapper = mountTable([
+      position({
+        id: "specified-option",
+        symbol: "SAP.DE",
+        instrumentCurrency: "EUR",
+        assetType: "OPTION",
+        direction: "SHORT",
+        optionType: "CALL",
+        contractSize: 100,
+        strikePrice: 120,
+        expirationDate: "2026-12-18",
+      }),
+    ])
+    await flushPromises()
+
+    const optionDetails = wrapper.get('[data-testid="holdings-option-details"]')
+    expect(optionDetails.text()).toContain("Short Call")
+    expect(optionDetails.text()).toContain("Strike €120.00")
+    expect(optionDetails.text()).toContain("Exp ")
+    expect(optionDetails.text()).toContain("×100")
+  })
+
   it("shows, sorts, and customizes realized P/L independently of unrealized P/L", async () => {
     const wrapper = mountTable([
       position({ id: "loss", symbol: "LOSS", instrumentCurrency: "EUR", realizedGainLoss: -10, unrealizedGainLoss: 90 }),
