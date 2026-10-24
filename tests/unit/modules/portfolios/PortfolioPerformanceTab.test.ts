@@ -24,6 +24,7 @@ vi.mock("@/api/portfolios", async (importOriginal) => {
   return {
     ...actual,
     getPortfolioAnalytics: vi.fn(),
+    getPortfolioPositions: vi.fn(),
     getPortfolioRiskMetrics: vi.fn(),
     recomputePortfolio: vi.fn(),
   }
@@ -100,17 +101,22 @@ describe("PortfolioPerformanceTab — §82.2 overview tiles", () => {
     vi.clearAllMocks()
     mocked.getPortfolioRiskMetrics.mockResolvedValue({ maxDrawdown: -0.1 } as never)
     mocked.getPortfolioAnalytics.mockResolvedValue(analytics() as never)
+    mocked.getPortfolioPositions.mockResolvedValue([] as never)
     mockedRate.mockResolvedValue({ rate: 1, asOf: "2026-10-02" } as never)
   })
 
-  it("renders the four tiles from the payload it already holds — no new API call", async () => {
+  it("loads analytics when the Performance tab mounts, not on portfolio entry", async () => {
     mocked.getPortfolioAnalytics.mockClear()
-    const wrapper = await mountTab()
+    const env = makeEnv()
+    usePortfolioStore(env).analytics = null
+    const wrapper = await mountTab(env)
     expect(tile(wrapper, "net-gain")).toContain("300")
     expect(tile(wrapper, "net-invested")).toContain("900")
     expect(tile(wrapper, "xirr")).toContain("14.50%")
     expect(tile(wrapper, "twr-pa")).toContain("11.25%")
-    expect(mocked.getPortfolioAnalytics).not.toHaveBeenCalled()
+    expect(mocked.getPortfolioAnalytics).toHaveBeenCalledTimes(1)
+    expect(mocked.getPortfolioAnalytics).toHaveBeenCalledWith("p1", "1Y", ["SPY"], "timeWeighted")
+    expect(mocked.getPortfolioPositions).toHaveBeenCalledWith("p1", undefined)
   })
 
   it("computes Timing as XIRR − TWR p.a. and reads it in plain language", async () => {

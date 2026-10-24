@@ -36,24 +36,45 @@ export const usePortfolioStore = defineStore("portfolios", () => {
   }
 
   async function fetchDetail(id: string): Promise<void> {
+    if (detail.value?.id !== id) {
+      // A prior portfolio's lazy tab data must not leak into a new detail view.
+      positions.value = []
+      analytics.value = null
+    }
     loading.value = true
     error.value = null
     try {
-      const [detailData, metrics, positionsData, analyticsData] = await Promise.all([
+      // Keep portfolio entry focused on its header. The active tab owns its
+      // data: HoldingsTable fetches positions, and PerformanceTab fetches
+      // analytics only when the user opens it.
+      const [detailData, metrics] = await Promise.all([
         portfoliosApi.getPortfolioDetail(id),
         portfoliosApi.getPortfolioSummaryMetrics(id),
-        portfoliosApi.getPortfolioPositions(id),
-        portfoliosApi.getPortfolioAnalytics(id, analyticsTimeframe.value, analyticsBenchmarks.value, analyticsReturnType.value),
       ])
       detail.value = detailData
       summaryMetrics.value = metrics
-      positions.value = positionsData
-      analytics.value = analyticsData
     } catch (err) {
       error.value = err instanceof Error ? err.message : "Failed to load portfolio"
       throw err
     } finally {
       loading.value = false
+    }
+  }
+
+  async function fetchAnalytics(id: string): Promise<void> {
+    analyticsLoading.value = true
+    try {
+      analytics.value = await portfoliosApi.getPortfolioAnalytics(
+        id,
+        analyticsTimeframe.value,
+        analyticsBenchmarks.value,
+        analyticsReturnType.value,
+      )
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : "Failed to load analytics"
+      throw err
+    } finally {
+      analyticsLoading.value = false
     }
   }
 
@@ -134,6 +155,7 @@ export const usePortfolioStore = defineStore("portfolios", () => {
     error,
     fetchAll,
     fetchDetail,
+    fetchAnalytics,
     fetchPositions,
     setTimeframe,
     setBenchmarks,

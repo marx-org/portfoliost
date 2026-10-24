@@ -5,7 +5,16 @@ import * as portfoliosApi from "@/api/portfolios"
 
 vi.mock("@/api/portfolios", async (importOriginal) => {
   const actual = await importOriginal<typeof portfoliosApi>()
-  return { ...actual, getPortfolios: vi.fn(), getPortfolioTotalMetrics: vi.fn(), createPortfolio: vi.fn() }
+  return {
+    ...actual,
+    getPortfolios: vi.fn(),
+    getPortfolioTotalMetrics: vi.fn(),
+    getPortfolioDetail: vi.fn(),
+    getPortfolioSummaryMetrics: vi.fn(),
+    getPortfolioPositions: vi.fn(),
+    getPortfolioAnalytics: vi.fn(),
+    createPortfolio: vi.fn(),
+  }
 })
 
 const mocked = vi.mocked(portfoliosApi)
@@ -86,6 +95,32 @@ describe("portfolios store", () => {
     expect(store.portfolios).toHaveLength(1)
     expect(store.portfolios[0].name).toBe("Top10")
     expect(store.totalMetrics?.totalValue).toBe(1200)
+  })
+
+  it("loads only the portfolio header data on entry; tab data stays lazy", async () => {
+    mocked.getPortfolioDetail.mockResolvedValue({ id: "p1", name: "Top10" } as never)
+    mocked.getPortfolioSummaryMetrics.mockResolvedValue({ totalValue: 1200 } as never)
+    mocked.getPortfolioPositions.mockResolvedValue([])
+    mocked.getPortfolioAnalytics.mockResolvedValue({} as never)
+
+    const store = usePortfolioStore()
+    await store.fetchDetail("p1")
+
+    expect(mocked.getPortfolioDetail).toHaveBeenCalledWith("p1")
+    expect(mocked.getPortfolioSummaryMetrics).toHaveBeenCalledWith("p1")
+    expect(mocked.getPortfolioPositions).not.toHaveBeenCalled()
+    expect(mocked.getPortfolioAnalytics).not.toHaveBeenCalled()
+  })
+
+  it("fetches analytics only when the performance tab requests them", async () => {
+    const result = { timeframe: "1Y" }
+    mocked.getPortfolioAnalytics.mockResolvedValue(result as never)
+    const store = usePortfolioStore()
+
+    await store.fetchAnalytics("p1")
+
+    expect(mocked.getPortfolioAnalytics).toHaveBeenCalledWith("p1", "1Y", ["SPY"], "timeWeighted")
+    expect(store.analytics).toEqual(result)
   })
 
   it("records the error when loading fails", async () => {

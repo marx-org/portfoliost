@@ -74,6 +74,34 @@ test("portfolio detail shows metric strip, tabbed sections, and positions", asyn
   await expect(page).toHaveURL(/\/en\/research\/META\/overview/)
 })
 
+test("portfolio entry fetches holdings once and defers analytics until Performance", async ({ page }) => {
+  const requests: Array<{ method: string; pathname: string; search: URLSearchParams }> = []
+  await login(page)
+  page.on("request", (request) => {
+    const url = new URL(request.url())
+    requests.push({ method: request.method(), pathname: url.pathname, search: url.searchParams })
+  })
+
+  await page.getByRole("link", { name: /Top10/ }).click()
+  await expect(page).toHaveURL(/\/en\/portfolios\/[^/]+\/holdings/)
+  await expect(page.getByRole("heading", { name: "Top10" })).toBeVisible()
+  await expect(page.locator("tbody tr").first()).toBeVisible()
+
+  const portfolioId = new URL(page.url()).pathname.split("/")[3]
+  const positionsPath = `/api/portfolios/${portfolioId}/positions`
+  const detailAnalytics = () => requests.filter((request) =>
+    request.method === "GET" &&
+    request.pathname === `/api/portfolios/${portfolioId}/analytics` &&
+    request.search.get("timeframe") === "1Y",
+  )
+  expect(requests.filter((request) => request.method === "GET" && request.pathname === positionsPath)).toHaveLength(1)
+  expect(detailAnalytics()).toHaveLength(0)
+
+  await page.getByRole("navigation", { name: "Portfolio tabs" }).getByRole("link", { name: "Performance" }).click()
+  await expect(page.getByText("Performance Chart")).toBeVisible()
+  expect(detailAnalytics()).toHaveLength(1)
+})
+
 test("portfolio news cards show the shared identity block, enriched from the open position (§61.7)", async ({ page }) => {
   await login(page)
   await page.getByRole("link", { name: /Top10/ }).click()
