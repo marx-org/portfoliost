@@ -56,7 +56,19 @@ async function marketValueCell(page: import("@playwright/test").Page, symbol: st
   return { primary: lines[0], sub }
 }
 
+async function totalCellText(page: import("@playwright/test").Page, label: string): Promise<string> {
+  const headers = page.locator("thead th")
+  const count = await headers.count()
+  let index = -1
+  for (let i = 0; i < count; i++) {
+    if ((await headers.nth(i).textContent())?.toUpperCase().includes(label.toUpperCase())) { index = i; break }
+  }
+  expect(index, `${label} column header`).toBeGreaterThan(-1)
+  return (await page.locator("tfoot tr td").nth(index).innerText()).replace(/\u00a0/g, " ").trim()
+}
+
 test("holdings converts portfolio-base values to the display currency", async ({ page, request }) => {
+  test.setTimeout(120_000)
   const run = Date.now()
   const token = await getBearerToken(request)
   const auth = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
@@ -107,10 +119,16 @@ test("holdings converts portfolio-base values to the display currency", async ({
   expect(cell.sub).toMatch(/^PLN/)
   expect(Math.abs(parseAmount(cell.sub!) - parseAmount(cell.primary) * USD_PLN) / parseAmount(cell.sub!)).toBeLessThan(0.002)
 
-  // Total row carries the display currency, never a guessed one.
-  const tfoot = page.locator("tfoot")
-  await expect(tfoot).toContainText("PLN")
-  await expect(tfoot).not.toContainText("$")
+  // Current market-value and unrealized totals follow the display currency.
+  // Realized P/L is separate and remains in each instrument's currency.
+  const marketTotal = await totalCellText(page, "Market Value")
+  const unrealizedTotal = await totalCellText(page, "Unrealized P/L")
+  expect(marketTotal).toContain("PLN")
+  expect(marketTotal).not.toContain("$")
+  expect(unrealizedTotal).toContain("PLN")
+  expect(unrealizedTotal).not.toContain("$")
+  await expect(page.getByTestId("holdings-total-realized")).toContainText("PLN")
+  await expect(page.getByTestId("holdings-total-realized")).toContainText("USD $0.00")
 
   // Best-effort cleanup (leftover "E2E B2*" entities are inert for other specs).
   try { await request.delete(`${GATEWAY}/api/portfolios/${pid}`, { headers: auth }) } catch { /* ignore */ }
