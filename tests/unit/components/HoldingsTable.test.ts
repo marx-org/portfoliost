@@ -2,6 +2,7 @@ import { flushPromises, mount } from "@vue/test-utils"
 import { createPinia, setActivePinia } from "pinia"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import HoldingsTable from "@/components/HoldingsTable.vue"
+import LabelFilterBar from "@/components/LabelFilterBar.vue"
 import { usePortfolioStore } from "@/stores/portfolios"
 import * as portfoliosApi from "@/api/portfolios"
 
@@ -206,6 +207,121 @@ describe("HoldingsTable — §157 client-side search, paging and symbol scaling"
     expect(wrapper.find('[data-testid="holdings-row"]').text()).toContain("AAPL")
   })
 
+  it("hides closed positions by default and reveals them accessibly in both modes", async () => {
+    const open = position({ id: "open", symbol: "AAPL" })
+    const closed = position({
+      id: "closed",
+      symbol: "MSFT",
+      isOpen: false,
+      closedAt: "2026-06-17T00:00:00.000Z",
+      marketValue: 9000,
+      unrealizedGainLoss: 800,
+    })
+
+    for (const mode of ["portfolio", "global"] as const) {
+      const wrapper = mountTable([open, closed], mode)
+      await flushPromises()
+
+      const filter = wrapper.get('[data-testid="holdings-closed-filter"]')
+      expect(filter.attributes("type")).toBe("checkbox")
+      expect(filter.attributes("aria-label")).toBe("Show closed positions")
+      expect((filter.element as HTMLInputElement).checked).toBe(false)
+      expect(rows(wrapper)).toHaveLength(1)
+      expect(range(wrapper)).toBe("1–1 of 1")
+      expect(wrapper.find("tfoot").text()).toContain("$1,000.00")
+
+      await filter.setValue(true)
+      await flushPromises()
+
+      expect(rows(wrapper)).toHaveLength(2)
+      expect(range(wrapper)).toBe("1–2 of 2")
+      expect(wrapper.text()).toContain("1 open · 1 closed")
+      expect(rows(wrapper)[1].text()).toContain("Closed")
+      expect(rows(wrapper)[1].text()).toContain("2026")
+      // Retained history is visible, but it is not part of current totals.
+      expect(wrapper.find("tfoot").text()).toContain("$1,000.00")
+      expect(wrapper.find("tfoot").text()).not.toContain("$10,000.00")
+
+      wrapper.unmount()
+    }
+
+    const historyOnly = mountTable([closed])
+    await flushPromises()
+    expect(rows(historyOnly)).toHaveLength(0)
+    expect(historyOnly.text()).toContain("No open positions. Show closed positions to view history.")
+    await historyOnly.get('[data-testid="holdings-closed-filter"]').setValue(true)
+    await flushPromises()
+    expect(rows(historyOnly)).toHaveLength(1)
+  })
+
+  it("applies label and search filters to closed history when it is revealed", async () => {
+    const wrapper = mountTable([
+      position({ id: "open", symbol: "AAPL", labels: [{ id: "current", name: "Current", color: "blue" }] }),
+      position({
+        id: "closed",
+        symbol: "MSFT",
+        companyName: "Closed Microsoft",
+        isOpen: false,
+        closedAt: "2025-03-04T00:00:00.000Z",
+        labels: [{ id: "history", name: "History", color: "gray" }],
+      }),
+    ])
+    await flushPromises()
+
+    wrapper.findComponent(LabelFilterBar).vm.$emit("update:modelValue", ["history"])
+    await flushPromises()
+    expect(rows(wrapper)).toHaveLength(0)
+    expect(wrapper.text()).toContain("No positions match the current filters")
+
+    await wrapper.get('[data-testid="holdings-closed-filter"]').setValue(true)
+    await wrapper.get('[data-testid="holdings-search"]').setValue("microsoft")
+    await flushPromises()
+
+    expect(rows(wrapper)).toHaveLength(1)
+    expect(rows(wrapper)[0].text()).toContain("MSFT")
+    expect(range(wrapper)).toBe("1–1 of 1")
+    expect(wrapper.find("tfoot").text()).toContain("$0.00")
+  })
+
+  it("sorts, groups and pages revealed history while group totals stay open-only", async () => {
+    const open = Array.from({ length: 20 }, (_, i) => position({ id: `open-${i}`, symbol: `ZZ${i}`, sector: "Technology" }))
+    const closed = position({
+      id: "closed",
+      symbol: "AAA",
+      isOpen: false,
+      closedAt: "2024-02-03T00:00:00.000Z",
+      marketValue: 9000,
+      sector: "Technology",
+    })
+    const wrapper = mountTable([...open, closed])
+    await flushPromises()
+
+    const filter = wrapper.get('[data-testid="holdings-closed-filter"]')
+    await filter.setValue(true)
+    await flushPromises()
+    expect(range(wrapper)).toBe("1–20 of 21")
+    expect(wrapper.find("tfoot").text()).toContain("$20,000.00")
+
+    // Paging runs over the revealed set, including its final retained row.
+    await wrapper.find('button[aria-label="Next page"]').trigger("click")
+    await flushPromises()
+    expect(rows(wrapper)).toHaveLength(1)
+    expect(rows(wrapper)[0].text()).toContain("AAA")
+    expect(range(wrapper)).toBe("21–21 of 21")
+
+    await wrapper.find('button[aria-label="First page"]').trigger("click")
+    await wrapper.findAll("th").find((th) => th.text().includes("Symbol"))!.trigger("click")
+    await flushPromises()
+    expect(rows(wrapper)[0].text()).toContain("AAA")
+
+    await wrapper.get('select[aria-label="Group by"]').setValue("sector")
+    await flushPromises()
+    expect(wrapper.find('[data-testid="holdings-group-row"]').text()).toContain("Technology 21")
+    const subtotal = wrapper.findAll("tr").find((row) => row.text().includes("Technology subtotal"))
+    expect(subtotal?.text()).toContain("$20,000.00")
+    expect(subtotal?.text()).not.toContain("$29,000.00")
+  })
+
   it("resets to the first page when the search narrows the result set", async () => {
     const positions = Array.from({ length: 25 }, (_, i) => position({ id: `p${i}`, symbol: `SYM${i}`, companyName: i === 24 ? "Uniquex Corp" : `Corp ${i}` }))
     const wrapper = mountTable(positions)
@@ -264,5 +380,33 @@ describe("HoldingsTable — §157 client-side search, paging and symbol scaling"
     expect(lines.filter(Boolean)).toHaveLength(2)
     // The CSV carries the symbol (SYM24), not the company name.
     expect(lines[1]).toContain("SYM24")
+  })
+
+  it("exports lifecycle status and close date when closed positions are included", async () => {
+    const blobParts: string[] = []
+    const origBlob = globalThis.Blob
+    class CaptureBlob extends origBlob {
+      constructor(parts: BlobPart[], opts?: BlobPropertyBag) {
+        super(parts, opts)
+        for (const part of parts) if (typeof part === "string") blobParts.push(part)
+      }
+    }
+    vi.spyOn(globalThis, "Blob").mockImplementation((CaptureBlob as never) as never)
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:mock")
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {})
+
+    const wrapper = mountTable([
+      position({ id: "open", symbol: "AAPL" }),
+      position({ id: "closed", symbol: "MSFT", isOpen: false, closedAt: "2025-03-04T00:00:00.000Z" }),
+    ])
+    await wrapper.get('[data-testid="holdings-closed-filter"]').setValue(true)
+    const exportButton = wrapper.findAll("button").find((button) => button.text().trim() === "Export")
+    await exportButton!.trigger("click")
+    await flushPromises()
+
+    const lines = blobParts.join("").split("\n")
+    expect(lines[0]).toBe("Symbol,Quantity,Avg Cost,Price,Market Value,Unrealized P/L,Weight,Status,Closed At")
+    expect(lines.find((line) => line.startsWith("MSFT,"))).toMatch(/,Closed,2025-03-04T00:00:00\.000Z$/)
+    expect(lines.find((line) => line.startsWith("AAPL,"))).toMatch(/,Open,$/)
   })
 })

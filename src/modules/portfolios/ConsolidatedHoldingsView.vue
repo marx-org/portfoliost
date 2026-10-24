@@ -28,7 +28,7 @@ onMounted(() => void refresh())
   <div>
     <div class="mb-6">
       <h1 class="text-2xl font-semibold">Consolidated holdings</h1>
-      <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">All open positions across your investment portfolios.</p>
+      <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Open positions across your investment portfolios, with closed history available.</p>
     </div>
 
     <InvestmentsTabs />
