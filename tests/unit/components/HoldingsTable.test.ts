@@ -39,6 +39,7 @@ function position(overrides: Record<string, unknown> = {}) {
     currentPrice: 100,
     marketValue: 1000,
     unrealizedGainLoss: 100,
+    realizedGainLoss: 0,
     percentageChange: 11.11,
     percentOfPortfolio: 4,
     displayCurrency: "USD",
@@ -93,9 +94,47 @@ describe("HoldingsTable — §157 client-side search, paging and symbol scaling"
     const symbolCol = cols.find((c) => !c.attributes("style"))
     expect(symbolCol, "symbol column has no fixed width").toBeTruthy()
     const fixed = cols.filter((c) => c.attributes("style")?.includes("width"))
-    // global mode: Portfolio + 6 fixed numeric columns + actions = 8 fixed,
+    // global mode: Portfolio + 7 fixed numeric columns + actions = 9 fixed,
     // Symbol the one flexible column without a width.
-    expect(fixed).toHaveLength(8)
+    expect(fixed).toHaveLength(9)
+  })
+
+  it("shows, sorts, and customizes realized P/L independently of unrealized P/L", async () => {
+    const wrapper = mountTable([
+      position({ id: "loss", symbol: "LOSS", instrumentCurrency: "EUR", realizedGainLoss: -10, unrealizedGainLoss: 90 }),
+      position({ id: "gain", symbol: "GAIN", realizedGainLoss: 20, unrealizedGainLoss: -80 }),
+    ])
+    await flushPromises()
+
+    const realizedHeader = wrapper.get('[data-testid="holdings-column-realized"]')
+    expect(realizedHeader.text()).toContain("Realized P/L")
+    expect(rows(wrapper)[0].get('[data-testid="holdings-cell-realized"]').text()).toBe("-€10.00")
+    expect(rows(wrapper)[0].text()).toContain("+€90.00")
+
+    await realizedHeader.trigger("click")
+    await flushPromises()
+    expect(rows(wrapper)[0].text()).toContain("LOSS")
+    expect(wrapper.get('[data-testid="holdings-column-realized"]').attributes("aria-sort")).toBe("ascending")
+
+    await wrapper.findAll("button").find((button) => button.text().startsWith("Customize"))!.trigger("click")
+    await flushPromises()
+    const toggle = wrapper
+      .findAll("label")
+      .find((label) => label.text().includes("Realized P/L"))!
+      .get('input[type="checkbox"]')
+    expect((toggle.element as HTMLInputElement).checked).toBe(true)
+    await toggle.setValue(false)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="holdings-column-realized"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="holdings-cell-realized"]').exists()).toBe(false)
+
+    const hiddenToggle = wrapper
+      .findAll("label")
+      .find((label) => label.text().includes("Realized P/L"))!
+      .get('input[type="checkbox"]')
+    await hiddenToggle.setValue(true)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="holdings-column-realized"]').exists()).toBe(true)
   })
 
   it("truncates a long company name inside the symbol column", () => {
@@ -120,12 +159,17 @@ describe("HoldingsTable — §157 client-side search, paging and symbol scaling"
   })
 
   it("pages client-side at the default size (20) and shows a range footer", async () => {
-    const positions = Array.from({ length: 25 }, (_, i) => position({ id: `p${i}`, symbol: `SYM${i}` }))
+    const positions = Array.from({ length: 25 }, (_, i) => position({
+      id: `p${i}`,
+      symbol: `SYM${i}`,
+      realizedGainLoss: i + 1,
+    }))
     const wrapper = mountTable(positions)
     expect(rows(wrapper)).toHaveLength(20)
     expect(range(wrapper)).toBe("1–20 of 25")
     // Total row is measured over ALL 25, not just the visible page.
     expect(wrapper.find("tfoot").text()).toContain("$25,000.00")
+    expect(wrapper.get('[data-testid="holdings-total-realized"]').text()).toBe("USD +$325.00")
 
     // Advance to page 2: the remaining 5 rows, total row unchanged.
     await wrapper.find('button[aria-label="Next page"]').trigger("click")
@@ -133,14 +177,15 @@ describe("HoldingsTable — §157 client-side search, paging and symbol scaling"
     expect(rows(wrapper)).toHaveLength(5)
     expect(range(wrapper)).toBe("21–25 of 25")
     expect(wrapper.find("tfoot").text()).toContain("$25,000.00")
+    expect(wrapper.get('[data-testid="holdings-total-realized"]').text()).toBe("USD +$325.00")
   })
 
   it("keeps group subtotals correct when only part of a group is on the page", async () => {
     // 12 Alpha + 13 Beta. Page size 20 → Alpha (12) fits on page 1, Beta (13)
     // splits 8/5 across pages. Each subtotal must still cover its whole group.
     const positions = [
-      ...Array.from({ length: 12 }, (_, i) => position({ id: `a${i}`, symbol: `A${i}`, sector: "Alpha" })),
-      ...Array.from({ length: 13 }, (_, i) => position({ id: `b${i}`, symbol: `B${i}`, sector: "Beta" })),
+      ...Array.from({ length: 12 }, (_, i) => position({ id: `a${i}`, symbol: `A${i}`, sector: "Alpha", realizedGainLoss: 1 })),
+      ...Array.from({ length: 13 }, (_, i) => position({ id: `b${i}`, symbol: `B${i}`, sector: "Beta", realizedGainLoss: 2 })),
     ]
     const wrapper = mountTable(positions)
     await wrapper.get('select[aria-label="Group by"]').setValue("sector")
@@ -157,6 +202,8 @@ describe("HoldingsTable — §157 client-side search, paging and symbol scaling"
       .filter((t) => t.includes("subtotal"))
     expect(subtotalTexts.some((t) => t.includes("Alpha subtotal") && t.includes("$12,000.00"))).toBe(true)
     expect(subtotalTexts.some((t) => t.includes("Beta subtotal") && t.includes("$13,000.00"))).toBe(true)
+    const realizedSubtotals = wrapper.findAll('[data-testid="holdings-group-realized"]').map((cell) => cell.text())
+    expect(realizedSubtotals).toEqual(expect.arrayContaining(["USD +$12.00", "USD +$26.00"]))
 
     // Page 2 holds the remaining 5 Beta rows; the Beta subtotal is still 13k.
     await wrapper.find('button[aria-label="Next page"]').trigger("click")
@@ -167,6 +214,22 @@ describe("HoldingsTable — §157 client-side search, paging and symbol scaling"
       .map((t) => t.text())
       .filter((t) => t.includes("subtotal"))
     expect(page2Subtotals.some((t) => t.includes("Beta subtotal") && t.includes("$13,000.00"))).toBe(true)
+    const betaSubtotal = wrapper.findAll("tr").find((row) => row.text().includes("Beta subtotal"))
+    expect(betaSubtotal?.get('[data-testid="holdings-group-realized"]').text()).toBe("USD +$26.00")
+  })
+
+  it("keeps realized group totals separate by instrument currency", async () => {
+    const wrapper = mountTable([
+      position({ id: "usd", symbol: "USD1", sector: "Technology", instrumentCurrency: "USD", realizedGainLoss: 10 }),
+      position({ id: "eur", symbol: "EUR1", sector: "Technology", instrumentCurrency: "EUR", realizedGainLoss: 20 }),
+    ])
+    await wrapper.get('select[aria-label="Group by"]').setValue("sector")
+    await flushPromises()
+
+    const realizedSubtotal = wrapper.get('[data-testid="holdings-group-realized"]')
+    expect(realizedSubtotal.text()).toContain("USD +$10.00")
+    expect(realizedSubtotal.text()).toContain("EUR +€20.00")
+    expect(realizedSubtotal.text()).not.toContain("$30.00")
   })
 
   it("filters by ticker in the header search", async () => {
@@ -208,7 +271,7 @@ describe("HoldingsTable — §157 client-side search, paging and symbol scaling"
   })
 
   it("hides closed positions by default and reveals them accessibly in both modes", async () => {
-    const open = position({ id: "open", symbol: "AAPL" })
+    const open = position({ id: "open", symbol: "AAPL", realizedGainLoss: 30 })
     const closed = position({
       id: "closed",
       symbol: "MSFT",
@@ -216,6 +279,7 @@ describe("HoldingsTable — §157 client-side search, paging and symbol scaling"
       closedAt: "2026-06-17T00:00:00.000Z",
       marketValue: 9000,
       unrealizedGainLoss: 800,
+      realizedGainLoss: 70,
     })
 
     for (const mode of ["portfolio", "global"] as const) {
@@ -229,6 +293,7 @@ describe("HoldingsTable — §157 client-side search, paging and symbol scaling"
       expect(rows(wrapper)).toHaveLength(1)
       expect(range(wrapper)).toBe("1–1 of 1")
       expect(wrapper.find("tfoot").text()).toContain("$1,000.00")
+      expect(wrapper.get('[data-testid="holdings-total-realized"]').text()).toBe("USD +$30.00")
 
       await filter.setValue(true)
       await flushPromises()
@@ -241,6 +306,7 @@ describe("HoldingsTable — §157 client-side search, paging and symbol scaling"
       // Retained history is visible, but it is not part of current totals.
       expect(wrapper.find("tfoot").text()).toContain("$1,000.00")
       expect(wrapper.find("tfoot").text()).not.toContain("$10,000.00")
+      expect(wrapper.get('[data-testid="holdings-total-realized"]').text()).toBe("USD +$100.00")
 
       wrapper.unmount()
     }
@@ -256,13 +322,14 @@ describe("HoldingsTable — §157 client-side search, paging and symbol scaling"
 
   it("applies label and search filters to closed history when it is revealed", async () => {
     const wrapper = mountTable([
-      position({ id: "open", symbol: "AAPL", labels: [{ id: "current", name: "Current", color: "blue" }] }),
+      position({ id: "open", symbol: "AAPL", realizedGainLoss: 10, labels: [{ id: "current", name: "Current", color: "blue" }] }),
       position({
         id: "closed",
         symbol: "MSFT",
         companyName: "Closed Microsoft",
         isOpen: false,
         closedAt: "2025-03-04T00:00:00.000Z",
+        realizedGainLoss: 25,
         labels: [{ id: "history", name: "History", color: "gray" }],
       }),
     ])
@@ -281,10 +348,11 @@ describe("HoldingsTable — §157 client-side search, paging and symbol scaling"
     expect(rows(wrapper)[0].text()).toContain("MSFT")
     expect(range(wrapper)).toBe("1–1 of 1")
     expect(wrapper.find("tfoot").text()).toContain("$0.00")
+    expect(wrapper.get('[data-testid="holdings-total-realized"]').text()).toBe("USD +$25.00")
   })
 
   it("sorts, groups and pages revealed history while group totals stay open-only", async () => {
-    const open = Array.from({ length: 20 }, (_, i) => position({ id: `open-${i}`, symbol: `ZZ${i}`, sector: "Technology" }))
+    const open = Array.from({ length: 20 }, (_, i) => position({ id: `open-${i}`, symbol: `ZZ${i}`, sector: "Technology", realizedGainLoss: 5 }))
     const closed = position({
       id: "closed",
       symbol: "AAA",
@@ -292,6 +360,7 @@ describe("HoldingsTable — §157 client-side search, paging and symbol scaling"
       closedAt: "2024-02-03T00:00:00.000Z",
       marketValue: 9000,
       sector: "Technology",
+      realizedGainLoss: 50,
     })
     const wrapper = mountTable([...open, closed])
     await flushPromises()
@@ -301,6 +370,7 @@ describe("HoldingsTable — §157 client-side search, paging and symbol scaling"
     await flushPromises()
     expect(range(wrapper)).toBe("1–20 of 21")
     expect(wrapper.find("tfoot").text()).toContain("$20,000.00")
+    expect(wrapper.get('[data-testid="holdings-total-realized"]').text()).toBe("USD +$150.00")
 
     // Paging runs over the revealed set, including its final retained row.
     await wrapper.find('button[aria-label="Next page"]').trigger("click")
@@ -361,7 +431,12 @@ describe("HoldingsTable — §157 client-side search, paging and symbol scaling"
     vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:mock")
     vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {})
 
-    const positions = Array.from({ length: 25 }, (_, i) => position({ id: `p${i}`, symbol: `SYM${i}`, companyName: i === 24 ? "Uniquex Corp" : `Corp ${i}` }))
+    const positions = Array.from({ length: 25 }, (_, i) => position({
+      id: `p${i}`,
+      symbol: `SYM${i}`,
+      companyName: i === 24 ? "Uniquex Corp" : `Corp ${i}`,
+      realizedGainLoss: i === 24 ? 15.75 : 0,
+    }))
     const wrapper = mountTable(positions)
     // Search matches only position 24 (by company name "Uniquex Corp").
     await wrapper.get('[data-testid="holdings-search"]').setValue("uniquex")
@@ -375,11 +450,12 @@ describe("HoldingsTable — §157 client-side search, paging and symbol scaling"
     const csv = blobParts.join("")
     expect(csv).toBeDefined()
     const lines = csv.split("\n")
-    expect(lines[0]).toBe("Symbol,Quantity,Avg Cost,Price,Market Value,Unrealized P/L,Weight")
+    expect(lines[0]).toBe("Symbol,Quantity,Avg Cost,Price,Market Value,Unrealized P/L,Realized P/L,Weight")
     // Only the single matching row is exported (filtered), not all 25.
     expect(lines.filter(Boolean)).toHaveLength(2)
     // The CSV carries the symbol (SYM24), not the company name.
     expect(lines[1]).toContain("SYM24")
+    expect(lines[1].split(",")[6]).toBe("15.75")
   })
 
   it("exports lifecycle status and close date when closed positions are included", async () => {
@@ -405,7 +481,7 @@ describe("HoldingsTable — §157 client-side search, paging and symbol scaling"
     await flushPromises()
 
     const lines = blobParts.join("").split("\n")
-    expect(lines[0]).toBe("Symbol,Quantity,Avg Cost,Price,Market Value,Unrealized P/L,Weight,Status,Closed At")
+    expect(lines[0]).toBe("Symbol,Quantity,Avg Cost,Price,Market Value,Unrealized P/L,Realized P/L,Weight,Status,Closed At")
     expect(lines.find((line) => line.startsWith("MSFT,"))).toMatch(/,Closed,2025-03-04T00:00:00\.000Z$/)
     expect(lines.find((line) => line.startsWith("AAPL,"))).toMatch(/,Open,$/)
   })

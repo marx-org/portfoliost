@@ -38,6 +38,7 @@ function position(overrides: Record<string, unknown> = {}) {
     currentPrice: 110,
     marketValue: 1100,
     unrealizedGainLoss: 100,
+    realizedGainLoss: 0,
     percentageChange: 10,
     percentOfPortfolio: 100,
     displayCurrency: "USD",
@@ -81,8 +82,8 @@ describe("ConsolidatedHoldingsView", () => {
 
   it("keeps duplicate position memberships separate and targets actions to the owning portfolio", async () => {
     mocked.getAllPositions.mockResolvedValue([
-      position({ id: "shared-position", portfolioId: "p1", portfolioName: "Broker account" }),
-      position({ id: "shared-position", portfolioId: "p2", portfolioName: "Retirement" }),
+      position({ id: "shared-position", portfolioId: "p1", portfolioName: "Broker account", realizedGainLoss: 18 }),
+      position({ id: "shared-position", portfolioId: "p2", portfolioName: "Retirement", realizedGainLoss: 42 }),
     ])
 
     const wrapper = mountView()
@@ -90,6 +91,8 @@ describe("ConsolidatedHoldingsView", () => {
 
     const rows = wrapper.findAll('[data-testid="holdings-row"]')
     expect(rows).toHaveLength(2)
+    expect(rows[0].get('[data-testid="holdings-cell-realized"]').text()).toBe("+$18.00")
+    expect(rows[1].get('[data-testid="holdings-cell-realized"]').text()).toBe("+$42.00")
     await rows[0].get('button[aria-label="Position actions"]').trigger("click")
     expect(rows[0].text()).toContain("Buy")
     expect(rows[1].text()).not.toContain("Buy")

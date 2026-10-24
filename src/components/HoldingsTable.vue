@@ -153,18 +153,18 @@ interface ColumnDef {
 }
 
 // Widths are the widest realistic single line of that column (dual-currency
-// value + P/L percent, measured in the browser) plus headroom, so `table-fixed`
-// never clips a number. Numeric cells use px-3 (not the table's px-5) to keep
-// the fixed total under the 1280px content width — only the Symbol column is
-// left flexible to absorb the remainder and truncate.
+// value + P/L percent, measured in the browser) plus headroom. The realized
+// column is native-currency only. The consolidated table's minimum width keeps
+// its owner column without squeezing Symbol; portfolio mode fits its viewport.
 const allColumns: ColumnDef[] = [
   { key: "symbol", label: "Symbol", sortable: true },
-  { key: "quantity", label: "Quantity", sortable: true, width: 111 },
+  { key: "quantity", label: "Quantity", sortable: true, width: 100 },
   { key: "avgCost", label: "Avg Cost", sortable: true, width: 110 },
-  { key: "price", label: "Price", sortable: true, width: 84 },
+  { key: "price", label: "Price", sortable: true, width: 78 },
   { key: "marketValue", label: "Market Value", sortable: true, width: 148 },
   { key: "unrealized", label: "Unrealized P/L", sortable: true, width: 146 },
-  { key: "weight", label: "% of Portfolio", sortable: true, width: 118 },
+  { key: "realized", label: "Realized P/L", sortable: true, width: 120 },
+  { key: "weight", label: "% of Portfolio", sortable: true, width: 105 },
 ]
 
 const visibleColumns = ref<string[]>(allColumns.map((c) => c.key))
@@ -231,6 +231,8 @@ const sorted = computed(() => {
         return p.marketValue ?? 0
       case "unrealized":
         return p.unrealizedGainLoss ?? 0
+      case "realized":
+        return p.realizedGainLoss ?? 0
       case "weight":
         return p.percentOfPortfolio ?? 0
       default:
@@ -320,6 +322,29 @@ function sortIndicator(key: string): string {
 const totalValue = computed(() => openSearched.value.reduce((s, p) => s + (p.marketValue || 0), 0))
 const totalUnrealized = computed(() => openSearched.value.reduce((s, p) => s + (p.unrealizedGainLoss || 0), 0))
 
+/** Totals stay in each instrument's currency instead of adding unlike currencies. */
+function realizedTotalsByCurrency(items: Position[]): Array<{ currency: string; amount: number }> {
+  const totals = new Map<string, number>()
+  for (const position of items) {
+    const currency = (position.instrumentCurrency ?? "").toUpperCase()
+    totals.set(currency, (totals.get(currency) ?? 0) + (position.realizedGainLoss ?? 0))
+  }
+  return [...totals.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([currency, amount]) => ({ currency, amount }))
+}
+
+function formatRealizedTotal(total: { currency: string; amount: number }): string {
+  const signedAmount = formatSignedAmount(total.amount, total.currency)
+  if (!total.currency) return signedAmount
+  // Intl uses the ISO code itself for currencies such as PLN, but symbols for
+  // currencies like USD/EUR. Add the code only in the latter case, so mixed-
+  // currency subtotals stay unambiguous without repeating codes such as "PLN".
+  return formatAmount(1, total.currency).trim().toUpperCase().startsWith(total.currency)
+    ? signedAmount
+    : `${total.currency} ${signedAmount}`
+}
+
 // §48.6e B2 — the backend's `converted*` position fields are denominated in
 // the portfolio BASE currency (wallets D21b), not the user's display
 // currency. Each position declares that denomination in `displayCurrency`
@@ -350,7 +375,9 @@ const totalValueDisplay = computed(() => (toDisplayRate.value == null ? totalVal
 const totalUnrealizedDisplay = computed(() => (toDisplayRate.value == null ? totalUnrealized.value : totalUnrealized.value * toDisplayRate.value))
 
 function gainClass(value: number | undefined): string {
-  return (value ?? 0) >= 0 ? "text-green-600" : "text-red-600"
+  return (value ?? 0) >= 0
+    ? "text-green-600 dark:text-green-400"
+    : "text-red-600 dark:text-red-400"
 }
 
 function exportCsv() {
@@ -364,11 +391,12 @@ function exportCsv() {
       p.currentPrice ?? "",
       p.marketValue ?? "",
       p.unrealizedGainLoss ?? "",
+      p.realizedGainLoss ?? 0,
       p.percentOfPortfolio ?? "",
       ...(showClosedPositions.value ? [p.isOpen ? "Open" : "Closed", p.isOpen ? "" : p.closedAt ?? ""] : []),
     ].join(","),
   )
-  const baseHeader = "Symbol,Quantity,Avg Cost,Price,Market Value,Unrealized P/L,Weight"
+  const baseHeader = "Symbol,Quantity,Avg Cost,Price,Market Value,Unrealized P/L,Realized P/L,Weight"
   const header = showClosedPositions.value ? `${baseHeader},Status,Closed At` : baseHeader
   const csv = [header, ...rows].join("\n")
   const blob = new Blob([csv], { type: "text/csv" })
@@ -559,13 +587,13 @@ function onPickerSaved() {
       <p v-if="noticeError" class="border-b border-slate-100 dark:border-slate-800 bg-red-50 dark:bg-red-500/10 px-5 py-2 text-sm text-red-700 dark:text-red-400">{{ noticeError }}</p>
 
       <div v-if="sorted.length" class="overflow-x-auto" data-testid="holdings-table-wrap">
-        <table class="w-full table-fixed text-sm">
+        <table :class="['w-full table-fixed text-sm', isGlobal ? 'min-w-[1140px]' : '']">
           <!-- §157 — table-fixed with an explicit colgroup: the numeric columns
                take a fixed share so a long company name inflates only the
                flexible Symbol column (which truncates), never pushing the
                Market Value column off-screen. -->
           <colgroup>
-            <col v-if="isGlobal" style="width: 120px" />
+            <col v-if="isGlobal" style="width: 110px" />
             <template v-for="col in visibleColumnsDef()" :key="col.key">
               <col v-if="col.width" :style="{ width: `${col.width}px` }" />
               <col v-else />
@@ -578,6 +606,7 @@ function onPickerSaved() {
               <th
                 v-for="col in visibleColumnsDef()"
                 :key="col.key"
+                :data-testid="col.key === 'realized' ? 'holdings-column-realized' : undefined"
                 class="py-2.5 font-medium"
                 :class="[col.width ? 'px-3' : 'px-5', col.sortable ? 'cursor-pointer select-none hover:text-slate-900 dark:hover:text-slate-100' : '']"
                 :aria-sort="sortKey === col.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined"
@@ -661,6 +690,16 @@ function onPickerSaved() {
                   :percent="pos.percentageChange"
                 />
               </td>
+              <td
+                v-if="visibleColumns.includes('realized')"
+                class="whitespace-nowrap px-3 py-3 text-right tabular-nums"
+              >
+                <span
+                  data-testid="holdings-cell-realized"
+                  :aria-label="`Realized P/L ${formatSignedAmount(pos.realizedGainLoss ?? 0, pos.instrumentCurrency)}`"
+                  :class="gainClass(pos.realizedGainLoss ?? 0)"
+                >{{ formatSignedAmount(pos.realizedGainLoss ?? 0, pos.instrumentCurrency) }}</span>
+              </td>
               <td v-if="visibleColumns.includes('weight')" class="whitespace-nowrap px-3 py-3 text-right tabular-nums">{{ formatPercent(pos.percentOfPortfolio) }}</td>
               <td class="px-5 py-3 text-right">
                 <div class="relative inline-block">
@@ -699,6 +738,14 @@ function onPickerSaved() {
               <td v-if="visibleColumns.includes('price')" class="px-3 py-3"></td>
               <td v-if="visibleColumns.includes('marketValue')" class="px-3 py-3 text-right tabular-nums">{{ formatAmount(groupTotal(g.items) * (toDisplayRate ?? 1), totalsCcy) }}</td>
               <td v-if="visibleColumns.includes('unrealized')" class="px-3 py-3 text-right tabular-nums">{{ formatSignedAmount(groupUnrealizedTotal(g.items) * (toDisplayRate ?? 1), totalsCcy) }}</td>
+              <td v-if="visibleColumns.includes('realized')" class="px-3 py-3 text-right tabular-nums" data-testid="holdings-group-realized">
+                <span
+                  v-for="total in realizedTotalsByCurrency(g.items)"
+                  :key="total.currency"
+                  class="mr-2 inline-block whitespace-nowrap"
+                  :class="gainClass(total.amount)"
+                >{{ formatRealizedTotal(total) }}</span>
+              </td>
               <td v-if="visibleColumns.includes('weight')" class="px-3 py-3"></td>
               <td class="px-5 py-3"></td>
             </tr>
@@ -711,6 +758,14 @@ function onPickerSaved() {
               <td v-if="visibleColumns.includes('price')" class="px-3 py-3"></td>
               <td v-if="visibleColumns.includes('marketValue')" class="px-3 py-3 text-right tabular-nums">{{ formatAmount(totalValueDisplay, totalsCcy) }}</td>
               <td v-if="visibleColumns.includes('unrealized')" class="px-3 py-3 text-right tabular-nums" :class="gainClass(totalUnrealized)">{{ formatSignedAmount(totalUnrealizedDisplay, totalsCcy) }}</td>
+              <td v-if="visibleColumns.includes('realized')" class="px-3 py-3 text-right tabular-nums" data-testid="holdings-total-realized">
+                <span
+                  v-for="total in realizedTotalsByCurrency(sorted)"
+                  :key="total.currency"
+                  class="mr-2 inline-block whitespace-nowrap"
+                  :class="gainClass(total.amount)"
+                >{{ formatRealizedTotal(total) }}</span>
+              </td>
               <td v-if="visibleColumns.includes('weight')" class="px-3 py-3"></td>
               <td class="px-5 py-3"></td>
             </tr>
