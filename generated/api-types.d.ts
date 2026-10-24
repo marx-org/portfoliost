@@ -3457,6 +3457,23 @@ export interface components {
             companyName: string;
             assetType: string;
             contractSize?: number | null;
+            /**
+             * @description Position direction; SHORT identifies a short derivative position.
+             * @enum {string|null}
+             */
+            direction?: "LONG" | "SHORT" | null;
+            /**
+             * @description Derivative option type; null for non-option positions.
+             * @enum {string|null}
+             */
+            optionType?: "CALL" | "PUT" | null;
+            /** @description Option strike price in instrument currency, when known. */
+            strikePrice?: number | null;
+            /**
+             * Format: date
+             * @description Option expiration date, when known.
+             */
+            expirationDate?: string | null;
             purchaseCurrency: string;
             instrumentCurrency: string;
             quantity: number;
