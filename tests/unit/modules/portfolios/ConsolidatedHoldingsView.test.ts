@@ -2,7 +2,9 @@ import { flushPromises, mount } from "@vue/test-utils"
 import { createPinia, setActivePinia } from "pinia"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import ConsolidatedHoldingsView from "@/modules/portfolios/ConsolidatedHoldingsView.vue"
+import AddPositionDialog from "@/modules/portfolios/AddPositionDialog.vue"
 import * as portfoliosApi from "@/api/portfolios"
+import { useCurrenciesStore } from "@/stores/currencies"
 
 vi.mock("@/api/portfolios", async (importOriginal) => {
   const actual = await importOriginal<typeof portfoliosApi>()
@@ -45,9 +47,14 @@ function position(overrides: Record<string, unknown> = {}) {
 }
 
 function mountView() {
+  const pinia = createPinia()
+  setActivePinia(pinia)
+  const currencies = useCurrenciesStore(pinia)
+  currencies.currencies = [{ code: "USD", name: "US Dollar", symbol: "$", minorUnits: 2, popular: true }]
+  currencies.loaded = true
   return mount(ConsolidatedHoldingsView, {
     global: {
-      plugins: [createPinia()],
+      plugins: [pinia],
       stubs: { RouterLink: { props: ["to"], template: "<a :href=\"to\"><slot /></a>" } },
     },
   })
@@ -70,6 +77,25 @@ describe("ConsolidatedHoldingsView", () => {
     expect(wrapper.text()).toContain("Broker account")
     expect(wrapper.text()).toContain("Retirement")
     expect(wrapper.findAll("button[aria-label='Position actions']")).toHaveLength(2)
+  })
+
+  it("keeps duplicate position memberships separate and targets actions to the owning portfolio", async () => {
+    mocked.getAllPositions.mockResolvedValue([
+      position({ id: "shared-position", portfolioId: "p1", portfolioName: "Broker account" }),
+      position({ id: "shared-position", portfolioId: "p2", portfolioName: "Retirement" }),
+    ])
+
+    const wrapper = mountView()
+    await flushPromises()
+
+    const rows = wrapper.findAll('[data-testid="holdings-row"]')
+    expect(rows).toHaveLength(2)
+    await rows[0].get('button[aria-label="Position actions"]').trigger("click")
+    expect(rows[0].text()).toContain("Buy")
+    expect(rows[1].text()).not.toContain("Buy")
+
+    await rows[0].findAll("button").find((button) => button.text().trim() === "Buy")!.trigger("click")
+    expect(wrapper.findComponent(AddPositionDialog).props("portfolioId")).toBe("p1")
   })
 
   it("shows a retryable error state", async () => {

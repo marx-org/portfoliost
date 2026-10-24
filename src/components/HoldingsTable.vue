@@ -6,7 +6,7 @@ import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
 import { useDisplayConversion } from "@/composables/useDisplayConversion"
 import { storeToRefs } from "pinia"
 import { removePortfolioPosition, getPortfolioTransactions } from "@/api/portfolios"
-import { formatAmount, formatNumber, formatPercent, formatSignedAmount } from "@/utils/format"
+import { formatAmount, formatDate, formatNumber, formatPercent, formatSignedAmount } from "@/utils/format"
 import { researchRoute } from "@/utils/research"
 import type { PortfolioPositions } from "@/api/types"
 import TickerBadge from "@/components/TickerBadge.vue"
@@ -46,6 +46,10 @@ const displayCurrencyStore = useDisplayCurrencyStore()
 const { currency: displayCurrency } = storeToRefs(displayCurrencyStore)
 const id = computed(() => String(route.params.id ?? ""))
 const isGlobal = computed(() => props.mode === "global")
+
+function positionKey(position: Position): string {
+  return `${position.portfolioId ?? id.value}\u0000${position.id}`
+}
 
 const openMenuId = ref<string | null>(null)
 const notice = ref<string | null>(null)
@@ -123,16 +127,20 @@ const groups = computed(() => {
     list.push(pos)
     map.set(key, list)
   }
-  const on = new Set(pagedPositions.value.map((p) => p.id))
+  const on = new Set(pagedPositions.value.map(positionKey))
   return [...map.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([label, items]) => ({ label, items, rows: items.filter((p) => on.has(p.id)) }))
+    .map(([label, items]) => ({ label, items, rows: items.filter((p) => on.has(positionKey(p))) }))
 })
 
 const colspan = computed(() => visibleColumns.value.length + 1 + (isGlobal.value ? 1 : 0))
 
 function groupTotal(items: Position[]): number {
-  return items.reduce((s, p) => s + (p.marketValue || 0), 0)
+  return items.reduce((s, p) => s + (p.isOpen ? p.marketValue || 0 : 0), 0)
+}
+
+function groupUnrealizedTotal(items: Position[]): number {
+  return items.reduce((s, p) => s + (p.isOpen ? p.unrealizedGainLoss || 0 : 0), 0)
 }
 
 interface ColumnDef {
@@ -169,26 +177,41 @@ watch(labelFilter, () => {
   if (!isGlobal.value) void store.fetchPositions(id.value, labelFilter.value)
 })
 
+const showClosedPositions = ref(false)
 const searchFilter = ref("")
 
-// The full set of open positions matching the active label filter. This is the
-// set the "N open" count is measured over.
-const positions = computed(() => {
+// Apply labels before the lifecycle toggle so retained history participates in
+// the same filter pipeline as open positions in both per-portfolio and global
+// views. The portfolio route also sends the label filter to the API.
+const labelFilteredPositions = computed(() => {
   const source = isGlobal.value ? (props.positions ?? []) : store.positions
-  return source.filter((p) => p.isOpen && (!isGlobal.value || !labelFilter.value.length || p.labels?.some((label) => labelFilter.value.includes(label.id))))
+  return source.filter((p) => !labelFilter.value.length || p.labels?.some((label) => labelFilter.value.includes(label.id)))
 })
 
-// The search-filtered set, matching ticker or company name (case-insensitive
-// substring, mirroring the transactions table's `searchFilter`). Applied
-// client-side on top of the already-fetched positions — no backend change.
-const searched = computed(() => {
-  const q = searchFilter.value.trim().toLowerCase()
-  if (!q) return positions.value
-  return positions.value.filter(
-    (p) =>
-      String(p.symbol ?? "").toLowerCase().includes(q) ||
-      String(p.companyName ?? "").toLowerCase().includes(q),
-  )
+const openPositions = computed(() => labelFilteredPositions.value.filter((p) => p.isOpen))
+const positions = computed(() => labelFilteredPositions.value.filter((p) => showClosedPositions.value || p.isOpen))
+
+function matchesSearch(position: Position, query: string): boolean {
+  return String(position.symbol ?? "").toLowerCase().includes(query) ||
+    String(position.companyName ?? "").toLowerCase().includes(query)
+}
+
+function matchingPositions(source: Position[]): Position[] {
+  const query = searchFilter.value.trim().toLowerCase()
+  return query ? source.filter((position) => matchesSearch(position, query)) : source
+}
+
+// Search both the visible rows and the open-only set independently: revealing
+// retained history must not change the current open-position count or totals.
+const searched = computed(() => matchingPositions(positions.value))
+const openSearched = computed(() => matchingPositions(openPositions.value))
+const emptyMessage = computed(() => {
+  if (labelFilter.value.length || searchFilter.value.trim() || showClosedPositions.value) {
+    return "No positions match the current filters."
+  }
+  if (!labelFilteredPositions.value.length) return "No open positions."
+  if (!openPositions.value.length) return "No open positions. Show closed positions to view history."
+  return "No positions match the current filters."
 })
 
 // The filtered+searched set in the current sort order. Paging, the totals and
@@ -236,7 +259,7 @@ const pagedPositions = computed(() => {
 
 // A filter, search or page-size change means the current page is meaningless —
 // fall back to the first page so a stale page never points at an empty slice.
-watch([labelFilter, searchFilter, pageSize], () => {
+watch([labelFilter, searchFilter, pageSize, showClosedPositions], () => {
   page.value = 1
 })
 
@@ -292,10 +315,10 @@ function sortIndicator(key: string): string {
   return sortDir.value === "asc" ? "↑" : "↓"
 }
 
-// Measured over the search-filtered set (not the raw open set), so the totals
-// track what a search is actually showing.
-const totalValue = computed(() => sorted.value.reduce((s, p) => s + (p.marketValue || 0), 0))
-const totalUnrealized = computed(() => sorted.value.reduce((s, p) => s + (p.unrealizedGainLoss || 0), 0))
+// Measured over the search-filtered open set, so history can never inflate
+// current holdings totals even while the closed rows are visible.
+const totalValue = computed(() => openSearched.value.reduce((s, p) => s + (p.marketValue || 0), 0))
+const totalUnrealized = computed(() => openSearched.value.reduce((s, p) => s + (p.unrealizedGainLoss || 0), 0))
 
 // §48.6e B2 — the backend's `converted*` position fields are denominated in
 // the portfolio BASE currency (wallets D21b), not the user's display
@@ -342,9 +365,12 @@ function exportCsv() {
       p.marketValue ?? "",
       p.unrealizedGainLoss ?? "",
       p.percentOfPortfolio ?? "",
+      ...(showClosedPositions.value ? [p.isOpen ? "Open" : "Closed", p.isOpen ? "" : p.closedAt ?? ""] : []),
     ].join(","),
   )
-  const csv = ["Symbol,Quantity,Avg Cost,Price,Market Value,Unrealized P/L,Weight", ...rows].join("\n")
+  const baseHeader = "Symbol,Quantity,Avg Cost,Price,Market Value,Unrealized P/L,Weight"
+  const header = showClosedPositions.value ? `${baseHeader},Status,Closed At` : baseHeader
+  const csv = [header, ...rows].join("\n")
   const blob = new Blob([csv], { type: "text/csv" })
   const url = URL.createObjectURL(blob)
   const a = document.createElement("a")
@@ -357,6 +383,11 @@ function exportCsv() {
 function openAction(kind: ActionKind, position: Position): void {
   openMenuId.value = null
   positionAction.value = { kind, position }
+}
+
+function toggleActionMenu(position: Position): void {
+  const key = positionKey(position)
+  openMenuId.value = openMenuId.value === key ? null : key
 }
 
 function onActionSaved() {
@@ -466,7 +497,10 @@ function onPickerSaved() {
       <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-700/60 px-5 py-3">
         <div class="flex items-center gap-3">
           <h2 class="text-base font-semibold">Positions</h2>
-          <span class="text-sm text-slate-500 dark:text-slate-400">{{ searched.length }} open</span>
+          <span class="text-sm text-slate-500 dark:text-slate-400">
+            <template v-if="showClosedPositions">{{ openSearched.length }} open · {{ searched.length - openSearched.length }} closed</template>
+            <template v-else>{{ openSearched.length }} open</template>
+          </span>
         </div>
         <div class="flex items-center gap-2">
           <label class="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
@@ -497,6 +531,16 @@ function onPickerSaved() {
       <div class="border-b border-slate-100 dark:border-slate-800 px-5 py-2">
         <div class="flex flex-wrap items-center gap-3">
           <LabelFilterBar v-model="labelFilter" @manage="manageLabelsOpen = true" />
+          <label class="inline-flex cursor-pointer items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+            <input
+              v-model="showClosedPositions"
+              type="checkbox"
+              class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 dark:border-slate-600"
+              aria-label="Show closed positions"
+              data-testid="holdings-closed-filter"
+            />
+            <span>Show closed positions</span>
+          </label>
           <label class="ml-auto flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
             <span class="sr-only">Filter by company name or ticker</span>
             <input
@@ -554,7 +598,7 @@ function onPickerSaved() {
                 <span class="font-normal text-slate-400 dark:text-slate-500">{{ g.items.length }}</span>
               </td>
             </tr>
-            <tr v-for="pos in g.rows" :key="pos.id" data-testid="holdings-row" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+            <tr v-for="pos in g.rows" :key="positionKey(pos)" data-testid="holdings-row" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
               <td v-if="isGlobal" class="truncate px-5 py-3 text-slate-700 dark:text-slate-200">{{ pos.portfolioName || pos.portfolioId }}</td>
               <template v-if="visibleColumns.includes('symbol')">
                 <!-- min-w-0 + overflow-hidden on the td: under table-fixed the
@@ -569,6 +613,9 @@ function onPickerSaved() {
                       :asset-type="pos.assetType"
                     />
                   </router-link>
+                  <span v-if="!pos.isOpen" class="mt-1 inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                    Closed<span v-if="pos.closedAt"> · {{ formatDate(pos.closedAt) }}</span>
+                  </span>
                   <LabelChips v-if="pos.labels?.length" :labels="pos.labels" :max="4" class="mt-1" />
                 </td>
               </template>
@@ -621,7 +668,7 @@ function onPickerSaved() {
                     type="button"
                     aria-label="Position actions"
                     class="rounded-lg p-1.5 text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200"
-                    @click="openMenuId = openMenuId === pos.id ? null : pos.id"
+                    @click="toggleActionMenu(pos)"
                   >
                     <svg class="h-4 w-4" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
                       <circle cx="8" cy="3" r="1.4" />
@@ -629,7 +676,7 @@ function onPickerSaved() {
                       <circle cx="8" cy="13" r="1.4" />
                     </svg>
                   </button>
-                  <template v-if="openMenuId === pos.id">
+                  <template v-if="openMenuId === positionKey(pos)">
                     <div class="fixed inset-0 z-20" @click="openMenuId = null"></div>
                     <div class="absolute right-0 z-30 mt-1 w-44 rounded-lg border border-slate-200 dark:border-slate-700/60 bg-white dark:bg-slate-900 py-1 shadow-lg">
                        <button v-if="!props.readonly" type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="openAction('buy', pos)">Buy</button>
@@ -651,7 +698,7 @@ function onPickerSaved() {
               <td v-if="visibleColumns.includes('avgCost')" class="px-3 py-3"></td>
               <td v-if="visibleColumns.includes('price')" class="px-3 py-3"></td>
               <td v-if="visibleColumns.includes('marketValue')" class="px-3 py-3 text-right tabular-nums">{{ formatAmount(groupTotal(g.items) * (toDisplayRate ?? 1), totalsCcy) }}</td>
-              <td v-if="visibleColumns.includes('unrealized')" class="px-3 py-3 text-right tabular-nums">{{ formatSignedAmount(g.items.reduce((s, p) => s + (p.unrealizedGainLoss || 0), 0) * (toDisplayRate ?? 1), totalsCcy) }}</td>
+              <td v-if="visibleColumns.includes('unrealized')" class="px-3 py-3 text-right tabular-nums">{{ formatSignedAmount(groupUnrealizedTotal(g.items) * (toDisplayRate ?? 1), totalsCcy) }}</td>
               <td v-if="visibleColumns.includes('weight')" class="px-3 py-3"></td>
               <td class="px-5 py-3"></td>
             </tr>
@@ -671,7 +718,7 @@ function onPickerSaved() {
         </table>
       </div>
       <p v-else class="px-5 py-6 text-sm text-slate-500 dark:text-slate-400">
-        {{ positions.length ? "No positions match the current filters." : "No open positions." }}
+        {{ emptyMessage }}
       </p>
 
       <!-- §157 — client-side paginator, mirroring the transactions table. The
