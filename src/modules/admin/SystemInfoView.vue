@@ -96,7 +96,7 @@ function formatSchedule(schedule?: string): string {
     if (minute === "*/1" && hour === "*" && dayOfMonth === "*" && month === "*" && dayOfWeek === "*") {
       return "Every minute"
     }
-    const minuteInterval = /^\/(\d+)$/.exec(minute.replace("*", ""))
+    const minuteInterval = /^\*\/(\d+)$/.exec(minute)
     if (minuteInterval && hour === "*" && dayOfMonth === "*" && month === "*" && dayOfWeek === "*") {
       return `Every ${minuteInterval[1]} minutes`
     }
