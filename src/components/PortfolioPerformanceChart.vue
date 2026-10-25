@@ -151,8 +151,22 @@ const gapMessage = computed(() => {
 let chartOptionsCache: { key: string; value: ChartOptions } | null = null
 type ChartOptions = ReturnType<typeof buildChartOptions>
 
-/** Colour of the benchmark overlay (matches its line). */
-const BENCHMARK_COLOR = "#94a3b8"
+/** Stable colors keep multiple benchmark overlays distinguishable. */
+const BENCHMARK_COLORS: Record<string, string> = {
+  SPY: "#94a3b8",
+  QQQ: "#c084fc",
+  DIA: "#f59e0b",
+  IWM: "#34d399",
+  VTI: "#22d3ee",
+  EFA: "#f472b6",
+  AGG: "#fb7185",
+}
+const BENCHMARK_FALLBACK_COLORS = ["#a78bfa", "#2dd4bf", "#f97316", "#e879f9"]
+
+function benchmarkColor(benchmark: BenchmarkSeries, index: number): string {
+  const symbol = (benchmark.symbol ?? "").toUpperCase()
+  return BENCHMARK_COLORS[symbol] ?? BENCHMARK_FALLBACK_COLORS[index % BENCHMARK_FALLBACK_COLORS.length]
+}
 
 function buildChartOptions() {
   const benchmarks = props.benchmarks ?? []
@@ -166,7 +180,7 @@ function buildChartOptions() {
   ]
   return {
     chart: { type: "line" as const, toolbar: { show: false }, zoom: { enabled: false } },
-    colors: [props.color, ...(hasInv ? [INVESTED_COLOR] : []), ...benchmarks.map(() => BENCHMARK_COLOR)],
+    colors: [props.color, ...(hasInv ? [INVESTED_COLOR] : []), ...benchmarks.map(benchmarkColor)],
     xaxis: { type: "datetime" as const, labels: { datetimeUTC: false } },
     // Portfolio, Invested, and the absolute flow-mirrored benchmarks share one
     // currency axis so a deposit/withdrawal is visible in every line.
@@ -182,10 +196,11 @@ function buildChartOptions() {
         formatter: (v: number) => formatCurrency(v, props.currency),
       },
     },
-    // Portfolio line solid+bold; Invested solid+thinner; benchmarks dashed+thin.
+    // All lines are solid: the legend and stable per-benchmark colors distinguish
+    // the series without turning the benchmark into visual noise.
     stroke: {
-      width: [2, ...(hasInv ? [1.5] : []), ...benchmarks.map(() => 1)],
-      dashArray: [0, ...(hasInv ? [0] : []), ...benchmarks.map(() => 4)],
+      width: [2.5, ...(hasInv ? [1.75] : []), ...benchmarks.map(() => 1.75)],
+      dashArray: [0, ...(hasInv ? [0] : []), ...benchmarks.map(() => 0)],
     },
     dataLabels: { enabled: false },
   }
