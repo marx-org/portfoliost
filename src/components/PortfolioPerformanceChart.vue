@@ -7,6 +7,7 @@
  */
 import { computed } from "vue"
 import { formatCompactCurrency, formatCurrency } from "@/utils/format"
+import type { PortfolioAnalytics } from "@/api/types"
 
 interface PerformancePoint {
   date?: string
@@ -23,14 +24,7 @@ interface PerformancePoint {
   cumulativeSimple?: number | null
 }
 
-interface BenchmarkSeries {
-  symbol?: string
-  name?: string
-  returnPercent?: number
-  timeSeries?: Array<{ date?: string; value?: number }>
-  /** Absolute flow-mirrored value in the portfolio/display currency. */
-  absoluteTimeSeries?: Array<{ date?: string; value?: number }>
-}
+type BenchmarkSeries = NonNullable<PortfolioAnalytics["benchmarks"]>[number]
 
 const props = withDefaults(
   defineProps<{
