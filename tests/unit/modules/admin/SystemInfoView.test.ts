@@ -13,6 +13,10 @@ function realRow(service: string, version: string, image: string) {
   return { service, version, impl: "real" as const, image }
 }
 
+function jobRow(service: string, version: string, image: string, schedule?: string, suspended = false) {
+  return { service, version, impl: "job" as const, image, schedule, suspended }
+}
+
 describe("SystemInfoView", () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -51,6 +55,40 @@ describe("SystemInfoView", () => {
     expect(wrapper.get('[data-testid="sys-ref-openst"]').text()).toBe("ghcr.io/marx-org/openst:v1.1.54")
     const services = wrapper.findAll('[data-testid^="sys-row-"]')
     expect(services.map((r) => r.attributes("data-testid"))).toEqual(["sys-row-portfoliost", "sys-row-openst"])
+  })
+
+  it("humanizes cron schedules while retaining the deployed version and raw expression", async () => {
+    mocked.mockResolvedValue({
+      services: [
+        jobRow("weekly-job", "v1.2.3", "ghcr.io/marx-org/weekly-job:v1.2.3", "0 3 * * 0"),
+        jobRow("annual-job", "v1.2.4", "ghcr.io/marx-org/annual-job:v1.2.4", "@yearly"),
+      ],
+      fetchedAt: "2026-10-19T10:00:00.000Z",
+    })
+    const wrapper = mount(SystemInfoView)
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="sys-schedule-weekly-job"]').text()).toContain("Every Sunday at 03:00")
+    expect(wrapper.get('[data-testid="sys-schedule-weekly-job"]').text()).toContain("0 3 * * 0")
+    expect(wrapper.get('[data-testid="sys-schedule-annual-job"]').text()).toContain("Once a year")
+    expect(wrapper.get('[data-testid="sys-ref-weekly-job"]').text()).toBe("ghcr.io/marx-org/weekly-job:v1.2.3")
+  })
+
+  it("identifies suspended and unscheduled jobs and falls back to an unknown schedule", async () => {
+    mocked.mockResolvedValue({
+      services: [
+        jobRow("suspended-job", "v1.2.3", "ghcr.io/marx-org/suspended-job:v1.2.3", "0 3 * * 0", true),
+        jobRow("on-demand-job", "v1.2.4", "ghcr.io/marx-org/on-demand-job:v1.2.4"),
+        jobRow("unknown-job", "v1.2.5", "ghcr.io/marx-org/unknown-job:v1.2.5", "every-other-sunday"),
+      ],
+      fetchedAt: "2026-10-19T10:00:00.000Z",
+    })
+    const wrapper = mount(SystemInfoView)
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="sys-schedule-suspended-job"]').text()).toContain("Suspended")
+    expect(wrapper.get('[data-testid="sys-schedule-on-demand-job"]').text()).toContain("Not scheduled")
+    expect(wrapper.get('[data-testid="sys-schedule-unknown-job"]').text()).toContain("every-other-sunday")
   })
 
   it("surfaces a load failure", async () => {
