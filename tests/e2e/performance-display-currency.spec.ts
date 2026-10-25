@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test"
 /** §48.6e B3 — the portfolio performance chart plots the analytics series,
  * which is denominated in the portfolio BASE currency (wallets
  * `baseCurrency`). When the display currency differs, the series (and the
- * benchmark overlay) must be converted client-side — the y-axis must never
+ * absolute benchmark overlay) must be converted client-side — the y-axis must never
  * carry a foreign symbol over native values.
  *
  * Uses the seeded Top10 portfolio, reads its actual series max + base
@@ -56,11 +56,11 @@ test("performance chart converts the series (and axis) to the display currency",
   const anRes = await request.get(`${GATEWAY}/api/portfolios/${top10!.id}/analytics?timeframe=1Y`, { headers: auth })
   const an = (await anRes.json()) as {
     performance?: { timeSeries?: Array<{ value?: number }> }
-    benchmarks?: Array<{ timeSeries?: Array<{ value?: number }> }>
+    benchmarks?: Array<{ absoluteTimeSeries?: Array<{ value?: number }> }>
   }
   const values = [
     ...(an.performance?.timeSeries ?? []).map((p) => p.value ?? 0),
-    ...(an.benchmarks ?? []).flatMap((b) => (b.timeSeries ?? []).map((p) => p.value ?? 0)),
+    ...(an.benchmarks ?? []).flatMap((b) => (b.absoluteTimeSeries ?? []).map((p) => p.value ?? 0)),
   ]
   const seriesMax = Math.max(...values)
   expect(seriesMax, "Top10 has a populated 1Y series").toBeGreaterThan(0)
