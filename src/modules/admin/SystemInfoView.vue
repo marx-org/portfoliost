@@ -20,6 +20,113 @@ const spaEntry: ServiceVersion = {
 
 const services = computed(() => [spaEntry, ...rawServices.value])
 
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+const MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+]
+const SPECIAL_SCHEDULES: Record<string, string> = {
+  "@yearly": "Once a year",
+  "@annually": "Once a year",
+  "@monthly": "Once a month",
+  "@weekly": "Once a week",
+  "@daily": "Once a day",
+  "@midnight": "Once a day",
+  "@hourly": "Every hour",
+}
+
+function cronNumber(value: string, min: number, max: number): number | null {
+  if (!/^\d+$/.test(value)) return null
+  const number = Number(value)
+  return number >= min && number <= max ? number : null
+}
+
+function cronWeekday(value: string): number | null {
+  const names: Record<string, number> = { SUN: 0, MON: 1, TUE: 2, WED: 3, THU: 4, FRI: 5, SAT: 6 }
+  const upper = value.toUpperCase()
+  if (upper in names) return names[upper]
+  const number = cronNumber(value, 0, 7)
+  return number === 7 ? 0 : number
+}
+
+function cronMonth(value: string): number | null {
+  const names: Record<string, number> = {
+    JAN: 1,
+    FEB: 2,
+    MAR: 3,
+    APR: 4,
+    MAY: 5,
+    JUN: 6,
+    JUL: 7,
+    AUG: 8,
+    SEP: 9,
+    OCT: 10,
+    NOV: 11,
+    DEC: 12,
+  }
+  const upper = value.toUpperCase()
+  if (upper in names) return names[upper]
+  return cronNumber(value, 1, 12)
+}
+
+function formatSchedule(schedule?: string): string {
+  const raw = schedule?.trim()
+  if (!raw) return "Not scheduled"
+
+  const special = SPECIAL_SCHEDULES[raw.toLowerCase()]
+  if (special) return special
+
+  const fields = raw.split(/\s+/)
+  if (fields.length !== 5) return raw
+
+  const [minute, hour, dayOfMonth, month, dayOfWeek] = fields
+  const minuteNumber = cronNumber(minute, 0, 59)
+  const hourNumber = cronNumber(hour, 0, 23)
+  if (minuteNumber === null || hourNumber === null) {
+    if (minute === "*/1" && hour === "*" && dayOfMonth === "*" && month === "*" && dayOfWeek === "*") {
+      return "Every minute"
+    }
+    const minuteInterval = /^\*\/(\d+)$/.exec(minute)
+    if (minuteInterval && hour === "*" && dayOfMonth === "*" && month === "*" && dayOfWeek === "*") {
+      return `Every ${minuteInterval[1]} minutes`
+    }
+    return raw
+  }
+
+  const time = `at ${String(hourNumber).padStart(2, "0")}:${String(minuteNumber).padStart(2, "0")}`
+  if (dayOfMonth === "*" && month === "*" && dayOfWeek === "*") {
+    return `Every day ${time}`
+  }
+
+  if (dayOfMonth === "*" && month === "*" && dayOfWeek !== "*") {
+    const weekday = cronWeekday(dayOfWeek)
+    return weekday === null ? raw : `Every ${WEEKDAYS[weekday]} ${time}`
+  }
+
+  if (dayOfMonth !== "*" && month === "*" && dayOfWeek === "*") {
+    const day = cronNumber(dayOfMonth, 1, 31)
+    return day === null ? raw : `On day ${day} of every month ${time}`
+  }
+
+  if (dayOfMonth !== "*" && month !== "*" && dayOfWeek === "*") {
+    const day = cronNumber(dayOfMonth, 1, 31)
+    const monthNumber = cronMonth(month)
+    return day === null || monthNumber === null ? raw : `Every ${MONTHS[monthNumber - 1]} ${day} ${time}`
+  }
+
+  return raw
+}
+
 async function load() {
   try {
     loading.value = true
@@ -76,8 +183,14 @@ function displayRef(svc: ServiceVersion) {
           <div class="text-sm text-slate-500 dark:text-slate-400" :data-testid="`sys-ref-${svc.service}`">
             {{ displayRef(svc) }}
           </div>
-          <div v-if="svc.schedule" class="font-mono text-xs text-slate-400 dark:text-slate-500">
-            {{ svc.schedule }}<span v-if="svc.suspended"> · suspended</span>
+          <div
+            v-if="svc.impl === 'job'"
+            class="text-xs text-slate-500 dark:text-slate-400"
+            :data-testid="`sys-schedule-${svc.service}`"
+          >
+            <span>{{ formatSchedule(svc.schedule) }}</span>
+            <span v-if="svc.schedule" class="ml-1 font-mono text-slate-400 dark:text-slate-500">({{ svc.schedule }})</span>
+            <span v-if="svc.suspended" class="ml-1 font-semibold">· Suspended</span>
           </div>
         </div>
         <span
