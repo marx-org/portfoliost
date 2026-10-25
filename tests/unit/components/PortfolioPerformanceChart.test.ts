@@ -105,7 +105,24 @@ describe("PortfolioPerformanceChart (§41.1)", () => {
     expect(opts.yaxis[0].seriesName).toEqual(["Portfolio", "S&P 500"])
     expect(opts.yaxis).toHaveLength(1)
     expect(opts.yaxis[0].labels.formatter(1100)).toMatch(/\$/)
-    expect(opts.stroke.dashArray).toEqual([0, 4])
+    expect(opts.stroke.dashArray).toEqual([0, 0])
+  })
+
+  it("uses stable distinct colors for standard benchmark symbols", () => {
+    const w = mount(PortfolioPerformanceChart, {
+      props: {
+        timeSeries: [ts("2026-07-01", 500)],
+        benchmarks: [
+          { symbol: "QQQ", name: "Nasdaq 100", absoluteTimeSeries: [{ date: "2026-07-01", value: 1000 }] },
+          { symbol: "SPY", name: "S&P 500", absoluteTimeSeries: [{ date: "2026-07-01", value: 1000 }] },
+          { symbol: "DIA", name: "Dow Jones", absoluteTimeSeries: [{ date: "2026-07-01", value: 1000 }] },
+        ],
+      },
+      global: { stubs: { apexchart: true } },
+    })
+    const opts = chartOptions(w)
+    expect(opts.colors.slice(1)).toEqual(["#c084fc", "#94a3b8", "#f59e0b"])
+    expect(opts.stroke.dashArray).toEqual([0, 0, 0, 0])
   })
 
   it("keeps the absolute benchmark visible when the portfolio starts near zero (ALL timeframe)", () => {
