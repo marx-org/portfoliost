@@ -363,12 +363,20 @@ const chartSeries = computed(() => {
   }))
 })
 
-// Benchmark overlays are a flow-mirrored INDEX (starts at 100) — dimensionless.
-// The chart plots them as % change on their own right axis, so they must NOT be
-// scaled by the display-currency rate: an index has no currency, and scaling it
-// would only rotate the numbers without changing the shape.
+// Benchmark overlays carry two series: `timeSeries` is the flow-adjusted index
+// used by yearly/excess calculations, while `absoluteTimeSeries` is the
+// flow-mirrored value that belongs on the equity chart. The latter is in the
+// portfolio base currency and needs the same display-currency conversion as
+// the portfolio and Invested lines.
 const chartBenchmarks = computed(() => {
-  return (props.analytics?.benchmarks ?? []).map((b) => ({ ...b }))
+  const rate = chartRate.value ?? 1
+  return (props.analytics?.benchmarks ?? []).map((b) => ({
+    ...b,
+    absoluteTimeSeries: (b.absoluteTimeSeries ?? []).map((p) => ({
+      ...p,
+      value: (p.value ?? 0) * rate,
+    })),
+  }))
 })
 
 // Config-only options (no `series`) so a refresh takes the updateSeries() path

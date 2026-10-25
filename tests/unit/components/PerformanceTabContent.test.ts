@@ -74,9 +74,9 @@ async function mountContent(
         // the stub surfaces both props it decides the overlay with: the flag
         // itself, and the `invested` value on the series it forwards.
         PortfolioPerformanceChart: {
-          props: ["showInvested", "timeSeries"],
+          props: ["showInvested", "timeSeries", "benchmarks", "currency"],
           template:
-            "<div data-testid='chart-stub' :data-show-invested='String(showInvested)' :data-invested='String(timeSeries?.[0]?.invested)' />",
+            "<div data-testid='chart-stub' :data-show-invested='String(showInvested)' :data-invested='String(timeSeries?.[0]?.invested)' :data-benchmark='String(benchmarks?.[0]?.absoluteTimeSeries?.[0]?.value)' :data-currency='String(currency)' />",
         },
         InstrumentSearchModal: true,
         TickerBadge: true,
@@ -168,6 +168,29 @@ describe("PerformanceTabContent — §83.1 prop-driven tab body", () => {
     expect(wrapper.get('[data-testid="perf-overview-net-gain"]').text()).toContain("€75")
     // Same DOM node: the component was updated, not torn down.
     expect(wrapper.get('[data-testid="perf-overview-net-gain"]').element).toBe(before)
+  })
+
+  it("converts the absolute benchmark series with the display currency", async () => {
+    const wrapper = await mountContent({
+      analytics: {
+        ...analytics(),
+        benchmarks: [{
+          symbol: "SPY",
+          name: "S&P 500",
+          timeSeries: [{ date: "2026-01-01", value: 100 }],
+          absoluteTimeSeries: [{ date: "2026-01-01", value: 1000 }],
+        }],
+      } as never,
+    })
+    expect(wrapper.get('[data-testid="chart-stub"]').attributes("data-benchmark")).toBe("1000")
+    expect(wrapper.get('[data-testid="chart-stub"]').attributes("data-currency")).toBe("USD")
+
+    mockedRate.mockResolvedValue({ rate: 0.25, asOf: "2026-10-02" } as never)
+    useDisplayCurrencyStore().currency = "EUR"
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="chart-stub"]').attributes("data-benchmark")).toBe("250")
+    expect(wrapper.get('[data-testid="chart-stub"]').attributes("data-currency")).toBe("EUR")
   })
 
   /**

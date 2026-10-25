@@ -1,16 +1,9 @@
 <script setup lang="ts">
 /**
  * Reusable portfolio performance chart (plan §27.4, §41): plots the raw
- * absolute `value` series (0 → ~111k USD) with a benchmark overlay. The
- * cumulative TWR/MWR/simple columns are % stats in the payload — they do NOT
- * drive the line (plan §41, example-service-verified).
- *
- * The benchmark is the backend's flow-mirrored index (starts at 100) —
- * dimensionless. It is drawn on a SECONDARY right axis as % change since the
- * window start, not rebased onto the absolute left axis: rebased, it read as
- * flat for long windows (ALL starts at the portfolio's tiny inception value,
- * so a 100→160 index plotted at a few percent of a 300k axis looks flat).
- * The two quantities cannot share one scale.
+ * absolute `value` series (0 → ~111k USD) with an absolute, flow-mirrored
+ * benchmark overlay. The cumulative TWR/MWR/simple columns in the payload are
+ * return statistics — they do NOT drive the equity lines.
  */
 import { computed } from "vue"
 import { formatCompactCurrency, formatCurrency } from "@/utils/format"
@@ -35,23 +28,8 @@ interface BenchmarkSeries {
   name?: string
   returnPercent?: number
   timeSeries?: Array<{ date?: string; value?: number }>
-}
-
-/**
- * The benchmark's points as % change since the first usable index value.
- *
- * `first` is the first point with a positive finite value — the route's index
- * starts at 100, so the first point is 0% by construction. Points without a
- * value become `null` (gaps), never 0: 0 is a real number on this axis.
- */
-function benchmarkPercentPoints(benchmark: Array<{ date?: string; value?: number }>): [number, number | null][] {
-  const points = benchmark
-  const first = points.find((p) => typeof p.value === "number" && Number.isFinite(p.value) && p.value > 0)?.value
-  if (first == null) return []
-  return points.map((p) => [
-    new Date(p.date ?? "").getTime(),
-    typeof p.value === "number" ? Math.round((p.value / first - 1) * 100 * 100) / 100 : null,
-  ])
+  /** Absolute flow-mirrored value in the portfolio/display currency. */
+  absoluteTimeSeries?: Array<{ date?: string; value?: number }>
 }
 
 const props = withDefaults(
@@ -86,7 +64,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{ recompute: [] }>()
 
-const toPoint = (p: PerformancePoint): [number, number] => [new Date(p.date ?? "").getTime(), p.value ?? 0]
+const toPoint = (p: { date?: string; value?: number }): [number, number] => [new Date(p.date ?? "").getTime(), p.value ?? 0]
 
 // §cash-invested overlay — the "Invested" line (cumulative net money-in) is
 // only drawn when the caller passes it through, so it shows on the per-
@@ -179,48 +157,35 @@ const gapMessage = computed(() => {
 let chartOptionsCache: { key: string; value: ChartOptions } | null = null
 type ChartOptions = ReturnType<typeof buildChartOptions>
 
-/** Right-axis + tooltip colour of the benchmark overlay (matches its line). */
+/** Colour of the benchmark overlay (matches its line). */
 const BENCHMARK_COLOR = "#94a3b8"
-
-function formatPercent(value: number): string {
-  return `${value > 0 ? "+" : ""}${value.toFixed(1)}%`
-}
 
 function buildChartOptions() {
   const benchmarks = props.benchmarks ?? []
   const hasInv = hasInvested.value
   // Series slots: 0 = Portfolio, 1 = Invested (optional), then benchmarks.
-  const benchmarkIndexes = new Set(
-    benchmarks.map((_, i) => 1 + (hasInv ? 1 : 0) + i),
-  )
+  // Every slot is an absolute value in the same display currency.
+  const valueSeriesNames = [
+    "Portfolio",
+    ...(hasInv ? ["Invested"] : []),
+    ...benchmarks.map((b) => b.name || b.symbol || "Benchmark"),
+  ]
   return {
     chart: { type: "line" as const, toolbar: { show: false }, zoom: { enabled: false } },
     colors: [props.color, ...(hasInv ? [INVESTED_COLOR] : []), ...benchmarks.map(() => BENCHMARK_COLOR)],
     xaxis: { type: "datetime" as const, labels: { datetimeUTC: false } },
-    // Left axis: the portfolio (and Invested) in display currency.
-    // Right axis: the benchmark index as % change since the window start.
+    // Portfolio, Invested, and the absolute flow-mirrored benchmarks share one
+    // currency axis so a deposit/withdrawal is visible in every line.
     yaxis: [
       {
-        seriesName: hasInv ? ["Portfolio", "Invested"] : ["Portfolio"],
+        seriesName: valueSeriesNames,
         labels: { formatter: (v: number) => formatCompactCurrency(v, props.currency) },
-      },
-      {
-        seriesName: benchmarks.map((b) => b.name || b.symbol || "Benchmark"),
-        show: benchmarks.length > 0,
-        opposite: true,
-        labels: {
-          style: { colors: BENCHMARK_COLOR },
-          formatter: (v: number) => (v > 0 ? "+" : "") + v.toFixed(0) + "%",
-        },
       },
     ],
     tooltip: {
       shared: true,
       y: {
-        formatter: (v: number, opts: { seriesIndex?: number }) =>
-          benchmarkIndexes.has(opts.seriesIndex ?? -1)
-            ? formatPercent(v)
-            : formatCurrency(v, props.currency),
+        formatter: (v: number) => formatCurrency(v, props.currency),
       },
     },
     // Portfolio line solid+bold; Invested solid+thinner; benchmarks dashed+thin.
@@ -254,7 +219,7 @@ const seriesData = computed(() => {
       : []),
     ...benchmarks.map((b) => ({
       name: b.name || b.symbol || "Benchmark",
-      data: benchmarkPercentPoints(b.timeSeries ?? []),
+      data: (b.absoluteTimeSeries ?? []).map(toPoint),
     })),
   ]
 })
@@ -277,7 +242,7 @@ const chartKey = computed(() => {
     hasInvested.value ? "inv" : "",
     benchmarks.map((b) => b.name || b.symbol || "Benchmark").join(","),
     `${props.timeSeries.length}|${(props.timeSeries[0]?.value ?? "").toString()}|${tail(props.timeSeries)}|${(props.timeSeries.at(-1)?.invested ?? "").toString()}`,
-    ...benchmarks.map((b) => `${(b.timeSeries ?? []).length}|${tail(b.timeSeries)}`),
+    ...benchmarks.map((b) => `${(b.absoluteTimeSeries ?? []).length}|${tail(b.absoluteTimeSeries)}`),
   ].join("~")
 })
 

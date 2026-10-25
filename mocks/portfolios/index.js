@@ -269,7 +269,7 @@ export function register(app) {
       : []
     const available = benchmarkSymbols()
     const symbols = wanted.filter((s) => available.includes(s))
-    const benchmarks = symbols.map((s) => benchmarkSeries(s, timeframe))
+    const benchmarks = symbols.map((s) => benchmarkSeries(s, timeframe, base.performance))
     ctx.res.json({ ...base, performance: withInvestedSeries(base.performance), benchmarks })
   })
 
@@ -474,7 +474,7 @@ export function register(app) {
       : []
     const available = benchmarkSymbols()
     const symbols = wanted.filter((s) => available.includes(s))
-    const benchmarks = symbols.map((s) => benchmarkSeries(s, timeframe))
+    const benchmarks = symbols.map((s) => benchmarkSeries(s, timeframe, base.performance))
 
     // A created portfolio starts with an empty backfill: the analytics call
     // reports `pending` (mirroring the real backend's n<2 auto-trigger) until
