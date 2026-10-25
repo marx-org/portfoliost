@@ -57,6 +57,19 @@ describe("SystemInfoView", () => {
     expect(services.map((r) => r.attributes("data-testid"))).toEqual(["sys-row-portfoliost", "sys-row-openst"])
   })
 
+  it("renders jobshot as a deployment without a schedule row", async () => {
+    mocked.mockResolvedValue({
+      services: [realRow("jobshot", "v1.6.1", "ghcr.io/marx-org/jobshot:v1.6.1")],
+      fetchedAt: "2026-10-19T10:00:00.000Z",
+    })
+    const wrapper = mount(SystemInfoView)
+    await flushPromises()
+
+    const row = wrapper.get('[data-testid="sys-row-jobshot"]')
+    expect(row.text()).toContain("Deployment")
+    expect(row.find('[data-testid="sys-schedule-jobshot"]').exists()).toBe(false)
+  })
+
   it("humanizes cron schedules while retaining the deployed version and raw expression", async () => {
     mocked.mockResolvedValue({
       services: [
