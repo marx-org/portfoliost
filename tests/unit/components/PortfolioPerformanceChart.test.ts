@@ -41,18 +41,18 @@ describe("PortfolioPerformanceChart (§41.1)", () => {
     expect(opts.yaxis[0].labels.formatter(94000)).toMatch(/K/i)
   })
 
-  it("formats the portfolio tooltip as full currency and the benchmark as % change", () => {
+  it("formats the portfolio and benchmark tooltips as full currency", () => {
     const w = mount(PortfolioPerformanceChart, {
       props: {
         timeSeries: [ts("2026-07-01", 500)],
-        benchmarks: [{ name: "S&P 500", timeSeries: [{ date: "2026-07-01", value: 100 }] }],
+        benchmarks: [{ name: "S&P 500", absoluteTimeSeries: [{ date: "2026-07-01", value: 100 }] }],
         currency: "USD",
       },
       global: { stubs: { apexchart: true } },
     })
     const opts = chartOptions(w)
     expect(opts.tooltip.y.formatter(94508.33, { seriesIndex: 0 })).toBe("$94,508.33")
-    expect(opts.tooltip.y.formatter(41.2, { seriesIndex: 1 })).toBe("+41.2%")
+    expect(opts.tooltip.y.formatter(41.2, { seriesIndex: 1 })).toBe("$41.20")
   })
 
   it("draws the 'Invested' line (same axis) when timeSeries carries invested", () => {
@@ -86,33 +86,29 @@ describe("PortfolioPerformanceChart (§41.1)", () => {
     expect(opts.series[0].name).toBe("Portfolio")
   })
 
-  it("plots the benchmark as % change since the window start on its own right axis", () => {
+  it("plots the benchmark absolute values on the shared currency axis", () => {
     const w = mount(PortfolioPerformanceChart, {
       props: {
         timeSeries: [ts("2026-07-01", 500), ts("2026-07-02", 94000)],
         benchmarks: [
-          { symbol: "SPY", name: "S&P 500", timeSeries: [{ date: "2026-07-01", value: 100 }, { date: "2026-07-02", value: 110 }] },
+          { symbol: "SPY", name: "S&P 500", absoluteTimeSeries: [{ date: "2026-07-01", value: 1000 }, { date: "2026-07-02", value: 1100 }] },
         ],
       },
       global: { stubs: { apexchart: true } },
     })
     const opts = chartOptions(w)
-    // 100→110 index reads as 0%→+10%: dimensionless, independent of the
-    // portfolio's absolute scale.
+    // Absolute benchmark money is comparable with the portfolio and invested
+    // lines, including visible cash-flow steps.
     expect(opts.series).toHaveLength(2)
     expect(opts.series[1].name).toBe("S&P 500")
-    expect(opts.series[1].data.map(([, v]) => v)).toEqual([0, 10])
-    expect(opts.yaxis[1].seriesName).toEqual(["S&P 500"])
-    expect(opts.yaxis).toHaveLength(2)
-    expect(opts.yaxis[1].show).toBe(true)
-    expect(opts.yaxis[1].labels.formatter(40)).toBe("+40%")
+    expect(opts.series[1].data.map(([, v]) => v)).toEqual([1000, 1100])
+    expect(opts.yaxis[0].seriesName).toEqual(["Portfolio", "S&P 500"])
+    expect(opts.yaxis).toHaveLength(1)
+    expect(opts.yaxis[0].labels.formatter(1100)).toMatch(/\$/)
     expect(opts.stroke.dashArray).toEqual([0, 4])
   })
 
-  it("keeps the benchmark visible when the portfolio starts near zero (ALL timeframe)", () => {
-    // The ALL window starts at the portfolio's inception (a few thousand
-    // against a 300k axis). Rebased onto that anchor the index looked flat;
-    // the % axis cannot be flattened by the portfolio's scale at all.
+  it("keeps the absolute benchmark visible when the portfolio starts near zero (ALL timeframe)", () => {
     const w = mount(PortfolioPerformanceChart, {
       props: {
         timeSeries: [
@@ -123,66 +119,67 @@ describe("PortfolioPerformanceChart (§41.1)", () => {
         benchmarks: [
           {
             name: "S&P 500",
-            timeSeries: [
-              { date: "2022-07-01", value: 100 },
-              { date: "2022-07-02", value: 101 },
-              { date: "2026-10-10", value: 140 },
+            absoluteTimeSeries: [
+              { date: "2022-07-01", value: 1000 },
+              { date: "2022-07-02", value: 1010 },
+              { date: "2026-10-10", value: 1400 },
             ],
           },
         ],
       },
       global: { stubs: { apexchart: true } },
     })
-    expect(chartOptions(w).series[1].data.map(([, v]) => v)).toEqual([0, 1, 40])
+    expect(chartOptions(w).series[1].data.map(([, v]) => v)).toEqual([1000, 1010, 1400])
   })
 
-  it("renders negative benchmark moves as negative % on the right axis", () => {
+  it("renders negative absolute benchmark moves on the shared axis", () => {
     const w = mount(PortfolioPerformanceChart, {
       props: {
         timeSeries: [ts("2026-07-01", 500)],
         benchmarks: [
-          { name: "S&P 500", timeSeries: [{ date: "2026-07-01", value: 100 }, { date: "2026-07-02", value: 95 }] },
+          { name: "S&P 500", absoluteTimeSeries: [{ date: "2026-07-01", value: 100 }, { date: "2026-07-02", value: 95 }] },
         ],
       },
       global: { stubs: { apexchart: true } },
     })
     const opts = chartOptions(w)
-    expect(opts.series[1].data.map(([, v]) => v)).toEqual([0, -5])
-    expect(opts.tooltip.y.formatter(-5, { seriesIndex: 1 })).toBe("-5.0%")
+    expect(opts.series[1].data.map(([, v]) => v)).toEqual([100, 95])
+    expect(opts.tooltip.y.formatter(95, { seriesIndex: 1 })).toBe("$95.00")
   })
 
-  it("keeps the Invested tooltip in currency and the benchmark (after it) in %", () => {
+  it("keeps the Invested and benchmark tooltips in currency", () => {
     const w = mount(PortfolioPerformanceChart, {
       props: {
         timeSeries: [
           { date: "2026-07-01", value: 500, invested: 400 },
         ],
-        benchmarks: [{ name: "S&P 500", timeSeries: [{ date: "2026-07-01", value: 100 }] }],
+        benchmarks: [{ name: "S&P 500", absoluteTimeSeries: [{ date: "2026-07-01", value: 100 }] }],
       },
       global: { stubs: { apexchart: true } },
     })
     const opts = chartOptions(w)
     expect(opts.series).toHaveLength(3)
-    expect(opts.yaxis[1].seriesName).toEqual(["S&P 500"])
+    expect(opts.yaxis[0].seriesName).toEqual(["Portfolio", "Invested", "S&P 500"])
     expect(opts.tooltip.y.formatter(90000, { seriesIndex: 1 })).toBe("$90,000.00")
-    expect(opts.tooltip.y.formatter(12.5, { seriesIndex: 2 })).toBe("+12.5%")
+    expect(opts.tooltip.y.formatter(12.5, { seriesIndex: 2 })).toBe("$12.50")
   })
 
-  it("hides the right axis and plots no benchmark when none is selected", () => {
+  it("uses one currency axis and plots no benchmark when none is selected", () => {
     const w = mount(PortfolioPerformanceChart, {
       props: { timeSeries: [ts("2026-07-01", 500)] },
       global: { stubs: { apexchart: true } },
     })
     const opts = chartOptions(w)
     expect(opts.series).toHaveLength(1)
-    expect(opts.yaxis[1].show).toBe(false)
+    expect(opts.yaxis).toHaveLength(1)
+    expect(opts.yaxis[0].seriesName).toEqual(["Portfolio"])
   })
 
-  it("plots an empty benchmark when its index has no usable starting value", () => {
+  it("plots an empty benchmark when no absolute series is returned", () => {
     const w = mount(PortfolioPerformanceChart, {
       props: {
         timeSeries: [ts("2026-07-01", 500)],
-        benchmarks: [{ name: "S&P 500", timeSeries: [{ date: "2026-07-01", value: 0 }] }],
+        benchmarks: [{ name: "S&P 500", absoluteTimeSeries: [] }],
       },
       global: { stubs: { apexchart: true } },
     })
@@ -373,23 +370,22 @@ describe("PortfolioPerformanceChart (§149 — showInvested capability)", () => 
   })
 
   it("gives the benchmark the slot Invested would have taken once it is off", () => {
-    // Slot arithmetic is what breaks if only the series is dropped: the tooltip
-    // decides currency vs % by slot index, so a benchmark must move into
-    // index 1 and the portfolio-index in front of it must not be read as one.
+    // Slot arithmetic must still keep the benchmark on the shared currency
+    // axis when the optional Invested line is disabled.
     const w = mount(PortfolioPerformanceChart, {
       props: {
         timeSeries: withInvested,
         showInvested: false,
-        benchmarks: [{ name: "S&P 500", timeSeries: [{ date: "2026-07-01", value: 100 }, { date: "2026-07-02", value: 110 }] }],
+        benchmarks: [{ name: "S&P 500", absoluteTimeSeries: [{ date: "2026-07-01", value: 1000 }, { date: "2026-07-02", value: 1100 }] }],
       },
       global: { stubs: { apexchart: true } },
     })
     const opts = chartOptions(w)
     expect(opts.series.map((s) => s.name)).toEqual(["Portfolio", "S&P 500"])
-    expect(opts.yaxis[1].seriesName).toEqual(["S&P 500"])
-    // index 0 is the portfolio (currency), index 1 is the benchmark (%)
+    expect(opts.yaxis[0].seriesName).toEqual(["Portfolio", "S&P 500"])
+    // Both series are absolute values in the same currency.
     expect(opts.tooltip.y.formatter(500, { seriesIndex: 0 })).toBe("$500.00")
-    expect(opts.tooltip.y.formatter(10, { seriesIndex: 1 })).toBe("+10.0%")
+    expect(opts.tooltip.y.formatter(1100, { seriesIndex: 1 })).toBe("$1,100.00")
   })
 })
 /**

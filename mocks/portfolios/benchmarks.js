@@ -68,7 +68,7 @@ function businessDaysBetween(start, end) {
   return days
 }
 
-export function benchmarkSeries(symbol, timeframe = "1Y") {
+export function benchmarkSeries(symbol, timeframe = "1Y", performance = null) {
   const start = START_BY_TIMEFRAME[timeframe] || START_BY_TIMEFRAME["1Y"]
   const days = businessDaysBetween(start, END_DATE)
   const rng = mulberry32(hashSeed(symbol + ":" + timeframe))
@@ -86,10 +86,40 @@ export function benchmarkSeries(symbol, timeframe = "1Y") {
   const last = timeSeries[timeSeries.length - 1]?.value ?? 100
   const returnPercent = (last / first - 1) * 100
 
+  // Keep the mock response aligned with the live contract: `timeSeries` is the
+  // indexed return line, while the chart consumes an absolute flow-mirrored
+  // value line. The fixture's investedCapital is the cumulative cash schedule.
+  const investedRows = (performance?.timeSeries ?? [])
+    .map((p) => ({ date: p.date, invested: Number(p.invested ?? p.investedCapital ?? 0) }))
+    .filter((p) => typeof p.date === "string")
+    .sort((a, b) => a.date.localeCompare(b.date))
+  const absoluteTimeSeries = []
+  let row = 0
+  let previousInvested = 0
+  let units = 0
+  for (const point of timeSeries) {
+    while (row < investedRows.length && investedRows[row].date <= point.date) {
+      const flow = investedRows[row].invested - previousInvested
+      if (flow !== 0) units = Math.max(0, units + flow / point.value)
+      previousInvested = investedRows[row].invested
+      row++
+    }
+    absoluteTimeSeries.push({ date: point.date, value: Math.round(units * point.value * 100) / 100 })
+  }
+
+  // A fixture without investedCapital still needs a visible absolute line.
+  if (absoluteTimeSeries.every((p) => p.value === 0)) {
+    const seed = Number(performance?.capitalBasis ?? 0)
+    for (let i = 0; i < absoluteTimeSeries.length; i++) {
+      absoluteTimeSeries[i].value = Math.round(seed * (timeSeries[i].value / first) * 100) / 100
+    }
+  }
+
   return {
     symbol,
     name: benchmarkName(symbol),
     timeSeries,
+    absoluteTimeSeries,
     returnPercent: Math.round(returnPercent * 100) / 100,
     volatility: vol,
   }
