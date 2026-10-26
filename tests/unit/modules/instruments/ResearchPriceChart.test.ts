@@ -217,7 +217,7 @@ describe("PriceChart", () => {
     const wrapper = mountChart()
     await flushPromises()
     await checkTransactions(wrapper)
-    expect(mockedGetAllTransactions).toHaveBeenCalledWith(1, 500, "date", "asc", undefined, "AAPL")
+    expect(mockedGetAllTransactions).toHaveBeenCalledWith(1, 100, "date", "asc", undefined, "AAPL")
     expect(mockedGetPortfolioTransactions).not.toHaveBeenCalled()
   })
 
@@ -225,8 +225,28 @@ describe("PriceChart", () => {
     const wrapper = mountChart({ portfolioId: "p1" })
     await flushPromises()
     await checkTransactions(wrapper)
-    expect(mockedGetPortfolioTransactions).toHaveBeenCalledWith("p1", 1, 500, "date", "asc", undefined, undefined, "AAPL")
+    expect(mockedGetPortfolioTransactions).toHaveBeenCalledWith("p1", 1, 100, "date", "asc", undefined, undefined, "AAPL")
     expect(mockedGetAllTransactions).not.toHaveBeenCalled()
+  })
+
+  it("loads later transaction pages when the API caps each page at 100 rows", async () => {
+    const dates = makeHistory().timestamps
+    const firstPage = Array.from({ length: 100 }, (_, i) =>
+      makeTx({ id: `page-1-${i}`, type: "BUY", executedAt: new Date(dates[0] * 1000).toISOString() }),
+    )
+    const secondPage = [makeTx({ id: "page-2", type: "SELL", executedAt: new Date(dates[1] * 1000).toISOString() })]
+    mockedGetPortfolioTransactions
+      .mockResolvedValueOnce({ items: firstPage, total: 101, page: 1, limit: 100 } as never)
+      .mockResolvedValueOnce({ items: secondPage, total: 101, page: 2, limit: 100 } as never)
+
+    const wrapper = mountChart({ portfolioId: "p1" })
+    await flushPromises()
+    await checkTransactions(wrapper)
+    await flushPromises()
+
+    expect(mockedGetPortfolioTransactions).toHaveBeenNthCalledWith(1, "p1", 1, 100, "date", "asc", undefined, undefined, "AAPL")
+    expect(mockedGetPortfolioTransactions).toHaveBeenNthCalledWith(2, "p1", 2, 100, "date", "asc", undefined, undefined, "AAPL")
+    expect((wrapper.vm as unknown as { transactions: unknown[] }).transactions).toHaveLength(101)
   })
 
   it("unchecking the Transactions checkbox clears transactions", async () => {

@@ -120,23 +120,48 @@ const transactionsLoading = ref(false)
 const transactionsError = ref<string | null>(null)
 const hasMoreTransactions = ref(false)
 const maxTxs = ref(props.maxTransactions ?? 500)
+// The wallets routes cap a page at 100 rows. Keep following pages instead of
+// asking for maxTxs in one request: chart transactions are sorted ascending,
+// so a single capped request silently loses the newest trades.
+const TRANSACTION_PAGE_SIZE = 100
 
 async function fetchTransactions(): Promise<void> {
   transactionsLoading.value = true
   transactionsError.value = null
   try {
-    const limit = maxTxs.value
+    const limit = Math.min(maxTxs.value, TRANSACTION_PAGE_SIZE)
     const symbol = props.symbol
-    let result
-    if (props.portfolioId) {
-      result = await getPortfolioTransactions(props.portfolioId, 1, limit, "date", "asc", undefined, undefined, symbol)
-    } else if (txPortfolioId.value !== "all") {
-      result = await getPortfolioTransactions(txPortfolioId.value, 1, limit, "date", "asc", undefined, undefined, symbol)
-    } else {
-      result = await getAllTransactions(1, limit, "date", "asc", undefined, symbol)
+    const allTransactions: Transaction[] = []
+    let page = 1
+    let total: number | undefined
+
+    while (allTransactions.length < maxTxs.value) {
+      const result = props.portfolioId
+        ? await getPortfolioTransactions(props.portfolioId, page, limit, "date", "asc", undefined, undefined, symbol)
+        : txPortfolioId.value !== "all"
+          ? await getPortfolioTransactions(txPortfolioId.value, page, limit, "date", "asc", undefined, undefined, symbol)
+          : await getAllTransactions(page, limit, "date", "asc", undefined, symbol)
+
+      const items = result.items ?? []
+      allTransactions.push(...items)
+      total = typeof result.total === "number" ? result.total : total
+
+      // The production API currently omits hasNext, so use total and the
+      // effective page size as the termination conditions.
+      const effectiveLimit = result.limit || limit
+      if (
+        items.length === 0 ||
+        allTransactions.length >= maxTxs.value ||
+        (total !== undefined && allTransactions.length >= total) ||
+        items.length < effectiveLimit
+      ) {
+        break
+      }
+      page++
     }
-    transactions.value = result.items
-    hasMoreTransactions.value = result.hasNext
+
+    transactions.value = allTransactions.slice(0, maxTxs.value)
+    hasMoreTransactions.value = total !== undefined && total > transactions.value.length
   } catch (err) {
     transactionsError.value = err instanceof Error ? err.message : "Failed to load transactions"
     transactions.value = []
