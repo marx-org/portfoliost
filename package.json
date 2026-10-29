@@ -24,7 +24,7 @@
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.1.1",
-    "@marx-org/contracts": "^1.6.79",
+    "@marx-org/contracts": "^1.6.81",
     "@vue-flow/core": "^1.48.2",
     "apexcharts": "^8.3.1",
     "pinia": "^4.1.0",
