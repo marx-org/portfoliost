@@ -27,7 +27,8 @@ COPY src/ src/
 COPY generated/ generated/
 COPY mocks/shared/data/universe.json mocks/shared/data/universe.json
 
-RUN --mount=type=secret,id=NODE_AUTH_TOKEN,env=NODE_AUTH_TOKEN \
+RUN --mount=type=secret,id=NODE_AUTH_TOKEN,env=NODE_AUTH_TOKEN,required=true \
+    printf '%s\n' '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}' >> .npmrc && \
     npm ci && \
     rm -f .npmrc && \
     npm run build

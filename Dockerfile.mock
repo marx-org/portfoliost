@@ -5,7 +5,8 @@ FROM ghcr.io/marx-org/base-node:22-alpine@sha256:2be4359005a5800a6aa0bbb32363271
 WORKDIR /app
 
 COPY package.json package-lock.json .npmrc ./
-RUN --mount=type=secret,id=NODE_AUTH_TOKEN,env=NODE_AUTH_TOKEN \
+RUN --mount=type=secret,id=NODE_AUTH_TOKEN,env=NODE_AUTH_TOKEN,required=true \
+    printf '%s\n' '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}' >> .npmrc && \
     npm ci --omit=dev && \
     rm -f .npmrc
 
