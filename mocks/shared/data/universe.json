@@ -180,6 +180,16 @@
     "source": "FINNHUB"
   },
   {
+    "symbol": "TXN",
+    "name": "Texas Instruments Incorporated",
+    "type": "STOCK",
+    "exchange": "US",
+    "currency": "USD",
+    "sector": "Technology",
+    "industry": "Semiconductors",
+    "source": "FINNHUB"
+  },
+  {
     "symbol": "V",
     "name": "Visa Inc",
     "type": "STOCK",
