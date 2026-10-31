@@ -27,7 +27,9 @@ function localUrl(value: string | undefined, fallback: string): string {
   return url.origin
 }
 
-const MOCK = localUrl(process.env.PORTFOLIOST_MOCK_URL, "http://localhost:4010")
+const MOCK = process.env.PORTFOLIOST_MOCK_URL === "http://localhost:14010"
+  ? "http://localhost:14010"
+  : "http://localhost:4010"
 const GATEWAY = localUrl(process.env.PORTFOLIOST_GATEWAY_URL, "http://localhost:8080")
 
 async function login(page: Page) {

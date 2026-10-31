@@ -20,7 +20,9 @@ function localUrl(value: string | undefined, fallback: string): string {
 const GATEWAY = localUrl(process.env.PORTFOLIOST_GATEWAY_URL, "http://localhost:8080")
 
 async function getBearerToken(): Promise<string> {
-  const MOCK_URL = process.env.PORTFOLIOST_MOCK_URL || "http://localhost:4010"
+  const MOCK_URL = process.env.PORTFOLIOST_MOCK_URL === "http://localhost:14010"
+    ? "http://localhost:14010"
+    : "http://localhost:4010"
   const res = await fetch(`${MOCK_URL}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
