@@ -10,6 +10,7 @@ import { seedPortfolios } from "./portfolios.mjs"
 import { seedUserPreferences } from "./user-preferences.mjs"
 import { seedFundCatalogue, seedTickerReference } from "./ticker-reference.mjs"
 import { seedOpenstNoPriceBonds } from "./openst.mjs"
+import { seedNewsArticles } from "./news-articles.mjs"
 
 const DATABASE_URL =
   process.env.DATABASE_URL ||
@@ -34,6 +35,7 @@ try {
     console.log("[db-seed] portfolios: SEED_PORTFOLIOS=false, skipping")
   }
 
+  await seedNewsArticles(sql)
   await seedUserPreferences(sql)
   await seedTickerReference(sql)
   await seedFundCatalogue(sql)
