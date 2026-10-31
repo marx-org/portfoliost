@@ -414,9 +414,14 @@ test("transactions page groups by kind of investment, sector, and country", asyn
   await expect(groupSelect).toHaveValue("none")
 
   await groupSelect.selectOption("assetType")
-  await expect(page.getByTestId("transactions-group-row")).toHaveCount(1)
-  await expect(page.getByTestId("transactions-group-row")).toContainText("Stock")
+  const assetTypeGroups = page.getByTestId("transactions-group-row")
+  // Earlier E2E specs add transactions of more than one asset type to the
+  // shared demo account. Assert the stable seeded Stock group, and that every
+  // rendered asset-type group has its subtotal, without assuming there is only
+  // one kind in the accumulated test data.
+  await expect(assetTypeGroups.filter({ hasText: "Stock" })).toHaveCount(1)
   await expect(page.getByText(/Stock subtotal/)).toHaveCount(1)
+  await expect(page.getByText(/subtotal/)).toHaveCount(await assetTypeGroups.count())
 
   await groupSelect.selectOption("sector")
   const globalSectorGroups = page.getByTestId("transactions-group-row")

@@ -18,11 +18,16 @@ cd "$(dirname "$0")/.."
 
 # 1. In-memory mock state (auth sessions, watchlists, news, charting...).
 docker compose restart example-service-mock >/dev/null
+MOCK_HEALTH_URL=${PORTFOLIOST_MOCK_URL:-http://localhost:4010}
+case "$MOCK_HEALTH_URL" in
+  http://localhost:*|http://127.0.0.1:*) ;;
+  *) echo "mock health URL must be a local Compose endpoint" >&2; exit 1 ;;
+esac
 
 healthy=""
 for i in $(seq 1 30); do
   if curl -sf -o /dev/null -H "Authorization: Bearer mock-dev-token" \
-    "http://localhost:4010/api/auth/me"; then
+    "${MOCK_HEALTH_URL%/}/api/auth/me"; then
     healthy="yes"
     break
   fi

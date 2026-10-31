@@ -1,0 +1,17 @@
+{
+  "name": "portfoliost-contracts-generator",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate": "openapi-typescript ../../node_modules/@marx-org/contracts/openapi.yaml -o ../../generated/api-types.d.ts",
+    "typecheck:vue": "cd ../.. && node tools/contracts-generator/node_modules/vue-tsc/bin/vue-tsc.js --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "openapi-typescript": "7.13.0",
+    "typescript": "5.9.3",
+    "vue-tsc": "3.3.14"
+  },
+  "overrides": {
+    "minimatch": "11.0.3"
+  }
+}

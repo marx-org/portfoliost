@@ -21,7 +21,9 @@ ARG VITE_PASSWORD_LOGIN_ENABLED=""
 ENV VITE_PASSWORD_LOGIN_ENABLED=$VITE_PASSWORD_LOGIN_ENABLED
 
 COPY package.json package-lock.json .npmrc ./
-COPY index.html vite.config.ts tailwind.config.js postcss.config.js tsconfig.json tsconfig.node.json ./
+COPY index.html vite.config.ts tailwind.config.js postcss.config.js tsconfig.json tsconfig.node.json tsconfig.ts7.json ./
+COPY tools/contracts-generator/ tools/contracts-generator/
+COPY tools/typescript7/ tools/typescript7/
 COPY public/ public/
 COPY src/ src/
 COPY generated/ generated/

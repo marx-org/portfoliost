@@ -6,5 +6,6 @@ COPY mocks/db-seed/package.json ./
 RUN npm install --omit=dev
 
 COPY mocks/db-seed/ ./
+COPY mocks/shared/data/raw/news_articles_all.json ./fixtures/news_articles_all.json
 
 CMD ["node", "run.mjs"]
