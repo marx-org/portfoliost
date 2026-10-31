@@ -258,9 +258,10 @@ test.describe("§84.10 accounts balance across viewports", () => {
     // …and it must not be a translucent cell with numbers bleeding through it.
     const alpha = await page.evaluate(() => {
       const el = document.querySelector('[data-testid="accounts-balance-account"]')!
-      const m = getComputedStyle(el).backgroundColor.match(/rgba?\(([^)]+)\)/)!
-      const parts = m[1].split(",").map(Number)
-      return parts.length > 3 ? parts[3] : 1
+      const color = getComputedStyle(el).backgroundColor
+      const alpha = color.match(/(?:\/|,)\s*([\d.]+)(%)?\s*\)$/)
+      if (!alpha) return color === "transparent" ? 0 : 1
+      return Number(alpha[1]) * (alpha[2] ? 0.01 : 1)
     })
     expect(alpha).toBe(1)
   })
