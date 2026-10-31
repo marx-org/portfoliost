@@ -17,7 +17,7 @@ function localUrl(value: string | undefined, fallback: string): string {
   return url.origin
 }
 
-const GATEWAY = localUrl("http://localhost:8080", "http://localhost:8080")
+const GATEWAY = localUrl(process.env.PORTFOLIOST_GATEWAY_URL, "http://localhost:8080")
 
 async function getBearerToken(): Promise<string> {
   const MOCK_URL = process.env.PORTFOLIOST_MOCK_URL || "http://localhost:4010"
