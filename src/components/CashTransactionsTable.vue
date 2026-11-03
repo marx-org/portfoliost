@@ -26,6 +26,7 @@ import LabelPickerPopover from "@/components/LabelPickerPopover.vue"
 import { triggerRectFromEvent, type TriggerRect } from "@/utils/popoverPosition"
 import PortfolioCashModals from "@/modules/portfolios/PortfolioCashModals.vue"
 import ConfirmDeleteModal from "@/modules/portfolios/ConfirmDeleteModal.vue"
+import { usePortfolioStore } from "@/stores/portfolios"
 import type { components } from "@/api/types"
 
 type PortfolioCash = components["schemas"]["PortfolioCash"]
@@ -66,6 +67,8 @@ const props = defineProps<{
   /** portfolio-mode only — the row-edit modal needs the portfolio's cash for
    * the balance hint and currency default */
   cash?: PortfolioCash | null
+  /** Portfolio mode supplies this directly; the global feed resolves it by row portfolio id. */
+  cashBaseCurrencyOnly?: boolean
   /** bump to force a reload (the portfolio tab reloads after a deposit) */
   refreshKey?: number
 }>()
@@ -73,6 +76,7 @@ const props = defineProps<{
 // ── State ────────────────────────────────────────────────────────────────
 
 const transactions = ref<Tx[]>([])
+const portfoliosStore = usePortfolioStore()
 const total        = ref(0)
 const page         = ref(1)
 const totalPages   = ref(1)
@@ -100,6 +104,19 @@ const modalAction  = ref<"deposit" | "withdraw" | "transfer">("deposit")
 const deleteTarget = ref<Tx | null>(null)
 const deleteBusy   = ref(false)
 const deleteError  = ref<string | null>(null)
+const editingPortfolio = computed(() =>
+  portfoliosStore.portfolios.find((portfolio) => portfolio.id === editing.value?.portfolioId),
+)
+const editingCash = computed<PortfolioCash>(() => props.cash ?? {
+  baseCurrency: editingPortfolio.value?.baseCurrency ?? editing.value?.currency ?? "",
+  balances: [],
+  total: 0,
+})
+const editingCashBaseCurrencyOnly = computed(() =>
+  props.mode === "portfolio"
+    ? props.cashBaseCurrencyOnly === true
+    : editingPortfolio.value?.cashBaseCurrencyOnly === true,
+)
 
 // ── Sortable columns (shared) ───────────────────────────────────────────
 
@@ -268,7 +285,10 @@ function typeLabel(tx: Tx): string {
 
 // ── Edit / Delete ────────────────────────────────────────────────────────
 
-function openEdit(tx: Tx) {
+async function openEdit(tx: Tx) {
+  if (props.mode === "global" && !portfoliosStore.portfolios.some((portfolio) => portfolio.id === tx.portfolioId)) {
+    await portfoliosStore.fetchAll().catch(() => undefined)
+  }
   editing.value  = tx
   modalAction.value =
     String(tx.type).toUpperCase() === "WITHDRAWAL" ? "withdraw"
@@ -515,7 +535,8 @@ function onPickerSaved() {
       :open="modalOpen"
       :action="modalAction"
       :portfolio-id="editing?.portfolioId ?? ''"
-      :cash="cash ?? { baseCurrency: editing?.currency ?? '', balances: [], total: 0 }"
+      :cash="editingCash"
+      :cash-base-currency-only="editingCashBaseCurrencyOnly"
       :edit-tx="editing ? editPayload(editing) : null"
       @close="modalOpen = false; editing = null"
       @done="onEditDone"

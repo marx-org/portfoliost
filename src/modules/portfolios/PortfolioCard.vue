@@ -348,7 +348,7 @@ async function submitRename(settings: PortfolioSettingsPayload) {
     await updatePortfolio(props.portfolio.id, settings)
     showRename.value = false
     await store.fetchAll()
-    notice.value = "Portfolio renamed"
+    notice.value = "Portfolio settings saved"
   } catch (err) {
     renameError.value = err instanceof Error ? err.message : "Failed to rename portfolio"
   } finally {
@@ -651,6 +651,7 @@ async function exportPositions(format: "csv" | "xml" | "json") {
       :name="portfolio.name"
       :base-currency="portfolio.baseCurrency ?? ''"
       :cash-leg-on-trade="portfolio.cashLegOnTrade ?? false"
+      :cash-base-currency-only="portfolio.cashBaseCurrencyOnly"
       :is-virtual="portfolio.isVirtual"
       :label-id="portfolio.labelId"
       :busy="renameBusy"

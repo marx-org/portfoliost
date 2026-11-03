@@ -78,6 +78,101 @@ test("cash tab: deposit moves the balance and lists a row", async ({ page, reque
   await request.delete(`${GATEWAY}/api/portfolios/${pid}`, { headers: auth }).catch(() => {})
 })
 
+test("cash-base-only settings restrict cash, keep foreign trades, and transfer in the destination base", async ({ page, request }) => {
+  test.setTimeout(120_000)
+  const run = Date.now()
+  const token = await getBearerToken(request)
+  const auth = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
+  const post = mk(auth, request)
+  const source = await post("/api/portfolios", { name: `E2E PLN cash only ${run}`, baseCurrency: "PLN" })
+  const destination = await post("/api/portfolios", { name: `E2E USD destination ${run}`, baseCurrency: "USD" })
+  const sourceId = String(source.id)
+  const destinationId = String(destination.id)
+  let tradeId: string | null = null
+
+  try {
+    await login(page)
+    await page.goto(`/en/portfolios/${sourceId}`)
+    await page.getByRole("button", { name: "Rename", exact: true }).click()
+    const settings = page.getByRole("dialog", { name: "Rename portfolio" })
+    await expect(settings).toBeVisible()
+    await settings.getByTestId("cash-base-currency-only").check()
+    await settings.getByRole("button", { name: "Save", exact: true }).click()
+    await expect(settings).not.toBeVisible()
+
+    const detail = await request.get(`${GATEWAY}/api/portfolios/${sourceId}`, { headers: auth })
+    expect(detail.status()).toBe(200)
+    expect((await detail.json()).cashBaseCurrencyOnly).toBe(true)
+
+    await page.goto(`/en/portfolios/${sourceId}/cash`)
+    await expect(page.getByTestId("cash-tab-total")).toBeVisible({ timeout: 15000 })
+    const rejectedDeposit = await request.post(`${GATEWAY}/api/portfolios/${sourceId}/cash/deposits`, {
+      headers: auth,
+      data: { amount: 100, currency: "USD" },
+    })
+    expect(rejectedDeposit.status()).toBe(422)
+
+    await page.getByTestId("cash-tab-deposit").click()
+    const depositDialog = page.getByRole("dialog", { name: "Cash movement" })
+    const sourceCurrency = depositDialog.getByTestId("pc-currency")
+    await expect(sourceCurrency.locator("option")).toHaveCount(1)
+    await expect(sourceCurrency).toHaveValue("PLN")
+    await depositDialog.getByTestId("pc-description").fill(`cash-only ${run}`)
+    await depositDialog.getByTestId("pc-amount").fill("50")
+    await depositDialog.getByTestId("pc-submit").click()
+    await expect(depositDialog).not.toBeVisible({ timeout: 10000 })
+    await expect(page.getByTestId("cash-balance-PLN")).toContainText("50")
+
+    const depositRow = page.locator("tbody tr", { hasText: "Deposit" }).first()
+    await expect(depositRow).toBeVisible({ timeout: 10000 })
+    await depositRow.getByRole("button", { name: "Edit" }).click()
+    const editDialog = page.getByRole("dialog", { name: "Cash movement" })
+    await expect(editDialog.getByTestId("pc-currency").locator("option")).toHaveCount(1)
+    await expect(editDialog.getByTestId("pc-currency")).toHaveValue("PLN")
+    await editDialog.getByRole("button", { name: "Cancel", exact: true }).click()
+
+    await page.goto("/en/investments/transactions/cash")
+    const globalRow = page.locator("tbody tr", { hasText: `cash-only ${run}` }).first()
+    await expect(globalRow).toBeVisible({ timeout: 10000 })
+    await globalRow.getByRole("button", { name: "Edit" }).click()
+    const globalEdit = page.getByRole("dialog", { name: "Cash movement" })
+    await expect(globalEdit.getByTestId("pc-currency").locator("option")).toHaveCount(1)
+    await expect(globalEdit.getByTestId("pc-currency")).toHaveValue("PLN")
+    await globalEdit.getByRole("button", { name: "Cancel", exact: true }).click()
+
+    await page.goto(`/en/portfolios/${sourceId}/cash`)
+    await page.getByTestId("cash-tab-transfer").click()
+    const transferDialog = page.getByRole("dialog", { name: "Cash movement" })
+    const targetSelect = transferDialog.getByTestId("pc-to-portfolio")
+    await targetSelect.selectOption(destinationId)
+    await transferDialog.getByTestId("pc-amount").fill("4")
+    await transferDialog.getByTestId("pc-leg-fx-manual").click()
+    await transferDialog.getByTestId("pc-target-rate").fill("0.25")
+    await expect(transferDialog.getByTestId("pc-submit")).toBeEnabled()
+    await transferDialog.getByTestId("pc-submit").click()
+    await expect(transferDialog).not.toBeVisible({ timeout: 10000 })
+
+    const sourceCash = await cashOf(request, auth, sourceId)
+    expect(sourceCash.balances).toHaveLength(1)
+    expect(sourceCash.balances[0]).toMatchObject({ currency: "PLN", balance: 46 })
+    const destinationCash = await cashOf(request, auth, destinationId)
+    expect(destinationCash.balances).toEqual([{ currency: "USD", balance: 1 }])
+
+    // The cash policy must not leak into the separate investment transaction form/API.
+    const foreignTrade = await request.post(`${GATEWAY}/api/portfolios/${sourceId}/transactions`, {
+      headers: auth,
+      data: { type: "BUY", symbol: "AAPL", quantity: 1, price: 10, currency: "USD", rateSource: "manual", exchangeRate: 4 },
+    })
+    expect(foreignTrade.status(), await foreignTrade.text()).toBe(201)
+    const body = await foreignTrade.json() as { id?: string }
+    tradeId = body.id ?? null
+  } finally {
+    if (tradeId) await request.delete(`${GATEWAY}/api/portfolios/${sourceId}/transactions/${tradeId}`, { headers: auth }).catch(() => {})
+    await request.delete(`${GATEWAY}/api/portfolios/${sourceId}`, { headers: auth }).catch(() => {})
+    await request.delete(`${GATEWAY}/api/portfolios/${destinationId}`, { headers: auth }).catch(() => {})
+  }
+})
+
 test("cash tab: transfer moves both portfolios' balances", async ({ page, request }) => {
   const run = Date.now()
   const token = await getBearerToken(request)

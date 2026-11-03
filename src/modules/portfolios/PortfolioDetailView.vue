@@ -40,7 +40,7 @@ const tabs = computed(() => [
 ])
 
 // §87.5 — the dialog is now "Portfolio settings": the name plus the UI-only
-// "generate a cash transaction on buy/sell" switch. The aria-label stays
+// cash-leg switch and the cash-base-currency policy. The aria-label stays
 // "Rename portfolio" — tests/e2e/parity-portfolios.spec.ts:87 selects the dialog by
 // that name, and a renamed label is a gratuitous e2e break for no user gain.
 const showRename = ref(false)
@@ -266,6 +266,7 @@ async function submitDelete() {
       :name="portfolioName"
       :base-currency="store.detail?.baseCurrency ?? ''"
       :cash-leg-on-trade="store.detail?.cashLegOnTrade ?? false"
+      :cash-base-currency-only="store.detail?.cashBaseCurrencyOnly ?? false"
       :is-virtual="isVirtual"
       :label-id="store.detail?.labelId"
       :busy="renameBusy"

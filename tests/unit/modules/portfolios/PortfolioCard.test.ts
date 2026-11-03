@@ -45,6 +45,7 @@ const PORTFOLIO = {
   // without it `formatCurrency` correctly falls back to a bare number, which
   // would make the currency assertion untestable rather than wrong.
   baseCurrency: "PLN",
+  cashBaseCurrencyOnly: false,
   currentValue: 100,
   capitalBasis: 100,
   metrics: { totalReturn: 0, openPositions: 1, unrealizedGainLoss: 0 },
@@ -113,6 +114,27 @@ describe("PortfolioCard sparkline (§53.3)", () => {
     await w.findAll("button").find((button) => button.text() === "Cancel")!.trigger("click")
 
     expect(routerPush).not.toHaveBeenCalled()
+  })
+
+  it("passes and saves the existing cash-only policy from card settings", async () => {
+    mockedPortfolios.getPortfolioAnalytics.mockResolvedValue(analytics([], "complete"))
+    mockedPortfolios.updatePortfolio.mockResolvedValue({} as never)
+    const w = await mountCard()
+
+    await w.find('[aria-label="Portfolio actions"]').trigger("click")
+    await w.findAll("button").find((button) => button.text() === "Edit")!.trigger("click")
+    await flushPromises()
+    const policy = w.find('[data-testid="cash-base-currency-only"]')
+    expect(policy.exists()).toBe(true)
+    expect((policy.element as HTMLInputElement).checked).toBe(false)
+    await policy.setValue(true)
+    await w.find("form").trigger("submit")
+    await flushPromises()
+
+    expect(mockedPortfolios.updatePortfolio).toHaveBeenCalledWith(
+      "p1",
+      expect.objectContaining({ cashBaseCurrencyOnly: true }),
+    )
   })
 
   it("remount key changes when the series fingerprint changes (timeframe swap)", async () => {

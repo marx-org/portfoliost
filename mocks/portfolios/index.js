@@ -21,7 +21,12 @@ function noPriceFixture() {
 }
 
 function noPricePortfolio() {
-  return noPriceFixture().portfolio
+  const portfolio = noPriceFixture().portfolio
+  return { ...portfolio, cashBaseCurrencyOnly: Boolean(portfolio.cashBaseCurrencyOnly) }
+}
+
+function withCashPolicy(portfolio) {
+  return portfolio ? { ...portfolio, cashBaseCurrencyOnly: Boolean(portfolio.cashBaseCurrencyOnly) } : null
 }
 
 function allShares() {
@@ -76,10 +81,10 @@ function withInvestedSeries(perf) {
 }
 
 function findPortfolio(id) {
-  if (created.has(id)) return created.get(id)
+  if (created.has(id)) return withCashPolicy(created.get(id))
   if (id === noPricePortfolio().id) return noPricePortfolio()
   const existing = loadRaw("portfolios_summaries.json").find((p) => p.id === id)
-  return existing || null
+  return withCashPolicy(existing)
 }
 
 function withDataFile(id, baseName, emptyName) {
@@ -235,7 +240,7 @@ function sumBy(positions, field) {
 export function register(app) {
   app.get("/api/portfolios", (ctx) => {
     if (!requireAuth(ctx)) return
-    const byId = new Map(loadRaw("portfolios_summaries.json").map((p) => [p.id, p]))
+    const byId = new Map(loadRaw("portfolios_summaries.json").map((p) => [p.id, withCashPolicy(p)]))
     for (const [id, p] of created) byId.set(id, p)
     const list = [...byId.values()]
     const np = noPricePortfolio()
@@ -400,7 +405,7 @@ export function register(app) {
 
   app.post("/api/portfolios", (ctx) => {
     if (!requireAuth(ctx)) return
-    const { name, description, currency = "USD", baseCurrency = "USD", isPublic = false, isMarginEnabled = false, isVirtual = false, labelId = null } = ctx.body || {}
+    const { name, description, currency = "USD", baseCurrency = "USD", isPublic = false, isMarginEnabled = false, cashBaseCurrencyOnly = false, isVirtual = false, labelId = null } = ctx.body || {}
     if (!name) {
       return ctx.res.status(422).json({ error: "ValidationError", message: "name is required", statusCode: 422 })
     }
@@ -419,12 +424,13 @@ export function register(app) {
       isVirtual: Boolean(isVirtual),
       labelId: isVirtual ? labelId : null,
       isMarginEnabled,
+      cashBaseCurrencyOnly: Boolean(cashBaseCurrencyOnly),
       createdAt: now,
       updatedAt: now,
     }
     created.set(id, portfolio)
     newPortfolioIds.add(id)
-    ensurePortfolio(id, { baseCurrency, isMarginEnabled })
+    ensurePortfolio(id, { baseCurrency, isMarginEnabled, cashBaseCurrencyOnly: Boolean(cashBaseCurrencyOnly) })
     ctx.res.status(201).json(portfolio)
   })
 
@@ -440,11 +446,16 @@ export function register(app) {
     const p = findPortfolio(ctx.params.id)
     const body = ctx.body || {}
     if (p) {
-      const updated = { ...p, ...body, updatedAt: nowIso() }
+      const updated = withCashPolicy({ ...p, ...body, updatedAt: nowIso() })
       created.set(ctx.params.id, updated)
+      ensurePortfolio(ctx.params.id, {
+        baseCurrency: updated.baseCurrency,
+        isMarginEnabled: updated.isMarginEnabled,
+        cashBaseCurrencyOnly: updated.cashBaseCurrencyOnly,
+      })
       return ctx.res.json(updated)
     }
-    ctx.res.json({ ...loadRaw("empty_portfolio_detail.json"), ...body, updatedAt: nowIso() })
+    ctx.res.json(withCashPolicy({ ...loadRaw("empty_portfolio_detail.json"), ...body, updatedAt: nowIso() }))
   })
 
   app.delete("/api/portfolios/:id", (ctx) => {
