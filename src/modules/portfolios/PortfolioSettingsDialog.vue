@@ -2,20 +2,19 @@
 import { computed, ref, watch } from "vue"
 import { useCurrenciesStore } from "@/stores/currencies"
 import { useLabelsStore } from "@/stores/labels"
+import type { PortfolioDetail } from "@/api/types"
 
-export interface PortfolioSettingsPayload {
-  name: string
-  baseCurrency: string
-  cashLegOnTrade: boolean
-  isVirtual?: boolean
-  labelId?: string
-}
+export type PortfolioSettingsPayload =
+  Required<Pick<PortfolioDetail, "name" | "baseCurrency" | "cashLegOnTrade" | "cashBaseCurrencyOnly">> & {
+    labelId?: NonNullable<PortfolioDetail["labelId"]>
+  }
 
 const props = withDefaults(defineProps<{
   open: boolean
   name: string
   baseCurrency: string
   cashLegOnTrade: boolean
+  cashBaseCurrencyOnly: boolean
   isVirtual?: boolean
   labelId?: string | null
   busy?: boolean
@@ -36,6 +35,7 @@ const currencies = computed(() => currenciesStore.options.map((currency) => curr
 const name = ref(props.name)
 const baseCurrency = ref(props.baseCurrency)
 const cashLegOnTrade = ref(props.cashLegOnTrade)
+const cashBaseCurrencyOnly = ref(props.cashBaseCurrencyOnly)
 const labelId = ref(props.labelId ?? "")
 
 watch(() => props.open, (open) => {
@@ -45,6 +45,7 @@ watch(() => props.open, (open) => {
   name.value = props.name
   baseCurrency.value = props.baseCurrency
   cashLegOnTrade.value = props.cashLegOnTrade
+  cashBaseCurrencyOnly.value = props.cashBaseCurrencyOnly
   labelId.value = props.labelId ?? ""
 })
 
@@ -55,6 +56,7 @@ function submit() {
     name: trimmedName,
     baseCurrency: baseCurrency.value,
     cashLegOnTrade: cashLegOnTrade.value,
+    cashBaseCurrencyOnly: cashBaseCurrencyOnly.value,
     labelId: props.isVirtual ? labelId.value : undefined,
   })
 }
@@ -104,6 +106,21 @@ function submit() {
             Generate a cash transaction on buy/sell
             <span class="block text-xs text-slate-500 dark:text-slate-400">
               Pre-ticks the cash checkbox on the buy/sell form. Sheet imports are unaffected.
+            </span>
+          </span>
+        </label>
+        <label v-if="!props.isVirtual" class="mb-4 flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
+          <input
+            id="portfolio-settings-cash-base-only"
+            v-model="cashBaseCurrencyOnly"
+            type="checkbox"
+            class="mt-0.5"
+            data-testid="cash-base-currency-only"
+          />
+          <span>
+            Base currency is the only available currency for cash
+            <span class="block text-xs text-slate-500 dark:text-slate-400">
+              Cash effects are converted into the base currency at the event date. Investment and trade currencies remain unrestricted.
             </span>
           </span>
         </label>

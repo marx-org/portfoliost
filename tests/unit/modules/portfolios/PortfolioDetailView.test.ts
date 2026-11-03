@@ -149,7 +149,7 @@ describe("PortfolioDetailView — §48.6e B3 umbrella: summary cards in the disp
     expect(txt(wrapper)).not.toContain("PLN 119,190.00")
   })
 
-  it("submits the edited base currency with portfolio settings", async () => {
+  it("submits the edited base currency and cash-only policy with portfolio settings", async () => {
     const wrapper = await mountDetail("PLN")
     await flushPromises()
 
@@ -157,12 +157,14 @@ describe("PortfolioDetailView — §48.6e B3 umbrella: summary cards in the disp
     await rename!.trigger("click")
     await wrapper.get("#portfolio-settings-name").setValue("Updated portfolio")
     await wrapper.get("#portfolio-settings-currency").setValue("USD")
+    await wrapper.get('[data-testid="cash-base-currency-only"]').setValue(true)
     await wrapper.get("form").trigger("submit")
 
     expect(mockedPortfolios.updatePortfolio).toHaveBeenCalledWith("p1", {
       name: "Updated portfolio",
       baseCurrency: "USD",
       cashLegOnTrade: false,
+      cashBaseCurrencyOnly: true,
     })
   })
 })

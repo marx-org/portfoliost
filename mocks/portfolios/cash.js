@@ -20,12 +20,15 @@ const round2 = (x) => Math.round(x * 100) / 100
 const TOP10_ID = "3cb589d8-f92d-428f-aeab-9ee5d4b9cef2"
 const baseCcy = new Map() // portfolioId -> base currency
 const margin = new Map() // portfolioId -> bool
+const cashBaseOnly = new Map() // portfolioId -> cashBaseCurrencyOnly
 const registered = new Set() // portfolioIds created via the API (transfer-eligible)
 
-export function ensurePortfolio(portfolioId, { baseCurrency, isMarginEnabled } = {}) {
+export function ensurePortfolio(portfolioId, { baseCurrency, isMarginEnabled, cashBaseCurrencyOnly } = {}) {
   registered.add(portfolioId)
-  if (!baseCcy.has(portfolioId)) baseCcy.set(portfolioId, String(baseCurrency || "USD").toUpperCase())
+  if (baseCurrency) baseCcy.set(portfolioId, String(baseCurrency).toUpperCase())
+  else if (!baseCcy.has(portfolioId)) baseCcy.set(portfolioId, "USD")
   if (typeof isMarginEnabled === "boolean") margin.set(portfolioId, isMarginEnabled)
+  if (typeof cashBaseCurrencyOnly === "boolean") cashBaseOnly.set(portfolioId, cashBaseCurrencyOnly)
 }
 export function hasCash(portfolioId) {
   return baseCcy.has(portfolioId) || portfolioId === TOP10_ID
@@ -35,6 +38,9 @@ function getBaseCcy(portfolioId) {
 }
 function isMargin(portfolioId) {
   return margin.has(portfolioId) ? margin.get(portfolioId) : false
+}
+export function isCashBaseCurrencyOnly(portfolioId) {
+  return cashBaseOnly.get(portfolioId) === true
 }
 
 function portfolioName(portfolioId) {
@@ -70,8 +76,24 @@ function balanceOf(portfolioId, currency) {
   seed()
   return balances.get(portfolioId)?.[String(currency).toUpperCase()] ?? 0
 }
+function balanceRows(portfolioId) {
+  seed()
+  const raw = balances.get(portfolioId) ?? {}
+  if (!isCashBaseCurrencyOnly(portfolioId)) {
+    return Object.entries(raw).map(([currency, balance]) => ({ currency, balance }))
+  }
+  const base = getBaseCcy(portfolioId)
+  let total = 0
+  for (const [currency, balance] of Object.entries(raw)) {
+    const rate = currency === base ? 1 : convert(1, currency, base, DEMO_RATES)
+    if (rate == null) throw new Error(`[cash-mock] no FX rate available for ${currency}>${base}`)
+    total += balance * rate
+  }
+  return [{ currency: base, balance: round2(total) }]
+}
 function totalOf(portfolioId) {
   seed()
+  if (isCashBaseCurrencyOnly(portfolioId)) return balanceRows(portfolioId)[0]?.balance ?? 0
   const base = getBaseCcy(portfolioId)
   let total = 0
   for (const [ccy, amt] of Object.entries(balances.get(portfolioId) ?? {})) total += amt * (ccy === base ? 1 : convert(1, ccy, base, DEMO_RATES) ?? 1)
@@ -80,10 +102,9 @@ function totalOf(portfolioId) {
 
 export function portfolioCash(portfolioId) {
   seed()
-  const c = balances.get(portfolioId) ?? {}
   return {
     baseCurrency: getBaseCcy(portfolioId),
-    balances: Object.entries(c).map(([currency, balance]) => ({ currency, balance })),
+    balances: balanceRows(portfolioId),
     total: totalOf(portfolioId),
   }
 }
@@ -168,7 +189,13 @@ function historyFor(portfolioId) {
   let sum = 0
   for (let i = days - 1; i >= 0; i--) {
     const d = last - i * 86_400_000
-    for (const r of rows) if (r.ms > d - 86_400_000 && r.ms <= d) running += r.ccy === base ? r.signed : r.signed * (convert(1, r.ccy, base, DEMO_RATES) ?? 1)
+    for (const r of rows) if (r.ms > d - 86_400_000 && r.ms <= d) {
+      const rate = r.ccy === base ? 1 : convert(1, r.ccy, base, DEMO_RATES)
+      if (rate == null && isCashBaseCurrencyOnly(portfolioId)) {
+        throw new Error(`[cash-mock] no event-date FX rate available for ${r.ccy}>${base}`)
+      }
+      running += r.signed * (rate ?? 1)
+    }
     const bal = round2(running)
     data.push({ date: new Date(d).toISOString(), balance: bal, change: 0, percentChange: null, high: 0, low: 0 })
     high = Math.max(high, bal)
@@ -220,6 +247,9 @@ function makeTx(portfolioId, type, amount, body, extra = {}, fx) {
 
 function mutateDeposit(portfolioId, body) {
   const ccy = String(body.currency || getBaseCcy(portfolioId)).toUpperCase()
+  if (isCashBaseCurrencyOnly(portfolioId) && ccy !== getBaseCcy(portfolioId)) {
+    return { error: "validation", message: `Cash currency must be ${getBaseCcy(portfolioId)}` }
+  }
   const value = Number(body.amount)
   if (!Number.isFinite(value) || value <= 0) return { error: "validation", message: "amount must be a positive number" }
   const fx = resolveFeeFx(body, ccy, { notional: value })
@@ -233,6 +263,9 @@ function mutateDeposit(portfolioId, body) {
 
 function mutateWithdraw(portfolioId, body) {
   const ccy = String(body.currency || getBaseCcy(portfolioId)).toUpperCase()
+  if (isCashBaseCurrencyOnly(portfolioId) && ccy !== getBaseCcy(portfolioId)) {
+    return { error: "validation", message: `Cash currency must be ${getBaseCcy(portfolioId)}` }
+  }
   const value = Number(body.amount)
   if (!Number.isFinite(value) || value <= 0) return { error: "validation", message: "amount must be a positive number" }
   const fx = resolveFeeFx(body, ccy, { notional: value })
@@ -250,13 +283,31 @@ function mutateTransfer(portfolioId, body) {
   if (!registered.has(toPortfolioId) && toPortfolioId !== TOP10_ID) return { error: "dest_notfound" }
   ensurePortfolio(toPortfolioId)
   const ccy = String(body.currency || getBaseCcy(portfolioId)).toUpperCase()
+  if (isCashBaseCurrencyOnly(portfolioId) && ccy !== getBaseCcy(portfolioId)) {
+    return { error: "validation", message: `Source cash currency must be ${getBaseCcy(portfolioId)}` }
+  }
   const value = Number(body.amount)
   if (!Number.isFinite(value) || value <= 0) return { error: "validation", message: "amount must be a positive number" }
   const fx = resolveFeeFx(body, ccy, { notional: value })
   if (fx.error) return { error: "validation", message: fx.error }
   const debit = round2(value + fx.feesSettled)
   const targetBase = getBaseCcy(toPortfolioId)
-  const autoTarget = targetBase === ccy ? value : value * (convert(1, ccy, targetBase, DEMO_RATES) ?? 1)
+  const suppliedTarget = body.targetAmount != null ? Number(body.targetAmount) : null
+  const resolvedRate = targetBase === ccy
+    ? 1
+    : body.targetFxRate != null
+      ? Number(body.targetFxRate)
+      : suppliedTarget != null
+        ? suppliedTarget / value
+        : convert(1, ccy, targetBase, DEMO_RATES)
+  if (
+    targetBase !== ccy &&
+    (isCashBaseCurrencyOnly(portfolioId) || isCashBaseCurrencyOnly(toPortfolioId)) &&
+    (resolvedRate == null || !Number.isFinite(resolvedRate) || resolvedRate <= 0)
+  ) {
+    return { error: "validation", message: `No transfer FX rate available for ${ccy}>${targetBase}` }
+  }
+  const autoTarget = value * (resolvedRate ?? 1)
   const targetAmount = body.targetAmount != null ? Number(body.targetAmount) : autoTarget
   const srcTx = makeTx(portfolioId, "TRANSFER", -debit, body, { toPortfolioId, isInternalTransfer: true }, fx)
   const dstTx = makeTx(toPortfolioId, "TRANSFER", round2(targetAmount), { ...body, currency: targetBase }, { toPortfolioId: portfolioId, isInternalTransfer: true })
@@ -333,6 +384,15 @@ export function register(app) {
     const body = { ...(ctx.body || {}) }
     if (body.transaction_date && !body.transactionDate) body.transactionDate = body.transaction_date
     delete body.type // the SPA no longer sends a type — the row type is fixed
+    if (isCashBaseCurrencyOnly(found.portfolioId)) {
+      const base = getBaseCcy(found.portfolioId)
+      if (String(found.currency).toUpperCase() !== base) {
+        return ctx.res.status(422).json({ error: "ValidationError", message: `Non-base cash rows cannot be edited while cash is limited to ${base}` })
+      }
+      if (body.currency != null && String(body.currency).toUpperCase() !== base) {
+        return ctx.res.status(422).json({ error: "ValidationError", message: `Cash currency must be ${base}` })
+      }
+    }
     if (typeof body.amount === "number") {
       // sign is re-clamped from the existing row's type (like the real PATCH):
       // WITHDRAWAL → −, DEPOSIT → +
@@ -400,14 +460,23 @@ export function register(app) {
 
   app.post("/api/import/portfolios/bootstrap", (ctx) => {
     if (!requireAuth(ctx)) return
-    const { externalSource, name, baseCurrency } = ctx.body || {}
-    if (!externalSource || !name) return ctx.res.status(422).json({ error: "ValidationError", message: "externalSource and name are required" })
+    const { externalSource, name, baseCurrency, cashBaseCurrencyOnly } = ctx.body || {}
+    if (!externalSource || !name || typeof cashBaseCurrencyOnly !== "boolean") {
+      return ctx.res.status(422).json({ error: "ValidationError", message: "externalSource, name, and cashBaseCurrencyOnly are required" })
+    }
     const key = `${externalSource}\u0000${name}`
     const existing = importPortfolios.get(key)
-    if (existing) return ctx.res.json({ ...existing, created: false })
-    const row = { id: uuid(), name, baseCurrency: String(baseCurrency || "USD").toUpperCase() }
+    const normalizedBase = String(baseCurrency || "USD").toUpperCase()
+    if (existing) {
+      existing.baseCurrency = normalizedBase
+      existing.cashBaseCurrencyOnly = cashBaseCurrencyOnly
+      ensurePortfolio(existing.id, { baseCurrency: normalizedBase, cashBaseCurrencyOnly })
+      return ctx.res.json({ ...existing, currency: normalizedBase, created: false })
+    }
+    const row = { id: uuid(), name, baseCurrency: normalizedBase, cashBaseCurrencyOnly }
     importPortfolios.set(key, row)
-    ctx.res.json({ ...row, created: true })
+    ensurePortfolio(row.id, { baseCurrency: normalizedBase, cashBaseCurrencyOnly })
+    ctx.res.json({ ...row, currency: normalizedBase, created: true })
   })
 
   app.post("/api/import/labels/bootstrap", (ctx) => {

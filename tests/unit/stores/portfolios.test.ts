@@ -28,6 +28,7 @@ function summary() {
       description: "Growth",
       currency: "USD",
       walletId: "w1",
+      cashBaseCurrencyOnly: false,
       capitalBasis: 1000,
       currentValue: 1200,
       isPublic: false,

@@ -600,6 +600,44 @@ async function main() {
       cash0.json.total === 1240,
     `got ${JSON.stringify(cash0.json).slice(0, 160)}`,
   )
+
+  const cashOnlyPf = await request("/portfolios", {
+    method: "POST",
+    token,
+    body: { name: "Cash base only mock", baseCurrency: "PLN", cashBaseCurrencyOnly: true },
+  })
+  const cashOnlyId = cashOnlyPf.json.id
+  check("cash-base-only setting is returned and persisted", cashOnlyPf.status === 201 && cashOnlyPf.json.cashBaseCurrencyOnly === true, JSON.stringify(cashOnlyPf.json).slice(0, 120))
+  const cashOnlyList = await request("/portfolios", { token })
+  check("cash-base-only setting is returned on portfolio reads", cashOnlyList.json.some((p) => p.id === cashOnlyId && p.cashBaseCurrencyOnly === true), "missing flag from list")
+  const foreignDeposit = await request(`/portfolios/${cashOnlyId}/cash/deposits`, { method: "POST", token, body: { amount: 100, currency: "USD" } })
+  check("cash-base-only rejects foreign cash deposits", foreignDeposit.status === 422, `got ${foreignDeposit.status}`)
+  const baseDeposit = await request(`/portfolios/${cashOnlyId}/cash/deposits`, { method: "POST", token, body: { amount: 50, currency: "PLN" } })
+  const cashOnlyCash = await request(`/portfolios/${cashOnlyId}/cash`, { token })
+  check("cash-base-only accepts base deposits and exposes one balance", baseDeposit.status === 201 && cashOnlyCash.json.balances.length === 1 && cashOnlyCash.json.balances[0].currency === "PLN" && cashOnlyCash.json.balances[0].balance === 50, JSON.stringify(cashOnlyCash.json))
+  const foreignTrade = await request(`/portfolios/${cashOnlyId}/transactions`, {
+    method: "POST",
+    token,
+    body: { type: "BUY", symbol: "AAPL", quantity: 1, price: 10, currency: "USD", rateSource: "manual", exchangeRate: 4 },
+  })
+  check("cash-base-only still allows foreign-currency investment trades", foreignTrade.status === 201, `got ${foreignTrade.status}`)
+  const afterForeignTrade = await request(`/portfolios/${cashOnlyId}/cash`, { token })
+  check("foreign investment cash effect stays in the single base balance", afterForeignTrade.status === 200 && afterForeignTrade.json.balances.length === 1 && afterForeignTrade.json.balances[0].currency === "PLN", JSON.stringify(afterForeignTrade.json))
+  const transferDest = await request("/portfolios", { method: "POST", token, body: { name: "Cash base-only transfer target", baseCurrency: "USD" } })
+  const foreignTransfer = await request(`/portfolios/${cashOnlyId}/cash/transfers`, {
+    method: "POST",
+    token,
+    body: { amount: 4, currency: "USD", toPortfolioId: transferDest.json.id },
+  })
+  check("cash-base-only rejects foreign transfer debits", foreignTransfer.status === 422, `got ${foreignTransfer.status}`)
+  const baseTransfer = await request(`/portfolios/${cashOnlyId}/cash/transfers`, {
+    method: "POST",
+    token,
+    body: { amount: 4, currency: "PLN", toPortfolioId: transferDest.json.id, targetFxRate: 0.25 },
+  })
+  const transferDestCash = await request(`/portfolios/${transferDest.json.id}/cash`, { token })
+  check("cash-base-only transfers use destination base currency", baseTransfer.status === 201 && transferDestCash.json.balances.some((b) => b.currency === "USD" && b.balance === 1), JSON.stringify(transferDestCash.json))
+
   const cashHist = await request(`/portfolios/${TOP10}/cash/balance-history?period=90d&resolution=day`, { token })
   check("cash.balance-history", cashHist.status === 200 && Array.isArray(cashHist.json.data) && cashHist.json.data.length > 50 && cashHist.json.meta.high === 1240, `got ${cashHist.status} len ${cashHist.json.data?.length}`)
   const cashTx0 = await request(`/portfolios/${TOP10}/cash/transactions`, { token })
@@ -1011,11 +1049,11 @@ async function main() {
   const pb = await request("/import/portfolios/bootstrap", {
     method: "POST",
     token,
-    body: { externalSource: importSource, name: "MockImportP", baseCurrency: "USD" },
+    body: { externalSource: importSource, name: "MockImportP", baseCurrency: "USD", cashBaseCurrencyOnly: false },
   })
   check("import.portfolios.bootstrap creates", pb.status === 200 && pb.json.created === true && pb.json.id, JSON.stringify(pb.json || {}).slice(0, 160))
-  const pb2 = await request("/import/portfolios/bootstrap", { method: "POST", token, body: { externalSource: importSource, name: "MockImportP", baseCurrency: "usd" } })
-  check("import.portfolios.bootstrap is idempotent", pb2.status === 200 && pb2.json.created === false && pb2.json.id === pb.json.id, JSON.stringify(pb2.json || {}).slice(0, 160))
+  const pb2 = await request("/import/portfolios/bootstrap", { method: "POST", token, body: { externalSource: importSource, name: "MockImportP", baseCurrency: "PLN", cashBaseCurrencyOnly: true } })
+  check("import.portfolios.bootstrap refreshes same-source cash policy", pb2.status === 200 && pb2.json.created === false && pb2.json.id === pb.json.id && pb2.json.baseCurrency === "PLN" && pb2.json.cashBaseCurrencyOnly === true, JSON.stringify(pb2.json || {}).slice(0, 160))
 
   const importTxBody = {
     source: { externalSource: importSource, spreadsheetId: "spr-mock", sheet: "tx" },
@@ -1060,7 +1098,7 @@ async function main() {
   )
   const runsAfter = await request("/import/sync-runs", { token })
   check("import.sync-runs empty after run delete", runsAfter.json.total === 0, JSON.stringify(runsAfter.json || {}).slice(0, 120))
-  const pb3 = await request("/import/portfolios/bootstrap", { method: "POST", token, body: { externalSource: importSource, name: "MockImportP", baseCurrency: "USD" } })
+  const pb3 = await request("/import/portfolios/bootstrap", { method: "POST", token, body: { externalSource: importSource, name: "MockImportP", baseCurrency: "USD", cashBaseCurrencyOnly: false } })
   check("import.portfolios.bootstrap re-creates after wipe", pb3.json.created === true, JSON.stringify(pb3.json || {}).slice(0, 120))
 
   const split = await fetch(`http://localhost:${PORT}/internal/apply-split`, {

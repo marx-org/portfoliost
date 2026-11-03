@@ -40,6 +40,7 @@ const tableRefreshKey = ref(0)
 
 const isMarginEnabled = computed(() => store.detail?.isMarginEnabled ?? false)
 const baseCurrency = computed(() => cash.value?.baseCurrency ?? store.detail?.baseCurrency ?? "")
+const cashBaseCurrencyOnly = computed(() => store.detail?.cashBaseCurrencyOnly ?? false)
 
 // Any currency balance below zero on a non-margin portfolio → amber badge.
 const negativeBalances = computed(() => {
@@ -161,6 +162,7 @@ function onModalDone() {
       :action="modalAction"
       :portfolio-id="id"
       :cash="cash ?? { baseCurrency: 'USD', balances: [], total: 0 }"
+      :cash-base-currency-only="cashBaseCurrencyOnly"
       @close="modalOpen = false"
       @done="onModalDone"
     />

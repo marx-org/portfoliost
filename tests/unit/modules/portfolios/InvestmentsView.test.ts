@@ -62,6 +62,7 @@ function summary() {
       name: "Top10",
       description: "Big US growth stocks",
       baseCurrency: "USD",
+      cashBaseCurrencyOnly: false,
       capitalBasis: 1000,
       currentValue: 1200,
       isPublic: false,
@@ -624,4 +625,3 @@ describe("§63.3: the cards sum to the headline", () => {
     expect(num(w, "card-value")).toBe(1200)
   })
 })
-

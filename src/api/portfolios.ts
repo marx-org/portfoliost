@@ -2,6 +2,15 @@ import { http } from "./client"
 import type { components, operations } from "../../generated/api-types"
 
 type PortfolioDetail = components["schemas"]["PortfolioDetail"]
+export interface CreatePortfolioInput {
+  name: string
+  description?: string
+  currency?: string
+  isPublic?: boolean
+  isVirtual?: boolean
+  labelId?: string
+  cashBaseCurrencyOnly?: components["schemas"]["CreatePortfolioRequest"]["cashBaseCurrencyOnly"]
+}
 type PortfolioSummaryMetrics = components["schemas"]["PortfolioSummaryMetrics"]
 type PortfolioPositions = components["schemas"]["Position"][]
 type PortfolioAnalytics1Y = components["schemas"]["PortfolioAnalytics"]
@@ -359,14 +368,7 @@ export async function getAllTransactions(
   )
 }
 
-export async function createPortfolio(input: {
-  name: string
-  description?: string
-  currency?: string
-  isPublic?: boolean
-  isVirtual?: boolean
-  labelId?: string
-}): Promise<PortfolioDetail> {
+export async function createPortfolio(input: CreatePortfolioInput): Promise<PortfolioDetail> {
   return http.post<PortfolioDetail>("/api/portfolios", input)
 }
 

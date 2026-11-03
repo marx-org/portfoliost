@@ -18,15 +18,17 @@ import type { components } from "@/api/types"
 
 type PortfolioCash = components["schemas"]["PortfolioCash"]
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   open: boolean
   action: "deposit" | "withdraw" | "transfer"
   portfolioId: string
   /** the portfolio's current cash (for the balance hint + currency default). */
   cash: PortfolioCash
+  /** When enabled, only the portfolio base currency can be used for cash movements. */
+  cashBaseCurrencyOnly?: boolean
   /** §62 follow-up — when set the modal edits this cash row (PATCH) instead of creating one. */
   editTx?: { id: string; type: string; amount: number | string; currency: string; date?: string; createdAt: string; description?: string | null; toPortfolioId?: string | null; fees?: number | null; feeCurrency?: string | null; feeRateSource?: "automatic" | "manual" | null; feeExchangeRate?: number | null } | null
-}>()
+}>(), { cashBaseCurrencyOnly: false })
 
 const emit = defineEmits<{ (e: "close"): void; (e: "done"): void }>()
 
@@ -54,6 +56,9 @@ const error = ref<string | null>(null)
 
 const allCurrencies = computed(() => currenciesStore.currencies.map((c) => c.code))
 const baseCurrency = computed(() => props.cash.baseCurrency)
+const cashCurrencies = computed(() =>
+  props.cashBaseCurrencyOnly && baseCurrency.value ? [baseCurrency.value] : allCurrencies.value,
+)
 const isEdit = computed(() => props.editTx != null)
 
 // Other user portfolios (transfer targets).
@@ -67,7 +72,18 @@ const targetCurrency = computed(() => targetPortfolio.value?.baseCurrency ?? nul
 
 // The FX leg converts the picked currency into the portfolio base currency
 // (the position's home currency), like the other cash dialogs (§62.7).
-const isCrossCcy = computed(() => currency.value !== "" && currency.value !== baseCurrency.value)
+const isBaseCrossCcy = computed(() => currency.value !== "" && currency.value !== baseCurrency.value)
+const isTransferCrossCcy = computed(() =>
+  props.action === "transfer" && !!targetCurrency.value && currency.value !== targetCurrency.value,
+)
+const needsAmountFx = computed(() =>
+  props.action === "transfer" ? isTransferCrossCcy.value : isBaseCrossCcy.value,
+)
+const isLegacyNonBaseEdit = computed(() =>
+  !!props.editTx &&
+  props.cashBaseCurrencyOnly &&
+  props.editTx.currency.toUpperCase() !== baseCurrency.value.toUpperCase(),
+)
 
 const availableBalance = computed(() => {
   const b = props.cash.balances.find((x) => x.currency.toUpperCase() === currency.value.toUpperCase())
@@ -93,16 +109,21 @@ const feeInCcy = computed<number | null>(() => {
 })
 
 const transferRateValue = computed<number | null>(() => {
-  if (props.action !== "transfer" || !isCrossCcy.value) return null
-  if (targetRateSource.value === "manual" && manualTargetAmount.value != null && amount.value > 0) {
-    return manualTargetAmount.value / amount.value
+  if (props.action !== "transfer" || !isTransferCrossCcy.value) return null
+  if (targetRateSource.value === "manual" && manualTargetAmount.value != null) {
+    return manualTargetAmount.value > 0 && amount.value > 0 ? manualTargetAmount.value / amount.value : null
+  }
+  if (targetRateSource.value === "manual" && Number(exchangeRate.value) > 0) {
+    return Number(exchangeRate.value)
   }
   return transferSuggestion.value?.rate ?? null
 })
 
 const targetAmountValue = computed<number | null>(() => {
-  if (props.action !== "transfer" || !isCrossCcy.value) return null
-  if (targetRateSource.value === "manual" && manualTargetAmount.value != null) return manualTargetAmount.value
+  if (props.action !== "transfer" || !isTransferCrossCcy.value) return null
+  if (targetRateSource.value === "manual" && manualTargetAmount.value != null) {
+    return manualTargetAmount.value > 0 ? manualTargetAmount.value : null
+  }
   if (transferRateValue.value == null) return null
   return amount.value * transferRateValue.value
 })
@@ -116,8 +137,10 @@ const netCredited = computed<number | null>(() => {
 const remainingBalance = computed(() => Math.max(0, availableBalance.value - totalDebited.value))
 
 const canSubmit = computed(() => {
-  if (!currency.value) return false
-  if (props.action === "transfer") return amount.value > 0 && toPortfolioId.value !== ""
+  if (!currency.value || isLegacyNonBaseEdit.value) return false
+  if (props.action === "transfer") {
+    return amount.value > 0 && toPortfolioId.value !== "" && (!isTransferCrossCcy.value || (targetAmountValue.value ?? 0) > 0)
+  }
   return amount.value > 0
 })
 
@@ -130,7 +153,7 @@ watch(
         // sign per type, so the amount ships as a magnitude).
         const tx = props.editTx
         amount.value = Math.abs(Number(tx.amount)) || 0
-        currency.value = tx.currency
+        currency.value = props.cashBaseCurrencyOnly ? baseCurrency.value : tx.currency
         description.value = tx.description ?? ""
         transactionDate.value = tx.date ?? tx.createdAt.slice(0, 10)
         toPortfolioId.value = tx.toPortfolioId ?? ""
@@ -205,9 +228,12 @@ async function submit() {
       fees: fees.value || undefined,
       feesType: feesType.value,
       feeCurrency: feesType.value === "fixed" ? feeCurrency.value : undefined,
-      rateSource: isCrossCcy.value ? rateSource.value : undefined,
+      rateSource: props.action !== "transfer" && isBaseCrossCcy.value ? rateSource.value : undefined,
       exchangeRate:
-        isCrossCcy.value && rateSource.value === "manual" && exchangeRate.value
+        props.action !== "transfer" &&
+        isBaseCrossCcy.value &&
+        rateSource.value === "manual" &&
+        exchangeRate.value
           ? Number(exchangeRate.value)
           : undefined,
       feeRateSource:
@@ -245,10 +271,13 @@ async function submit() {
         description: description.value || undefined,
         transactionDate: transactionDate.value || undefined,
         toPortfolioId: toPortfolioId.value,
-        ...(isCrossCcy.value &&
+        ...(isTransferCrossCcy.value &&
         targetRateSource.value === "manual" &&
         manualTargetAmount.value != null
           ? { targetAmount: manualTargetAmount.value }
+          : {}),
+        ...(isTransferCrossCcy.value && transferRateValue.value != null
+          ? { targetFxRate: transferRateValue.value }
           : {}),
         ...feeFx,
       })
@@ -301,10 +330,14 @@ const submitLabel = computed(() => (props.action === "deposit" ? "Deposit" : pro
 
         <div>
           <label for="pc-currency" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Currency</label>
-          <select id="pc-currency" v-model="currency" class="input" data-testid="pc-currency">
-            <option v-for="c in allCurrencies" :key="c" :value="c">{{ c }}</option>
+          <select id="pc-currency" v-model="currency" class="input" :disabled="isLegacyNonBaseEdit" data-testid="pc-currency">
+            <option v-for="c in cashCurrencies" :key="c" :value="c">{{ c }}</option>
           </select>
         </div>
+
+        <p v-if="isLegacyNonBaseEdit" class="text-sm text-amber-700 dark:text-amber-300 sm:col-span-2">
+          This existing {{ props.editTx?.currency }} cash row is not in {{ baseCurrency }} and cannot be edited under the base-currency-only cash setting.
+        </p>
 
         <div>
           <label for="pc-amount" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Amount *</label>
@@ -323,7 +356,7 @@ const submitLabel = computed(() => (props.action === "deposit" ? "Deposit" : pro
           <input id="pc-date" v-model="transactionDate" type="date" class="input" data-testid="pc-date" />
         </div>
 
-        <template v-if="!isEdit && (isCrossCcy || action === 'transfer')">
+        <template v-if="!isEdit && (needsAmountFx || action === 'transfer')">
           <FxRateFields
             :leg="action === 'transfer' ? 'Transfer' : 'Deposit'"
             :from="currency"
@@ -338,19 +371,38 @@ const submitLabel = computed(() => (props.action === "deposit" ? "Deposit" : pro
             class="sm:col-span-2"
           >
             <template v-if="action === 'transfer'" #manual>
-              <label for="pc-target-amount" class="mb-1 block text-xs text-slate-500 dark:text-slate-400">
-                Target amount in {{ targetCurrency }} — leave empty to convert at the custom rate
-              </label>
-              <input
-                id="pc-target-amount"
-                v-model.number="manualTargetAmount"
-                type="number"
-                min="0"
-                step="any"
-                class="input"
-                placeholder="auto"
-                data-testid="pc-target-amount"
-              />
+              <div class="space-y-3">
+                <div>
+                  <label for="pc-target-rate" class="mb-1 block text-xs text-slate-500 dark:text-slate-400">
+                    Custom rate ({{ targetCurrency }} per {{ currency }})
+                  </label>
+                  <input
+                    id="pc-target-rate"
+                    v-model="exchangeRate"
+                    type="number"
+                    min="0"
+                    step="any"
+                    class="input"
+                    :placeholder="transferSuggestion ? transferSuggestion.rate.toFixed(4) : 'e.g. 4.35'"
+                    data-testid="pc-target-rate"
+                  />
+                </div>
+                <div>
+                  <label for="pc-target-amount" class="mb-1 block text-xs text-slate-500 dark:text-slate-400">
+                    Target amount in {{ targetCurrency }} (optional)
+                  </label>
+                  <input
+                    id="pc-target-amount"
+                    v-model.number="manualTargetAmount"
+                    type="number"
+                    min="0"
+                    step="any"
+                    class="input"
+                    placeholder="auto"
+                    data-testid="pc-target-amount"
+                  />
+                </div>
+              </div>
             </template>
           </FxRateFields>
         </template>
@@ -412,7 +464,7 @@ const submitLabel = computed(() => (props.action === "deposit" ? "Deposit" : pro
               <dt>Total debited</dt>
               <dd>{{ formatCurrency(totalDebited, currency) }}</dd>
             </div>
-            <div v-if="action === 'transfer' && isCrossCcy" class="flex justify-between gap-3">
+            <div v-if="action === 'transfer' && isTransferCrossCcy" class="flex justify-between gap-3">
               <dt>Target ({{ targetCurrency }})</dt>
               <dd>
                 <template v-if="targetAmountValue != null">{{ formatCurrency(targetAmountValue, targetCurrency || "") }}</template>
