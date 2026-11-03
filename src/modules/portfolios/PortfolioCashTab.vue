@@ -151,9 +151,10 @@ function onModalDone() {
       <!-- Cash transactions -->
       <CashTransactionsTable
         mode="portfolio"
-        :portfolio-id="id"
-        :cash="cash"
-        :refresh-key="tableRefreshKey"
+      :portfolio-id="id"
+      :cash="cash"
+      :cash-base-currency-only="cashBaseCurrencyOnly"
+      :refresh-key="tableRefreshKey"
       />
     </template>
 

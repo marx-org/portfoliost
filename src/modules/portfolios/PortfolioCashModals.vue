@@ -330,7 +330,14 @@ const submitLabel = computed(() => (props.action === "deposit" ? "Deposit" : pro
 
         <div>
           <label for="pc-currency" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Currency</label>
-          <select id="pc-currency" v-model="currency" class="input" :disabled="isLegacyNonBaseEdit" data-testid="pc-currency">
+          <select
+            id="pc-currency"
+            v-model="currency"
+            class="input"
+            :disabled="isLegacyNonBaseEdit"
+            :data-cash-base-only="props.cashBaseCurrencyOnly"
+            data-testid="pc-currency"
+          >
             <option v-for="c in cashCurrencies" :key="c" :value="c">{{ c }}</option>
           </select>
         </div>
