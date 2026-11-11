@@ -176,13 +176,15 @@ watch(
         feeExchangeRate.value = tx.feeExchangeRate != null ? String(tx.feeExchangeRate) : ""
       } else {
         amount.value = 0
-        currency.value = baseCurrency.value
+        // A single-currency account cannot take a movement in its display base:
+        // the ledger currency is the only one the server accepts.
+        currency.value = ledgerCurrency.value ?? baseCurrency.value
         description.value = ""
         transactionDate.value = new Date().toISOString().slice(0, 10)
         toPortfolioId.value = ""
         fees.value = 0
         feesType.value = "fixed"
-        feeCurrency.value = baseCurrency.value || ""
+        feeCurrency.value = ledgerCurrency.value ?? baseCurrency.value
       }
       rateSource.value = "automatic"
       exchangeRate.value = ""
