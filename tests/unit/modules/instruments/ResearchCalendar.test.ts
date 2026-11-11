@@ -15,17 +15,35 @@ vi.mock("@/api/instruments", async (importOriginal) => {
   }
 })
 
+// The calendar cards filter to dates after today, so the fixture is anchored to
+// the clock the suite runs on. Absolute dates here are a time bomb: the "upcoming"
+// rows silently age out of the window and the test fails for a reason no diff
+// explains (#67).
+function iso(offsetDays: number): string {
+  const d = new Date()
+  d.setUTCDate(d.getUTCDate() + offsetDays)
+  return d.toISOString().slice(0, 10)
+}
+
+function displayDate(offsetDays: number): string {
+  return new Date(iso(offsetDays)).toLocaleDateString("en-US", {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+  })
+}
+
 function calendarData() {
   return {
     currency: "USD",
-    earnings: [{ date: "2026-10-28", title: "Q4 2026 Earnings Call", year: 2026, quarter: 4 }],
+    earnings: [{ date: iso(3), title: "Upcoming Earnings Call", year: new Date().getFullYear(), quarter: 4 }],
     exDividend: [
-      { date: "2026-11-10", title: "Ex-Dividend Nov 2026", year: 2026, amount: 0.29 },
-      { date: "2026-02-10", title: "Ex-Dividend Feb 2026", year: 2026, amount: 0.33 },
+      { date: iso(5), title: "Upcoming Ex-Dividend", year: new Date().getFullYear(), amount: 0.29 },
+      { date: iso(-90), title: "Past Ex-Dividend", year: new Date().getFullYear(), amount: 0.33 },
     ],
     dividend: [
-      { date: "2026-12-15", title: "Dividend Dec 2026", year: 2026, amount: 0.29 },
-      { date: "2026-03-15", title: "Dividend Mar 2026", year: 2026, amount: 0.25 },
+      { date: iso(60), title: "Upcoming Dividend", year: new Date().getFullYear(), amount: 0.29 },
+      { date: iso(-30), title: "Past Dividend", year: new Date().getFullYear(), amount: 0.25 },
     ],
   }
 }
@@ -44,10 +62,10 @@ describe("ResearchCalendar — §49.9 upcoming sections", () => {
     const pay = wrapper.findAll(".card").filter((c) => c.text().includes("Upcoming Dividend"))
     expect(ex).toHaveLength(1)
     expect(pay).toHaveLength(1)
-    expect(ex[0].text()).toContain("Nov 10, 2026")
-    expect(ex[0].text()).not.toContain("Feb 10, 2026")
-    expect(pay[0].text()).toContain("Dec 15, 2026")
-    expect(pay[0].text()).not.toContain("Mar 15, 2026")
+    expect(ex[0].text()).toContain(displayDate(5))
+    expect(ex[0].text()).not.toContain(displayDate(-90))
+    expect(pay[0].text()).toContain(displayDate(60))
+    expect(pay[0].text()).not.toContain(displayDate(-30))
     expect(pay[0].text()).toContain("$0.29")
   })
 
