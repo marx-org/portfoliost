@@ -78,6 +78,60 @@ test("cash tab: deposit moves the balance and lists a row", async ({ page, reque
   await request.delete(`${GATEWAY}/api/portfolios/${pid}`, { headers: auth }).catch(() => {})
 })
 
+test("cash settlement currency: an account displayed in PLN that settles in USD", async ({ page, request }) => {
+  test.setTimeout(120_000)
+  const run = Date.now()
+  const token = await getBearerToken(request)
+  const auth = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
+  const post = mk(auth, request)
+
+  // IBKR-shaped: the portfolio is displayed in PLN, the account holds USD.
+  const portfolio = await post("/api/portfolios", { name: `E2E USD settlement ${run}`, baseCurrency: "PLN" })
+  const pid = String(portfolio.id)
+
+  try {
+    await login(page)
+    await page.goto(`/en/portfolios/${pid}`)
+    await page.getByRole("button", { name: "Rename", exact: true }).click()
+    const settings = page.getByRole("dialog", { name: "Rename portfolio" })
+    await expect(settings).toBeVisible()
+    await settings.getByTestId("cash-settlement-currency").selectOption("USD")
+    await settings.getByRole("button", { name: "Save", exact: true }).click()
+    await expect(settings).not.toBeVisible({ timeout: 10_000 })
+
+    const detail = await request.get(`${GATEWAY}/api/portfolios/${pid}`, { headers: auth })
+    expect((await detail.json()).cashCurrency).toBe("USD")
+
+    // The deposit modal offers only the settlement currency.
+    await page.goto(`/en/portfolios/${pid}/cash`)
+    await expect(page.getByTestId("cash-tab-total")).toBeVisible({ timeout: 15000 })
+    await page.getByTestId("cash-tab-deposit").click()
+    const dialog = page.getByRole("dialog", { name: "Cash movement" })
+    const currency = dialog.getByTestId("pc-currency")
+    await expect(currency.locator("option")).toHaveCount(1)
+    await expect(currency).toHaveValue("USD")
+
+    await dialog.getByTestId("pc-amount").fill("100")
+    await dialog.getByTestId("pc-description").fill(`settlement ${run}`)
+    await dialog.getByRole("button", { name: "Deposit", exact: true }).click()
+    await expect(dialog).not.toBeVisible({ timeout: 10_000 })
+
+    // One balance, in the settlement currency; the total is that balance revalued
+    // to the display base.
+    const cash = await cashOf(request, auth, pid)
+    expect(cash.balances).toEqual([{ currency: "USD", balance: 100 }])
+    expect(cash.baseCurrency).toBe("PLN")
+
+    const rejected = await request.post(`${GATEWAY}/api/portfolios/${pid}/cash/deposits`, {
+      headers: auth,
+      data: { amount: 50, currency: "PLN" },
+    })
+    expect(rejected.status()).toBe(422)
+  } finally {
+    await request.delete(`${GATEWAY}/api/portfolios/${pid}`, { headers: auth }).catch(() => {})
+  }
+})
+
 test("cash-base-only settings restrict cash, keep foreign trades, and transfer in the destination base", async ({ page, request }) => {
   test.setTimeout(120_000)
   const run = Date.now()

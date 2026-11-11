@@ -267,6 +267,7 @@ async function submitDelete() {
       :base-currency="store.detail?.baseCurrency ?? ''"
       :cash-leg-on-trade="store.detail?.cashLegOnTrade ?? false"
       :cash-base-currency-only="store.detail?.cashBaseCurrencyOnly ?? false"
+      :cash-currency="store.detail?.cashCurrency ?? null"
       :is-virtual="isVirtual"
       :label-id="store.detail?.labelId"
       :busy="renameBusy"

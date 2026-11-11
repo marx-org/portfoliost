@@ -69,6 +69,8 @@ const props = defineProps<{
   cash?: PortfolioCash | null
   /** Portfolio mode supplies this directly; the global feed resolves it by row portfolio id. */
   cashBaseCurrencyOnly?: boolean
+  /** §243 — the portfolio's cash settlement currency, when it has one. */
+  cashCurrency?: string | null
   /** bump to force a reload (the portfolio tab reloads after a deposit) */
   refreshKey?: number
 }>()
@@ -116,6 +118,12 @@ const editingCashBaseCurrencyOnly = computed(() =>
   props.mode === "portfolio"
     ? props.cashBaseCurrencyOnly === true
     : editingPortfolio.value?.cashBaseCurrencyOnly === true,
+)
+/** The currency the edited row's portfolio settles cash in (null = multi-currency). */
+const editingLedgerCurrency = computed(() =>
+  props.mode === "portfolio"
+    ? props.cashCurrency ?? null
+    : editingPortfolio.value?.cashCurrency ?? null,
 )
 
 // ── Sortable columns (shared) ───────────────────────────────────────────
@@ -537,6 +545,7 @@ function onPickerSaved() {
       :portfolio-id="editing?.portfolioId ?? ''"
       :cash="editingCash"
       :cash-base-currency-only="editingCashBaseCurrencyOnly"
+      :cash-currency="editingLedgerCurrency"
       :edit-tx="editing ? editPayload(editing) : null"
       @close="modalOpen = false; editing = null"
       @done="onEditDone"

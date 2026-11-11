@@ -652,6 +652,7 @@ async function exportPositions(format: "csv" | "xml" | "json") {
       :base-currency="portfolio.baseCurrency ?? ''"
       :cash-leg-on-trade="portfolio.cashLegOnTrade ?? false"
       :cash-base-currency-only="portfolio.cashBaseCurrencyOnly"
+      :cash-currency="portfolio.cashCurrency ?? null"
       :is-virtual="portfolio.isVirtual"
       :label-id="portfolio.labelId"
       :busy="renameBusy"

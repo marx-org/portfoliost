@@ -6,6 +6,8 @@ import type { PortfolioDetail } from "@/api/types"
 
 export type PortfolioSettingsPayload =
   Required<Pick<PortfolioDetail, "name" | "baseCurrency" | "cashLegOnTrade" | "cashBaseCurrencyOnly">> & {
+    /** null = the cash ledger stays per trade currency. */
+    cashCurrency: string | null
     labelId?: NonNullable<PortfolioDetail["labelId"]>
   }
 
@@ -15,11 +17,13 @@ const props = withDefaults(defineProps<{
   baseCurrency: string
   cashLegOnTrade: boolean
   cashBaseCurrencyOnly: boolean
+  cashCurrency?: string | null
   isVirtual?: boolean
   labelId?: string | null
   busy?: boolean
   error?: string | null
 }>(), {
+  cashCurrency: null,
   busy: false,
   error: null,
 })
@@ -36,6 +40,7 @@ const name = ref(props.name)
 const baseCurrency = ref(props.baseCurrency)
 const cashLegOnTrade = ref(props.cashLegOnTrade)
 const cashBaseCurrencyOnly = ref(props.cashBaseCurrencyOnly)
+const cashCurrency = ref(props.cashCurrency ?? "")
 const labelId = ref(props.labelId ?? "")
 
 watch(() => props.open, (open) => {
@@ -46,6 +51,7 @@ watch(() => props.open, (open) => {
   baseCurrency.value = props.baseCurrency
   cashLegOnTrade.value = props.cashLegOnTrade
   cashBaseCurrencyOnly.value = props.cashBaseCurrencyOnly
+  cashCurrency.value = props.cashCurrency ?? ""
   labelId.value = props.labelId ?? ""
 })
 
@@ -57,6 +63,12 @@ function submit() {
     baseCurrency: baseCurrency.value,
     cashLegOnTrade: cashLegOnTrade.value,
     cashBaseCurrencyOnly: cashBaseCurrencyOnly.value,
+    // "Base currency only" is the shorthand for settlement = base; sending a
+    // settlement currency as well would be redundant, and empty means
+    // "no single settlement currency" (per-trade-currency ledger).
+    cashCurrency: cashBaseCurrencyOnly.value
+      ? baseCurrency.value
+      : (cashCurrency.value || null),
     labelId: props.isVirtual ? labelId.value : undefined,
   })
 }
@@ -124,6 +136,16 @@ function submit() {
             </span>
           </span>
         </label>
+        <div v-if="!props.isVirtual && !cashBaseCurrencyOnly" class="mb-4">
+          <label for="portfolio-settings-cash-currency" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Cash settlement currency</label>
+          <select id="portfolio-settings-cash-currency" v-model="cashCurrency" class="input" data-testid="cash-settlement-currency">
+            <option value="">None — one balance per trade currency</option>
+            <option v-for="currency in currencies" :key="currency" :value="currency">{{ currency }}</option>
+          </select>
+          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            The currency the account actually holds money in. IBKR settles every leg in USD even though the portfolio is displayed in PLN; setting it keeps the ledger from accumulating balances in currencies the account never held.
+          </p>
+        </div>
         <p v-if="error" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ error }}</p>
         <div class="flex justify-end gap-2">
           <button type="button" class="btn-ghost" @click="emit('close')">Cancel</button>
