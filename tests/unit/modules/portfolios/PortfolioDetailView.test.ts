@@ -165,7 +165,44 @@ describe("PortfolioDetailView — §48.6e B3 umbrella: summary cards in the disp
       baseCurrency: "USD",
       cashLegOnTrade: false,
       cashBaseCurrencyOnly: true,
+      // base-only is the shorthand for settlement = base, so the payload states
+      // the settlement currency explicitly.
+      cashCurrency: "USD",
     })
+  })
+
+  it("sends a settlement currency when the account settles in something other than the base", async () => {
+    const wrapper = await mountDetail("PLN")
+    await flushPromises()
+
+    const rename = wrapper.findAll("button").find((button) => button.text() === "Rename")
+    await rename!.trigger("click")
+    // The settlement select is only offered when the ledger is not base-only.
+    const select = wrapper.get('[data-testid="cash-settlement-currency"]')
+    select.setValue("USD")
+    await wrapper.get("form").trigger("submit")
+
+    expect(mockedPortfolios.updatePortfolio).toHaveBeenCalledWith("p1", {
+      name: "Obligacje PKO SA Beata",
+      baseCurrency: "PLN",
+      cashLegOnTrade: false,
+      cashBaseCurrencyOnly: false,
+      cashCurrency: "USD",
+    })
+  })
+
+  it("leaves the settlement currency null when no single currency is chosen", async () => {
+    const wrapper = await mountDetail("PLN")
+    await flushPromises()
+
+    const rename = wrapper.findAll("button").find((button) => button.text() === "Rename")
+    await rename!.trigger("click")
+    wrapper.get('[data-testid="cash-settlement-currency"]').setValue("")
+    await wrapper.get("form").trigger("submit")
+
+    const payload = mockedPortfolios.updatePortfolio.mock.calls[0][1]
+    expect(payload.cashBaseCurrencyOnly).toBe(false)
+    expect(payload.cashCurrency).toBeNull()
   })
 })
 

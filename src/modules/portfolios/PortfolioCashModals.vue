@@ -26,6 +26,8 @@ const props = withDefaults(defineProps<{
   cash: PortfolioCash
   /** When enabled, only the portfolio base currency can be used for cash movements. */
   cashBaseCurrencyOnly?: boolean
+  /** §243 — the single currency the account settles in, when it is not the base. */
+  cashCurrency?: string | null
   /** §62 follow-up — when set the modal edits this cash row (PATCH) instead of creating one. */
   editTx?: { id: string; type: string; amount: number | string; currency: string; date?: string; createdAt: string; description?: string | null; toPortfolioId?: string | null; fees?: number | null; feeCurrency?: string | null; feeRateSource?: "automatic" | "manual" | null; feeExchangeRate?: number | null } | null
 }>(), { cashBaseCurrencyOnly: false })
@@ -56,8 +58,17 @@ const error = ref<string | null>(null)
 
 const allCurrencies = computed(() => currenciesStore.currencies.map((c) => c.code))
 const baseCurrency = computed(() => props.cash.baseCurrency)
+/**
+ * The currency the cash ledger is denominated in. `cashCurrency` is the account's
+ * settlement currency (IBKR: USD, displayed in PLN); `cashBaseCurrencyOnly` is the
+ * shorthand for settlement = base. When neither is set the ledger is genuinely
+ * multi-currency and every registry currency is a valid choice.
+ */
+const ledgerCurrency = computed(() =>
+  props.cashCurrency ?? (props.cashBaseCurrencyOnly ? baseCurrency.value : null),
+)
 const cashCurrencies = computed(() =>
-  props.cashBaseCurrencyOnly && baseCurrency.value ? [baseCurrency.value] : allCurrencies.value,
+  ledgerCurrency.value ? [ledgerCurrency.value] : allCurrencies.value,
 )
 const isEdit = computed(() => props.editTx != null)
 
@@ -81,8 +92,8 @@ const needsAmountFx = computed(() =>
 )
 const isLegacyNonBaseEdit = computed(() =>
   !!props.editTx &&
-  props.cashBaseCurrencyOnly &&
-  props.editTx.currency.toUpperCase() !== baseCurrency.value.toUpperCase(),
+  ledgerCurrency.value != null &&
+  props.editTx.currency.toUpperCase() !== ledgerCurrency.value.toUpperCase(),
 )
 
 const availableBalance = computed(() => {
@@ -153,7 +164,7 @@ watch(
         // sign per type, so the amount ships as a magnitude).
         const tx = props.editTx
         amount.value = Math.abs(Number(tx.amount)) || 0
-        currency.value = props.cashBaseCurrencyOnly ? baseCurrency.value : tx.currency
+        currency.value = ledgerCurrency.value ?? tx.currency
         description.value = tx.description ?? ""
         transactionDate.value = tx.date ?? tx.createdAt.slice(0, 10)
         toPortfolioId.value = tx.toPortfolioId ?? ""
@@ -165,13 +176,15 @@ watch(
         feeExchangeRate.value = tx.feeExchangeRate != null ? String(tx.feeExchangeRate) : ""
       } else {
         amount.value = 0
-        currency.value = baseCurrency.value
+        // A single-currency account cannot take a movement in its display base:
+        // the ledger currency is the only one the server accepts.
+        currency.value = ledgerCurrency.value ?? baseCurrency.value
         description.value = ""
         transactionDate.value = new Date().toISOString().slice(0, 10)
         toPortfolioId.value = ""
         fees.value = 0
         feesType.value = "fixed"
-        feeCurrency.value = baseCurrency.value || ""
+        feeCurrency.value = ledgerCurrency.value ?? baseCurrency.value
       }
       rateSource.value = "automatic"
       exchangeRate.value = ""
@@ -335,7 +348,7 @@ const submitLabel = computed(() => (props.action === "deposit" ? "Deposit" : pro
             v-model="currency"
             class="input"
             :disabled="isLegacyNonBaseEdit"
-            :data-cash-base-only="props.cashBaseCurrencyOnly"
+            :data-cash-base-only="ledgerCurrency != null"
             data-testid="pc-currency"
           >
             <option v-for="c in cashCurrencies" :key="c" :value="c">{{ c }}</option>
