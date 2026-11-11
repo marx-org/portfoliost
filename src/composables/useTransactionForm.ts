@@ -49,23 +49,34 @@ export function useTransactionForm(
   })
 
   /**
-   * Exchange rate for the fee currency → instrument currency.
-   * null when no conversion needed or rate not yet available.
+   * Exchange rate for the fee currency → payment/base currency.
+   *
+   * The stored `feeExchangeRate` is the fee currency's rate to the portfolio
+   * base currency — the same axis the importer writes from the sheet's col 32
+   * "Kurs waluty opłaty" — not fee → transaction currency. null when the fee is
+   * already in the base currency or no rate is available yet.
    */
   const feeRateValue = computed<number | null>(() => {
     if (feeValue.value <= 0) return null
-    if (form.value.feeCurrency === instrCcy.value) return null
+    const base = targetCurrency.value?.toUpperCase() ?? null
+    if (!base || form.value.feeCurrency === base) return null
     if (form.value.feeRateSource === "manual" && form.value.feeExchangeRate) {
       return Number(form.value.feeExchangeRate)
     }
     return feeSuggestion.value?.rate ?? null
   })
 
-  /** Fee expressed in instrument currency */
-  const feeInUsd = computed(() => {
+  /** Fee expressed in the instrument/transaction currency. */
+  const feeInUsd = computed<number | null>(() => {
+    if (feeValue.value <= 0) return null
     if (form.value.feeCurrency === instrCcy.value) return feeValue.value
-    if (feeRateValue.value == null) return null
-    return feeValue.value * feeRateValue.value
+    const base = targetCurrency.value?.toUpperCase() ?? null
+    // A fee already in the base currency has itself as its base value.
+    const feeToBase = form.value.feeCurrency === base ? 1 : feeRateValue.value
+    if (feeToBase == null) return null
+    // No trade rate means the instrument currency is the base, so the fee's base
+    // value is already its transaction value.
+    return (feeValue.value * feeToBase) / (txRateValue.value ?? 1)
   })
 
   /** Total cost in instrument currency (before FX to wallet) */
