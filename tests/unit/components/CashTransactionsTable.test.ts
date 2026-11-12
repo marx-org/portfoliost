@@ -316,4 +316,38 @@ describe("CashTransactionsTable — shared cash table (date column + sorting)", 
     const w = await mountTable()
     expect(w.text()).toContain("boom")
   })
+
+  // ── #245 — interest, charges and conversions ─────────────────────────────
+
+  it("renders a conversion with both legs", async () => {
+    mocked.getPortfolioCashTransactions.mockResolvedValue(
+      page([portfolioTx({ type: "FX_CONVERSION", amount: -99, currency: "EUR", toCurrency: "USD", toAmount: 110, displayLabel: "Conversion" })]) as never,
+    )
+    const w = await mountTable()
+    const row = w.find('[data-testid="cash-tx-pt1"]')
+    expect(row.text()).toContain("Conversion")
+    expect(row.text()).toContain("→ $110.00")
+  })
+
+  it("does not show a second leg for a same-currency correction", async () => {
+    mocked.getPortfolioCashTransactions.mockResolvedValue(
+      page([portfolioTx({ type: "FX_CONVERSION", amount: -60.5, currency: "USD", toCurrency: "USD", toAmount: null })]) as never,
+    )
+    const w = await mountTable()
+    const row = w.find('[data-testid="cash-tx-pt1"]')
+    expect(row.text()).toContain("Conversion")
+    expect(row.text()).not.toContain("→")
+  })
+
+  it("labels interest and charge rows from the shared kind map", async () => {
+    mocked.getPortfolioCashTransactions.mockResolvedValue(
+      page([
+        portfolioTx({ id: "pt2", type: "INTEREST", amount: 12.5, currency: "USD" }),
+        portfolioTx({ id: "pt3", type: "FEE", amount: -7.4, currency: "USD" }),
+      ]) as never,
+    )
+    const w = await mountTable()
+    expect(w.find('[data-testid="cash-tx-pt2"]').text()).toContain("Interest")
+    expect(w.find('[data-testid="cash-tx-pt3"]').text()).toContain("Fee")
+  })
 })

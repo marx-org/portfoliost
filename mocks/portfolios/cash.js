@@ -10,9 +10,56 @@ import { currenciesPayload, resolveFeeFx, DEMO_RATES } from "../lib/demo-fx.js"
 import { convert } from "@marx-org/contracts/fx"
 import { labelsForCashTransaction, matchesCashLabelFilter } from "../labels.js"
 
-const CASH_LABELS = { DEPOSIT: "Deposit", WITHDRAWAL: "Withdrawal", TRANSFER: "Transfer" }
+const CASH_LABELS = {
+  DEPOSIT: "Deposit",
+  WITHDRAWAL: "Withdrawal",
+  TRANSFER: "Transfer",
+  INTEREST: "Interest",
+  FEE: "Fee",
+  FX_CONVERSION: "Conversion",
+}
 
 const round2 = (x) => Math.round(x * 100) / 100
+
+// A conversion whose two legs are the same currency is not an exchange: it is a
+// correction of one balance. Same distinction as the wallets backend's
+// displayLabelFor.
+function displayLabel(type, currency, toCurrency) {
+  if (type === "FX_CONVERSION") {
+    const to = String(toCurrency ?? currency ?? "").toUpperCase()
+    return to === String(currency ?? "").toUpperCase() ? "Correction" : "Conversion"
+  }
+  return CASH_LABELS[type] ?? type
+}
+
+// Signed legs of a cash row, keyed by currency — mirrors cashRowLegs in the
+// wallets ledger: only a conversion has a second leg.
+function legsOf(row) {
+  const ccy = String(row.currency || "USD").toUpperCase()
+  const legs = { [ccy]: Number(row.amount) || 0 }
+  if (String(row.type).toUpperCase() === "FX_CONVERSION" && row.toAmount != null) {
+    const to = String(row.toCurrency || ccy).toUpperCase()
+    legs[to] = round2((legs[to] ?? 0) + Number(row.toAmount))
+  }
+  return legs
+}
+
+// Canonical conversion legs before writing, mirroring normalizeConversionLegs:
+// two legs in one currency collapse to one signed amount, and a conversion with
+// nothing handed over is a one-sided credit in the receiving currency.
+function normalizeLegs(row) {
+  const from = String(row.currency ?? "").toUpperCase()
+  const to = String(row.toCurrency ?? row.currency ?? "").toUpperCase()
+  const handed = Number(row.amount ?? 0)
+  const received = Math.abs(Number(row.toAmount ?? 0))
+  if (!from || !to) return null
+  if (from === to) {
+    const net = round2(handed + received)
+    return net === 0 ? null : { currency: from, amount: net, toCurrency: to, toAmount: null }
+  }
+  if (handed === 0) return received === 0 ? null : { currency: to, amount: received, toCurrency: null, toAmount: null }
+  return { currency: from, amount: handed, toCurrency: to, toAmount: received }
+}
 
 // ── portfolio resolution ────────────────────────────────────────────────────
 // Cash state is keyed by portfolio id. The seeded Top10 is cash-enabled by
@@ -67,9 +114,25 @@ function seed() {
 function applyRow(portfolioId, row) {
   if (!balances.has(portfolioId)) balances.set(portfolioId, {})
   if (!txBy.has(portfolioId)) txBy.set(portfolioId, [])
-  const ccy = String(row.currency || "USD").toUpperCase()
-  balances.get(portfolioId)[ccy] = round2((balances.get(portfolioId)[ccy] ?? 0) + (Number(row.amount) || 0))
-  txBy.get(portfolioId).unshift({ ...row, portfolioId, currency: ccy })
+  for (const [currency, signed] of Object.entries(legsOf(row))) {
+    if (!signed) continue
+    balances.get(portfolioId)[currency] = round2((balances.get(portfolioId)[currency] ?? 0) + signed)
+  }
+  txBy.get(portfolioId).unshift({ ...row, portfolioId, currency: String(row.currency || "USD").toUpperCase() })
+}
+
+// Balances are always derived from the rows, so an edit or a delete replays the
+// ledger instead of nudging a single currency (as the wallets backend does).
+function replayBalances(portfolioId) {
+  const acc = {}
+  for (const t of liveRows(portfolioId)) {
+    const merged = overrides.get(t.id) ? { ...t, ...overrides.get(t.id) } : t
+    for (const [currency, signed] of Object.entries(legsOf(merged))) {
+      if (!signed) continue
+      acc[currency] = round2((acc[currency] ?? 0) + signed)
+    }
+  }
+  balances.set(portfolioId, acc)
 }
 
 function balanceOf(portfolioId, currency) {
@@ -140,9 +203,11 @@ function toRow(portfolioId, t) {
     type,
     instrumentSymbol: merged.instrumentSymbol ?? null,
     instrumentName: merged.instrumentName ?? null,
-    displayLabel: merged.displayLabel ?? CASH_LABELS[type] ?? type,
+    displayLabel: merged.displayLabel ?? displayLabel(type, merged.currency, merged.toCurrency),
     amount: Number(merged.amount) || 0,
     currency: merged.currency,
+    toCurrency: merged.toCurrency ?? null,
+    toAmount: merged.toAmount != null ? Number(merged.toAmount) : null,
     createdAt: merged.createdAt ?? merged.date ?? nowIso(),
     description: merged.description ?? null,
     transactionDate: merged.transactionDate ?? merged.transaction_date ?? null,
@@ -179,7 +244,11 @@ function allRecent() {
 function historyFor(portfolioId) {
   seed()
   const base = getBaseCcy(portfolioId)
-  const rows = (txBy.get(portfolioId) ?? []).map((t) => ({ ms: new Date(t.date ?? t.createdAt).getTime(), signed: Number(t.amount) || 0, ccy: t.currency }))
+  const rows = liveRows(portfolioId).flatMap((t) => {
+    const merged = overrides.get(t.id) ? { ...t, ...overrides.get(t.id) } : t
+    const ms = new Date(merged.date ?? merged.createdAt).getTime()
+    return Object.entries(legsOf(merged)).map(([ccy, signed]) => ({ ms, signed, ccy }))
+  })
   const days = 90
   const last = new Date("2026-08-12T00:00:00Z").getTime()
   const data = []
@@ -274,6 +343,59 @@ function mutateWithdraw(portfolioId, body) {
   const tx = makeTx(portfolioId, "WITHDRAWAL", -net, body, {}, fx)
   applyRow(portfolioId, tx)
   const after = balanceOf(portfolioId, ccy)
+  return { ...toRow(portfolioId, tx), feesSettled: Math.round(fx.feesSettled * 1e8) / 1e8, new_balance: after, remaining_balance: after }
+}
+
+// Interest and charges move the balance without money crossing the account
+// boundary: INTEREST keeps the caller's sign (a debit-interest posting is a fact),
+// FEE is a magnitude booked as a debit. Mirrors internalCash in the wallets routes.
+function mutateInternal(portfolioId, body, kind) {
+  const ccy = String(body.currency || getBaseCcy(portfolioId)).toUpperCase()
+  if (isCashBaseCurrencyOnly(portfolioId) && ccy !== getBaseCcy(portfolioId)) {
+    return { error: "validation", message: `Cash currency must be ${getBaseCcy(portfolioId)}` }
+  }
+  const raw = Number(body.amount)
+  if (!Number.isFinite(raw)) return { error: "validation", message: "amount must be a number" }
+  const amount = kind === "FEE" ? -Math.abs(raw) : raw
+  if (amount === 0) return { error: "validation", message: "amount must be non-zero" }
+  const fx = resolveFeeFx(body, ccy, { notional: Math.abs(amount) })
+  if (fx.error) return { error: "validation", message: fx.error }
+  const tx = makeTx(portfolioId, kind, amount, body, {}, fx)
+  applyRow(portfolioId, tx)
+  const after = balanceOf(portfolioId, ccy)
+  return { ...toRow(portfolioId, tx), feesSettled: Math.round(fx.feesSettled * 1e8) / 1e8, new_balance: after, remaining_balance: after }
+}
+
+// Two legs, one row: `amount` is the signed leg handed over, `toAmount` the
+// magnitude received. The charge is netted into the leg it is quoted in by the
+// caller; a charge in a third currency is refused rather than dropped.
+function mutateConversion(portfolioId, body) {
+  const legs = normalizeLegs({
+    currency: body.currency || getBaseCcy(portfolioId),
+    amount: body.amount,
+    toCurrency: body.toCurrency,
+    toAmount: body.toAmount,
+  })
+  if (!legs) return { error: "validation", message: "this conversion changes nothing — both legs are zero" }
+  const to = legs.toCurrency ?? legs.currency
+  if (isCashBaseCurrencyOnly(portfolioId)) {
+    const base = getBaseCcy(portfolioId)
+    if (legs.currency !== base && to !== base) {
+      return { error: "validation", message: `A conversion in a ${base}-settled portfolio must involve ${base}` }
+    }
+  }
+  const chargeCcy = String(body.feeCurrency ?? legs.currency).toUpperCase()
+  if (body.fees != null && Math.abs(Number(body.fees)) > 0 && chargeCcy !== legs.currency && chargeCcy !== to) {
+    return {
+      error: "validation",
+      message: `A conversion charge in ${chargeCcy} belongs to neither leg (${legs.currency} handed over, ${to} received)`,
+    }
+  }
+  const fx = resolveFeeFx(body, legs.currency, { notional: Math.abs(legs.amount) })
+  if (fx.error) return { error: "validation", message: fx.error }
+  const tx = { ...makeTx(portfolioId, "FX_CONVERSION", legs.amount, body, {}, fx), toCurrency: legs.toCurrency, toAmount: legs.toAmount }
+  applyRow(portfolioId, tx)
+  const after = balanceOf(portfolioId, legs.currency)
   return { ...toRow(portfolioId, tx), feesSettled: Math.round(fx.feesSettled * 1e8) / 1e8, new_balance: after, remaining_balance: after }
 }
 
@@ -384,31 +506,62 @@ export function register(app) {
     const body = { ...(ctx.body || {}) }
     if (body.transaction_date && !body.transactionDate) body.transactionDate = body.transaction_date
     delete body.type // the SPA no longer sends a type — the row type is fixed
+    const isConversion = String(found.type).toUpperCase() === "FX_CONVERSION"
+    const merged = { ...found, ...body }
     if (isCashBaseCurrencyOnly(found.portfolioId)) {
       const base = getBaseCcy(found.portfolioId)
-      if (String(found.currency).toUpperCase() !== base) {
-        return ctx.res.status(422).json({ error: "ValidationError", message: `Non-base cash rows cannot be edited while cash is limited to ${base}` })
-      }
-      if (body.currency != null && String(body.currency).toUpperCase() !== base) {
-        return ctx.res.status(422).json({ error: "ValidationError", message: `Cash currency must be ${base}` })
+      if (isConversion) {
+        // The first leg of a conversion is by definition foreign to the
+        // settlement currency; what is not allowed is one that touches neither.
+        const to = String(merged.toCurrency ?? merged.currency ?? base).toUpperCase()
+        if (String(merged.currency).toUpperCase() !== base && to !== base) {
+          return ctx.res.status(422).json({ error: "ValidationError", message: `A conversion in a ${base}-settled portfolio must involve ${base}` })
+        }
+      } else {
+        if (String(found.currency).toUpperCase() !== base) {
+          return ctx.res.status(422).json({ error: "ValidationError", message: `Non-base cash rows cannot be edited while cash is limited to ${base}` })
+        }
+        if (body.currency != null && String(body.currency).toUpperCase() !== base) {
+          return ctx.res.status(422).json({ error: "ValidationError", message: `Cash currency must be ${base}` })
+        }
       }
     }
-    if (typeof body.amount === "number") {
+    if (isConversion) {
+      // Legs are edited as one unit and collapse to the canonical shape, so the
+      // stored row never has two legs in one currency or a zero amount.
+      const legs = normalizeLegs({
+        currency: merged.currency,
+        amount: merged.amount,
+        toCurrency: merged.toCurrency,
+        toAmount: merged.toAmount,
+      })
+      if (!legs) return ctx.res.status(422).json({ error: "ValidationError", message: "the legs cancel out — delete the row instead" })
+      body.amount = legs.amount
+      body.currency = legs.currency
+      body.toCurrency = legs.toCurrency
+      body.toAmount = legs.toAmount
+    } else if (typeof body.amount === "number") {
       // sign is re-clamped from the existing row's type (like the real PATCH):
-      // WITHDRAWAL → −, DEPOSIT → +
+      // WITHDRAWAL → −, DEPOSIT → +. INTEREST and FEE keep the sign they were
+      // sent with — flipping a debit-interest row would move the balance twice.
       const t = String(found.type).toUpperCase()
       const abs = Math.abs(body.amount)
-      body.amount = t === "WITHDRAWAL" ? -abs : abs
+      if (t === "WITHDRAWAL") body.amount = -abs
+      else if (t === "DEPOSIT") body.amount = abs
+      if (body.amount === 0) return ctx.res.status(422).json({ error: "ValidationError", message: "amount must be non-zero (delete the row instead)" })
     }
     overrides.set(txId, { ...overrides.get(txId), ...body })
+    replayBalances(found.portfolioId)
     ctx.res.json(allRecent().find((t) => t.id === txId))
   })
 
   app.delete("/api/portfolios/cash/transactions/:txId", (ctx) => {
     if (!requireAuth(ctx)) return
     const txId = ctx.params.txId
-    if (!allRecent().some((t) => t.id === txId)) return ctx.res.status(404).json({ error: "NotFound", message: "Transaction not found" })
+    const found = allRecent().find((t) => t.id === txId)
+    if (!found) return ctx.res.status(404).json({ error: "NotFound", message: "Transaction not found" })
     overrides.set(txId, null)
+    replayBalances(found.portfolioId)
     ctx.res.status(204).end()
   })
 
@@ -448,6 +601,27 @@ export function register(app) {
     const res = mutateTransfer(ctx.params.id, ctx.body || {})
     if (res.error === "validation") return ctx.res.status(422).json({ error: "ValidationError", message: res.message })
     if (res.error === "dest_notfound") return ctx.res.status(404).json({ error: "NotFound", message: "Destination portfolio not found" })
+    ctx.res.status(201).json(res)
+  })
+
+  app.post("/api/portfolios/:id/cash/interest", (ctx) => {
+    if (!requireAuth(ctx)) return
+    const res = mutateInternal(ctx.params.id, ctx.body || {}, "INTEREST")
+    if (res.error === "validation") return ctx.res.status(422).json({ error: "ValidationError", message: res.message })
+    ctx.res.status(201).json(res)
+  })
+
+  app.post("/api/portfolios/:id/cash/fees", (ctx) => {
+    if (!requireAuth(ctx)) return
+    const res = mutateInternal(ctx.params.id, ctx.body || {}, "FEE")
+    if (res.error === "validation") return ctx.res.status(422).json({ error: "ValidationError", message: res.message })
+    ctx.res.status(201).json(res)
+  })
+
+  app.post("/api/portfolios/:id/cash/conversions", (ctx) => {
+    if (!requireAuth(ctx)) return
+    const res = mutateConversion(ctx.params.id, ctx.body || {})
+    if (res.error === "validation") return ctx.res.status(422).json({ error: "ValidationError", message: res.message })
     ctx.res.status(201).json(res)
   })
 
