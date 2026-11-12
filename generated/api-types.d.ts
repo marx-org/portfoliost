@@ -3913,21 +3913,27 @@ export interface components {
             /** Format: date-time */
             executedAt?: string;
         };
-        DepositCashRequest: components["schemas"]["FeeFxFields"] & {
+        CashFeeFields: {
+            /** @description Charge attached to the movement. For a cash row it is metadata: the ledger replay reads the amounts, so a conversion charge must already be netted into the leg it is quoted in. */
+            fees?: number | null;
+            /** @enum {string|null} */
+            feesType?: "fixed" | "pct" | null;
+        };
+        DepositCashRequest: components["schemas"]["FeeFxFields"] & components["schemas"]["CashFeeFields"] & {
             amount: number;
             /** @description Defaults to the portfolio baseCurrency; any registry currency allowed */
             currency?: string;
             description?: string;
             transactionDate?: string;
         };
-        WithdrawCashRequest: components["schemas"]["FeeFxFields"] & {
+        WithdrawCashRequest: components["schemas"]["FeeFxFields"] & components["schemas"]["CashFeeFields"] & {
             amount: number;
             /** @description Defaults to the portfolio baseCurrency; any registry currency allowed */
             currency?: string;
             description?: string;
             transactionDate?: string;
         };
-        TransferCashRequest: components["schemas"]["FeeFxFields"] & {
+        TransferCashRequest: components["schemas"]["FeeFxFields"] & components["schemas"]["CashFeeFields"] & {
             amount: number;
             currency: string;
             description?: string;
@@ -3938,7 +3944,7 @@ export interface components {
             targetAmount?: number | null;
             targetFxRate?: number | null;
         };
-        InterestCashRequest: components["schemas"]["FeeFxFields"] & {
+        InterestCashRequest: components["schemas"]["FeeFxFields"] & components["schemas"]["CashFeeFields"] & {
             /** @description Signed: positive = interest credited, negative = interest charged */
             amount: number;
             /** @description Defaults to the portfolio's cash currency */
@@ -3946,7 +3952,7 @@ export interface components {
             description?: string;
             transactionDate?: string;
         };
-        FeeCashRequest: components["schemas"]["FeeFxFields"] & {
+        FeeCashRequest: components["schemas"]["FeeFxFields"] & components["schemas"]["CashFeeFields"] & {
             /** @description Magnitude of the charge; the server books it as a debit */
             amount: number;
             /** @description Defaults to the portfolio's cash currency */
@@ -3954,13 +3960,13 @@ export interface components {
             description?: string;
             transactionDate?: string;
         };
-        ConversionCashRequest: components["schemas"]["FeeFxFields"] & {
+        ConversionCashRequest: components["schemas"]["FeeFxFields"] & components["schemas"]["CashFeeFields"] & {
             /** @description Signed leg handed over (negative for an outflow). For a pure correction this is the correction itself. */
             amount: number;
             currency: string;
             /** @description Currency received. Omitted or equal to `currency` means a balance correction rather than an exchange. */
             toCurrency?: string | null;
-            /** @description Amount received */
+            /** @description Amount received, positive. Net effect = amount + toAmount. A conversion charge is netted into the leg it is quoted in by the writer — the ledger reads amounts and treats `fees` as metadata, and a charge in a third currency is rejected (422). */
             toAmount: number;
             description?: string;
             transactionDate?: string;
