@@ -99,6 +99,23 @@ describe("PortfolioCashTab (§62.8)", () => {
     expect(w.find('[data-testid="cash-tx-t1"]').exists()).toBe(true)
   })
 
+  it("styles the six action buttons as one peer group (#73)", async () => {
+    // Deposit is the primary action, the other five secondary. `btn-ghost` is the
+    // utility for secondary affordances (pagination, inline row actions in the
+    // table), so a ghost button next to Deposit reads as decoration, not as an
+    // action. Asserting the class set keeps a future kind from being added with
+    // the wrong weight.
+    const w = await mountTab()
+    const actions = ["deposit", "withdraw", "transfer", "interest", "fee", "conversion"].map(
+      (k) => w.find(`[data-testid="cash-tab-${k}"]`),
+    )
+    expect(actions.every((b) => b.exists())).toBe(true)
+    const classes = actions.map((b) => b.attributes("class") as string)
+    expect(classes.some((c) => c.includes("btn-ghost"))).toBe(false)
+    expect(classes.filter((c) => c.includes("btn-primary")).length).toBe(1)
+    expect(classes.filter((c) => c.includes("btn-secondary")).length).toBe(5)
+  })
+
   it("shows the negative-cash badge when a non-margin portfolio has a negative balance", async () => {
     mocked.getPortfolioCash.mockResolvedValue(cash({ balances: [{ currency: "USD", balance: -50 }] }) as never)
     const w = await mountTab(makeEnv({ id: "p1", isMarginEnabled: false, baseCurrency: "USD" }))

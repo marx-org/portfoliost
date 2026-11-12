@@ -106,13 +106,17 @@ function onModalDone() {
             </p>
           </div>
           <div class="flex flex-wrap gap-2">
+            <!-- One row of peer actions: "record a cash event here". Deposit is the
+                 primary, the rest secondary — the same pattern as the portfolio header
+                 (Share/Rename vs Add Position). `btn-ghost` is for secondary affordances
+                 (pagination, inline row actions), not for peers of Deposit (#73). -->
             <button type="button" class="btn-primary text-sm" data-testid="cash-tab-deposit" @click="openModal('deposit')">Deposit</button>
             <button type="button" class="btn-secondary text-sm" data-testid="cash-tab-withdraw" @click="openModal('withdraw')">Withdraw</button>
             <button type="button" class="btn-secondary text-sm" data-testid="cash-tab-transfer" @click="openModal('transfer')">Transfer</button>
             <!-- #245 — the kinds a broker account has but a trade sheet does not. -->
-            <button type="button" class="btn-ghost text-sm" data-testid="cash-tab-interest" @click="openModal('interest')">Interest</button>
-            <button type="button" class="btn-ghost text-sm" data-testid="cash-tab-fee" @click="openModal('fee')">Charge</button>
-            <button type="button" class="btn-ghost text-sm" data-testid="cash-tab-conversion" @click="openModal('conversion')">Conversion</button>
+            <button type="button" class="btn-secondary text-sm" data-testid="cash-tab-interest" @click="openModal('interest')">Interest</button>
+            <button type="button" class="btn-secondary text-sm" data-testid="cash-tab-fee" @click="openModal('fee')">Charge</button>
+            <button type="button" class="btn-secondary text-sm" data-testid="cash-tab-conversion" @click="openModal('conversion')">Conversion</button>
           </div>
         </div>
 
