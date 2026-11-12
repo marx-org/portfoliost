@@ -132,6 +132,87 @@ test("cash settlement currency: an account displayed in PLN that settles in USD"
   }
 })
 
+test("cash kinds: interest, charge and conversion move the ledger and render in the table", async ({ page, request }) => {
+  test.setTimeout(120_000)
+  const run = Date.now()
+  const token = await getBearerToken(request)
+  const auth = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
+  const post = mk(auth, request)
+
+  const portfolio = await post("/api/portfolios", { name: `E2E Cash Kinds ${run}`, baseCurrency: "USD" })
+  const pid = String(portfolio.id)
+  await post(`/api/portfolios/${pid}/cash/deposits`, { amount: 1000, currency: "USD" })
+
+  try {
+    await login(page)
+    await page.goto(`/en/portfolios/${pid}/cash`)
+    await expect(page.getByTestId("cash-tab-total")).toBeVisible({ timeout: 15000 })
+    const dialog = page.getByRole("dialog", { name: "Cash movement" })
+
+    // Interest is signed: the same form accepts a credit and a charge.
+    await page.getByTestId("cash-tab-interest").click()
+    await expect(dialog).toBeVisible()
+    await dialog.getByTestId("pc-amount").fill("12.5")
+    await dialog.getByRole("button", { name: "Interest", exact: true }).click()
+    await expect(dialog).not.toBeVisible({ timeout: 10_000 })
+    expect(await balanceOf(request, auth, pid, "USD")).toBe(1012.5)
+
+    await page.getByTestId("cash-tab-interest").click()
+    await dialog.getByTestId("pc-amount").fill("-3")
+    await dialog.getByRole("button", { name: "Interest", exact: true }).click()
+    await expect(dialog).not.toBeVisible({ timeout: 10_000 })
+    expect(await balanceOf(request, auth, pid, "USD")).toBe(1009.5)
+
+    // A charge attached to no transaction is booked as a debit from its magnitude.
+    await page.getByTestId("cash-tab-fee").click()
+    await dialog.getByTestId("pc-amount").fill("7.4")
+    await dialog.getByRole("button", { name: "Charge", exact: true }).click()
+    await expect(dialog).not.toBeVisible({ timeout: 10_000 })
+    expect(await balanceOf(request, auth, pid, "USD")).toBe(1002.1)
+
+    // A conversion is two legs: 1000 EUR handed over, 1100 USD received.
+    await page.getByTestId("cash-tab-conversion").click()
+    await dialog.getByTestId("pc-currency").selectOption("EUR")
+    await dialog.getByTestId("pc-amount").fill("1000")
+    await dialog.getByTestId("pc-to-currency").selectOption("USD")
+    await dialog.getByTestId("pc-to-amount").fill("1100")
+    await dialog.getByTestId("pc-description").fill(`conversion ${run}`)
+    await dialog.getByRole("button", { name: "Conversion", exact: true }).click()
+    await expect(dialog).not.toBeVisible({ timeout: 10_000 })
+    expect(await balanceOf(request, auth, pid, "USD")).toBe(2102.1)
+    expect(await balanceOf(request, auth, pid, "EUR")).toBe(-1000)
+
+    // The broker's own conversion residual is a correction of one balance.
+    await page.getByTestId("cash-tab-conversion").click()
+    await dialog.getByTestId("pc-amount").fill("60.5")
+    await dialog.getByTestId("pc-description").fill(`residual ${run}`)
+    await dialog.getByRole("button", { name: "Conversion", exact: true }).click()
+    await expect(dialog).not.toBeVisible({ timeout: 10_000 })
+    expect(await balanceOf(request, auth, pid, "USD")).toBe(2041.6)
+
+    // The table shows the kind and, for a real exchange, the leg received.
+    const rows = page.locator("tbody tr")
+    await expect(rows.filter({ hasText: "Interest" }).first()).toBeVisible({ timeout: 10_000 })
+    await expect(rows.filter({ hasText: "Fee" }).first()).toBeVisible({ timeout: 10_000 })
+    await expect(rows.filter({ hasText: `conversion ${run}` }).first()).toContainText("→")
+    // The correction has no second leg, so it shows no arrow.
+    await expect(rows.filter({ hasText: `residual ${run}` }).first()).not.toContainText("→")
+
+    const list = await request.get(`${GATEWAY}/api/portfolios/${pid}/cash/transactions?limit=50`, { headers: auth })
+    expect(list.status()).toBe(200)
+    const items = ((await list.json()) as { items: Array<Record<string, unknown>> }).items
+    const kinds = new Set(items.map((t) => t.type))
+    expect(kinds.has("INTEREST")).toBe(true)
+    expect(kinds.has("FEE")).toBe(true)
+    expect(kinds.has("FX_CONVERSION")).toBe(true)
+    const conversion = items.find((t) => t.type === "FX_CONVERSION" && t.toCurrency === "USD" && String(t.currency) === "EUR")
+    expect(Number(conversion!.toAmount)).toBe(1100)
+    expect(Number(conversion!.amount)).toBe(-1000)
+  } finally {
+    await request.delete(`${GATEWAY}/api/portfolios/${pid}`, { headers: auth }).catch(() => {})
+  }
+})
+
 test("cash-base-only settings restrict cash, keep foreign trades, and transfer in the destination base", async ({ page, request }) => {
   test.setTimeout(120_000)
   const run = Date.now()
