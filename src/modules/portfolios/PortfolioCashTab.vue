@@ -2,8 +2,8 @@
 /**
  * §62.8 — per-portfolio cash tab (example-service parity). Balance block (one row per
  * currency + base-currency total), the CashBalanceChart over the base-currency
- * PortfolioCashHistory series, Deposit/Withdraw/Transfer via
- * PortfolioCashModals, and the shared CashTransactionsTable. An amber
+ * PortfolioCashHistory series, Deposit/Withdraw/Transfer/Interest/Charge/Conversion
+ * via PortfolioCashModals, and the shared CashTransactionsTable. An amber
  * negative-cash badge shows on a non-margin portfolio when any currency
  * balance < 0.
  */
@@ -15,6 +15,7 @@ import {
 } from "@/api/portfolios"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { formatCurrency, formatSignedCurrency } from "@/utils/format"
+import { type CashAction } from "@/utils/cashKinds"
 import CashBalanceChart from "@/components/CashBalanceChart.vue"
 import CashTransactionsTable from "@/components/CashTransactionsTable.vue"
 import PortfolioCashModals from "@/modules/portfolios/PortfolioCashModals.vue"
@@ -34,7 +35,7 @@ const error = ref<string | null>(null)
 
 // Modal state
 const modalOpen = ref(false)
-const modalAction = ref<"deposit" | "withdraw" | "transfer">("deposit")
+const modalAction = ref<CashAction>("deposit")
 /** bumped after a movement so the shared table reloads its page */
 const tableRefreshKey = ref(0)
 
@@ -77,7 +78,7 @@ watch(() => route.params.id, (nid, oid) => {
   }
 })
 
-function openModal(action: "deposit" | "withdraw" | "transfer") {
+function openModal(action: CashAction) {
   modalAction.value = action
   modalOpen.value = true
 }
@@ -104,10 +105,14 @@ function onModalDone() {
               {{ formatCurrency(cash.total, baseCurrency) }}
             </p>
           </div>
-          <div class="flex gap-2">
+          <div class="flex flex-wrap gap-2">
             <button type="button" class="btn-primary text-sm" data-testid="cash-tab-deposit" @click="openModal('deposit')">Deposit</button>
             <button type="button" class="btn-secondary text-sm" data-testid="cash-tab-withdraw" @click="openModal('withdraw')">Withdraw</button>
             <button type="button" class="btn-secondary text-sm" data-testid="cash-tab-transfer" @click="openModal('transfer')">Transfer</button>
+            <!-- #245 — the kinds a broker account has but a trade sheet does not. -->
+            <button type="button" class="btn-ghost text-sm" data-testid="cash-tab-interest" @click="openModal('interest')">Interest</button>
+            <button type="button" class="btn-ghost text-sm" data-testid="cash-tab-fee" @click="openModal('fee')">Charge</button>
+            <button type="button" class="btn-ghost text-sm" data-testid="cash-tab-conversion" @click="openModal('conversion')">Conversion</button>
           </div>
         </div>
 

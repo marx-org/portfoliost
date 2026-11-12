@@ -24,6 +24,7 @@ import LabelChips from "@/components/LabelChips.vue"
 import LabelManagerDialog from "@/components/LabelManagerDialog.vue"
 import LabelPickerPopover from "@/components/LabelPickerPopover.vue"
 import { triggerRectFromEvent, type TriggerRect } from "@/utils/popoverPosition"
+import { cashTypeLabel, editActionFor, type CashAction } from "@/utils/cashKinds"
 import PortfolioCashModals from "@/modules/portfolios/PortfolioCashModals.vue"
 import ConfirmDeleteModal from "@/modules/portfolios/ConfirmDeleteModal.vue"
 import { usePortfolioStore } from "@/stores/portfolios"
@@ -57,6 +58,8 @@ type Tx = {
   feeCurrency?: string | null
   feeRateSource?: "automatic" | "manual" | null
   feeExchangeRate?: number | null
+  toCurrency?: string | null
+  toAmount?: number | string | null
   labels?: components["schemas"]["Label"][]
 }
 
@@ -102,7 +105,7 @@ const pickerTrigger    = ref<TriggerRect | null>(null)
 // Edit / delete
 const editing      = ref<Tx | null>(null)
 const modalOpen    = ref(false)
-const modalAction  = ref<"deposit" | "withdraw" | "transfer">("deposit")
+const modalAction  = ref<CashAction>("deposit")
 const deleteTarget = ref<Tx | null>(null)
 const deleteBusy   = ref(false)
 const deleteError  = ref<string | null>(null)
@@ -281,14 +284,18 @@ function dateLabel(tx: Tx): string {
   return props.mode === "global" ? formatDateTime(dateOf(tx)) : formatDate(dateOf(tx))
 }
 
-const TYPE_LABELS: Record<string, string> = {
-  DEPOSIT: "Deposit",
-  WITHDRAWAL: "Withdrawal",
-  TRANSFER: "Transfer",
+function typeLabel(tx: Tx): string {
+  return tx.displayLabel ?? cashTypeLabel(tx.type)
 }
 
-function typeLabel(tx: Tx): string {
-  return tx.displayLabel ?? TYPE_LABELS[String(tx.type).toUpperCase()] ?? tx.type
+/** The currency of a conversion's second leg, or null when there is none —
+ * a same-currency pair is a correction of one balance, not an exchange. */
+function secondLegOf(tx: Tx): string | null {
+  const to = String(tx.toCurrency ?? "").toUpperCase()
+  const from = String(tx.currency ?? "").toUpperCase()
+  if (!to || to === from) return null
+  if (tx.toAmount == null || Number(tx.toAmount) === 0) return null
+  return to
 }
 
 // ── Edit / Delete ────────────────────────────────────────────────────────
@@ -298,10 +305,7 @@ async function openEdit(tx: Tx) {
     await portfoliosStore.fetchAll().catch(() => undefined)
   }
   editing.value  = tx
-  modalAction.value =
-    String(tx.type).toUpperCase() === "WITHDRAWAL" ? "withdraw"
-    : String(tx.type).toUpperCase() === "TRANSFER" ? "transfer"
-    : "deposit"
+  modalAction.value = editActionFor(tx.type)
   modalOpen.value = true
 }
 
@@ -328,6 +332,10 @@ function editPayload(tx: Tx) {
     feeCurrency: tx.feeCurrency ?? null,
     feeRateSource: tx.feeRateSource ?? null,
     feeExchangeRate: tx.feeExchangeRate ?? null,
+    // #245 — the conversion's second leg, so the modal can show and edit both.
+    // `amount` is a string in the global feed, so the leg is normalized here.
+    toCurrency: tx.toCurrency ?? null,
+    toAmount: tx.toAmount == null ? null : Number(tx.toAmount),
   }
 }
 
@@ -456,6 +464,9 @@ function onPickerSaved() {
                 :class="amountOf(tx) < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-700 dark:text-green-400'"
               >
                 {{ formatCurrency(amountOf(tx), tx.currency) }}
+                <span v-if="secondLegOf(tx)" class="block text-xs tabular-nums text-slate-500 dark:text-slate-400">
+                  → {{ formatCurrency(Number(tx.toAmount), secondLegOf(tx)!) }}
+                </span>
               </td>
 
               <!-- Balance (portfolio only) -->

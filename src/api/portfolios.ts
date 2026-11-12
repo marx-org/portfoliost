@@ -270,11 +270,18 @@ type RecentCashTransactionsPage = components["schemas"]["RecentCashTransactionsP
 type DepositCashRequest = components["schemas"]["DepositCashRequest"]
 type WithdrawCashRequest = components["schemas"]["WithdrawCashRequest"]
 type TransferCashRequest = components["schemas"]["TransferCashRequest"]
+type InterestCashRequest = components["schemas"]["InterestCashRequest"]
+type FeeCashRequest = components["schemas"]["FeeCashRequest"]
+type ConversionCashRequest = components["schemas"]["ConversionCashRequest"]
 type GetPortfolioCashHistoryQuery = NonNullable<operations["getPortfolioCashHistory"]["parameters"]["query"]>
 type GetRecentCashTransactionsQuery = NonNullable<operations["getRecentCashTransactions"]["parameters"]["query"]>
 export interface UpdateCashTransactionInput {
   amount?: number
   currency?: string
+  /** FX_CONVERSION only: the currency received. Same as `currency` = a correction. */
+  toCurrency?: string | null
+  /** FX_CONVERSION only: the amount received, net of the conversion charge. */
+  toAmount?: number | null
   description?: string
   date?: string
   fees?: number
@@ -326,6 +333,25 @@ export async function withdrawCash(id: string, input: WithdrawCashRequest): Prom
 
 export async function transferCash(id: string, input: TransferCashRequest): Promise<CashTransaction> {
   return http.post<CashTransaction>(`/api/portfolios/${id}/cash/transfers`, input)
+}
+
+/** #245 — broker interest. `amount` is signed: credited (+) or charged (−). */
+export async function interestCash(id: string, input: InterestCashRequest): Promise<CashTransaction> {
+  return http.post<CashTransaction>(`/api/portfolios/${id}/cash/interest`, input)
+}
+
+/** #245 — an account charge attached to no transaction. The server books it as a debit. */
+export async function feeCash(id: string, input: FeeCashRequest): Promise<CashTransaction> {
+  return http.post<CashTransaction>(`/api/portfolios/${id}/cash/fees`, input)
+}
+
+/**
+ * #245 — a currency exchange, or a correction of one balance when both legs are
+ * the same currency. `amount` is the signed leg handed over, `toAmount` the
+ * magnitude received, already net of any conversion charge.
+ */
+export async function conversionCash(id: string, input: ConversionCashRequest): Promise<CashTransaction> {
+  return http.post<CashTransaction>(`/api/portfolios/${id}/cash/conversions`, input)
 }
 
 export async function getRecentCashTransactions(

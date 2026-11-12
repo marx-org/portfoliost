@@ -654,6 +654,38 @@ async function main() {
   check("cash.transfer credits destination", destCash.json.balances.some((b) => b.currency === "USD" && b.balance === 100), `got ${JSON.stringify(destCash.json).slice(0, 120)}`)
   const srcCash = await request(`/portfolios/${TOP10}/cash`, { token })
   check("cash.transfer debits source (750-102=648)", srcCash.json.balances.some((b) => b.currency === "USD" && b.balance === 648), `got ${JSON.stringify(srcCash.json.balances).slice(0, 120)}`)
+
+  // §245 — interest, charges and conversions are balance movements with no
+  // instrument behind them. Sign rules: INTEREST keeps the sign it is sent with,
+  // FEE is a magnitude booked as a debit, FX_CONVERSION is two legs.
+  const interest = await request(`/portfolios/${TOP10}/cash/interest`, { method: "POST", token, body: { amount: 12.5, currency: "USD", description: "Credit interest" } })
+  check("cash.interest credits the balance and keeps its sign", interest.status === 201 && interest.json.type === "INTEREST" && interest.json.amount === 12.5 && interest.json.displayLabel === "Interest" && interest.json.new_balance === 660.5, `got ${interest.status} ${JSON.stringify(interest.json).slice(0, 140)}`)
+  const debitInterest = await request(`/portfolios/${TOP10}/cash/interest`, { method: "POST", token, body: { amount: -3, currency: "USD" } })
+  check("cash.interest accepts a debit-interest posting", debitInterest.status === 201 && debitInterest.json.amount === -3 && debitInterest.json.new_balance === 657.5, `got ${debitInterest.status} ${JSON.stringify(debitInterest.json).slice(0, 140)}`)
+  const fee = await request(`/portfolios/${TOP10}/cash/fees`, { method: "POST", token, body: { amount: 7.4, currency: "USD", description: "Broker charge" } })
+  check("cash.fee books a magnitude as a debit", fee.status === 201 && fee.json.type === "FEE" && fee.json.amount === -7.4 && fee.json.displayLabel === "Fee" && fee.json.new_balance === 650.1, `got ${fee.status} ${JSON.stringify(fee.json).slice(0, 140)}`)
+  const conversion = await request(`/portfolios/${TOP10}/cash/conversions`, {
+    method: "POST",
+    token,
+    body: { currency: "EUR", amount: -99, toCurrency: "USD", toAmount: 110, fees: 1, feeCurrency: "EUR", description: "EUR to USD" },
+  })
+  const afterConversion = await request(`/portfolios/${TOP10}/cash`, { token })
+  check("cash.conversion moves both legs", conversion.status === 201 && conversion.json.toCurrency === "USD" && conversion.json.toAmount === 110 && conversion.json.displayLabel === "Conversion" && afterConversion.json.balances.some((b) => b.currency === "EUR" && b.balance === 401) && afterConversion.json.balances.some((b) => b.currency === "USD" && b.balance === 760.1), `got ${conversion.status} ${JSON.stringify(afterConversion.json.balances)}`)
+  const correction = await request(`/portfolios/${TOP10}/cash/conversions`, { method: "POST", token, body: { currency: "USD", amount: -60.5, description: "Forex residual" } })
+  const afterCorrection = await request(`/portfolios/${TOP10}/cash`, { token })
+  check("cash.conversion with one currency is a correction", correction.status === 201 && correction.json.toCurrency === "USD" && correction.json.toAmount === null && correction.json.displayLabel === "Correction" && afterCorrection.json.balances.some((b) => b.currency === "USD" && b.balance === 699.6), `got ${correction.status} ${JSON.stringify(afterCorrection.json.balances)}`)
+  const badFee = await request(`/portfolios/${TOP10}/cash/conversions`, { method: "POST", token, body: { currency: "EUR", amount: -10, toAmount: 11, fees: 2, feeCurrency: "GBP" } })
+  check("cash.conversion rejects a charge in a third currency", badFee.status === 422, `got ${badFee.status}`)
+  const emptyConversion = await request(`/portfolios/${TOP10}/cash/conversions`, { method: "POST", token, body: { currency: "USD", amount: -5, toCurrency: "USD", toAmount: 5 } })
+  check("cash.conversion rejects legs that cancel out", emptyConversion.status === 422, `got ${emptyConversion.status}`)
+  const patchedConversion = await request(`/portfolios/cash/transactions/${conversion.json.id}`, { method: "PATCH", token, body: { amount: -100, toAmount: 105 } })
+  const afterPatch = await request(`/portfolios/${TOP10}/cash`, { token })
+  check("cash PATCH replays both conversion legs", patchedConversion.status === 200 && Number(patchedConversion.json.amount) === -100 && Number(patchedConversion.json.toAmount) === 105 && afterPatch.json.balances.some((b) => b.currency === "EUR" && b.balance === 400) && afterPatch.json.balances.some((b) => b.currency === "USD" && b.balance === 694.6), `got ${patchedConversion.status} ${JSON.stringify(afterPatch.json.balances)}`)
+  const patchedInterest = await request(`/portfolios/cash/transactions/${interest.json.id}`, { method: "PATCH", token, body: { amount: 20 } })
+  check("cash PATCH keeps a debit-interest sign", patchedInterest.status === 200 && Number(patchedInterest.json.amount) === 20, `got ${patchedInterest.status} ${JSON.stringify(patchedInterest.json).slice(0, 120)}`)
+  const recentKinds = await request("/portfolios/cash/recent-transactions?limit=100&sortBy=date&sortOrder=desc", { token })
+  const kinds = new Set(recentKinds.json.data.map((r) => r.type))
+  check("cash recent feed carries the new kinds", ["INTEREST", "FEE", "FX_CONVERSION"].every((t) => kinds.has(t)) && recentKinds.json.data.every((r) => "toCurrency" in r && "toAmount" in r), `got ${[...kinds].join(",")}`)
   const recent = await request("/portfolios/cash/recent-transactions?page=1&limit=10&sortBy=date&sortOrder=desc", { token })
   check("cash.recent-transactions", recent.status === 200 && isObj(recent.json) && Array.isArray(recent.json.data) && isObj(recent.json.meta), `got ${recent.status}`)
   check("cash.recent-transactions fields", recent.status === 200 && hasKeys(recent.json.data[0], ["id", "portfolioId", "portfolioName", "type", "displayLabel", "amount", "date"]), JSON.stringify(recent.json.data && recent.json.data[0]).slice(0, 120))
