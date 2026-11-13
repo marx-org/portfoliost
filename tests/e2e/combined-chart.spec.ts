@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test"
 
+const GATEWAY = process.env.PORTFOLIOST_GATEWAY_URL || "http://localhost:8080"
+
 /**
  * §83.6 — the combined (all-portfolios) chart moved from the investments
  * dashboard to its own tab at `/en/investments/performance`, which renders the
@@ -76,7 +78,7 @@ test("every §82 tile renders a NUMBER on the aggregate, not a dash", async ({ p
   }
 })
 
-test("the Yearly view is available on ALL and reconciles to the Net gain tile", async ({ page }) => {
+test("the Yearly view is available on ALL and reconciles to the Net gain tile", async ({ page, request }) => {
   await login(page)
   await openTab(page)
 
@@ -84,13 +86,36 @@ test("the Yearly view is available on ALL and reconciles to the Net gain tile", 
   await expect(yearly).toBeEnabled()
   await yearly.click()
 
-  const total = await page.getByTestId("total-perf-returns-yearly-total-gain").innerText()
-  await expect(page.getByTestId("total-perf-returns-yearly-total-gain")).toBeVisible({ timeout: 30_000 })
+  const totalEl = page.getByTestId("total-perf-returns-yearly-total-gain")
+  await expect(totalEl).toBeVisible({ timeout: 30_000 })
+  const total = await totalEl.innerText()
 
-  // The Σ footer is the same number as the Net gain tile by construction (both
-  // ride `convert()`), so a divergence is a real inconsistency.
   const gain = await page.getByTestId("total-perf-overview-net-gain").innerText()
-  expect(total).toBe(gain)
+
+  /**
+   * §82.5 (PROD): the Σ of the yearly rows is `net(last) − net(first)` while the
+   * tile is gain since inception, so they are the same number only when the
+   * series opens at net 0. Asserting equality outright passed on the seeded
+   * compose data and is false on any account whose first snapshot already
+   * carries a net — which is what the unit tests call out. The honest invariant
+   * is the difference: Σ − tile = −openingNet.
+   */
+  const token = await page.evaluate(() => localStorage.getItem("portfoliost_token"))
+  const res = await request.get(`${GATEWAY}/api/portfolios/merged?timeframe=ALL`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  expect(res.ok(), await res.text()).toBe(true)
+  const perf = (await res.json() as { performance?: { timeSeries?: Array<{ value?: number; invested?: number | null }> } }).performance
+  const series = perf?.timeSeries ?? []
+  expect(series.length).toBeGreaterThan(0)
+  const openingNet = (series[0].value ?? 0) - (series[0].invested ?? 0)
+
+  const money = (s: string): number => Number(s.replace(/[^0-9.,-]/g, "").replace(/,/g, ""))
+  if (Math.abs(openingNet) < 0.005) {
+    expect(total).toBe(gain)
+  } else {
+    expect(money(total) - money(gain)).toBeCloseTo(-openingNet, 2)
+  }
 
   // …and a shorter window holds no full calendar year, so Yearly disables itself.
   await chartCard(page).getByRole("button", { name: "1Y" }).click()
