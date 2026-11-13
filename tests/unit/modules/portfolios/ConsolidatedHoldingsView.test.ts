@@ -3,6 +3,8 @@ import { createPinia, setActivePinia } from "pinia"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import ConsolidatedHoldingsView from "@/modules/portfolios/ConsolidatedHoldingsView.vue"
 import AddPositionDialog from "@/modules/portfolios/AddPositionDialog.vue"
+import HoldingsTable from "@/components/HoldingsTable.vue"
+import type { PortfolioPositions } from "@/api/types"
 import * as portfoliosApi from "@/api/portfolios"
 import { useCurrenciesStore } from "@/stores/currencies"
 
@@ -99,6 +101,52 @@ describe("ConsolidatedHoldingsView", () => {
 
     await rows[0].findAll("button").find((button) => button.text().trim() === "Buy")!.trigger("click")
     expect(wrapper.findComponent(AddPositionDialog).props("portfolioId")).toBe("p1")
+  })
+
+  it("keeps the table mounted while the aggregate refreshes, so paging and filters survive", async () => {
+    // §90 — a label save, a buy or a dividend calls the table's `refresh` prop. If
+    // the loading branch replaces the table, the component remounts and every
+    // local ref (pageSize, search, groupBy, sort, visibleColumns) resets.
+    const rows = [
+      position(),
+      position({ id: "pos-2", portfolioId: "p2", portfolioName: "Retirement", symbol: "KO", companyName: "Coca-Cola Co" }),
+    ]
+    // Deferred so the DOM can be inspected while the refresh is genuinely in flight.
+    const resolvers: Array<(value: PortfolioPositions) => void> = []
+    mocked.getAllPositions.mockImplementation(() => new Promise((res) => resolvers.push(res)))
+
+    const wrapper = mountView()
+    resolvers[0](rows)
+    await flushPromises()
+
+    const table = wrapper.findComponent(HoldingsTable)
+    // The table's paging and search are local refs; set them through the DOM so
+    // Vue's v-model sees a real input event.
+    const pageSize = wrapper.element.querySelector('[data-testid="holdings-page-size"]') as HTMLSelectElement
+    const search = wrapper.element.querySelector('[data-testid="holdings-search"]') as HTMLInputElement
+    pageSize.value = "50"
+    pageSize.dispatchEvent(new Event("change"))
+    search.value = "KO"
+    search.dispatchEvent(new Event("input"))
+    await flushPromises()
+    expect(wrapper.findAll('[data-testid="holdings-row"]')).toHaveLength(1)
+
+    const pending = (table.props("refresh") as () => Promise<void>)()
+    await flushPromises()
+    // Mid-refresh the table is still mounted, with a "Refreshing…" line instead of
+    // a loading card.
+    expect(wrapper.find('[data-testid="holdings-table-wrap"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="holdings-refreshing"]').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain("Loading holdings...")
+
+    resolvers[1](rows)
+    await pending
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="holdings-refreshing"]').exists()).toBe(false)
+    expect((wrapper.element.querySelector('[data-testid="holdings-page-size"]') as HTMLSelectElement).value).toBe("50")
+    expect((wrapper.element.querySelector('[data-testid="holdings-search"]') as HTMLInputElement).value).toBe("KO")
+    expect(wrapper.findAll('[data-testid="holdings-row"]')).toHaveLength(1)
   })
 
   it("shows a retryable error state", async () => {
