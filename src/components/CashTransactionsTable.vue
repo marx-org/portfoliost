@@ -14,6 +14,7 @@
  */
 import { computed, onMounted, ref, watch } from "vue"
 import {
+  getPortfolioCash,
   getPortfolioCashTransactions,
   getRecentCashTransactions,
   deleteCashTransaction,
@@ -129,6 +130,67 @@ const editingLedgerCurrency = computed(() =>
     : editingPortfolio.value?.cashCurrency ?? null,
 )
 
+// ── Recording a new event (global mode only) ─────────────────────────────
+//
+// §93 — the consolidated cash page has no portfolio in scope, so the owning
+// portfolio is part of the affordance: pick it, then pick the kind. The modal is
+// the same PortfolioCashModals the per-portfolio tab uses, so the currency rules
+// (#243) and the kind set (#245) cannot drift between the two surfaces.
+const addPortfolios = computed(() =>
+  [...portfoliosStore.portfolios].sort((a, b) =>
+    String(a.name ?? "").localeCompare(String(b.name ?? "")),
+  ),
+)
+// Default to the first portfolio in name order so the buttons work immediately.
+const addPortfolioId = ref(addPortfolios.value[0]?.id ?? "")
+watch(addPortfolios, (list) => {
+  if (!addPortfolioId.value) addPortfolioId.value = list[0]?.id ?? ""
+})
+const addAction      = ref<CashAction>("deposit")
+const addOpen        = ref(false)
+const addBusy        = ref(false)
+const addError       = ref<string | null>(null)
+const addCash        = ref<PortfolioCash | null>(null)
+const addPortfolio = computed(() =>
+  portfoliosStore.portfolios.find((portfolio) => portfolio.id === addPortfolioId.value),
+)
+
+/** A cash payload for the modal when the chosen portfolio has no cash yet. */
+const addCashForModal = computed<PortfolioCash>(() =>
+  addCash.value ?? {
+    baseCurrency: addPortfolio.value?.baseCurrency ?? "",
+    balances: [],
+    total: 0,
+  },
+)
+
+async function openAdd(action: CashAction) {
+  const portfolioId = addPortfolioId.value || addPortfolios.value[0]?.id
+  if (!portfolioId) {
+    addError.value = "No portfolio to record a cash event into."
+    return
+  }
+  addBusy.value = true
+  addError.value = null
+  try {
+    addPortfolioId.value = portfolioId
+    addCash.value = await getPortfolioCash(portfolioId)
+    editing.value = null
+    addAction.value = action
+    addOpen.value = true
+  } catch (err) {
+    addError.value = err instanceof Error ? err.message : "Failed to load that portfolio's cash"
+  } finally {
+    addBusy.value = false
+  }
+}
+
+function onAddDone() {
+  addOpen.value = false
+  notice.value = "Cash event recorded"
+  void load()
+}
+
 // ── Sortable columns (shared) ───────────────────────────────────────────
 
 const sortableColumns = computed(() => {
@@ -215,7 +277,15 @@ async function load(targetPage = page.value) {
   }
 }
 
-onMounted(() => load())
+onMounted(() => {
+  // The record-a-cash-event toolbar needs the portfolio list. The view that
+  // mounts this table already fetches it, so this is a safety net for the case
+  // where it did not — it must not delay or block the feed itself.
+  if (props.mode === "global" && !portfoliosStore.portfolios.length) {
+    void portfoliosStore.fetchAll().catch(() => undefined)
+  }
+  void load()
+})
 
 watch([labelFilter, searchFilter], () => load(1))
 
@@ -407,7 +477,36 @@ function onPickerSaved() {
       </div>
     </div>
 
+    <!-- §93 — the per-portfolio tab has these buttons; the consolidated feed did
+         not, so recording a cash event meant first opening the portfolio. The
+         portfolio is named here because the feed spans every one of them. -->
+    <div v-if="mode === 'global'" class="border-b border-slate-100 dark:border-slate-800 px-5 py-2">
+      <div class="flex flex-wrap items-center gap-2">
+        <label class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+          <span class="sr-only">Portfolio to record the cash event into</span>
+          <select
+            v-model="addPortfolioId"
+            class="input !w-40 !py-1.5 !text-xs"
+            aria-label="Portfolio to record the cash event into"
+            data-testid="cash-add-portfolio"
+          >
+            <option v-for="portfolio in addPortfolios" :key="portfolio.id" :value="portfolio.id">
+              {{ portfolio.name }}
+            </option>
+          </select>
+        </label>
+        <button type="button" class="btn-primary text-sm" data-testid="cash-add-deposit" @click="openAdd('deposit')">Deposit</button>
+        <button type="button" class="btn-secondary text-sm" data-testid="cash-add-withdraw" @click="openAdd('withdraw')">Withdraw</button>
+        <button type="button" class="btn-secondary text-sm" data-testid="cash-add-transfer" @click="openAdd('transfer')">Transfer</button>
+        <button type="button" class="btn-secondary text-sm" data-testid="cash-add-interest" @click="openAdd('interest')">Interest</button>
+        <button type="button" class="btn-secondary text-sm" data-testid="cash-add-fee" @click="openAdd('fee')">Charge</button>
+        <button type="button" class="btn-secondary text-sm" data-testid="cash-add-conversion" @click="openAdd('conversion')">Conversion</button>
+        <span v-if="addBusy" class="text-xs text-slate-500 dark:text-slate-400">Loading portfolio cash…</span>
+      </div>
+    </div>
+
     <p v-if="notice" class="border-b border-slate-100 dark:border-slate-800 px-5 py-3 text-sm text-green-700 dark:text-green-400">{{ notice }}</p>
+    <p v-if="addError" class="border-b border-slate-100 dark:border-slate-800 px-5 py-3 text-sm text-red-700 dark:text-red-400">{{ addError }}</p>
     <p v-if="error"  class="border-b border-slate-100 dark:border-slate-800 px-5 py-3 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
     <p v-if="loading" class="px-5 py-6 text-sm text-slate-500 dark:text-slate-400">Loading cash transactions…</p>
 
@@ -560,6 +659,18 @@ function onPickerSaved() {
       :edit-tx="editing ? editPayload(editing) : null"
       @close="modalOpen = false; editing = null"
       @done="onEditDone"
+    />
+
+    <PortfolioCashModals
+      :open="addOpen"
+      :action="addAction"
+      :portfolio-id="addPortfolioId"
+      :portfolio-name="addPortfolio?.name ?? null"
+      :cash="addCashForModal"
+      :cash-base-currency-only="addPortfolio?.cashBaseCurrencyOnly === true"
+      :cash-currency="addPortfolio?.cashCurrency ?? null"
+      @close="addOpen = false"
+      @done="onAddDone"
     />
 
     <ConfirmDeleteModal
