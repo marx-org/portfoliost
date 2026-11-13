@@ -4,7 +4,35 @@
  */
 import { expect, test } from "@playwright/test"
 
+const GATEWAY = process.env.PORTFOLIOST_GATEWAY_URL || "http://localhost:8080"
+const MOCK = process.env.PORTFOLIOST_MOCK_URL || "http://localhost:4010"
 const LABEL_NAME = `E2E-${Math.floor(Date.now() / 1000)}`
+
+/**
+ * Nothing in the suite deletes the labels it creates, so they pile up on the
+ * shared demo data. `LabelChips` renders only the first `max` (4 in the holdings
+ * row) and hides the rest behind a `+N` overflow, so once more than four labels
+ * sit on the META position this spec's badge is not in the DOM at all — the test
+ * then measures how many times it has run. Remove this suite's own leftovers
+ * first, so the badge assertion is about the label just created.
+ */
+async function removeTestLabels(request: import("@playwright/test").APIRequestContext) {
+  const loginRes = await request.post(`${MOCK}/api/auth/login`, {
+    data: { email: "demo@example.com", password: "example-service-mock" },
+  })
+  expect(loginRes.status()).toBe(200)
+  const token = ((await loginRes.json()) as { access_token?: string }).access_token ?? ""
+  const auth = { Authorization: `Bearer ${token}` }
+
+  const labelsRes = await request.get(`${GATEWAY}/api/labels`, { headers: auth })
+  expect(labelsRes.status(), await labelsRes.text()).toBe(200)
+  const labels = (await labelsRes.json()) as Array<{ id: string; name: string }>
+  for (const label of labels) {
+    if (!/^E2E(-TX)?-\d+$/.test(label.name)) continue
+    const del = await request.delete(`${GATEWAY}/api/labels/${label.id}`, { headers: auth })
+    expect(del.status(), `delete ${label.name}: ${await del.text()}`).toBeLessThan(300)
+  }
+}
 
 async function login(page: import("@playwright/test").Page) {
   await page.goto("/login")
@@ -15,7 +43,8 @@ async function login(page: import("@playwright/test").Page) {
 }
 
 test.describe.serial("labels (D65-D71)", () => {
-  test("create a label via LabelManager", async ({ page }) => {
+  test("create a label via LabelManager", async ({ page, request }) => {
+    await removeTestLabels(request)
     await login(page)
     await page.getByRole("link", { name: /Top10/ }).click()
     await expect(page).toHaveURL(/\/en\/portfolios\/.*\/holdings/)
