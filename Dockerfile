@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---- build stage ----
-FROM ghcr.io/marx-org/base-node:22-alpine@sha256:4c555748c9819babb757c7c328a12443b9d242edcfcc11cd196c24623dc704dd AS build
+FROM ghcr.io/marx-org/base-node:22-alpine@sha256:3f029b552d9d4c61751b88bed969e5bc1010a776a43b749795426e5bd692f2b1 AS build
 
 WORKDIR /app
 
@@ -36,7 +36,7 @@ RUN --mount=type=secret,id=NODE_AUTH_TOKEN,env=NODE_AUTH_TOKEN,required=true \
     npm run build
 
 # ---- serve stage ----
-FROM ghcr.io/marx-org/base-node:22-alpine@sha256:4c555748c9819babb757c7c328a12443b9d242edcfcc11cd196c24623dc704dd
+FROM ghcr.io/marx-org/base-node:22-alpine@sha256:3f029b552d9d4c61751b88bed969e5bc1010a776a43b749795426e5bd692f2b1
 
 RUN npm install -g serve
 
