@@ -102,13 +102,13 @@ test("cash settlement currency: an account displayed in PLN that settles in USD"
     const detail = await request.get(`${GATEWAY}/api/portfolios/${pid}`, { headers: auth })
     expect((await detail.json()).cashCurrency).toBe("USD")
 
-    // The deposit modal offers only the settlement currency.
+    // The deposit modal offers the settlement and the base.
     await page.goto(`/en/portfolios/${pid}/cash`)
     await expect(page.getByTestId("cash-tab-total")).toBeVisible({ timeout: 15000 })
     await page.getByTestId("cash-tab-deposit").click()
     const dialog = page.getByRole("dialog", { name: "Cash movement" })
     const currency = dialog.getByTestId("pc-currency")
-    await expect(currency.locator("option")).toHaveCount(1)
+    await expect(currency.locator("option")).toHaveCount(2)
     await expect(currency).toHaveValue("USD")
 
     await dialog.getByTestId("pc-amount").fill("100")
@@ -116,17 +116,21 @@ test("cash settlement currency: an account displayed in PLN that settles in USD"
     await dialog.getByRole("button", { name: "Deposit", exact: true }).click()
     await expect(dialog).not.toBeVisible({ timeout: 10_000 })
 
-    // One balance, in the settlement currency; the total is that balance revalued
-    // to the display base.
+    // Two balances: the settlement and the base (the base starts at zero); the
+    // total is revalued to the display base.
     const cash = await cashOf(request, auth, pid)
-    expect(cash.balances).toEqual([{ currency: "USD", balance: 100 }])
+    expect(cash.balances).toEqual([
+      { currency: "PLN", balance: 0 },
+      { currency: "USD", balance: 100 },
+    ])
     expect(cash.baseCurrency).toBe("PLN")
 
-    const rejected = await request.post(`${GATEWAY}/api/portfolios/${pid}/cash/deposits`, {
+    // The base is now allowed: a PLN deposit is a normal movement.
+    const pln = await request.post(`${GATEWAY}/api/portfolios/${pid}/cash/deposits`, {
       headers: auth,
       data: { amount: 50, currency: "PLN" },
     })
-    expect(rejected.status()).toBe(422)
+    expect(pln.status()).toBe(201)
   } finally {
     await request.delete(`${GATEWAY}/api/portfolios/${pid}`, { headers: auth }).catch(() => {})
   }
