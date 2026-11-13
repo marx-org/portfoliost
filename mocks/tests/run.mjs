@@ -748,6 +748,54 @@ async function main() {
     `${pfUnsorted.json.items.length} vs ${pfTxsAsc.json.items.length}`,
   )
 
+  // §74 — in-kind position transfer. No cash moves, nothing is realised, and
+  // both legs share one group id.
+  const sharesDest = await request("/portfolios", { method: "POST", token, body: { name: "Shares transfer dest", baseCurrency: "USD" } })
+  const cashBefore = await request(`/portfolios/${TOP10}/cash/transactions`, { token })
+  const heldMsft = (await request(`/portfolios/${TOP10}/positions`, { token })).json.find((p) => p.symbol === "MSFT" && p.isOpen)
+  const xfer = await request(`/portfolios/${TOP10}/transfers`, {
+    method: "POST",
+    token,
+    body: { symbol: "MSFT", quantity: 2, toPortfolioId: sharesDest.json.id, notes: "moved to IBKR", executedAt: "2026-10-04" },
+  })
+  check(
+    "transfers write a paired OUT/IN group",
+    xfer.status === 201 &&
+      xfer.json.legs.length === 2 &&
+      xfer.json.legs[0].type === "TRANSFER_OUT" &&
+      xfer.json.legs[1].type === "TRANSFER_IN" &&
+      xfer.json.legs[0].transferGroupId === xfer.json.legs[1].transferGroupId &&
+      xfer.json.legs[0].linkedTransferId === xfer.json.legs[1].id &&
+      xfer.json.legs[0].realizedGainLoss === null &&
+      xfer.json.legs[0].quantity === 2 &&
+      xfer.json.legs[0].executedAt === "2026-10-04",
+    `got ${xfer.status} ${JSON.stringify(xfer.json).slice(0, 160)}`,
+  )
+  const srcFeed = await request(`/portfolios/${TOP10}/transactions?instrumentSymbol=MSFT`, { token })
+  check("transfers appear in the source feed", srcFeed.json.items.some((t) => t.type === "TRANSFER_OUT"), `got ${srcFeed.json.items.map((t) => t.type).join(",")}`)
+  const destFeed = await request(`/portfolios/${sharesDest.json.id}/transactions`, { token })
+  check(
+    "transfers appear in the destination feed with the note",
+    destFeed.json.items.some((t) => t.type === "TRANSFER_IN" && t.notes === "moved to IBKR"),
+    `got ${destFeed.json.items.map((t) => t.type).join(",")}`,
+  )
+  const destPositions = await request(`/portfolios/${sharesDest.json.id}/positions`, { token })
+  check(
+    "the destination holds what arrived, at the source cost",
+    destPositions.json.some((p) => p.symbol === "MSFT" && p.quantity === 2 && p.averageCostBasis === heldMsft.averageCostBasis),
+    `got ${JSON.stringify(destPositions.json).slice(0, 160)}`,
+  )
+  const srcPositions = await request(`/portfolios/${TOP10}/positions`, { token })
+  check("the source position shrinks by the transferred quantity", srcPositions.json.find((p) => p.symbol === "MSFT").quantity === heldMsft.quantity - 2, `got ${srcPositions.json.find((p) => p.symbol === "MSFT").quantity}`)
+  const cashAfter = await request(`/portfolios/${TOP10}/cash/transactions`, { token })
+  check("a position transfer creates no cash row", cashAfter.json.items.length === cashBefore.json.items.length, `${cashBefore.json.items.length} → ${cashAfter.json.items.length}`)
+  const over = await request(`/portfolios/${TOP10}/transfers`, { method: "POST", token, body: { symbol: "MSFT", quantity: 100000, toPortfolioId: sharesDest.json.id } })
+  check("transfers reject more than is open", over.status === 422 && over.json.code === "transfer_exceeds_open_lots", `got ${over.status} ${JSON.stringify(over.json).slice(0, 120)}`)
+  const selfXfer = await request(`/portfolios/${TOP10}/transfers`, { method: "POST", token, body: { symbol: "MSFT", quantity: 1, toPortfolioId: TOP10 } })
+  check("transfers reject a self-transfer", selfXfer.status === 422, `got ${selfXfer.status}`)
+  const badDest = await request(`/portfolios/${TOP10}/transfers`, { method: "POST", token, body: { symbol: "MSFT", quantity: 1, toPortfolioId: "no-such" } })
+  check("transfers reject an unknown destination", badDest.status === 404, `got ${badDest.status}`)
+
   const del = await request(`/portfolios/${cid}`, { method: "DELETE", token })
   check("portfolios.delete → 204", del.status === 204, `got ${del.status}`)
   const gone = await request(`/portfolios/${cid}`, { token })

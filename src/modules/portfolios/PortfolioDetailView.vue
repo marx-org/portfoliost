@@ -9,6 +9,7 @@ import { storeToRefs } from "pinia"
 import { deletePortfolio, updatePortfolio } from "@/api/portfolios"
 import { formatCurrency, formatPercent, formatSignedCurrency } from "@/utils/format"
 import AddPositionDialog from "@/modules/portfolios/AddPositionDialog.vue"
+import TransferSharesDialog from "@/modules/portfolios/TransferSharesDialog.vue"
 import PortfolioSettingsDialog, { type PortfolioSettingsPayload } from "@/modules/portfolios/PortfolioSettingsDialog.vue"
 
 const route = useRoute()
@@ -52,6 +53,8 @@ const deleteBusy = ref(false)
 const deleteError = ref<string | null>(null)
 
 const showAddPosition = ref(false)
+/** §74 — in-kind transfer of a holding to another portfolio. */
+const showTransferShares = ref(false)
 
 onMounted(load)
 
@@ -152,6 +155,18 @@ async function onAddPositionAdded() {
   await store.fetchDetail(id)
 }
 
+/** §74 — the legs are written on the server; refresh so the holdings and the
+ * transactions tab show the movement. The dialog stays open to show its own
+ * confirmation line; the user closes it. */
+async function onTransferDone() {
+  await store.fetchDetail(id)
+  // The Holdings table reads store.positions, which only fetchPositions
+  // refreshes — without this the source table keeps showing the lot that left.
+  // Labels are filtered client-side too, so dropping the query filter here is
+  // safe.
+  await store.fetchPositions(id)
+}
+
 async function submitDelete() {
   deleteBusy.value = true
   deleteError.value = null
@@ -206,6 +221,7 @@ async function submitDelete() {
             </template>
           </div>
           <button type="button" class="btn-secondary text-sm" @click="openRename">Rename</button>
+          <button v-if="!isVirtual" type="button" class="btn-secondary text-sm" data-testid="transfer-shares-button" @click="showTransferShares = true">Transfer shares</button>
            <button v-if="!isVirtual" type="button" class="btn-primary text-sm" @click="openAddPosition">Add Position</button>
           <button type="button" class="btn-red-ghost text-sm" @click="openDelete">Delete</button>
         </div>
@@ -299,6 +315,13 @@ async function submitDelete() {
       :portfolio-id="id"
       @close="onAddPositionClose"
       @added="onAddPositionAdded"
+    />
+
+    <TransferSharesDialog
+      :open="showTransferShares"
+      :portfolio-id="id"
+      @close="showTransferShares = false"
+      @done="onTransferDone"
     />
   </div>
 </template>

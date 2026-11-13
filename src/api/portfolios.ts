@@ -354,6 +354,18 @@ export async function conversionCash(id: string, input: ConversionCashRequest): 
   return http.post<CashTransaction>(`/api/portfolios/${id}/cash/conversions`, input)
 }
 
+/**
+ * §74 — move an instrument to another portfolio, in kind. The server draws the
+ * quantity FIFO from this portfolio's open lots and returns every leg it wrote:
+ * one TRANSFER_OUT per lot plus its TRANSFER_IN. No cash row, no realised P/L.
+ */
+export async function transferPosition(
+  id: string,
+  input: components["schemas"]["TransferPositionRequest"],
+): Promise<components["schemas"]["TransferPositionResponse"]> {
+  return http.post<components["schemas"]["TransferPositionResponse"]>(`/api/portfolios/${id}/transfers`, input)
+}
+
 export async function getRecentCashTransactions(
   page = 1,
   limit = 10,

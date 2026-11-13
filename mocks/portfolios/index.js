@@ -690,6 +690,138 @@ export function register(app) {
     ctx.res.status(201).json(tx)
   })
 
+  /**
+   * §74 — in-kind transfer of a holding to another portfolio.
+   *
+   * The mock has no per-lot FIFO queue, so it draws the quantity as a single lot
+   * at the position's average cost. The response shape, the refusals and the
+   * "no cash, no realised P/L" rule match the real backend — that is what the SPA
+   * and the mock tests depend on.
+   */
+  app.post("/api/portfolios/:id/transfers", (ctx) => {
+    if (!requireAuth(ctx)) return
+    initTxs()
+    const body = ctx.body || {}
+    const source = findPortfolio(ctx.params.id)
+    if (!source && !created.has(ctx.params.id)) {
+      return ctx.res.status(404).json({ error: "NotFound", message: "Portfolio not found", statusCode: 404 })
+    }
+    if (source?.isVirtual) {
+      return ctx.res.status(409).json({ error: "ReadOnlyPortfolio", message: "Virtual portfolios are read-only" })
+    }
+
+    const targetId = String(body.toPortfolioId || "")
+    if (targetId === ctx.params.id) {
+      return ctx.res.status(422).json({ error: "ValidationError", message: "A portfolio cannot transfer to itself" })
+    }
+    const target = findPortfolio(targetId)
+    if (!target && !created.has(targetId)) {
+      return ctx.res.status(404).json({ error: "NotFound", message: "Target portfolio not found", statusCode: 404 })
+    }
+    if (target?.isVirtual) {
+      return ctx.res.status(409).json({ error: "ReadOnlyPortfolio", message: "The target portfolio is virtual and read-only" })
+    }
+
+    const symbol = String(body.symbol || "").toUpperCase()
+    const quantity = Number(body.quantity)
+    if (!symbol || !Number.isFinite(quantity) || quantity <= 0) {
+      return ctx.res.status(422).json({ error: "ValidationError", message: "symbol and a positive quantity are required" })
+    }
+
+    const sourcePositions = positionsFor(ctx.params.id)
+    const position = sourcePositions.find((p) => p.symbol === symbol && p.isOpen)
+    if (!position || Number(position.quantity) < quantity) {
+      const open = position ? Number(position.quantity) : 0
+      return ctx.res.status(422).json({
+        error: "ValidationError",
+        code: "transfer_exceeds_open_lots",
+        message: `TRANSFER_OUT of ${quantity} exceeds ${open} open in ${symbol}`,
+      })
+    }
+
+    const price = position.averageCostBasis ?? position.avgCostBasis ?? 0
+    const currency = position.purchaseCurrency || "USD"
+    const executedAt = body.executedAt || nowIso()
+    const total = round2(quantity * price)
+    const transferGroupId = uuid()
+
+    const out = {
+      id: uuid(),
+      portfolioId: ctx.params.id,
+      portfolioName: source.name,
+      positionId: position.id,
+      type: "TRANSFER_OUT",
+      instrumentSymbol: symbol,
+      instrumentName: position.companyName ?? symbol,
+      quantity,
+      price,
+      fees: 0,
+      taxes: null,
+      notes: body.notes ?? null,
+      totalAmount: total,
+      currency,
+      instrumentCurrency: position.instrumentCurrency || currency,
+      assetType: position.assetType || "STOCK",
+      realizedGainLoss: null,
+      exchangeRate: 1,
+      convertedTotalAmount: total,
+      convertedPrice: price,
+      convertedFees: 0,
+      transferGroupId,
+      sourceTransactionId: null,
+      executedAt,
+      createdAt: nowIso(),
+      displayCurrency: source.baseCurrency || "USD",
+    }
+    const inRow = {
+      ...out,
+      id: uuid(),
+      portfolioId: targetId,
+      portfolioName: target?.name ?? "",
+      type: "TRANSFER_IN",
+      positionId: null,
+      linkedTransferId: out.id,
+    }
+    out.linkedTransferId = inRow.id
+    allTxs.set(out.id, out)
+    allTxs.set(inRow.id, inRow)
+
+    // The holdings move with the legs: the sender keeps the remainder at the same
+    // cost, the receiver's position is re-weighted by what arrived.
+    position.quantity = round2(Number(position.quantity) - quantity)
+    if (position.quantity <= 0) {
+      position.isOpen = false
+      position.closedAt = executedAt
+    }
+    const targetPositions = positionsFor(targetId)
+    const arriving = targetPositions.find((p) => p.symbol === symbol && p.isOpen)
+    if (arriving) {
+      const oldQty = Number(arriving.quantity)
+      arriving.quantity = round2(oldQty + quantity)
+      arriving.averageCostBasis = round2((oldQty * Number(arriving.averageCostBasis ?? price) + quantity * price) / arriving.quantity)
+    } else {
+      targetPositions.push({
+        ...position,
+        id: uuid(),
+        portfolioId: targetId,
+        quantity,
+        averageCostBasis: price,
+        avgCostBasis: price,
+        isOpen: true,
+        openedAt: executedAt,
+        closedAt: null,
+      })
+    }
+
+    ctx.res.status(201).json({
+      transferGroupId,
+      quantity,
+      legs: [out, inRow],
+      sourcePositionId: position.id,
+      targetPositionId: arriving?.id ?? targetPositions[targetPositions.length - 1].id,
+    })
+  })
+
   app.patch("/api/portfolios/:id/transactions/:txId", (ctx) => {
     if (!requireAuth(ctx)) return
     initTxs()
