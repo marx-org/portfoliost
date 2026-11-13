@@ -24,10 +24,24 @@ async function getBearerToken(request: import("@playwright/test").APIRequestCont
   return ((await res.json()) as { access_token?: string }).access_token ?? ""
 }
 
-function parseAmount(line: string): number {
-  const m = line.replace(/\u00a0/g, " ").match(/-?[\d,]+\.\d{2}/)
-  if (!m) throw new Error(`no amount in "${line}"`)
-  return Number(m[0].replace(/,/g, ""))
+/** The card renders with `Intl.NumberFormat(..., { style: "currency" })`, so a
+ * negative amount is "-$31,261.62" in USD but "-PLN 124,467.56" in PLN — the
+ * sign is attached to the currency symbol, not to the digits. The old
+ * `-?[\d,]+\.\d{2}` regex only captured the digits, so it read a negative balance
+ * as positive. Take the number, then decide the sign from what precedes it. */
+function parseAmount(line: string): number | null {
+  const cleaned = line.replace(/\u00a0/g, " ").replace(/\u2212/g, "-").trim()
+  const m = cleaned.match(/[\d,]+\.\d{2}/)
+  if (!m) return null // "—" while the FX rate is still resolving
+  const value = Number(m[0].replace(/,/g, ""))
+  const negative = cleaned.slice(0, m.index ?? 0).includes("-") || cleaned.startsWith("(")
+  return negative ? -value : value
+}
+
+/** The card converts `cashValue` at the live rate, so the rendered amount is
+ * expected to match within a cent-scale tolerance, sign included. */
+function matches(expected: number, got: number): boolean {
+  return Math.abs(got - expected) <= Math.max(1, Math.abs(expected) * 0.002)
 }
 
 test("investments cash balance renders the converted total for the display currency", async ({ page, request }) => {
@@ -68,34 +82,43 @@ test("investments cash balance renders the converted total for the display curre
     const expectTotal = async (display: string) => {
       const { cashValue, baseCurrency } = await cashValueInfo()
       const r = await rate(baseCurrency, display)
-      return { expected: cashValue * r, present: cashValue > 0 }
+      return { expected: cashValue * r, cashValue, baseCurrency }
     }
 
-    // Default display USD.
-    let got = 0
-    await expect
-      .poll(async () => {
-        const m = (await page.getByTestId("cash-balance").innerText()).replace(/\u00a0/g, " ").match(/-?[\d,]+\.\d{2}/)
-        got = m ? Number(m[0].replace(/,/g, "")) : 0
-        return got > 0
-      }, { timeout: 30000, message: "cash balance should resolve to an amount" })
-      .toBeTruthy()
+    // Default display USD. Poll until the card matches rather than until it is
+    // positive: aggregate cash across portfolios can legitimately be negative
+    // (the replayed trade legs outweigh the deposits), and a `got > 0` gate
+    // then waits out the whole timeout on a card that is rendering correctly.
     const usd = await expectTotal("USD")
-    expect(Math.abs(got - usd.expected)).toBeLessThanOrEqual(Math.max(1, usd.expected * 0.002))
+    await expect
+      .poll(
+        async () => {
+          const got = parseAmount(await page.getByTestId("cash-balance").innerText())
+          return got !== null && matches(usd.expected, got)
+        },
+        {
+          timeout: 30000,
+          message: `cash card should render cashValue ${usd.cashValue} ${usd.baseCurrency} converted to USD`,
+        },
+      )
+      .toBeTruthy()
 
     // Switch the display to PLN: the same cash, now valued in PLN.
     await page.getByRole("button", { name: /Display currency:/ }).click()
     await page.locator("div.absolute.right-0").getByRole("button", { name: "PLN", exact: true }).click()
-    let gotPln = 0
-    await expect
-      .poll(async () => {
-        const m = (await page.getByTestId("cash-balance").innerText()).replace(/\u00a0/g, " ").match(/-?[\d,]+\.\d{2}/)
-        gotPln = m ? Number(m[0].replace(/,/g, "")) : 0
-        return gotPln > 0
-      }, { timeout: 30000 })
-      .toBeTruthy()
     const pln = await expectTotal("PLN")
-    expect(Math.abs(gotPln - pln.expected)).toBeLessThanOrEqual(Math.max(1, pln.expected * 0.002))
+    await expect
+      .poll(
+        async () => {
+          const got = parseAmount(await page.getByTestId("cash-balance").innerText())
+          return got !== null && matches(pln.expected, got)
+        },
+        {
+          timeout: 30000,
+          message: `cash card should render the same cash in PLN (${pln.expected})`,
+        },
+      )
+      .toBeTruthy()
   } finally {
     try { await request.delete(`${GATEWAY}/api/portfolios/${pid}`, { headers: auth }) } catch { /* ignore */ }
   }

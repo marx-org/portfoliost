@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test"
 
+const GATEWAY = process.env.PORTFOLIOST_GATEWAY_URL || "http://localhost:8080"
+
 async function login(page: import("@playwright/test").Page) {
   await page.goto("/login")
   await page.getByTestId("email").fill("demo@example.com")
@@ -403,52 +405,131 @@ test("holdings table groups by type, sector, and country", async ({ page }) => {
   await expect(page.getByText(/Total/).first()).toBeVisible()
 })
 
-test("transactions page groups by kind of investment, sector, and country", async ({ page }) => {
+type GroupableRow = { assetType?: string | null; sector?: string | null; country?: string | null }
+type GroupMode = "assetType" | "sector" | "country"
+
+/** Mirrors TransactionsTable's groupValue, so the expected labels are the ones
+ * the component must render for exactly the rows it fetched. */
+function groupLabel(row: GroupableRow, mode: GroupMode): string {
+  if (mode === "assetType") {
+    const type = row.assetType || "STOCK"
+    return type.charAt(0) + type.slice(1).toLowerCase()
+  }
+  return (mode === "sector" ? row.sector : row.country) ?? "Other"
+}
+
+function groupCounts(rows: GroupableRow[], mode: GroupMode): Map<string, number> {
+  const counts = new Map<string, number>()
+  for (const row of rows) counts.set(groupLabel(row, mode), (counts.get(groupLabel(row, mode)) ?? 0) + 1)
+  return counts
+}
+
+/** The exact window the table fetched, straight from the API. */
+async function fetchedRows(
+  request: import("@playwright/test").APIRequestContext,
+  url: string,
+  token: string | null,
+): Promise<GroupableRow[]> {
+  const res = await request.get(url, { headers: { Authorization: `Bearer ${token}` } })
+  expect(res.ok(), await res.text()).toBe(true)
+  const body = await res.json() as { items?: GroupableRow[] }
+  return body.items ?? []
+}
+
+/**
+ * Group by `mode` and require the rendered groups to be exactly the groups the
+ * fetched rows contain, each with its subtotal. The expected labels come from
+ * the data on the page rather than from names written into the test, so the
+ * assertion tests the grouping and not how much data earlier specs accumulated.
+ */
+async function expectExactGrouping(
+  page: import("@playwright/test").Page,
+  groupSelect: import("@playwright/test").Locator,
+  rows: GroupableRow[],
+  mode: GroupMode,
+): Promise<void> {
+  const expected = groupCounts(rows, mode)
+  await groupSelect.selectOption(mode)
+  const groupRows = page.getByTestId("transactions-group-row")
+  await expect(groupRows).toHaveCount(expected.size)
+
+  for (const [label, count] of expected) {
+    const header = groupRows.filter({ hasText: label })
+    await expect(header).toHaveCount(1)
+    // The header carries the group's row count, so no fetched row was dropped
+    // or counted twice.
+    await expect(header.first()).toContainText(
+      new RegExp(`${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s+${count}$`),
+    )
+    await expect(page.getByText(`${label} subtotal`)).toHaveCount(1)
+  }
+}
+
+test("transactions page groups by kind of investment, sector, and country", async ({ page, request }) => {
   await login(page)
   await page.goto("/en/investments/transactions")
 
   await page.getByRole("combobox", { name: "Rows per page" }).selectOption("50")
   await expect(page.getByTestId("transactions-group-row")).toHaveCount(0)
 
+  // The global page only ever holds the 50 most recent rows, and every spec that
+  // ran before this one wrote transactions into the shared demo account, so the
+  // set of sectors and countries on the page is not knowable in advance — a
+  // hardcoded name such as "Technology" is a test of how much data has
+  // accumulated, not of the grouping (#55 fixed the same problem for assetType).
+  const token = await page.evaluate(() => localStorage.getItem("portfoliost_token"))
+  const rows = await fetchedRows(
+    request,
+    `${GATEWAY}/api/portfolios/transactions?page=1&limit=50&sortBy=date&sortOrder=desc`,
+    token,
+  )
+  expect(rows.length).toBeGreaterThan(0)
+
   const groupSelect = page.getByLabel("Group by")
   await expect(groupSelect).toHaveValue("none")
 
+  for (const mode of ["assetType", "sector", "country"] as GroupMode[]) {
+    await expectExactGrouping(page, groupSelect, rows, mode)
+  }
+
+  // The seeded data always contributes a Stock group, and it is the one group
+  // whose label is stable regardless of what the other specs wrote.
   await groupSelect.selectOption("assetType")
-  const assetTypeGroups = page.getByTestId("transactions-group-row")
-  // Earlier E2E specs add transactions of more than one asset type to the
-  // shared demo account. Assert the stable seeded Stock group, and that every
-  // rendered asset-type group has its subtotal, without assuming there is only
-  // one kind in the accumulated test data.
-  await expect(assetTypeGroups.filter({ hasText: "Stock" })).toHaveCount(1)
+  await expect(page.getByTestId("transactions-group-row").filter({ hasText: "Stock" })).toHaveCount(1)
   await expect(page.getByText(/Stock subtotal/)).toHaveCount(1)
-  await expect(page.getByText(/subtotal/)).toHaveCount(await assetTypeGroups.count())
-
-  await groupSelect.selectOption("sector")
-  const globalSectorGroups = page.getByTestId("transactions-group-row")
-  await expect(globalSectorGroups.filter({ hasText: "Technology" })).toHaveCount(1)
-  await expect(page.getByText(/subtotal/)).toHaveCount(await globalSectorGroups.count())
-
-  await groupSelect.selectOption("country")
-  await expect(page.getByTestId("transactions-group-row").filter({ hasText: "US" })).toHaveCount(1)
-  await expect(page.getByText(/US subtotal/)).toHaveCount(1)
 
   await groupSelect.selectOption("none")
   await expect(page.getByTestId("transactions-group-row")).toHaveCount(0)
 })
 
-test("portfolio transactions tab groups by sector with subtotals", async ({ page }) => {
+test("portfolio transactions tab groups by sector with subtotals", async ({ page, request }) => {
   await login(page)
   await page.getByRole("link", { name: /Top10/ }).click()
   await expect(page).toHaveURL(/\/en\/portfolios\/.*\/holdings/)
   await page.getByRole("navigation", { name: "Portfolio tabs" }).getByRole("link", { name: "Transactions" }).click()
   await expect(page).toHaveURL(/\/en\/portfolios\/.*\/transactions/)
 
+  // The portfolio's history is longer than the default 20-row page, so grouping
+  // was previously measured over whatever the first page happened to hold.
+  await page.getByRole("combobox", { name: "Rows per page" }).selectOption("50")
+
+  const portfolioId = page.url().match(/\/portfolios\/([^/]+)/)?.[1]
+  const token = await page.evaluate(() => localStorage.getItem("portfoliost_token"))
+  const rows = await fetchedRows(
+    request,
+    `${GATEWAY}/api/portfolios/${portfolioId}/transactions?page=1&limit=50&sortBy=date&sortOrder=desc`,
+    token,
+  )
+  expect(rows.length).toBeGreaterThan(0)
+
   const groupSelect = page.getByLabel("Group by")
-  await groupSelect.selectOption("sector")
+  await expectExactGrouping(page, groupSelect, rows, "sector")
+
+  // Top10's seeded history is what makes this portfolio useful for the grouping
+  // check: two distinct sectors must be present, and they are on the page.
   const sectorGroups = page.getByTestId("transactions-group-row")
   await expect(sectorGroups.filter({ hasText: "Technology" })).toHaveCount(1)
   await expect(sectorGroups.filter({ hasText: "Communication Services" })).toHaveCount(1)
-  await expect(page.getByText(/subtotal/)).toHaveCount(await sectorGroups.count())
 
   await groupSelect.selectOption("none")
   await expect(page.getByTestId("transactions-group-row")).toHaveCount(0)
