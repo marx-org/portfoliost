@@ -105,15 +105,22 @@ const showCustomize = ref(false)
 const sortKey = ref<string | null>(null)
 const sortDir = ref<"asc" | "desc">("asc")
 
-type GroupMode = "none" | "assetType" | "sector" | "country"
+type GroupMode = "none" | "assetType" | "sector" | "country" | "portfolio"
 const groupBy = ref<GroupMode>("none")
 
-const groupModes: Array<{ value: GroupMode; label: string }> = [
-  { value: "none", label: "None" },
-  { value: "assetType", label: "Type" },
-  { value: "sector", label: "Sector" },
-  { value: "country", label: "Country" },
-]
+// §142 — the aggregate view is a list of portfolios, so "Portfolio" is a
+// meaningful grouping there; in the single-portfolio table every row has the
+// same owner and the option would be a no-op.
+const groupModes = computed(() => {
+  const modes: Array<{ value: GroupMode; label: string }> = [
+    { value: "none", label: "None" },
+    { value: "assetType", label: "Type" },
+    { value: "sector", label: "Sector" },
+    { value: "country", label: "Country" },
+  ]
+  if (isGlobal.value) modes.push({ value: "portfolio", label: "Portfolio" })
+  return modes
+})
 
 function groupValue(pos: Position, mode: GroupMode): string {
   switch (mode) {
@@ -123,6 +130,8 @@ function groupValue(pos: Position, mode: GroupMode): string {
       return pos.sector || "Other"
     case "country":
       return pos.country || "Other"
+    case "portfolio":
+      return pos.portfolioName || pos.portfolioId || "Unknown"
     default:
       return ""
   }
@@ -256,6 +265,8 @@ const sorted = computed(() => {
         return p.realizedGainLoss ?? 0
       case "weight":
         return p.percentOfPortfolio ?? 0
+      case "portfolio":
+        return p.portfolioName || p.portfolioId || ""
       default:
         return p.symbol
     }
@@ -324,7 +335,9 @@ function toggleColumn(key: string) {
 }
 
 function toggleSort(key: string) {
-  if (!allColumns.find((c) => c.key === key)?.sortable) return
+  // The Portfolio column is not part of `allColumns` (it only exists in the
+  // aggregate table), so it is allowed here rather than through the column list.
+  if (key === "portfolio" ? !isGlobal.value : !allColumns.find((c) => c.key === key)?.sortable) return
   if (sortKey.value === key) {
     sortDir.value = sortDir.value === "asc" ? "desc" : "asc"
   } else {
@@ -623,7 +636,17 @@ function onPickerSaved() {
           </colgroup>
           <thead>
             <tr class="border-b border-slate-100 dark:border-slate-800 text-left text-xs uppercase text-slate-500 dark:text-slate-400">
-              <th v-if="isGlobal" class="px-5 py-2.5 font-medium">Portfolio</th>
+              <th
+                v-if="isGlobal"
+                class="px-5 py-2.5 font-medium cursor-pointer select-none hover:text-slate-900 dark:hover:text-slate-100"
+                :aria-sort="sortKey === 'portfolio' ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined"
+                @click="toggleSort('portfolio')"
+              >
+                <span class="inline-flex items-center gap-1">
+                  Portfolio
+                  <span class="text-[10px] text-slate-400 dark:text-slate-500">{{ sortIndicator("portfolio") }}</span>
+                </span>
+              </th>
               <th
                 v-for="col in visibleColumnsDef()"
                 :key="col.key"
