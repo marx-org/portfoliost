@@ -167,7 +167,7 @@ test.describe.serial("consolidated holdings (§142)", () => {
     await openHoldings(page, "AAPL")
 
     await expect(page.getByRole("heading", { name: "Consolidated holdings" })).toBeVisible()
-    await expect(page.getByRole("columnheader", { name: "Portfolio", exact: true })).toBeVisible()
+    await expect(page.getByRole("columnheader", { name: /^Portfolio/ })).toBeVisible()
 
     const rows = page.getByTestId("holdings-row")
     await expect(rows.filter({ hasText: NAME_A })).toHaveCount(1)
@@ -242,6 +242,40 @@ test.describe.serial("consolidated holdings (§142)", () => {
     }
 
     await page.getByLabel("Group by").selectOption("none")
+  })
+
+  test("the Portfolio column sorts and groups the aggregate by owner", async ({ page, request }) => {
+    await login(page)
+    await openHoldings(page)
+
+    const fetched = await openPositions(request, headers)
+    const perPortfolio = new Map<string, number>()
+    for (const p of fetched) {
+      const name = p.portfolioName || ""
+      perPortfolio.set(name, (perPortfolio.get(name) ?? 0) + 1)
+    }
+
+    await page.getByLabel("Group by").selectOption("portfolio")
+    const groupRows = page.getByTestId("holdings-group-row")
+    await expect(groupRows).toHaveCount(perPortfolio.size)
+    for (const [name, count] of perPortfolio) {
+      await expect(groupRows.filter({ hasText: name }).first()).toHaveText(`${name} ${count}`)
+    }
+    // The two portfolios this spec seeded are separate groups, not merged.
+    await expect(groupRows.filter({ hasText: NAME_A })).toHaveCount(1)
+    await expect(groupRows.filter({ hasText: NAME_B })).toHaveCount(1)
+    await page.getByLabel("Group by").selectOption("none")
+
+    await page.getByRole("columnheader", { name: /^Portfolio/ }).click()
+    await expect(page.getByRole("columnheader", { name: /^Portfolio/ })).toHaveAttribute("aria-sort", "ascending")
+    const names: string[] = []
+    for (const row of await page.getByTestId("holdings-row").all()) {
+      names.push((await row.locator("td").first().innerText()).trim())
+    }
+    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)))
+
+    await page.getByRole("columnheader", { name: /^Portfolio/ }).click()
+    await expect(page.getByRole("columnheader", { name: /^Portfolio/ })).toHaveAttribute("aria-sort", "descending")
   })
 
   test("sorting the consolidated table orders the aggregate", async ({ page, request }) => {

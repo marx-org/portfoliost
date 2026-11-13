@@ -286,8 +286,53 @@ describe("HoldingsTable — §157 client-side search, paging and symbol scaling"
     expect(realizedSubtotal.text()).not.toContain("$30.00")
   })
 
-  it("filters by ticker in the header search", async () => {
-    const positions = Array.from({ length: 6 }, (_, i) => position({ id: `p${i}`, symbol: i === 0 ? "GOOG" : `SYM${i}`, companyName: i === 0 ? "Alphabet" : `Corp ${i}` }))
+  // §142 — the aggregate table is a list of portfolios, so the owner is a first
+  // class grouping and sort key there, and meaningless in the portfolio table.
+  it("groups the aggregate by owning portfolio with per-portfolio counts", async () => {
+    const wrapper = mountTable([
+      position({ id: "a", symbol: "A1", portfolioName: "Alpha" }),
+      position({ id: "b", symbol: "B1", portfolioName: "Beta" }),
+      position({ id: "c", symbol: "C1", portfolioName: "Alpha" }),
+    ])
+    const options = wrapper.findAll('select[aria-label="Group by"] option').map((o) => o.text())
+    expect(options).toContain("Portfolio")
+
+    await wrapper.get('select[aria-label="Group by"]').setValue("portfolio")
+    await flushPromises()
+
+    const headers = wrapper.findAll('[data-testid="holdings-group-row"]').map((r) => r.text())
+    expect(headers).toEqual(expect.arrayContaining(["Alpha 2", "Beta 1"]))
+    expect(rows(wrapper)).toHaveLength(3)
+  })
+
+  it("does not offer portfolio grouping in the single-portfolio table", () => {
+    const wrapper = mountTable([position()], "portfolio")
+    const options = wrapper.findAll('select[aria-label="Group by"] option').map((o) => o.text())
+    expect(options).not.toContain("Portfolio")
+  })
+
+  it("sorts the aggregate by the owning portfolio", async () => {
+    const wrapper = mountTable([
+      position({ id: "a", symbol: "A1", portfolioName: "Zeta" }),
+      position({ id: "b", symbol: "B1", portfolioName: "Alpha" }),
+      position({ id: "c", symbol: "C1", portfolioName: "Mid" }),
+    ])
+    const portfolioHeader = wrapper.findAll("thead th").find((th) => th.text().includes("Portfolio"))!
+
+    const portfolioOf = (row: { find: (s: string) => { text: () => string } }) => row.find("td").text().trim()
+
+    await portfolioHeader.trigger("click")
+    await flushPromises()
+    expect(portfolioHeader.attributes("aria-sort")).toBe("ascending")
+    expect(wrapper.findAll('[data-testid="holdings-row"]').map(portfolioOf)).toEqual(["Alpha", "Mid", "Zeta"])
+
+    await portfolioHeader.trigger("click")
+    await flushPromises()
+    expect(portfolioHeader.attributes("aria-sort")).toBe("descending")
+    expect(wrapper.findAll('[data-testid="holdings-row"]').map(portfolioOf)).toEqual(["Zeta", "Mid", "Alpha"])
+  })
+
+  it("filters by ticker in the header search", async () => {    const positions = Array.from({ length: 6 }, (_, i) => position({ id: `p${i}`, symbol: i === 0 ? "GOOG" : `SYM${i}`, companyName: i === 0 ? "Alphabet" : `Corp ${i}` }))
     const wrapper = mountTable(positions)
     await wrapper.get('[data-testid="holdings-search"]').setValue("goog")
     await flushPromises()
