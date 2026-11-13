@@ -27,6 +27,7 @@ const store = usePortfolioStore()
 
 const positions = ref<Position[]>([])
 const positionsLoading = ref(false)
+const search = ref("")
 const symbol = ref("")
 const quantity = ref("")
 const toPortfolioId = ref("")
@@ -39,6 +40,16 @@ const moved = ref<components["schemas"]["TransferPositionResponse"] | null>(null
 const targetPortfolios = computed(
   () => store.portfolios.filter((p) => p.id !== props.portfolioId && !p.isVirtual),
 )
+
+// A portfolio can hold a few hundred positions, so the instrument list is
+// filterable by symbol or name rather than one long select.
+const filteredPositions = computed(() => {
+  const q = search.value.trim().toLowerCase()
+  if (!q) return positions.value
+  return positions.value.filter(
+    (p) => p.symbol.toLowerCase().includes(q) || (p.companyName ?? "").toLowerCase().includes(q),
+  )
+})
 
 const selected = computed(() => positions.value.find((p) => p.symbol === symbol.value) ?? null)
 const maxQuantity = computed(() => selected.value?.quantity ?? 0)
@@ -59,6 +70,7 @@ watch(
   async (open) => {
     if (!open) return
     symbol.value = ""
+    search.value = ""
     quantity.value = ""
     toPortfolioId.value = ""
     date.value = new Date().toISOString().slice(0, 10)
@@ -91,6 +103,17 @@ watch(
 // dialog is almost always opened to move a whole holding or a slice of one.
 watch(symbol, () => {
   if (selected.value && quantity.value === "") quantity.value = String(selected.value.quantity)
+})
+
+// A filter that excludes the chosen instrument would leave the <select> with a
+// value its own options no longer contain, which the browser silently resets to
+// empty — so clear it here, and with it the quantity, rather than letting the
+// form carry an invisible selection.
+watch(filteredPositions, (list) => {
+  if (symbol.value && !list.some((p) => p.symbol === symbol.value)) {
+    symbol.value = ""
+    quantity.value = ""
+  }
 })
 
 async function submit() {
@@ -140,11 +163,18 @@ async function submit() {
       </p>
 
       <form class="grid grid-cols-1 gap-4 sm:grid-cols-2" data-testid="ts-form" @submit.prevent="submit">
+        <div class="sm:col-span-2">
+          <label for="ts-search" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Filter holdings</label>
+          <input id="ts-search" v-model="search" type="search" class="input" placeholder="Symbol or name" data-testid="ts-search" />
+        </div>
+
         <div>
           <label for="ts-instrument" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Instrument *</label>
           <select id="ts-instrument" v-model="symbol" class="input" required data-testid="ts-instrument">
-            <option value="" disabled>{{ positionsLoading ? "Loading positions…" : "Select a holding" }}</option>
-            <option v-for="p in positions" :key="p.id" :value="p.symbol">
+            <option value="" disabled>
+              {{ positionsLoading ? "Loading positions…" : filteredPositions.length === 0 ? "No holdings match" : "Select a holding" }}
+            </option>
+            <option v-for="p in filteredPositions" :key="p.id" :value="p.symbol">
               {{ p.symbol }} — {{ formatNumber(p.quantity, 2) }} {{ p.assetType === "OPTION" ? "contracts" : "shares" }}
             </option>
           </select>

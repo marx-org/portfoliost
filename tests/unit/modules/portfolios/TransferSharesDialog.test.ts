@@ -102,6 +102,27 @@ describe("TransferSharesDialog (§74)", () => {
     expect(ids).toEqual(["", "p2"])
   })
 
+  it("filters the instrument list by symbol or name", async () => {
+    const w = await openDialog()
+    w.find('[data-testid="ts-search"]').setValue("micro")
+    await flushPromises()
+    const instrument = w.find('[data-testid="ts-instrument"]')
+    expect(instrument.findAll("option").map((o) => o.text().trim())).toEqual([
+      "Select a holding",
+      "MSFT — 32 shares",
+    ])
+
+    // A filter that excludes the chosen instrument clears the selection instead
+    // of leaving the <select> with a value its own options no longer contain.
+    instrument.setValue("MSFT")
+    await flushPromises()
+    w.find('[data-testid="ts-search"]').setValue("zzzz")
+    await flushPromises()
+    expect(instrument.findAll("option").map((o) => o.text().trim())).toEqual(["No holdings match"])
+    expect((w.find('[data-testid="ts-submit"]').element as HTMLButtonElement).disabled).toBe(true)
+    expect(mocked.transferPosition).not.toHaveBeenCalled()
+  })
+
   it("posts the contract shape and reports the legs it created", async () => {
     const w = await openDialog()
     mocked.transferPosition.mockResolvedValue({
