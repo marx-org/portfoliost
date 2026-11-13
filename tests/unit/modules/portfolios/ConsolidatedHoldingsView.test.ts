@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import ConsolidatedHoldingsView from "@/modules/portfolios/ConsolidatedHoldingsView.vue"
 import AddPositionDialog from "@/modules/portfolios/AddPositionDialog.vue"
 import HoldingsTable from "@/components/HoldingsTable.vue"
+import type { PortfolioPositions } from "@/api/types"
 import * as portfoliosApi from "@/api/portfolios"
 import { useCurrenciesStore } from "@/stores/currencies"
 
@@ -111,7 +112,7 @@ describe("ConsolidatedHoldingsView", () => {
       position({ id: "pos-2", portfolioId: "p2", portfolioName: "Retirement", symbol: "KO", companyName: "Coca-Cola Co" }),
     ]
     // Deferred so the DOM can be inspected while the refresh is genuinely in flight.
-    const resolvers: Array<(value: unknown) => void> = []
+    const resolvers: Array<(value: PortfolioPositions) => void> = []
     mocked.getAllPositions.mockImplementation(() => new Promise((res) => resolvers.push(res)))
 
     const wrapper = mountView()
