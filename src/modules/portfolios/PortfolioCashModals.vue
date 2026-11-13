@@ -87,9 +87,21 @@ const baseCurrency = computed(() => props.cash.baseCurrency)
 const ledgerCurrency = computed(() =>
   props.cashCurrency ?? (props.cashBaseCurrencyOnly ? baseCurrency.value : null),
 )
-const cashCurrencies = computed(() =>
-  ledgerCurrency.value ? [ledgerCurrency.value] : allCurrencies.value,
-)
+/**
+ * The currencies a non-conversion cash movement may use. When the base is the
+ * only available cash, just the base; when a settlement is set and the base is
+ * not exclusive, both the settlement and the base (IBKR: USD + PLN); when the
+ * ledger is genuinely multi-currency, every registry currency.
+ */
+const cashCurrencies = computed(() => {
+  if (props.cashBaseCurrencyOnly) return [baseCurrency.value].filter(Boolean)
+  if (props.cashCurrency) {
+    const settlement = props.cashCurrency.toUpperCase()
+    const base = baseCurrency.value.toUpperCase()
+    return settlement === base ? [base] : [props.cashCurrency, baseCurrency.value].filter(Boolean)
+  }
+  return allCurrencies.value
+})
 const isEdit = computed(() => props.editTx != null)
 
 // Other user portfolios (transfer targets).

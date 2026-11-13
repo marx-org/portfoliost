@@ -130,14 +130,14 @@ describe("PortfolioCashTab (§62.8)", () => {
     expect(w.find('[data-testid="cash-negative-badge"]').exists()).toBe(false)
   })
 
-  it("restricts the cash currency list to the settlement currency", async () => {
-    // IBKR-shaped: displayed in PLN, settles in USD.
-    mocked.getPortfolioCash.mockResolvedValue(cash({ baseCurrency: "PLN", balances: [{ currency: "USD", balance: 500 }] }) as never)
+  it("offers the settlement and the base when the base is not exclusive", async () => {
+    // IBKR-shaped: displayed in PLN, settles in USD, and also holds PLN.
+    mocked.getPortfolioCash.mockResolvedValue(cash({ baseCurrency: "PLN", balances: [{ currency: "USD", balance: 500 }, { currency: "PLN", balance: 40 }] }) as never)
     const w = await mountTab(makeEnv({ id: "p1", isMarginEnabled: false, baseCurrency: "PLN", cashCurrency: "USD" }))
     await w.find('[data-testid="cash-tab-deposit"]').trigger("click")
     await flushPromises()
     const options = w.find('[data-testid="pc-currency"]').findAll("option")
-    expect(options.map((o) => o.text().trim())).toEqual(["USD"])
+    expect(options.map((o) => o.text().trim())).toEqual(["USD", "PLN"])
   })
 
   it("opens the deposit modal and posts depositCash on submit", async () => {
