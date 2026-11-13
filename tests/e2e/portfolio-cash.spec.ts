@@ -429,6 +429,125 @@ test("global cash feed lists cross-portfolio rows with the portfolio name", asyn
   await request.delete(`${GATEWAY}/api/portfolios/${String(a.id)}`, { headers: auth }).catch(() => {})
 })
 
+test("consolidated cash page: record every kind of cash event against the chosen portfolio", async ({ page, request }) => {
+  const run = Date.now()
+  const token = await getBearerToken(request)
+  const auth = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
+  const post = mk(auth, request)
+
+  const a = await post("/api/portfolios", { name: `E2E CashAdd A ${run}`, baseCurrency: "USD" })
+  const b = await post("/api/portfolios", { name: `E2E CashAdd B ${run}`, baseCurrency: "USD" })
+  // §243: a portfolio displayed in PLN that settles in USD — the modal must offer
+  // only USD, exactly as the per-portfolio tab does.
+  const c = await post("/api/portfolios", { name: `E2E CashAdd C ${run}`, baseCurrency: "PLN", cashCurrency: "USD" })
+  const aid = String(a.id)
+  const bid = String(b.id)
+  const cid = String(c.id)
+  await post(`/api/portfolios/${aid}/cash/deposits`, { amount: 1000, currency: "USD", description: `seed ${run}` })
+
+  try {
+    await login(page)
+    await page.goto("/en/investments/transactions/cash")
+
+    const portfolioSelect = page.getByTestId("cash-add-portfolio")
+    await expect(portfolioSelect).toBeVisible({ timeout: 20000 })
+    await portfolioSelect.selectOption(aid)
+
+    const dialog = page.getByRole("dialog", { name: "Cash movement" })
+
+    await page.getByTestId("cash-add-deposit").click()
+    await expect(dialog).toBeVisible()
+    // The feed has no portfolio in scope, so the dialog states which one it lands in.
+    await expect(dialog.getByTestId("pc-portfolio-name")).toContainText(`E2E CashAdd A ${run}`)
+    await dialog.getByTestId("pc-amount").fill("200")
+    await dialog.getByTestId("pc-description").fill(`deposit ${run}`)
+    await dialog.getByTestId("pc-submit").click()
+    await expect(dialog).not.toBeVisible({ timeout: 15000 })
+    expect(await balanceOf(request, auth, aid, "USD")).toBe(1200)
+    await expect(page.getByText("Cash event recorded")).toBeVisible()
+
+    await page.getByTestId("cash-add-withdraw").click()
+    await dialog.getByTestId("pc-amount").fill("50")
+    await dialog.getByTestId("pc-description").fill(`withdraw ${run}`)
+    await dialog.getByTestId("pc-submit").click()
+    await expect(dialog).not.toBeVisible({ timeout: 15000 })
+    expect(await balanceOf(request, auth, aid, "USD")).toBe(1150)
+
+    // Interest is signed: the same form accepts a credit and a charge.
+    await page.getByTestId("cash-add-interest").click()
+    await dialog.getByTestId("pc-amount").fill("12.5")
+    await dialog.getByTestId("pc-description").fill(`interest ${run}`)
+    await dialog.getByTestId("pc-submit").click()
+    await expect(dialog).not.toBeVisible({ timeout: 15000 })
+    expect(await balanceOf(request, auth, aid, "USD")).toBe(1162.5)
+
+    await page.getByTestId("cash-add-fee").click()
+    await dialog.getByTestId("pc-amount").fill("7.4")
+    await dialog.getByTestId("pc-description").fill(`charge ${run}`)
+    await dialog.getByTestId("pc-submit").click()
+    await expect(dialog).not.toBeVisible({ timeout: 15000 })
+    expect(await balanceOf(request, auth, aid, "USD")).toBe(1155.1)
+
+    // Transfer needs the destination picked in the modal; both ledgers move.
+    await page.getByTestId("cash-add-transfer").click()
+    await dialog.getByTestId("pc-to-portfolio").selectOption(bid)
+    await dialog.getByTestId("pc-amount").fill("100")
+    await dialog.getByTestId("pc-description").fill(`transfer ${run}`)
+    await dialog.getByTestId("pc-submit").click()
+    await expect(dialog).not.toBeVisible({ timeout: 15000 })
+    expect(await balanceOf(request, auth, aid, "USD")).toBe(1055.1)
+    expect(await balanceOf(request, auth, bid, "USD")).toBe(100)
+
+    await page.getByTestId("cash-add-conversion").click()
+    await dialog.getByTestId("pc-currency").selectOption("EUR")
+    await dialog.getByTestId("pc-amount").fill("100")
+    await dialog.getByTestId("pc-to-currency").selectOption("USD")
+    await dialog.getByTestId("pc-to-amount").fill("110")
+    await dialog.getByTestId("pc-description").fill(`conversion ${run}`)
+    await dialog.getByTestId("pc-submit").click()
+    await expect(dialog).not.toBeVisible({ timeout: 15000 })
+    expect(await balanceOf(request, auth, aid, "USD")).toBe(1165.1)
+    expect(await balanceOf(request, auth, aid, "EUR")).toBe(-100)
+
+    // Every kind lands in the consolidated feed, tagged with its owning portfolio.
+    // The shared account accumulates rows from every run, and a transfer's destination
+    // leg also names portfolio A in its description, so the expected set is taken from
+    // the payload the view fetches instead of a hardcoded count.
+    const feed = (await (
+      await request.get(`${GATEWAY}/api/portfolios/cash/recent-transactions?page=1&limit=50`, { headers: auth })
+    ).json()) as { data: Array<{ id: string; portfolioId: string; displayLabel: string }> }
+    const mine = feed.data.filter((row) => row.portfolioId === aid)
+    const labels = new Set(mine.map((row) => row.displayLabel))
+    for (const label of ["Deposit", "Withdrawal", "Interest", "Fee", "Transfer", "Conversion"]) {
+      expect(labels.has(label)).toBe(true)
+    }
+
+    await page.getByLabel("Rows per page").selectOption("50")
+    for (const row of mine) {
+      const tr = page.getByTestId(`cash-tx-${row.id}`)
+      await expect(tr).toBeVisible({ timeout: 10000 })
+      await expect(tr).toContainText(`E2E CashAdd A ${run}`)
+    }
+    // The conversion row shows its second leg; the transfer row names the destination.
+    await expect(page.getByTestId(`cash-tx-${mine.find((r) => r.displayLabel === "Conversion")!.id}`)).toContainText("→")
+    await expect(page.getByTestId(`cash-tx-${mine.find((r) => r.displayLabel === "Transfer")!.id}`)).toContainText(`E2E CashAdd B ${run}`)
+
+    // The settlement currency of the selected portfolio governs the modal, not the page.
+    await portfolioSelect.selectOption(cid)
+    await page.getByTestId("cash-add-deposit").click()
+    await expect(dialog).toBeVisible()
+    const currency = dialog.getByTestId("pc-currency")
+    await expect(currency.locator("option")).toHaveCount(1)
+    await expect(currency).toHaveValue("USD")
+    await dialog.getByRole("button", { name: "Cancel", exact: true }).click()
+    await expect(dialog).not.toBeVisible({ timeout: 10000 })
+  } finally {
+    for (const id of [aid, bid, cid]) {
+      await request.delete(`${GATEWAY}/api/portfolios/${id}`, { headers: auth }).catch(() => {})
+    }
+  }
+})
+
 test("cash tab: the transactions table has a Date column and sorts on every column", async ({ page, request }) => {
   const run = Date.now()
   const token = await getBearerToken(request)

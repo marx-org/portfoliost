@@ -2,6 +2,7 @@ import { flushPromises, mount } from "@vue/test-utils"
 import { createPinia, setActivePinia } from "pinia"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import CashTransactionsTable from "@/components/CashTransactionsTable.vue"
+import PortfolioCashModals from "@/modules/portfolios/PortfolioCashModals.vue"
 import * as portfoliosApi from "@/api/portfolios"
 
 vi.mock("vue-router", () => ({
@@ -16,11 +17,26 @@ vi.mock("@/api/portfolios", async (importOriginal) => {
     getPortfolioCashTransactions: vi.fn(),
     getRecentCashTransactions: vi.fn(),
     deleteCashTransaction: vi.fn(),
+    getPortfolioCash: vi.fn(),
+    getPortfolios: vi.fn(),
+    getPortfolioTotalMetrics: vi.fn(),
+    depositCash: vi.fn(),
+    interestCash: vi.fn(),
   }
 })
 
 vi.mock("@/api/fx", () => ({
   getLatestRate: vi.fn().mockResolvedValue({ rate: 1, asOf: "2026-08-25" }),
+}))
+
+// The cash modal loads the currency registry when it opens. Mocking the store
+// keeps the test hermetic — an unmocked fetch has no server to answer it.
+vi.mock("@/stores/currencies", () => ({
+  useCurrenciesStore: () => ({
+    loaded: true,
+    load: vi.fn(),
+    currencies: [{ code: "USD", name: "US Dollar", symbol: "$", minorUnits: 2, popular: true }],
+  }),
 }))
 
 const mocked = vi.mocked(portfoliosApi)
@@ -67,8 +83,12 @@ function page<T>(items: T[], total = items.length) {
   return { items, total, page: 1, limit: 10, totalPages: 1, hasNext: false, hasPrevious: false }
 }
 
-async function mountTable(props: Record<string, unknown> = {}) {
+async function mountTable(props: Record<string, unknown> = {}, portfolios: Array<Record<string, unknown>> = [{ id: "p1", name: "Portfolio 1", baseCurrency: "USD" }]) {
   setActivePinia(createPinia())
+  // The consolidated toolbar loads the portfolio list through the store on mount;
+  // mock that call so the select is populated rather than hitting the network.
+  mocked.getPortfolios.mockResolvedValue(portfolios as never)
+  mocked.getPortfolioTotalMetrics.mockResolvedValue({ totalValue: 0, baseCurrency: "USD" } as never)
   const wrapper = mount(CashTransactionsTable, {
     props: { mode: "portfolio", portfolioId: "p1", ...props },
     global: {
@@ -131,6 +151,93 @@ describe("CashTransactionsTable — shared cash table (date column + sorting)", 
     expect(w.find('[data-testid="table-th-portfolioName"]').exists()).toBe(true)
     expect(w.find('[data-testid="table-th-balance"]').exists()).toBe(false)
     expect(w.text()).toContain("Portfolio 1")
+  })
+
+  // ── §93 — recording a cash event from the consolidated feed ──────────────
+
+  it("offers the record-a-cash-event toolbar only on the consolidated feed", async () => {
+    const w = await mountTable({ mode: "global" }, [
+      { id: "p1", name: "Alpha", baseCurrency: "PLN" },
+      { id: "p2", name: "Retirement", baseCurrency: "USD", cashCurrency: "USD" },
+    ])
+    for (const kind of ["deposit", "withdraw", "transfer", "interest", "fee", "conversion"]) {
+      expect(w.find(`[data-testid="cash-add-${kind}"]`).exists()).toBe(true)
+    }
+    const select = w.element.querySelector('[data-testid="cash-add-portfolio"]') as HTMLSelectElement
+    expect(Array.from(select.options).map((o) => o.textContent?.trim())).toEqual(["Alpha", "Retirement"])
+    // Default to the first portfolio in name order, so the buttons work at once.
+    expect(select.value).toBe("p1")
+
+    // The per-portfolio tab already has its own actions next to its balance.
+    const single = await mountTable()
+    expect(single.find('[data-testid="cash-add-deposit"]').exists()).toBe(false)
+  })
+
+  it("opens the shared cash modal for the portfolio picked on the feed", async () => {
+    mocked.getPortfolioCash.mockResolvedValue({
+      baseCurrency: "USD",
+      balances: [{ currency: "USD", balance: 0 }],
+      total: 0,
+    } as never)
+    const w = await mountTable({ mode: "global" }, [
+      { id: "p1", name: "Alpha", baseCurrency: "PLN" },
+      { id: "p2", name: "Retirement", baseCurrency: "USD", cashCurrency: "USD", cashBaseCurrencyOnly: true },
+    ])
+
+    const select = w.element.querySelector('[data-testid="cash-add-portfolio"]') as HTMLSelectElement
+    select.value = "p2"
+    select.dispatchEvent(new Event("change"))
+    await flushPromises()
+
+    w.get('[data-testid="cash-add-interest"]').trigger("click")
+    await flushPromises()
+
+    expect(mocked.getPortfolioCash).toHaveBeenCalledWith("p2")
+    const addModal = w.findAllComponents(PortfolioCashModals).find((m) => m.props("portfolioId") === "p2")
+    expect(addModal).toBeTruthy()
+    expect(addModal!.props("action")).toBe("interest")
+    // The currency rules (#243) come from the chosen portfolio, not the page.
+    expect(addModal!.props("cashCurrency")).toBe("USD")
+    expect(addModal!.props("cashBaseCurrencyOnly")).toBe(true)
+    // The dialog names the portfolio the event lands in — the feed has none in scope.
+    expect(addModal!.props("portfolioName")).toBe("Retirement")
+  })
+
+  it("records the event through the modal and reloads the feed", async () => {
+    mocked.getPortfolioCash.mockResolvedValue({
+      baseCurrency: "USD",
+      balances: [{ currency: "USD", balance: 500 }],
+      total: 500,
+    } as never)
+    mocked.depositCash.mockResolvedValue({ id: "c-new", amount: 250, currency: "USD" } as never)
+    const w = await mountTable({ mode: "global" }, [{ id: "p1", name: "Alpha", baseCurrency: "USD" }])
+    mocked.getRecentCashTransactions.mockClear()
+
+    w.get('[data-testid="cash-add-deposit"]').trigger("click")
+    await flushPromises()
+
+    const amount = w.element.querySelector('[data-testid="pc-amount"]') as HTMLInputElement
+    amount.value = "250"
+    amount.dispatchEvent(new Event("input"))
+    await flushPromises()
+
+    w.get('[data-testid="pc-form"]').trigger("submit")
+    await flushPromises()
+
+    expect(mocked.depositCash).toHaveBeenCalledTimes(1)
+    expect(mocked.depositCash.mock.calls[0][0]).toBe("p1")
+    expect(mocked.getRecentCashTransactions).toHaveBeenCalled()
+    expect(w.text()).toContain("Cash event recorded")
+  })
+
+  it("keeps the table visible when the chosen portfolio's cash cannot be loaded", async () => {
+    mocked.getPortfolioCash.mockRejectedValue(new Error("cash unavailable"))
+    const w = await mountTable({ mode: "global" }, [{ id: "p1", name: "Alpha", baseCurrency: "USD" }])
+    w.get('[data-testid="cash-add-deposit"]').trigger("click")
+    await flushPromises()
+
+    expect(w.text()).toContain("cash unavailable")
+    expect(w.find('[data-testid="cash-tx-rt1"]').exists()).toBe(true)
   })
 
   it("filters cash transactions by company name or ticker", async () => {

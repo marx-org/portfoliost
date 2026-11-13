@@ -42,6 +42,9 @@ const props = withDefaults(defineProps<{
   cashBaseCurrencyOnly?: boolean
   /** §243 — the single currency the account settles in, when it is not the base. */
   cashCurrency?: string | null
+  /** §93 — the consolidated feed has no portfolio in scope, so name the one the
+   *  event is being recorded into on the dialog itself. */
+  portfolioName?: string | null
   /** §62 follow-up — when set the modal edits this cash row (PATCH) instead of creating one. */
   editTx?: { id: string; type: string; amount: number | string; currency: string; date?: string; createdAt: string; description?: string | null; toPortfolioId?: string | null; toCurrency?: string | null; toAmount?: number | null; fees?: number | null; feeCurrency?: string | null; feeRateSource?: "automatic" | "manual" | null; feeExchangeRate?: number | null } | null
 }>(), { cashBaseCurrencyOnly: false })
@@ -458,7 +461,10 @@ const amountLabel = computed(() => {
   >
     <div class="card max-h-[85vh] w-full max-w-2xl overflow-y-auto p-6" role="dialog" aria-modal="true" aria-label="Cash movement">
       <div class="mb-4 flex items-center justify-between">
-        <h3 class="text-base font-semibold">{{ title }}</h3>
+        <h3 class="text-base font-semibold">
+          {{ title }}
+          <span v-if="portfolioName" class="block text-xs font-normal text-slate-500 dark:text-slate-400" data-testid="pc-portfolio-name">{{ portfolioName }}</span>
+        </h3>
         <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="emit('close')">✕</button>
       </div>
 
