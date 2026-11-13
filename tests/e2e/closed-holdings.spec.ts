@@ -26,6 +26,15 @@ const usd = (value: number) =>
 test("closed positions stay hidden by default and can be revealed in portfolio and consolidated Holdings", async ({ page, request }) => {
   test.setTimeout(120_000)
   const run = Date.now()
+  // A position is shared by symbol across portfolios, and a portfolio that has
+  // transactions cannot be deleted (409), so a fixed symbol would collide with
+  // the leftovers of every previous run of this suite: the consolidated view
+  // would then show three "E2ECLOSED" rows instead of one. Tagging the symbols
+  // with the run makes the data this spec asserts on its own.
+  const tag = run.toString(36).toUpperCase() // the server uppercases symbols
+  const OPEN = `E2EOPEN${tag}`
+  const CYCLE = `E2ECYCLE${tag}`
+  const CLOSED = `E2ECLOSED${tag}`
   const token = await getBearerToken(request)
   const auth = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
   const portfolioName = `E2E closed history ${run}`
@@ -46,21 +55,21 @@ test("closed positions stay hidden by default and can be revealed in portfolio a
   }
 
   try {
-    await trade("BUY", "E2EOPEN", 2, 100)
-    await trade("SELL", "E2EOPEN", 1, 125)
+    await trade("BUY", OPEN, 2, 100)
+    await trade("SELL", OPEN, 1, 125)
     // A close/rebuy is one stock holding, not a second lifecycle row. The API
     // response must carry the historical realized amount on that open row.
-    await trade("BUY", "E2ECYCLE", 10, 100)
-    await trade("SELL", "E2ECYCLE", 10, 120)
-    await trade("BUY", "E2ECYCLE", 2, 130)
-    await trade("BUY", "E2ECLOSED", 2, 100)
-    await trade("SELL", "E2ECLOSED", 1, 150)
-    await trade("SELL", "E2ECLOSED", 1, 140)
+    await trade("BUY", CYCLE, 10, 100)
+    await trade("SELL", CYCLE, 10, 120)
+    await trade("BUY", CYCLE, 2, 130)
+    await trade("BUY", CLOSED, 2, 100)
+    await trade("SELL", CLOSED, 1, 150)
+    await trade("SELL", CLOSED, 1, 140)
 
     const optionResponse = await request.post(`${GATEWAY}/api/portfolios/${portfolioId}/positions`, {
       headers: auth,
       data: {
-        symbol: "E2ECYCLE",
+        symbol: CYCLE,
         instrumentName: "Example Cycle Call",
         quantity: 1,
         price: 2,
@@ -88,11 +97,11 @@ test("closed positions stay hidden by default and can be revealed in portfolio a
       strikePrice: number | null
       expirationDate: string | null
     }>
-    const open = positions.find((position) => position.symbol === "E2EOPEN")
-    const cycleRows = positions.filter((position) => position.symbol === "E2ECYCLE")
+    const open = positions.find((position) => position.symbol === OPEN)
+    const cycleRows = positions.filter((position) => position.symbol === CYCLE)
     const cycleStock = cycleRows.find((position) => position.assetType === "STOCK")
     const cycleOption = cycleRows.find((position) => position.assetType === "OPTION")
-    const closed = positions.find((position) => position.symbol === "E2ECLOSED")
+    const closed = positions.find((position) => position.symbol === CLOSED)
     expect(cycleRows).toHaveLength(2)
     expect(cycleStock).toMatchObject({ isOpen: true, quantity: 2, realizedGainLoss: 200 })
     expect(cycleOption).toMatchObject({
@@ -119,9 +128,9 @@ test("closed positions stay hidden by default and can be revealed in portfolio a
     await page.goto(`/en/portfolios/${portfolioId}/holdings`)
     const rows = page.locator('[data-testid="holdings-row"]')
     await expect(rows).toHaveCount(3)
-    const openRow = rows.filter({ hasText: "E2EOPEN" })
+    const openRow = rows.filter({ hasText: OPEN })
     await expect(openRow.getByTestId("holdings-cell-realized")).toContainText("+$25.00")
-    const cycleRow = rows.filter({ hasText: "E2ECYCLE" })
+    const cycleRow = rows.filter({ hasText: CYCLE })
     await expect(cycleRow).toHaveCount(2)
     const cycleBadgeDetails = await cycleRow.locator('[data-testid="ticker-badge-details"]').allTextContents()
     expect(cycleBadgeDetails).toContain("Stock")
@@ -139,7 +148,7 @@ test("closed positions stay hidden by default and can be revealed in portfolio a
     await closedFilter.press("Space")
     await expect(closedFilter).toBeChecked()
     await expect(rows).toHaveCount(4)
-    const closedRow = rows.filter({ hasText: "E2ECLOSED" })
+    const closedRow = rows.filter({ hasText: CLOSED })
     await expect(closedRow).toContainText("Closed")
     await expect(closedRow).toContainText(/\d{4}/)
     await expect(closedRow.getByTestId("holdings-cell-realized")).toContainText("+$90.00")
@@ -149,21 +158,21 @@ test("closed positions stay hidden by default and can be revealed in portfolio a
     // The consolidated route uses the same filter pipeline and retains the
     // owning portfolio name on the revealed membership row.
     await page.goto("/en/investments/holdings")
-    await page.getByTestId("holdings-search").fill("E2ECLOSED")
+    await page.getByTestId("holdings-search").fill(CLOSED)
     await expect(page.locator('[data-testid="holdings-row"]')).toHaveCount(0)
     await page.getByRole("checkbox", { name: "Show closed positions" }).check()
-    const consolidatedClosed = page.locator('[data-testid="holdings-row"]').filter({ hasText: "E2ECLOSED" })
+    const consolidatedClosed = page.locator('[data-testid="holdings-row"]').filter({ hasText: CLOSED })
     await expect(consolidatedClosed).toHaveCount(1)
     await expect(consolidatedClosed).toContainText(portfolioName)
     await expect(consolidatedClosed).toContainText("Closed")
     await expect(consolidatedClosed.getByTestId("holdings-cell-realized")).toContainText("+$90.00")
 
-    await page.getByTestId("holdings-search").fill("E2EOPEN")
-    const consolidatedOpen = page.locator('[data-testid="holdings-row"]').filter({ hasText: "E2EOPEN" })
+    await page.getByTestId("holdings-search").fill(OPEN)
+    const consolidatedOpen = page.locator('[data-testid="holdings-row"]').filter({ hasText: OPEN })
     await expect(consolidatedOpen).toHaveCount(1)
     await expect(consolidatedOpen.getByTestId("holdings-cell-realized")).toContainText("+$25.00")
-    await page.getByTestId("holdings-search").fill("E2ECYCLE")
-    const consolidatedCycle = page.locator('[data-testid="holdings-row"]').filter({ hasText: "E2ECYCLE" })
+    await page.getByTestId("holdings-search").fill(CYCLE)
+    const consolidatedCycle = page.locator('[data-testid="holdings-row"]').filter({ hasText: CYCLE })
     await expect(consolidatedCycle).toHaveCount(2)
     const consolidatedCycleOption = consolidatedCycle.filter({ has: page.getByTestId("holdings-option-details") })
     await expect(consolidatedCycleOption).toHaveCount(1)
