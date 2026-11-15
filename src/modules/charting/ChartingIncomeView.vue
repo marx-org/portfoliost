@@ -4,6 +4,7 @@ import { computed, watch } from "vue"
 import { getChartIncome } from "@/api/charting"
 import { useChartScope } from "./useChartScope"
 import { useChartData } from "./useChartData"
+import MonthlyIncomeChart from "./MonthlyIncomeChart.vue"
 
 const scope = useChartScope()
 const { data, loading, error, load } = useChartData(getChartIncome)
@@ -23,6 +24,8 @@ const chartSeries = computed(() => [
 
 <template>
   <div class="space-y-3" data-testid="charting-income">
+    <MonthlyIncomeChart />
+    <h3 class="text-sm font-medium text-slate-500">Annual totals</h3>
     <p v-if="loading" class="text-sm text-slate-500">Loading…</p>
     <p v-else-if="error" class="text-sm text-red-600">Failed to load income data.</p>
     <template v-else>
