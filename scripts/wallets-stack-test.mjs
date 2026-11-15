@@ -93,6 +93,30 @@ async function main() {
   check("cash balance reflects the deposit (500)", usd != null && Math.abs(usd.balance - 500) < 1e-6, JSON.stringify(cash.json?.balances))
   check("cash total ≈ 500", cash.json != null && Math.abs((cash.json.total ?? 0) - 500) < 1e-6)
 
+  // ── Charting reads (feature #253) ───────────────────────────
+  // Bounded, typed, and no replay: a chart GET reads facts and must answer in
+  // well under a full backfill (which fans out to every symbol's prices).
+  const chartBase = "/api/portfolios/charting"
+  const timed = async (path) => {
+    const t0 = Date.now()
+    const r = await req(path, { headers: H })
+    return { ...r, ms: Date.now() - t0 }
+  }
+  const income = await timed(`${chartBase}/income?accounts=${pid}`)
+  check("charting.income → 200", income.status === 200, `got ${income.status}`)
+  check("charting.income has currency/scope/coverage", income.json?.currency === "USD" && !!income.json?.scope && !!income.json?.coverage, JSON.stringify(income.json).slice(0, 120))
+  check("charting.income bounded read (<2000ms)", income.ms < 2000, `${income.ms}ms`)
+
+  const perf = await timed(`${chartBase}/performance?accounts=${pid}`)
+  check("charting.performance → 200 bounded", perf.status === 200 && perf.ms < 2000, `got ${perf.status} ${perf.ms}ms`)
+  const alloc = await timed(`${chartBase}/allocation?accounts=${pid}`)
+  check("charting.allocation → 200 bounded", alloc.status === 200 && alloc.ms < 2000, `got ${alloc.status} ${alloc.ms}ms`)
+  const cashChart = await timed(`${chartBase}/cash?accounts=${pid}`)
+  check("charting.cash → 200 bounded", cashChart.status === 200 && cashChart.ms < 2000, `got ${cashChart.status} ${cashChart.ms}ms`)
+
+  const badChart = await req(`${chartBase}/income?accounts=not-a-uuid`, { headers: H })
+  check("charting.income malformed id → 422", badChart.status === 422, `got ${badChart.status}`)
+
   // best-effort cleanup: remove the cash leg, then the (now empty) portfolio
   if (deposit.json?.id) {
     await req(`/api/portfolios/cash/transactions/${deposit.json.id}`, { method: "DELETE", headers: H })
