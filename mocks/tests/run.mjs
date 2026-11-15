@@ -1207,6 +1207,14 @@ async function main() {
     `got ${chartIncome.status} ${JSON.stringify(chartIncome.json || {}).slice(0, 120)}`,
   )
 
+  check(
+    "charting.income marks partial / current-period data",
+    chartIncome.status === 200 &&
+      chartIncome.json.coverage.currentPeriod === true &&
+      chartIncome.json.monthly.some((m) => m.partial === true),
+    `currentPeriod=${chartIncome.json?.coverage?.currentPeriod}`,
+  )
+
   const chartIncomeMulti = await request(
     `/portfolios/charting/income?accounts=11111111-1111-4111-8111-111111111111,22222222-2222-4222-8222-222222222222`,
     { token },
