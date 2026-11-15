@@ -52,9 +52,22 @@ test("daily-equivalent income is the annual total divided by 365", async ({ page
     expect(daily.amount).toBeCloseTo(annual.total / 365, 6)
   }
 
-  await page.goto("/en/charting/income")
+  // The page is loaded with the SAME scope as the API call above. Leaving the
+  // scope at "All" makes this spec read whatever portfolios previous specs
+  // created (plan §48.4c isolation rule), so the UI and the API would not be
+  // describing the same dataset.
+  await page.goto(`/en/charting/income?accounts=${TOP10}`)
   const chart = page.getByTestId("annual-income-average-day")
   await expect(chart).toBeVisible()
   await expect(chart.locator("tbody tr")).toHaveCount(body.dailyAverageByYear.length)
   await expect(chart.getByTestId("annual-average-partial")).toBeVisible()
+
+  for (const daily of body.dailyAverageByYear) {
+    const row = chart.locator("tbody tr").filter({ hasText: String(daily.year) })
+    await expect(row).toHaveCount(1)
+    const cells = row.locator("td")
+    await expect(cells.nth(1)).toHaveText(daily.basis)
+    await expect(cells.nth(2)).toHaveText(String(daily.divisor))
+    await expect(cells.nth(3)).toHaveText(String(daily.amount))
+  }
 })
