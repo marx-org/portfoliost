@@ -48,9 +48,10 @@ for (const [platform, arch] of [["linux/amd64", "x64"], ["linux/arm64", "arm64"]
 
     const asset = html.match(/src="(\/assets\/[^\"]+\.js)"/)?.[1]
     assert.ok(asset, "index must reference a built JS asset")
-    const js = await fetch(new URL(asset, base))
+    const js = await fetch(new URL(asset, base), { headers: { "Accept-Encoding": "gzip" } })
     assert.equal(js.status, 200)
     assert.match(js.headers.get("content-type"), /javascript/)
+    assert.equal(js.headers.get("content-encoding"), "gzip", "JS compression must work")
     const hash = createHash("sha256").update(Buffer.from(await js.arrayBuffer())).digest("hex")
     hashes.push(hash)
     console.log(JSON.stringify({ platform, arch, serve: "14.2.6", deepLink: "ok", runtimeConfig: "ok", assetSha256: hash }))
