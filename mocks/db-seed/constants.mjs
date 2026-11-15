@@ -69,6 +69,51 @@ export const SEED_TRANSACTIONS = [
   { id: "7c442c12-3799-48f3-ae7d-5d23d6731a36", positionId: "89d5af01-b423-44cd-a890-1e42d4f46065", instrumentSymbol: "KLAC", instrumentName: "KLA Corp", quantity: 42, price: 181.765, totalAmount: 7634.13, sector: "Technology", country: "US" },
 ]
 
+/**
+ * Charting income facts (feature #253, sub-issue #257). The charting reads
+ * (`/api/portfolios/charting/*`) serve ONLY published `chart_event_facts` at a
+ * portfolio's published generation — there is no on-read rebuild — so the seed
+ * must supply both a `chart_projection_state` row and its facts or the Income
+ * chart renders empty. These are TEST fixtures, not live data.
+ *
+ * Anchored to `now` (UTC) so the current month is always partial and the series
+ * is never stale: a run of MONTHS consecutive months ending this month. The
+ * first month of the window has a dividend + interest, the second is a true
+ * zero (a gap month), then dividends/interest/options resume. The current month
+ * carries only an option receipt so it renders as a partial bar.
+ */
+export const CHART_INCOME_MONTHS = 4
+
+function monthKey(date) {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`
+}
+
+export function seedChartEvents(now = new Date()) {
+  const months = []
+  for (let i = CHART_INCOME_MONTHS - 1; i >= 0; i--) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1))
+    months.push(d)
+  }
+  const events = []
+  const push = (monthDate, day, receiptKind, amount) => {
+    const date = `${monthKey(monthDate)}-${String(day).padStart(2, "0")}`
+    events.push({ eventDate: date, receiptKind, amountBase: amount })
+  }
+  months.forEach((m, idx) => {
+    const isCurrent = idx === months.length - 1
+    if (isCurrent) {
+      // Current month: only an option premium receipt — a partial bar.
+      push(m, 5, "option", 30)
+      return
+    }
+    if (idx === 1) return // true zero month (no receipts) between two receipt months
+    push(m, 10, "dividend", 100 + idx * 50)
+    push(m, 20, "interest", 10 + idx)
+    if (idx % 2 === 0) push(m, 25, "option", 20)
+  })
+  return events
+}
+
 export const SEED_SHARE_PRIVACY = JSON.stringify({
   benchmarks: ["SPY"],
   showValues: true,
