@@ -91,8 +91,17 @@ const router = createRouter({
         },
         {
           path: "charting",
-          name: "charting",
-          component: () => import("@/modules/charting/ChartingView.vue"),
+          component: () => import("@/modules/charting/ChartingLayout.vue"),
+          children: [
+            { path: "", redirect: "/en/charting/performance" },
+            { path: "performance", name: "charting-performance", component: () => import("@/modules/charting/ChartingPerformanceView.vue") },
+            { path: "income", name: "charting-income", component: () => import("@/modules/charting/ChartingIncomeView.vue") },
+            { path: "allocation", name: "charting-allocation", component: () => import("@/modules/charting/ChartingAllocationView.vue") },
+            { path: "cash", name: "charting-cash", component: () => import("@/modules/charting/ChartingCashView.vue") },
+            { path: "stock-categories", name: "charting-stock-categories", component: () => import("@/modules/charting/StockCategoriesView.vue") },
+            // Existing research instrument comparison kept available.
+            { path: "research", name: "charting-research", component: () => import("@/modules/charting/ChartingView.vue") },
+          ],
         },
         {
           path: "settings",
