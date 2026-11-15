@@ -55,7 +55,16 @@ export function useChartScope(opts?: { route?: RouteLike; router?: RouterLike })
 
   /** Persist the current selection into the route query (deep-linkable, shareable). */
   function syncRoute(): void {
-    void router.replace({ query: { ...route.query, ...toRouteQuery() } })
+    // Rebuild the query from the scope keys only, so clearing a selection also
+    // REMOVES its key. Spreading the old query first left a stale `accounts`
+    // behind when the selection became empty (reset would not clear the URL).
+    const next: Record<string, string> = {}
+    for (const [key, value] of Object.entries(route.query)) {
+      if (key === "accounts" || key === "labels" || key === "currency") continue
+      if (typeof value === "string") next[key] = value
+    }
+    Object.assign(next, toRouteQuery())
+    void router.replace({ query: next })
   }
 
   // Round-trip: a deep link (or back/forward) updates the selection.
