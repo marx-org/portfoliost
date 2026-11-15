@@ -6,6 +6,7 @@
 import {
   SEED_USER_ID, SEED_PORTFOLIO_ID, SEED_SHARE_ID,
   SEED_POSITIONS, SEED_TRANSACTIONS, SEED_SHARE_PRIVACY,
+  seedChartEvents,
 } from "./constants.mjs"
 
 function seededTotalInvested() {
@@ -163,6 +164,29 @@ export async function seedPortfolios(sql) {
       `
     }
     insertedSnapshots = snapshots.length
+
+    // Charting facts (feature #253/#254). The charting reads serve only the
+    // published generation's `chart_event_facts`, so the seed publishes
+    // generation 1 as complete and inserts the income facts. Without this the
+    // Income chart renders empty in e2e (it never rebuilds on read).
+    const chartEvents = seedChartEvents()
+    await tx`
+      INSERT INTO portfolios.chart_projection_state
+        (portfolio_id, generation, version, status, dirty_from, updated_at)
+      VALUES
+        (${SEED_PORTFOLIO_ID}, ${1}, ${1}, ${"complete"}, ${null}, ${updatedAt})
+    `
+    for (const ev of chartEvents) {
+      await tx`
+        INSERT INTO portfolios.chart_event_facts
+          (generation, portfolio_id, event_date, receipt_kind,
+           amount_base, amount_original, original_currency, standalone)
+        VALUES
+          (${1}, ${SEED_PORTFOLIO_ID}, ${ev.eventDate}, ${ev.receiptKind},
+           ${ev.amountBase.toFixed(8)}, ${ev.amountBase.toFixed(8)}, ${"USD"}, ${true})
+      `
+    }
+    console.log(`[db-seed] portfolios: seeded chart generation 1 with ${chartEvents.length} income fact(s)`)
   })
   console.log(`[db-seed] portfolios: inserted Top10 portfolio, ${SEED_POSITIONS.length} positions, ${SEED_TRANSACTIONS.length} transactions, ${insertedSnapshots} snapshots (${snapshots[0].snapshotDate}…${snapshots[snapshots.length - 1].snapshotDate})`)
 }
