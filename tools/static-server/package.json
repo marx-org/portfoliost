@@ -1,0 +1,7 @@
+{
+  "name": "portfoliost-static-server",
+  "private": true,
+  "dependencies": {
+    "serve": "14.2.6"
+  }
+}
