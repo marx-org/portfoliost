@@ -1193,6 +1193,79 @@ async function main() {
     JSON.stringify(splitJson),
   )
 
+  // ── Charting datasets (feature #253) ────────────────────────
+  const chartIncome = await request("/portfolios/charting/income", { token })
+  check(
+    "charting.income default scope returns dataset",
+    chartIncome.status === 200 &&
+      chartIncome.json &&
+      chartIncome.json.currency === "USD" &&
+      Array.isArray(chartIncome.json.monthly) &&
+      chartIncome.json.monthly.length > 0 &&
+      chartIncome.json.coverage &&
+      chartIncome.json.coverage.generation > 0,
+    `got ${chartIncome.status} ${JSON.stringify(chartIncome.json || {}).slice(0, 120)}`,
+  )
+
+  const chartIncomeMulti = await request(
+    `/portfolios/charting/income?accounts=11111111-1111-4111-8111-111111111111,22222222-2222-4222-8222-222222222222`,
+    { token },
+  )
+  check(
+    "charting.income multiple accounts scoped",
+    chartIncomeMulti.status === 200 &&
+      chartIncomeMulti.json.scope.accountIds.length === 2 &&
+      chartIncomeMulti.json.monthly.length > 0,
+    `got ${chartIncomeMulti.status}`,
+  )
+
+  const chartIncomeBad = await request("/portfolios/charting/income?accounts=not-a-uuid", { token })
+  check("charting.income malformed id → 422", chartIncomeBad.status === 422, `got ${chartIncomeBad.status}`)
+
+  const chartIncomeEmpty = await request(
+    `/portfolios/charting/income?accounts=${"9".repeat(8)}-9999-4999-8999-999999999999`,
+    { token },
+  )
+  check(
+    "charting.income unknown account → empty coverage, no invented data",
+    chartIncomeEmpty.status === 200 &&
+      chartIncomeEmpty.json.coverage.status === "empty" &&
+      chartIncomeEmpty.json.monthly.length === 0,
+    `got ${chartIncomeEmpty.status} ${chartIncomeEmpty.json?.coverage?.status}`,
+  )
+
+  const chartAllocation = await request("/portfolios/charting/allocation", { token })
+  check(
+    "charting.allocation default scope returns slices",
+    chartAllocation.status === 200 && Array.isArray(chartAllocation.json.bySector) && chartAllocation.json.bySector.length > 0,
+    `got ${chartAllocation.status}`,
+  )
+
+  const chartCategories = await request("/portfolios/charting/stock-categories", { token })
+  check(
+    "charting.stock-categories lists assignments",
+    chartCategories.status === 200 && Array.isArray(chartCategories.json) && chartCategories.json.length > 0,
+    `got ${chartCategories.status}`,
+  )
+
+  const chartCategoryBad = await request("/portfolios/charting/stock-categories", {
+    method: "PUT",
+    token,
+    body: { symbol: "AAPL.US", instrumentCurrency: "USD", category: "premium" },
+  })
+  check("charting.stock-categories unknown category → 422", chartCategoryBad.status === 422, `got ${chartCategoryBad.status}`)
+
+  const chartCategoryOk = await request("/portfolios/charting/stock-categories", {
+    method: "PUT",
+    token,
+    body: { symbol: "AAPL.US", instrumentCurrency: "USD", category: "very_high_growth" },
+  })
+  check(
+    "charting.stock-categories valid update echoes assignment",
+    chartCategoryOk.status === 200 && chartCategoryOk.json.category === "very_high_growth",
+    `got ${chartCategoryOk.status} ${JSON.stringify(chartCategoryOk.json || {}).slice(0, 120)}`,
+  )
+
   // ── 404 + errors ────────────────────────────────────────────
   const nope = await request("/does/not/exist", { token })
   check("unknown route → 404", nope.status === 404, `got ${nope.status}`)
