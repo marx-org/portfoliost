@@ -7,6 +7,7 @@ import { useChartData } from "./useChartData"
 import MonthlyIncomeChart from "./MonthlyIncomeChart.vue"
 import CumulativeIncomeChart from "./CumulativeIncomeChart.vue"
 import AnnualIncomeChart from "./AnnualIncomeChart.vue"
+import AnnualIncomeAverageChart from "./AnnualIncomeAverageChart.vue"
 
 const scope = useChartScope()
 const { data, loading, error, load } = useChartData(getChartIncome)
@@ -25,6 +26,9 @@ const currency = computed(() => data.value?.currency ?? "")
       <CumulativeIncomeChart :points="data?.cumulative ?? []" :currency="currency" />
       <h3 class="text-sm font-medium text-slate-500">Annual totals</h3>
       <AnnualIncomeChart :points="data?.annual ?? []" :currency="currency" />
+      <h3 class="text-sm font-medium text-slate-500">Annual-equivalent averages</h3>
+      <AnnualIncomeAverageChart :points="data?.dailyAverageByYear ?? []" unit="day" :currency="currency" />
+      <AnnualIncomeAverageChart :points="data?.monthlyAverageByYear ?? []" unit="month" :currency="currency" />
     </template>
   </div>
 </template>
