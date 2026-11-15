@@ -52,8 +52,11 @@ const props = withDefaults(
      * worse than silence, because it is believed. */
      heldGapSymbols?: string[] | null
      showInvested?: boolean
+     /** The Charting pages reuse this renderer but own their own refresh, so the
+      * portfolio-only recompute control is hidden there. */
+     showRecompute?: boolean
   }>(),
-   { benchmarks: () => [], currency: "USD", color: "#3b82f6", backfillPending: false, loading: false, height: 300, recomputing: false, gapSymbols: null, heldGapSymbols: null, showInvested: true },
+   { benchmarks: () => [], currency: "USD", color: "#3b82f6", backfillPending: false, loading: false, height: 300, recomputing: false, gapSymbols: null, heldGapSymbols: null, showInvested: true, showRecompute: true },
 )
 
 const emit = defineEmits<{ recompute: [] }>()
@@ -263,7 +266,7 @@ defineExpose({ options, chartOptions, seriesData })
 
 <template>
   <div data-testid="portfolio-performance-chart">
-    <div class="mb-2 flex items-center justify-between">
+    <div v-if="showRecompute" class="mb-2 flex items-center justify-between">
       <span />
       <button
         type="button"

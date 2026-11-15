@@ -186,7 +186,34 @@ export async function seedPortfolios(sql) {
            ${ev.amountBase.toFixed(8)}, ${ev.amountBase.toFixed(8)}, ${"USD"}, ${true})
       `
     }
-    console.log(`[db-seed] portfolios: seeded chart generation 1 with ${chartEvents.length} income fact(s)`)
+
+    // Position-day facts for the same published generation, so the Charting
+    // performance and allocation pages have data in e2e too (the projection
+    // never rebuilds on read). Three days across the snapshot window: the first,
+    // a middle and the latest. Each position carries its quantity, market value
+    // and remaining basis so the daily series and the latest-day allocation both
+    // resolve to something real.
+    const chartDays = [
+      snapshots[0].snapshotDate,
+      snapshots[Math.floor(snapshots.length / 2)].snapshotDate,
+      snapshots[snapshots.length - 1].snapshotDate,
+    ]
+    for (const day of chartDays) {
+      for (const p of SEED_POSITIONS) {
+        const basis = (p.quantity * p.averageCostBasis).toFixed(8)
+        await tx`
+          INSERT INTO portfolios.chart_position_daily
+            (generation, portfolio_id, position_id, day, quantity, value,
+             remaining_basis, realized_gain, income, net_flow,
+             instrument_currency, price_known, carried_forward)
+          VALUES
+            (${1}, ${SEED_PORTFOLIO_ID}, ${p.id}, ${day}, ${p.quantity.toFixed(8)},
+             ${basis}, ${basis}, ${"0"}, ${"0"}, ${"0"},
+             ${p.instrumentCurrency ?? "USD"}, ${true}, ${false})
+        `
+      }
+    }
+    console.log(`[db-seed] portfolios: seeded chart generation 1 with ${chartEvents.length} income fact(s) and ${chartDays.length} position-day(s)`)
   })
   console.log(`[db-seed] portfolios: inserted Top10 portfolio, ${SEED_POSITIONS.length} positions, ${SEED_TRANSACTIONS.length} transactions, ${insertedSnapshots} snapshots (${snapshots[0].snapshotDate}…${snapshots[snapshots.length - 1].snapshotDate})`)
 }

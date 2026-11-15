@@ -1,22 +1,54 @@
 <script setup lang="ts">
-/** Charting → Allocation (feature #253, sub-issue #256/#266–#271). */
+/**
+ * Charting → Allocation (feature #253, sub-issue #256/#266–#271).
+ *
+ * Renders the shared `AllocationBreakdown` from the charting allocation dataset,
+ * so this page and the per-portfolio Allocation tab are the same renderer. The
+ * view may be mounted with a fixed scope (the portfolio tab) or read the shared
+ * URL scope.
+ */
 import { computed, watch } from "vue"
 import { getChartAllocation } from "@/api/charting"
+import type { ChartScopeQuery } from "@/api/charting"
+import AllocationBreakdown, { type AllocationSlice } from "@/components/AllocationBreakdown.vue"
 import { useChartScope } from "./useChartScope"
 import { useChartData } from "./useChartData"
+
+const props = defineProps<{ scope?: ChartScopeQuery }>()
 
 const scope = useChartScope()
 const { data, loading, error, load } = useChartData(getChartAllocation)
 
-watch(scope.scopeQuery, (q) => void load(q), { immediate: true })
+const activeScope = computed<ChartScopeQuery>(() => props.scope ?? scope.scopeQuery.value)
+watch(activeScope, (q) => void load(q), { immediate: true })
 
-const slices = computed(() => data.value?.byAssetType ?? [])
-const chartOptions = {
-  chart: { type: "donut", height: 320 },
-  labels: slices.value.map((s) => s.label),
-  colors: ["#3b82f6", "#22c55e", "#f59e0b", "#ef4444", "#a855f7", "#14b8a6"],
+const baseCurrency = computed(() => data.value?.currency ?? "")
+
+type ChartSlice = {
+  key: string
+  label?: string
+  value: number
+  percent?: number | null
+  sourceCurrency?: string | null
+  unknown?: boolean
 }
-const chartSeries = computed(() => slices.value.map((s) => s.value))
+
+function toSlices(rows: ChartSlice[] | undefined): AllocationSlice[] {
+  return (rows ?? []).map((r) => ({
+    key: r.key,
+    label: r.label ?? r.key,
+    value: r.value ?? 0,
+    percent: r.percent ?? null,
+    // A slice may be reported in its own source currency (byCurrency rows).
+    currency: r.sourceCurrency ?? baseCurrency.value,
+    unknown: r.unknown,
+  }))
+}
+
+const bySector = computed(() => toSlices(data.value?.bySector))
+const byAssetType = computed(() => toSlices(data.value?.byAssetType))
+const byCurrency = computed(() => toSlices(data.value?.byCurrency))
+const hasSlices = computed(() => bySector.value.length || byAssetType.value.length || byCurrency.value.length)
 </script>
 
 <template>
@@ -24,16 +56,15 @@ const chartSeries = computed(() => slices.value.map((s) => s.value))
     <p v-if="loading" class="text-sm text-slate-500">Loading…</p>
     <p v-else-if="error" class="text-sm text-red-600">Failed to load allocation data.</p>
     <template v-else>
-      <apexchart v-if="slices.length" type="donut" :options="chartOptions" :series="chartSeries" :height="320" />
+      <AllocationBreakdown
+        v-if="hasSlices"
+        :by-sector="bySector"
+        :by-asset-type="byAssetType"
+        :by-currency="byCurrency"
+        :currency="baseCurrency"
+        testid="charting-allocation-breakdown"
+      />
       <p v-else class="text-sm text-slate-500">No allocation data for this scope.</p>
-      <table v-if="slices.length" class="w-full text-sm">
-        <thead><tr class="text-left text-slate-400"><th class="py-1">Asset type</th><th>Value</th><th>%</th></tr></thead>
-        <tbody>
-          <tr v-for="s in slices" :key="s.key" class="border-t border-slate-100 dark:border-slate-800">
-            <td class="py-1">{{ s.label }}</td><td>{{ s.value }}</td><td>{{ s.percent ?? "—" }}</td>
-          </tr>
-        </tbody>
-      </table>
       <div v-if="data" class="text-xs text-slate-500">Generation {{ data.coverage.generation }} · {{ data.coverage.status }}</div>
     </template>
   </div>
