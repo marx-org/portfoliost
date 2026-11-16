@@ -8,6 +8,7 @@ import {
   SEED_POSITIONS, SEED_TRANSACTIONS, SEED_SHARE_PRIVACY,
   seedChartEvents,
 } from "./constants.mjs"
+import { randomUUID } from "node:crypto"
 
 function seededTotalInvested() {
   return Math.round(SEED_TRANSACTIONS.reduce((s, t) => s + t.totalAmount, 0) * 100) / 100
@@ -184,6 +185,49 @@ export async function seedPortfolios(sql) {
         VALUES
           (${1}, ${SEED_PORTFOLIO_ID}, ${ev.eventDate}, ${ev.receiptKind},
            ${ev.amountBase.toFixed(8)}, ${ev.amountBase.toFixed(8)}, ${"USD"}, ${true})
+      `
+    }
+
+    // The published facts must be REBUILDABLE, not merely present. Since #254
+    // `POST /:id/recompute` (and the nightly refresh) derive the chart facts from
+    // the canonical ledger, so the seed also writes the source rows the
+    // projection replays: a DIVIDEND transaction per dividend, an INTEREST cash
+    // row per interest credit and an OPTION transaction per premium. Without
+    // them, `chart-recompute.spec.ts` would replace the hand-published income
+    // facts with an empty set and every income spec after it would fail — a
+    // fixture drift that hides exactly the class of bug the seed was meant to
+    // catch. `total_amount` stays 0 on the dividend/option rows: the cash ledger
+    // credits any non-BUY principal, and these rows exist to feed the charts,
+    // not to move Top10's cash.
+    const incomePosition = SEED_POSITIONS[0]
+    for (const ev of chartEvents) {
+      if (ev.receiptKind === "interest") {
+        await tx`
+          INSERT INTO portfolios.portfolio_cash_transactions
+            (user_id, portfolio_id, type, amount, currency, description,
+             transaction_date, rate_source)
+          VALUES
+            (${SEED_USER_ID}, ${SEED_PORTFOLIO_ID}, ${"INTEREST"},
+             ${ev.amountBase.toFixed(8)}, ${"USD"}, ${"Seeded interest"},
+             ${ev.eventDate}, ${"automatic"})
+        `
+        continue
+      }
+      const isOption = ev.receiptKind === "option"
+      await tx`
+        INSERT INTO portfolios.transactions
+          (id, user_id, portfolio_id, position_id, type,
+           instrument_symbol, instrument_name,
+           quantity, price, currency, instrument_currency, asset_type,
+           fees, total_amount, converted_total_amount, exchange_rate,
+           rate_source, fee_rate_source, executed_at, created_at, updated_at)
+        VALUES
+          (${randomUUID()}, ${SEED_USER_ID}, ${SEED_PORTFOLIO_ID}, ${incomePosition.id},
+           ${isOption ? "BUY" : "DIVIDEND"}, ${incomePosition.symbol}, ${incomePosition.companyName},
+           ${"0"}, ${"0"}, ${"USD"}, ${"USD"}, ${isOption ? "OPTION" : "STOCK"},
+           ${"0"}, ${"0"}, ${ev.amountBase.toFixed(8)}, ${"1"},
+           ${"automatic"}, ${"automatic"},
+           ${`${ev.eventDate}T12:00:00.000Z`}, ${createdAt}, ${updatedAt})
       `
     }
 
