@@ -12,6 +12,7 @@ import { getChartAllocation } from "@/api/charting"
 import type { ChartScopeQuery } from "@/api/charting"
 import AllocationBreakdown, { type AllocationSlice } from "@/components/AllocationBreakdown.vue"
 import StockCategoryAllocationChart from "./StockCategoryAllocationChart.vue"
+import LabelCostValueChart from "./LabelCostValueChart.vue"
 import { useChartScope } from "./useChartScope"
 import { useChartData } from "./useChartData"
 
@@ -50,6 +51,7 @@ const bySector = computed(() => toSlices(data.value?.bySector))
 const byAssetType = computed(() => toSlices(data.value?.byAssetType))
 const byCurrency = computed(() => toSlices(data.value?.byCurrency))
 const byCategory = computed(() => toSlices(data.value?.byCategory))
+const byCostBasis = computed(() => data.value?.byCostBasis ?? [])
 const hasSlices = computed(
   () => bySector.value.length || byAssetType.value.length || byCurrency.value.length || byCategory.value.length,
 )
@@ -73,7 +75,12 @@ const hasSlices = computed(
         :slices="byCategory"
         :currency="baseCurrency"
       />
-      <p v-else class="text-sm text-slate-500">No allocation data for this scope.</p>
+      <LabelCostValueChart
+        v-if="byCostBasis.length"
+        :rows="byCostBasis"
+        :currency="baseCurrency"
+      />
+      <p v-if="!hasSlices && !byCostBasis.length" class="text-sm text-slate-500">No allocation data for this scope.</p>
       <div v-if="data" class="text-xs text-slate-500">Generation {{ data.coverage.generation }} · {{ data.coverage.status }}</div>
     </template>
   </div>
