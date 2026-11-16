@@ -19,6 +19,13 @@ const KNOWN_LABELS = new Set([
   "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
 ])
 
+// Cost basis vs market value per label (#270). The scope label filter (OR)
+// narrows these independent groups.
+const LABEL_COST_VALUE = [
+  { key: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", label: "Core", costBasis: 180, value: 210 },
+  { key: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", label: "Growth", costBasis: 30, value: 90 },
+]
+
 const CATEGORY_CODES = new Set([
   "balanced",
   "high_yield",
@@ -139,7 +146,15 @@ function allocationData(scope) {
       slice("not_classified", "Not classified", 80, { percent: pct(80) }),
     ],
     byLabel: [slice("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "Core", 200, { percent: pct(200) }), slice("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "Growth", 100, { percent: pct(100) })],
-    byCostBasis: [slice("basis", "Remaining cost basis", 210), slice("value", "Market value", 300)],
+    byCostBasis: LABEL_COST_VALUE.filter((r) => !scope.labelIds.length || scope.labelIds.includes(r.key)).map((r) => ({
+      key: r.key,
+      label: r.label,
+      costBasis: r.costBasis,
+      value: r.value,
+      percentCost: null,
+      percentValue: null,
+      unknown: false,
+    })),
     positions: [
       slice("AAPL.US", "Apple Inc.", 120, { percent: pct(120) }),
       slice("MSFT.US", "Microsoft Corp.", 100, { percent: pct(100) }),
