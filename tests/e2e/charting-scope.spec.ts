@@ -49,6 +49,10 @@ test("account scope persists across subpages, in the URL and across a reload", a
 
   // The scope survives navigating to another subpage.
   await page.getByTestId("charting-layout").getByRole("link", { name: "Performance" }).click()
+  // Wait for the PATH to change before asserting the query: asserting the query
+  // alone passes against the pre-navigation URL, which is how this test stayed
+  // green while the subpage links were dropping the scope.
+  await expect(page).toHaveURL(/\/en\/charting\/performance/)
   await expect(page).toHaveURL(new RegExp(`accounts=${TOP10}`))
 
   // ...and a reload (a deep link): the same account comes back selected.

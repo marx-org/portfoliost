@@ -53,7 +53,7 @@ function toggleAccount(id: string) {
       <router-link
         v-for="s in sections"
         :key="s.category"
-        :to="s.to"
+        :to="{ path: s.to, query: route.query }"
         class="rounded px-3 py-1 text-sm"
         :class="active === s.category ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'"
         data-testid="charting-nav"
