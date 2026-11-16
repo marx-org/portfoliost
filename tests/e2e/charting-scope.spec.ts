@@ -82,6 +82,39 @@ test("the same renderers are reached through Charting and the portfolio tabs", a
   await expect(page.locator('[data-testid="portfolio-allocation-by-sector"]')).toBeVisible()
 })
 
+test("an account with no published projection does not empty the All scope", async ({ page, request }) => {
+  // #95: a portfolio created after the seed has no charting facts. Before the
+  // fix its generation-0 projection row made scope All read generation 0 for
+  // every account, so the shared charts rendered "No income data" even though
+  // Top10 had published facts.
+  await login(page)
+  const headers = await auth(request)
+
+  const created = await request.post(`${GATEWAY}/api/portfolios`, {
+    headers,
+    data: { name: `E2E-NoProjection-${Date.now()}`, baseCurrency: "USD" },
+  })
+  expect(created.status(), await created.text()).toBeLessThan(300)
+
+  const res = await request.get(`${GATEWAY}/api/portfolios/charting/income`, { headers })
+  expect(res.status(), await res.text()).toBe(200)
+  const body = (await res.json()) as {
+    coverage: { status: string; generation: number; missing: Array<{ reason: string; detail?: string }> }
+    annual: Array<{ year: number; total: number }>
+    monthly: unknown[]
+  }
+  expect(body.annual.length, JSON.stringify(body.coverage)).toBeGreaterThan(0)
+  expect(body.coverage.status).toBe("partial")
+  expect(body.coverage.missing.some((m) => m.reason === "not_projected")).toBe(true)
+
+  // The page itself renders rows, not the empty state.
+  await page.goto("/en/charting/income")
+  const chart = page.getByTestId("annual-income-chart")
+  await expect(chart).toBeVisible()
+  await expect(chart.locator("tbody tr")).toHaveCount(body.annual.length)
+  await expect(page.getByTestId("charting-income").getByText("No income data for this scope")).toHaveCount(0)
+})
+
 test("an account AND a label scope intersect in the request the page sends", async ({ page, request }) => {
   await login(page)
 
