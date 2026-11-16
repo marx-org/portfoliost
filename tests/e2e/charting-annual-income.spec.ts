@@ -62,7 +62,9 @@ test("annual totals match the monthly/quarterly sums and the current year is YTD
   // The seed has no prior-year facts, so the ratio must be undefined, not 0.
   expect(current!.yoyChangePercent).toBeNull()
 
-  await page.goto("/en/charting/income")
+  // Same scope as the API call above: the All page reads every portfolio,
+  // including ones earlier specs created, so pin the scope explicitly.
+  await page.goto(`/en/charting/income?accounts=${TOP10}`)
   const chart = page.getByTestId("annual-income-chart")
   await expect(chart).toBeVisible()
   await expect(chart.locator("tbody tr")).toHaveCount(body.annual.length)
