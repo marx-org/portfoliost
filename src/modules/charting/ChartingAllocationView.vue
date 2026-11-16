@@ -13,6 +13,7 @@ import type { ChartScopeQuery } from "@/api/charting"
 import AllocationBreakdown, { type AllocationSlice } from "@/components/AllocationBreakdown.vue"
 import StockCategoryAllocationChart from "./StockCategoryAllocationChart.vue"
 import LabelCostValueChart from "./LabelCostValueChart.vue"
+import AssetTypeAllocationChart from "./AssetTypeAllocationChart.vue"
 import { useChartScope } from "./useChartScope"
 import { useChartData } from "./useChartData"
 
@@ -73,6 +74,11 @@ const hasSlices = computed(
       <StockCategoryAllocationChart
         v-if="byCategory.length"
         :slices="byCategory"
+        :currency="baseCurrency"
+      />
+      <AssetTypeAllocationChart
+        v-if="byAssetType.length"
+        :slices="byAssetType"
         :currency="baseCurrency"
       />
       <LabelCostValueChart
