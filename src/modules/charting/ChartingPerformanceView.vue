@@ -11,6 +11,7 @@ import { computed, watch } from "vue"
 import { getChartPerformance } from "@/api/charting"
 import type { ChartScopeQuery } from "@/api/charting"
 import ValuationChart from "./ValuationChart.vue"
+import ReturnsChart from "./ReturnsChart.vue"
 import { useChartScope } from "./useChartScope"
 import { useChartData } from "./useChartData"
 
@@ -58,6 +59,11 @@ const benchmarkOptions = [
         :currency="currency"
         :height="320"
         :benchmarks="benchmarks"
+      />
+      <ReturnsChart
+        v-if="data?.quarterly?.length"
+        :points="data.quarterly"
+        :currency="currency"
       />
       <p v-else class="text-sm text-slate-500">No performance data for this scope.</p>
       <div v-if="data" class="text-xs text-slate-500">Generation {{ data.coverage.generation }} · {{ data.coverage.status }}</div>

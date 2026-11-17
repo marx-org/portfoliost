@@ -182,7 +182,8 @@ function performanceData(scope) {
       { date: "2026-02-01", value: 1040, invested: 1000, capitalBasis: 1000, cumulativeIncome: 50, cumulativeOptions: 10, unpricedValue: 0, carriedValue: 0, twr: 0.04, mwr: 0.039, simple: 0.04 },
     ],
     quarterly: [
-      { quarter: "2026-Q1", endingValue: 1040, cumulativeNetContributions: 1000, twr: 0.04, netGainChange: 3.85, partial: true },
+      { quarter: "2025-Q4", endingValue: 1000, cumulativeNetContributions: 1000, twr: null, netGainChange: null, partial: false },
+      { quarter: "2026-Q1", endingValue: 1040, cumulativeNetContributions: 1000, twr: 4, netGainChange: 4, partial: true },
     ],
     scatter: [
       { symbol: "AAPL.US", name: "Apple Inc.", marketValue: 120, totalProfit: 30, realized: 5, unrealized: 20, dividends: 5 },
