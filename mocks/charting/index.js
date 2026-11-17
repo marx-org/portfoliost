@@ -171,7 +171,7 @@ function performanceData(scope) {
   const currency = scope.currency
   const nothing = scopeMatchesNothing(scope.accountIds)
   if (nothing) {
-    return { currency, scope, coverage: coverageFor(true), series: [], quarterly: [], scatter: [] }
+    return { currency, scope, coverage: coverageFor(true), series: [], quarterly: [], scatter: [], benchmarks: [] }
   }
   return {
     currency,
@@ -187,6 +187,10 @@ function performanceData(scope) {
     scatter: [
       { symbol: "AAPL.US", name: "Apple Inc.", marketValue: 120, totalProfit: 30, realized: 5, unrealized: 20, dividends: 5 },
       { symbol: "MSFT.US", name: "Microsoft Corp.", marketValue: 100, totalProfit: -10, realized: 0, unrealized: -10, dividends: 0 },
+    ],
+    benchmarks: [
+      { symbol: "SPY", name: "S&P 500", returnPercent: 4, volatility: 12, timeSeries: [{ date: "2026-01-01", value: 100 }, { date: "2026-02-01", value: 104 }], absoluteTimeSeries: [{ date: "2026-01-01", value: 1000 }, { date: "2026-02-01", value: 1040 }] },
+      { symbol: "QQQ", name: "Nasdaq 100", returnPercent: 6, volatility: 16, timeSeries: [{ date: "2026-01-01", value: 100 }, { date: "2026-02-01", value: 106 }], absoluteTimeSeries: [{ date: "2026-01-01", value: 1000 }, { date: "2026-02-01", value: 1060 }] },
     ],
   }
 }

@@ -28,8 +28,16 @@ const props = withDefaults(
     height?: number
     gapSymbols?: string[] | null
     heldGapSymbols?: string[] | null
+    benchmarks?: Array<{
+      symbol: string
+      name: string
+      absoluteTimeSeries: Array<{ date: string; value: number }>
+      timeSeries?: Array<{ date: string; value: number }>
+      returnPercent?: number | null
+      volatility?: number | null
+    }>
   }>(),
-  { points: () => [], currency: "", height: 340, gapSymbols: null, heldGapSymbols: null },
+  { points: () => [], currency: "", height: 340, gapSymbols: null, heldGapSymbols: null, benchmarks: () => [] },
 )
 
 const timeSeries = computed(() =>
@@ -40,6 +48,19 @@ const timeSeries = computed(() =>
     capitalBasis: p.capitalBasis ?? null,
     cumulativeIncome: p.cumulativeIncome ?? null,
     cumulativeOptions: p.cumulativeOptions ?? null,
+  })),
+)
+
+// The renderer's benchmark type uses optional (not nullable) numbers; map the
+// contract's nulls to undefined so the shared component stays type-safe.
+const benchmarkSeries = computed(() =>
+  (props.benchmarks ?? []).map((b) => ({
+    symbol: b.symbol,
+    name: b.name,
+    timeSeries: b.timeSeries ?? [],
+    absoluteTimeSeries: b.absoluteTimeSeries,
+    returnPercent: b.returnPercent ?? undefined,
+    volatility: b.volatility ?? undefined,
   })),
 )
 </script>
@@ -55,6 +76,7 @@ const timeSeries = computed(() =>
       :show-recompute="false"
       :gap-symbols="gapSymbols"
       :held-gap-symbols="heldGapSymbols"
+      :benchmarks="benchmarkSeries"
     />
     <p v-else class="text-sm text-slate-500 dark:text-slate-400">No performance data for this scope.</p>
   </div>
