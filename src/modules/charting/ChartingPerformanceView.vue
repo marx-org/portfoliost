@@ -10,7 +10,7 @@
 import { computed, watch } from "vue"
 import { getChartPerformance } from "@/api/charting"
 import type { ChartScopeQuery } from "@/api/charting"
-import PortfolioPerformanceChart from "@/components/PortfolioPerformanceChart.vue"
+import ValuationChart from "./ValuationChart.vue"
 import { useChartScope } from "./useChartScope"
 import { useChartData } from "./useChartData"
 
@@ -22,9 +22,7 @@ const { data, loading, error, load } = useChartData(getChartPerformance)
 const activeScope = computed<ChartScopeQuery>(() => props.scope ?? scope.scopeQuery.value)
 watch(activeScope, (q) => void load(q), { immediate: true })
 
-const timeSeries = computed(() =>
-  (data.value?.series ?? []).map((p) => ({ date: p.date, value: p.value, invested: p.invested ?? null })),
-)
+const points = computed(() => data.value?.series ?? [])
 const currency = computed(() => data.value?.currency ?? "")
 </script>
 
@@ -33,12 +31,11 @@ const currency = computed(() => data.value?.currency ?? "")
     <p v-if="loading" class="text-sm text-slate-500">Loading…</p>
     <p v-else-if="error" class="text-sm text-red-600">Failed to load performance data.</p>
     <template v-else>
-      <PortfolioPerformanceChart
-        v-if="timeSeries.length"
-        :time-series="timeSeries"
+      <ValuationChart
+        v-if="points.length"
+        :points="points"
         :currency="currency"
         :height="320"
-        :show-recompute="false"
       />
       <p v-else class="text-sm text-slate-500">No performance data for this scope.</p>
       <div v-if="data" class="text-xs text-slate-500">Generation {{ data.coverage.generation }} · {{ data.coverage.status }}</div>

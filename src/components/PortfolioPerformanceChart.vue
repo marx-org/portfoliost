@@ -19,6 +19,12 @@ interface PerformancePoint {
    * price, so `value` does not include them. Absent = not measured (a row
    * written before the column existed), which is NOT the same as 0. */
   unpricedValue?: number | null
+  /** Remaining cost basis (informative overlay, not added to `value`). */
+  capitalBasis?: number | null
+  /** Cumulative dividends + interest received (informative overlay). */
+  cumulativeIncome?: number | null
+  /** Cumulative option receipts (informative overlay). */
+  cumulativeOptions?: number | null
   cumulativeTwr?: number | null
   cumulativeMwr?: number | null
   cumulativeSimple?: number | null
@@ -52,11 +58,14 @@ const props = withDefaults(
      * worse than silence, because it is believed. */
      heldGapSymbols?: string[] | null
      showInvested?: boolean
+     /** Draw the informative capital/income/option overlays (Charting). Off by
+      * default so the existing Performance tab is unchanged. */
+     showOverlays?: boolean
      /** The Charting pages reuse this renderer but own their own refresh, so the
       * portfolio-only recompute control is hidden there. */
      showRecompute?: boolean
   }>(),
-   { benchmarks: () => [], currency: "USD", color: "#3b82f6", backfillPending: false, loading: false, height: 300, recomputing: false, gapSymbols: null, heldGapSymbols: null, showInvested: true, showRecompute: true },
+   { benchmarks: () => [], currency: "USD", color: "#3b82f6", backfillPending: false, loading: false, height: 300, recomputing: false, gapSymbols: null, heldGapSymbols: null, showInvested: true, showOverlays: false, showRecompute: true },
 )
 
 const emit = defineEmits<{ recompute: [] }>()
@@ -68,6 +77,16 @@ const toPoint = (p: { date?: string; value?: number }): [number, number] => [new
 //portfolio performance chart AND the combined chart. Same currency as value.
 const hasInvested = computed(() => props.showInvested !== false && props.timeSeries.some((p) => p.invested != null))
 const INVESTED_COLOR = "#0ea5e9"
+const hasCapitalBasis = computed(() => props.showOverlays && props.timeSeries.some((p) => p.capitalBasis != null))
+const hasIncome = computed(() => props.showOverlays && props.timeSeries.some((p) => p.cumulativeIncome != null))
+const hasOptions = computed(() => props.showOverlays && props.timeSeries.some((p) => p.cumulativeOptions != null))
+/** Informative overlays (never added to value): capital basis, cumulative
+ *  income and cumulative options. Off unless the caller opts in. */
+const overlays = computed(() => [
+  ...(hasCapitalBasis.value ? [{ name: "Capital basis", color: "#94a3b8", field: "capitalBasis" as const }] : []),
+  ...(hasIncome.value ? [{ name: "Cumulative income", color: "#10b981", field: "cumulativeIncome" as const }] : []),
+  ...(hasOptions.value ? [{ name: "Cumulative options", color: "#f59e0b", field: "cumulativeOptions" as const }] : []),
+])
 
 // §63.8 / §72.30 — TWO different claims, and the component says the one that is
 // true of the point it is drawing.
@@ -174,16 +193,18 @@ function benchmarkColor(benchmark: BenchmarkSeries, index: number): string {
 function buildChartOptions() {
   const benchmarks = props.benchmarks ?? []
   const hasInv = hasInvested.value
-  // Series slots: 0 = Portfolio, 1 = Invested (optional), then benchmarks.
-  // Every slot is an absolute value in the same display currency.
+  const ov = overlays.value
+  // Series slots: 0 = Portfolio, 1 = Invested (optional), then the informative
+  // overlays, then benchmarks. Every slot is in the same display currency.
   const valueSeriesNames = [
     "Portfolio",
     ...(hasInv ? ["Invested"] : []),
+    ...ov.map((o) => o.name),
     ...benchmarks.map((b) => b.name || b.symbol || "Benchmark"),
   ]
   return {
     chart: { type: "line" as const, toolbar: { show: false }, zoom: { enabled: false } },
-    colors: [props.color, ...(hasInv ? [INVESTED_COLOR] : []), ...benchmarks.map(benchmarkColor)],
+    colors: [props.color, ...(hasInv ? [INVESTED_COLOR] : []), ...ov.map((o) => o.color), ...benchmarks.map(benchmarkColor)],
     xaxis: { type: "datetime" as const, labels: { datetimeUTC: false } },
     // Portfolio, Invested, and the absolute flow-mirrored benchmarks share one
     // currency axis so a deposit/withdrawal is visible in every line.
@@ -202,8 +223,8 @@ function buildChartOptions() {
     // All lines are solid: the legend and stable per-benchmark colors distinguish
     // the series without turning the benchmark into visual noise.
     stroke: {
-      width: [2.5, ...(hasInv ? [1.75] : []), ...benchmarks.map(() => 1.75)],
-      dashArray: [0, ...(hasInv ? [0] : []), ...benchmarks.map(() => 0)],
+      width: [2.5, ...(hasInv ? [1.75] : []), ...ov.map(() => 1.5), ...benchmarks.map(() => 1.75)],
+      dashArray: [0, ...(hasInv ? [0] : []), ...ov.map(() => 0), ...benchmarks.map(() => 0)],
     },
     dataLabels: { enabled: false },
   }
@@ -229,6 +250,10 @@ const seriesData = computed(() => {
     ...(hasInvested.value
       ? [{ name: "Invested", data: props.timeSeries.map((p) => [new Date(p.date ?? "").getTime(), p.invested ?? 0]) }]
       : []),
+    ...overlays.value.map((o) => ({
+      name: o.name,
+      data: props.timeSeries.map((p) => [new Date(p.date ?? "").getTime(), (p[o.field] as number | null | undefined) ?? 0]),
+    })),
     ...benchmarks.map((b) => ({
       name: b.name || b.symbol || "Benchmark",
       data: (b.absoluteTimeSeries ?? []).map(toPoint),
@@ -252,6 +277,7 @@ const chartKey = computed(() => {
     props.color,
     props.height,
     hasInvested.value ? "inv" : "",
+    overlays.value.map((o) => `${o.name}:${(props.timeSeries.at(-1)?.[o.field] as number | null | undefined) ?? ""}`).join(","),
     benchmarks.map((b) => b.name || b.symbol || "Benchmark").join(","),
     `${props.timeSeries.length}|${(props.timeSeries[0]?.value ?? "").toString()}|${tail(props.timeSeries)}|${(props.timeSeries.at(-1)?.invested ?? "").toString()}`,
     ...benchmarks.map((b) => `${(b.absoluteTimeSeries ?? []).length}|${tail(b.absoluteTimeSeries)}`),
