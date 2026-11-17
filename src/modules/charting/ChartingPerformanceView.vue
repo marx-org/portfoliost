@@ -12,6 +12,7 @@ import { getChartPerformance } from "@/api/charting"
 import type { ChartScopeQuery } from "@/api/charting"
 import ValuationChart from "./ValuationChart.vue"
 import ReturnsChart from "./ReturnsChart.vue"
+import ProfitValueScatterChart from "./ProfitValueScatterChart.vue"
 import { useChartScope } from "./useChartScope"
 import { useChartData } from "./useChartData"
 
@@ -63,6 +64,11 @@ const benchmarkOptions = [
       <ReturnsChart
         v-if="data?.quarterly?.length"
         :points="data.quarterly"
+        :currency="currency"
+      />
+      <ProfitValueScatterChart
+        v-if="data?.scatter?.length"
+        :points="data.scatter"
         :currency="currency"
       />
       <p v-else class="text-sm text-slate-500">No performance data for this scope.</p>
