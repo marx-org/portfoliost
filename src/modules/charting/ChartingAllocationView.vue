@@ -15,6 +15,7 @@ import StockCategoryAllocationChart from "./StockCategoryAllocationChart.vue"
 import LabelCostValueChart from "./LabelCostValueChart.vue"
 import AssetTypeAllocationChart from "./AssetTypeAllocationChart.vue"
 import SectorAllocationChart from "./SectorAllocationChart.vue"
+import CurrencyAllocationChart from "./CurrencyAllocationChart.vue"
 import { useChartScope } from "./useChartScope"
 import { useChartData } from "./useChartData"
 
@@ -85,6 +86,11 @@ const hasSlices = computed(
       <SectorAllocationChart
         v-if="bySector.length"
         :slices="bySector"
+        :currency="baseCurrency"
+      />
+      <CurrencyAllocationChart
+        v-if="byCurrency.length"
+        :slices="byCurrency"
         :currency="baseCurrency"
       />
       <LabelCostValueChart
