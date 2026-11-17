@@ -14,7 +14,7 @@ function mountChart(props: Record<string, unknown> = {}) {
       stubs: {
         PortfolioPerformanceChart: {
           name: "PortfolioPerformanceChart",
-          props: ["timeSeries", "currency", "showOverlays", "height"],
+          props: ["timeSeries", "currency", "showOverlays", "height", "benchmarks"],
           template: '<div class="perf-stub" />',
         },
       },
@@ -37,6 +37,22 @@ describe("ValuationChart", () => {
       cumulativeIncome: 100,
       cumulativeOptions: 40,
     })
+  })
+
+  it("passes the shared benchmark series to the renderer", () => {
+    const benchmarks = [
+      {
+        symbol: "SPY",
+        name: "S&P 500",
+        returnPercent: 4,
+        volatility: 12,
+        timeSeries: [{ date: "2026-01-01", value: 100 }],
+        absoluteTimeSeries: [{ date: "2026-01-01", value: 1000 }],
+      },
+    ]
+    const wrapper = mountChart({ benchmarks })
+    const chart = wrapper.findComponent({ name: "PortfolioPerformanceChart" })
+    expect(chart.props("benchmarks")).toEqual(benchmarks)
   })
 
   it("shows an empty state when there is no performance data", () => {

@@ -36,6 +36,8 @@ export interface ChartScopeQuery {
   to?: string
   /** Chart-specific metric selector (e.g. twr | net_gain_change). */
   metric?: string
+  /** Benchmark symbols to mirror into (e.g. SPY, QQQ). */
+  benchmarks?: string[]
 }
 
 function scopeQuery(scope: ChartScopeQuery = {}): string {
@@ -46,6 +48,7 @@ function scopeQuery(scope: ChartScopeQuery = {}): string {
   if (scope.from) q.set("from", scope.from)
   if (scope.to) q.set("to", scope.to)
   if (scope.metric) q.set("metric", scope.metric)
+  if (scope.benchmarks?.length) q.set("benchmarks", scope.benchmarks.join(","))
   const s = q.toString()
   return s ? `?${s}` : ""
 }

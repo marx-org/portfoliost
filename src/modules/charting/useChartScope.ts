@@ -24,6 +24,7 @@ export function useChartScope(opts?: { route?: RouteLike; router?: RouterLike })
 
   const selectedAccountIds = ref<string[]>(parseList((route.query as Record<string, unknown>).accounts))
   const selectedLabelIds = ref<string[]>(parseList((route.query as Record<string, unknown>).labels))
+  const selectedBenchmarks = ref<string[]>(parseList((route.query as Record<string, unknown>).benchmarks))
 
   const allAccounts = computed(() => selectedAccountIds.value.length === 0)
   const allLabels = computed(() => selectedLabelIds.value.length === 0)
@@ -42,6 +43,7 @@ export function useChartScope(opts?: { route?: RouteLike; router?: RouterLike })
       from: typeof q.from === "string" ? q.from : undefined,
       to: typeof q.to === "string" ? q.to : undefined,
       metric: typeof q.metric === "string" ? q.metric : undefined,
+      benchmarks: selectedBenchmarks.value.length ? selectedBenchmarks.value : undefined,
     }
   })
 
@@ -50,6 +52,7 @@ export function useChartScope(opts?: { route?: RouteLike; router?: RouterLike })
     if (selectedAccountIds.value.length) q.accounts = selectedAccountIds.value.join(",")
     if (selectedLabelIds.value.length) q.labels = selectedLabelIds.value.join(",")
     if (currency.value) q.currency = currency.value
+    if (selectedBenchmarks.value.length) q.benchmarks = selectedBenchmarks.value.join(",")
     return q
   }
 
@@ -60,7 +63,7 @@ export function useChartScope(opts?: { route?: RouteLike; router?: RouterLike })
     // behind when the selection became empty (reset would not clear the URL).
     const next: Record<string, string> = {}
     for (const [key, value] of Object.entries(route.query)) {
-      if (key === "accounts" || key === "labels" || key === "currency") continue
+      if (key === "accounts" || key === "labels" || key === "currency" || key === "benchmarks") continue
       if (typeof value === "string") next[key] = value
     }
     Object.assign(next, toRouteQuery())
@@ -78,6 +81,12 @@ export function useChartScope(opts?: { route?: RouteLike; router?: RouterLike })
     () => (route.query as Record<string, unknown>).labels,
     (v) => {
       selectedLabelIds.value = parseList(v)
+    },
+  )
+  watch(
+    () => (route.query as Record<string, unknown>).benchmarks,
+    (v) => {
+      selectedBenchmarks.value = parseList(v)
     },
   )
 
@@ -100,12 +109,14 @@ export function useChartScope(opts?: { route?: RouteLike; router?: RouterLike })
   function reset(): void {
     selectedAccountIds.value = []
     selectedLabelIds.value = []
+    selectedBenchmarks.value = []
     syncRoute()
   }
 
   return {
     selectedAccountIds,
     selectedLabelIds,
+    selectedBenchmarks,
     allAccounts,
     allLabels,
     currency,
@@ -115,6 +126,15 @@ export function useChartScope(opts?: { route?: RouteLike; router?: RouterLike })
     toggleLabel,
     setAccounts,
     setLabels,
+    setBenchmarks: (symbols: string[]) => {
+      selectedBenchmarks.value = symbols
+      syncRoute()
+    },
+    toggleBenchmark: (symbol: string) => {
+      const cur = selectedBenchmarks.value
+      selectedBenchmarks.value = cur.includes(symbol) ? cur.filter((s) => s !== symbol) : [...cur, symbol]
+      syncRoute()
+    },
     syncRoute,
   }
 }
