@@ -16,6 +16,7 @@ import LabelCostValueChart from "./LabelCostValueChart.vue"
 import AssetTypeAllocationChart from "./AssetTypeAllocationChart.vue"
 import SectorAllocationChart from "./SectorAllocationChart.vue"
 import CurrencyAllocationChart from "./CurrencyAllocationChart.vue"
+import HoldingsCompositionChart from "./HoldingsCompositionChart.vue"
 import { useChartScope } from "./useChartScope"
 import { useChartData } from "./useChartData"
 
@@ -55,6 +56,7 @@ const byAssetType = computed(() => toSlices(data.value?.byAssetType))
 const byCurrency = computed(() => toSlices(data.value?.byCurrency))
 const byCategory = computed(() => toSlices(data.value?.byCategory))
 const byCostBasis = computed(() => data.value?.byCostBasis ?? [])
+const positions = computed(() => data.value?.positions ?? [])
 const hasSlices = computed(
   () => bySector.value.length || byAssetType.value.length || byCurrency.value.length || byCategory.value.length,
 )
@@ -91,6 +93,11 @@ const hasSlices = computed(
       <CurrencyAllocationChart
         v-if="byCurrency.length"
         :slices="byCurrency"
+        :currency="baseCurrency"
+      />
+      <HoldingsCompositionChart
+        v-if="positions.length"
+        :rows="positions"
         :currency="baseCurrency"
       />
       <LabelCostValueChart
