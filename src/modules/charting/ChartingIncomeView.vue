@@ -10,6 +10,7 @@ import AnnualIncomeChart from "./AnnualIncomeChart.vue"
 import AnnualIncomeAverageChart from "./AnnualIncomeAverageChart.vue"
 import QuarterlyIncomeChart from "./QuarterlyIncomeChart.vue"
 import QuarterlyIncomeGrowthChart from "./QuarterlyIncomeGrowthChart.vue"
+import MonthlyPayerCountChart from "./MonthlyPayerCountChart.vue"
 
 const scope = useChartScope()
 const { data, loading, error, load } = useChartData(getChartIncome)
@@ -32,6 +33,8 @@ const currency = computed(() => data.value?.currency ?? "")
       <QuarterlyIncomeChart :points="data?.quarterly ?? []" :currency="currency" />
       <h3 class="text-sm font-medium text-slate-500">Quarterly year-over-year growth</h3>
       <QuarterlyIncomeGrowthChart :points="data?.quarterly ?? []" :currency="currency" />
+      <h3 class="text-sm font-medium text-slate-500">Dividend-payer coverage</h3>
+      <MonthlyPayerCountChart :months="data?.payerCoverage ?? []" />
       <h3 class="text-sm font-medium text-slate-500">Annual-equivalent averages</h3>
       <AnnualIncomeAverageChart :points="data?.dailyAverageByYear ?? []" unit="day" :currency="currency" />
       <AnnualIncomeAverageChart :points="data?.monthlyAverageByYear ?? []" unit="month" :currency="currency" />

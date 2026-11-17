@@ -63,7 +63,9 @@ test("cumulative income keeps the pre-window opening and is flat over a zero/opt
   expect(flat).toBe(true)
 
   // The UI renders the same dataset: the opening label and one row per point.
-  await page.goto(`/en/charting/income?from=${from}`)
+  // Same scope as the API call above: the All page reads every portfolio,
+  // including ones earlier specs created, so pin the scope explicitly.
+  await page.goto(`/en/charting/income?accounts=${TOP10}&from=${from}`)
   const cumulative = page.getByTestId("cumulative-income-chart")
   await expect(cumulative).toBeVisible()
   await expect(cumulative.getByTestId("cumulative-opening")).toContainText(String(series[0].openingBalance))
