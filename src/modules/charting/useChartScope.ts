@@ -25,6 +25,19 @@ export function useChartScope(opts?: { route?: RouteLike; router?: RouterLike })
   const selectedAccountIds = ref<string[]>(parseList((route.query as Record<string, unknown>).accounts))
   const selectedLabelIds = ref<string[]>(parseList((route.query as Record<string, unknown>).labels))
   const selectedBenchmarks = ref<string[]>(parseList((route.query as Record<string, unknown>).benchmarks))
+  const kind = ref<"normal" | "virtual">(
+    (route.query as Record<string, unknown>).kind === "virtual" ? "virtual" : "normal",
+  )
+  const from = ref<string | undefined>(
+    typeof (route.query as Record<string, unknown>).from === "string"
+      ? ((route.query as Record<string, unknown>).from as string)
+      : undefined,
+  )
+  const to = ref<string | undefined>(
+    typeof (route.query as Record<string, unknown>).to === "string"
+      ? ((route.query as Record<string, unknown>).to as string)
+      : undefined,
+  )
 
   const allAccounts = computed(() => selectedAccountIds.value.length === 0)
   const allLabels = computed(() => selectedLabelIds.value.length === 0)
@@ -39,9 +52,10 @@ export function useChartScope(opts?: { route?: RouteLike; router?: RouterLike })
     return {
       accounts: selectedAccountIds.value.length ? selectedAccountIds.value : undefined,
       labels: selectedLabelIds.value.length ? selectedLabelIds.value : undefined,
+      kind: kind.value,
       currency: currency.value,
-      from: typeof q.from === "string" ? q.from : undefined,
-      to: typeof q.to === "string" ? q.to : undefined,
+      from: from.value,
+      to: to.value,
       metric: typeof q.metric === "string" ? q.metric : undefined,
       benchmarks: selectedBenchmarks.value.length ? selectedBenchmarks.value : undefined,
     }
@@ -51,7 +65,10 @@ export function useChartScope(opts?: { route?: RouteLike; router?: RouterLike })
     const q: Record<string, string> = {}
     if (selectedAccountIds.value.length) q.accounts = selectedAccountIds.value.join(",")
     if (selectedLabelIds.value.length) q.labels = selectedLabelIds.value.join(",")
+    if (kind.value === "virtual") q.kind = "virtual"
     if (currency.value) q.currency = currency.value
+    if (from.value) q.from = from.value
+    if (to.value) q.to = to.value
     if (selectedBenchmarks.value.length) q.benchmarks = selectedBenchmarks.value.join(",")
     return q
   }
@@ -63,7 +80,7 @@ export function useChartScope(opts?: { route?: RouteLike; router?: RouterLike })
     // behind when the selection became empty (reset would not clear the URL).
     const next: Record<string, string> = {}
     for (const [key, value] of Object.entries(route.query)) {
-      if (key === "accounts" || key === "labels" || key === "currency" || key === "benchmarks") continue
+      if (key === "accounts" || key === "labels" || key === "currency" || key === "benchmarks" || key === "kind" || key === "from" || key === "to") continue
       if (typeof value === "string") next[key] = value
     }
     Object.assign(next, toRouteQuery())
@@ -89,6 +106,30 @@ export function useChartScope(opts?: { route?: RouteLike; router?: RouterLike })
       selectedBenchmarks.value = parseList(v)
     },
   )
+  watch(
+    () => (route.query as Record<string, unknown>).kind,
+    (v) => {
+      const next = v === "virtual" ? "virtual" : "normal"
+      if (next !== kind.value) {
+        kind.value = next
+        // Switching side clears the account selection: the two are mutually
+        // exclusive and a stale id from the other side must not survive.
+        selectedAccountIds.value = []
+      }
+    },
+  )
+  watch(
+    () => (route.query as Record<string, unknown>).from,
+    (v) => {
+      from.value = typeof v === "string" && v ? v : undefined
+    },
+  )
+  watch(
+    () => (route.query as Record<string, unknown>).to,
+    (v) => {
+      to.value = typeof v === "string" && v ? v : undefined
+    },
+  )
 
   function setAccounts(ids: string[]): void {
     selectedAccountIds.value = ids
@@ -96,6 +137,14 @@ export function useChartScope(opts?: { route?: RouteLike; router?: RouterLike })
   }
   function setLabels(ids: string[]): void {
     selectedLabelIds.value = ids
+    syncRoute()
+  }
+  /** Switch between real (normal) and virtual portfolios, clearing the account selection. */
+  function setKind(next: "normal" | "virtual"): void {
+    if (next === kind.value) return
+    kind.value = next
+    selectedAccountIds.value = []
+    selectedLabelIds.value = []
     syncRoute()
   }
   function toggleAccount(id: string): void {
@@ -110,6 +159,15 @@ export function useChartScope(opts?: { route?: RouteLike; router?: RouterLike })
     selectedAccountIds.value = []
     selectedLabelIds.value = []
     selectedBenchmarks.value = []
+    kind.value = "normal"
+    from.value = undefined
+    to.value = undefined
+    syncRoute()
+  }
+  /** Set the inclusive date window; empty string clears that bound. */
+  function setDates(nextFrom: string, nextTo: string): void {
+    from.value = nextFrom || undefined
+    to.value = nextTo || undefined
     syncRoute()
   }
 
@@ -117,11 +175,16 @@ export function useChartScope(opts?: { route?: RouteLike; router?: RouterLike })
     selectedAccountIds,
     selectedLabelIds,
     selectedBenchmarks,
+    kind,
+    from,
+    to,
     allAccounts,
     allLabels,
     currency,
     scopeQuery,
     reset,
+    setKind,
+    setDates,
     toggleAccount,
     toggleLabel,
     setAccounts,

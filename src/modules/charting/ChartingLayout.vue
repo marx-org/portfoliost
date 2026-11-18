@@ -18,7 +18,7 @@ import type { ChartCategory } from "./registry"
 const route = useRoute()
 
 const scope = useChartScope()
-const { selectedAccountIds, selectedLabelIds, allAccounts, allLabels } = scope
+const { selectedAccountIds, selectedLabelIds, allAccounts, allLabels, kind, from, to } = scope
 
 const portfolios = usePortfolioStore()
 const { portfolios: accountList } = storeToRefs(portfolios)
@@ -26,6 +26,14 @@ const { portfolios: accountList } = storeToRefs(portfolios)
 onMounted(() => {
   if (!accountList.value.length) void portfolios.fetchAll().catch(() => {})
 })
+
+// Normal and virtual portfolios are separate, mutually exclusive filter lines:
+// the switch picks which side the account multiselect operates on. A virtual
+// portfolio is a read-only view over the positions carrying its label, so it is
+// never mixed with real accounts.
+const visibleAccounts = computed(() =>
+  accountList.value.filter((p) => (kind.value === "virtual" ? p.isVirtual === true : p.isVirtual !== true)),
+)
 
 const sections: { category: ChartCategory; label: string; to: string }[] = [
   { category: "performance", label: "Performance", to: "/en/charting/performance" },
@@ -44,6 +52,14 @@ const active = computed<ChartCategory>(() => {
 
 function toggleAccount(id: string) {
   scope.toggleAccount(id)
+}
+
+/** Apply the two date bounds together so the route is written once. */
+function onDateChange(which: "from" | "to", event: Event) {
+  const value = (event.target as HTMLInputElement).value
+  const nextFrom = which === "from" ? value : from.value ?? ""
+  const nextTo = which === "to" ? value : to.value ?? ""
+  scope.setDates(nextFrom, nextTo)
 }
 </script>
 
@@ -64,11 +80,30 @@ function toggleAccount(id: string) {
 
     <!-- Scope toolbar -->
     <div class="flex flex-wrap items-center gap-3 rounded border border-slate-200 p-3 dark:border-slate-700" data-testid="charting-toolbar">
+      <div class="flex items-center gap-1 rounded border border-slate-300 p-0.5 dark:border-slate-600" data-testid="charting-kind-switch">
+        <span class="px-1 text-xs font-medium uppercase text-slate-400 dark:text-slate-500">Portfolios</span>
+        <button
+          type="button"
+          class="rounded px-2 py-0.5 text-xs"
+          :class="kind === 'normal' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'"
+          @click="scope.setKind('normal')"
+        >
+          Normal
+        </button>
+        <button
+          type="button"
+          class="rounded px-2 py-0.5 text-xs"
+          :class="kind === 'virtual' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'"
+          @click="scope.setKind('virtual')"
+        >
+          Virtual
+        </button>
+      </div>
       <div class="flex flex-wrap items-center gap-2">
         <span class="text-xs font-medium uppercase text-slate-400 dark:text-slate-500">Accounts</span>
         <span v-if="allAccounts" class="text-xs text-slate-500">All</span>
         <button
-          v-for="p in accountList"
+          v-for="p in visibleAccounts"
           :key="p.id"
           type="button"
           class="rounded border px-2 py-0.5 text-xs"
@@ -78,8 +113,32 @@ function toggleAccount(id: string) {
           {{ p.name }}
         </button>
       </div>
-      <label-filter-bar :model-value="selectedLabelIds" @update:model-value="scope.setLabels" />
-      <span v-if="allLabels" class="text-xs text-slate-500">All labels</span>
+      <!-- A virtual portfolio is itself a label-defined view, so the separate
+           label filter only applies to normal accounts. -->
+      <template v-if="kind === 'normal'">
+        <label-filter-bar :model-value="selectedLabelIds" @update:model-value="scope.setLabels" />
+        <span v-if="allLabels" class="text-xs text-slate-500">All labels</span>
+      </template>
+      <div class="flex items-center gap-1" data-testid="charting-date-range">
+        <label class="text-xs font-medium uppercase text-slate-400 dark:text-slate-500" for="charting-date-from">From</label>
+        <input
+          id="charting-date-from"
+          type="date"
+          class="input h-7 w-36 text-xs"
+          :value="from ?? ''"
+          data-testid="charting-date-from"
+          @change="onDateChange('from', $event)"
+        />
+        <label class="text-xs font-medium uppercase text-slate-400 dark:text-slate-500" for="charting-date-to">To</label>
+        <input
+          id="charting-date-to"
+          type="date"
+          class="input h-7 w-36 text-xs"
+          :value="to ?? ''"
+          data-testid="charting-date-to"
+          @change="onDateChange('to', $event)"
+        />
+      </div>
       <button type="button" class="btn-ghost text-xs" @click="scope.reset()">Reset</button>
     </div>
 
