@@ -537,11 +537,14 @@ test("consolidated cash page: record every kind of cash event against the chosen
     await expect(page.getByTestId(`cash-tx-${mine.find((r) => r.displayLabel === "Transfer")!.id}`)).toContainText(`E2E CashAdd B ${run}`)
 
     // The settlement currency of the selected portfolio governs the modal, not the page.
+    // #251 (#95): a settlement set with a non-exclusive base offers BOTH the
+    // settlement (USD, preselected) and the base (PLN) — IBKR-style USD + PLN.
     await portfolioSelect.selectOption(cid)
     await page.getByTestId("cash-add-deposit").click()
     await expect(dialog).toBeVisible()
     const currency = dialog.getByTestId("pc-currency")
-    await expect(currency.locator("option")).toHaveCount(1)
+    const options = await currency.locator("option").allTextContents()
+    expect(options).toHaveLength(2)
     await expect(currency).toHaveValue("USD")
     await dialog.getByRole("button", { name: "Cancel", exact: true }).click()
     await expect(dialog).not.toBeVisible({ timeout: 10000 })
