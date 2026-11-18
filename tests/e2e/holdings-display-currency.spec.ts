@@ -83,53 +83,72 @@ test("holdings converts portfolio-base values to the display currency", async ({
   const portfolio = await mk("/api/portfolios", { name: `E2E B2 ${run}`, baseCurrency: "USD" })
 
   const pid = String(portfolio.id)
-  await mk(`/api/portfolios/${pid}/positions`, { symbol: "SNT.WA", quantity: 100, price: 100, currency: "PLN" })
-  await mk(`/api/portfolios/${pid}/positions`, { symbol: "AAPL", quantity: 10, price: 200, currency: "USD" })
+  try {
+    await mk(`/api/portfolios/${pid}/positions`, { symbol: "SNT.WA", quantity: 100, price: 100, currency: "PLN" })
+    await mk(`/api/portfolios/${pid}/positions`, { symbol: "AAPL", quantity: 10, price: 200, currency: "USD" })
 
-  await login(page)
-  await page.goto(`/en/portfolios/${pid}/holdings`)
-  await expect(page.locator("thead th").filter({ hasText: "Market Value" })).toBeVisible({ timeout: 20000 })
+    // #77 — position create answers 201 BEFORE the fire-and-forget quote
+    // refresh lands (it runs on the serialized backfill runner, one quote fetch
+    // per holding). The holdings table reads the STORED price, so navigating
+    // immediately races the refresh: the first position may be priced while a
+    // later one still shows "—". Wait for both stored prices instead.
+    await expect
+      .poll(
+        async () => {
+          const rows = (await (
+            await request.get(`${GATEWAY}/api/portfolios/${pid}/positions`, { headers: auth })
+          ).json()) as Array<{ currentPrice: number | null }>
+          return rows.filter((r) => r.currentPrice != null).length
+        },
+        { timeout: 30_000 },
+      )
+      .toBe(2)
 
-  // Default display currency USD = the portfolio base: SNT.WA (PLN) shows the
-  // PLN primary + its USD-converted sub-line (× 1.08/4.3); AAPL (USD) has no
-  // sub-line (same currency as the display).
-  let cell = await marketValueCell(page, "SNT.WA")
-  expect(cell.primary).toMatch(/^PLN/)
-  expect(cell.sub, "SNT.WA sub-line under USD display").toMatch(/^\$/)
-  expect(Math.abs(parseAmount(cell.sub!) - parseAmount(cell.primary) * PLN_USD) / parseAmount(cell.sub!)).toBeLessThan(0.002)
+    await login(page)
+    await page.goto(`/en/portfolios/${pid}/holdings`)
+    await expect(page.locator("thead th").filter({ hasText: "Market Value" })).toBeVisible({ timeout: 20000 })
 
-  cell = await marketValueCell(page, "AAPL")
-  expect(cell.primary).toMatch(/^\$/)
-  expect(cell.sub).toBeNull()
+    // Default display currency USD = the portfolio base: SNT.WA (PLN) shows the
+    // PLN primary + its USD-converted sub-line (× 1.08/4.3); AAPL (USD) has no
+    // sub-line (same currency as the display).
+    let cell = await marketValueCell(page, "SNT.WA")
+    expect(cell.primary).toMatch(/^PLN/)
+    expect(cell.sub, "SNT.WA sub-line under USD display").toMatch(/^\$/)
+    expect(Math.abs(parseAmount(cell.sub!) - parseAmount(cell.primary) * PLN_USD) / parseAmount(cell.sub!)).toBeLessThan(0.002)
 
-  // Switch the display currency to PLN via the header menu.
-  await page.getByRole("button", { name: /Display currency:/ }).click()
-  await page.locator("div.absolute.right-0").getByRole("button", { name: "PLN", exact: true }).click()
+    cell = await marketValueCell(page, "AAPL")
+    expect(cell.primary).toMatch(/^\$/)
+    expect(cell.sub).toBeNull()
 
-  // SNT.WA (PLN): same-currency as the display → sub-line disappears.
-  await expect
-    .poll(async () => (await marketValueCell(page, "SNT.WA")).sub, { timeout: 10000 })
-    .toBeNull()
-  cell = await marketValueCell(page, "SNT.WA")
-  expect(cell.primary).toMatch(/^PLN/)
+    // Switch the display currency to PLN via the header menu.
+    await page.getByRole("button", { name: /Display currency:/ }).click()
+    await page.locator("div.absolute.right-0").getByRole("button", { name: "PLN", exact: true }).click()
 
-  // AAPL (USD): primary $, converted PLN sub-line (× 4.3/1.08).
-  cell = await marketValueCell(page, "AAPL")
-  expect(cell.primary).toMatch(/^\$/)
-  expect(cell.sub).toMatch(/^PLN/)
-  expect(Math.abs(parseAmount(cell.sub!) - parseAmount(cell.primary) * USD_PLN) / parseAmount(cell.sub!)).toBeLessThan(0.002)
+    // SNT.WA (PLN): same-currency as the display → sub-line disappears.
+    await expect
+      .poll(async () => (await marketValueCell(page, "SNT.WA")).sub, { timeout: 10000 })
+      .toBeNull()
+    cell = await marketValueCell(page, "SNT.WA")
+    expect(cell.primary).toMatch(/^PLN/)
 
-  // Current market-value and unrealized totals follow the display currency.
-  // Realized P/L is separate and remains in each instrument's currency.
-  const marketTotal = await totalCellText(page, "Market Value")
-  const unrealizedTotal = await totalCellText(page, "Unrealized P/L")
-  expect(marketTotal).toContain("PLN")
-  expect(marketTotal).not.toContain("$")
-  expect(unrealizedTotal).toContain("PLN")
-  expect(unrealizedTotal).not.toContain("$")
-  await expect(page.getByTestId("holdings-total-realized")).toContainText("PLN")
-  await expect(page.getByTestId("holdings-total-realized")).toContainText("USD $0.00")
+    // AAPL (USD): primary $, converted PLN sub-line (× 4.3/1.08).
+    cell = await marketValueCell(page, "AAPL")
+    expect(cell.primary).toMatch(/^\$/)
+    expect(cell.sub).toMatch(/^PLN/)
+    expect(Math.abs(parseAmount(cell.sub!) - parseAmount(cell.primary) * USD_PLN) / parseAmount(cell.sub!)).toBeLessThan(0.002)
 
-  // Best-effort cleanup (leftover "E2E B2*" entities are inert for other specs).
-  try { await request.delete(`${GATEWAY}/api/portfolios/${pid}`, { headers: auth }) } catch { /* ignore */ }
+    // Current market-value and unrealized totals follow the display currency.
+    // Realized P/L is separate and remains in each instrument's currency.
+    const marketTotal = await totalCellText(page, "Market Value")
+    const unrealizedTotal = await totalCellText(page, "Unrealized P/L")
+    expect(marketTotal).toContain("PLN")
+    expect(marketTotal).not.toContain("$")
+    expect(unrealizedTotal).toContain("PLN")
+    expect(unrealizedTotal).not.toContain("$")
+    await expect(page.getByTestId("holdings-total-realized")).toContainText("PLN")
+    await expect(page.getByTestId("holdings-total-realized")).toContainText("USD $0.00")
+  } finally {
+    // Best-effort cleanup: leftover "E2E B2*" entities are inert for other specs.
+    await request.delete(`${GATEWAY}/api/portfolios/${pid}`, { headers: auth }).catch(() => {})
+  }
 })

@@ -326,9 +326,20 @@ test.describe.serial("consolidated holdings (§142)", () => {
     const rows = lines.slice(1)
 
     // One exported line per open position in the aggregate — the duplicate symbol
-    // is not merged into a single line.
+    // is not merged into a single line. Scoped to THIS spec's portfolios: the
+    // demo account cannot delete portfolios with transactions (409), so every
+    // previous run's leftovers stay in the aggregate and a whole-DB equality
+    // would race the page's mount-time fetch against this call. Leftovers can
+    // only add lines, so a per-(symbol, quantity) lower bound is stable.
     const fetched = await openPositions(request, headers)
-    expect(rows.length).toBe(fetched.length)
+    const own = fetched.filter((r) => r.portfolioName === NAME_A || r.portfolioName === NAME_B)
+    expect(own.length).toBeGreaterThan(0)
+    const rowKeys = rows.map((r) => r.split(",").slice(0, 2).join(","))
+    for (const p of own) {
+      const key = `${String(p.symbol).toUpperCase()},${p.quantity}`
+      const wanted = own.filter((q) => `${String(q.symbol).toUpperCase()},${q.quantity}` === key).length
+      expect(rowKeys.filter((k) => k === key).length, `${key} exported`).toBeGreaterThanOrEqual(wanted)
+    }
     const aapl = rows.filter((r) => r.split(",")[0].toUpperCase() === "AAPL")
     expect(aapl.some((r) => r.startsWith("AAPL,5,100"))).toBe(true)
     expect(aapl.some((r) => r.startsWith("AAPL,2,150"))).toBe(true)

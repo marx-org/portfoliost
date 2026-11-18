@@ -87,7 +87,11 @@ test("clicking a transaction marker opens that trade's details", async ({ page }
   // hands updateOptions a JSON copy of the options, so the function is dropped
   // on the next redraw and the dot is repainted inert. This asserts the real
   // path — a listener bound to the marker node — survives a later redraw too.
-  const marker = page.locator(".apexcharts-point-annotation-marker").first()
+  // Top10's SNT.WA buys sit on the seeded bar 2026-08-02 (mocks/db-seed), a
+  // Sunday, so the chart's nearest-bar mapping lands them on 2026-08-03; any
+  // other portfolio's SNT.WA trades (E2E leftovers) must not shift the target,
+  // so select the marker by its bar date rather than DOM order.
+  const marker = page.locator(".apexcharts-point-annotation-marker[class*='tx-marker-2026-08-03']").first()
   await expect(marker).toBeVisible({ timeout: 20000 })
   await marker.click()
   const panel = page.getByTestId("chart-tx-details")
