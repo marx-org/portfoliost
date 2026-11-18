@@ -215,6 +215,16 @@ function cashData(scope) {
       { year: 2025, contributions: 1200, withdrawals: 0, net: 1200, partial: false },
       { year: 2026, contributions: 300, withdrawals: 100, net: 200, partial: true },
     ],
+    cumulativeContributions: [
+      { key: "pf-1", label: "Main brokerage", points: [
+        { date: "2025-01-01", net: 1200, contributions: 1200, withdrawals: 0, unknown: false },
+        { date: "2026-01-01", net: 1400, contributions: 1500, withdrawals: 100, unknown: false },
+      ] },
+      { key: "__total__", label: "Total", points: [
+        { date: "2025-01-01", net: 1200, contributions: 1200, withdrawals: 0, unknown: false },
+        { date: "2026-01-01", net: 1400, contributions: 1500, withdrawals: 100, unknown: false },
+      ] },
+    ],
   }
 }
 

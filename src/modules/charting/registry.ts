@@ -48,6 +48,7 @@ export const chartRegistry: readonly ChartKind[] = [
   // ── Cash & funding ──────────────────────────────────────────
   { id: "cash-balance", title: "Broker cash balances through time", category: "cash", dataset: "cash" },
   { id: "cash-contributions", title: "Annual net external contributions", category: "cash", dataset: "cash" },
+  { id: "cash-cumulative-contributions", title: "Cumulative external contributions per account", category: "cash", dataset: "cash" },
 
   // ── Stock categories ────────────────────────────────────────
   { id: "stock-categories", title: "Stock categories", category: "categories", dataset: "categories" },
