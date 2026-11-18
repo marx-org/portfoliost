@@ -157,3 +157,68 @@ test("an account AND a label scope intersect in the request the page sends", asy
     )
     .toBe(true)
 })
+
+test("normal and virtual portfolios are separate, mutually exclusive scopes", async ({ page, request }) => {
+  await login(page)
+  const headers = await auth(request)
+
+  // A label + a virtual portfolio that mirrors it. The virtual view is a
+  // read-only label-defined portfolio, never mixed with real accounts.
+  const labelRes = await request.post(`${GATEWAY}/api/labels`, {
+    headers,
+    data: { name: `E2E-VIRTUAL-${Date.now()}` },
+  })
+  expect(labelRes.status(), await labelRes.text()).toBeLessThan(300)
+  const label = (await labelRes.json()) as { id: string }
+  const virtualRes = await request.post(`${GATEWAY}/api/portfolios`, {
+    headers,
+    data: { name: `E2E-VIEW-${Date.now()}`, baseCurrency: "USD", isVirtual: true, labelId: label.id },
+  })
+  expect(virtualRes.status(), await virtualRes.text()).toBeLessThan(300)
+  const virtual = (await virtualRes.json()) as { id: string; name: string }
+
+  await page.goto("/en/charting/performance")
+  const toolbar = page.getByTestId("charting-toolbar")
+  const kindSwitch = page.getByTestId("charting-kind-switch")
+
+  // Normal is the default; the virtual portfolio is not in the account list.
+  await expect(kindSwitch.getByRole("button", { name: "Normal" })).toHaveClass(/bg-blue-600/)
+  await expect(toolbar.getByRole("button", { name: "Top10" })).toBeVisible()
+  await expect(toolbar.getByRole("button", { name: virtual.name })).toHaveCount(0)
+
+  // Selecting a real account, then switching to Virtual, clears it: the two
+  // sides can never be selected together.
+  await toolbar.getByRole("button", { name: "Top10" }).click()
+  await expect(page).toHaveURL(new RegExp(`accounts=${TOP10}`))
+  await kindSwitch.getByRole("button", { name: "Virtual" }).click()
+  await expect(page).toHaveURL(/kind=virtual/)
+  await expect(page).not.toHaveURL(/accounts=/)
+  await expect(toolbar.getByRole("button", { name: virtual.name })).toBeVisible()
+  await expect(toolbar.getByRole("button", { name: "Top10" })).toHaveCount(0)
+
+  // Reset returns to Normal + All.
+  await toolbar.getByRole("button", { name: "Reset" }).click()
+  await expect(page).not.toHaveURL(/kind=/)
+  await expect(kindSwitch.getByRole("button", { name: "Normal" })).toHaveClass(/bg-blue-600/)
+})
+
+test("the Charting toolbar carries an inclusive date window in the URL", async ({ page }) => {
+  await login(page)
+  await page.goto("/en/charting/performance")
+
+  await page.getByTestId("charting-date-from").fill("2026-01-01")
+  await page.getByTestId("charting-date-to").fill("2026-06-30")
+  await expect(page).toHaveURL(/from=2026-01-01/)
+  await expect(page).toHaveURL(/to=2026-06-30/)
+
+  // The window survives subpage navigation.
+  await page.getByTestId("charting-layout").getByRole("link", { name: "Income" }).click()
+  await expect(page).toHaveURL(/\/en\/charting\/income/)
+  await expect(page).toHaveURL(/from=2026-01-01/)
+  await expect(page).toHaveURL(/to=2026-06-30/)
+
+  // Reset clears the window.
+  await page.getByTestId("charting-toolbar").getByRole("button", { name: "Reset" }).click()
+  await expect(page).not.toHaveURL(/from=/)
+  await expect(page).not.toHaveURL(/to=/)
+})

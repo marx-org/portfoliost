@@ -46,6 +46,7 @@ export function scopeKey(scope: ChartScopeQuery): string {
   return [
     (scope.accounts ?? []).slice().sort().join(","),
     (scope.labels ?? []).slice().sort().join(","),
+    scope.kind ?? "normal",
     scope.currency ?? "",
     scope.from ?? "",
     scope.to ?? "",

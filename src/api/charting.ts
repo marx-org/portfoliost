@@ -28,6 +28,8 @@ export interface ChartScopeQuery {
   accounts?: string[]
   /** Current position-label IDs, combined with OR. Empty/absent = All. */
   labels?: string[]
+  /** Which side of the account filter is active: real or virtual portfolios. */
+  kind?: "normal" | "virtual"
   /** ISO-4217 display currency for comparable values. */
   currency?: string
   /** Inclusive window start (YYYY-MM-DD). */
@@ -44,6 +46,7 @@ function scopeQuery(scope: ChartScopeQuery = {}): string {
   const q = new URLSearchParams()
   if (scope.accounts?.length) q.set("accounts", scope.accounts.join(","))
   if (scope.labels?.length) q.set("labels", scope.labels.join(","))
+  if (scope.kind === "virtual") q.set("kind", "virtual")
   if (scope.currency) q.set("currency", scope.currency)
   if (scope.from) q.set("from", scope.from)
   if (scope.to) q.set("to", scope.to)

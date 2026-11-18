@@ -16,6 +16,44 @@ describe("useChartScope", () => {
     expect(scope.selectedAccountIds.value).toEqual([])
   })
 
+  it("defaults to normal kind and All when the query is empty", () => {
+    const { scope } = makeScope({})
+    expect(scope.kind.value).toBe("normal")
+    expect(scope.scopeQuery.value.kind).toBe("normal")
+    expect(scope.allAccounts.value).toBe(true)
+    expect(scope.allLabels.value).toBe(true)
+    expect(scope.selectedAccountIds.value).toEqual([])
+  })
+
+  it("reads the virtual kind from the route and writes it back", () => {
+    const { scope, router } = makeScope({ kind: "virtual" })
+    expect(scope.kind.value).toBe("virtual")
+    expect(scope.scopeQuery.value.kind).toBe("virtual")
+    expect(router.replace).not.toHaveBeenCalled()
+    scope.setKind("normal")
+    expect(scope.kind.value).toBe("normal")
+    expect(router.replace).toHaveBeenCalledWith(expect.objectContaining({ query: expect.not.objectContaining({ kind: expect.anything() }) }))
+  })
+
+  it("switching kind clears the account selection (mutually exclusive)", () => {
+    const { scope, router } = makeScope({ accounts: "a1" })
+    scope.setKind("virtual")
+    expect(scope.kind.value).toBe("virtual")
+    expect(scope.selectedAccountIds.value).toEqual([])
+    expect(router.replace).toHaveBeenCalledWith(expect.objectContaining({ query: expect.objectContaining({ kind: "virtual" }) }))
+    expect(router.replace).toHaveBeenCalledWith(expect.objectContaining({ query: expect.not.objectContaining({ accounts: expect.anything() }) }))
+  })
+
+  it("round-trips the date window from and to", () => {
+    const { scope, router } = makeScope({})
+    scope.setDates("2026-01-01", "2026-06-30")
+    expect(scope.scopeQuery.value.from).toBe("2026-01-01")
+    expect(scope.scopeQuery.value.to).toBe("2026-06-30")
+    expect(router.replace).toHaveBeenCalledWith(
+      expect.objectContaining({ query: expect.objectContaining({ from: "2026-01-01", to: "2026-06-30" }) }),
+    )
+  })
+
   it("parses accounts/labels from the route query", () => {
     const { scope } = makeScope({ accounts: "a,b", labels: "l1" })
     expect(scope.selectedAccountIds.value).toEqual(["a", "b"])

@@ -27,8 +27,9 @@ vi.mock("@/api/portfolios", async (importOriginal) => {
   return {
     ...actual,
     getPortfolios: vi.fn(async () => [
-      { id: "a1", name: "Account One" },
-      { id: "a2", name: "Account Two" },
+      { id: "a1", name: "Account One", isVirtual: false },
+      { id: "a2", name: "Account Two", isVirtual: false },
+      { id: "v1", name: "Growth View", isVirtual: true },
     ] as never),
     getPortfolioTotalMetrics: vi.fn(async () => ({}) as never),
   }
@@ -111,5 +112,37 @@ describe("ChartingLayout", () => {
     await flushPromises()
     expect(buttonByText(wrapper, "Account Two").classes()).toContain("border-blue-500")
     expect(hasAllAccountsChip(wrapper)).toBe(false)
+  })
+
+  it("normal mode lists only real accounts and hides virtual portfolios", async () => {
+    const wrapper = mountLayout()
+    await flushPromises()
+    const text = wrapper.get('[data-testid="charting-toolbar"]').text()
+    expect(text).toContain("Account One")
+    expect(text).not.toContain("Growth View")
+    expect(buttonByText(wrapper, "Normal").classes()).toContain("bg-blue-600")
+  })
+
+  it("switching to virtual lists only virtual portfolios and clears the account selection", async () => {
+    route().query = { accounts: "a1" }
+    const wrapper = mountLayout()
+    await flushPromises()
+    await buttonByText(wrapper, "Virtual").trigger("click")
+    const toolbar = wrapper.get('[data-testid="charting-toolbar"]')
+    expect(toolbar.text()).toContain("Growth View")
+    expect(toolbar.text()).not.toContain("Account One")
+    // Switching side is mutually exclusive: the real account selection is gone.
+    expect(route().query.accounts).toBeUndefined()
+    expect(route().query.kind).toBe("virtual")
+    expect(hasAllAccountsChip(wrapper)).toBe(true)
+  })
+
+  it("reset returns to normal and clears the kind", async () => {
+    route().query = { kind: "virtual" }
+    const wrapper = mountLayout()
+    await flushPromises()
+    await buttonByText(wrapper, "Reset").trigger("click")
+    expect(route().query.kind).toBeUndefined()
+    expect(buttonByText(wrapper, "Normal").classes()).toContain("bg-blue-600")
   })
 })
