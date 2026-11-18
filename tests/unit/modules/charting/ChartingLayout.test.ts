@@ -137,6 +137,23 @@ describe("ChartingLayout", () => {
     expect(hasAllAccountsChip(wrapper)).toBe(true)
   })
 
+  it("predefined ranges set the date window, and ALL clears it", async () => {
+    const wrapper = mountLayout()
+    await flushPromises()
+
+    await buttonByText(wrapper, "1M").trigger("click")
+    expect(route().query.from).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(route().query.to).toBeUndefined()
+    // The chosen range is highlighted.
+    expect(buttonByText(wrapper, "1M").classes()).toContain("bg-blue-50")
+
+    // ALL clears the window.
+    await buttonByText(wrapper, "ALL").trigger("click")
+    expect(route().query.from).toBeUndefined()
+    expect(route().query.to).toBeUndefined()
+    expect(buttonByText(wrapper, "ALL").classes()).toContain("bg-blue-50")
+  })
+
   it("reset returns to normal and clears the kind", async () => {
     route().query = { kind: "virtual" }
     const wrapper = mountLayout()

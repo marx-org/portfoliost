@@ -221,4 +221,11 @@ test("the Charting toolbar carries an inclusive date window in the URL", async (
   await page.getByTestId("charting-toolbar").getByRole("button", { name: "Reset" }).click()
   await expect(page).not.toHaveURL(/from=/)
   await expect(page).not.toHaveURL(/to=/)
+
+  // Predefined ranges behave like the performance chart's timeframe control.
+  await page.getByTestId("charting-range-1m").click()
+  await expect(page).toHaveURL(/from=/)
+  await expect(page).not.toHaveURL(/to=/)
+  await page.getByTestId("charting-range-all").click()
+  await expect(page).not.toHaveURL(/from=/)
 })

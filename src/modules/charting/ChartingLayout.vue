@@ -54,6 +54,58 @@ function toggleAccount(id: string) {
   scope.toggleAccount(id)
 }
 
+/**
+ * Predefined ranges, matching the performance chart's timeframe control
+ * (1W/1M/3M/6M/1Y/2Y/ALL). The Charting API takes an inclusive from/to window,
+ * so a range sets `from` relative to today and leaves `to` open; ALL clears
+ * both. Months/years are subtracted with the day clamped to the target month.
+ */
+type RangeKey = "1W" | "1M" | "3M" | "6M" | "1Y" | "2Y" | "ALL"
+const RANGES: { key: RangeKey; label: string; days?: number; months?: number }[] = [
+  { key: "1W", label: "1W", days: 7 },
+  { key: "1M", label: "1M", months: 1 },
+  { key: "3M", label: "3M", months: 3 },
+  { key: "6M", label: "6M", months: 6 },
+  { key: "1Y", label: "1Y", months: 12 },
+  { key: "2Y", label: "2Y", months: 24 },
+  { key: "ALL", label: "ALL" },
+]
+
+function subtractMonths(date: Date, months: number): Date {
+  const d = new Date(date)
+  const day = d.getUTCDate()
+  d.setUTCDate(1)
+  d.setUTCMonth(d.getUTCMonth() - months)
+  const lastDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate()
+  d.setUTCDate(Math.min(day, lastDay))
+  return d
+}
+
+function rangeFrom(key: RangeKey, now: Date = new Date()): string | undefined {
+  const r = RANGES.find((x) => x.key === key)
+  if (!r || key === "ALL") return undefined
+  const d = r.days != null ? new Date(now.getTime() - r.days * 86_400_000) : subtractMonths(now, r.months ?? 0)
+  return d.toISOString().slice(0, 10)
+}
+
+/** The range whose window matches the current from/to, or null for a custom window. */
+const activeRange = computed<RangeKey | null>(() => {
+  const today = new Date()
+  const todayStr = today.toISOString().slice(0, 10)
+  // A window with an explicit `to` other than today is custom.
+  if (to.value && to.value !== todayStr) return null
+  if (!from.value) return to.value ? null : "ALL"
+  for (const r of RANGES) {
+    if (r.key === "ALL") continue
+    if (rangeFrom(r.key, today) === from.value) return r.key
+  }
+  return null
+})
+
+function setRange(key: RangeKey) {
+  scope.setDates(rangeFrom(key) ?? "", "")
+}
+
 /** Apply the two date bounds together so the route is written once. */
 function onDateChange(which: "from" | "to", event: Event) {
   const value = (event.target as HTMLInputElement).value
@@ -120,7 +172,19 @@ function onDateChange(which: "from" | "to", event: Event) {
         <span v-if="allLabels" class="text-xs text-slate-500">All labels</span>
       </template>
       <div class="flex items-center gap-1" data-testid="charting-date-range">
-        <label class="text-xs font-medium uppercase text-slate-400 dark:text-slate-500" for="charting-date-from">From</label>
+        <button
+          v-for="r in RANGES"
+          :key="r.key"
+          type="button"
+          class="btn-secondary text-xs"
+          :class="activeRange === r.key ? 'border-blue-600 bg-blue-50 text-blue-700 dark:border-blue-600 dark:bg-blue-500/10 dark:text-blue-400' : ''"
+          :aria-pressed="activeRange === r.key"
+          :data-testid="`charting-range-${r.key.toLowerCase()}`"
+          @click="setRange(r.key)"
+        >
+          {{ r.label }}
+        </button>
+        <label class="ml-1 text-xs font-medium uppercase text-slate-400 dark:text-slate-500" for="charting-date-from">From</label>
         <input
           id="charting-date-from"
           type="date"
