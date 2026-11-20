@@ -74,6 +74,7 @@ const hasSlices = computed(
         :by-currency="byCurrency"
         :currency="baseCurrency"
         testid="charting-allocation-breakdown"
+        collapsible-tables
       />
       <StockCategoryAllocationChart
         v-if="byCategory.length"

@@ -30,6 +30,7 @@ export interface AllocationSlice {
  */
 import { computed } from "vue"
 import { formatCurrency, formatPercent } from "@/utils/format"
+import CollapsibleSection from "./CollapsibleSection.vue"
 
 const props = withDefaults(
   defineProps<{
@@ -40,8 +41,11 @@ const props = withDefaults(
     currency?: string
     /** Testid prefix (`${testid}-<field>`); defaults to "allocation". */
     testid?: string
+    /** Render the companion tables inside collapsed sections (Charting). Off by
+     * default so the per-portfolio Allocation tab is unchanged. */
+    collapsibleTables?: boolean
   }>(),
-  { bySector: () => [], byAssetType: () => [], byCurrency: () => [], currency: "", testid: "allocation" },
+  { bySector: () => [], byAssetType: () => [], byCurrency: () => [], currency: "", testid: "allocation", collapsibleTables: false },
 )
 
 function label(s: AllocationSlice): string {
@@ -83,8 +87,13 @@ const donutSeries = computed(() => sectorSlices.value.map((s) => s.value))
         <component :is="'apexchart'" v-if="donutSeries.length" :options="donutOptions" :series="donutSeries" />
         <p v-else class="text-sm text-slate-500 dark:text-slate-400">No allocation data.</p>
       </div>
-      <div class="card overflow-hidden" :data-testid="`${testid}-by-sector`">
-        <div class="border-b border-slate-200 dark:border-slate-700/60 px-5 py-3">
+      <component
+        :is="collapsibleTables ? CollapsibleSection : 'div'"
+        class="card overflow-hidden"
+        :data-testid="`${testid}-by-sector`"
+        :title="collapsibleTables ? 'Sector Weights' : undefined"
+      >
+        <div v-if="!collapsibleTables" class="border-b border-slate-200 dark:border-slate-700/60 px-5 py-3">
           <h2 class="text-base font-semibold">Sector Weights</h2>
         </div>
         <table class="w-full text-sm">
@@ -103,12 +112,17 @@ const donutSeries = computed(() => sectorSlices.value.map((s) => s.value))
             </tr>
           </tbody>
         </table>
-      </div>
+      </component>
     </div>
 
     <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-      <div class="card overflow-hidden" :data-testid="`${testid}-by-asset-type`">
-        <div class="border-b border-slate-200 dark:border-slate-700/60 px-5 py-3">
+      <component
+        :is="collapsibleTables ? CollapsibleSection : 'div'"
+        class="card overflow-hidden"
+        :data-testid="`${testid}-by-asset-type`"
+        :title="collapsibleTables ? 'By Asset Type' : undefined"
+      >
+        <div v-if="!collapsibleTables" class="border-b border-slate-200 dark:border-slate-700/60 px-5 py-3">
           <h2 class="text-base font-semibold">By Asset Type</h2>
         </div>
         <table class="w-full text-sm">
@@ -120,9 +134,14 @@ const donutSeries = computed(() => sectorSlices.value.map((s) => s.value))
             </tr>
           </tbody>
         </table>
-      </div>
-      <div class="card overflow-hidden" :data-testid="`${testid}-by-currency`">
-        <div class="border-b border-slate-200 dark:border-slate-700/60 px-5 py-3">
+      </component>
+      <component
+        :is="collapsibleTables ? CollapsibleSection : 'div'"
+        class="card overflow-hidden"
+        :data-testid="`${testid}-by-currency`"
+        :title="collapsibleTables ? 'By Currency' : undefined"
+      >
+        <div v-if="!collapsibleTables" class="border-b border-slate-200 dark:border-slate-700/60 px-5 py-3">
           <h2 class="text-base font-semibold">By Currency</h2>
         </div>
         <table class="w-full text-sm">
@@ -134,7 +153,7 @@ const donutSeries = computed(() => sectorSlices.value.map((s) => s.value))
             </tr>
           </tbody>
         </table>
-      </div>
+      </component>
     </div>
   </div>
 </template>

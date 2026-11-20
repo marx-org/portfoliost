@@ -97,6 +97,7 @@ test("quarterly YoY compares the same quarter across years and leaves undefined 
   // The page renders the compared years and the companion amounts.
   await page.goto(`/en/charting/income?accounts=${pf}`)
   const table = page.getByTestId("charting-quarterly-yoy-table")
+  await page.getByTestId("charting-quarterly-yoy-table-toggle").click()
   await expect(table).toBeVisible()
   await expect(page.getByText("2025 vs 2024")).toBeVisible()
   await expect(table.locator("tbody tr", { hasText: "Q1" })).toHaveCount(1)

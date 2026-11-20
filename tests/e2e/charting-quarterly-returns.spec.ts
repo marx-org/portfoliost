@@ -70,6 +70,7 @@ test("quarterly returns expose TWR and net-gain-change modes", async ({ page, re
   await page.goto("/en/charting/performance")
   const chart = page.getByTestId("charting-quarterly-returns")
   await expect(chart).toBeVisible()
+  await page.getByTestId("charting-quarterly-returns-table-toggle").click()
   await expect(page.getByTestId("charting-quarterly-returns-table")).toBeVisible()
   await expect(page.getByTestId("charting-quarterly-returns-mode-net-gain")).toBeVisible()
   await page.getByTestId("charting-quarterly-returns-mode-net-gain").click()

@@ -12,6 +12,7 @@
 import { computed } from "vue"
 import type { components } from "@/api/types"
 import { formatCurrency } from "@/utils/format"
+import CollapsibleSection from "@/components/CollapsibleSection.vue"
 
 type Point = components["schemas"]["ChartContributionPoint"]
 
@@ -63,7 +64,7 @@ const chartSeries = computed(() => [
         <h2 class="mb-2 text-base font-semibold">Annual External Contributions</h2>
         <apexchart type="bar" :options="chartOptions" :series="chartSeries" :height="340" />
       </div>
-      <div class="card overflow-hidden" :data-testid="`${testid}-table`">
+      <CollapsibleSection title="Annual External Contributions" :testid="`${testid}-table`">
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-slate-100 text-left text-xs uppercase text-slate-500 dark:border-slate-800 dark:text-slate-400">
@@ -90,7 +91,7 @@ const chartSeries = computed(() => [
         <p class="px-5 py-2 text-xs text-slate-500 dark:text-slate-400">
           Deposits and withdrawals are owner funding. Withdrawals are shown below zero in the chart. Transfers are internal cash/in-kind moves; a one-sided boundary transfer is not owner funding.
         </p>
-      </div>
+      </CollapsibleSection>
     </template>
     <p v-else class="text-sm text-slate-500 dark:text-slate-400">No annual external contributions for this scope.</p>
   </div>

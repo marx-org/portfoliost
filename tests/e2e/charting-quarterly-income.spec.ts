@@ -70,6 +70,7 @@ test("quarterly receipts group by year, zero-fill covered quarters and reconcile
   // The page renders the same dataset, with one row per quarter.
   await page.goto(`/en/charting/income?accounts=${TOP10}`)
   const table = page.getByTestId("charting-quarterly-income-table")
+  await page.getByTestId("charting-quarterly-income-table-toggle").click()
   await expect(table).toBeVisible()
   await expect(table.locator("tbody tr")).toHaveCount(body.quarterly.length)
 

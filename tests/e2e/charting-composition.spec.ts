@@ -95,6 +95,7 @@ test("composition lists instrument identities plus cash, sorted descending", asy
   // The page renders the full table.
   await page.goto(`/en/charting/allocation?accounts=${pf}`)
   const table = page.getByTestId("charting-holdings-composition-table")
+  await page.getByTestId("charting-holdings-composition-table-toggle").click()
   await expect(table).toBeVisible()
   await expect(table.locator("tbody tr")).toHaveCount(body!.positions.length)
 })

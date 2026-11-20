@@ -125,6 +125,7 @@ test("category allocation is value-weighted, editable and survives a reload", as
   // The page renders the same dataset.
   await page.goto(`/en/charting/allocation?accounts=${pf}`)
   const table = page.getByTestId("charting-stock-category-allocation-table")
+  await page.getByTestId("charting-stock-category-allocation-table-toggle").click()
   await expect(table).toBeVisible()
   await expect(table.locator("tbody tr", { hasText: "Balanced" })).toHaveCount(1)
   await expect(table.locator("tbody tr", { hasText: "High yield" })).toHaveCount(1)
@@ -134,6 +135,8 @@ test("category allocation is value-weighted, editable and survives a reload", as
   // after a reload.
   expect((await put("MSFT", "high_growth")).status()).toBe(200)
   await page.reload()
+  // A reload remounts the view, so the section is collapsed again.
+  await page.getByTestId("charting-stock-category-allocation-table-toggle").click()
   await expect(table).toBeVisible()
   await expect(table.locator("tbody tr", { hasText: "High growth" })).toHaveCount(1)
   await expect(table.locator("tbody tr", { hasText: "High yield" })).toHaveCount(0)

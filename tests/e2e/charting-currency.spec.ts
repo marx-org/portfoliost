@@ -92,6 +92,7 @@ test("currency slices are comparable and reconcile to the position total", async
   // The page renders the same breakdown.
   await page.goto(`/en/charting/allocation?accounts=${pf}`)
   const table = page.getByTestId("charting-currency-allocation-table")
+  await page.getByTestId("charting-currency-allocation-table-toggle").click()
   await expect(table).toBeVisible()
   await expect(table.locator("tbody tr", { hasText: "USD" })).toHaveCount(1)
   await expect(table.locator("tbody tr", { hasText: "PLN" })).toHaveCount(1)

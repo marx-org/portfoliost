@@ -113,6 +113,7 @@ test("scatter plots market value against realised+unrealized+dividends profit", 
   // The Charting page renders the same table.
   await page.goto(`/en/charting/performance?accounts=${pf}`)
   const table = page.getByTestId("charting-profit-value-scatter-table")
+  await page.getByTestId("charting-profit-value-scatter-table-toggle").click()
   await expect(table).toBeVisible()
   const rows = table.locator("tbody tr")
   await expect(rows).toHaveCount(body!.scatter.length)

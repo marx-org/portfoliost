@@ -9,6 +9,7 @@
 import { computed } from "vue"
 import type { components } from "@/api/types"
 import { formatCurrency } from "@/utils/format"
+import CollapsibleSection from "@/components/CollapsibleSection.vue"
 
 type CashSeries = components["schemas"]["ChartCashSeries"]
 type Point = { date: string; balance: number }
@@ -60,10 +61,7 @@ function latest(s: CashSeries): Point | undefined {
         <h2 class="mb-2 text-base font-semibold">Broker Cash Balances</h2>
         <component :is="'apexchart'" :options="chartOptions" :series="chartSeries" />
       </div>
-      <div class="card overflow-hidden" :data-testid="`${testid}-table`">
-        <div class="border-b border-slate-200 px-5 py-3 dark:border-slate-700/60">
-          <h2 class="text-base font-semibold">Cash Balances</h2>
-        </div>
+      <CollapsibleSection title="Cash Balances" :testid="`${testid}-table`">
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-slate-100 text-left text-xs uppercase text-slate-500 dark:border-slate-800 dark:text-slate-400">
@@ -81,7 +79,7 @@ function latest(s: CashSeries): Point | undefined {
         <p class="px-5 py-2 text-xs text-slate-500 dark:text-slate-400">
           Balances are in {{ currency }}. Negative cash is shown, not clamped. Internal transfers cancel in the total.
         </p>
-      </div>
+      </CollapsibleSection>
     </template>
     <p v-else class="text-sm text-slate-500 dark:text-slate-400">No cash history for this scope.</p>
   </div>

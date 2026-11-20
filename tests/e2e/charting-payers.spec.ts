@@ -109,6 +109,7 @@ test("payer coverage counts distinct current holdings per month, not dividend ro
   // The page renders the same dataset.
   await page.goto(`/en/charting/income?accounts=${pf}`)
   const table = page.getByTestId("charting-payer-coverage-table")
+  await page.getByTestId("charting-payer-coverage-table-toggle").click()
   await expect(table).toBeVisible()
   await expect(table.locator("tbody tr")).toHaveCount(12)
   const juneRow = table.locator("tbody tr", { hasText: "Jun" })

@@ -10,6 +10,7 @@
  */
 import { computed } from "vue"
 import type { components } from "@/api/types"
+import CollapsibleSection from "@/components/CollapsibleSection.vue"
 
 type Point = components["schemas"]["ChartIncomeCumulativePoint"]
 
@@ -46,21 +47,23 @@ const chartSeries = computed(() => [
     </p>
     <apexchart v-if="rows.length" type="area" :options="chartOptions" :series="chartSeries" :height="320" />
     <p v-else class="text-sm text-slate-500">No income data for this scope.</p>
-    <table v-if="rows.length" class="w-full text-sm">
-      <thead>
-        <tr class="text-left text-slate-400">
-          <th class="py-1">Month</th><th>Dividends</th><th>Interest</th><th>Cumulative</th><th>Opening</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="p in rows" :key="p.date" class="border-t border-slate-100 dark:border-slate-800">
-          <td class="py-1">{{ p.date.slice(0, 7) }}</td>
-          <td>{{ p.dividends ?? 0 }}</td>
-          <td>{{ p.interest ?? 0 }}</td>
-          <td>{{ p.total ?? 0 }}</td>
-          <td>{{ p.openingBalance ?? 0 }}</td>
-        </tr>
-      </tbody>
-    </table>
+    <CollapsibleSection v-if="rows.length" title="Cumulative income" testid="cumulative-income-chart-table">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left text-slate-400">
+            <th class="py-1">Month</th><th>Dividends</th><th>Interest</th><th>Cumulative</th><th>Opening</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="p in rows" :key="p.date" class="border-t border-slate-100 dark:border-slate-800">
+            <td class="py-1">{{ p.date.slice(0, 7) }}</td>
+            <td>{{ p.dividends ?? 0 }}</td>
+            <td>{{ p.interest ?? 0 }}</td>
+            <td>{{ p.total ?? 0 }}</td>
+            <td>{{ p.openingBalance ?? 0 }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </CollapsibleSection>
   </div>
 </template>

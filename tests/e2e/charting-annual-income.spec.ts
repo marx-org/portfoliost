@@ -67,6 +67,7 @@ test("annual totals match the monthly/quarterly sums and the current year is YTD
   await page.goto(`/en/charting/income?accounts=${TOP10}`)
   const chart = page.getByTestId("annual-income-chart")
   await expect(chart).toBeVisible()
+  await page.getByTestId("annual-income-chart-table-toggle").click()
   await expect(chart.locator("tbody tr")).toHaveCount(body.annual.length)
   await expect(chart.getByTestId("annual-ytd-note")).toBeVisible()
 

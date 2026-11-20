@@ -63,6 +63,7 @@ test("monthly-equivalent income is the annual total divided by 12", async ({ pag
   await page.goto(`/en/charting/income?accounts=${TOP10}`)
   const chart = page.getByTestId("annual-income-average-month")
   await expect(chart).toBeVisible()
+  await page.getByTestId("annual-income-average-month-table-toggle").click()
   await expect(chart.locator("tbody tr")).toHaveCount(body.monthlyAverageByYear.length)
   await expect(chart.getByTestId("annual-average-partial")).toBeVisible()
 

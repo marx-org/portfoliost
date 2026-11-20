@@ -90,6 +90,9 @@ test("sector weights split sectors and reconcile to the position total", async (
   // The page renders the same breakdown.
   await page.goto(`/en/charting/allocation?accounts=${pf}`)
   const table = page.getByTestId("charting-sector-allocation-table")
+  // Tables are collapsed by default, so only the chart is visible until expanded.
+  await expect(table.locator("tbody")).toBeHidden()
+  await page.getByTestId("charting-sector-allocation-table-toggle").click()
   await expect(table).toBeVisible()
   await expect(table.locator("tbody tr")).toHaveCount(body!.bySector.length)
 })

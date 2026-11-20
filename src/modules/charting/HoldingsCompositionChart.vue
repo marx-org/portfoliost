@@ -20,6 +20,7 @@ export interface HoldingSlice {
  */
 import { computed } from "vue"
 import { formatCurrency, formatPercent } from "@/utils/format"
+import CollapsibleSection from "@/components/CollapsibleSection.vue"
 
 const TOP_N = 8
 
@@ -77,10 +78,7 @@ const donutSeries = computed(() => donutRows.value.map((r) => r.value))
         <h2 class="mb-2 text-base font-semibold">Current Holdings</h2>
         <component :is="'apexchart'" :options="donutOptions" :series="donutSeries" />
       </div>
-      <div class="card overflow-hidden" :data-testid="`${testid}-table`">
-        <div class="border-b border-slate-200 px-5 py-3 dark:border-slate-700/60">
-          <h2 class="text-base font-semibold">Holdings</h2>
-        </div>
+      <CollapsibleSection title="Holdings" :testid="`${testid}-table`">
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-slate-100 text-left text-xs uppercase text-slate-500 dark:border-slate-800 dark:text-slate-400">
@@ -104,7 +102,7 @@ const donutSeries = computed(() => donutRows.value.map((r) => r.value))
         <p class="px-5 py-2 text-xs text-slate-500 dark:text-slate-400">
           Top {{ TOP_N }} plus Other in the donut; every holding is in the table. Negative balances are shown here, not in the pie.
         </p>
-      </div>
+      </CollapsibleSection>
     </template>
     <p v-else class="text-sm text-slate-500 dark:text-slate-400">No holdings for this scope.</p>
   </div>

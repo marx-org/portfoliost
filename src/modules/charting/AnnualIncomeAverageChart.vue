@@ -10,6 +10,7 @@
  */
 import { computed } from "vue"
 import type { components } from "@/api/types"
+import CollapsibleSection from "@/components/CollapsibleSection.vue"
 
 type Point = components["schemas"]["ChartIncomeAveragePoint"]
 
@@ -46,20 +47,22 @@ const chartSeries = computed(() => [
     </p>
     <apexchart v-if="rows.length" type="bar" :options="chartOptions" :series="chartSeries" :height="300" />
     <p v-else class="text-sm text-slate-500">No income data for this scope.</p>
-    <table v-if="rows.length" class="w-full text-sm">
-      <thead>
-        <tr class="text-left text-slate-400">
-          <th class="py-1">Year</th><th>Basis</th><th>Divisor</th><th>Per {{ per }}</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="p in rows" :key="p.year" class="border-t border-slate-100 dark:border-slate-800">
-          <td class="py-1">{{ p.year }}<span v-if="p.partial" class="ml-1 text-xs text-slate-400">YTD</span></td>
-          <td>{{ p.basis }}</td>
-          <td>{{ p.divisor }}</td>
-          <td>{{ p.amount ?? 0 }}</td>
-        </tr>
-      </tbody>
-    </table>
+    <CollapsibleSection v-if="rows.length" :title="`Annual-equivalent per ${per}`" :testid="`annual-income-average-${unit}-table`">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left text-slate-400">
+            <th class="py-1">Year</th><th>Basis</th><th>Divisor</th><th>Per {{ per }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="p in rows" :key="p.year" class="border-t border-slate-100 dark:border-slate-800">
+            <td class="py-1">{{ p.year }}<span v-if="p.partial" class="ml-1 text-xs text-slate-400">YTD</span></td>
+            <td>{{ p.basis }}</td>
+            <td>{{ p.divisor }}</td>
+            <td>{{ p.amount ?? 0 }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </CollapsibleSection>
   </div>
 </template>

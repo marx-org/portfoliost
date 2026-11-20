@@ -11,6 +11,7 @@
  */
 import { computed } from "vue"
 import type { components } from "@/api/types"
+import CollapsibleSection from "@/components/CollapsibleSection.vue"
 
 type Point = components["schemas"]["ChartIncomeAnnualPoint"]
 
@@ -57,23 +58,25 @@ const chartSeries = computed(() => [
     </p>
     <apexchart v-if="rows.length" type="bar" :options="chartOptions" :series="chartSeries" :height="340" />
     <p v-else class="text-sm text-slate-500">No income data for this scope.</p>
-    <table v-if="rows.length" class="w-full text-sm">
-      <thead>
-        <tr class="text-left text-slate-400">
-          <th class="py-1">Year</th><th>Dividends</th><th>Interest</th><th>Options</th><th>Total</th><th>Prior</th><th>YoY</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="p in rows" :key="p.year" class="border-t border-slate-100 dark:border-slate-800">
-          <td class="py-1">{{ p.year }}<span v-if="p.year === currentYear" class="ml-1 text-xs text-slate-400">YTD</span></td>
-          <td>{{ p.dividends ?? 0 }}</td>
-          <td>{{ p.interest ?? 0 }}</td>
-          <td>{{ p.options ?? 0 }}</td>
-          <td>{{ p.total ?? 0 }}</td>
-          <td>{{ p.priorYearTotal ?? "—" }}</td>
-          <td>{{ p.yoyChangePercent == null ? "—" : `${p.yoyChangePercent}%` }}</td>
-        </tr>
-      </tbody>
-    </table>
+    <CollapsibleSection v-if="rows.length" title="Annual totals" testid="annual-income-chart-table">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left text-slate-400">
+            <th class="py-1">Year</th><th>Dividends</th><th>Interest</th><th>Options</th><th>Total</th><th>Prior</th><th>YoY</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="p in rows" :key="p.year" class="border-t border-slate-100 dark:border-slate-800">
+            <td class="py-1">{{ p.year }}<span v-if="p.year === currentYear" class="ml-1 text-xs text-slate-400">YTD</span></td>
+            <td>{{ p.dividends ?? 0 }}</td>
+            <td>{{ p.interest ?? 0 }}</td>
+            <td>{{ p.options ?? 0 }}</td>
+            <td>{{ p.total ?? 0 }}</td>
+            <td>{{ p.priorYearTotal ?? "—" }}</td>
+            <td>{{ p.yoyChangePercent == null ? "—" : `${p.yoyChangePercent}%` }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </CollapsibleSection>
   </div>
 </template>
