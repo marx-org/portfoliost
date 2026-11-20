@@ -34,6 +34,7 @@ test("income chart renders monthly dividends/interest/options with a zero and a 
 
   const chart = page.getByTestId("monthly-income-chart")
   await expect(chart).toBeVisible({ timeout: 30_000 })
+  await page.getByTestId("monthly-income-chart-table-toggle").click()
 
   // One row per visible month. The window is now-relative (last 4 months), so
   // assert the shape rather than hardcoded months: at least 3 rows and the

@@ -108,6 +108,7 @@ test("cumulative contributions run per account and sum to a combined total", asy
 
   await page.goto(`/en/charting/cash?accounts=${a},${b}`)
   const table = page.getByTestId("charting-cumulative-contributions-table")
+  await page.getByTestId("charting-cumulative-contributions-table-toggle").click()
   await expect(table).toBeVisible()
   await expect(table.locator("tbody tr")).toHaveCount(3)
   await expect(table.locator("tbody tr").filter({ hasText: "Total" })).toContainText("$1,100.00")

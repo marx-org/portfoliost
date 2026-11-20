@@ -125,6 +125,7 @@ test("cost basis vs market value is grouped by label, with an unlabelled bucket"
   // The Charting page renders the same paired data.
   await page.goto(`/en/charting/allocation?accounts=${pf}`)
   const table = page.getByTestId("charting-label-cost-value-table")
+  await page.getByTestId("charting-label-cost-value-table-toggle").click()
   await expect(table).toBeVisible()
   await expect(table.locator("tbody tr", { hasText: label.name })).toHaveCount(1)
   await expect(table.locator("tbody tr", { hasText: "Unlabelled" })).toHaveCount(1)

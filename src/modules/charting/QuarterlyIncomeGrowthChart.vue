@@ -10,6 +10,7 @@
  */
 import { computed } from "vue"
 import { formatCurrency, formatPercent } from "@/utils/format"
+import CollapsibleSection from "@/components/CollapsibleSection.vue"
 
 type Point = {
   quarter: string
@@ -82,10 +83,7 @@ const chartSeries = computed(() => [
       <p class="text-xs text-slate-500" :data-testid="`${testid}-partial`">
         The current quarter is year-to-date and is compared with the prior full quarter, not a final YoY.
       </p>
-      <div class="card overflow-hidden" :data-testid="`${testid}-table`">
-        <div class="border-b border-slate-200 px-5 py-3 dark:border-slate-700/60">
-          <h2 class="text-base font-semibold">Quarterly Income Growth</h2>
-        </div>
+      <CollapsibleSection title="Quarterly Income Growth" :testid="`${testid}-table`">
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-slate-100 text-left text-xs uppercase text-slate-500 dark:border-slate-800 dark:text-slate-400">
@@ -108,7 +106,7 @@ const chartSeries = computed(() => [
             </tr>
           </tbody>
         </table>
-      </div>
+      </CollapsibleSection>
     </template>
     <p v-else class="text-sm text-slate-500 dark:text-slate-400">No year-over-year quarterly income for this scope.</p>
   </div>

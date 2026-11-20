@@ -125,6 +125,7 @@ test("annual funding is deposits minus withdrawals, with boundary transfers kept
 
   await page.goto(`/en/charting/cash?accounts=${a}`)
   const table = page.getByTestId("charting-annual-contributions-table")
+  await page.getByTestId("charting-annual-contributions-table-toggle").click()
   await expect(table).toBeVisible()
   await expect(table.locator("tbody tr")).toHaveCount(1)
   await expect(table.locator("tbody tr").first()).toContainText("$800.00")

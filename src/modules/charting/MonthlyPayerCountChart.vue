@@ -10,6 +10,7 @@
  * calendar.
  */
 import { computed } from "vue"
+import CollapsibleSection from "@/components/CollapsibleSection.vue"
 
 type Month = { year: number; month: number; count: number; partial?: boolean }
 
@@ -61,10 +62,7 @@ const chartSeries = computed(() => [
       <p v-if="hasPartial" class="text-xs text-slate-500" :data-testid="`${testid}-partial`">
         {{ selectedYear }} is in progress; the current and later months are year-to-date, not a full-year forecast.
       </p>
-      <div class="card overflow-hidden" :data-testid="`${testid}-table`">
-        <div class="border-b border-slate-200 px-5 py-3 dark:border-slate-700/60">
-          <h2 class="text-base font-semibold">Dividend Payers</h2>
-        </div>
+      <CollapsibleSection title="Dividend Payers" :testid="`${testid}-table`">
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-slate-100 text-left text-xs uppercase text-slate-500 dark:border-slate-800 dark:text-slate-400">
@@ -81,7 +79,7 @@ const chartSeries = computed(() => [
             </tr>
           </tbody>
         </table>
-      </div>
+      </CollapsibleSection>
     </template>
     <p v-else class="text-sm text-slate-500 dark:text-slate-400">No dividend-payer data for this scope.</p>
   </div>

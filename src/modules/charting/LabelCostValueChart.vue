@@ -23,6 +23,7 @@ export interface LabelCostValueRow {
  */
 import { computed } from "vue"
 import { formatCurrency } from "@/utils/format"
+import CollapsibleSection from "@/components/CollapsibleSection.vue"
 
 const props = withDefaults(
   defineProps<{
@@ -62,10 +63,7 @@ const chartSeries = computed(() => [
         <h2 class="mb-2 text-base font-semibold">Cost Basis vs Market Value by Label</h2>
         <component :is="'apexchart'" :options="chartOptions" :series="chartSeries" />
       </div>
-      <div class="card overflow-hidden" :data-testid="`${testid}-table`">
-        <div class="border-b border-slate-200 px-5 py-3 dark:border-slate-700/60">
-          <h2 class="text-base font-semibold">Cost Basis vs Market Value</h2>
-        </div>
+      <CollapsibleSection title="Cost Basis vs Market Value" :testid="`${testid}-table`">
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-slate-100 text-left text-xs uppercase text-slate-500 dark:border-slate-800 dark:text-slate-400">
@@ -85,7 +83,7 @@ const chartSeries = computed(() => [
         <p class="px-5 py-2 text-xs text-slate-500 dark:text-slate-400">
           Labels may overlap, so each row is an independent group and the rows are not a portfolio total.
         </p>
-      </div>
+      </CollapsibleSection>
     </template>
     <p v-else class="text-sm text-slate-500 dark:text-slate-400">No cost-basis data for this scope.</p>
   </div>

@@ -89,6 +89,7 @@ test("asset-type proportions split stocks and bonds and reconcile to the total",
   // The page renders the same breakdown.
   await page.goto(`/en/charting/allocation?accounts=${pf}`)
   const table = page.getByTestId("charting-asset-allocation-table")
+  await page.getByTestId("charting-asset-allocation-table-toggle").click()
   await expect(table).toBeVisible()
   await expect(table.locator("tbody tr", { hasText: "STOCK" })).toHaveCount(1)
   await expect(table.locator("tbody tr", { hasText: "BOND" })).toHaveCount(1)

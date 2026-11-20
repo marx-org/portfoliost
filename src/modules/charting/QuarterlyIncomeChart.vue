@@ -10,6 +10,7 @@
  */
 import { computed } from "vue"
 import { formatCurrency } from "@/utils/format"
+import CollapsibleSection from "@/components/CollapsibleSection.vue"
 
 type Point = {
   quarter: string
@@ -67,10 +68,7 @@ const partialLabel = computed(() => {
       <p v-if="partialLabel" class="text-xs text-slate-500" :data-testid="`${testid}-partial`">
         {{ partialLabel }} is year-to-date, not a full-quarter forecast.
       </p>
-      <div class="card overflow-hidden" :data-testid="`${testid}-table`">
-        <div class="border-b border-slate-200 px-5 py-3 dark:border-slate-700/60">
-          <h2 class="text-base font-semibold">Quarterly Receipts</h2>
-        </div>
+      <CollapsibleSection title="Quarterly Receipts" :testid="`${testid}-table`">
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-slate-100 text-left text-xs uppercase text-slate-500 dark:border-slate-800 dark:text-slate-400">
@@ -93,7 +91,7 @@ const partialLabel = computed(() => {
             </tr>
           </tbody>
         </table>
-      </div>
+      </CollapsibleSection>
     </template>
     <p v-else class="text-sm text-slate-500 dark:text-slate-400">No quarterly income for this scope.</p>
   </div>

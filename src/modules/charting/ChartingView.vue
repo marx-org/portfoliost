@@ -7,6 +7,7 @@ import type { components } from "@/api/types"
 import InstrumentSearchModal from "@/modules/instruments/InstrumentSearchModal.vue"
 import { COMPARE_METRICS } from "@/modules/instruments/compareMetrics"
 import TickerBadge from "@/components/TickerBadge.vue"
+import CollapsibleSection from "@/components/CollapsibleSection.vue"
 
 type ResearchCompare = components["schemas"]["ResearchCompare"]
 
@@ -194,8 +195,9 @@ onMounted(async () => {
 
       <div v-else-if="items.length" data-testid="compare-chart">
         <component :is="'apexchart'" :options="chartOptions" :series="chartSeries" />
-        <div class="mt-4 overflow-x-auto">
-          <table class="w-full text-sm">
+        <CollapsibleSection variant="plain" title="Fundamentals comparison" testid="charting-compare-table" class="mt-4">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
             <thead>
             <tr class="border-b border-slate-200 dark:border-slate-700/60 text-left text-xs tracking-wide text-slate-500 dark:text-slate-400">
               <!-- §85.4 — `uppercase` moved off the row: it is right for the
@@ -224,7 +226,8 @@ onMounted(async () => {
               </tr>
             </tbody>
           </table>
-        </div>
+          </div>
+        </CollapsibleSection>
       </div>
     </div>
 

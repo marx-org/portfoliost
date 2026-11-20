@@ -115,6 +115,7 @@ test("an account with no published projection does not empty the All scope", asy
   await page.goto("/en/charting/income")
   const chart = page.getByTestId("annual-income-chart")
   await expect(chart).toBeVisible()
+  await page.getByTestId("annual-income-chart-table-toggle").click()
   await expect(chart.locator("tbody tr")).toHaveCount(body.annual.length)
   await expect(page.getByTestId("charting-income").getByText("No income data for this scope")).toHaveCount(0)
 })

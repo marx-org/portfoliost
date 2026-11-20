@@ -12,6 +12,7 @@ import { getChartIncome } from "@/api/charting"
 import { useChartData } from "./useChartData"
 import { useChartScope } from "./useChartScope"
 import type { ChartScopeQuery } from "@/api/charting"
+import CollapsibleSection from "@/components/CollapsibleSection.vue"
 
 const props = defineProps<{ scope?: ChartScopeQuery }>()
 
@@ -77,14 +78,16 @@ const chartSeries = computed(() => {
     <template v-else>
       <apexchart v-if="points.length" type="line" :options="chartOptions" :series="chartSeries" :height="340" />
       <p v-else class="text-sm text-slate-500">No income data for this scope.</p>
-      <table v-if="points.length" class="w-full text-sm">
-        <thead><tr class="text-left text-slate-400"><th class="py-1">Month</th><th>Dividends</th><th>Interest</th><th>Options</th><th>Total</th><th>Partial</th></tr></thead>
-        <tbody>
-          <tr v-for="p in points" :key="p.period" class="border-t border-slate-100 dark:border-slate-800">
-            <td class="py-1">{{ p.period }}</td><td>{{ p.dividends }}</td><td>{{ p.interest }}</td><td>{{ p.options }}</td><td>{{ p.total }}</td><td>{{ p.partial ? "yes" : "" }}</td>
-          </tr>
-        </tbody>
-      </table>
+      <CollapsibleSection v-if="points.length" title="Monthly income" testid="monthly-income-chart-table">
+        <table class="w-full text-sm">
+          <thead><tr class="text-left text-slate-400"><th class="py-1">Month</th><th>Dividends</th><th>Interest</th><th>Options</th><th>Total</th><th>Partial</th></tr></thead>
+          <tbody>
+            <tr v-for="p in points" :key="p.period" class="border-t border-slate-100 dark:border-slate-800">
+              <td class="py-1">{{ p.period }}</td><td>{{ p.dividends }}</td><td>{{ p.interest }}</td><td>{{ p.options }}</td><td>{{ p.total }}</td><td>{{ p.partial ? "yes" : "" }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </CollapsibleSection>
     </template>
   </div>
 </template>
