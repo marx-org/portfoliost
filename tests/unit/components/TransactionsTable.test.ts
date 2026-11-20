@@ -203,12 +203,26 @@ describe("TransactionsTable — an in-kind transfer is not a payment", () => {
       items: [
         tx({ type: "TRANSFER_OUT", quantity: 5, totalAmount: 5000 }),
         tx({ type: "TRANSFER_IN", quantity: 5, totalAmount: 5000 }),
+        // A real cash row in the same group: if transfers contributed their
+        // notional, the subtotal would be swamped and would not equal this SELL.
+        tx({ type: "SELL", quantity: 2, totalAmount: 1000 }),
       ],
-      total: 2, page: 1, totalPages: 1,
+      total: 3, page: 1, totalPages: 1,
     } as never)
     const wrapper = await mountTable()
-    // 10000 of notional cost between the two legs would dominate any total shown.
-    expect(wrapper.text()).not.toContain("10,000")
-    expect(wrapper.text()).not.toContain("$5,000")
+    // Grouping is "none" by default, which renders no group subtotal. Switch it
+    // on so the subtotal row exists to assert against.
+    await wrapper.get('select[aria-label="Group by"]').setValue("assetType")
+    await flushPromises()
+    const subtotalRow = wrapper.findAll("tr").find((r) => r.text().includes("subtotal"))
+    // With transfers forced to 0 the subtotal is just the SELL (+1000); if the
+    // notional legs leaked in it would read 5,000 / 10,000. Assert the exact
+    // figure, not just the absence of the notional — a positive assertion fails
+    // if the subtotal feature is removed entirely, which the old negative-only
+    // test did not.
+    expect(subtotalRow, "group subtotal row").toBeTruthy()
+    expect(subtotalRow!.text()).toContain("1,000.00")
+    expect(subtotalRow!.text()).not.toContain("10,000")
+    expect(subtotalRow!.text()).not.toContain("5,000")
   })
 })

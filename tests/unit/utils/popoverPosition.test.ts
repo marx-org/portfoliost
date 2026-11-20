@@ -60,8 +60,12 @@ describe("computePopoverPosition", () => {
     expect(pos.left + panel.width).toBeLessThanOrEqual(viewport.width - VIEWPORT_MARGIN)
   })
 
-  it("exposes an estimated panel size for the first paint", () => {
-    expect(ESTIMATED_PANEL).toEqual({ width: 288, height: 320 })
+  it("exposes a non-zero estimated panel size for the first paint", () => {
+    // The old assertion pinned ESTIMATED_PANEL to its own literal, which restates
+    // the constant. What matters is that it is a sane, non-zero box; the exact
+    // pixel size is a layout-tuning detail, not a behaviour.
+    expect(ESTIMATED_PANEL.width).toBeGreaterThan(0)
+    expect(ESTIMATED_PANEL.height).toBeGreaterThan(0)
   })
 })
 

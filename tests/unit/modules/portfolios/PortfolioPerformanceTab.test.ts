@@ -313,10 +313,6 @@ describe("yearlyReturns (§82.3 / D88)", () => {
   })
 
   /**
-   * `Π(1 + twr)` reconciles exactly, and this is the property that catches a
-   * wrong base year: it is the telescoping ratio of the stored index.
-   */
-  /**
    * §82.5 (PROD) — `Σ gains` reconciles to `totalReturn` ONLY when the series
    * opens at net 0. It telescopes to `net(last) − net(first)`, so on a series
    * that already carries a gain or a loss on its first snapshot day the two
@@ -328,20 +324,13 @@ describe("yearlyReturns (§82.3 / D88)", () => {
    * Crypto. Every fixture opened at 0, which is why the original assertion passed
    * and the e2e passed, and why only a deploy to real data exposed it.
    *
-   * The opening-net values are the data defect §78.1/§78.2 already own (XTB's
-   * missing `Wpłata` row, IBKR / IKE Marek / IKE Beata's missing ledger rows).
-   * §82 does not paper over it — but it must not assert it away either.
+   * The old "reconciles: Σ gains equals totalReturn MINUS the series' opening
+   * net" case used WORKED, which opens at 0, so it asserted `openingNet === 0`
+   * and then compared the fixture to itself — it could never have caught the
+   * invariant it was written for. The Marek case below is the one with teeth;
+   * WORKED's reconciliation is already covered by "compounds to ×1.7044 and sums
+   * the gains to 13,240" above.
    */
-  it("reconciles: Σ gains equals totalReturn MINUS the series' opening net", () => {
-    const netOf = (p: { value: number; invested: number }) => p.value - p.invested
-    const openingNet = netOf(WORKED[0])
-    const totalReturn = netOf(WORKED[WORKED.length - 1])
-    // WORKED opens at net 0, so the two coincide here — which is precisely why
-    // this fixture could never have caught the false invariant.
-    expect(openingNet).toBe(0)
-    expect(yearlyTotals(yearlyReturns(WORKED, TODAY)).gain).toBeCloseTo(totalReturn - openingNet, 6)
-  })
-
   it("shows the gap on a PROD-shaped series whose first day already carries a net loss", () => {
     // IKE Marek's shape: opens 2 610.72 under water, closes 37 314.36 over.
     const marek = [point("2021-10-22", 100, -2610.72), point("2021-12-31", 120, 10000), point("2022-12-31", 150, 37314.36)]

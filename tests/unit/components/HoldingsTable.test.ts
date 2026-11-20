@@ -547,7 +547,6 @@ describe("HoldingsTable — §157 client-side search, paging and symbol scaling"
     await flushPromises()
     expect(URL.revokeObjectURL).toHaveBeenCalled()
     const csv = blobParts.join("")
-    expect(csv).toBeDefined()
     const lines = csv.split("\n")
     expect(lines[0]).toBe("Symbol,Quantity,Avg Cost,Price,Market Value,Unrealized P/L,Realized P/L,Weight")
     // Only the single matching row is exported (filtered), not all 25.

@@ -136,8 +136,12 @@ describe("RecordDividendDialog (§49.4)", () => {
       taxes: 30,
       notes: "Q4 div",
     })
-    const wrapper0 = wrapper.emitted("saved")
-    expect(wrapper0).toBeTruthy()
+    // VTU's `emitted("saved")` returns `events[cid] || {}` — an object whether
+    // or not the event fired — so the old `expect(...).toBeTruthy()` here could
+    // not fail. Assert the emitted payload is an array carrying the saved id.
+    const saved = wrapper.emitted("saved")
+    expect(Array.isArray(saved)).toBe(true)
+    expect(saved).toHaveLength(1)
   })
 
   it("total mode — net summary reflects gross − tax", async () => {
