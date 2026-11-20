@@ -31,6 +31,8 @@ test("charting shows an empty state and a preset is applied", async ({ page }) =
   await expect(page.getByTestId("stock-chip")).toHaveCount(8)
   await expect(page.getByText(/8\/10 selected/)).toBeVisible()
   await expect(page.locator(".apexcharts-canvas").first()).toBeVisible()
+  // #137 moved the comparison table into a collapsed CollapsibleSection.
+  await page.getByTestId("charting-compare-table-toggle").click()
   await expect(page.getByText("P/E (TTM)").last()).toBeVisible()
 
   expect(consoleErrors).toEqual([])
@@ -55,6 +57,8 @@ test("charting adds stocks via search and compares them", async ({ page }) => {
 
   await expect(page.getByTestId("stock-chip")).toHaveCount(2)
   await expect(page.locator(".apexcharts-canvas").first()).toBeVisible()
+  // #137 moved the comparison table into a collapsed CollapsibleSection.
+  await page.getByTestId("charting-compare-table-toggle").click()
   await expect(page.locator("th", { hasText: "AAPL" })).toBeVisible()
   await expect(page.locator("th", { hasText: "MSFT" })).toBeVisible()
 })
@@ -85,6 +89,8 @@ test("charting switches metric and removes a stock", async ({ page }) => {
   await expect(page.locator(".apexcharts-canvas").first()).toBeVisible()
 
   await page.getByTestId("metric-picker").selectOption("netMargin")
+  // #137 moved the comparison table into a collapsed CollapsibleSection.
+  await page.getByTestId("charting-compare-table-toggle").click()
   await expect(page.getByText("Net Margin").last()).toBeVisible()
 
   await page.getByTestId("remove-stock").first().click()
