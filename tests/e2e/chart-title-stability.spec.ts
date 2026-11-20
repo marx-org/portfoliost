@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test"
+import { login } from "./helpers/login"
 
 /**
  * §47.6 — the Price Chart title carries the resolved instrument currency and
@@ -6,13 +7,6 @@ import { expect, test } from "@playwright/test"
  * cross-currency note appear — no card reflow. Plan §48.5: the currency is
  * shown as the title selector, defaulted to the instrument's base currency.
  */
-async function login(page: import("@playwright/test").Page) {
-  await page.goto("/login")
-  await page.getByTestId("email").fill("demo@example.com")
-  await page.getByTestId("password").fill("example-service-mock")
-  await page.getByTestId("signin").click()
-  await page.waitForURL(/investments/, { timeout: 20000 })
-}
 
 interface Box {
   x: number

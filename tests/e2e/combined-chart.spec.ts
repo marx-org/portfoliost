@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test"
+import { login } from "./helpers/login"
 
 const GATEWAY = process.env.PORTFOLIOST_GATEWAY_URL || "http://localhost:8080"
 
@@ -12,13 +13,6 @@ const GATEWAY = process.env.PORTFOLIOST_GATEWAY_URL || "http://localhost:8080"
  * while the aggregate returned nulls, and a tab that renders four `—` looks
  * exactly like a working page. §83.6's own note calls this the failure mode.
  */
-async function login(page: import("@playwright/test").Page) {
-  await page.goto("/login")
-  await page.getByTestId("email").fill("demo@example.com")
-  await page.getByTestId("password").fill("example-service-mock")
-  await page.getByTestId("signin").click()
-  await expect(page).toHaveURL(/\/en\/investments/)
-}
 
 async function openTab(page: import("@playwright/test").Page) {
   await page.goto("/en/investments/performance")

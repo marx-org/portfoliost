@@ -1,17 +1,10 @@
 import { expect, test, type Page } from "@playwright/test"
+import { login } from "./helpers/login"
 
 // §36 — an admin page was reachable only by clicking through the nav. A hard
 // load of /en/admin/* ran the router guard before /auth/me had answered, read
 // the unhydrated store as "not an admin" and bounced to /en/investments, so
 // deep links, refreshes and bookmarks all landed on the dashboard.
-
-async function login(page: Page) {
-  await page.goto("/login")
-  await page.getByTestId("email").fill("demo@example.com")
-  await page.getByTestId("password").fill("example-service-mock")
-  await page.getByTestId("signin").click()
-  await expect(page).toHaveURL(/\/en\//)
-}
 
 test("a hard load of an admin deep link stays on that page", async ({ page }) => {
   await login(page)

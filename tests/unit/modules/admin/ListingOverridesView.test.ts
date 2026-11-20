@@ -1,9 +1,7 @@
 import { flushPromises, mount } from "@vue/test-utils"
 import { createPinia, setActivePinia } from "pinia"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import type { RouteLocationNormalized } from "vue-router"
 import ListingOverridesView from "@/modules/admin/ListingOverridesView.vue"
-import router, { authGuard } from "@/router"
 import {
   createListingOverride,
   disableListingOverride,
@@ -219,15 +217,7 @@ describe("ListingOverridesView", () => {
     expect(panel.text()).toContain("CAD")
     expect(panel.text()).toContain("ticker collision")
   })
-
-  it("auth redirect: the route is admin-guarded and bounces anonymous users to login", async () => {
-    setActivePinia(createPinia())
-    localStorage.clear()
-    const resolved = router.resolve({ name: "admin-listing-overrides" })
-    expect(resolved.meta.admin).toBe(true)
-
-    // No token in storage — the guard must not let an anonymous deep link through.
-    const result = await authGuard(resolved as unknown as RouteLocationNormalized)
-    expect(result).toMatchObject({ name: "login" })
-  })
+  // The admin-route guard behaviour ("admin-listing-overrides has meta.admin and
+  // bounces anonymous users to login") was also asserted here; it is the router's
+  // contract, not this view's, and is already covered in tests/unit/router/authGuard.test.ts.
 })

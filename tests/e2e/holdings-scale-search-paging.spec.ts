@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test"
+import { login } from "./helpers/login"
 
 /** §157 — the holdings table scales (no horizontal scroll, the symbol column
  *  absorbs long names), and gains a client-side search filter and paging. Both
@@ -13,14 +14,6 @@ import { expect, test } from "@playwright/test"
 
 const GATEWAY = process.env.PORTFOLIOST_GATEWAY_URL || "http://localhost:8080"
 const MOCK = process.env.PORTFOLIOST_MOCK_URL || "http://localhost:4010"
-
-async function login(page: import("@playwright/test").Page) {
-  await page.goto("/login")
-  await page.getByTestId("email").fill("demo@example.com")
-  await page.getByTestId("password").fill("example-service-mock")
-  await page.getByTestId("signin").click()
-  await expect(page).toHaveURL(/\/en\/investments/)
-}
 
 async function getBearerToken(request: import("@playwright/test").APIRequestContext): Promise<string> {
   const res = await request.post(`${MOCK}/api/auth/login`, {

@@ -18,6 +18,7 @@
  */
 import { expect, test, type Page, type APIRequestContext } from "@playwright/test"
 import { readFileSync } from "node:fs"
+import { login } from "./helpers/login"
 
 const GATEWAY = process.env.PORTFOLIOST_GATEWAY_URL || "http://localhost:8080"
 const MOCK = process.env.PORTFOLIOST_MOCK_URL || "http://localhost:4010"
@@ -35,14 +36,6 @@ type Position = {
   quantity?: number
   assetType?: string
   isOpen?: boolean
-}
-
-async function login(page: Page) {
-  await page.goto("/login")
-  await page.getByTestId("email").fill("demo@example.com")
-  await page.getByTestId("password").fill("example-service-mock")
-  await page.getByTestId("signin").click()
-  await expect(page).toHaveURL(/\/en\/investments/)
 }
 
 async function auth(request: APIRequestContext): Promise<Record<string, string>> {

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test"
+import { login } from "./helpers/login"
 
 /** §48.6e B2 — holdings `converted*` values are portfolio-base-currency
  * (wallets D21b; each position declares the denomination in
@@ -13,14 +14,6 @@ const GATEWAY = process.env.PORTFOLIOST_GATEWAY_URL || "http://localhost:8080"
 const MOCK = process.env.PORTFOLIOST_MOCK_URL || "http://localhost:4010"
 const USD_PLN = 4.3 / 1.08
 const PLN_USD = 1.08 / 4.3
-
-async function login(page: import("@playwright/test").Page) {
-  await page.goto("/login")
-  await page.getByTestId("email").fill("demo@example.com")
-  await page.getByTestId("password").fill("example-service-mock")
-  await page.getByTestId("signin").click()
-  await expect(page).toHaveURL(/\/en\/investments/)
-}
 
 async function getBearerToken(request: import("@playwright/test").APIRequestContext): Promise<string> {
   const res = await request.post(`${MOCK}/api/auth/login`, {

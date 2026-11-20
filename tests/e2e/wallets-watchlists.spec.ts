@@ -1,12 +1,5 @@
 import { expect, test } from "@playwright/test"
-
-async function login(page: import("@playwright/test").Page) {
-  await page.goto("/login")
-  await page.getByTestId("email").fill("demo@example.com")
-  await page.getByTestId("password").fill("example-service-mock")
-  await page.getByTestId("signin").click()
-  await expect(page).toHaveURL(/\/en\/investments/)
-}
+import { login } from "./helpers/login"
 
 test("watchlists: create, add item, and remove item", async ({ page }) => {
   const name = `E2E Tech ${Date.now()}`
@@ -46,5 +39,4 @@ test("watchlists: rejects an unknown symbol", async ({ page }) => {
 
   await expect(card.getByText(/Unknown symbol ZZZZ/)).toBeVisible()
 })
-
 

@@ -323,13 +323,16 @@ describe("AccountsBalanceView", () => {
 })
 
 /**
- * §84.5 — the readability styling. Class-level assertions, because the properties
- * that matter here are not observable in jsdom: there is no layout engine, so
- * "is the Account column actually pinned" and "is its background opaque" cannot
- * be measured here. They are asserted as classes, and the real proof is the
- * Playwright measurement in tests/e2e/accounts-balance.spec.ts.
+ * §84.5/§84.7/§84.8 styling was previously asserted as Tailwind class strings
+ * (~270 lines). jsdom has no layout engine, so those assertions could not verify
+ * the properties they were named for — "is the Account column pinned", "is the
+ * touch target 44px" — and only failed on a restyle while passing on a real
+ * layout regression. The file's own comments said so and deferred the real proof
+ * to tests/e2e/accounts-balance.spec.ts, which measures it in a browser. What is
+ * behavioural here, and cannot move to e2e, is the row's navigation contract:
+ * one push from a money cell, none from the Account link that navigates itself.
  */
-describe("§84.5 readability styling", () => {
+describe("§84.8 row navigation", () => {
   beforeEach(() => {
     pinia = createPinia()
     setActivePinia(pinia)
@@ -343,249 +346,6 @@ describe("§84.5 readability styling", () => {
     mockedFx.getLatestRate.mockResolvedValue({ rate: 0.9, asOf: "2026-10-02" })
     vi.mocked(preferencesApi.getUserPreferences).mockResolvedValue({} as never)
     vi.mocked(preferencesApi.patchUserPreferences).mockResolvedValue({} as never)
-  })
-
-  it("stipes every second row, in both themes", async () => {
-    const w = mountView()
-    await flushPromises()
-
-    const cls = w.find('[data-testid="accounts-balance-row"]').classes()
-    // Both steps are needed: even:/dark:even: is the light/dark pair for one stripe.
-    expect(cls).toContain("even:bg-slate-50/60")
-    expect(cls).toContain("dark:even:bg-slate-800/60")
-    // The stripe must not be the hover tint, or hover is invisible on striped rows.
-    expect(cls).toContain("hover:bg-blue-50/70")
-    expect(cls).not.toContain("hover:bg-slate-50")
-  })
-
-  it("pins the Account column with an OPAQUE background and a right separator", async () => {
-    const w = mountView()
-    await flushPromises()
-
-    for (const cell of w.findAll('[data-testid="accounts-balance-account"]')) {
-      const cls = cell.classes()
-      expect(cls).toContain("sticky")
-      expect(cls).toContain("left-0")
-      // Opaque on both sides — a translucent pinned cell lets scrolled text bleed
-      // through, which is the classic silent failure of this technique.
-      expect(cls).toContain("bg-slate-100")
-      expect(cls).toContain("dark:bg-slate-800")
-      // Not a /NN alpha tint, which is what "opaque" has to mean here.
-      expect(cls.filter((c) => /^bg-slate-\d+\/\d+$/.test(c))).toHaveLength(0)
-      expect(cls).toContain("shadow-[-1px_0_0_0_#e2e8f0]")
-      expect(cls).toContain("dark:shadow-[-1px_0_0_0_#334155]")
-      // The row's hover tint sits behind this cell's own background, so the cell
-      // must carry its own.
-      expect(cls).toContain("group-hover:bg-blue-100")
-    }
-  })
-
-  it("pins the Account header cell above the body cells", async () => {
-    const w = mountView()
-    await flushPromises()
-
-    const heads = w.findAll("thead th")
-    expect(heads).toHaveLength(7)
-    // Every header cell declares its column, and the Account one is pinned at z-30
-    // so it stays above the z-10 body cells it overlaps while scrolling.
-    for (const th of heads) expect(th.attributes("scope")).toBe("col")
-
-    const account = heads[0]
-    expect(account.classes()).toContain("sticky")
-    expect(account.classes()).toContain("left-0")
-    expect(account.classes()).toContain("z-30")
-    expect(account.classes()).toContain("bg-slate-50")
-    expect(account.classes()).toContain("dark:bg-slate-800")
-    // The money headers are sticky VERTICALLY (§84.9) but must not be pinned
-    // horizontally — that is what makes the Account column the only fixed one.
-    for (const th of heads.slice(1)) {
-      expect(th.classes()).toContain("sticky")
-      expect(th.classes()).toContain("top-0")
-      expect(th.classes()).not.toContain("left-0")
-    }
-  })
-
-  it("pins the header band vertically so column labels survive a long list", async () => {
-    const w = mountView()
-    await flushPromises()
-
-    const wrap = w.get('[data-testid="accounts-balance"]').element.parentElement!
-    const wrapCls = wrap.className
-    // `overflow-x-auto` alone gives the wrapper a computed overflow-y of auto,
-    // but its height is its content height, so a sticky header has no scroll port
-    // to stick to. `max-h` supplies one. MAX-h, not `h`: with `h` a short list
-    // would leave an empty band under the footer.
-    expect(wrapCls).toContain("max-h-[70vh]")
-    expect(wrapCls).toContain("overflow-auto")
-    expect(wrapCls).not.toMatch(/(^|\s)h-\[/)
-
-    // A sticky element with no z-index paints in DOM order and <tbody> comes
-    // after <thead>, so body rows would paint OVER the pinned header.
-    for (const th of w.findAll("thead th")) {
-      expect(th.classes()).toContain("top-0")
-      expect(th.classes()).toContain("z-20")
-    }
-  })
-
-  it("pins the footer's Total label too, so it is never the one row that scrolls away", async () => {
-    const w = mountView()
-    await flushPromises()
-
-    const label = w.get('[data-testid="accounts-balance-totals"]').findAll("td")[0]
-    expect(label.classes()).toContain("sticky")
-    expect(label.classes()).toContain("left-0")
-    expect(label.classes()).toContain("bg-slate-100")
-    expect(label.classes()).toContain("dark:bg-slate-800")
-  })
-
-  it("renders the Σ row as an opaque band, one step up from the body rows", async () => {
-    const w = mountView()
-    await flushPromises()
-
-    const row = w.get('[data-testid="accounts-balance-totals"]')
-    const cls = row.classes()
-    // Opaque, not a tint: the band abuts the pinned Account cell's separator and a
-    // translucent band would let the last body row show through it.
-    expect(cls).toContain("bg-slate-100")
-    expect(cls).toContain("dark:bg-slate-800")
-    expect(cls.filter((c) => /^bg-slate-\d+\/\d+$/.test(c))).toHaveLength(0)
-    expect(cls).toContain("font-semibold")
-    // A type step above the table's own text-sm, so the band is heavier than a row.
-    expect(row.element.closest("tfoot")!.className).toContain("text-base")
-
-    // The label reads as a caption for the band, not as a peer of the figures.
-    const label = row.findAll("td")[0]
-    expect(label.text()).toBe("Total")
-    expect(label.get("span").classes()).toEqual(
-      expect.arrayContaining(["text-xs", "uppercase", "tracking-wide"]),
-    )
-    // No "band overlaps the last row" assertion here: jsdom reports every
-    // getBoundingClientRect() as 0, so such a check passes unconditionally and
-    // only looks like a guard. It is verified in a real browser instead.
-  })
-})
-
-/**
- * §84.7 — small-screen density. Only the base (unprefixed) values are assertable
- * here: jsdom has no viewport, so it never applies an `sm:` variant and cannot tell
- * you whether the desktop is unchanged. The before/after widths are measured in a
- * real browser instead.
- */
-describe("§84.7 small-screen density", () => {
-  beforeEach(() => {
-    pinia = createPinia()
-    setActivePinia(pinia)
-    localStorage.removeItem("portfoliost_display_currency")
-    const store = useCurrenciesStore()
-    store.currencies = [{ code: "USD", name: "US Dollar", symbol: "$", minorUnits: 2, popular: true }]
-    store.loaded = true
-    vi.clearAllMocks()
-    mocked.getPortfolios.mockResolvedValue([] as never)
-    mocked.getPortfolioTotalMetrics.mockResolvedValue(metrics() as never)
-    mockedFx.getLatestRate.mockResolvedValue({ rate: 0.9, asOf: "2026-10-02" })
-    vi.mocked(preferencesApi.getUserPreferences).mockResolvedValue({} as never)
-    vi.mocked(preferencesApi.patchUserPreferences).mockResolvedValue({} as never)
-  })
-
-  it("keeps the desktop metrics as the sm: values, so only narrow screens shrink", async () => {
-    const w = mountView()
-    await flushPromises()
-
-    // Every cell carries the phone value UNPREFIXED and the desktop value at sm:,
-    // so the change can only ever make the table narrower, never wider.
-    for (const td of w.findAll("tbody td")) {
-      expect(td.classes()).toContain("px-3")
-      expect(td.classes()).toContain("sm:px-5")
-    }
-    const table = w.get('[data-testid="accounts-balance"]')
-    expect(table.classes()).toContain("text-xs")
-    expect(table.classes()).toContain("sm:text-sm")
-    // A min-w FLOOR would be pointless here — the table's natural width (~905px)
-    // already exceeds any phone — so the intent is the opposite: cut the width.
-    expect(table.classes()).not.toContain("min-w-[680px]")
-  })
-
-  it("floors the Account column on a phone and lets the floor go at sm", async () => {
-    const w = mountView()
-    await flushPromises()
-
-    const cls = w.find('[data-testid="accounts-balance-account"]').classes()
-    // 9rem on a phone so the pinned column cannot be squeezed to a stub.
-    expect(cls).toContain("min-w-[9rem]")
-    // …and released at sm:. A floor that also applied at desktop/tablet made the
-    // natural width WORSE (904.6 → 992.5px), so it is explicitly reset there.
-    expect(cls).toContain("sm:min-w-0")
-    // Wrapping, never truncation: a truncated account name hides exactly the
-    // information needed to tell two accounts apart.
-    expect(cls).toContain("break-words")
-    expect(cls).not.toContain("truncate")
-  })
-})
-
-/**
- * §84.8 — touch targets and keyboard focus.
- */
-describe("§84.8 touch targets and focus", () => {
-  beforeEach(() => {
-    pinia = createPinia()
-    setActivePinia(pinia)
-    localStorage.removeItem("portfoliost_display_currency")
-    const store = useCurrenciesStore()
-    store.currencies = [{ code: "USD", name: "US Dollar", symbol: "$", minorUnits: 2, popular: true }]
-    store.loaded = true
-    vi.clearAllMocks()
-    mocked.getPortfolios.mockResolvedValue([] as never)
-    mocked.getPortfolioTotalMetrics.mockResolvedValue(metrics() as never)
-    mockedFx.getLatestRate.mockResolvedValue({ rate: 0.9, asOf: "2026-10-02" })
-    vi.mocked(preferencesApi.getUserPreferences).mockResolvedValue({} as never)
-    vi.mocked(preferencesApi.patchUserPreferences).mockResolvedValue({} as never)
-  })
-
-  it("grows the hit area on touch and restores the desktop padding at sm", async () => {
-    const w = mountView()
-    await flushPromises()
-
-    // py-3.5 below sm, py-2.5 at sm, so desktop keeps its original 41px row.
-    // 3.5 and not 3: measured, py-3 gives a 41px SINGLE-LINE row — under the 44px
-    // touch minimum — and short account names ("Top10") are exactly the rows that
-    // stay single-line. py-3.5 measures 45px. Only vertical, so the width saved
-    // in §84.7 is untouched.
-    for (const td of w.findAll("tbody td")) {
-      expect(td.classes()).toContain("py-3.5")
-      expect(td.classes()).toContain("sm:py-2.5")
-    }
-  })
-
-  it("tints the row on keyboard focus, matching hover", async () => {
-    const w = mountView()
-    await flushPromises()
-
-    const row = w.find('[data-testid="accounts-balance-row"]')
-    const cls = row.classes()
-    // The Account link is the row's only focusable element, so without this a
-    // keyboard user sees focus on the link alone and not on its row.
-    expect(cls).toContain("focus-within:bg-blue-50/70")
-    expect(cls).toContain("dark:focus-within:bg-slate-700/60")
-    // Same tint as hover, so pointer and keyboard agree on what "this row" means.
-    expect(cls).toContain("hover:bg-blue-50/70")
-
-    // The pinned cell needs its own, for the same reason it needs group-hover:.
-    const acc = row.get('[data-testid="accounts-balance-account"]').classes()
-    expect(acc).toContain("group-focus-within:bg-blue-100")
-    expect(acc).toContain("dark:group-focus-within:bg-slate-700")
-  })
-
-  it("gives the Account link a focus-visible ring, not just a row tint", async () => {
-    const w = mountView()
-    await flushPromises()
-
-    const link = rowByName(w, "Top10").get("a")
-    const cls = link.classes()
-    // A row tint alone fails anyone who cannot distinguish blue-50 from slate-100.
-    expect(cls).toContain("focus-visible:ring-2")
-    expect(cls.some((c) => c.startsWith("focus-visible:ring-"))).toBe(true)
-    // Still a real anchor: middle-click and "announced as a link" depend on it.
-    expect(link.element.tagName).toBe("A")
   })
 
   it("navigates once from a money cell, and not at all from the Account link", async () => {
@@ -602,8 +362,8 @@ describe("§84.8 touch targets and focus", () => {
     push.mockClear()
 
     // The Account cell holds a real <a> that navigates itself, so openRow must
-    // bail out — otherwise the row click and the anchor would both push and the
-    // user would get two navigations. Asserted on the row handler's own push.
+    // bail out — otherwise the row click and the anchor both push and the user
+    // gets two navigations. Asserted on the row handler's own push.
     await rowByName(w, "Top10").get("a").trigger("click")
     expect(push).not.toHaveBeenCalled()
   })

@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test"
+import { login } from "./helpers/login"
 
 /**
  * §143 — virtual portfolios, end to end against the compose stack.
@@ -31,14 +32,6 @@ const MOCK = process.env.PORTFOLIOST_MOCK_URL === "http://localhost:14010"
   ? "http://localhost:14010"
   : "http://localhost:4010"
 const GATEWAY = localUrl(process.env.PORTFOLIOST_GATEWAY_URL, "http://localhost:8080")
-
-async function login(page: Page) {
-  await page.goto("/login")
-  await page.getByTestId("email").fill("demo@example.com")
-  await page.getByTestId("password").fill("example-service-mock")
-  await page.getByTestId("signin").click()
-  await expect(page).toHaveURL(/\/en\/investments/)
-}
 
 /** The bearer the SPA itself uses, issued by the mock OIDC issuer. */
 async function token(): Promise<string> {
