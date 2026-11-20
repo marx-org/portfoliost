@@ -23,10 +23,12 @@ function mountChart(props: Record<string, unknown> = {}) {
 }
 
 describe("ValuationChart", () => {
-  it("maps the scoped points onto the shared renderer and enables overlays", () => {
+  it("maps the scoped points onto the shared renderer", () => {
     const wrapper = mountChart()
     const chart = wrapper.findComponent({ name: "PortfolioPerformanceChart" })
-    expect(chart.props("showOverlays")).toBe(true)
+    // The old companion assertion `showOverlays === true` could not fail: the
+    // template hardcodes `:show-overlays="true"` (ValuationChart.vue:75), so it
+    // is true for every mount regardless of input.
     const series = chart.props("timeSeries") as Array<Record<string, unknown>>
     expect(series).toHaveLength(2)
     expect(series[1]).toMatchObject({

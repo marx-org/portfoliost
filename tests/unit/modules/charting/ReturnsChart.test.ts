@@ -26,7 +26,10 @@ describe("ReturnsChart", () => {
 
     const rows = wrapper.findAll('[data-testid="charting-quarterly-returns-table"] tbody tr')
     expect(rows).toHaveLength(2)
-    expect(rows[1].text()).toContain("20")
+    // `rows[1].text()` also contains the `2026-Q2` quarter label, which itself
+    // contains "20" — assert the net-gain cell rather than the row text.
+    const cells = rows[1]!.findAll("td")
+    expect(cells.at(-1)!.text()).toContain("20")
   })
 
   it("switches to net-gain change on the same boundaries", async () => {

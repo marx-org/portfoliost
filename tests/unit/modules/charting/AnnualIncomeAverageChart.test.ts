@@ -20,8 +20,13 @@ describe("AnnualIncomeAverageChart", () => {
     })
     const rows = wrapper.findAll("tbody tr")
     expect(rows).toHaveLength(2)
-    expect(rows[0].text()).toContain("365")
-    expect(rows[1].text()).toContain("2")
+    // The table echoes `p.divisor` and `p.amount`, so assert the per-row cells
+    // rather than `rows[n].text()`, which also carries the year (`2026` contains
+    // "2", as the old assertion relied on).
+    expect(rows[0]!.findAll("td")[2]!.text()).toBe("365")
+    expect(rows[0]!.findAll("td")[3]!.text()).toBe("1")
+    expect(rows[1]!.findAll("td")[0]!.text()).toContain("2026")
+    expect(rows[1]!.findAll("td")[3]!.text()).toBe("2")
     expect(wrapper.get('[data-testid="annual-income-average-day"]').text()).toContain("÷ 365")
   })
 
@@ -35,7 +40,7 @@ describe("AnnualIncomeAverageChart", () => {
       global: { stubs: { apexchart: true } },
     })
     expect(wrapper.get('[data-testid="annual-income-average-month"]').text()).toContain("÷ 12")
-    expect(wrapper.get("tbody").text()).toContain("100")
+    expect(wrapper.get("tbody").findAll("tr")[0]!.findAll("td")[3]!.text()).toBe("100")
   })
 
   it("marks the current partial year and says it is not a forecast", () => {

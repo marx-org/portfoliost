@@ -55,8 +55,17 @@ describe("MonthlyIncomeChart", () => {
     mockedIncome.mockResolvedValue(dataset() as never)
     const wrapper = mountChart()
     await flushPromises()
-    expect(mockedIncome).toHaveBeenCalled()
-    expect(wrapper.find('[data-testid="monthly-income-chart"]').exists()).toBe(true)
+    // The old assertions were `toHaveBeenCalled()` plus the existence of the
+    // root `<div data-testid="monthly-income-chart">`, which renders
+    // unconditionally — neither checked the scope or the rendered data.
+    // useChartScope's default query is empty accounts/labels and kind "normal";
+    // what proves the scope is wired is that this is what the fetcher receives.
+    expect(mockedIncome).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "normal", accounts: undefined, labels: undefined }),
+    )
+    // The rows come from the mocked response, so the render is what proves the
+    // response reached the table.
+    expect(wrapper.findAll("tbody tr")).toHaveLength(3)
   })
 
   it("shows an empty state when there is no income", async () => {

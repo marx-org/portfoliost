@@ -8,10 +8,20 @@ describe("chart registry", () => {
   })
 
   it("groups charts by category", () => {
-    for (const cat of ["performance", "income", "allocation", "cash", "categories"] as const) {
-      const list = chartsByCategory(cat)
-      expect(list.length).toBeGreaterThan(0)
-      expect(list.every((c) => c.category === cat)).toBe(true)
+    // The old companion assertion `list.every(c => c.category === cat)` could
+    // not fail: `chartsByCategory` is `chartRegistry.filter(c => c.category ===
+    // category)`, so every returned element satisfies the predicate by
+    // construction. What is worth pinning is which charts each category
+    // resolves to, so a chart silently dropped from (or added to) a tab fails.
+    const expected: Record<string, string[]> = {
+      performance: ["performance-valuation", "performance-benchmark", "performance-quarterly", "performance-scatter"],
+      income: ["income-monthly", "income-cumulative", "income-annual", "income-daily-average", "income-monthly-average", "income-quarterly", "income-quarterly-yoy", "income-payer-coverage"],
+      allocation: ["allocation-currency", "allocation-asset-type", "allocation-sector", "allocation-category", "allocation-cost-basis", "allocation-composition"],
+      cash: ["cash-balance", "cash-contributions", "cash-cumulative-contributions"],
+      categories: ["stock-categories"],
+    }
+    for (const [cat, ids] of Object.entries(expected)) {
+      expect(chartsByCategory(cat as "performance").map((c) => c.id)).toEqual(ids)
     }
   })
 
