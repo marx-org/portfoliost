@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test"
+import { login } from "./helpers/login"
 
 /**
  * §84.3 — the Accounts balance tab, end to end against the compose stack.
@@ -16,14 +17,6 @@ import { expect, test, type Locator, type Page } from "@playwright/test"
 
 const GATEWAY = process.env.PORTFOLIOST_GATEWAY_URL || "http://localhost:8080"
 const MOCK = process.env.PORTFOLIOST_MOCK_URL || "http://localhost:4010"
-
-async function login(page: Page) {
-  await page.goto("/login")
-  await page.getByTestId("email").fill("demo@example.com")
-  await page.getByTestId("password").fill("example-service-mock")
-  await page.getByTestId("signin").click()
-  await expect(page).toHaveURL(/\/en\/investments/)
-}
 
 async function bearer(request: import("@playwright/test").APIRequestContext): Promise<string> {
   const res = await request.post(`${MOCK}/api/auth/login`, {

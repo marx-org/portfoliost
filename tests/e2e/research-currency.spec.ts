@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test"
+import { login } from "./helpers/login"
 
 /**
  * §47.5 — the research UI never renders a guessed USD currency:
@@ -15,14 +16,6 @@ import { expect, test } from "@playwright/test"
  * mocks/shared/data/research and is contract-tested in mocks/tests/run.mjs.
  */
 type Carrier = { currency: string | null; currencySource: string }
-
-async function login(page: import("@playwright/test").Page) {
-  await page.goto("/login")
-  await page.getByTestId("email").fill("demo@example.com")
-  await page.getByTestId("password").fill("example-service-mock")
-  await page.getByTestId("signin").click()
-  await page.waitForURL(/investments/, { timeout: 20000 })
-}
 
 /** Serve a fixed currency + currencySource on the profile and quote carriers. */
 async function overrideCurrency(page: import("@playwright/test").Page, symbol: string, carrier: Carrier) {

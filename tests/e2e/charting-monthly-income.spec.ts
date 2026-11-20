@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test"
+import { login } from "./helpers/login"
 
 /**
  * Income chart, end to end against the dockerized stack (feature #253,
@@ -14,14 +15,6 @@ import { expect, test } from "@playwright/test"
  */
 
 const TOP10 = "3cb589d8-f92d-428f-aeab-9ee5d4b9cef2"
-
-async function login(page: import("@playwright/test").Page) {
-  await page.goto("/login")
-  await page.getByTestId("email").fill("demo@example.com")
-  await page.getByTestId("password").fill("example-service-mock")
-  await page.getByTestId("signin").click()
-  await expect(page).toHaveURL(/\/en\/investments/)
-}
 
 test("income chart renders monthly dividends/interest/options with a zero and a partial month", async ({ page }) => {
   const consoleErrors: string[] = []

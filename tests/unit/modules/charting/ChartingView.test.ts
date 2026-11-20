@@ -69,8 +69,14 @@ describe("ChartingView", () => {
     expect(mockedCompare).toHaveBeenCalledWith(["AAPL", "MSFT"])
     expect(wrapper.findAll('[data-testid="stock-chip"]').length).toBe(2)
     expect(wrapper.find('[data-testid="compare-chart"]').exists()).toBe(true)
-    expect(wrapper.text()).toContain("P/E (TTM)")
-    expect(wrapper.text()).toContain("23.5")
+    // Assert the rendered table, not the metric <select>: `P/E (TTM)` is also an
+    // <option> label, so `wrapper.text()` contains it even when the comparison
+    // table never renders. The row label must be in <tbody>, and the cell must
+    // carry the fixture's formatted value.
+    const bodyRows = wrapper.findAll('[data-testid="compare-chart"] tbody tr')
+    expect(bodyRows).toHaveLength(1)
+    expect(bodyRows[0]!.findAll("td")[0]!.text()).toBe("P/E (TTM)")
+    expect(bodyRows[0]!.findAll("td")[1]!.text()).toBe("23.5")
   })
 
   it("removes a stock", async () => {
@@ -134,7 +140,8 @@ describe("ChartingView", () => {
     }
   })
 
-  it("changes the metric via the picker", async () => {    const wrapper = mountView()
+  it("changes the metric via the picker", async () => {
+    const wrapper = mountView()
     await flushPromises()
     await wrapper.findComponent({ name: "InstrumentSearchModal" }).vm.$emit("add", "AAPL", "Apple Inc")
     await wrapper.findComponent({ name: "InstrumentSearchModal" }).vm.$emit("add", "MSFT", "Microsoft Corp")
@@ -143,6 +150,38 @@ describe("ChartingView", () => {
     await wrapper.find('[data-testid="metric-picker"]').setValue("netMargin")
     await flushPromises()
 
-    expect(wrapper.text()).toContain("Net Margin")
+    // `Net Margin` is an <option> label too, so a text assertion passes even
+    // when the picker does nothing. Assert the rendered row label and the
+    // percentage the netMargin formatter produces (fixture netMargin = 20).
+    const bodyRows = wrapper.findAll('[data-testid="compare-chart"] tbody tr')
+    expect(bodyRows).toHaveLength(1)
+    expect(bodyRows[0]!.findAll("td")[0]!.text()).toBe("Net Margin")
+    expect(bodyRows[0]!.findAll("td")[1]!.text()).toBe("20.00%")
+  })
+
+  // #137 moved the comparison table into a CollapsibleSection that is collapsed
+  // by default. CollapsibleSection keeps the body in the DOM (`v-show`), so a
+  // unit test that only reads markup passes whether the table is collapsed or
+  // not — the three e2e specs broke exactly that way. Assert the collapse
+  // contract here so the next markup change is caught by `npm run test`, which
+  // does run in CI, instead of only by e2e.
+  it("keeps the comparison table collapsed until the section is expanded", async () => {
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.findComponent({ name: "InstrumentSearchModal" }).vm.$emit("add", "AAPL", "Apple Inc")
+    await wrapper.findComponent({ name: "InstrumentSearchModal" }).vm.$emit("add", "MSFT", "Microsoft Corp")
+    await flushPromises()
+
+    const section = wrapper.get('[data-testid="charting-compare-table"]')
+    const toggle = wrapper.get('[data-testid="charting-compare-table-toggle"]')
+    const body = wrapper.get('[data-testid="charting-compare-table-body"]')
+
+    expect(toggle.attributes("aria-expanded")).toBe("false")
+    expect((body.element as HTMLElement).style.display).toBe("none")
+
+    await toggle.trigger("click")
+    expect(toggle.attributes("aria-expanded")).toBe("true")
+    expect((body.element as HTMLElement).style.display).toBe("")
+    expect(section.find("tbody tr").text()).toContain("P/E (TTM)")
   })
 })

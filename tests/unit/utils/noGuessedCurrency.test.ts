@@ -39,10 +39,10 @@ const GUESSED_FALLBACK = /(\|\||\?\?|=)\s*(?:\(\s*)?["']USD["']/
 
 describe("§66.2 no guessed currency", () => {
   const files = walk(SRC)
-
-  it("finds source files to check (sanity)", () => {
-    expect(files.length).toBeGreaterThan(50)
-  })
+  // The old suite had a separate "finds source files to check (sanity)" test
+  // asserting `files.length > 50`. Fold the guard in here so an empty walk fails
+  // loudly rather than silently passing the two real checks below.
+  expect(files.length, "no source files found to scan under src/").toBeGreaterThan(50)
 
   it("every currency formatter call passes a currency argument", () => {
     const offenders: string[] = []

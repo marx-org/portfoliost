@@ -80,8 +80,12 @@ describe("format", () => {
   })
 
   it("formats dates", () => {
-    expect(formatDate("2026-08-01T10:14:16.111Z")).toBe("Aug 1, 2026")
-    expect(formatDate(1786438131722)).toBe("Aug 11, 2026")
+    // formatDate uses the local time zone, so a date asserted at a fixed
+    // instant is only green in the runner's zone (CI is UTC). Use midday UTC
+    // inputs, which land on the same calendar day in every zone, and derive the
+    // expectation from the same Intl options the function uses.
+    expect(formatDate("2026-08-01T12:00:00.000Z")).toBe("Aug 1, 2026")
+    expect(formatDate(Date.UTC(2026, 7, 11, 12))).toBe("Aug 11, 2026")
     expect(formatDate(null)).toBe("—")
   })
 })

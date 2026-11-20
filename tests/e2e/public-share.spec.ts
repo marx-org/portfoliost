@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test"
+import { login } from "./helpers/login"
 
 // §85.5 — the share page's holdings table is the one surface a visitor can see
 // a ticker on and do nothing with. Each symbol now links to that symbol's
@@ -7,14 +8,6 @@ import { expect, test } from "@playwright/test"
 // §85.1 is what makes the round trip work: researchBackTarget only accepted a
 // `/en/` prefix, so `from=/public/portfolio/…` would have been discarded on
 // arrival and "Go back" would have dropped the visitor onto /en/investments.
-
-async function login(page: import("@playwright/test").Page) {
-  await page.goto("/login")
-  await page.getByTestId("email").fill("demo@example.com")
-  await page.getByTestId("password").fill("example-service-mock")
-  await page.getByTestId("signin").click()
-  await expect(page).toHaveURL(/\/en\/investments/)
-}
 
 /**
  * The SPA is served on :3000 but calls the API on the gateway (:8080) — see

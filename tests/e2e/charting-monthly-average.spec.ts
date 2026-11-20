@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext } from "@playwright/test"
+import { login } from "./helpers/login"
 
 /**
  * Monthly-equivalent received income, end to end against the dockerized stack
@@ -13,14 +14,6 @@ import { expect, test, type APIRequestContext } from "@playwright/test"
 const GATEWAY = process.env.PORTFOLIOST_GATEWAY_URL || "http://localhost:8080"
 const MOCK = process.env.PORTFOLIOST_MOCK_URL || "http://localhost:4010"
 const TOP10 = "3cb589d8-f92d-428f-aeab-9ee5d4b9cef2"
-
-async function login(page: import("@playwright/test").Page) {
-  await page.goto("/login")
-  await page.getByTestId("email").fill("demo@example.com")
-  await page.getByTestId("password").fill("example-service-mock")
-  await page.getByTestId("signin").click()
-  await expect(page).toHaveURL(/\/en\/investments/)
-}
 
 async function auth(request: APIRequestContext): Promise<Record<string, string>> {
   const res = await request.post(`${MOCK}/api/auth/login`, {

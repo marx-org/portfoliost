@@ -40,8 +40,14 @@ describe("nodeMatchesQuery", () => {
 
 describe("filterNodeDefs", () => {
   it("returns every node when all areas are visible and query is empty", () => {
+    // The old form compared the output ids to `topologyNodes.map(n => n.id)`,
+    // which passes even if the filter is `return nodes` — it asserted the
+    // function against its own input. Compare to the full registry id set
+    // instead, so dropping a node from the registry (or from the filter) fails.
     const out = filterNodeDefs(topologyNodes, ALL_AREAS, "")
-    expect(out.map((n) => n.id)).toEqual(topologyNodes.map((n) => n.id))
+    const expected = topologyNodes.map((n) => n.id).sort()
+    expect(out.map((n) => n.id).sort()).toEqual(expected)
+    expect(out).toHaveLength(topologyNodes.length)
   })
 
   it("honours both the area set and the query in combination", () => {

@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext } from "@playwright/test"
+import { login } from "./helpers/login"
 
 /**
  * Sector weights and values, end to end against the dockerized stack (feature
@@ -16,14 +17,6 @@ const MOCK = process.env.PORTFOLIOST_MOCK_URL || "http://localhost:4010"
 
 type Slice = { key: string; label: string; value: number; percent: number | null }
 type Allocation = { coverage: { status: string; generation: number }; bySector: Slice[]; byAssetType: Slice[] }
-
-async function login(page: import("@playwright/test").Page) {
-  await page.goto("/login")
-  await page.getByTestId("email").fill("demo@example.com")
-  await page.getByTestId("password").fill("example-service-mock")
-  await page.getByTestId("signin").click()
-  await expect(page).toHaveURL(/\/en\/investments/)
-}
 
 async function auth(request: APIRequestContext): Promise<Record<string, string>> {
   const res = await request.post(`${MOCK}/api/auth/login`, {

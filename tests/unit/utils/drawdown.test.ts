@@ -7,7 +7,7 @@ import { currentDrawdownPercent } from "@/utils/drawdown"
  * drawdown. The TWR index is the flow-neutral series the peak belongs on.
  */
 describe("currentDrawdownPercent", () => {
-  it("reads −50%, not −75%, for a deposit made during a drawdown", () => {
+  it("reads −75%, not −50%, for a deposit made during a drawdown", () => {
     // 100 → 50 → +100 → 150 → 75. Flow-neutral: the deposit lands on a flat
     // price day (index stays 50) and the portfolio then halves to 25.
     const series = [

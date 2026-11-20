@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test"
+import { login } from "./helpers/login"
 
 // D55 / steps 10-11 — click-to-inspect details panel + selection
 // highlight/dimming (step 10) and the toolbar with search + area filter pills
@@ -10,14 +11,6 @@ import { expect, test } from "@playwright/test"
 // visibility. Live status/traffic never resolves in this compose stack (the
 // admin module needs X-User-* headers or a JWT), so assertions stay on static
 // content and filtering behavior.
-
-async function login(page: import("@playwright/test").Page) {
-  await page.goto("/login")
-  await page.getByTestId("email").fill("demo@example.com")
-  await page.getByTestId("password").fill("example-service-mock")
-  await page.getByTestId("signin").click()
-  await expect(page).toHaveURL(/\/en\//)
-}
 
 async function openTopology(page: import("@playwright/test").Page) {
   await login(page)

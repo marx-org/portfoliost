@@ -1,17 +1,11 @@
 import { expect, test } from "@playwright/test"
+import { login } from "./helpers/login"
 
 /**
  * §36.4 — Top/Bottom Performers show unrealized P/L in each position's
  * instrument currency (not a hardcoded USD), with an optional converted
  * sub-line to the display currency for cross-currency positions.
  */
-async function login(page: import("@playwright/test").Page) {
-  await page.goto("/login")
-  await page.getByTestId("email").fill("demo@example.com")
-  await page.getByTestId("password").fill("example-service-mock")
-  await page.getByTestId("signin").click()
-  await page.waitForURL(/investments/, { timeout: 20000 })
-}
 
 test("top performers show P/L in the instrument currency (PLN position)", async ({ page }) => {
   await login(page)

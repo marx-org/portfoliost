@@ -62,9 +62,8 @@ describe("hasActiveTraffic", () => {
 
 describe("TOPOLOGY_NODE_TYPES", () => {
   it("provides a custom component for every node area", () => {
+    // The old second assertion (`TOPOLOGY_NODE_TYPES[area]` truthy for each
+    // area) could not fail once this key-set equality passed.
     expect(Object.keys(TOPOLOGY_NODE_TYPES).sort()).toEqual([...NODE_AREAS].sort())
-    for (const area of NODE_AREAS) {
-      expect(TOPOLOGY_NODE_TYPES[area]).toBeTruthy()
-    }
   })
 })

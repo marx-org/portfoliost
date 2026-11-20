@@ -1,13 +1,6 @@
 import { expect, test } from "@playwright/test"
 import type { Page, Request } from "@playwright/test"
-
-async function login(page: Page) {
-  await page.goto("/login")
-  await page.getByTestId("email").fill("demo@example.com")
-  await page.getByTestId("password").fill("example-service-mock")
-  await page.getByTestId("signin").click()
-  await expect(page).toHaveURL(/\/en\/investments/)
-}
+import { login } from "./helpers/login"
 
 /** Every mutating call the SPA makes, so "navigation writes nothing" is checkable. */
 function collectWrites(page: Page) {

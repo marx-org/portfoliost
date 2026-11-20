@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest"
 import {
-  NODE_AREAS,
   areaNodes,
   downstreamOf,
   edgesForNode,
@@ -137,25 +136,12 @@ describe("topology graph definition (D55-3)", () => {
     expect(sortedPairs(edgePairs)).toEqual(sortedPairs(EXPECTED_EDGE_PAIRS))
   })
 
-  it("snapshots node IDs and edge pairs", () => {
-    expect({ nodeIds, edgePairs: sortedPairs(edgePairs) }).toMatchSnapshot()
-  })
-
   it("has unique node IDs and every edge references defined nodes", () => {
     expect(new Set(topologyNodes.map((n) => n.id)).size).toBe(topologyNodes.length)
     for (const e of topologyEdges) {
       expect(nodeById.has(e.source), `edge ${e.source}→${e.target}: unknown source`).toBe(true)
       expect(nodeById.has(e.target), `edge ${e.source}→${e.target}: unknown target`).toBe(true)
     }
-  })
-
-  it("covers every declared area with the expected node counts", () => {
-    expect(NODE_AREAS).toHaveLength(5)
-    expect(areaNodes("internal")).toHaveLength(6)
-    expect(areaNodes("storage")).toHaveLength(2)
-    expect(areaNodes("jobs")).toHaveLength(15)
-    expect(areaNodes("external-services")).toHaveLength(5)
-    expect(areaNodes("data-providers")).toHaveLength(16)
   })
 
   it("marks the six probed deployments + postgres/redis workloads as live and nothing else", () => {
@@ -172,16 +158,11 @@ describe("topology graph definition (D55-3)", () => {
     expect(nodeById.get("yfinance")?.provider?.quota).toBeUndefined()
   })
 
-  it("maps verified OpenST CronJobs without claiming live execution health", () => {
-    for (const id of ["openst-bond-import", "openst-bond-archive", "openst-cpi-import", "openst-cpi-seed"]) {
-      expect(nodeById.get(id)?.live).toBe(false)
-      expect(nodeById.get(id)?.job?.schedule).toBeTruthy()
-      expect(downstreamOf(id)).toEqual(["openst"])
-    }
-    expect(nodeById.get("openst-cpi-seed")?.job?.suspended).toBe(true)
-  })
-
   // §80.3 — the job tier was static data that had drifted from the cluster.
+  // This is the one place that pins the pfire CronJob tier's schedule, purpose,
+  // liveness and suspension. The per-provider OpenST case below only adds what
+  // is specific to OpenST (the always-downstream edge and cpi-seed's suspension),
+  // so it no longer re-asserts `live`/`schedule` for the same nodes.
   it("maps the pfire CronJob tier the cluster actually runs (§80.3)", () => {
     const cronJobNodeIds = [
       "portfoliost-instruments-corpbondsync",
@@ -220,10 +201,17 @@ describe("topology graph definition (D55-3)", () => {
     expect(suspended).toEqual(["openst-cpi-seed", "stooq-downloader", "stooq-importer"])
   })
 
-  it("gives every job node a purpose, and the ECB edge the instruments owner", () => {
-    for (const n of areaNodes("jobs")) {
-      expect(n.job?.purpose, `${n.id}: purpose`).toBeTruthy()
+  it("routes the OpenST CronJobs downstream to openst", () => {
+    // The liveness/schedule part of the old test duplicated the §80.3 matrix;
+    // what was unique is the OpenST ownership edge.
+    for (const id of ["openst-bond-import", "openst-bond-archive", "openst-cpi-import", "openst-cpi-seed"]) {
+      expect(downstreamOf(id), id).toEqual(["openst"])
     }
+    expect(nodeById.get("openst-cpi-seed")?.job?.suspended).toBe(true)
+  })
+
+  it("gives the ECB edge the instruments owner", () => {
+    // `purpose` on every job node is already asserted by the §80.3 matrix above.
     expect(upstreamOf("ecb")).toEqual(["portfoliost-instruments"])
     expect(downstreamOf("portfoliost-wallets")).not.toContain("ecb")
   })

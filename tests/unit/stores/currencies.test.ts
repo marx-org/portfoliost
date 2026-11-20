@@ -50,8 +50,10 @@ describe("currencies store", () => {
   it("minorUnits falls back to 2 for unknown codes", async () => {
     const store = useCurrenciesStore()
     await store.load()
-    expect(store.minorUnits("JPY")).toBe(2) // not in mock payload
-    expect(store.minorUnits("usd")).toBe(2)
+    // JPY is absent from the mock payload, so this is the only case that proves
+    // the fallback. The old `minorUnits("usd") === 2` assertion did not: USD is
+    // in the payload with minorUnits 2, so it passes with or without a fallback.
+    expect(store.minorUnits("JPY")).toBe(2)
   })
 
   it("info lookup is case-insensitive", async () => {

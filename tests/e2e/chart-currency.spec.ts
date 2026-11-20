@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test"
 import { DEMO_FX } from "../../mocks/db-seed/constants.mjs"
+import { login } from "./helpers/login"
 
 /**
  * §36 — price charts display the instrument's native currency (not a hard
@@ -7,13 +8,6 @@ import { DEMO_FX } from "../../mocks/db-seed/constants.mjs"
  * percent-normalized with an explicit caption instead of a misleading
  * raw-price overlay.
  */
-async function login(page: import("@playwright/test").Page) {
-  await page.goto("/login")
-  await page.getByTestId("email").fill("demo@example.com")
-  await page.getByTestId("password").fill("example-service-mock")
-  await page.getByTestId("signin").click()
-  await page.waitForURL(/investments/, { timeout: 20000 })
-}
 
 /** SVG y-axis labels of the Price Chart card (the page hosts other charts too). */
 async function priceChartYAxis(page: import("@playwright/test").Page): Promise<string[]> {

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test"
+import { login } from "./helpers/login"
 
 // logos.md §12.6 — logos resolve through the real provider tier
 // (gateway → instruments → cachest → openst) with permanent local storage.
@@ -8,14 +9,6 @@ import { expect, test } from "@playwright/test"
 // target the gateway directly.
 
 const GATEWAY = process.env.PORTFOLIOST_GATEWAY_URL || "http://localhost:8080"
-
-async function login(page: import("@playwright/test").Page) {
-  await page.goto("/login")
-  await page.getByTestId("email").fill("demo@example.com")
-  await page.getByTestId("password").fill("example-service-mock")
-  await page.getByTestId("signin").click()
-  await expect(page).toHaveURL(/\/en\//)
-}
 
 test("research page requests a logo for the viewed symbol", async ({ page }) => {
   await login(page)

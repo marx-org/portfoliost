@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test"
+import { login } from "./helpers/login"
 
 /**
  * Stock-category editor, end to end against the dockerized stack (feature #253,
@@ -8,14 +9,6 @@ import { expect, test } from "@playwright/test"
  * reload. Editing a category must not trigger any financial replay: the only
  * write the page issues is the category PUT.
  */
-
-async function login(page: import("@playwright/test").Page) {
-  await page.goto("/login")
-  await page.getByTestId("email").fill("demo@example.com")
-  await page.getByTestId("password").fill("example-service-mock")
-  await page.getByTestId("signin").click()
-  await expect(page).toHaveURL(/\/en\/investments/)
-}
 
 test("a stock category persists across a reload and the edit is the only write", async ({ page }) => {
   await login(page)
