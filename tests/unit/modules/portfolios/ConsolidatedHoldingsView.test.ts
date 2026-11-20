@@ -149,6 +149,18 @@ describe("ConsolidatedHoldingsView", () => {
     expect(wrapper.findAll('[data-testid="holdings-row"]')).toHaveLength(1)
   })
 
+  it("does not render the §90 template comment as page text", async () => {
+    mocked.getAllPositions.mockResolvedValue([position()])
+
+    const wrapper = mountView()
+    await flushPromises()
+
+    // A `//` line inside <template> is literal text, not a comment; it must never
+    // reach the rendered page.
+    expect(wrapper.text()).not.toContain("§90")
+    expect(wrapper.text()).not.toContain("the loading card only replaces")
+  })
+
   it("shows a retryable error state", async () => {
     mocked.getAllPositions.mockRejectedValue(new Error("aggregate unavailable"))
 
