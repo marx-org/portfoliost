@@ -78,21 +78,24 @@ describe("topology layout (D55-9)", () => {
   })
 
   it("keeps every lane origin inside the drag bounds so lanes stay movable", () => {
+    // `lane.x >= 0` is already asserted in the packing test above; this adds the
+    // y axis and is the one home for the lane-origin drag clamp.
     for (const lane of layout.lanes) {
-      expect(lane.x, lane.area).toBeGreaterThanOrEqual(0)
       expect(lane.y, lane.area).toBeGreaterThanOrEqual(0)
     }
   })
 
   it("covers every node of its area with the matching lane", () => {
+    // The one home for node containment: the old suite asserted the same four
+    // inequalities twice, once as `p.x >= lane.x` and again as `p.x - lane.x >= 0`.
     for (const def of topologyNodes) {
       const lane = layout.lanes.find((l) => l.area === def.area)!
       const p = layout.positions[def.id]
       const s = NODE_SIZES[def.area]
-      expect(p.x, def.id).toBeGreaterThanOrEqual(lane.x)
-      expect(p.y, def.id).toBeGreaterThanOrEqual(lane.y)
-      expect(p.x + s.width, def.id).toBeLessThanOrEqual(lane.x + lane.width)
-      expect(p.y + s.height, def.id).toBeLessThanOrEqual(lane.y + lane.height)
+      expect(p.x - lane.x, def.id).toBeGreaterThanOrEqual(0)
+      expect(p.y - lane.y, def.id).toBeGreaterThanOrEqual(0)
+      expect(lane.x + lane.width - (p.x + s.width), def.id).toBeGreaterThanOrEqual(0)
+      expect(lane.y + lane.height - (p.y + s.height), def.id).toBeGreaterThanOrEqual(0)
     }
   })
 
@@ -113,18 +116,6 @@ describe("topology layout (D55-9)", () => {
     expect(new Set(ids).size).toBe(ids.length)
     for (const lane of layout.lanes) {
       expect(laneId(lane.area)).toMatch(/^lane-/)
-    }
-  })
-
-  it("every member node sits strictly inside its lane (bounded boxes)", () => {
-    for (const def of topologyNodes) {
-      const lane = layout.lanes.find((l) => l.area === def.area)!
-      const p = layout.positions[def.id]
-      const s = NODE_SIZES[def.area]
-      expect(p.x - lane.x, def.id).toBeGreaterThanOrEqual(0)
-      expect(p.y - lane.y, def.id).toBeGreaterThanOrEqual(0)
-      expect(lane.x + lane.width - (p.x + s.width), def.id).toBeGreaterThanOrEqual(0)
-      expect(lane.y + lane.height - (p.y + s.height), def.id).toBeGreaterThanOrEqual(0)
     }
   })
 

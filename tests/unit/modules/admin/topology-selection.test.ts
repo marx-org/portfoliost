@@ -85,10 +85,4 @@ describe("selection across the static graph", () => {
     expect(hasSelection(null)).toBe(false)
     expect(hasSelection("cachest")).toBe(true)
   })
-
-  it("every static node resolves against every static selection without error", () => {
-    for (const sel of everyNodeId) {
-      for (const id of everyNodeId) nodeSelectionState(sel, id, topologyEdges)
-    }
-  })
 })

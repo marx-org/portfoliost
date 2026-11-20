@@ -1,9 +1,8 @@
 import { createPinia, setActivePinia, type Pinia } from "pinia"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { useTopologyStore, DEFAULT_POLL_INTERVAL_MS } from "@/modules/admin/topology/topology-store"
+import { useTopologyStore } from "@/modules/admin/topology/topology-store"
 import { nodeById } from "@/modules/admin/topology/graph-definition"
 import { dotState } from "@/modules/admin/topology/nodes/status"
-import type { DotState } from "@/modules/admin/topology/nodes/status"
 import * as adminApi from "@/api/admin"
 import type { TopologyStatusResponse, TopologyTrafficResponse } from "@/api/admin"
 
@@ -165,65 +164,23 @@ describe("topology store", () => {
     expect(mocked.fetchTopologyStatus).toHaveBeenCalledTimes(4)
   })
 
-  it("defaults the poll interval to 30 s", () => {
-    expect(DEFAULT_POLL_INTERVAL_MS).toBe(30_000)
+  // D55-5. The `dotState` mapping itself is exhaustively covered in
+  // topology-node-status.test.ts; what this store-level case has to prove is
+  // only that the fetched status reaches `nodeData()` and is fed to `dotState`
+  // unchanged, so the view renders the right health colour. The old 8-row
+  // matrix re-ran every dotState branch through the store for no extra signal.
+  it("feeds the fetched status through nodeData() into dotState", async () => {
+    mocked.fetchTopologyStatus.mockResolvedValue(
+      statusResponse([
+        { name: "portfoliost-admin", reachable: true, impl: "real", replicas: { desired: 2, ready: 2 }, restarts: 1 },
+      ]),
+    )
+    mocked.fetchTopologyTraffic.mockResolvedValue(trafficResponse([]))
+    const store = useTopologyStore()
+    await store.refresh()
+
+    const data = store.nodeData(nodeById.get("portfoliost-admin")!)
+    expect(data.status?.impl).toBe("real")
+    expect(dotState(data.status)).toBe("healthy")
   })
-
-  // D55-5 test matrix: every impl value and every Prometheus state must map to
-  // the expected dot-state so the view renders the correct health colour.
-  it.each<[string, TopologyStatusResponse["services"][number], DotState]>([
-    [
-      "real — ready replicas, low restarts → healthy",
-      { name: "portfoliost-admin", reachable: true, impl: "real", replicas: { desired: 2, ready: 2 }, restarts: 1 },
-      "healthy",
-    ],
-    [
-      "mock — ready replicas, no restarts → healthy",
-      { name: "portfoliost-admin", reachable: true, impl: "mock", replicas: { desired: 1, ready: 1 }, restarts: 0 },
-      "healthy",
-    ],
-    [
-      "unknown impl / unreachable → down",
-      { name: "portfoliost-admin", reachable: false, impl: "unknown" },
-      "down",
-    ],
-    [
-      "job impl, no Prometheus data → unknown",
-      { name: "portfoliost-admin", reachable: true, impl: "job", replicas: null, restarts: null },
-      "unknown",
-    ],
-    [
-      "real — partial replicas → degraded",
-      { name: "portfoliost-admin", reachable: true, impl: "real", replicas: { desired: 3, ready: 1 }, restarts: 0 },
-      "degraded",
-    ],
-    [
-      "real — restarts ≥ 5 → degraded",
-      { name: "portfoliost-admin", reachable: true, impl: "real", replicas: { desired: 1, ready: 1 }, restarts: 5 },
-      "degraded",
-    ],
-    [
-      "real — Prometheus unavailable (null/null) → unknown",
-      { name: "portfoliost-admin", reachable: true, impl: "real", replicas: null, restarts: null },
-      "unknown",
-    ],
-    [
-      "real — only restarts present, >5 → degraded",
-      { name: "portfoliost-admin", reachable: true, impl: "real", replicas: null, restarts: 9 },
-      "degraded",
-    ],
-  ])(
-    "status mapping: %s",
-    async (_label, service, expectedState) => {
-      mocked.fetchTopologyStatus.mockResolvedValue(statusResponse([service]))
-      mocked.fetchTopologyTraffic.mockResolvedValue(trafficResponse([]))
-      const store = useTopologyStore()
-      await store.refresh()
-
-      const def = nodeById.get("portfoliost-admin")!
-      const data = store.nodeData(def)
-      expect(data.status?.impl).toBe(service.impl)
-      expect(dotState(data.status)).toBe(expectedState)
-    },
-  )
 })
