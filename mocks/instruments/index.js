@@ -70,10 +70,29 @@ function detailFor(symbol, research) {
 function profileFor(symbol, research) {
   const p = loadRaw("instruments_profile.json")
   const ci = currencyInfo(research)
-  if (!research) return { ...p, currencySource: ci.currencySource }
+  // §86 — per-asset-class Key Facts. The real instruments profile carries these;
+  // the mock mirrors them so the KeyFactsCard renders the same rows. Keyed by
+  // symbol so an ETF/crypto/bond gets its own block instead of the equity rows.
+  const keyFacts = loadRaw("instruments_key_facts.json")[symbol] ?? null
+  if (!research) {
+    // No research profile (a crypto pair or bond the equity research table does
+    // not cover): still serve a profile carrying the keyFacts and an identity
+    // block derived from them, so the card renders its own rows.
+    const kindToAssetType = { etf: "ETF", crypto: "CRYPTO", corp_bond: "BOND" }
+    return {
+      ...p,
+      ticker: symbol,
+      keyFacts,
+      name: keyFacts?.name ?? keyFacts?.issuer ?? symbol,
+      assetType: keyFacts ? kindToAssetType[keyFacts.kind] ?? null : p.assetType,
+      exchange: keyFacts?.exchange ?? keyFacts?.market ?? p.exchange,
+      currencySource: ci.currencySource,
+    }
+  }
   return {
     ...p,
     ticker: symbol,
+    keyFacts,
     name: research.overview.name,
     country: research.overview.country,
     countryCode:
