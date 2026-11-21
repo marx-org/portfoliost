@@ -121,8 +121,14 @@ function incomeData(scope) {
       { quarter: "2026-Q2", dividends: 0, interest: 0, options: 0, total: 0, priorYearQuarterTotal: 400, yoyChangePercent: -100 },
       { quarter: "2026-Q3", dividends: 95.2, interest: 0.7, options: 0, total: 95.9, priorYearQuarterTotal: 510, yoyChangePercent: -81.2 },
     ],
-    dailyAverageByYear: [{ year: 2026, basis: "days", divisor: 365, amount: 467.9 / 365, partial: true }],
-    monthlyAverageByYear: [{ year: 2026, basis: "months", divisor: 12, amount: 467.9 / 12, partial: true }],
+    dailyAverageByYear: [
+      { year: 2025, basis: "days", divisor: 365, amount: 1710 / 365, partial: false },
+      { year: 2026, basis: "days", divisor: 365, amount: 467.9 / 365, partial: true },
+    ],
+    monthlyAverageByYear: [
+      { year: 2025, basis: "months", divisor: 12, amount: 1710 / 12, partial: false },
+      { year: 2026, basis: "months", divisor: 12, amount: 467.9 / 12, partial: true },
+    ],
     payerCoverage: [
       { year: 2026, month: 1, count: 6, partial: false },
       { year: 2026, month: 2, count: 0, partial: false },
