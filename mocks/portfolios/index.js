@@ -3,6 +3,7 @@ import { labelsForTransaction, matchesLabelFilter } from "../labels.js"
 import { resolveFeeFx } from "../lib/demo-fx.js"
 import { loadJson, loadRaw, loadResearch, normalize } from "../lib/data.js"
 import { paginatePage, uuid, nowIso } from "../lib/http.js"
+import { markPortfolioKnown } from "../lib/accounts.js"
 import { applyTradeCash, tradeSigned, ensurePortfolio } from "./cash.js"
 import { benchmarkSeries, benchmarkSymbols } from "./benchmarks.js"
 
@@ -430,6 +431,7 @@ export function register(app) {
     }
     created.set(id, portfolio)
     newPortfolioIds.add(id)
+    markPortfolioKnown(id)
     ensurePortfolio(id, { baseCurrency, isMarginEnabled, cashBaseCurrencyOnly: Boolean(cashBaseCurrencyOnly) })
     ctx.res.status(201).json(portfolio)
   })

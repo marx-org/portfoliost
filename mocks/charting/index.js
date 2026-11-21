@@ -1,5 +1,6 @@
 import { requireAuth } from "../lib/auth.js"
 import { loadRaw, loadResearch } from "../lib/data.js"
+import { isKnownAccount } from "../lib/accounts.js"
 
 // ── Shared investment-charting mock (feature #253) ──────────────────────────
 // The datasets are deterministic so the mock, unit and e2e tests agree. Scope
@@ -9,10 +10,13 @@ import { loadRaw, loadResearch } from "../lib/data.js"
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-const KNOWN_ACCOUNTS = new Set([
-  "11111111-1111-4111-8111-111111111111",
-  "22222222-2222-4222-8222-222222222222",
-])
+// Accounts the charting mock treats as real. The seeded Top10 and any portfolio
+// created through the API are registered in lib/accounts.js; the two `1111…`/
+// `2222…` fixtures stay known because the mock's own test suite
+// (mocks/tests/run.mjs) scopes against them. A well-formed but foreign id
+// (e.g. 9999…) is still unknown, so the scope reports `coverage:"empty"` — that
+// contract is asserted by both run.mjs and charting-monthly-income.spec.ts.
+const EXTRA_KNOWN_ACCOUNTS = ["11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"]
 const KNOWN_LABELS = new Set([
   "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
   "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
@@ -57,7 +61,7 @@ function parseScope(ctx) {
 }
 
 function scopeMatchesNothing(accounts) {
-  return accounts.length > 0 && accounts.every((id) => !KNOWN_ACCOUNTS.has(id))
+  return accounts.length > 0 && accounts.every((id) => !isKnownAccount(id) && !EXTRA_KNOWN_ACCOUNTS.includes(id))
 }
 
 function coverageFor(nothing) {
@@ -117,8 +121,14 @@ function incomeData(scope) {
       { quarter: "2026-Q2", dividends: 0, interest: 0, options: 0, total: 0, priorYearQuarterTotal: 400, yoyChangePercent: -100 },
       { quarter: "2026-Q3", dividends: 95.2, interest: 0.7, options: 0, total: 95.9, priorYearQuarterTotal: 510, yoyChangePercent: -81.2 },
     ],
-    dailyAverageByYear: [{ year: 2026, basis: "days", divisor: 365, amount: 467.9 / 365, partial: true }],
-    monthlyAverageByYear: [{ year: 2026, basis: "months", divisor: 12, amount: 467.9 / 12, partial: true }],
+    dailyAverageByYear: [
+      { year: 2025, basis: "days", divisor: 365, amount: 1710 / 365, partial: false },
+      { year: 2026, basis: "days", divisor: 365, amount: 467.9 / 365, partial: true },
+    ],
+    monthlyAverageByYear: [
+      { year: 2025, basis: "months", divisor: 12, amount: 1710 / 12, partial: false },
+      { year: 2026, basis: "months", divisor: 12, amount: 467.9 / 12, partial: true },
+    ],
     payerCoverage: [
       { year: 2026, month: 1, count: 6, partial: false },
       { year: 2026, month: 2, count: 0, partial: false },
