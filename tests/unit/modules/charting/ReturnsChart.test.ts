@@ -32,6 +32,23 @@ describe("ReturnsChart", () => {
     expect(cells.at(-1)!.text()).toContain("20")
   })
 
+  it("rounds bar data labels and the axis to short percents", () => {
+    const wrapper = mount(ReturnsChart, {
+      props: { points, currency: "USD" },
+      global: { stubs: { apexchart: ApexStub } },
+    })
+    const options = wrapper.findComponent(ApexStub).props("options") as {
+      dataLabels: { formatter: (v: number) => string }
+      yaxis: { labels: { formatter: (v: number) => string } }
+    }
+    // Bar labels keep the raw float short (`69.72577697` → `69.7%`).
+    expect(options.dataLabels.formatter(69.72577697)).toBe("69.7%")
+    expect(options.dataLabels.formatter(-24.97272669)).toBe("-25%")
+    // Axis ticks are percentages too: no trailing zeroes, always with `%`.
+    expect(options.yaxis.labels.formatter(80)).toBe("80%")
+    expect(options.yaxis.labels.formatter(69.72577697)).toBe("69.7%")
+  })
+
   it("switches to net-gain change on the same boundaries", async () => {
     const wrapper = mount(ReturnsChart, {
       props: { points, currency: "USD" },

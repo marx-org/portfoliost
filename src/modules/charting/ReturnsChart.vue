@@ -39,6 +39,13 @@ const values = computed(() =>
 const chartOptions = computed(() => ({
   chart: { type: "bar" as const, height: 300 },
   xaxis: { categories: rows.value.map((r) => r.quarter) },
+  // ApexCharts prints each bar's raw float by default (`69.72577697`). Keep the
+  // labels but round to a short percent (`69.7%`) — the values are already
+  // percentages, so the raw float is both noisy and ambiguous about the unit.
+  dataLabels: { formatter: (v: number) => percentAxis(v) },
+  // Axis ticks need the same treatment: without a formatter they render as
+  // `80.00000000`, `60.00000000`, … — meaningless trailing zeroes and no unit.
+  yaxis: { labels: { formatter: percentAxis } },
   colors: ["#2563eb"],
   tooltip: {
     y: { formatter: (v: number) => `${v > 0 ? "+" : ""}${v}%` },
@@ -48,6 +55,11 @@ const chartSeries = computed(() => [{ name: metricLabel.value, data: values.valu
 
 function percent(v: number | null | undefined): string {
   return v == null ? "—" : `${v > 0 ? "+" : ""}${v}%`
+}
+
+/** Bar label / axis tick → compact percent: trim float noise, always show the unit. */
+function percentAxis(v: number): string {
+  return `${Number(v.toFixed(1))}%`
 }
 </script>
 
