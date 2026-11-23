@@ -135,6 +135,19 @@ export function useChartScope(opts?: { route?: RouteLike; router?: RouterLike })
     selectedAccountIds.value = ids
     syncRoute()
   }
+  /** Set the display currency for every charting value (persisted in the URL). */
+  function setCurrency(next: string): void {
+    const cur = next.trim().toUpperCase()
+    if (!/^[A-Z]{3}$/.test(cur)) return
+    // The `currency` computed reads the route query, so writing it there is
+    // what re-denominates every child chart.
+    const q: Record<string, string> = {}
+    for (const [key, value] of Object.entries(route.query)) {
+      if (typeof value === "string" && key !== "currency") q[key] = value
+    }
+    q.currency = cur
+    void router.replace({ query: q })
+  }
   function setLabels(ids: string[]): void {
     selectedLabelIds.value = ids
     syncRoute()
@@ -189,6 +202,7 @@ export function useChartScope(opts?: { route?: RouteLike; router?: RouterLike })
     toggleLabel,
     setAccounts,
     setLabels,
+    setCurrency,
     setBenchmarks: (symbols: string[]) => {
       selectedBenchmarks.value = symbols
       syncRoute()

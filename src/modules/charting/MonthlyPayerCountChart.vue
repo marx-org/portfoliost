@@ -12,7 +12,7 @@
 import { computed } from "vue"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
 
-type Month = { year: number; month: number; count: number; partial?: boolean }
+type Month = { year: number; month: number; count: number; symbols?: string[]; partial?: boolean }
 
 const props = withDefaults(
   defineProps<{ months?: Month[]; testid?: string }>(),
@@ -38,16 +38,30 @@ const hasPartial = computed(() =>
   (selectedYear.value === currentMonthKey.value.year && yearRows.value.some((m) => m.month >= currentMonthKey.value.month)),
 )
 
+const monthData = computed(() =>
+  MONTHS.map((_, i) => {
+    const m = yearRows.value.find((x) => x.month === i + 1)
+    return { month: i + 1, count: m?.count ?? null, symbols: m?.symbols ?? [] }
+  }),
+)
+
 const chartOptions = computed(() => ({
   chart: { type: "bar" as const, height: 300 },
   xaxis: { categories: MONTHS },
   colors: ["#10b981"],
-  tooltip: { y: { formatter: (v: number) => `${v} payer${v === 1 ? "" : "s"}` } },
+  tooltip: {
+    custom: ({ dataPointIndex }: { dataPointIndex: number }) => {
+      const d = monthData.value[dataPointIndex]
+      if (!d || d.count == null) return `${MONTHS[dataPointIndex]}: no data`
+      const names = d.symbols.length ? `<br/>${d.symbols.join(", ")}` : ""
+      return `${MONTHS[dataPointIndex]}: ${d.count} payer${d.count === 1 ? "" : "s"}${names}`
+    },
+  },
 }))
 const chartSeries = computed(() => [
   {
     name: "Dividend payers",
-    data: MONTHS.map((_, i) => yearRows.value.find((m) => m.month === i + 1)?.count ?? null),
+    data: monthData.value.map((d) => d.count),
   },
 ])
 </script>

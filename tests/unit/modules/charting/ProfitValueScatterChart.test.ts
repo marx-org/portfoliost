@@ -51,6 +51,20 @@ describe("ProfitValueScatterChart", () => {
     expect(rows[0].text()).toContain("Apple")
   })
 
+  it("enables zoom and can expand to a full-window chart", async () => {
+    const wrapper = mount(ProfitValueScatterChart, {
+      props: { points, currency: "USD" },
+      global: { stubs: { apexchart: ApexStub } },
+    })
+    const chart = wrapper.findComponent(ApexStub)
+    const options = chart.props("options") as { chart: { zoom: { enabled: boolean }; toolbar: { show: boolean } } }
+    expect(options.chart.zoom.enabled).toBe(true)
+    expect(options.chart.toolbar.show).toBe(true)
+
+    await wrapper.get('[data-testid="charting-profit-value-scatter-expand"]').trigger("click")
+    expect(wrapper.get('[data-testid="charting-profit-value-scatter-expand"]').text()).toContain("Close")
+  })
+
   it("shows an empty state when there are no holdings", () => {
     const wrapper = mount(ProfitValueScatterChart, {
       props: { points: [], currency: "USD" },

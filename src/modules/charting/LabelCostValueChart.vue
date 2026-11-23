@@ -24,6 +24,7 @@ export interface LabelCostValueRow {
 import { computed } from "vue"
 import { formatCurrency } from "@/utils/format"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
+import { axisCurrency } from "./chartFormat"
 
 const props = withDefaults(
   defineProps<{
@@ -43,10 +44,12 @@ function label(row: LabelCostValueRow): string {
 }
 
 const chartOptions = computed(() => ({
-  chart: { type: "bar" as const, height: 360, toolbar: { show: false } },
+  // Horizontal paired bars need vertical room per label; 360 clipped the rows
+  // and made the pairs hard to compare.
+  chart: { type: "bar" as const, height: 520, toolbar: { show: false } },
   plotOptions: { bar: { horizontal: true, borderRadius: 3 } },
   colors: ["#94a3b8", "#2563eb"],
-  xaxis: { categories: groups.value.map(label) },
+  xaxis: { categories: groups.value.map(label), labels: { formatter: (v: number) => axisCurrency(v, props.currency) } },
   tooltip: { y: { formatter: (v: number) => formatCurrency(v, props.currency) } },
   legend: { position: "bottom" as const },
 }))

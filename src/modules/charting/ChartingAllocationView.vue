@@ -14,7 +14,6 @@ import AllocationBreakdown, { type AllocationSlice } from "@/components/Allocati
 import StockCategoryAllocationChart from "./StockCategoryAllocationChart.vue"
 import LabelCostValueChart from "./LabelCostValueChart.vue"
 import AssetTypeAllocationChart from "./AssetTypeAllocationChart.vue"
-import SectorAllocationChart from "./SectorAllocationChart.vue"
 import CurrencyAllocationChart from "./CurrencyAllocationChart.vue"
 import HoldingsCompositionChart from "./HoldingsCompositionChart.vue"
 import { useChartScope } from "./useChartScope"
@@ -84,11 +83,6 @@ const hasSlices = computed(
       <AssetTypeAllocationChart
         v-if="byAssetType.length"
         :slices="byAssetType"
-        :currency="baseCurrency"
-      />
-      <SectorAllocationChart
-        v-if="bySector.length"
-        :slices="bySector"
         :currency="baseCurrency"
       />
       <CurrencyAllocationChart

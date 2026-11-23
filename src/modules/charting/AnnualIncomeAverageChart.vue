@@ -11,6 +11,7 @@
 import { computed } from "vue"
 import type { components } from "@/api/types"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
+import { axisCurrency, labelCurrency } from "./chartFormat"
 
 type Point = components["schemas"]["ChartIncomeAveragePoint"]
 
@@ -27,7 +28,9 @@ const hasPartial = computed(() => rows.value.some((p) => p.partial))
 const chartOptions = computed(() => ({
   chart: { type: "bar", height: 300 },
   xaxis: { categories: rows.value.map((p) => String(p.year)) },
+  yaxis: { labels: { formatter: (v: number) => axisCurrency(v, props.currency) } },
   colors: ["#f59e0b"],
+  dataLabels: { enabled: true, formatter: (v: number) => labelCurrency(v, props.currency) },
   tooltip: {
     y: { formatter: (v: number) => `${v} ${props.currency}/${per.value}`.trim() },
   },

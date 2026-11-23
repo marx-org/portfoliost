@@ -42,6 +42,22 @@ describe("MonthlyPayerCountChart", () => {
     expect(wrapper.get('[data-testid="charting-payer-coverage-partial"]').text()).toContain("in progress")
   })
 
+  it("lists payer tickers in the tooltip", () => {
+    const withSymbols = [
+      { year: CURRENT_YEAR - 1, month: 1, count: 2, symbols: ["AAPL", "SAP.DE"], partial: false },
+    ]
+    const wrapper = mount(MonthlyPayerCountChart, {
+      props: { months: withSymbols },
+      global: { stubs: { apexchart: ApexStub } },
+    })
+    const chart = wrapper.findComponent(ApexStub)
+    const options = chart.props("options") as { tooltip: { custom: (o: { dataPointIndex: number }) => string } }
+    const html = options.tooltip.custom({ dataPointIndex: 0 })
+    expect(html).toContain("2 payers")
+    expect(html).toContain("AAPL")
+    expect(html).toContain("SAP.DE")
+  })
+
   it("shows an empty state when there is no data", () => {
     const wrapper = mount(MonthlyPayerCountChart, {
       props: { months: [] },
