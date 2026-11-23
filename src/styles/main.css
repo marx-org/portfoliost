@@ -46,3 +46,36 @@
 @utility card {
   @apply rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700/60 dark:bg-slate-900;
 }
+
+/*
+ * ApexCharts draws its own toolbar menu with a hardcoded white surface but
+ * inherits the page text colour. In dark mode the page text is near-white
+ * (slate-100), so the menu renders white-on-white and is unreadable. Give it a
+ * dark surface, readable text and a visible hover in dark mode. Light mode keeps
+ * ApexCharts' defaults (dark text on white).
+ */
+.dark .apexcharts-menu {
+  background: #1e293b; /* slate-800 */
+  color: #e2e8f0; /* slate-200 */
+  border: 1px solid #334155; /* slate-700 */
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
+}
+
+.dark .apexcharts-menu-item {
+  color: #e2e8f0;
+}
+
+.dark .apexcharts-menu-item:hover {
+  background: #334155;
+  color: #f8fafc;
+}
+
+/* Toolbar icons (menu/zoom/pan) default to a dim gray that is hard to see on the
+   dark card; lift them to slate-400. The SVGs stroke with currentColor. */
+.dark .apexcharts-toolbar .apexcharts-menu-icon,
+.dark .apexcharts-toolbar .apexcharts-reset-icon,
+.dark .apexcharts-toolbar .apexcharts-pan-icon,
+.dark .apexcharts-toolbar .apexcharts-zoom-icon,
+.dark .apexcharts-toolbar .apexcharts-selection-icon {
+  color: #94a3b8; /* slate-400 */
+}
