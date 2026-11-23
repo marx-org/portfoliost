@@ -11,6 +11,8 @@ import { computed, onMounted } from "vue"
 import { useRoute } from "vue-router"
 import { storeToRefs } from "pinia"
 import { usePortfolioStore } from "@/stores/portfolios"
+import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
+import { useCurrenciesStore } from "@/stores/currencies"
 import LabelFilterBar from "@/components/LabelFilterBar.vue"
 import { useChartScope } from "./useChartScope"
 import type { ChartCategory } from "./registry"
@@ -23,8 +25,20 @@ const { selectedAccountIds, selectedLabelIds, allAccounts, allLabels, kind, from
 const portfolios = usePortfolioStore()
 const { portfolios: accountList } = storeToRefs(portfolios)
 
+// Display currency: the charting default and the source for the toolbar select.
+const displayCurrencyStore = useDisplayCurrencyStore()
+const { currency: displayCurrency } = storeToRefs(displayCurrencyStore)
+const currenciesStore = useCurrenciesStore()
+const currencyOptions = computed(() => currenciesStore.options)
+const activeCurrency = computed(() => scope.currency.value ?? displayCurrency.value)
+
 onMounted(() => {
   if (!accountList.value.length) void portfolios.fetchAll().catch(() => {})
+  void currenciesStore.load().catch(() => {})
+  // Charting is re-denominated by the `currency` scope param. When the URL does
+  // not already pin one, default it to the user's display currency so the whole
+  // page matches the rest of the app (and not the API's fallback).
+  if (!scope.currency.value) scope.setCurrency(displayCurrency.value)
 })
 
 // Normal and virtual portfolios are separate, mutually exclusive filter lines:
@@ -171,6 +185,18 @@ function onDateChange(which: "from" | "to", event: Event) {
         <label-filter-bar :model-value="selectedLabelIds" @update:model-value="scope.setLabels" />
         <span v-if="allLabels" class="text-xs text-slate-500">All labels</span>
       </template>
+      <label class="flex items-center gap-1 text-xs font-medium uppercase text-slate-400 dark:text-slate-500" for="charting-currency">
+        Currency
+        <select
+          id="charting-currency"
+          class="input h-7 w-24 text-xs"
+          :value="activeCurrency"
+          data-testid="charting-currency"
+          @change="scope.setCurrency(($event.target as HTMLSelectElement).value)"
+        >
+          <option v-for="c in currencyOptions" :key="c.code" :value="c.code">{{ c.code }}</option>
+        </select>
+      </label>
       <div class="flex items-center gap-1" data-testid="charting-date-range">
         <button
           v-for="r in RANGES"

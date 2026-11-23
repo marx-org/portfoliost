@@ -25,6 +25,14 @@ describe("useChartScope", () => {
     expect(scope.selectedAccountIds.value).toEqual([])
   })
 
+  it("sets the currency in the route query", () => {
+    const { scope, router } = makeScope({ accounts: "a1" })
+    scope.setCurrency("pln")
+    expect(router.replace).toHaveBeenCalledWith(
+      expect.objectContaining({ query: expect.objectContaining({ currency: "PLN", accounts: "a1" }) }),
+    )
+  })
+
   it("reads the virtual kind from the route and writes it back", () => {
     const { scope, router } = makeScope({ kind: "virtual" })
     expect(scope.kind.value).toBe("virtual")

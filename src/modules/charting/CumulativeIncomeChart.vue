@@ -11,6 +11,7 @@
 import { computed } from "vue"
 import type { components } from "@/api/types"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
+import { axisCurrency } from "./chartFormat"
 
 type Point = components["schemas"]["ChartIncomeCumulativePoint"]
 
@@ -28,6 +29,7 @@ const opening = computed(() => {
 const chartOptions = computed(() => ({
   chart: { type: "area", height: 320 },
   xaxis: { type: "datetime" },
+  yaxis: { labels: { formatter: (v: number) => axisCurrency(v, props.currency) } },
   stroke: { width: 2 },
   colors: ["#22c55e"],
   tooltip: { y: { formatter: (v: number) => `${v} ${props.currency}`.trim() } },

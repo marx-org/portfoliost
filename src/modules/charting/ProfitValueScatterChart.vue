@@ -38,6 +38,7 @@ const props = withDefaults(
 
 const search = ref("")
 const showZero = ref(false)
+const expanded = ref(false)
 type SortKey = "marketValue" | "totalProfit"
 const sortKey = ref<SortKey>("marketValue")
 
@@ -67,7 +68,14 @@ function displaySymbol(p: ProfitValuePoint): string {
 }
 
 const chartOptions = computed(() => ({
-  chart: { type: "scatter" as const, height: 380, toolbar: { show: false }, zoom: { enabled: false } },
+  chart: {
+    type: "scatter" as const,
+    // Expandable + zoomable: most holdings crowd into one corner, so the plot
+    // needs pan/zoom and a full-window mode to separate them.
+    height: expanded.value ? 720 : 420,
+    toolbar: { show: true, autoSelected: "zoom" },
+    zoom: { enabled: true, type: "xy" as const },
+  },
   xaxis: {
     title: { text: `Market value (${props.currency})` },
     labels: { formatter: (v: number) => formatCurrency(v, props.currency) },
@@ -117,8 +125,22 @@ const chartSeries = computed(() => [
           </select>
         </label>
       </div>
-      <div class="card p-6" :data-testid="`${testid}-chart`">
-        <h2 class="mb-2 text-base font-semibold">Market Value vs Total Profit</h2>
+      <div
+        class="card p-6"
+        :class="expanded ? 'fixed inset-4 z-50 overflow-auto' : ''"
+        :data-testid="`${testid}-chart`"
+      >
+        <div class="mb-2 flex items-center justify-between gap-3">
+          <h2 class="text-base font-semibold">Market Value vs Total Profit</h2>
+          <button
+            type="button"
+            class="btn-secondary text-xs"
+            :data-testid="`${testid}-expand`"
+            @click="expanded = !expanded"
+          >
+            {{ expanded ? "Close" : "Expand" }}
+          </button>
+        </div>
         <component :is="'apexchart'" :options="chartOptions" :series="chartSeries" />
       </div>
       <CollapsibleSection title="Holdings" :testid="`${testid}-table`">

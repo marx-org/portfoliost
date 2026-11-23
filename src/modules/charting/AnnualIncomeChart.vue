@@ -12,6 +12,7 @@
 import { computed } from "vue"
 import type { components } from "@/api/types"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
+import { axisCurrency } from "./chartFormat"
 
 type Point = components["schemas"]["ChartIncomeAnnualPoint"]
 
@@ -28,7 +29,7 @@ const chartOptions = computed(() => ({
   chart: { type: "bar", height: 340 },
   xaxis: { categories: rows.value.map((p) => String(p.year)) },
   yaxis: [
-    { seriesName: "Income", title: { text: "Income" } },
+    { seriesName: "Income", title: { text: "Income" }, labels: { formatter: (v: number) => axisCurrency(v, props.currency) } },
     {
       opposite: true,
       seriesName: "YoY %",

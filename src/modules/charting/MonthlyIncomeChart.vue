@@ -13,6 +13,7 @@ import { useChartData } from "./useChartData"
 import { useChartScope } from "./useChartScope"
 import type { ChartScopeQuery } from "@/api/charting"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
+import { axisCurrency } from "./chartFormat"
 
 const props = defineProps<{ scope?: ChartScopeQuery }>()
 
@@ -55,7 +56,13 @@ const trendLine = computed(() =>
 
 const chartOptions = computed(() => ({
   chart: { type: "line", height: 340, stacked: false },
-  xaxis: { categories: categories.value },
+  xaxis: {
+    categories: categories.value,
+    // Monthly categories are dense: rotate and drop overlapping ticks so the
+    // dates stay readable instead of colliding.
+    labels: { rotate: -45, rotateAlways: false, hideOverlappingLabels: true },
+  },
+  yaxis: { labels: { formatter: (v: number) => axisCurrency(v, currency.value) } },
   stroke: { width: [0, 0, 2] },
   colors: ["#22c55e", "#f59e0b", "#3b82f6"],
   legend: { position: "top" },
