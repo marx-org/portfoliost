@@ -91,7 +91,7 @@ describe("PerformanceSummaryCard", () => {
       "mwr",
       "xirr",
     ]) {
-      expect(w.find(`[data-testid="perf-summary-tip-${id}"]`).attributes("title")).toBeTruthy()
+      expect(w.find(`[data-testid="perf-summary-tip-${id}"]`).attributes("aria-label")).toBeTruthy()
     }
   })
 
