@@ -1,0 +1,224 @@
+<script setup lang="ts">
+/**
+ * PerformanceSummaryCard — the one performance summary used by both the
+ * consolidated (cumulative) page and a single portfolio's Performance tab.
+ *
+ * It is a READ of the analytics payload: every figure is already on
+ * `PortfolioAnalytics.performance` (totalValue, capitalBasis, totalReturn,
+ * realized/unrealized gains, income, annualizedReturn/TWR, moneyWeightedReturn
+ * /MWR, xirr). Money is converted base → display currency through the one
+ * `useDisplayConversion` (D27/§66.3); rates are never converted.
+ *
+ * Each value carries a tooltip (title + accessible description) explaining what
+ * it means and how it is calculated. Withheld rates show the reason, never a
+ * confident 0.
+ */
+import { computed } from "vue"
+import type { PortfolioAnalytics } from "@/api/types"
+import { formatPercent, formatSignedCurrency } from "@/utils/format"
+import { useDisplayConversion } from "@/composables/useDisplayConversion"
+
+const props = withDefaults(
+  defineProps<{
+    /** `/:id/analytics` or `/merged`, cast to the one PortfolioAnalytics. */
+    performance: PortfolioAnalytics["performance"] | null
+    /** The base currency `performance` is denominated in. */
+    baseCurrency: string
+    /** Testid prefix (docs/COMPONENTS.md `${tid}-<field>`). */
+    testid?: string
+    /** Virtual portfolios are views over existing transactions, not cash books. */
+    showInvested?: boolean
+    /** Print the constant-currency caveat (aggregate mount only). */
+    fxCaveat?: boolean
+  }>(),
+  { testid: "perf-summary", showInvested: true, fxCaveat: false },
+)
+
+function tid(id: string): string {
+  return `${props.testid}-${id}`
+}
+
+const perf = computed(() => props.performance ?? null)
+
+// Money rides the SAME conversion as the chart (never a bare × rate): no rate
+// yet means no number, and the label falls back to the amount's own currency.
+const { convert, displayCurrencyOr } = useDisplayConversion(() => props.baseCurrency)
+const ccy = computed(() => displayCurrencyOr() ?? undefined)
+
+/** base-currency money → display currency, formatted (null → "—"). */
+function money(v: number | null | undefined): string {
+  return formatSignedCurrency(convert(v), ccy.value)
+}
+/** A rate is currency-independent — never converted. */
+function pct(v: number | null | undefined): string {
+  return formatPercent(v, 2, true)
+}
+
+/** Sign colouring for a rate/money tile. Absent stays neutral, never "green 0%". */
+function signClass(v: number | null | undefined): string {
+  if (v == null || v === 0) return ""
+  return v > 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+}
+
+/** Plain-language rendering of the contract's withheld reasons. */
+function withheldText(reason: string | null | undefined): string {
+  if (reason === "insufficient_history") return "not enough history yet"
+  if (reason === "invalid_data") return "history contains gaps"
+  return "not available"
+}
+
+const twrPa = computed(() => perf.value?.annualizedReturn ?? null)
+const twrPaWithheld = computed(() => perf.value?.annualizedReturnWithheldReason ?? null)
+const mwr = computed(() => perf.value?.moneyWeightedReturn ?? null)
+const xirr = computed(() => perf.value?.xirr ?? null)
+const xirrWithheld = computed(() => perf.value?.xirrWithheldReason ?? null)
+</script>
+
+<template>
+  <div class="card p-6" :data-testid="tid('root')">
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+      <h2 class="text-base font-semibold">Performance summary</h2>
+      <p
+        v-if="fxCaveat"
+        class="rounded-lg bg-slate-50 px-3 py-1.5 text-xs text-slate-500 dark:bg-slate-800/50 dark:text-slate-400"
+        :data-testid="tid('fx-caveat')"
+      >
+        Constant currency: totals converted at today's rate across the whole history.
+      </p>
+    </div>
+
+    <!-- Value -->
+    <section class="mb-5" :data-testid="tid('group-value')">
+      <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Value</h3>
+      <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
+          <dt class="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
+            Total value
+            <span
+              class="cursor-help text-slate-400"
+              title="Market value of everything: positions at market price plus cash, in your display currency."
+              aria-label="Market value of everything: positions at market price plus cash, in your display currency."
+              :data-testid="tid('tip-total-value')"
+            >ⓘ</span>
+          </dt>
+          <dd class="mt-1 text-xl font-semibold tabular-nums" :data-testid="tid('total-value')">{{ money(perf?.totalValue) }}</dd>
+        </div>
+        <div v-if="showInvested" class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
+          <dt class="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
+            Total invested
+            <span
+              class="cursor-help text-slate-400"
+              title="Net money you put in (deposits − withdrawals) plus the cost of shares transferred in or out. Excludes interest, fees and FX."
+              aria-label="Net money you put in (deposits minus withdrawals) plus the cost of shares transferred in or out. Excludes interest, fees and FX."
+              :data-testid="tid('tip-total-invested')"
+            >ⓘ</span>
+          </dt>
+          <dd class="mt-1 text-xl font-semibold tabular-nums" :data-testid="tid('total-invested')">{{ money(perf?.capitalBasis) }}</dd>
+        </div>
+      </dl>
+    </section>
+
+    <!-- Return -->
+    <section class="mb-5" :data-testid="tid('group-return')">
+      <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Return</h3>
+      <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
+          <dt class="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
+            Net gain
+            <span
+              class="cursor-help text-slate-400"
+              title="Total value minus total invested. The % is that gain over total invested."
+              aria-label="Total value minus total invested. The percent is that gain over total invested."
+              :data-testid="tid('tip-net-gain')"
+            >ⓘ</span>
+          </dt>
+          <dd class="mt-1 flex flex-wrap items-baseline gap-2">
+            <span class="text-xl font-semibold tabular-nums" :class="signClass(perf?.totalReturn)" :data-testid="tid('net-gain')">{{ money(perf?.totalReturn) }}</span>
+            <span class="text-sm tabular-nums" :class="signClass(perf?.totalReturnPercent)" :data-testid="tid('net-gain-percent')">{{ pct(perf?.totalReturnPercent) }}</span>
+          </dd>
+        </div>
+        <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
+          <dt class="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
+            Realized P/L
+            <span
+              class="cursor-help text-slate-400"
+              title="Profit locked in when you sold, using FIFO cost basis. Cash in the bank from selling."
+              aria-label="Profit locked in when you sold, using FIFO cost basis."
+              :data-testid="tid('tip-realized')"
+            >ⓘ</span>
+          </dt>
+          <dd class="mt-1 text-xl font-semibold tabular-nums" :class="signClass(perf?.realizedGains)" :data-testid="tid('realized')">{{ money(perf?.realizedGains) }}</dd>
+        </div>
+        <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
+          <dt class="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
+            Unrealized P/L
+            <span
+              class="cursor-help text-slate-400"
+              title="Paper gain or loss on positions still open: market value minus cost."
+              aria-label="Paper gain or loss on positions still open: market value minus cost."
+              :data-testid="tid('tip-unrealized')"
+            >ⓘ</span>
+          </dt>
+          <dd class="mt-1 text-xl font-semibold tabular-nums" :class="signClass(perf?.unrealizedGains)" :data-testid="tid('unrealized')">{{ money(perf?.unrealizedGains) }}</dd>
+        </div>
+        <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
+          <dt class="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
+            Income
+            <span
+              class="cursor-help text-slate-400"
+              title="Dividends received in the period, net of withholding tax."
+              aria-label="Dividends received in the period, net of withholding tax."
+              :data-testid="tid('tip-income')"
+            >ⓘ</span>
+          </dt>
+          <dd class="mt-1 text-xl font-semibold tabular-nums" :class="signClass(perf?.income)" :data-testid="tid('income')">{{ money(perf?.income) }}</dd>
+        </div>
+      </dl>
+    </section>
+
+    <!-- Rates -->
+    <section :data-testid="tid('group-rates')">
+      <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Rates</h3>
+      <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
+          <dt class="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
+            TWR p.a.
+            <span
+              class="cursor-help text-slate-400"
+              title="Time-weighted return per year: how the strategy performed with cash-flow timing removed. Chain-linked daily."
+              aria-label="Time-weighted return per year, with cash-flow timing removed."
+              :data-testid="tid('tip-twr')"
+            >ⓘ</span>
+          </dt>
+          <dd class="mt-1 text-xl font-semibold tabular-nums" :class="signClass(twrPa)" :data-testid="tid('twr')">{{ pct(twrPa) }}</dd>
+          <p v-if="twrPa == null" class="mt-1 text-xs text-slate-400 dark:text-slate-500" :data-testid="tid('twr-withheld')">{{ withheldText(twrPaWithheld) }}</p>
+        </div>
+        <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
+          <dt class="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
+            MWR
+            <span
+              class="cursor-help text-slate-400"
+              title="Money-weighted return over the period: the return your actual money earned, weighted by when you added or took out cash."
+              aria-label="Money-weighted return over the period, weighted by cash-flow timing."
+              :data-testid="tid('tip-mwr')"
+            >ⓘ</span>
+          </dt>
+          <dd class="mt-1 text-xl font-semibold tabular-nums" :class="signClass(mwr)" :data-testid="tid('mwr')">{{ pct(mwr) }}</dd>
+        </div>
+        <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
+          <dt class="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
+            XIRR
+            <span
+              class="cursor-help text-slate-400"
+              title="Annualised money-weighted rate: the single yearly rate that discounts every cash flow to today's value."
+              aria-label="Annualised money-weighted rate that discounts every cash flow to today's value."
+              :data-testid="tid('tip-xirr')"
+            >ⓘ</span>
+          </dt>
+          <dd class="mt-1 text-xl font-semibold tabular-nums" :class="signClass(xirr)" :data-testid="tid('xirr')">{{ pct(xirr) }}</dd>
+          <p v-if="xirr == null" class="mt-1 text-xs text-slate-400 dark:text-slate-500" :data-testid="tid('xirr-withheld')">{{ withheldText(xirrWithheld) }}</p>
+        </div>
+      </dl>
+    </section>
+  </div>
+</template>
