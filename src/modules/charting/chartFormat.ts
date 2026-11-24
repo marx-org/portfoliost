@@ -4,10 +4,15 @@
  * Raw ApexCharts ticks print the full float (`80.00000000`, `69.72577697`) —
  * a wall of trailing zeroes with no unit. These helpers give every chart the
  * same compact, unit-qualified labels so axes stay readable.
+ *
+ * Data-label formatters are called with `null` for missing points (e.g. a YoY
+ * line with no prior-year comparison), so every helper is null-safe and returns
+ * an empty string rather than throwing on `null.toFixed`.
  */
 
 /** Compact currency, keeping at most one decimal and trimming a trailing `.0`. */
-function compactCurrency(value: number, currency: string): string {
+function compactCurrency(value: number | null | undefined, currency: string): string {
+  if (value == null || Number.isNaN(value)) return ""
   const ccy = /^[A-Za-z]{3}$/.test(currency ?? "") ? currency.toUpperCase() : null
   const formatted = ccy
     ? new Intl.NumberFormat("en-US", {
@@ -22,22 +27,24 @@ function compactCurrency(value: number, currency: string): string {
 }
 
 /** Axis tick for a currency amount: compact (`$80`, `$1.2M`), no float noise. */
-export function axisCurrency(value: number, currency: string): string {
+export function axisCurrency(value: number | null | undefined, currency: string): string {
   return compactCurrency(value, currency)
 }
 
 /** Bar/line data label for a currency amount: compact and rounded. */
-export function labelCurrency(value: number, currency: string): string {
+export function labelCurrency(value: number | null | undefined, currency: string): string {
   return compactCurrency(value, currency)
 }
 
 /** Axis tick for a percent value already expressed in percent units. */
-export function axisPercent(value: number): string {
+export function axisPercent(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(value)) return ""
   return `${Number(value.toFixed(1))}%`
 }
 
 /** Data label for a percent value, rounded to one decimal, with an explicit sign. */
-export function labelPercent(value: number): string {
+export function labelPercent(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(value)) return ""
   const rounded = Number(value.toFixed(1))
   return `${rounded > 0 ? "+" : ""}${rounded}%`
 }
