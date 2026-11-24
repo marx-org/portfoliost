@@ -16,7 +16,7 @@ const GATEWAY = process.env.PORTFOLIOST_GATEWAY_URL || "http://localhost:8080"
 
 async function openTab(page: import("@playwright/test").Page) {
   await page.goto("/en/investments/performance")
-  await expect(page.getByTestId("total-perf-overview")).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByTestId("total-perf-summary-root")).toBeVisible({ timeout: 30_000 })
 }
 
 /**
@@ -60,9 +60,9 @@ test("every §82 tile renders a NUMBER on the aggregate, not a dash", async ({ p
   // 60-point withholding floor — so TWR p.a. may legitimately be withheld HERE.
   // The others are not withheld by any predicate and a dash would be a bug.
   for (const id of [
-    "total-perf-overview-net-gain",
-    "total-perf-overview-net-invested",
-    "total-perf-overview-xirr",
+    "total-perf-summary-net-gain",
+    "total-perf-summary-total-invested",
+    "total-perf-summary-xirr",
     "total-performance-max-drawdown",
     "total-performance-current-drawdown",
   ]) {
@@ -84,7 +84,7 @@ test("the Yearly view is available on ALL and reconciles to the Net gain tile", 
   await expect(totalEl).toBeVisible({ timeout: 30_000 })
   const total = await totalEl.innerText()
 
-  const gain = await page.getByTestId("total-perf-overview-net-gain").innerText()
+  const gain = await page.getByTestId("total-perf-summary-net-gain").innerText()
 
   /**
    * §82.5 (PROD): the Σ of the yearly rows is `net(last) − net(first)` while the
@@ -124,7 +124,7 @@ test("the Yearly view is available on ALL and reconciles to the Net gain tile", 
 test("the constant-currency caveat is stated on the aggregate (§83.6)", async ({ page }) => {
   await login(page)
   await openTab(page)
-  await expect(page.getByTestId("total-perf-overview-fx-caveat")).toContainText("Constant currency")
+  await expect(page.getByTestId("total-perf-summary-fx-caveat")).toContainText("Constant currency")
 })
 
 test("the dashboard links to the tab instead of repeating the curve", async ({ page }) => {
@@ -135,5 +135,5 @@ test("the dashboard links to the tab instead of repeating the curve", async ({ p
   await expect(link).toBeVisible({ timeout: 30_000 })
   await link.click()
   await expect(page).toHaveURL(/\/en\/investments\/performance/)
-  await expect(page.getByTestId("total-perf-overview")).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByTestId("total-perf-summary-root")).toBeVisible({ timeout: 30_000 })
 })

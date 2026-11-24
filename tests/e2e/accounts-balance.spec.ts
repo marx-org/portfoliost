@@ -112,8 +112,8 @@ test("the accounts balance tab is the landing page, and its rows add up", async 
   // dashboard's "Total value" tile after the same conversion — on another route.
   const footerTotal = await amount(page.getByTestId("accounts-balance-totals-total"))
   await page.goto("/en/investments")
-  await expect(page.getByTestId("tile-total-value")).toBeVisible({ timeout: 30_000 })
-  const tileTotal = await amount(page.getByTestId("tile-total-value"))
+  await expect(page.getByTestId("perf-summary-total-value")).toBeVisible({ timeout: 30_000 })
+  const tileTotal = await amount(page.getByTestId("perf-summary-total-value"))
   // Tolerance of 1 unit, not a percentage: both cells are the same conversion of
   // the same number, so anything larger is a real disagreement rather than a
   // rounding difference.

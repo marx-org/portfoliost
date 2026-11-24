@@ -39,6 +39,8 @@ function analytics(overrides: Record<string, unknown> = {}) {
       monthlyReturns: [{ month: "2026-01", returnPercent: 10 }],
       timeWeightedReturn: 10,
       moneyWeightedReturn: 14.5,
+      xirr: 14.5,
+      xirrWithheldReason: null,
       simpleReturnPercent: 33.33,
       annualizedReturn: 11.25,
       annualizedReturnWithheldReason: null,
@@ -94,7 +96,7 @@ async function mountContent(
 }
 
 function tile(wrapper: Awaited<ReturnType<typeof mountContent>>, id: string) {
-  return wrapper.get(`[data-testid="perf-overview-${id}"]`).text()
+  return wrapper.get(`[data-testid="perf-summary-${id}"]`).text()
 }
 
 /**
@@ -118,10 +120,9 @@ describe("PerformanceTabContent — §83.1 prop-driven tab body", () => {
   it("renders every tile from its props", async () => {
     const wrapper = await mountContent()
     expect(tile(wrapper, "net-gain")).toContain("300")
-    expect(tile(wrapper, "net-invested")).toContain("900")
+    expect(tile(wrapper, "total-invested")).toContain("900")
     expect(tile(wrapper, "xirr")).toContain("14.50%")
-    expect(tile(wrapper, "twr-pa")).toContain("11.25%")
-    expect(tile(wrapper, "timing")).toContain("+3.25%")
+    expect(tile(wrapper, "twr")).toContain("11.25%")
     // Drawdown reads the `riskMetrics` prop, not a fetch.
     expect(wrapper.get('[data-testid="performance-max-drawdown"]').text()).toContain("10.00%")
   })
@@ -136,38 +137,35 @@ describe("PerformanceTabContent — §83.1 prop-driven tab body", () => {
         ],
       }) as never,
     })
-    expect(tile(wrapper, "net-invested")).toContain("850")
+    expect(tile(wrapper, "total-invested")).toContain("850")
   })
 
-  it("renders — and hides Timing — when the TWR p.a. is withheld", async () => {
-    // §82.2's rule: a withheld rate must not become a confident Timing reading,
-    // because Timing is a difference of two rates and one of them is absent.
+  it("renders — (never 0) when the TWR p.a. is withheld", async () => {
     const wrapper = await mountContent({
       analytics: analytics({
         annualizedReturn: null,
         annualizedReturnWithheldReason: "insufficient_history",
       }) as never,
     })
-    expect(tile(wrapper, "twr-pa")).toContain("—")
+    expect(tile(wrapper, "twr")).toContain("—")
     // The plain-language reason sits beside the tile, inside the card.
-    expect(wrapper.get('[data-testid="perf-overview"]').text()).toContain("not enough history yet")
-    expect(wrapper.find('[data-testid="perf-overview-timing"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="perf-summary-root"]').text()).toContain("not enough history yet")
   })
 
   it("re-renders the money tiles on a display-currency switch without a remount", async () => {
     // §48.6e B3 — ref, not snapshot. A remount would re-fetch the chart and drop
     // the selection; the tiles must follow the store in place.
     const wrapper = await mountContent()
-    const before = wrapper.get('[data-testid="perf-overview-net-gain"]').element
+    const before = wrapper.get('[data-testid="perf-summary-net-gain"]').element
     expect(tile(wrapper, "net-gain")).toContain("$300")
 
     mockedRate.mockResolvedValue({ rate: 0.25, asOf: "2026-10-02" } as never)
     useDisplayCurrencyStore().currency = "EUR"
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="perf-overview-net-gain"]').text()).toContain("€75")
+    expect(wrapper.get('[data-testid="perf-summary-net-gain"]').text()).toContain("€75")
     // Same DOM node: the component was updated, not torn down.
-    expect(wrapper.get('[data-testid="perf-overview-net-gain"]').element).toBe(before)
+    expect(wrapper.get('[data-testid="perf-summary-net-gain"]').element).toBe(before)
   })
 
   it("converts the absolute benchmark series with the display currency", async () => {
@@ -202,13 +200,13 @@ describe("PerformanceTabContent — §83.1 prop-driven tab body", () => {
   it("§149 — hides Net invested and withholds the chart's invested data for a virtual portfolio", async () => {
     const wrapper = await mountContent({ showInvested: false })
     // the withheld tile is gone, not rendered as a zero or an em dash
-    expect(wrapper.find('[data-testid="perf-overview-net-invested"]').exists()).toBe(false)
-    expect(wrapper.get('[data-testid="perf-overview"]').text()).not.toContain("Net invested")
+    expect(wrapper.find('[data-testid="perf-summary-total-invested"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="perf-summary-root"]').text()).not.toContain("Net invested")
     // the tiles a virtual portfolio DOES support are all still there, with their
     // real values: net gain, XIRR/TWR and the drawdown on the card below
     expect(tile(wrapper, "net-gain")).toContain("300")
     expect(tile(wrapper, "xirr")).toContain("14.50%")
-    expect(tile(wrapper, "twr-pa")).toContain("11.25%")
+    expect(tile(wrapper, "twr")).toContain("11.25%")
     expect(wrapper.get('[data-testid="performance-max-drawdown"]').text()).toContain("10.00%")
     // and the chart is told both ways: flag off, and the series carries no
     // invested value that could be drawn as a substitute.
@@ -219,14 +217,14 @@ describe("PerformanceTabContent — §83.1 prop-driven tab body", () => {
 
   it("§149 — keeps Net invested and forwards the chart data for a casual portfolio", async () => {
     const wrapper = await mountContent({ showInvested: true })
-    expect(tile(wrapper, "net-invested")).toContain("900")
+    expect(tile(wrapper, "total-invested")).toContain("900")
     const chart = wrapper.get('[data-testid="chart-stub"]')
     expect(chart.attributes("data-show-invested")).toBe("true")
     expect(chart.attributes("data-invested")).toBe("900")
     // and that is the default mode — an unset prop is a casual mount
     const casual = await mountContent()
     expect(casual.get('[data-testid="chart-stub"]').attributes("data-show-invested")).toBe("true")
-    expect(tile(casual, "net-invested")).toContain("900")
+    expect(tile(casual, "total-invested")).toContain("900")
   })
 
   it("emits update:timeframe instead of writing per-portfolio store state", async () => {
@@ -336,13 +334,13 @@ describe("PerformanceTabContent — §83.1 prop-driven tab body", () => {
     // The per-portfolio mount must keep its ids byte-identical — three existing
     // specs select on them.
     const plain = await mountContent()
-    expect(plain.find('[data-testid="perf-overview"]').exists()).toBe(true)
-    expect(plain.find('[data-testid="total-perf-overview"]').exists()).toBe(false)
+    expect(plain.find('[data-testid="perf-summary-root"]').exists()).toBe(true)
+    expect(plain.find('[data-testid="total-perf-summary-root"]').exists()).toBe(false)
 
     const prefixed = await mountContent({ testid: "total" })
-    expect(prefixed.find('[data-testid="perf-overview"]').exists()).toBe(false)
-    expect(prefixed.find('[data-testid="total-perf-overview"]').exists()).toBe(true)
-    expect(prefixed.find('[data-testid="total-perf-overview-net-gain"]').exists()).toBe(true)
+    expect(prefixed.find('[data-testid="perf-summary-root"]').exists()).toBe(false)
+    expect(prefixed.find('[data-testid="total-perf-summary-root"]').exists()).toBe(true)
+    expect(prefixed.find('[data-testid="total-perf-summary-net-gain"]').exists()).toBe(true)
     expect(prefixed.find('[data-testid="total-performance-max-drawdown"]').exists()).toBe(true)
     // The templated per-year ids prefix the same way.
     expect(prefixed.find('[data-testid="total-perf-returns-yearly-hint"]').exists()).toBe(false)

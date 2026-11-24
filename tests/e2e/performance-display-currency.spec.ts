@@ -167,7 +167,7 @@ test("overview Net gain tile and yearly Gain column re-convert together (§82.5)
   await yearlyBtn.click()
   await expect(page.getByTestId("perf-returns-yearly")).toBeVisible()
 
-  const netGain = page.getByTestId("perf-overview-net-gain")
+  const netGain = page.getByTestId("perf-summary-net-gain")
   const sumGain = page.getByTestId("perf-returns-yearly-total-gain")
 
   // Baseline (display USD): the tile is the payload's `totalReturn` …

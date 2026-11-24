@@ -8,15 +8,40 @@ import { usePortfolioFreshness, usePortfolioValues } from "@/stores/portfolios"
 import { useCurrenciesStore } from "@/stores/currencies"
 import { useLabelsStore } from "@/stores/labels"
 import { storeToRefs } from "pinia"
-import { formatCurrency, formatPercent, formatSignedCurrency } from "@/utils/format"
+import { formatCurrency, formatPercent } from "@/utils/format"
+import { getMergedAnalytics } from "@/api/portfolios"
+import type { PortfolioAnalytics } from "@/api/types"
 import InvestmentsTabs from "@/modules/portfolios/InvestmentsTabs.vue"
 import PortfolioCard from "@/modules/portfolios/PortfolioCard.vue"
 import AddPositionDialog from "@/modules/portfolios/AddPositionDialog.vue"
+import PerformanceSummaryCard from "@/components/PerformanceSummaryCard.vue"
 
 const store = usePortfolioStore()
 const route = useRoute()
 const loading = ref(true)
 const error = ref<string | null>(null)
+// §288 — the consolidated performance summary card is fed from the same
+// /merged analytics the cumulative Performance tab uses, so the main page and
+// that tab show the same numbers.
+const mergedAnalytics = ref<PortfolioAnalytics | null>(null)
+// The card's money totals come from `totalMetrics` (the same live aggregate the
+// account rows sum to, so the headline reconciles), while the rate/income/P/L
+// fields come from the analytics payload. Gain is derived from
+// (totalValue − capitalBasis), never a stored totalGainLoss (§68.4).
+const cardPerformance = computed(() => {
+  const a = mergedAnalytics.value?.performance
+  const tm = store.totalMetrics
+  if (!a && !tm) return null
+  const totalValue = tm?.totalValue ?? a?.totalValue
+  const capitalBasis = tm?.capitalBasis ?? a?.capitalBasis
+  const totalReturn =
+    tm != null ? tm.totalValue - tm.capitalBasis : a?.totalReturn
+  const totalReturnPercent =
+    tm != null && tm.capitalBasis > 0
+      ? ((tm.totalValue - tm.capitalBasis) / tm.capitalBasis) * 100
+      : a?.totalReturnPercent
+  return { ...(a ?? {}), totalValue, capitalBasis, totalReturn, totalReturnPercent }
+})
 
 // D26: every currency selector is fed exclusively by the /api/currencies registry
 const currenciesStore = useCurrenciesStore()
@@ -67,16 +92,7 @@ const priceNote = computed(() => {
   }
 })
 
-const derived = computed(() => {
-  const tm = store.totalMetrics
-  const totalValue = tm?.totalValue ?? 0
-  const capitalBasis = tm?.capitalBasis ?? 0
-  const gainLoss = totalValue - capitalBasis
-  return {
-    gainLoss,
-    returnPercentage: capitalBasis > 0 ? (gainLoss / capitalBasis) * 100 : 0,
-  }
-})
+
 
 const freshnessById = usePortfolioFreshness()
 // §63.3 — each card renders its Value/Invested/Return from the SAME breakdown row
@@ -147,6 +163,11 @@ onMounted(async () => {
   void displayCurrencyStore.hydrateFromServer()
   try {
     await store.fetchAll()
+    // Consolidated performance for the summary card (non-blocking: a failure
+    // degrades the card, not the page).
+    void getMergedAnalytics("ALL", [])
+      .then((a) => { mergedAnalytics.value = a })
+      .catch(() => { mergedAnalytics.value = null })
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Failed to load portfolios"
   } finally {
@@ -258,7 +279,7 @@ async function submitCreate() {
       <!-- §68 — cash is a first-class citizen. Four tiles, each labelled with what
            it is, in the order the user asked for. Total = Cash + Instruments, and
            the two derived figures come from the same pair. -->
-      <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3" data-testid="headline-tiles">
+      <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2" data-testid="headline-tiles">
         <div class="card p-5" data-testid="tile-cash">
           <p class="text-sm text-slate-500 dark:text-slate-400">Cash value</p>
           <p class="mt-1 text-2xl font-semibold tabular-nums" data-testid="tile-cash-value">
@@ -271,38 +292,18 @@ async function submitCreate() {
             {{ formatCurrency(toDisplay(store.totalMetrics.instrumentsValue), displayCurrency) }}
           </p>
         </div>
-        <div class="card p-5" data-testid="tile-total">
-          <p class="text-sm text-slate-500 dark:text-slate-400">Total value</p>
-          <p class="mt-1 text-2xl font-semibold tabular-nums" data-testid="tile-total-value">
-            {{ formatCurrency(toDisplay(store.totalMetrics.totalValue), displayCurrency) }}
-          </p>
-        </div>
-        <div class="card p-5" data-testid="tile-invested">
-          <p class="text-sm text-slate-500 dark:text-slate-400">Total invested</p>
-          <p class="mt-1 text-2xl font-semibold tabular-nums" data-testid="tile-invested-value">
-            {{ formatCurrency(toDisplay(store.totalMetrics.capitalBasis), displayCurrency) }}
-          </p>
-        </div>
-        <div class="card p-5" data-testid="tile-gainloss">
-          <p class="text-sm text-slate-500 dark:text-slate-400">Total gain / loss</p>
-          <p
-            class="mt-1 text-2xl font-semibold tabular-nums"
-            :class="derived.gainLoss >= 0 ? 'text-green-600' : 'text-red-600'"
-            data-testid="tile-gainloss-value"
-          >
-            {{ formatSignedCurrency(toDisplay(derived.gainLoss), displayCurrency) }}
-          </p>
-        </div>
-        <div class="card p-5" data-testid="tile-return">
-          <p class="text-sm text-slate-500 dark:text-slate-400">Total return</p>
-          <p
-            class="mt-1 text-2xl font-semibold tabular-nums"
-            :class="derived.returnPercentage >= 0 ? 'text-green-600' : 'text-red-600'"
-            data-testid="tile-return-value"
-          >
-            {{ formatPercent(derived.returnPercentage) }}
-          </p>
-        </div>
+      </div>
+
+      <!-- §288 — the one performance summary (value, invested, return, P/L split,
+           income, TWR/MWR/XIRR) replaces the old total/invested/gain/return
+           tiles. Cash and Instruments stay above as the balance split. -->
+      <div class="mb-6">
+        <PerformanceSummaryCard
+          :performance="cardPerformance"
+          :base-currency="store.totalMetrics?.baseCurrency ?? ''"
+          testid="perf-summary"
+          :fx-caveat="true"
+        />
       </div>
     </template>
 
