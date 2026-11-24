@@ -27,8 +27,11 @@ const props = withDefaults(
     currency?: string
     /** Testid prefix (`${testid}-chart` / `${testid}-table`). */
     testid?: string
+    /** Render the companion table. Charting keeps the table from
+     * `AllocationBreakdown`, so it hides this one to avoid a duplicate. */
+    showTable?: boolean
   }>(),
-  { slices: () => [], currency: "", testid: "charting-sector-allocation" },
+  { slices: () => [], currency: "", testid: "charting-sector-allocation", showTable: true },
 )
 
 const rows = computed(() => props.slices ?? [])
@@ -44,7 +47,8 @@ function percent(s: SectorSlice): number {
 }
 
 const chartOptions = computed(() => ({
-  chart: { type: "bar" as const, height: 360, toolbar: { show: false } },
+  // Horizontal bars need vertical room per sector; 360 clipped long lists.
+  chart: { type: "bar" as const, height: 420, toolbar: { show: false } },
   plotOptions: { bar: { horizontal: true, borderRadius: 3 } },
   colors: ["#2563eb"],
   xaxis: { categories: rows.value.map(label) },
@@ -60,7 +64,7 @@ const chartSeries = computed(() => [{ name: "Market value", data: rows.value.map
         <h2 class="mb-2 text-base font-semibold">Sector Weights</h2>
         <component :is="'apexchart'" :options="chartOptions" :series="chartSeries" />
       </div>
-      <CollapsibleSection title="Sector Weights" :testid="`${testid}-table`">
+      <CollapsibleSection v-if="showTable" title="Sector Weights" :testid="`${testid}-table`">
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-slate-100 text-left text-xs uppercase text-slate-500 dark:border-slate-800 dark:text-slate-400">

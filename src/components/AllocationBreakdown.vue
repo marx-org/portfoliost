@@ -44,8 +44,19 @@ const props = withDefaults(
     /** Render the companion tables inside collapsed sections (Charting). Off by
      * default so the per-portfolio Allocation tab is unchanged. */
     collapsibleTables?: boolean
+    /** Render the sector donut. Charting hides it to use the taller, more
+     * readable horizontal Sector Weights bar instead; the table stays. */
+    showSectorDonut?: boolean
   }>(),
-  { bySector: () => [], byAssetType: () => [], byCurrency: () => [], currency: "", testid: "allocation", collapsibleTables: false },
+  {
+    bySector: () => [],
+    byAssetType: () => [],
+    byCurrency: () => [],
+    currency: "",
+    testid: "allocation",
+    collapsibleTables: false,
+    showSectorDonut: true,
+  },
 )
 
 function label(s: AllocationSlice): string {
@@ -81,8 +92,11 @@ const donutSeries = computed(() => sectorSlices.value.map((s) => s.value))
 
 <template>
   <div class="space-y-6" :data-testid="testid">
-    <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
-      <div class="card p-6" :data-testid="`${testid}-donut`">
+    <div
+      class="grid gap-6"
+      :class="showSectorDonut ? 'grid-cols-1 xl:grid-cols-2' : 'grid-cols-1'"
+    >
+      <div v-if="showSectorDonut" class="card p-6" :data-testid="`${testid}-donut`">
         <h2 class="mb-2 text-base font-semibold">By Sector</h2>
         <component :is="'apexchart'" v-if="donutSeries.length" :options="donutOptions" :series="donutSeries" />
         <p v-else class="text-sm text-slate-500 dark:text-slate-400">No allocation data.</p>

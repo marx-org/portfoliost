@@ -44,6 +44,9 @@ function linearTrend(points: { period: string; value: number; partial?: boolean 
 }
 
 const categories = computed(() => points.value.map((p) => p.period))
+// ~91 monthly categories at ~13px each collide even when rotated. Show roughly
+// a dozen evenly spaced labels (the tooltip still reports the exact month).
+const labelEvery = computed(() => Math.max(1, Math.ceil(categories.value.length / 12)))
 const divInt = computed(() => points.value.map((p) => Math.round(((p.dividends ?? 0) + (p.interest ?? 0)) * 1e8) / 1e8))
 const options = computed(() => points.value.map((p) => p.options ?? 0))
 
@@ -58,9 +61,13 @@ const chartOptions = computed(() => ({
   chart: { type: "line", height: 340, stacked: false },
   xaxis: {
     categories: categories.value,
-    // Monthly categories are dense: rotate and drop overlapping ticks so the
-    // dates stay readable instead of colliding.
-    labels: { rotate: -45, rotateAlways: false, hideOverlappingLabels: true },
+    // ~91 monthly categories collide even rotated. Blank all but every Nth label
+    // so ~12 evenly spaced dates remain; the tooltip still uses the exact month.
+    labels: {
+      rotate: -45,
+      rotateAlways: false,
+      formatter: (val: string) => (categories.value.indexOf(val) % labelEvery.value === 0 ? val : ""),
+    },
   },
   yaxis: { labels: { formatter: (v: number) => axisCurrency(v, currency.value) } },
   stroke: { width: [0, 0, 2] },
