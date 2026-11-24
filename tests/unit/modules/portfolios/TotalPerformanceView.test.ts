@@ -118,11 +118,11 @@ describe("TotalPerformanceView", () => {
     // nothing to disclose. Here the tab renders it.
     const wrapper = mountView()
     await flushPromises()
-    const note = wrapper.get('[data-testid="total-perf-overview-fx-caveat"]').text()
+    const note = wrapper.get('[data-testid="total-perf-summary-fx-caveat"]').text()
     expect(note).toContain("Constant currency")
     // …and it sits ABOVE the money tiles, which are the numbers a reader checks
     // against a bank balance.
-    const card = wrapper.get('[data-testid="total-perf-overview"]')
+    const card = wrapper.get('[data-testid="total-perf-summary-root"]')
     expect(card.text().indexOf("Constant currency")).toBeLessThan(
       card.text().indexOf("Net gain"),
     )
@@ -131,7 +131,7 @@ describe("TotalPerformanceView", () => {
   it("prefixes every testid, so this tab cannot be confused with a portfolio's", async () => {
     const wrapper = mountView()
     await flushPromises()
-    expect(wrapper.find('[data-testid="total-perf-overview"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="perf-overview"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="total-perf-summary-root"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="perf-summary-root"]').exists()).toBe(false)
   })
 })

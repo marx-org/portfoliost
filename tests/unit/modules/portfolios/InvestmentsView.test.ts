@@ -156,7 +156,22 @@ describe("InvestmentsView", () => {
       performance: { timeSeries: [{ date: "2026-01-01", value: 100 }], monthlyReturns: [] },
     } as never)
     mocked.getMergedAnalytics.mockResolvedValue({
-      performance: { timeSeries: [{ date: "2026-01-01", value: 1000 }], monthlyReturns: [] },
+      performance: {
+        totalValue: 1200,
+        capitalBasis: 1000,
+        totalReturn: 200,
+        totalReturnPercent: 20,
+        realizedGains: 80,
+        unrealizedGains: 120,
+        income: 40,
+        annualizedReturn: 11.25,
+        annualizedReturnWithheldReason: null,
+        moneyWeightedReturn: 14.5,
+        xirr: 12.75,
+        xirrWithheldReason: null,
+        timeSeries: [{ date: "2026-01-01", value: 1000 }],
+        monthlyReturns: [],
+      },
     } as never)
     mockedFx.getLatestRate.mockResolvedValue({ rate: 0.9, asOf: "2026-09-21" })
   })
@@ -176,7 +191,7 @@ describe("InvestmentsView", () => {
    * §68.4 — the four headline tiles, and the identity that makes the section
    * worth having: Total = Cash + Instruments, in the rendered output.
    */
-  it("renders the four §68 tiles and Total == Cash + Instruments", async () => {
+  it("renders the cash/instruments split and the card total == cash + instruments", async () => {
     mocked.getPortfolioTotalMetrics.mockResolvedValue({
       instrumentsValue: 800,
       cashValue: 400,
@@ -192,14 +207,12 @@ describe("InvestmentsView", () => {
     const tiles = wrapper.get('[data-testid="headline-tiles"]')
     expect(tiles.text()).toContain("Cash value")
     expect(tiles.text()).toContain("Instruments value")
-    expect(tiles.text()).toContain("Total value")
-    expect(tiles.text()).toContain("Total invested")
 
     const num = (id: string) =>
       Number(wrapper.get(`[data-testid="${id}"]`).text().replace(/[^0-9.-]/g, ""))
     const cash = num("tile-cash-value")
     const instruments = num("tile-instruments-value")
-    const total = num("tile-total-value")
+    const total = num("perf-summary-total-value")
     expect(cash).toBe(400)
     expect(instruments).toBe(800)
     expect(total).toBe(1200)
@@ -207,10 +220,10 @@ describe("InvestmentsView", () => {
     expect(cash + instruments).toBe(total)
   })
 
-  it("derives gain/loss and return from the same pair as the tiles (§68.4)", async () => {
-    // deliberately inconsistent response fields: the tiles and the derived pair
-    // must come from (totalValue, capitalBasis), not from totalGainLoss /
-    // returnPercentage, or they could disagree.
+  it("shows gain/loss and return from the analytics payload, not totalMetrics (§68.4)", async () => {
+    // deliberately inconsistent totalMetrics fields: the card must read the
+    // analytics payload (totalReturn / totalReturnPercent), not totalGainLoss /
+    // returnPercentage, or the two could disagree.
     mocked.getPortfolioTotalMetrics.mockResolvedValue({
       instrumentsValue: 800,
       cashValue: 400,
@@ -222,14 +235,23 @@ describe("InvestmentsView", () => {
       portfolioBreakdown: [],
       cashBreakdown: [],
     } as never)
+    mocked.getMergedAnalytics.mockResolvedValue({
+      performance: {
+        totalValue: 1200,
+        capitalBasis: 1000,
+        totalReturn: 200,
+        totalReturnPercent: 20,
+        timeSeries: [],
+        monthlyReturns: [],
+      },
+    } as never)
     const wrapper = mountView()
     await flushPromises()
 
     const num = (id: string) =>
       Number(wrapper.get(`[data-testid="${id}"]`).text().replace(/[^0-9.-]/g, ""))
-    // 1200 - 1000
-    expect(num("tile-gainloss-value")).toBe(200)
-    expect(wrapper.get('[data-testid="tile-return-value"]').text()).toContain("20.00%")
+    expect(num("perf-summary-net-gain")).toBe(200)
+    expect(wrapper.get('[data-testid="perf-summary-net-gain-percent"]').text()).toContain("20.00%")
   })
 
   it("renders a NEGATIVE cash tile rather than an em dash (§68.3)", async () => {
@@ -568,6 +590,9 @@ describe("§63.3: the cards sum to the headline", () => {
           unpricedPositions: 0, priceAsOf: null, priceSource: "quote" },
       ],
     } as never)
+    mocked.getMergedAnalytics.mockResolvedValue({
+      performance: { totalValue: 1096.23, capitalBasis: 1000, totalReturn: 96.23, totalReturnPercent: 9.62, timeSeries: [], monthlyReturns: [] },
+    } as never)
     const w = mountView()
     await flushPromises()
 
@@ -575,7 +600,7 @@ describe("§63.3: the cards sum to the headline", () => {
     expect(num(w, "card-invested")).toBe(1000)
     expect(num(w, "card-instruments-value")).toBe(1000)
     // the load-bearing assertion: the card and the headline are the same number
-    expect(num(w, "card-value")).toBe(num(w, "tile-total-value"))
+    expect(num(w, "card-value")).toBe(num(w, "perf-summary-total-value"))
   })
 
   it("keeps Σ cards equal to the headline across several portfolios", async () => {
@@ -602,12 +627,15 @@ describe("§63.3: the cards sum to the headline", () => {
       baseCurrency: "USD", cashBreakdown: [], unpricedPositions: 0,
       portfolioBreakdown: breakdown,
     } as never)
+    mocked.getMergedAnalytics.mockResolvedValue({
+      performance: { totalValue: total, capitalBasis: 3000, totalReturn: 0, totalReturnPercent: 0, timeSeries: [], monthlyReturns: [] },
+    } as never)
     const w = mountView()
     await flushPromises()
 
     const cards = w.findAll('[data-testid="card-value"]').map((el) => Number(el.text().replace(/[^0-9.-]/g, "")))
     expect(cards.length).toBe(3)
-    expect(cards.reduce((s, v) => s + v, 0)).toBeCloseTo(num(w, "tile-total-value"), 2)
+    expect(cards.reduce((s, v) => s + v, 0)).toBeCloseTo(num(w, "perf-summary-total-value"), 2)
   })
 
   it("falls back to the stored figures when the breakdown has no row for the card", async () => {

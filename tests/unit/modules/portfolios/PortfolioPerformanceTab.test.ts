@@ -51,6 +51,8 @@ function analytics(overrides: Record<string, unknown> = {}) {
       monthlyReturns: [{ month: "2026-01", returnPercent: 10 }],
       timeWeightedReturn: 10,
       moneyWeightedReturn: 14.5,
+      xirr: 14.5,
+      xirrWithheldReason: null,
       simpleReturnPercent: 33.33,
       annualizedReturn: 11.25,
       annualizedReturnWithheldReason: null,
@@ -93,7 +95,7 @@ async function mountTab(env = makeEnv()) {
 }
 
 function tile(wrapper: Awaited<ReturnType<typeof mountTab>>, id: string) {
-  return wrapper.get(`[data-testid="perf-overview-${id}"]`).text()
+  return wrapper.get(`[data-testid="perf-summary-${id}"]`).text()
 }
 
 describe("PortfolioPerformanceTab — §82.2 overview tiles", () => {
@@ -111,41 +113,12 @@ describe("PortfolioPerformanceTab — §82.2 overview tiles", () => {
     usePortfolioStore(env).analytics = null
     const wrapper = await mountTab(env)
     expect(tile(wrapper, "net-gain")).toContain("300")
-    expect(tile(wrapper, "net-invested")).toContain("900")
+    expect(tile(wrapper, "total-invested")).toContain("900")
     expect(tile(wrapper, "xirr")).toContain("14.50%")
-    expect(tile(wrapper, "twr-pa")).toContain("11.25%")
+    expect(tile(wrapper, "twr")).toContain("11.25%")
     expect(mocked.getPortfolioAnalytics).toHaveBeenCalledTimes(1)
     expect(mocked.getPortfolioAnalytics).toHaveBeenCalledWith("p1", "1Y", ["SPY"], "timeWeighted")
     expect(mocked.getPortfolioPositions).toHaveBeenCalledWith("p1", undefined)
-  })
-
-  it("computes Timing as XIRR − TWR p.a. and reads it in plain language", async () => {
-    const wrapper = await mountTab()
-    // 14.50 − 11.25 = +3.25 pp → "adding money helped"
-    expect(tile(wrapper, "timing")).toContain("+3.25%")
-    expect(wrapper.get('[data-testid="perf-overview-timing"]').text()).toContain("adding money helped")
-  })
-
-  it("reads the other direction when the user's timing lagged the investments", async () => {
-    const env = makeEnv()
-    usePortfolioStore().analytics = analytics({
-      moneyWeightedReturn: 4,
-      annualizedReturn: 13,
-    }) as never
-    const wrapper = await mountTab(env)
-    expect(tile(wrapper, "timing")).toContain("-9.00%")
-    expect(wrapper.get('[data-testid="perf-overview-timing"]').text()).toContain("adding money hurt")
-  })
-
-  it("calls a sub-1pp gap 'roughly neutral' rather than pretending to 2 dp of precision", async () => {
-    const env = makeEnv()
-    usePortfolioStore().analytics = analytics({
-      moneyWeightedReturn: 11.6,
-      annualizedReturn: 11.25,
-    }) as never
-    const wrapper = await mountTab(env)
-    expect(tile(wrapper, "timing")).toContain("+0.35%")
-    expect(wrapper.get('[data-testid="perf-overview-timing"]').text()).toContain("roughly neutral")
   })
 
   /**
@@ -153,7 +126,7 @@ describe("PortfolioPerformanceTab — §82.2 overview tiles", () => {
    * facts and must not look alike. `formatPercent(null)` returns "—", so the
    * em-dash is what keeps "we don't know" from reading as "nothing happened".
    */
-  it("renders — (never 0) for a withheld TWR p.a., and hides the Timing line entirely", async () => {
+  it("renders — (never 0) for a withheld TWR p.a.", async () => {
     const env = makeEnv()
     usePortfolioStore().analytics = analytics({
       annualizedReturn: null,
@@ -161,24 +134,23 @@ describe("PortfolioPerformanceTab — §82.2 overview tiles", () => {
     }) as never
     const wrapper = await mountTab(env)
 
-    expect(tile(wrapper, "twr-pa")).toBe("—")
-    expect(wrapper.get('[data-testid="perf-overview-twr-pa"]').text()).not.toContain("0.00%")
+    expect(tile(wrapper, "twr")).toBe("—")
+    expect(wrapper.get('[data-testid="perf-summary-twr"]').text()).not.toContain("0.00%")
     // The reason is shown, so the em-dash is explained rather than mysterious.
     expect(wrapper.text()).toContain("not enough history yet")
-    // Timing is a difference of two rates — with one withheld it means nothing.
-    expect(wrapper.find('[data-testid="perf-overview-timing"]').exists()).toBe(false)
   })
 
-  it("renders — for a withheld XIRR and hides Timing", async () => {
+  it("renders — for a withheld XIRR", async () => {
     const env = makeEnv()
     usePortfolioStore().analytics = analytics({
       moneyWeightedReturn: null,
       moneyWeightedReturnWithheldReason: "insufficient_history",
+      xirr: null,
+      xirrWithheldReason: "insufficient_history",
       annualizedReturn: 11.25,
     }) as never
     const wrapper = await mountTab(env)
     expect(tile(wrapper, "xirr")).toBe("—")
-    expect(wrapper.find('[data-testid="perf-overview-timing"]').exists()).toBe(false)
   })
 
   it("renders — for absent fields rather than 0", async () => {
@@ -188,25 +160,24 @@ describe("PortfolioPerformanceTab — §82.2 overview tiles", () => {
       capitalBasis: undefined,
       timeSeries: [],
       moneyWeightedReturn: undefined,
+      xirr: undefined,
+      xirrWithheldReason: undefined,
       annualizedReturn: undefined,
       annualizedReturnWithheldReason: undefined,
     }) as never
     const wrapper = await mountTab(env)
     expect(tile(wrapper, "net-gain")).toBe("—")
-    expect(tile(wrapper, "net-invested")).toBe("—")
+    expect(tile(wrapper, "total-invested")).toBe("—")
     expect(tile(wrapper, "xirr")).toBe("—")
-    expect(tile(wrapper, "twr-pa")).toBe("—")
-    expect(wrapper.find('[data-testid="perf-overview-timing"]').exists()).toBe(false)
+    expect(tile(wrapper, "twr")).toBe("—")
   })
 
   it("renders a genuine 0.00% as 0.00%, not as the withheld —", async () => {
     const env = makeEnv()
-    usePortfolioStore().analytics = analytics({ annualizedReturn: 0, moneyWeightedReturn: 0 }) as never
+    usePortfolioStore().analytics = analytics({ annualizedReturn: 0, moneyWeightedReturn: 0, xirr: 0 }) as never
     const wrapper = await mountTab(env)
-    expect(tile(wrapper, "twr-pa")).toBe("0.00%")
+    expect(tile(wrapper, "twr")).toBe("0.00%")
     expect(tile(wrapper, "xirr")).toBe("0.00%")
-    expect(tile(wrapper, "timing")).toContain("0.00%")
-    expect(tile(wrapper, "timing")).not.toContain("—")
   })
 
   it("converts the money tiles through the shared display-currency path", async () => {
@@ -217,7 +188,7 @@ describe("PortfolioPerformanceTab — §82.2 overview tiles", () => {
     useDisplayCurrencyStore().setCurrency("PLN")
     const wrapper = await mountTab(env)
     expect(tile(wrapper, "net-gain")).toContain("1,200")
-    expect(tile(wrapper, "net-invested")).toContain("3,600")
+    expect(tile(wrapper, "total-invested")).toContain("3,600")
   })
 
   it("shows no money figure while the rate is unknown — never a guess at 1:1", async () => {
@@ -240,9 +211,9 @@ describe("PortfolioPerformanceTab — §82.2 overview tiles", () => {
     useDisplayCurrencyStore().setCurrency("PLN")
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="perf-overview"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="perf-summary-root"]').exists()).toBe(true)
     expect(tile(wrapper, "net-gain")).toContain("1,200")
-    expect(tile(wrapper, "net-invested")).toContain("3,600")
+    expect(tile(wrapper, "total-invested")).toContain("3,600")
   })
 
   it("leaves the rate tiles unconverted — a percentage is not money", async () => {
@@ -251,17 +222,17 @@ describe("PortfolioPerformanceTab — §82.2 overview tiles", () => {
     useDisplayCurrencyStore().setCurrency("PLN")
     const wrapper = await mountTab(env)
     expect(tile(wrapper, "xirr")).toBe("+14.50%")
-    expect(tile(wrapper, "twr-pa")).toBe("+11.25%")
-    expect(tile(wrapper, "timing")).toContain("+3.25%")
+    expect(tile(wrapper, "twr")).toBe("+11.25%")
     // 4× on a rate would read +58.00% — the category error this asserts against.
-    expect(tile(wrapper, "timing")).not.toContain("58")
+    expect(tile(wrapper, "xirr")).not.toContain("58")
+    expect(tile(wrapper, "twr")).not.toContain("58")
   })
 
   it("places the overview card above the Performance Chart card", async () => {
     const wrapper = await mountTab()
     const cards = wrapper.findAll(".card")
-    expect(cards[0].attributes("data-testid")).toBe("perf-overview")
-    expect(wrapper.html().indexOf("perf-overview")).toBeLessThan(
+    expect(cards[0].attributes("data-testid")).toBe("perf-summary-root")
+    expect(wrapper.html().indexOf("perf-summary-root")).toBeLessThan(
       wrapper.html().indexOf("Performance Chart:"),
     )
   })
@@ -467,7 +438,7 @@ describe("PortfolioPerformanceTab — §82.3 Monthly | Yearly toggle", () => {
     const { wrapper } = await mountWithSeries("ALL")
     await wrapper.get('[data-testid="perf-returns-mode-yearly"]').trigger("click")
     expect(wrapper.get('[data-testid="perf-returns-yearly-total-gain"]').text()).toBe(
-      wrapper.get('[data-testid="perf-overview-net-gain"]').text(),
+      wrapper.get('[data-testid="perf-summary-net-gain"]').text(),
     )
   })
 
@@ -480,7 +451,7 @@ describe("PortfolioPerformanceTab — §82.3 Monthly | Yearly toggle", () => {
     useDisplayCurrencyStore().setCurrency("PLN")
     await flushPromises()
     expect(wrapper.get('[data-testid="perf-returns-yearly-total-gain"]').text()).toBe(
-      wrapper.get('[data-testid="perf-overview-net-gain"]').text(),
+      wrapper.get('[data-testid="perf-summary-net-gain"]').text(),
     )
     expect(wrapper.get('[data-testid="perf-returns-yearly-total-gain"]').text()).toContain("52,960")
   })
