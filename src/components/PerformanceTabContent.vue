@@ -184,6 +184,10 @@ const props = withDefaults(defineProps<{
   fxCaveat?: boolean
   /** Virtual portfolios are views over existing transactions, not cash books. */
   showInvested?: boolean
+  /** Cash balance in the base currency (aggregate or per-portfolio summary). */
+  cashValue?: number | null
+  /** Instruments market value in the base currency. */
+  instrumentsValue?: number | null
 }>(), { showInvested: true })
 
 const emit = defineEmits<{
@@ -571,6 +575,8 @@ function gainClass(value: number | undefined): string {
       :base-currency="props.baseCurrency"
       :testid="tid('perf-summary')"
       :show-invested="props.showInvested"
+      :cash-value="props.cashValue"
+      :instruments-value="props.instrumentsValue"
       :fx-caveat="props.fxCaveat"
     />
 

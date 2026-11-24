@@ -124,6 +124,8 @@ async function handleRecompute() {
     :backfill-pending="backfillPending"
     :recomputing="recomputeBusy"
     :show-invested="!store.detail?.isVirtual"
+    :cash-value="store.summaryMetrics?.cashValue"
+    :instruments-value="store.summaryMetrics?.positionValue"
     @update:timeframe="changeTimeframe"
     @update:selected-benchmarks="(syms) => store.setBenchmarks(syms, id())"
     @recompute="handleRecompute"

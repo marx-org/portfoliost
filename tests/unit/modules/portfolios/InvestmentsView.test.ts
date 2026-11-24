@@ -204,14 +204,11 @@ describe("InvestmentsView", () => {
     const wrapper = mountView()
     await flushPromises()
 
-    const tiles = wrapper.get('[data-testid="headline-tiles"]')
-    expect(tiles.text()).toContain("Cash value")
-    expect(tiles.text()).toContain("Instruments value")
-
+    // Cash and Instruments now live inside the summary card (no separate tiles).
     const num = (id: string) =>
       Number(wrapper.get(`[data-testid="${id}"]`).text().replace(/[^0-9.-]/g, ""))
-    const cash = num("tile-cash-value")
-    const instruments = num("tile-instruments-value")
+    const cash = num("perf-summary-cash")
+    const instruments = num("perf-summary-instruments")
     const total = num("perf-summary-total-value")
     expect(cash).toBe(400)
     expect(instruments).toBe(800)
@@ -266,7 +263,7 @@ describe("InvestmentsView", () => {
     } as never)
     const wrapper = mountView()
     await flushPromises()
-    const cash = wrapper.get('[data-testid="tile-cash-value"]').text()
+    const cash = wrapper.get('[data-testid="perf-summary-cash"]').text()
     expect(cash).not.toBe("\u2014")
     expect(cash).toContain("1,200")
   })

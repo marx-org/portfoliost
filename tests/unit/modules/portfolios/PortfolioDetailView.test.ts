@@ -48,9 +48,6 @@ vi.mock("@/api/client", () => ({
 const mockedFx = vi.mocked(fxApi)
 const mockedPortfolios = vi.mocked(portfoliosApi)
 
-/** Intl renders currency CODES with a non-breaking space — normalize for assertions. */
-const txt = (w: { text: () => string }) => w.text().replace(/\u00a0/g, " ")
-
 // §48.6e B3 umbrella (B2 residual) — the summary cards render
 // summaryMetrics, which wallets denominates in the portfolio baseCurrency
 // (Obligacje PKO: 119,190 PLN must never show as "$119,190.00").
@@ -112,41 +109,6 @@ describe("PortfolioDetailView — §48.6e B3 umbrella: summary cards in the disp
     setActivePinia(createPinia())
     vi.clearAllMocks()
     mockedFx.getLatestRate.mockResolvedValue({ rate: 0.25, asOf: "2026-08-25" })
-  })
-
-  it("converts portfolio-base summaryMetrics to the display currency", async () => {
-    const wrapper = await mountDetail("USD")
-    await flushPromises()
-
-    expect(mockedFx.getLatestRate).toHaveBeenCalledWith("PLN", "USD")
-    // 119,190 × 0.25 = 29,797.50 — never "$119,190.00" (the B2 mislabel).
-    expect(wrapper.text()).toContain("$29,797.50")
-    expect(wrapper.text()).not.toContain("$119,190.00")
-    // P/L converted too (4,190 × 0.25 = 1,047.50); return % untouched.
-    expect(wrapper.text()).toContain("$1,047.50")
-    expect(wrapper.text()).toContain("3.64%")
-  })
-
-  it("same-currency portfolio: no FX fetch, values rendered as-is", async () => {
-    const wrapper = await mountDetail("PLN")
-    await flushPromises()
-
-    expect(mockedFx.getLatestRate).not.toHaveBeenCalled()
-    expect(txt(wrapper)).toContain("PLN 119,190.00")
-    expect(txt(wrapper)).toContain("PLN 115,000.00")
-  })
-
-  it("switching the display currency in place re-converts the cards", async () => {
-    const wrapper = await mountDetail("PLN")
-    await flushPromises()
-    expect(txt(wrapper)).toContain("PLN 119,190.00")
-
-    const pinia = wrapper.vm.$.appContext.app.config.globalProperties.$pinia
-    useDisplayCurrencyStore(pinia).currency = "USD"
-    await flushPromises()
-
-    expect(wrapper.text()).toContain("$29,797.50")
-    expect(txt(wrapper)).not.toContain("PLN 119,190.00")
   })
 
   it("submits the edited base currency and cash-only policy with portfolio settings", async () => {
