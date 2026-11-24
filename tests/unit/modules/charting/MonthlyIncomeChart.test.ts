@@ -68,6 +68,29 @@ describe("MonthlyIncomeChart", () => {
     expect(wrapper.findAll("tbody tr")).toHaveLength(3)
   })
 
+  it("thins dense month labels so the axis does not overlap", async () => {
+    const monthly = Array.from({ length: 24 }, (_, i) => ({
+      period: "2026-" + String((i % 12) + 1).padStart(2, "0"),
+      dividends: 1,
+      interest: 0,
+      options: 0,
+      total: 1,
+      partial: false,
+    }))
+    mockedIncome.mockResolvedValue({ ...dataset(), monthly } as never)
+    const ApexStub = { name: "ApexStub", props: ["options", "series"], template: '<div class="apex-stub" />' }
+    const wrapper = mount(MonthlyIncomeChart, { global: { stubs: { apexchart: ApexStub } } })
+    await flushPromises()
+    const options = wrapper.findComponent(ApexStub).props("options") as {
+      xaxis: { labels: { formatter: (v: string) => string } }
+    }
+    const shown = monthly.filter((m) => options.xaxis.labels.formatter(m.period) !== "").length
+    // 24 months -> every 2nd label, so ~12 remain (not all 24).
+    expect(shown).toBeLessThan(monthly.length)
+    expect(shown).toBeGreaterThanOrEqual(10)
+    expect(options.xaxis.labels.formatter(monthly[0]!.period)).toBe(monthly[0]!.period)
+  })
+
   it("shows an empty state when there is no income", async () => {
     mockedIncome.mockResolvedValue({ ...dataset(), monthly: [] } as never)
     const wrapper = mountChart()
