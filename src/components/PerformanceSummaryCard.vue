@@ -17,6 +17,7 @@ import { computed } from "vue"
 import type { PortfolioAnalytics } from "@/api/types"
 import { formatPercent, formatSignedCurrency } from "@/utils/format"
 import { useDisplayConversion } from "@/composables/useDisplayConversion"
+import InfoTip from "@/components/InfoTip.vue"
 
 const props = withDefaults(
   defineProps<{
@@ -44,6 +45,20 @@ const perf = computed(() => props.performance ?? null)
 // yet means no number, and the label falls back to the amount's own currency.
 const { convert, displayCurrencyOr } = useDisplayConversion(() => props.baseCurrency)
 const ccy = computed(() => displayCurrencyOr() ?? undefined)
+
+// Tooltip copy for each field (rendered by InfoTip).
+const tips = {
+  total_value: 'Market value of everything: positions at market price plus cash, in your display currency.',
+  total_invested: 'Net money you put in (deposits − withdrawals) plus the cost of shares transferred in or out. Excludes interest, fees and FX.',
+  net_gain: 'Total value minus total invested. The % is that gain over total invested.',
+  realized: 'Profit locked in when you sold, using FIFO cost basis. Cash in the bank from selling.',
+  unrealized: 'Paper gain or loss on positions still open: market value minus cost.',
+  income: 'Dividends received in the period, net of withholding tax.',
+  twr: 'Time-weighted return per year: how the strategy performed with cash-flow timing removed. Chain-linked daily.',
+  mwr: 'Money-weighted return over the period: the return your actual money earned, weighted by when you added or took out cash.',
+  xirr: "Annualised money-weighted rate: the single yearly rate that discounts every cash flow to today's value.",
+}
+
 
 /** base-currency money → display currency, formatted (null → "—"). */
 function money(v: number | null | undefined): string {
@@ -94,24 +109,14 @@ const xirrWithheld = computed(() => perf.value?.xirrWithheldReason ?? null)
         <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
           <dt class="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
             Total value
-            <span
-              class="cursor-help text-slate-400"
-              title="Market value of everything: positions at market price plus cash, in your display currency."
-              aria-label="Market value of everything: positions at market price plus cash, in your display currency."
-              :data-testid="tid('tip-total-value')"
-            >ⓘ</span>
+            <InfoTip :text="tips.total_value" :testid="tid('tip-total-value')" />
           </dt>
           <dd class="mt-1 text-xl font-semibold tabular-nums" :data-testid="tid('total-value')">{{ money(perf?.totalValue) }}</dd>
         </div>
         <div v-if="showInvested" class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
           <dt class="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
             Total invested
-            <span
-              class="cursor-help text-slate-400"
-              title="Net money you put in (deposits − withdrawals) plus the cost of shares transferred in or out. Excludes interest, fees and FX."
-              aria-label="Net money you put in (deposits minus withdrawals) plus the cost of shares transferred in or out. Excludes interest, fees and FX."
-              :data-testid="tid('tip-total-invested')"
-            >ⓘ</span>
+            <InfoTip :text="tips.total_invested" :testid="tid('tip-total-invested')" />
           </dt>
           <dd class="mt-1 text-xl font-semibold tabular-nums" :data-testid="tid('total-invested')">{{ money(perf?.capitalBasis) }}</dd>
         </div>
@@ -125,12 +130,7 @@ const xirrWithheld = computed(() => perf.value?.xirrWithheldReason ?? null)
         <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
           <dt class="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
             Net gain
-            <span
-              class="cursor-help text-slate-400"
-              title="Total value minus total invested. The % is that gain over total invested."
-              aria-label="Total value minus total invested. The percent is that gain over total invested."
-              :data-testid="tid('tip-net-gain')"
-            >ⓘ</span>
+            <InfoTip :text="tips.net_gain" :testid="tid('tip-net-gain')" />
           </dt>
           <dd class="mt-1 flex flex-wrap items-baseline gap-2">
             <span class="text-xl font-semibold tabular-nums" :class="signClass(perf?.totalReturn)" :data-testid="tid('net-gain')">{{ money(perf?.totalReturn) }}</span>
@@ -140,36 +140,21 @@ const xirrWithheld = computed(() => perf.value?.xirrWithheldReason ?? null)
         <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
           <dt class="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
             Realized P/L
-            <span
-              class="cursor-help text-slate-400"
-              title="Profit locked in when you sold, using FIFO cost basis. Cash in the bank from selling."
-              aria-label="Profit locked in when you sold, using FIFO cost basis."
-              :data-testid="tid('tip-realized')"
-            >ⓘ</span>
+            <InfoTip :text="tips.realized" :testid="tid('tip-realized')" />
           </dt>
           <dd class="mt-1 text-xl font-semibold tabular-nums" :class="signClass(perf?.realizedGains)" :data-testid="tid('realized')">{{ money(perf?.realizedGains) }}</dd>
         </div>
         <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
           <dt class="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
             Unrealized P/L
-            <span
-              class="cursor-help text-slate-400"
-              title="Paper gain or loss on positions still open: market value minus cost."
-              aria-label="Paper gain or loss on positions still open: market value minus cost."
-              :data-testid="tid('tip-unrealized')"
-            >ⓘ</span>
+            <InfoTip :text="tips.unrealized" :testid="tid('tip-unrealized')" />
           </dt>
           <dd class="mt-1 text-xl font-semibold tabular-nums" :class="signClass(perf?.unrealizedGains)" :data-testid="tid('unrealized')">{{ money(perf?.unrealizedGains) }}</dd>
         </div>
         <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
           <dt class="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
             Income
-            <span
-              class="cursor-help text-slate-400"
-              title="Dividends received in the period, net of withholding tax."
-              aria-label="Dividends received in the period, net of withholding tax."
-              :data-testid="tid('tip-income')"
-            >ⓘ</span>
+            <InfoTip :text="tips.income" :testid="tid('tip-income')" />
           </dt>
           <dd class="mt-1 text-xl font-semibold tabular-nums" :class="signClass(perf?.income)" :data-testid="tid('income')">{{ money(perf?.income) }}</dd>
         </div>
@@ -183,12 +168,7 @@ const xirrWithheld = computed(() => perf.value?.xirrWithheldReason ?? null)
         <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
           <dt class="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
             TWR p.a.
-            <span
-              class="cursor-help text-slate-400"
-              title="Time-weighted return per year: how the strategy performed with cash-flow timing removed. Chain-linked daily."
-              aria-label="Time-weighted return per year, with cash-flow timing removed."
-              :data-testid="tid('tip-twr')"
-            >ⓘ</span>
+            <InfoTip :text="tips.twr" :testid="tid('tip-twr')" />
           </dt>
           <dd class="mt-1 text-xl font-semibold tabular-nums" :class="signClass(twrPa)" :data-testid="tid('twr')">{{ pct(twrPa) }}</dd>
           <p v-if="twrPa == null" class="mt-1 text-xs text-slate-400 dark:text-slate-500" :data-testid="tid('twr-withheld')">{{ withheldText(twrPaWithheld) }}</p>
@@ -196,24 +176,14 @@ const xirrWithheld = computed(() => perf.value?.xirrWithheldReason ?? null)
         <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
           <dt class="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
             MWR
-            <span
-              class="cursor-help text-slate-400"
-              title="Money-weighted return over the period: the return your actual money earned, weighted by when you added or took out cash."
-              aria-label="Money-weighted return over the period, weighted by cash-flow timing."
-              :data-testid="tid('tip-mwr')"
-            >ⓘ</span>
+            <InfoTip :text="tips.mwr" :testid="tid('tip-mwr')" />
           </dt>
           <dd class="mt-1 text-xl font-semibold tabular-nums" :class="signClass(mwr)" :data-testid="tid('mwr')">{{ pct(mwr) }}</dd>
         </div>
         <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
           <dt class="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
             XIRR
-            <span
-              class="cursor-help text-slate-400"
-              title="Annualised money-weighted rate: the single yearly rate that discounts every cash flow to today's value."
-              aria-label="Annualised money-weighted rate that discounts every cash flow to today's value."
-              :data-testid="tid('tip-xirr')"
-            >ⓘ</span>
+            <InfoTip :text="tips.xirr" :testid="tid('tip-xirr')" />
           </dt>
           <dd class="mt-1 text-xl font-semibold tabular-nums" :class="signClass(xirr)" :data-testid="tid('xirr')">{{ pct(xirr) }}</dd>
           <p v-if="xirr == null" class="mt-1 text-xs text-slate-400 dark:text-slate-500" :data-testid="tid('xirr-withheld')">{{ withheldText(xirrWithheld) }}</p>
