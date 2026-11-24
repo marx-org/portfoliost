@@ -279,29 +279,15 @@ async function submitCreate() {
       <!-- §68 — cash is a first-class citizen. Four tiles, each labelled with what
            it is, in the order the user asked for. Total = Cash + Instruments, and
            the two derived figures come from the same pair. -->
-      <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2" data-testid="headline-tiles">
-        <div class="card p-5" data-testid="tile-cash">
-          <p class="text-sm text-slate-500 dark:text-slate-400">Cash value</p>
-          <p class="mt-1 text-2xl font-semibold tabular-nums" data-testid="tile-cash-value">
-            {{ formatCurrency(toDisplay(store.totalMetrics.cashValue), displayCurrency) }}
-          </p>
-        </div>
-        <div class="card p-5" data-testid="tile-instruments">
-          <p class="text-sm text-slate-500 dark:text-slate-400">Instruments value</p>
-          <p class="mt-1 text-2xl font-semibold tabular-nums" data-testid="tile-instruments-value">
-            {{ formatCurrency(toDisplay(store.totalMetrics.instrumentsValue), displayCurrency) }}
-          </p>
-        </div>
-      </div>
-
-      <!-- §288 — the one performance summary (value, invested, return, P/L split,
-           income, TWR/MWR/XIRR) replaces the old total/invested/gain/return
-           tiles. Cash and Instruments stay above as the balance split. -->
+      <!-- §288 — cash and instruments now live inside the summary card; the old
+           Cash/Instruments headline tiles were the duplicate. -->
       <div class="mb-6">
         <PerformanceSummaryCard
           :performance="cardPerformance"
           :base-currency="store.totalMetrics?.baseCurrency ?? ''"
           testid="perf-summary"
+          :cash-value="store.totalMetrics?.cashValue"
+          :instruments-value="store.totalMetrics?.instrumentsValue"
           :fx-caveat="true"
         />
       </div>

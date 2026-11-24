@@ -29,6 +29,10 @@ const props = withDefaults(
     testid?: string
     /** Virtual portfolios are views over existing transactions, not cash books. */
     showInvested?: boolean
+    /** Cash balance in the base currency (shown in the Value group when provided). */
+    cashValue?: number | null
+    /** Instruments (open-position) market value in the base currency. */
+    instrumentsValue?: number | null
     /** Print the constant-currency caveat (aggregate mount only). */
     fxCaveat?: boolean
   }>(),
@@ -57,6 +61,8 @@ const tips = {
   twr: 'Time-weighted return per year: how the strategy performed with cash-flow timing removed. Chain-linked daily.',
   mwr: 'Money-weighted return over the period: the return your actual money earned, weighted by when you added or took out cash.',
   xirr: "Annualised money-weighted rate: the single yearly rate that discounts every cash flow to today's value.",
+  cash: 'Cash balance across currencies, in your display currency.',
+  instruments: 'Market value of open positions (instruments), in your display currency.',
 }
 
 
@@ -119,6 +125,20 @@ const xirrWithheld = computed(() => perf.value?.xirrWithheldReason ?? null)
             <InfoTip :text="tips.total_invested" :testid="tid('tip-total-invested')" />
           </dt>
           <dd class="mt-1 text-xl font-semibold tabular-nums" :data-testid="tid('total-invested')">{{ money(perf?.capitalBasis) }}</dd>
+        </div>
+        <div v-if="instrumentsValue != null" class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
+          <dt class="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
+            Instruments
+            <InfoTip :text="tips.instruments" :testid="tid('tip-instruments')" />
+          </dt>
+          <dd class="mt-1 text-xl font-semibold tabular-nums" :data-testid="tid('instruments')">{{ money(instrumentsValue) }}</dd>
+        </div>
+        <div v-if="cashValue != null" class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
+          <dt class="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
+            Cash
+            <InfoTip :text="tips.cash" :testid="tid('tip-cash')" />
+          </dt>
+          <dd class="mt-1 text-xl font-semibold tabular-nums" :data-testid="tid('cash')">{{ money(cashValue) }}</dd>
         </div>
       </dl>
     </section>

@@ -100,4 +100,11 @@ describe("PerformanceSummaryCard", () => {
     await flushPromises()
     expect(w.find('[data-testid="perf-summary-total-invested"]').exists()).toBe(false)
   })
+
+  it("shows Cash and Instruments when provided", async () => {
+    const w = mountCard({ cashValue: 400, instrumentsValue: 800 })
+    await flushPromises()
+    expect(w.get('[data-testid="perf-summary-cash"]').text()).toContain("400")
+    expect(w.get('[data-testid="perf-summary-instruments"]').text()).toContain("800")
+  })
 })

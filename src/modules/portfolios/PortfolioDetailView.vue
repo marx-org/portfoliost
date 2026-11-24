@@ -3,11 +3,9 @@ import { computed, onMounted, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
-import { useDisplayConversion } from "@/composables/useDisplayConversion"
 import { useCurrenciesStore } from "@/stores/currencies"
 import { storeToRefs } from "pinia"
 import { deletePortfolio, updatePortfolio } from "@/api/portfolios"
-import { formatCurrency, formatPercent, formatSignedCurrency } from "@/utils/format"
 import AddPositionDialog from "@/modules/portfolios/AddPositionDialog.vue"
 import TransferSharesDialog from "@/modules/portfolios/TransferSharesDialog.vue"
 import PortfolioSettingsDialog, { type PortfolioSettingsPayload } from "@/modules/portfolios/PortfolioSettingsDialog.vue"
@@ -82,38 +80,6 @@ const description = computed(() => store.detail?.description ?? store.portfolios
 // denominated in the portfolio baseCurrency (wallets `summary_metrics`);
 // convert to the display currency once via getLatestRate (never a
 // mislabelled amount). Pending cross-currency rate renders "—"; an
-// unresolvable pair degrades to 1:1 (§48.3).
-//
-// §67.2 — this was a FOURTH copy of the same base→display conversion, and the
-// only one that DEGRADED an unresolvable pair to 1:1 (`: 1` in the old
-// watchEffect). That defeated the `summaryPending` gate right below it: a failed
-// rate made `summaryRate` 1, so `summaryPending` went false and the template
-// rendered native portfolio-currency values under the DISPLAY currency's symbol
-// — precisely the mislabelled amount §66.2 forbids. useDisplayConversion leaves
-// the rate null instead, so the existing `—` path does its job.
-const { rate: summaryRate } = useDisplayConversion(() => store.detail?.baseCurrency)
-const summaryPending = computed(() => {
-  const src = (store.detail?.baseCurrency ?? "").toUpperCase()
-  return !!src && src !== displayCurrency.value.toUpperCase() && summaryRate.value === null
-})
-const summary = computed(() => {
-  const m = store.summaryMetrics
-  if (!m) return null
-  const rate = summaryRate.value ?? 1
-  return {
-    ...m,
-    totalValue: m.totalValue * rate,
-    capitalBasis: m.capitalBasis * rate,
-    unrealizedGainLoss: m.unrealizedGainLoss * rate,
-    realizedGain: m.realizedGain * rate,
-    cumulativeDividends: m.cumulativeDividends * rate,
-  }
-})
-
-function gainClass(value: number | undefined): string {
-  return (value ?? 0) >= 0 ? "text-green-600" : "text-red-600"
-}
-
 function openRename() {
   renameError.value = null
   showRename.value = true
@@ -224,41 +190,6 @@ async function submitDelete() {
           <button v-if="!isVirtual" type="button" class="btn-secondary text-sm" data-testid="transfer-shares-button" @click="showTransferShares = true">Transfer shares</button>
            <button v-if="!isVirtual" type="button" class="btn-primary text-sm" @click="openAddPosition">Add Position</button>
           <button type="button" class="btn-red-ghost text-sm" @click="openDelete">Delete</button>
-        </div>
-      </div>
-
-      <div v-if="summary" class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-6">
-        <div class="card p-4">
-          <p class="text-sm text-slate-500 dark:text-slate-400">Total Value</p>
-          <p class="mt-1 text-xl font-semibold tabular-nums">{{ summaryPending ? "—" : formatCurrency(summary.totalValue, displayCurrency) }}</p>
-        </div>
-        <div class="card p-4">
-          <p class="text-sm text-slate-500 dark:text-slate-400">Total Invested</p>
-          <p class="mt-1 text-xl font-semibold tabular-nums">{{ summaryPending ? "—" : formatCurrency(summary.capitalBasis, displayCurrency) }}</p>
-        </div>
-        <div class="card p-4">
-          <p class="text-sm text-slate-500 dark:text-slate-400">Return</p>
-          <p class="mt-1 text-xl font-semibold tabular-nums" :class="gainClass(summary.simpleReturnPercent)">
-            {{ formatPercent(summary.simpleReturnPercent) }}
-          </p>
-        </div>
-        <div class="card p-4">
-          <p class="text-sm text-slate-500 dark:text-slate-400">Unrealized P/L</p>
-          <p class="mt-1 text-xl font-semibold tabular-nums" :class="gainClass(summary.unrealizedGainLoss)">
-            {{ summaryPending ? "—" : formatSignedCurrency(summary.unrealizedGainLoss, displayCurrency) }}
-          </p>
-        </div>
-        <div class="card p-4">
-          <p class="text-sm text-slate-500 dark:text-slate-400">Realized</p>
-          <p class="mt-1 text-xl font-semibold tabular-nums" :class="gainClass(summary.realizedGain)">
-            {{ summaryPending ? "—" : formatSignedCurrency(summary.realizedGain, displayCurrency) }}
-          </p>
-        </div>
-        <div class="card p-4">
-          <p class="text-sm text-slate-500 dark:text-slate-400">Income</p>
-          <p class="mt-1 text-xl font-semibold tabular-nums" :class="gainClass(summary.cumulativeDividends)">
-            {{ summaryPending ? "—" : formatSignedCurrency(summary.cumulativeDividends, displayCurrency) }}
-          </p>
         </div>
       </div>
 
