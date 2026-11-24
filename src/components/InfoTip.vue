@@ -2,9 +2,9 @@
 /**
  * InfoTip — a small ⓘ that reveals an explanation on hover AND keyboard focus.
  *
- * A native `title` only shows on a long hover and not at all on focus, which is
- * why the card's tooltips read as "not working". This renders a styled bubble
- * (CSS group-hover / group-focus-within) and keeps `title` as a fallback.
+ * A native `title` only shows on a long hover and not at all on focus, and it
+ * overlaps this bubble (double tooltip). This renders a styled bubble on hover
+ * AND keyboard focus; `aria-label` carries the text for assistive tech.
  */
 defineProps<{ text: string; testid?: string }>()
 </script>
@@ -16,7 +16,6 @@ defineProps<{ text: string; testid?: string }>()
       tabindex="0"
       role="note"
       :aria-label="text"
-      :title="text"
       :data-testid="testid"
     >ⓘ</span>
     <span
