@@ -21,4 +21,11 @@ describe("chartFormat", () => {
     expect(labelPercent(-1.24805828)).toBe("-1.2%")
     expect(labelPercent(0)).toBe("0%")
   })
+
+  it("is null-safe for missing data points (YoY lines with no prior year)", () => {
+    expect(axisCurrency(null, "USD")).toBe("")
+    expect(labelCurrency(undefined, "USD")).toBe("")
+    expect(axisPercent(null)).toBe("")
+    expect(labelPercent(null)).toBe("")
+  })
 })
