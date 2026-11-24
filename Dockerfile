@@ -2,7 +2,7 @@
 
 # Browser assets are architecture-independent. Run npm, TypeScript and Vite on
 # the builder's native CPU, not once per target under QEMU (#109).
-FROM --platform=$BUILDPLATFORM ghcr.io/marx-org/base-node:22-alpine@sha256:4c555748c9819babb757c7c328a12443b9d242edcfcc11cd196c24623dc704dd AS build
+FROM --platform=$BUILDPLATFORM ghcr.io/marx-org/base-node:22-alpine@sha256:a3d3cea2575a542fe6f3d0b931f214027870ddf2cbcef488fc60b913c8f9c40d AS build
 
 WORKDIR /app
 
@@ -42,13 +42,13 @@ RUN npm run build:prepared
 
 # serve and its dependencies are pure JavaScript. Install the locked tree on the
 # native builder and copy it into either runtime; no target-platform RUN needed.
-FROM --platform=$BUILDPLATFORM ghcr.io/marx-org/base-node:22-alpine@sha256:4c555748c9819babb757c7c328a12443b9d242edcfcc11cd196c24623dc704dd AS server
+FROM --platform=$BUILDPLATFORM ghcr.io/marx-org/base-node:22-alpine@sha256:a3d3cea2575a542fe6f3d0b931f214027870ddf2cbcef488fc60b913c8f9c40d AS server
 WORKDIR /opt/serve
 COPY tools/static-server/package.json tools/static-server/package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund
 
 # ---- serve stage ----
-FROM ghcr.io/marx-org/base-node:22-alpine@sha256:4c555748c9819babb757c7c328a12443b9d242edcfcc11cd196c24623dc704dd
+FROM ghcr.io/marx-org/base-node:22-alpine@sha256:a3d3cea2575a542fe6f3d0b931f214027870ddf2cbcef488fc60b913c8f9c40d
 
 COPY --from=server /opt/serve /opt/serve
 ENV PATH="/opt/serve/node_modules/.bin:${PATH}"
