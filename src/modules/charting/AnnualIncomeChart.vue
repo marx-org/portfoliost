@@ -12,7 +12,8 @@
 import { computed } from "vue"
 import type { components } from "@/api/types"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
-import { axisCurrency } from "./chartFormat"
+import { formatCurrency, formatPercent } from "@/utils/format"
+import { axisCurrency, labelCurrency, labelPercent } from "./chartFormat"
 
 type Point = components["schemas"]["ChartIncomeAnnualPoint"]
 
@@ -34,15 +35,21 @@ const chartOptions = computed(() => ({
       opposite: true,
       seriesName: "YoY %",
       title: { text: "YoY %" },
-      labels: { formatter: (v: number) => `${v}%` },
+      labels: { formatter: (v: number) => `${Number(v.toFixed(1))}%` },
     },
   ],
   stroke: { width: [0, 2] },
   colors: ["#22c55e", "#3b82f6"],
+  // Series 0 is the income bar (currency), series 1 the YoY line (percent).
+  // Both printed raw floats (`5917.36`, `8.38752417`); round them.
+  dataLabels: {
+    formatter: (v: number, opts: { seriesIndex: number }) =>
+      opts.seriesIndex === 1 ? labelPercent(v) : labelCurrency(v, props.currency),
+  },
   tooltip: {
     y: [
-      { formatter: (v: number) => `${v} ${props.currency}`.trim() },
-      { formatter: (v: number | null) => (v == null ? "—" : `${v}%`) },
+      { formatter: (v: number) => formatCurrency(v, props.currency) },
+      { formatter: (v: number | null) => (v == null ? "—" : formatPercent(v, 1, true)) },
     ],
   },
 }))
@@ -74,7 +81,7 @@ const chartSeries = computed(() => [
             <td>{{ p.options ?? 0 }}</td>
             <td>{{ p.total ?? 0 }}</td>
             <td>{{ p.priorYearTotal ?? "—" }}</td>
-            <td>{{ p.yoyChangePercent == null ? "—" : `${p.yoyChangePercent}%` }}</td>
+            <td>{{ p.yoyChangePercent == null ? "—" : formatPercent(p.yoyChangePercent, 1, true) }}</td>
           </tr>
         </tbody>
       </table>

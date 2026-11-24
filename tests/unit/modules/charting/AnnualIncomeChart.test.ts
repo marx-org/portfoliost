@@ -16,7 +16,7 @@ describe("AnnualIncomeChart", () => {
     })
     const rows = wrapper.findAll("tbody tr")
     expect(rows).toHaveLength(2)
-    expect(rows[1].text()).toContain("25%")
+    expect(rows[1].text()).toContain("25.0%")
     expect(rows[1].text()).toContain("100")
   })
 

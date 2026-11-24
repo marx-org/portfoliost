@@ -32,6 +32,7 @@ const chartOptions = computed(() => ({
   chart: { type: "line" as const, height: 340, toolbar: { show: false }, zoom: { enabled: false } },
   xaxis: { type: "datetime" as const },
   yaxis: { labels: { formatter: (v: number) => axisCurrency(v, props.currency) } },
+  dataLabels: { enabled: false },
   stroke: { width: [2, 2, 2, 2.5] },
   colors: ["#2563eb", "#0ea5e9", "#8b5cf6", "#f59e0b", "#10b981", "#ef4444", "#64748b"],
   tooltip: { shared: true, y: { formatter: (v: number) => formatCurrency(v, props.currency) } },

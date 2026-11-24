@@ -19,6 +19,7 @@ export interface SectorSlice {
 import { computed } from "vue"
 import { formatCurrency, formatPercent } from "@/utils/format"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
+import { labelCurrency } from "./chartFormat"
 
 const props = withDefaults(
   defineProps<{
@@ -52,6 +53,8 @@ const chartOptions = computed(() => ({
   plotOptions: { bar: { horizontal: true, borderRadius: 3 } },
   colors: ["#2563eb"],
   xaxis: { categories: rows.value.map(label) },
+  // Bars printed raw floats (`544588.17017128`); round to a short currency label.
+  dataLabels: { formatter: (v: number) => labelCurrency(v, props.currency) },
   tooltip: { y: { formatter: (v: number) => formatCurrency(v, props.currency) } },
 }))
 const chartSeries = computed(() => [{ name: "Market value", data: rows.value.map((s) => s.value) }])
