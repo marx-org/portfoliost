@@ -13,6 +13,7 @@ import { useChartData } from "./useChartData"
 import { useChartScope } from "./useChartScope"
 import type { ChartScopeQuery } from "@/api/charting"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
+import { formatCurrency } from "@/utils/format"
 import { axisCurrency } from "./chartFormat"
 
 const props = defineProps<{ scope?: ChartScopeQuery }>()
@@ -73,7 +74,8 @@ const chartOptions = computed(() => ({
   stroke: { width: [0, 0, 2] },
   colors: ["#22c55e", "#f59e0b", "#3b82f6"],
   legend: { position: "top" },
-  tooltip: { y: { formatter: (v: number) => `${v} ${currency.value}` } },
+  // Round the tooltip (the trend line and bars otherwise print raw floats).
+  tooltip: { y: { formatter: (v: number) => formatCurrency(v, currency.value) } },
 }))
 const chartSeries = computed(() => {
   const out: { name: string; type: string; data: number[] }[] = [

@@ -11,7 +11,7 @@
 import { computed } from "vue"
 import { formatCurrency } from "@/utils/format"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
-import { axisCurrency } from "./chartFormat"
+import { axisCurrency, labelCurrency } from "./chartFormat"
 
 type Point = {
   quarter: string
@@ -45,6 +45,8 @@ const chartOptions = computed(() => ({
   yaxis: { labels: { formatter: (v: number) => axisCurrency(v, props.currency) } },
   colors: ["#2563eb", "#0ea5e9", "#8b5cf6", "#f59e0b", "#10b981"],
   legend: { position: "bottom" as const },
+  // Bars printed raw floats (`20.77`); round to a short currency label.
+  dataLabels: { formatter: (v: number) => labelCurrency(v, props.currency) },
   tooltip: { y: { formatter: (v: number) => formatCurrency(v, props.currency) } },
 }))
 const chartSeries = computed(() =>

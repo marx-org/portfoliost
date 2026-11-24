@@ -11,6 +11,7 @@
 import { computed } from "vue"
 import type { components } from "@/api/types"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
+import { formatCurrency } from "@/utils/format"
 import { axisCurrency } from "./chartFormat"
 
 type Point = components["schemas"]["ChartIncomeCumulativePoint"]
@@ -30,9 +31,12 @@ const chartOptions = computed(() => ({
   chart: { type: "area", height: 320 },
   xaxis: { type: "datetime" },
   yaxis: { labels: { formatter: (v: number) => axisCurrency(v, props.currency) } },
+  // A 90-point area chart cannot carry per-point labels legibly; the axis,
+  // tooltip and table carry the values.
+  dataLabels: { enabled: false },
   stroke: { width: 2 },
   colors: ["#22c55e"],
-  tooltip: { y: { formatter: (v: number) => `${v} ${props.currency}`.trim() } },
+  tooltip: { y: { formatter: (v: number) => formatCurrency(v, props.currency) } },
 }))
 const chartSeries = computed(() => [
   {
@@ -45,7 +49,7 @@ const chartSeries = computed(() => [
 <template>
   <div class="space-y-3" data-testid="cumulative-income-chart">
     <p v-if="opening > 0" class="text-xs text-slate-500" data-testid="cumulative-opening">
-      Lifetime before window: {{ opening }} {{ currency }}
+      Lifetime before window: {{ formatCurrency(opening, currency) }}
     </p>
     <apexchart v-if="rows.length" type="area" :options="chartOptions" :series="chartSeries" :height="320" />
     <p v-else class="text-sm text-slate-500">No income data for this scope.</p>
