@@ -12,7 +12,7 @@ import { computed } from "vue"
 import type { components } from "@/api/types"
 import { formatCurrency } from "@/utils/format"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
-import { axisCurrency } from "./chartFormat"
+import { axisCurrency, axisTitle, chartTitle } from "./chartFormat"
 
 type ContributionSeries = components["schemas"]["ChartContributionSeries"]
 type Point = components["schemas"]["ChartContributionSeriesPoint"]
@@ -33,8 +33,12 @@ const hasUnknown = computed(() => rows.value.some((s) => s.points.some((p) => p.
 
 const chartOptions = computed(() => ({
   chart: { type: "line" as const, height: 340, toolbar: { show: false }, zoom: { enabled: false } },
-  xaxis: { type: "datetime" as const },
-  yaxis: { labels: { formatter: (v: number) => axisCurrency(v, props.currency) } },
+  title: chartTitle("Cumulative External Contributions"),
+  xaxis: { type: "datetime" as const, title: axisTitle("Date") },
+  yaxis: {
+    title: axisTitle(`Net funding (${props.currency})`),
+    labels: { formatter: (v: number) => axisCurrency(v, props.currency) },
+  },
   dataLabels: { enabled: false },
   stroke: { width: [2, 2, 2, 2.5] },
   colors: ["#2563eb", "#0ea5e9", "#8b5cf6", "#f59e0b", "#10b981", "#ef4444", "#64748b"],

@@ -26,6 +26,7 @@ export interface ProfitValuePoint {
 import { computed, ref } from "vue"
 import { formatCurrency } from "@/utils/format"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
+import { axisTitle, chartTitle } from "./chartFormat"
 
 const props = withDefaults(
   defineProps<{
@@ -76,12 +77,13 @@ const chartOptions = computed(() => ({
     toolbar: { show: true, autoSelected: "zoom" },
     zoom: { enabled: true, type: "xy" as const },
   },
+  title: chartTitle("Market Value vs Total Profit"),
   xaxis: {
-    title: { text: `Market value (${props.currency})` },
+    title: axisTitle(`Market value (${props.currency})`),
     labels: { formatter: (v: number) => formatCurrency(v, props.currency) },
   },
   yaxis: {
-    title: { text: `Total profit (${props.currency})` },
+    title: axisTitle(`Total profit (${props.currency})`),
     labels: { formatter: (v: number) => formatCurrency(v, props.currency) },
   },
   tooltip: {

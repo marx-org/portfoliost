@@ -12,7 +12,7 @@ import { computed } from "vue"
 import type { components } from "@/api/types"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
 import { formatCurrency } from "@/utils/format"
-import { axisCurrency } from "./chartFormat"
+import { axisCurrency, axisTitle, chartTitle } from "./chartFormat"
 
 type Point = components["schemas"]["ChartIncomeCumulativePoint"]
 
@@ -29,8 +29,12 @@ const opening = computed(() => {
 
 const chartOptions = computed(() => ({
   chart: { type: "area", height: 320 },
-  xaxis: { type: "datetime" },
-  yaxis: { labels: { formatter: (v: number) => axisCurrency(v, props.currency) } },
+  title: chartTitle("Cumulative income"),
+  xaxis: { type: "datetime", title: axisTitle("Date") },
+  yaxis: {
+    title: axisTitle(`Cumulative income (${props.currency})`),
+    labels: { formatter: (v: number) => axisCurrency(v, props.currency) },
+  },
   // A 90-point area chart cannot carry per-point labels legibly; the axis,
   // tooltip and table carry the values.
   dataLabels: { enabled: false },

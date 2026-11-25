@@ -79,3 +79,26 @@
 .dark .apexcharts-toolbar .apexcharts-selection-icon {
   color: #94a3b8; /* slate-400 */
 }
+
+/*
+ * Built-in ApexCharts titles are SVG text with a presentation `fill`
+ * attribute. CSS wins over that attribute, so the same chart options stay
+ * readable in both themes without rebuilding the options on theme changes.
+ */
+.apexcharts-title-text {
+  fill: #0f172a; /* slate-900 */
+}
+
+.dark .apexcharts-title-text {
+  fill: #f1f5f9; /* slate-100 */
+}
+
+.apexcharts-xaxis-title-text,
+.apexcharts-yaxis-title-text {
+  fill: #475569; /* slate-600 */
+}
+
+.dark .apexcharts-xaxis-title-text,
+.dark .apexcharts-yaxis-title-text {
+  fill: #cbd5e1; /* slate-300 */
+}

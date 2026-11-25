@@ -10,6 +10,8 @@
  * an empty string rather than throwing on `null.toFixed`.
  */
 
+export { axisTitle, chartTitle } from "@/utils/chartOptions"
+
 /** Compact currency, keeping at most one decimal and trimming a trailing `.0`. */
 function compactCurrency(value: number | null | undefined, currency: string): string {
   if (value == null || Number.isNaN(value)) return ""

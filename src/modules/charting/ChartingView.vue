@@ -8,6 +8,7 @@ import InstrumentSearchModal from "@/modules/instruments/InstrumentSearchModal.v
 import { COMPARE_METRICS } from "@/modules/instruments/compareMetrics"
 import TickerBadge from "@/components/TickerBadge.vue"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
+import { axisTitle, chartTitle } from "./chartFormat"
 
 type ResearchCompare = components["schemas"]["ResearchCompare"]
 
@@ -24,6 +25,27 @@ const route = useRoute()
 
 const metricDef = computed(() => COMPARE_METRICS.find((m) => m.key === metric.value) ?? COMPARE_METRICS[0])
 
+// The comparison axis mixes currencies and ratios, so the title names the
+// metric and its unit rather than guessing one display currency.
+const PERCENT_METRICS = new Set<keyof ResearchCompare>([
+  "dividendYield",
+  "revenueGrowth",
+  "netMargin",
+  "roe",
+  "grossMargin",
+  "operatingMargin",
+  "fcfMargin",
+])
+const CURRENCY_METRICS = new Set<keyof ResearchCompare>(["price", "marketCap", "netIncome", "revenue"])
+const metricAxisTitle = computed(() => {
+  const unit = PERCENT_METRICS.has(metric.value)
+    ? "%"
+    : CURRENCY_METRICS.has(metric.value)
+      ? "instrument currency"
+      : "ratio"
+  return `${metricDef.value.label} (${unit})`
+})
+
 const nameOf = (symbol: string) => items.value.find((r) => r.symbol === symbol)?.name ?? symbol
 
 const chartSeries = computed(() => [
@@ -35,6 +57,7 @@ const chartSeries = computed(() => [
 
 const chartOptions = computed(() => ({
   chart: { type: "bar" as const, height: 360, toolbar: { show: false } },
+  title: chartTitle("Fundamentals comparison"),
   colors: ["#2563eb"],
   plotOptions: { bar: { columnWidth: "55%", borderRadius: 3 } },
   dataLabels: {
@@ -43,8 +66,11 @@ const chartOptions = computed(() => ({
     offsetY: -6,
     style: { fontSize: "10px" },
   },
-  xaxis: { categories: items.value.map((r) => r.symbol) },
-  yaxis: { labels: { formatter: (v: number) => metricDef.value.chartFmt(v) } },
+  xaxis: { categories: items.value.map((r) => r.symbol), title: axisTitle("Stock") },
+  yaxis: {
+    title: axisTitle(metricAxisTitle.value),
+    labels: { formatter: (v: number) => metricDef.value.chartFmt(v) },
+  },
   grid: { borderColor: "#e2e8f0" },
 }))
 

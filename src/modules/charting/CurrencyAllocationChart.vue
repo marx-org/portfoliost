@@ -23,6 +23,7 @@ export interface CurrencySlice {
 import { computed } from "vue"
 import { formatCurrency, formatPercent } from "@/utils/format"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
+import { chartTitle } from "./chartFormat"
 
 const props = withDefaults(
   defineProps<{
@@ -51,6 +52,7 @@ const COLORS = ["#2563eb", "#0ea5e9", "#8b5cf6", "#f59e0b", "#10b981", "#ef4444"
 
 const donutOptions = computed(() => ({
   chart: { type: "donut" as const, height: 320, toolbar: { show: false } },
+  title: chartTitle("By Currency (denomination)"),
   labels: rows.value.map(label),
   colors: COLORS,
   legend: { position: "bottom" as const },

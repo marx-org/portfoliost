@@ -14,7 +14,7 @@ import { useChartScope } from "./useChartScope"
 import type { ChartScopeQuery } from "@/api/charting"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
 import { formatCurrency } from "@/utils/format"
-import { axisCurrency } from "./chartFormat"
+import { axisCurrency, axisTitle, chartTitle } from "./chartFormat"
 
 const props = defineProps<{ scope?: ChartScopeQuery }>()
 
@@ -60,8 +60,10 @@ const trendLine = computed(() =>
 
 const chartOptions = computed(() => ({
   chart: { type: "line", height: 340, stacked: false },
+  title: chartTitle("Monthly income"),
   xaxis: {
     categories: categories.value,
+    title: axisTitle("Month"),
     // ~91 monthly categories collide even rotated. Blank all but every Nth label
     // so ~12 evenly spaced dates remain; the tooltip still uses the exact month.
     labels: {
@@ -70,7 +72,10 @@ const chartOptions = computed(() => ({
       formatter: (val: string) => (categories.value.indexOf(val) % labelEvery.value === 0 ? val : ""),
     },
   },
-  yaxis: { labels: { formatter: (v: number) => axisCurrency(v, currency.value) } },
+  yaxis: {
+    title: axisTitle(`Income (${currency.value})`),
+    labels: { formatter: (v: number) => axisCurrency(v, currency.value) },
+  },
   stroke: { width: [0, 0, 2] },
   colors: ["#22c55e", "#f59e0b", "#3b82f6"],
   legend: { position: "top" },

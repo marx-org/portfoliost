@@ -11,7 +11,7 @@
 import { computed } from "vue"
 import { formatCurrency, formatPercent } from "@/utils/format"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
-import { axisPercent } from "./chartFormat"
+import { axisPercent, axisTitle, chartTitle } from "./chartFormat"
 
 type Point = {
   quarter: string
@@ -47,8 +47,12 @@ const rows = computed(() =>
 const categories = ["Q1", "Q2", "Q3", "Q4"]
 const chartOptions = computed(() => ({
   chart: { type: "bar" as const, height: 300, toolbar: { show: false } },
-  xaxis: { categories },
-  yaxis: { labels: { formatter: axisPercent } },
+  title: chartTitle("Quarterly Income Growth"),
+  xaxis: { categories, title: axisTitle("Quarter") },
+  yaxis: {
+    title: axisTitle("YoY change (%)"),
+    labels: { formatter: axisPercent },
+  },
   plotOptions: { bar: { distributed: true } },
   colors: rows.value.map((r) =>
     typeof r.yoyChangePercent !== "number" ? "#e2e8f0" : r.yoyChangePercent >= 0 ? "#10b981" : "#ef4444",
