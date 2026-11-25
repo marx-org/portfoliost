@@ -67,11 +67,15 @@ const benchmarkSeries = computed(() =>
 
 <template>
   <div class="space-y-3" data-testid="charting-valuation">
+    <h2 class="text-base font-semibold">Valuation, capital and cumulative income</h2>
     <PortfolioPerformanceChart
       v-if="timeSeries.length"
       :time-series="timeSeries"
       :currency="currency"
       :height="height"
+      title="Valuation, capital and cumulative income"
+      xaxis-title="Date"
+      :yaxis-title="`Value (${currency})`"
       :show-overlays="true"
       :show-recompute="false"
       :gap-symbols="gapSymbols"

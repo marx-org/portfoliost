@@ -13,7 +13,7 @@ import { computed } from "vue"
 import type { components } from "@/api/types"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
 import { formatCurrency, formatPercent } from "@/utils/format"
-import { axisCurrency, labelCurrency, labelPercent } from "./chartFormat"
+import { axisCurrency, axisTitle, chartTitle, labelCurrency, labelPercent } from "./chartFormat"
 
 type Point = components["schemas"]["ChartIncomeAnnualPoint"]
 
@@ -28,13 +28,18 @@ const hasCurrentYear = computed(() => rows.value.some((p) => p.year === currentY
 
 const chartOptions = computed(() => ({
   chart: { type: "bar", height: 340 },
-  xaxis: { categories: rows.value.map((p) => String(p.year)) },
+  title: chartTitle("Annual totals"),
+  xaxis: { categories: rows.value.map((p) => String(p.year)), title: axisTitle("Year") },
   yaxis: [
-    { seriesName: "Income", title: { text: "Income" }, labels: { formatter: (v: number) => axisCurrency(v, props.currency) } },
+    {
+      seriesName: "Income",
+      title: axisTitle(`Income (${props.currency})`),
+      labels: { formatter: (v: number) => axisCurrency(v, props.currency) },
+    },
     {
       opposite: true,
       seriesName: "YoY %",
-      title: { text: "YoY %" },
+      title: axisTitle("YoY (%)"),
       labels: { formatter: (v: number) => `${Number(v.toFixed(1))}%` },
     },
   ],

@@ -12,6 +12,7 @@
 import { computed, ref } from "vue"
 import { formatCurrency } from "@/utils/format"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
+import { axisTitle, chartTitle } from "./chartFormat"
 
 type Point = {
   quarter: string
@@ -38,14 +39,18 @@ const values = computed(() =>
 
 const chartOptions = computed(() => ({
   chart: { type: "bar" as const, height: 300 },
-  xaxis: { categories: rows.value.map((r) => r.quarter) },
+  title: chartTitle(`Quarterly Returns — ${metricLabel.value}`),
+  xaxis: { categories: rows.value.map((r) => r.quarter), title: axisTitle("Quarter") },
   // ApexCharts prints each bar's raw float by default (`69.72577697`). Keep the
   // labels but round to a short percent (`69.7%`) — the values are already
   // percentages, so the raw float is both noisy and ambiguous about the unit.
   dataLabels: { formatter: (v: number) => percentAxis(v) },
   // Axis ticks need the same treatment: without a formatter they render as
   // `80.00000000`, `60.00000000`, … — meaningless trailing zeroes and no unit.
-  yaxis: { labels: { formatter: percentAxis } },
+  yaxis: {
+    title: axisTitle("Return (%)"),
+    labels: { formatter: percentAxis },
+  },
   colors: ["#2563eb"],
   tooltip: {
     y: { formatter: (v: number) => `${v > 0 ? "+" : ""}${v}%` },

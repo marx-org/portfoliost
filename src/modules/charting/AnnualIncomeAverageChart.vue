@@ -11,7 +11,7 @@
 import { computed } from "vue"
 import type { components } from "@/api/types"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
-import { axisCurrency, labelCurrency } from "./chartFormat"
+import { axisCurrency, axisTitle, chartTitle, labelCurrency } from "./chartFormat"
 
 type Point = components["schemas"]["ChartIncomeAveragePoint"]
 
@@ -22,13 +22,18 @@ const props = withDefaults(
 
 const rows = computed(() => props.points ?? [])
 const per = computed(() => (props.unit === "day" ? "day" : "month"))
+const titleText = computed(() => `Annual-equivalent Income per ${per.value}`)
 const divisor = computed(() => props.unit === "day" ? 365 : 12)
 const hasPartial = computed(() => rows.value.some((p) => p.partial))
 
 const chartOptions = computed(() => ({
   chart: { type: "bar", height: 300 },
-  xaxis: { categories: rows.value.map((p) => String(p.year)) },
-  yaxis: { labels: { formatter: (v: number) => axisCurrency(v, props.currency) } },
+  title: chartTitle(titleText.value),
+  xaxis: { categories: rows.value.map((p) => String(p.year)), title: axisTitle("Year") },
+  yaxis: {
+    title: axisTitle(`Income (${props.currency}/${per.value})`),
+    labels: { formatter: (v: number) => axisCurrency(v, props.currency) },
+  },
   colors: ["#f59e0b"],
   dataLabels: { enabled: true, formatter: (v: number) => labelCurrency(v, props.currency) },
   tooltip: {
@@ -42,6 +47,7 @@ const chartSeries = computed(() => [
 
 <template>
   <div class="space-y-3" :data-testid="`annual-income-average-${unit}`">
+    <h2 class="text-base font-semibold">{{ titleText }}</h2>
     <p class="text-xs text-slate-500">
       Annual-equivalent received income per {{ per }} (the year's total ÷ {{ divisor }}). Not a forecast.
     </p>

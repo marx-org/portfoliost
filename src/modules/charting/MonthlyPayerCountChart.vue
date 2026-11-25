@@ -11,6 +11,7 @@
  */
 import { computed } from "vue"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
+import { axisTitle, chartTitle } from "./chartFormat"
 
 type Month = { year: number; month: number; count: number; symbols?: string[]; partial?: boolean }
 
@@ -47,7 +48,13 @@ const monthData = computed(() =>
 
 const chartOptions = computed(() => ({
   chart: { type: "bar" as const, height: 300 },
-  xaxis: { categories: MONTHS },
+  title: chartTitle(
+    selectedYear.value == null
+      ? "Dividend Payers by Month"
+      : `Dividend Payers by Month — ${selectedYear.value}`,
+  ),
+  xaxis: { categories: MONTHS, title: axisTitle("Month") },
+  yaxis: { title: axisTitle("Payers (count)") },
   colors: ["#10b981"],
   tooltip: {
     custom: ({ dataPointIndex }: { dataPointIndex: number }) => {

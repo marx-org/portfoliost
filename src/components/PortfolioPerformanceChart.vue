@@ -7,6 +7,7 @@
  */
 import { computed } from "vue"
 import { formatCompactCurrency, formatCurrency } from "@/utils/format"
+import { axisTitle, chartTitle } from "@/utils/chartOptions"
 import type { PortfolioAnalytics } from "@/api/types"
 
 interface PerformancePoint {
@@ -41,6 +42,11 @@ const props = withDefaults(
     backfillPending?: boolean
     loading?: boolean
     height?: number
+    /** Built-in ApexCharts title, used by Charting so exports carry the heading. */
+    title?: string
+    /** Optional axis titles (Charting); omitted on the portfolio chart. */
+    xaxisTitle?: string
+    yaxisTitle?: string
     /** §63.8 — a recompute/backfill pass is in flight. The chart is grayed
      * out and non-interactable (no tooltip / no re-trigger) until it finishes. */
     recomputing?: boolean
@@ -65,7 +71,7 @@ const props = withDefaults(
       * portfolio-only recompute control is hidden there. */
      showRecompute?: boolean
   }>(),
-   { benchmarks: () => [], currency: "USD", color: "#3b82f6", backfillPending: false, loading: false, height: 300, recomputing: false, gapSymbols: null, heldGapSymbols: null, showInvested: true, showOverlays: false, showRecompute: true },
+   { benchmarks: () => [], currency: "USD", color: "#3b82f6", backfillPending: false, loading: false, height: 300, title: "", xaxisTitle: "", yaxisTitle: "", recomputing: false, gapSymbols: null, heldGapSymbols: null, showInvested: true, showOverlays: false, showRecompute: true },
 )
 
 const emit = defineEmits<{ recompute: [] }>()
@@ -204,13 +210,19 @@ function buildChartOptions() {
   ]
   return {
     chart: { type: "line" as const, toolbar: { show: false }, zoom: { enabled: false } },
+    ...(props.title ? { title: chartTitle(props.title) } : {}),
     colors: [props.color, ...(hasInv ? [INVESTED_COLOR] : []), ...ov.map((o) => o.color), ...benchmarks.map(benchmarkColor)],
-    xaxis: { type: "datetime" as const, labels: { datetimeUTC: false } },
+    xaxis: {
+      type: "datetime" as const,
+      labels: { datetimeUTC: false },
+      ...(props.xaxisTitle ? { title: axisTitle(props.xaxisTitle) } : {}),
+    },
     // Portfolio, Invested, and the absolute flow-mirrored benchmarks share one
     // currency axis so a deposit/withdrawal is visible in every line.
     yaxis: [
       {
         seriesName: valueSeriesNames,
+        ...(props.yaxisTitle ? { title: axisTitle(props.yaxisTitle) } : {}),
         labels: { formatter: (v: number) => formatCompactCurrency(v, props.currency) },
       },
     ],
@@ -235,6 +247,9 @@ const chartOptions = computed(() => {
   const key = [
     props.currency,
     props.color,
+    props.title,
+    props.xaxisTitle,
+    props.yaxisTitle,
     ...benchmarks.map((b) => b.name || b.symbol || "Benchmark"),
   ].join("|")
   if (chartOptionsCache?.key === key) return chartOptionsCache.value
@@ -276,6 +291,9 @@ const chartKey = computed(() => {
     props.currency,
     props.color,
     props.height,
+    props.title,
+    props.xaxisTitle,
+    props.yaxisTitle,
     hasInvested.value ? "inv" : "",
     overlays.value.map((o) => `${o.name}:${(props.timeSeries.at(-1)?.[o.field] as number | null | undefined) ?? ""}`).join(","),
     benchmarks.map((b) => b.name || b.symbol || "Benchmark").join(","),
