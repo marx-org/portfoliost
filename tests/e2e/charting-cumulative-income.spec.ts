@@ -62,7 +62,10 @@ test("cumulative income keeps the pre-window opening and is flat over a zero/opt
   const cumulative = page.getByTestId("cumulative-income-chart")
   await expect(cumulative).toBeVisible()
   await page.getByTestId("cumulative-income-chart-table-toggle").click()
-  await expect(cumulative.getByTestId("cumulative-opening")).toContainText(String(series[0].openingBalance))
+  // The opening is rendered currency-formatted (e.g. "$1,000.00"), so compare
+  // digits rather than the raw number's string form.
+  const openingText = (await cumulative.getByTestId("cumulative-opening").innerText()).replace(/[^0-9]/g, "")
+  expect(openingText).toContain(String(series[0].openingBalance))
   await expect(cumulative.locator("tbody tr")).toHaveCount(series.length)
   const uiLastTotal = Number((await cumulative.locator("tbody tr").last().locator("td").nth(3).innerText()).trim())
   expect(uiLastTotal).toBe(last.total)
