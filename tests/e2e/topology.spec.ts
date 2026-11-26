@@ -421,9 +421,14 @@ test("re-layout restores the canonical arrangement after a manual move", async (
   expect(Math.abs(afterDrag.x - before.x)).toBeGreaterThan(40)
 
   await page.getByTestId("topo-relayout").click()
-  const afterRelayout = await laneBox(external)
-  expect(Math.abs(afterRelayout.x - before.x)).toBeLessThan(2)
-  expect(Math.abs(afterRelayout.y - before.y)).toBeLessThan(2)
+  // The re-layout is reactive and can take a frame to settle (slower CI);
+  // poll instead of reading the box the instant after the click.
+  await expect
+    .poll(async () => {
+      const r = await laneBox(external)
+      return Math.abs(r.x - before.x) < 2 && Math.abs(r.y - before.y) < 2
+    }, { timeout: 5000 })
+    .toBe(true)
 })
 
 test("moved lanes persist across a reload", async ({ page }) => {

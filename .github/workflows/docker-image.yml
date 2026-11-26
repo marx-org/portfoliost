@@ -11,7 +11,7 @@ jobs:
     uses: marx-org/pfire-workflows/.github/workflows/docker-image.yml@f06ee147e41e051c4a6a108e81823073ec57e350
     with:
       node_version: '22'
-      test_command: node --test scripts/npm-auth.check.mjs && npm ci && npm run build && npm run test && npm run test:mock
+      test_command: node --test scripts/npm-auth.check.mjs && npm ci && npm run build && npm run test && npm run test:mock && npx playwright install --with-deps chromium && npm run test:e2e:mock
     secrets: inherit
     permissions:
       contents: write
