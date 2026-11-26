@@ -17,7 +17,7 @@
 import { spawn } from "node:child_process"
 import { createServer } from "node:http"
 import { readFile, writeFile, rm } from "node:fs/promises"
-import { join, extname } from "node:path"
+import { join, extname, resolve, sep } from "node:path"
 import { once } from "node:events"
 
 const ROOT = new URL("..", import.meta.url).pathname
@@ -50,7 +50,13 @@ async function serveDist() {
   const server = createServer(async (req, res) => {
     let p = decodeURIComponent((req.url || "/").split("?")[0])
     if (p === "/") p = "/index.html"
-    let fp = join(dist, p)
+    // Resolve within dist and reject traversal: a request path must not escape
+    // the static root (CodeQL: uncontrolled data in path expression).
+    const fp = resolve(dist, "." + p)
+    if (fp !== dist && !fp.startsWith(dist + sep)) {
+      res.statusCode = 403
+      return res.end("forbidden")
+    }
     try {
       const buf = await readFile(fp)
       res.setHeader("content-type", MIME[extname(fp)] || "application/octet-stream")
