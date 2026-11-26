@@ -1,104 +1,236 @@
 @import "tailwindcss";
 @config "../../tailwind.config.js";
 
+/*
+ * Topology design language — token layer.
+ *
+ * Light values live on :root. The theme store toggles `.dark` on <html> and the
+ * whole layer flips at once, so every utility, surface and chart rule that
+ * references these vars follows the theme without a per-component palette.
+ */
+:root {
+  --surface: #ffffff;
+  --surface-2: #f8fafc; /* light page canvas */
+  --border: #e2e8f0;
+  --text: #0f172a;
+  --muted: #475569;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --danger: #dc2626;
+  --danger-hover: #b91c1c;
+  --danger-soft: #fef2f2;
+  --danger-soft-hover: #fee2e2;
+  --danger-border: #fecaca;
+  --danger-text: #b91c1c;
+  --emerald: #059669;
+  --emerald-hover: #047857;
+  --radius: 0.75rem;
+  --elevation: 0 1px 2px rgb(15 23 42 / 0.06);
+}
+
+.dark {
+  --surface: #0f172a;
+  --surface-2: #020617; /* dark page canvas */
+  --border: #334155;
+  --text: #f1f5f9;
+  --muted: #94a3b8;
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --danger: #ef4444;
+  --danger-hover: #dc2626;
+  --danger-soft: rgb(239 68 68 / 0.10);
+  --danger-soft-hover: rgb(239 68 68 / 0.20);
+  --danger-border: rgb(239 68 68 / 0.30);
+  --danger-text: #fca5a5;
+  --emerald: #34d399;
+  --emerald-hover: #059669;
+  --elevation: 0 1px 2px rgb(2 6 23 / 0.6);
+}
+
+/*
+ * Tokens surfaced as utilities. `inline` keeps the utilities reading the live
+ * CSS variables, so light/dark flips happen in the browser rather than by
+ * rebuilding the CSS.
+ */
+@theme inline {
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-danger: var(--danger);
+  --color-emerald: var(--emerald);
+  --radius-card: var(--radius);
+  --shadow-card: var(--elevation);
+}
+
 @layer base {
   body {
-    @apply bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
+    @apply bg-surface-2 text-text antialiased;
   }
 }
 
+@utility card {
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--elevation);
+}
+
 @utility btn {
-  @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  border-radius: calc(var(--radius) - 4px);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.25rem;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s;
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
 }
 
 @utility btn-primary {
-  @apply btn bg-blue-600 text-white hover:bg-blue-700;
+  @apply btn;
+  background: var(--accent);
+  color: #ffffff;
+
+  &:hover:not(:disabled) {
+    background: var(--accent-hover);
+  }
 }
 
 @utility btn-secondary {
-  @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700;
+  @apply btn;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+
+  &:hover:not(:disabled) {
+    background: var(--surface-2);
+  }
 }
 
 @utility btn-danger {
-  @apply btn bg-red-600 text-white hover:bg-red-700;
+  @apply btn;
+  background: var(--danger);
+  color: #ffffff;
+
+  &:hover:not(:disabled) {
+    background: var(--danger-hover);
+  }
 }
 
 @utility btn-ghost {
-  @apply btn text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800;
+  @apply btn;
+  background-color: transparent;
+  color: var(--muted);
+
+  &:hover:not(:disabled) {
+    background-color: var(--surface-2);
+    color: var(--text);
+  }
 }
 
 @utility btn-emerald {
-  @apply btn bg-emerald-600 text-white hover:bg-emerald-700;
+  @apply btn;
+  background: var(--emerald);
+  color: #ffffff;
+
+  &:hover:not(:disabled) {
+    background: var(--emerald-hover);
+  }
 }
 
 @utility btn-red-ghost {
-  @apply btn border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20;
+  @apply btn;
+  border: 1px solid var(--danger-border);
+  background: var(--danger-soft);
+  color: var(--danger-text);
+
+  &:hover:not(:disabled) {
+    background: var(--danger-soft-hover);
+  }
 }
 
 @utility input {
-  @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500;
+  width: 100%;
+  border-radius: calc(var(--radius) - 4px);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: var(--text);
+
+  &::placeholder {
+    color: var(--muted);
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
 }
 
 @utility label {
-  @apply mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300;
-}
-
-@utility card {
-  @apply rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700/60 dark:bg-slate-900;
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--muted);
 }
 
 /*
  * ApexCharts draws its own toolbar menu with a hardcoded white surface but
- * inherits the page text colour. In dark mode the page text is near-white
- * (slate-100), so the menu renders white-on-white and is unreadable. Give it a
- * dark surface, readable text and a visible hover in dark mode. Light mode keeps
- * ApexCharts' defaults (dark text on white).
+ * inherits the page text colour. In dark mode the page text is near-white, so
+ * the menu renders white-on-white and is unreadable. Give it a dark surface,
+ * readable text and a visible hover in dark mode. Light mode keeps ApexCharts'
+ * defaults (dark text on white). All colors come from the token layer.
  */
 .dark .apexcharts-menu {
-  background: #1e293b; /* slate-800 */
-  color: #e2e8f0; /* slate-200 */
-  border: 1px solid #334155; /* slate-700 */
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  box-shadow: 0 6px 16px rgb(2 6 23 / 0.45);
 }
 
 .dark .apexcharts-menu-item {
-  color: #e2e8f0;
+  color: var(--text);
 }
 
 .dark .apexcharts-menu-item:hover {
-  background: #334155;
-  color: #f8fafc;
+  background: var(--border);
+  color: var(--text);
 }
 
 /* Toolbar icons (menu/zoom/pan) default to a dim gray that is hard to see on the
-   dark card; lift them to slate-400. The SVGs stroke with currentColor. */
+   dark card; lift them to the muted token. The SVGs stroke with currentColor. */
 .dark .apexcharts-toolbar .apexcharts-menu-icon,
 .dark .apexcharts-toolbar .apexcharts-reset-icon,
 .dark .apexcharts-toolbar .apexcharts-pan-icon,
 .dark .apexcharts-toolbar .apexcharts-zoom-icon,
 .dark .apexcharts-toolbar .apexcharts-selection-icon {
-  color: #94a3b8; /* slate-400 */
+  color: var(--muted);
 }
 
 /*
- * Built-in ApexCharts titles are SVG text with a presentation `fill`
- * attribute. CSS wins over that attribute, so the same chart options stay
- * readable in both themes without rebuilding the options on theme changes.
+ * Built-in ApexCharts titles are SVG text with a presentation `fill` attribute.
+ * CSS wins over that attribute, so the same chart options stay readable in both
+ * themes without rebuilding the options on theme changes.
  */
 .apexcharts-title-text {
-  fill: #0f172a; /* slate-900 */
-}
-
-.dark .apexcharts-title-text {
-  fill: #f1f5f9; /* slate-100 */
+  fill: var(--text);
 }
 
 .apexcharts-xaxis-title-text,
 .apexcharts-yaxis-title-text {
-  fill: #475569; /* slate-600 */
-}
-
-.dark .apexcharts-xaxis-title-text,
-.dark .apexcharts-yaxis-title-text {
-  fill: #cbd5e1; /* slate-300 */
+  fill: var(--muted);
 }
