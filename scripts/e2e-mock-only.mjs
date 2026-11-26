@@ -17,7 +17,7 @@
 import { spawn } from "node:child_process"
 import { createServer } from "node:http"
 import { readFile, writeFile, rm } from "node:fs/promises"
-import { join, extname, resolve, sep } from "node:path"
+import { join, extname } from "node:path"
 import { once } from "node:events"
 
 const ROOT = new URL("..", import.meta.url).pathname
@@ -50,13 +50,15 @@ async function serveDist() {
   const server = createServer(async (req, res) => {
     let p = decodeURIComponent((req.url || "/").split("?")[0])
     if (p === "/") p = "/index.html"
-    // Resolve within dist and reject traversal: a request path must not escape
-    // the static root (CodeQL: uncontrolled data in path expression).
-    const fp = resolve(dist, "." + p)
-    if (fp !== dist && !fp.startsWith(dist + sep)) {
+    // Reject traversal and any character outside a conservative URL-path set
+    // before touching the filesystem. This early-return guard is the
+    // sanitizer CodeQL's path-injection query recognises: readFile is only
+    // reached when p is a safe, relative asset path.
+    if (p.includes("..") || !/^\/[A-Za-z0-9._/-]*$/.test(p)) {
       res.statusCode = 403
       return res.end("forbidden")
     }
+    const fp = join(dist, p)
     try {
       const buf = await readFile(fp)
       res.setHeader("content-type", MIME[extname(fp)] || "application/octet-stream")
