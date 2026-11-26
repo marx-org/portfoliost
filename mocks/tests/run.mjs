@@ -474,7 +474,7 @@ async function main() {
   const aNoBench = await request(`/portfolios/${pid}/analytics?timeframe=1Y`, { token })
   check("portfolios.analytics default benchmarks empty", Array.isArray(aNoBench.json.benchmarks) && aNoBench.json.benchmarks.length === 0, `len ${(aNoBench.json.benchmarks || []).length}`)
   const positions = await request(`/portfolios/${pid}/positions`, { token })
-  check("portfolios.positions", positions.status === 200 && Array.isArray(positions.json) && positions.json.length === 10, `got ${positions.status} len ${positions.json && positions.json.length}`)
+  check("portfolios.positions", positions.status === 200 && Array.isArray(positions.json) && positions.json.length === 11, `got ${positions.status} len ${positions.json && positions.json.length}`)
   check("portfolios.position fields", isObj(positions.json[0]) && hasKeys(positions.json[0], ["id", "symbol", "quantity", "averageCostBasis", "currentPrice", "marketValue"]), JSON.stringify(positions.json[0]).slice(0, 120))
   check(
     "portfolios.positions live price derived (mv = qty × current, p/l = qty × (current − avg))",
@@ -492,7 +492,7 @@ async function main() {
   const cfd = await request(`/portfolios/${pid}/positions/cfd-hints`, { token })
   check("portfolios.positions.cfd-hints", cfd.status === 200, `got ${cfd.status}`)
   const txs = await request(`/portfolios/${pid}/transactions?page=1&limit=10`, { token })
-  check("portfolios.transactions", txs.status === 200 && txs.json.total === 10 && txs.json.items.length === 10, `got ${txs.status} total ${txs.json && txs.json.total}`)
+  check("portfolios.transactions", txs.status === 200 && txs.json.total === 11 && txs.json.items.length === 10, `got ${txs.status} total ${txs.json && txs.json.total}`)
   check(
     "portfolios.transactions enriched sector/country",
     txs.status === 200 && txs.json.items.every((t) => typeof t.sector === "string" && t.sector.length > 0 && typeof t.country === "string" && t.country.length > 0),

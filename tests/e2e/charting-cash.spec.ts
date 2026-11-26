@@ -47,7 +47,7 @@ async function cash(request: APIRequestContext, headers: Record<string, string>,
   return (await res.json()) as Cash
 }
 
-test("per-account cash lines plus a total, with internal transfers cancelling", async ({ page, request }) => {
+test("per-account cash lines plus a total, with internal transfers cancelling @needs-backend", async ({ page, request }) => {
   await login(page)
   const headers = await auth(request)
 

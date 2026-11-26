@@ -41,7 +41,7 @@ async function performance(request: APIRequestContext, headers: Record<string, s
   return (await res.json()) as Performance
 }
 
-test("benchmarks mirror the scoped flows through the shared engine", async ({ page, request }) => {
+test("benchmarks mirror the scoped flows through the shared engine @needs-backend", async ({ page, request }) => {
   await login(page)
   const headers = await auth(request)
 

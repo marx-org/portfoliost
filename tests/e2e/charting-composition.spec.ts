@@ -33,7 +33,7 @@ async function allocation(request: APIRequestContext, headers: Record<string, st
   return (await res.json()) as Allocation
 }
 
-test("composition lists instrument identities plus cash, sorted descending", async ({ page, request }) => {
+test("composition lists instrument identities plus cash, sorted descending @needs-backend", async ({ page, request }) => {
   await login(page)
   const headers = await auth(request)
 

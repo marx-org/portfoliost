@@ -33,7 +33,7 @@ async function allocation(request: APIRequestContext, headers: Record<string, st
   return (await res.json()) as Allocation
 }
 
-test("sector weights split sectors and reconcile to the position total", async ({ page, request }) => {
+test("sector weights split sectors and reconcile to the position total @needs-backend", async ({ page, request }) => {
   await login(page)
   const headers = await auth(request)
 

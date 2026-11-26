@@ -37,7 +37,7 @@ async function allocation(request: APIRequestContext, headers: Record<string, st
   return (await res.json()) as Allocation
 }
 
-test("category allocation is value-weighted, editable and survives a reload", async ({ page, request }) => {
+test("category allocation is value-weighted, editable and survives a reload @needs-backend", async ({ page, request }) => {
   await login(page)
   const headers = await auth(request)
 

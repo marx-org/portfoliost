@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test"
 
-test("OIDC flow: sign in with passkey completes full PKCE flow", async ({ page }) => {
+test("OIDC flow: sign in with passkey completes full PKCE flow @needs-backend", async ({ page }) => {
   await page.goto("/login")
   await page.waitForLoadState("networkidle")
 

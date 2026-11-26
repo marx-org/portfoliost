@@ -136,7 +136,7 @@ test("price chart keeps the rendered series when /history 502s (provider burst)"
  * `firstConverted > 0`, the caveat line) and went NaN on
  * `usd.closes[native.length - 1]` once the service changed under it.
  */
-test("§48.5/§72.17 — currency selector converts the series (SNT.WA PLN→USD)", async ({ page }) => {
+test("§48.5/§72.17 — currency selector converts the series (SNT.WA PLN→USD) @needs-backend", async ({ page }) => {
   await login(page)
 
   // Capture both price-bars responses (native on load, converted after the

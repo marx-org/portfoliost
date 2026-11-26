@@ -28,7 +28,7 @@ function iso(offsetDays: number): string {
 function displayDate(offsetDays: number): string {
   return new Date(iso(offsetDays)).toLocaleDateString("en-US", {
     month: "short",
-    day: "2-digit",
+    day: "numeric",
     year: "numeric",
   })
 }

@@ -33,7 +33,7 @@ async function income(request: APIRequestContext, headers: Record<string, string
   return (await res.json()) as Income
 }
 
-test("payer coverage counts distinct current holdings per month, not dividend rows", async ({ page, request }) => {
+test("payer coverage counts distinct current holdings per month, not dividend rows @needs-backend", async ({ page, request }) => {
   await login(page)
   const headers = await auth(request)
 

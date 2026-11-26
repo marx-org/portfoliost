@@ -1,5 +1,6 @@
 import { requireAuth } from "../lib/auth.js"
 import { loadRaw, loadResearch } from "../lib/data.js"
+import { isKnownAccount } from "../lib/accounts.js"
 
 // ── Shared investment-charting mock (feature #253) ──────────────────────────
 // The datasets are deterministic so the mock, unit and e2e tests agree. Scope
@@ -9,10 +10,13 @@ import { loadRaw, loadResearch } from "../lib/data.js"
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-const KNOWN_ACCOUNTS = new Set([
-  "11111111-1111-4111-8111-111111111111",
-  "22222222-2222-4222-8222-222222222222",
-])
+// Accounts the charting mock treats as real. The seeded Top10 and any portfolio
+// created through the API are registered in lib/accounts.js; the two `1111…`/
+// `2222…` fixtures stay known because the mock's own test suite
+// (mocks/tests/run.mjs) scopes against them. A well-formed but foreign id
+// (e.g. 9999…) is still unknown, so the scope reports `coverage:"empty"` — that
+// contract is asserted by both run.mjs and charting-monthly-income.spec.ts.
+const EXTRA_KNOWN_ACCOUNTS = ["11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"]
 const KNOWN_LABELS = new Set([
   "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
   "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
@@ -57,7 +61,7 @@ function parseScope(ctx) {
 }
 
 function scopeMatchesNothing(accounts) {
-  return accounts.length > 0 && accounts.every((id) => !KNOWN_ACCOUNTS.has(id))
+  return accounts.length > 0 && accounts.every((id) => !isKnownAccount(id) && !EXTRA_KNOWN_ACCOUNTS.includes(id))
 }
 
 function coverageFor(nothing) {
@@ -94,31 +98,40 @@ function incomeData(scope) {
     scope,
     coverage: coverageFor(false),
     monthly: [
-      { period: "2026-01", dividends: 120.5, interest: 8.25, options: 40, total: 168.75, partial: false },
-      { period: "2026-02", dividends: 0, interest: 8.1, options: 0, total: 8.1, partial: false },
-      { period: "2026-03", dividends: 210.75, interest: 9.4, options: -25, total: 195.15, partial: false },
-      { period: "2026-04", dividends: 95.2, interest: 8.8, options: 0, total: 104, partial: true },
+      { period: "2026-01", dividends: 120, interest: 9, options: 40, total: 169, partial: false },
+      { period: "2026-02", dividends: 0, interest: 8, options: 0, total: 8, partial: false },
+      { period: "2026-03", dividends: 211, interest: 9, options: -25, total: 195, partial: false },
+      { period: "2026-04", dividends: 0, interest: 0, options: 0, total: 0, partial: false },
+      { period: "2026-05", dividends: 104, interest: 0, options: 0, total: 104, partial: false },
+      { period: "2026-06", dividends: 0, interest: 0, options: 0, total: 0, partial: false },
+      { period: "2026-07", dividends: 50, interest: 0, options: 0, total: 50, partial: false },
+      { period: "2026-08", dividends: 46, interest: 0, options: 0, total: 46, partial: false },
+      { period: "2026-09", dividends: 0, interest: 0, options: 0, total: 0, partial: false },
+      { period: "2026-10", dividends: 0, interest: 0, options: 0, total: 0, partial: false },
+      { period: "2026-11", dividends: 50, interest: 5, options: 0, total: 55, partial: true },
     ],
     cumulative: [
-      { date: "2026-01-31", dividends: 120.5, interest: 8.25, options: 40, total: 168.75, openingBalance: 0 },
-      { date: "2026-02-28", dividends: 120.5, interest: 16.35, options: 40, total: 176.85, openingBalance: 0 },
-      { date: "2026-03-31", dividends: 331.25, interest: 25.75, options: 15, total: 372, openingBalance: 0 },
+      { date: "2026-01-31", dividends: 120, interest: 9, options: 40, total: 1129, openingBalance: 1000 },
+      { date: "2026-02-28", dividends: 120, interest: 17, options: 40, total: 1137, openingBalance: 1000 },
+      { date: "2026-03-31", dividends: 331, interest: 26, options: 15, total: 1357, openingBalance: 1000 },
+      { date: "2026-04-30", dividends: 331, interest: 26, options: 15, total: 1357, openingBalance: 1000 },
+      { date: "2026-11-30", dividends: 581, interest: 31, options: 15, total: 1612, openingBalance: 1000 },
     ],
     annual: [
-      { year: 2025, dividends: 1500, interest: 90, options: 120, total: 1710, priorYearTotal: null, yoyChangePercent: null },
-      { year: 2026, dividends: 426.45, interest: 26.45, options: 15, total: 467.9, priorYearTotal: 1710, yoyChangePercent: -72.6 },
+      { year: 2026, dividends: 581, interest: 31, options: 15, total: 627, priorYearTotal: null, yoyChangePercent: null },
     ],
     quarterly: [
-      { quarter: "2025-Q1", dividends: 300, interest: 0, options: 0, total: 300, priorYearQuarterTotal: null, yoyChangePercent: null },
-      { quarter: "2025-Q2", dividends: 400, interest: 0, options: 0, total: 400, priorYearQuarterTotal: null, yoyChangePercent: null },
-      { quarter: "2025-Q3", dividends: 510, interest: 0, options: 0, total: 510, priorYearQuarterTotal: null, yoyChangePercent: null },
-      { quarter: "2025-Q4", dividends: 500, interest: 0, options: 0, total: 500, priorYearQuarterTotal: null, yoyChangePercent: null },
-      { quarter: "2026-Q1", dividends: 331.25, interest: 25.75, options: 15, total: 372, priorYearQuarterTotal: 300, yoyChangePercent: 24 },
-      { quarter: "2026-Q2", dividends: 0, interest: 0, options: 0, total: 0, priorYearQuarterTotal: 400, yoyChangePercent: -100 },
-      { quarter: "2026-Q3", dividends: 95.2, interest: 0.7, options: 0, total: 95.9, priorYearQuarterTotal: 510, yoyChangePercent: -81.2 },
+      { quarter: "2026-Q1", dividends: 331, interest: 26, options: 15, total: 372, priorYearQuarterTotal: null, yoyChangePercent: null },
+      { quarter: "2026-Q2", dividends: 104, interest: 0, options: 0, total: 104, priorYearQuarterTotal: null, yoyChangePercent: null },
+      { quarter: "2026-Q3", dividends: 96, interest: 0, options: 0, total: 96, priorYearQuarterTotal: null, yoyChangePercent: null },
+      { quarter: "2026-Q4", dividends: 50, interest: 5, options: 0, total: 55, priorYearQuarterTotal: null, yoyChangePercent: null },
     ],
-    dailyAverageByYear: [{ year: 2026, basis: "days", divisor: 365, amount: 467.9 / 365, partial: true }],
-    monthlyAverageByYear: [{ year: 2026, basis: "months", divisor: 12, amount: 467.9 / 12, partial: true }],
+    dailyAverageByYear: [
+      { year: 2026, basis: "days", divisor: 365, amount: 627 / 365, partial: true },
+    ],
+    monthlyAverageByYear: [
+      { year: 2026, basis: "months", divisor: 12, amount: 627 / 12, partial: true },
+    ],
     payerCoverage: [
       { year: 2026, month: 1, count: 6, partial: false },
       { year: 2026, month: 2, count: 0, partial: false },

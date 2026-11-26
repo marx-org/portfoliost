@@ -60,7 +60,7 @@ async function totalCellText(page: import("@playwright/test").Page, label: strin
   return (await page.locator("tfoot tr td").nth(index).innerText()).replace(/\u00a0/g, " ").trim()
 }
 
-test("holdings converts portfolio-base values to the display currency", async ({ page, request }) => {
+test("holdings converts portfolio-base values to the display currency @needs-backend", async ({ page, request }) => {
   test.setTimeout(120_000)
   const run = Date.now()
   const token = await getBearerToken(request)

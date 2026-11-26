@@ -71,7 +71,7 @@ test("cash tab: deposit moves the balance and lists a row", async ({ page, reque
   await request.delete(`${GATEWAY}/api/portfolios/${pid}`, { headers: auth }).catch(() => {})
 })
 
-test("cash settlement currency: an account displayed in PLN that settles in USD", async ({ page, request }) => {
+test("cash settlement currency: an account displayed in PLN that settles in USD @needs-backend", async ({ page, request }) => {
   test.setTimeout(120_000)
   const run = Date.now()
   const token = await getBearerToken(request)
@@ -305,7 +305,7 @@ test("cash-base-only settings restrict cash, keep foreign trades, and transfer i
   }
 })
 
-test("cash tab: transfer moves both portfolios' balances", async ({ page, request }) => {
+test("cash tab: transfer moves both portfolios' balances @needs-backend", async ({ page, request }) => {
   const run = Date.now()
   const token = await getBearerToken(request)
   const auth = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
@@ -408,7 +408,7 @@ test("cash tab: edit + delete a cash row", async ({ page, request }) => {
   await request.delete(`${GATEWAY}/api/portfolios/${pid}`, { headers: auth }).catch(() => {})
 })
 
-test("global cash feed lists cross-portfolio rows with the portfolio name", async ({ page, request }) => {
+test("global cash feed lists cross-portfolio rows with the portfolio name @needs-backend", async ({ page, request }) => {
   const run = Date.now()
   const token = await getBearerToken(request)
   const auth = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
@@ -426,7 +426,7 @@ test("global cash feed lists cross-portfolio rows with the portfolio name", asyn
   await request.delete(`${GATEWAY}/api/portfolios/${String(a.id)}`, { headers: auth }).catch(() => {})
 })
 
-test("consolidated cash page: record every kind of cash event against the chosen portfolio", async ({ page, request }) => {
+test("consolidated cash page: record every kind of cash event against the chosen portfolio @needs-backend", async ({ page, request }) => {
   const run = Date.now()
   const token = await getBearerToken(request)
   const auth = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }

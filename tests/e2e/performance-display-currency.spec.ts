@@ -112,7 +112,7 @@ function parseMoney(text: string): number | null {
   return Number(cleaned.replace(/,/g, ""))
 }
 
-test("overview Net gain tile and yearly Gain column re-convert together (§82.5)", async ({ page, request }) => {
+test("overview Net gain tile and yearly Gain column re-convert together (§82.5) @needs-backend", async ({ page, request }) => {
   const auth = { Authorization: `Bearer ${await token(request)}` }
   const portfolios = (await (await request.get(`${GATEWAY}/api/portfolios`, { headers: auth })).json()) as Array<{
     id: string

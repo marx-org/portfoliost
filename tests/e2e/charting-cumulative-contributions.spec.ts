@@ -52,7 +52,7 @@ async function cash(request: APIRequestContext, headers: Record<string, string>,
   return (await res.json()) as Cash
 }
 
-test("cumulative contributions run per account and sum to a combined total", async ({ page, request }) => {
+test("cumulative contributions run per account and sum to a combined total @needs-backend", async ({ page, request }) => {
   await login(page)
   const headers = await auth(request)
 

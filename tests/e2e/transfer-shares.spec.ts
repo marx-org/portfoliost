@@ -36,7 +36,7 @@ async function balanceOf(request: import("@playwright/test").APIRequestContext, 
   return ((cash.balances as Array<{ currency: string; balance: number }>) ?? []).find((b) => b.currency === ccy)?.balance ?? 0
 }
 
-test("transferring shares writes both legs and moves no cash", async ({ page, request }) => {
+test("transferring shares writes both legs and moves no cash @needs-backend", async ({ page, request }) => {
   const run = Date.now()
   const token = await getBearerToken(request)
   const auth = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
@@ -109,7 +109,7 @@ test("transferring shares writes both legs and moves no cash", async ({ page, re
   await expect(page.getByTestId("holdings-row").filter({ hasText: "AAPL" }).first()).toBeVisible({ timeout: 15000 })
 })
 
-test("a quantity above the open lots is refused before anything is written", async ({ page, request }) => {
+test("a quantity above the open lots is refused before anything is written @needs-backend", async ({ page, request }) => {
   const run = Date.now()
   const token = await getBearerToken(request)
   const auth = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }

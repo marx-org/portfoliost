@@ -61,7 +61,7 @@ test.describe.serial("labels (D65-D71)", () => {
     await expect(filterBar.locator(`[title="${LABEL_NAME}"]`)).toBeVisible()
   })
 
-  test("assign label to a position and verify badge in holdings row", async ({ page }) => {
+  test("assign label to a position and verify badge in holdings row @needs-backend", async ({ page }) => {
     await login(page)
     await page.getByRole("link", { name: /Top10/ }).click()
     await expect(page).toHaveURL(/\/en\/portfolios\/.*\/holdings/)

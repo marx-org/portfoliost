@@ -1,0 +1,6 @@
+{
+  "//": "§86 per-asset-class Key Facts, mirrored from the real instruments profiles so the mock's /api/instruments/:symbol/profile returns the same keyFacts the SPA's KeyFactsCard renders. Keyed by upper-cased symbol. TEST fixture.",
+  "SPY": { "kind": "etf", "category": "Equity" },
+  "BTC-USD": { "kind": "crypto", "name": "Bitcoin USD", "exchange": "CCC", "icoDate": "2010-07-13", "circulatingSupply": 20115200, "totalSupply": 20115200 },
+  "BST0327": { "kind": "corp_bond", "issuer": "Best S.A.", "series": "W3", "market": "GPW RR", "status": "Notowane", "nominalValue": 100, "nominalCurrency": "PLN", "secured": "NIE", "couponType": "zmienne WIBOR 3M + 4%", "currentRate": 7.83, "maturityDate": "2027-03-07" }
+}

@@ -116,6 +116,18 @@ export function createApp() {
         const method = (req.method || "GET").toUpperCase()
         const query = parseQuery(url)
 
+        // CORS. In the compose stack the SPA talks to the nginx gateway, which
+        // adds these; when the mock is served directly (mock-only e2e, #141) the
+        // browser would otherwise block every cross-origin call. Mirror the
+        // gateway's allow-list so both setups behave the same.
+        const origin = req.headers.origin
+        if (origin === "http://localhost:3000" || origin === "http://localhost:8080") {
+          res.setHeader("Access-Control-Allow-Origin", origin)
+        }
+        res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, PUT, DELETE, OPTIONS")
+        res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, Accept")
+        res.setHeader("Access-Control-Max-Age", "86400")
+
         const ctx = { method, path, tokens, query, headers: req.headers }
         ctx.req = req
         ctx.res = res

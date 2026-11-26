@@ -155,7 +155,7 @@ test.describe.serial("consolidated holdings (§142)", () => {
     await createLabel(request, headers)
   })
 
-  test("aggregates both portfolios and keeps a duplicate symbol as two rows", async ({ page, request }) => {
+  test("aggregates both portfolios and keeps a duplicate symbol as two rows @needs-backend", async ({ page, request }) => {
     await login(page)
     await openHoldings(page, "AAPL")
 
@@ -177,7 +177,7 @@ test.describe.serial("consolidated holdings (§142)", () => {
     expect(await portfolioSymbols(request, headers, ids.b)).toContain("AAPL")
   })
 
-  test("labels: assigning on a consolidated row badges that row and filters the table", async ({ page }) => {
+  test("labels: assigning on a consolidated row badges that row and filters the table @needs-backend", async ({ page }) => {
     await login(page)
     await openHoldings(page, "AAPL")
 
@@ -211,7 +211,7 @@ test.describe.serial("consolidated holdings (§142)", () => {
     await expect(rows.filter({ hasText: LABEL_NAME })).toHaveCount(1)
   })
 
-  test("grouping subtotals and counts match the aggregate the view fetched", async ({ page, request }) => {
+  test("grouping subtotals and counts match the aggregate the view fetched @needs-backend", async ({ page, request }) => {
     await login(page)
     await openHoldings(page)
 
@@ -237,7 +237,7 @@ test.describe.serial("consolidated holdings (§142)", () => {
     await page.getByLabel("Group by").selectOption("none")
   })
 
-  test("the Portfolio column sorts and groups the aggregate by owner", async ({ page, request }) => {
+  test("the Portfolio column sorts and groups the aggregate by owner @needs-backend", async ({ page, request }) => {
     await login(page)
     await openHoldings(page)
 
@@ -271,7 +271,7 @@ test.describe.serial("consolidated holdings (§142)", () => {
     await expect(page.getByRole("columnheader", { name: /^Portfolio/ })).toHaveAttribute("aria-sort", "descending")
   })
 
-  test("sorting the consolidated table orders the aggregate", async ({ page, request }) => {
+  test("sorting the consolidated table orders the aggregate @needs-backend", async ({ page, request }) => {
     await login(page)
     await openHoldings(page)
 
@@ -292,7 +292,7 @@ test.describe.serial("consolidated holdings (§142)", () => {
     await expect(page.getByRole("columnheader", { name: "Quantity" })).toHaveAttribute("aria-sort", "descending")
   })
 
-  test("column customization and CSV export reflect the consolidated set", async ({ page, request }) => {
+  test("column customization and CSV export reflect the consolidated set @needs-backend", async ({ page, request }) => {
     await login(page)
     await openHoldings(page)
 
@@ -339,7 +339,7 @@ test.describe.serial("consolidated holdings (§142)", () => {
     expect(rows.some((r) => r.split(",")[0].toUpperCase() === "MSFT")).toBe(true)
   })
 
-  test("the display currency re-expresses consolidated values", async ({ page }) => {
+  test("the display currency re-expresses consolidated values @needs-backend", async ({ page }) => {
     await login(page)
     await page.goto("/en/investments")
     await page.getByRole("button", { name: /Display currency:/ }).click()
@@ -359,7 +359,7 @@ test.describe.serial("consolidated holdings (§142)", () => {
     await page.locator("div.absolute.right-0").getByRole("button", { name: "USD", exact: true }).click()
   })
 
-  test("research and chart actions open from a consolidated row", async ({ page }) => {
+  test("research and chart actions open from a consolidated row @needs-backend", async ({ page }) => {
     await login(page)
     await openHoldings(page, "MSFT")
 
@@ -376,7 +376,7 @@ test.describe.serial("consolidated holdings (§142)", () => {
     await page.getByRole("button", { name: "Close" }).click()
   })
 
-  test("a Buy from a consolidated row lands in the owning portfolio and refreshes the row", async ({ page, request }) => {
+  test("a Buy from a consolidated row lands in the owning portfolio and refreshes the row @needs-backend", async ({ page, request }) => {
     await login(page)
     await openHoldings(page, "AAPL")
 
@@ -408,14 +408,14 @@ test.describe.serial("consolidated holdings (§142)", () => {
     expect(asNumber(await quantityOf(page.getByTestId("holdings-row").filter({ hasText: NAME_A }).first()))).toBe(5)
   })
 
-  test("the empty state is stated when nothing matches", async ({ page }) => {
+  test("the empty state is stated when nothing matches @needs-backend", async ({ page }) => {
     await login(page)
     await openHoldings(page, "not-a-real-ticker-zzz")
     await expect(page.getByTestId("holdings-table-wrap")).toHaveCount(0)
     await expect(page.getByText("No positions match the current filters.")).toBeVisible()
   })
 
-  test("the error state offers a Retry that restores the table", async ({ page }) => {
+  test("the error state offers a Retry that restores the table @needs-backend", async ({ page }) => {
     await login(page)
     await page.route("**/api/portfolios/positions*", (route) =>
       route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ message: "Holdings unavailable (test)" }) }),

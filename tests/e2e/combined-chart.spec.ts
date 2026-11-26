@@ -52,7 +52,7 @@ test("the cumulative tab shows its currency and selects timeframes (§46.7)", as
   await expect(block.locator(".apexcharts-canvas").first()).toBeVisible({ timeout: 30_000 })
 })
 
-test("every §82 tile renders a NUMBER on the aggregate, not a dash", async ({ page }) => {
+test("every §82 tile renders a NUMBER on the aggregate, not a dash @needs-backend", async ({ page }) => {
   await login(page)
   await openTab(page)
 
@@ -72,7 +72,7 @@ test("every §82 tile renders a NUMBER on the aggregate, not a dash", async ({ p
   }
 })
 
-test("the Yearly view is available on ALL and reconciles to the Net gain tile", async ({ page, request }) => {
+test("the Yearly view is available on ALL and reconciles to the Net gain tile @needs-backend", async ({ page, request }) => {
   await login(page)
   await openTab(page)
 

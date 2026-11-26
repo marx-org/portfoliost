@@ -3,6 +3,7 @@ import { labelsForTransaction, matchesLabelFilter } from "../labels.js"
 import { resolveFeeFx } from "../lib/demo-fx.js"
 import { loadJson, loadRaw, loadResearch, normalize } from "../lib/data.js"
 import { paginatePage, uuid, nowIso } from "../lib/http.js"
+import { markPortfolioKnown } from "../lib/accounts.js"
 import { applyTradeCash, tradeSigned, ensurePortfolio } from "./cash.js"
 import { benchmarkSeries, benchmarkSymbols } from "./benchmarks.js"
 
@@ -430,6 +431,7 @@ export function register(app) {
     }
     created.set(id, portfolio)
     newPortfolioIds.add(id)
+    markPortfolioKnown(id)
     ensurePortfolio(id, { baseCurrency, isMarginEnabled, cashBaseCurrencyOnly: Boolean(cashBaseCurrencyOnly) })
     ctx.res.status(201).json(portfolio)
   })
@@ -978,7 +980,10 @@ export function register(app) {
     const symbols = new Set(positions.map((p) => normalize(p.symbol)))
     const all = loadRaw("news_articles_all.json")
     const items = (all?.data ?? []).filter((a) => symbols.has(normalize(a.ticker)))
-    ctx.res.json({ data: items, total: items.length })
+    ctx.res.json({
+      data: items,
+      pagination: { count: items.length, total_count: items.length, has_next_page: false, has_previous_page: false },
+    })
   })
 
   app.get("/api/portfolios/:id/compare", (ctx) => {
