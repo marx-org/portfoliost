@@ -37,7 +37,7 @@ async function income(request: APIRequestContext, headers: Record<string, string
   return (await res.json()) as Income
 }
 
-test("quarterly YoY compares the same quarter across years and leaves undefined growth undefined", async ({ page, request }) => {
+test("quarterly YoY compares the same quarter across years and leaves undefined growth undefined @needs-backend", async ({ page, request }) => {
   await login(page)
   const headers = await auth(request)
 
