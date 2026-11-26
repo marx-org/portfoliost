@@ -40,7 +40,7 @@ async function allocation(request: APIRequestContext, headers: Record<string, st
   return (await res.json()) as Allocation
 }
 
-test("cost basis vs market value is grouped by label, with an unlabelled bucket", async ({ page, request }) => {
+test("cost basis vs market value is grouped by label, with an unlabelled bucket @needs-backend", async ({ page, request }) => {
   await login(page)
   const headers = await auth(request)
 

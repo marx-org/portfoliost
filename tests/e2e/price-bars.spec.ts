@@ -32,7 +32,7 @@ async function getBearerToken(): Promise<string> {
   return body.access_token ?? ""
 }
 
-test("GET /api/instruments/AAPL/price-bars returns a valid series", async ({ request }) => {
+test("GET /api/instruments/AAPL/price-bars returns a valid series @needs-backend", async ({ request }) => {
   const token = await getBearerToken()
   const res = await request.get(
     `${GATEWAY}/api/instruments/AAPL/price-bars?from=2026-07-28&to=2026-07-31`,
@@ -75,7 +75,7 @@ test("GET /api/instruments/AAPL/price-bars returns 401 without auth", async ({ r
   expect(res.status()).toBe(401)
 })
 
-test("GET /api/instruments/AAPL/price-bars returns 400 for invalid date params", async ({
+test("GET /api/instruments/AAPL/price-bars returns 400 for invalid date params @needs-backend", async ({
   request,
 }) => {
   const token = await getBearerToken()

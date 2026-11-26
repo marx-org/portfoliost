@@ -42,7 +42,7 @@ async function performance(request: APIRequestContext, headers: Record<string, s
   return (await res.json()) as Performance
 }
 
-test("scatter plots market value against realised+unrealized+dividends profit", async ({ page, request }) => {
+test("scatter plots market value against realised+unrealized+dividends profit @needs-backend", async ({ page, request }) => {
   await login(page)
   const headers = await auth(request)
 

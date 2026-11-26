@@ -40,7 +40,7 @@ async function performance(request: APIRequestContext, headers: Record<string, s
   return (await res.json()) as Performance
 }
 
-test("valuation chart shows capital, invested and cumulative income overlays", async ({ page, request }) => {
+test("valuation chart shows capital, invested and cumulative income overlays @needs-backend", async ({ page, request }) => {
   await login(page)
   const headers = await auth(request)
 

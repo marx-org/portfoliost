@@ -54,7 +54,7 @@ async function cashRows(request: import("@playwright/test").APIRequestContext, a
 }
 
 test.describe("§87.5 — cash leg on trade", () => {
-  test("the buy form's box is pre-ticked from the portfolio flag, and a ticked buy creates a linked deposit", async ({
+  test("the buy form's box is pre-ticked from the portfolio flag, and a ticked buy creates a linked deposit @needs-backend", async ({
     page,
     request,
   }) => {
@@ -213,7 +213,7 @@ test.describe("§87.5 — cash leg on trade", () => {
     await request.delete(`${GATEWAY}/api/portfolios/${pid}`, { headers: a })
   })
 
-  test("a newly created portfolio does not inherit import policy from its name", async ({ request }) => {
+  test("a newly created portfolio does not inherit import policy from its name @needs-backend", async ({ request }) => {
     const a = await auth(request)
     const post = mk(a, request)
     const run = Date.now()

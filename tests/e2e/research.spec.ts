@@ -480,7 +480,7 @@ test("§86: a Catalyst corporate bond renders its own key facts", async ({ page 
 // card has — the category code, which no upstream ever sends.
 // ---------------------------------------------------------------------------
 
-test("§78: a fund category renders its category code, not an upstream error", async ({ page }) => {
+test("§78: a fund category renders its category code, not an upstream error @needs-backend", async ({ page }) => {
   await login(page)
   await page.goto("/en/research/ING01W/overview")
 

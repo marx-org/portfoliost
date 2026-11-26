@@ -33,7 +33,7 @@ async function allocation(request: APIRequestContext, headers: Record<string, st
   return (await res.json()) as Allocation
 }
 
-test("asset-type proportions split stocks and bonds and reconcile to the total", async ({ page, request }) => {
+test("asset-type proportions split stocks and bonds and reconcile to the total @needs-backend", async ({ page, request }) => {
   await login(page)
   const headers = await auth(request)
 

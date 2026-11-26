@@ -94,7 +94,7 @@ async function seedVirtualPortfolios(
   return names
 }
 
-test("creates a virtual portfolio through the dialog and lists it on the virtual tab", async ({ page, request }) => {
+test("creates a virtual portfolio through the dialog and lists it on the virtual tab @needs-backend", async ({ page, request }) => {
   const t = await token()
   const label = await seedLabel(request, t)
   const name = `Dialog Virtual ${Date.now()}`
@@ -217,7 +217,7 @@ async function seedVirtualPortfolio(
  * call is the only way to prove that hiding the buttons is not the enforcement.
  */
 test.describe("§148 virtual detail is read-only and the API is authoritative", () => {
-  test("hides cash and write affordances, and the API refuses each write", async ({ page, request }) => {
+  test("hides cash and write affordances, and the API refuses each write @needs-backend", async ({ page, request }) => {
     const t = await token()
     await clearVirtualPortfolios(request, t)
     const label = await seedLabel(request, t)

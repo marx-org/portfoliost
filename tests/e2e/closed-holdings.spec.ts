@@ -16,7 +16,7 @@ async function getBearerToken(request: import("@playwright/test").APIRequestCont
 const usd = (value: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
 
-test("closed positions stay hidden by default and can be revealed in portfolio and consolidated Holdings", async ({ page, request }) => {
+test("closed positions stay hidden by default and can be revealed in portfolio and consolidated Holdings @needs-backend", async ({ page, request }) => {
   test.setTimeout(120_000)
   const run = Date.now()
   // A position is shared by symbol across portfolios, and a portfolio that has

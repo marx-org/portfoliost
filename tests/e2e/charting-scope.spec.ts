@@ -79,7 +79,7 @@ test("the same renderers are reached through Charting and the portfolio tabs", a
   await expect(page.locator('[data-testid="portfolio-allocation-by-sector"]')).toBeVisible()
 })
 
-test("an account with no published projection does not empty the All scope", async ({ page, request }) => {
+test("an account with no published projection does not empty the All scope @needs-backend", async ({ page, request }) => {
   // #95: a portfolio created after the seed has no charting facts. Before the
   // fix its generation-0 projection row made scope All read generation 0 for
   // every account, so the shared charts rendered "No income data" even though

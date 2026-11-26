@@ -51,7 +51,7 @@ async function cash(request: APIRequestContext, headers: Record<string, string>,
   return (await res.json()) as Cash
 }
 
-test("annual funding is deposits minus withdrawals, with boundary transfers kept separate", async ({ page, request }) => {
+test("annual funding is deposits minus withdrawals, with boundary transfers kept separate @needs-backend", async ({ page, request }) => {
   await login(page)
   const headers = await auth(request)
 

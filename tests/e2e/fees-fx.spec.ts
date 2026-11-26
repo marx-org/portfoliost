@@ -37,7 +37,7 @@ async function openTxBuy(page: import("@playwright/test").Page) {
   return buy
 }
 
-test("buy dialog: portfolio-base FX section → automatic suggests, custom submits a manual rate", async ({ page, request }) => {
+test("buy dialog: portfolio-base FX section → automatic suggests, custom submits a manual rate @needs-backend", async ({ page, request }) => {
   const run = Date.now()
   const token = await getBearerToken(request)
   const auth = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }

@@ -19,7 +19,7 @@ async function getBearerToken(request: import("@playwright/test").APIRequestCont
   return body.access_token ?? ""
 }
 
-test("record dividend nets the wallet and populates Dividends + Transactions Tax column", async ({ page, request }) => {
+test("record dividend nets the wallet and populates Dividends + Transactions Tax column @needs-backend", async ({ page, request }) => {
   const run = Date.now()
   const token = await getBearerToken(request)
   const auth = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }

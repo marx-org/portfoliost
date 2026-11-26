@@ -27,7 +27,8 @@
     "gen:types": "npm --prefix tools/contracts-generator ci && npm --prefix tools/contracts-generator run generate",
     "test:stack:wallets": "node scripts/wallets-stack-test.mjs",
     "test:stack:portfolios": "node scripts/portfolios-stack-test.mjs",
-    "test:stack:listing-overrides": "node scripts/listing-overrides-stack-test.mjs"
+    "test:stack:listing-overrides": "node scripts/listing-overrides-stack-test.mjs",
+    "test:e2e:mock": "node scripts/e2e-mock-only.mjs"
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.1.3",
