@@ -308,7 +308,7 @@ const router = createRouter({
     },
     {
       path: "/:pathMatch(.*)*",
-      redirect: "/en/investments",
+      redirect: "/en/investments/accounts-balance",
     },
   ],
 })
@@ -340,10 +340,10 @@ export const authGuard = async (to: RouteLocationNormalized): Promise<AuthGuardR
     return { name: "login", query: { redirect: to.fullPath } }
   }
   if (to.meta.admin && !auth.isAdmin) {
-    return { name: "investments" }
+    return { name: "accounts-balance" }
   }
   if (to.name === "login" && auth.isAuthenticated) {
-    return { name: "investments" }
+    return { name: "accounts-balance" }
   }
   return true
 }

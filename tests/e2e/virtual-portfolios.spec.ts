@@ -100,6 +100,7 @@ test("creates a virtual portfolio through the dialog and lists it on the virtual
   const name = `Dialog Virtual ${Date.now()}`
 
   await login(page)
+  await page.goto("/en/investments")
   await page.getByRole("button", { name: "Create Investment Portfolio" }).click()
   const dialog = page.getByRole("dialog", { name: "Create portfolio" })
   await expect(dialog).toBeVisible()
@@ -147,6 +148,7 @@ test.describe("§143 the two-tab page across viewports", () => {
 
       await page.setViewportSize({ width: vp.width, height: vp.height })
       await login(page)
+      await page.goto("/en/investments")
 
       // Investment tab: its own heading, and none of the virtual rows.
       await expect(page.getByRole("heading", { name: "Investment Portfolios" })).toBeVisible()

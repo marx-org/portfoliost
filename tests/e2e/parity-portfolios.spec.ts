@@ -12,6 +12,9 @@ test("sidebar matches example-service: no Wallets/News, Report bug; cash as a ca
   await expect(nav.getByRole("link", { name: /News/ })).toHaveCount(0)
   await expect(page.getByRole("link", { name: "Report bug" })).toHaveCount(0)
 
+  // Login lands on Accounts balance (the default tab); the grid lives on the
+  // Portfolios tab.
+  await page.goto("/en/investments")
   await expect(page.getByRole("heading", { name: "Investment Portfolios", exact: true })).toBeVisible()
   // the portfolio-native cash summary card (no wallet section anymore)
   await expect(page.getByTestId("cash-balance")).toBeVisible({ timeout: 10000 })
@@ -21,6 +24,7 @@ test("sidebar matches example-service: no Wallets/News, Report bug; cash as a ca
 
 test("portfolio card shows chart, quick links and manage menu", async ({ page }) => {
   await login(page)
+  await page.goto("/en/investments")
 
   const card = page.locator(".card", { hasText: "Top10" }).first()
   await expect(card.getByRole("button", { name: "Add Position" })).toBeVisible()
@@ -48,6 +52,7 @@ test("portfolio card shows chart, quick links and manage menu", async ({ page })
 
 test("card sparkline remounts on timeframe switch (§53.3)", async ({ page }) => {
   await login(page)
+  await page.goto("/en/investments")
 
   const card = page.locator(".card", { hasText: "Top10" }).first()
   const oldChart = await card.locator(".vue-apexcharts").first().elementHandle()
@@ -68,6 +73,7 @@ test("create, rename and delete a portfolio from the card manage menu", async ({
   const name = `E2E Manage ${Date.now()}`
   const renamed = `${name} renamed`
   await login(page)
+  await page.goto("/en/investments")
 
   await page.getByRole("button", { name: "Create Investment Portfolio" }).click()
   await page.getByRole("textbox", { name: "Name" }).fill(name)

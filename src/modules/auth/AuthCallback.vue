@@ -47,7 +47,7 @@ onMounted(async () => {
     clearVerifier()
     const redirect = sessionStorage.getItem("portfoliost_oidc_redirect")
     sessionStorage.removeItem("portfoliost_oidc_redirect")
-    router.push(redirect || { name: "investments" })
+    router.push(redirect || { name: "accounts-balance" })
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Token exchange failed"
     loading.value = false

@@ -10,7 +10,8 @@ test("OIDC flow: sign in with passkey completes full PKCE flow @needs-backend", 
   await oidcBtn.click()
 
   // Browser follows meta-refresh to /auth/callback?code=...&state=...
-  // AuthCallback exchanges code via POST /api/auth/token
-  await page.waitForURL("**/investments**", { timeout: 15000 })
-  await expect(page.getByTestId("cash-balance")).toBeVisible({ timeout: 10000 })
+  // AuthCallback exchanges code via POST /api/auth/token, then lands on the
+  // default page (Accounts balance).
+  await page.waitForURL("**/accounts-balance**", { timeout: 15000 })
+  await expect(page.getByTestId("accounts-balance")).toBeVisible({ timeout: 10000 })
 })

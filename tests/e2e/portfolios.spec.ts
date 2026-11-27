@@ -5,6 +5,7 @@ const GATEWAY = process.env.PORTFOLIOST_GATEWAY_URL || "http://localhost:8080"
 
 test("investments dashboard shows totals and the portfolio", async ({ page }) => {
   await login(page)
+  await page.goto("/en/investments")
 
   await expect(page.getByRole("heading", { name: "Portfolios", exact: true })).toBeVisible()
   await expect(page.getByText("Performance summary")).toBeVisible()
@@ -13,6 +14,7 @@ test("investments dashboard shows totals and the portfolio", async ({ page }) =>
 
 test("investments tabs switch between portfolios, transactions, and watchlists", async ({ page }) => {
   await login(page)
+  await page.goto("/en/investments")
 
   const tabs = page.getByRole("navigation", { name: "Investment sections" })
   await expect(tabs.getByRole("link", { name: "Portfolios", exact: true })).toHaveClass(/border-blue-600/)
@@ -200,6 +202,7 @@ test("editing an investing transaction opens example-service-style modal and sav
 test("creating a new portfolio adds it to the list", async ({ page }) => {
   const name = `E2E Test ${Date.now()}`
   await login(page)
+  await page.goto("/en/investments")
 
   await page.getByRole("button", { name: "Create Investment Portfolio" }).click()
   await expect(page.getByRole("dialog")).toBeVisible()

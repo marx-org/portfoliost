@@ -53,7 +53,10 @@ const items = [
   {
     label: "Portfolios",
     sublabel: "Watchlists",
-    to: { name: "investments" },
+    // §84 — the section's landing tab is Accounts balance, so the sidebar item
+    // opens that, not the Portfolios grid. The grid stays one click away on the
+    // tab strip.
+    to: { name: "accounts-balance" },
     icon: "briefcase",
   },
   {
@@ -74,7 +77,7 @@ function isActive(item: { to: unknown; label: string }): boolean {
   }
   const name = (item.to as { name: string }).name
   // Portfolios tab should also be active on portfolio-* sub-routes
-  if (name === "investments") {
+  if (name === "accounts-balance") {
     const currentName = router.currentRoute.value.name as string | undefined
     return (
       // §84 — `accounts-balance` is the `/` landing page and the first tab, so

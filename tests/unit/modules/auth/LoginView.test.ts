@@ -82,13 +82,13 @@ describe("LoginView", () => {
     expect(wrapper.find("button[data-testid=oidc-signin]").exists()).toBe(true)
   })
 
-  it("logs in and navigates to investments when password login is enabled", async () => {
+  it("logs in and navigates to accounts balance when password login is enabled", async () => {
     passwordLoginEnabled.value = true
     mocked.login.mockResolvedValue(makeResponse())
     const wrapper = mountLogin()
     await wrapper.find("form").trigger("submit")
     await flushPromises()
     expect(mocked.login).toHaveBeenCalledWith({ email: "demo@example.com", password: "example-service-mock" })
-    expect(push).toHaveBeenCalledWith({ name: "investments" })
+    expect(push).toHaveBeenCalledWith({ name: "accounts-balance" })
   })
 })
