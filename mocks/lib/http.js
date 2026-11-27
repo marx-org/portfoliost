@@ -117,16 +117,20 @@ export function createApp() {
         const query = parseQuery(url)
 
         // CORS. In the compose stack the SPA talks to the nginx gateway, which
-        // adds these; when the mock is served directly (mock-only e2e, #141) the
-        // browser would otherwise block every cross-origin call. Mirror the
-        // gateway's allow-list so both setups behave the same.
-        const origin = req.headers.origin
-        if (origin === "http://localhost:3000" || origin === "http://localhost:8080") {
-          res.setHeader("Access-Control-Allow-Origin", origin)
+        // adds these headers (and only it must — duplicates are rejected by
+        // browsers). The mock sets them only when served directly (mock-only
+        // e2e, #141); behind the gateway, the gateway is the single source.
+        // The gateway always sets X-Forwarded-For, so its presence identifies
+        // the proxied case.
+        if (!req.headers["x-forwarded-for"]) {
+          const origin = req.headers.origin
+          if (origin === "http://localhost:3000" || origin === "http://localhost:8080") {
+            res.setHeader("Access-Control-Allow-Origin", origin)
+          }
+          res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, PUT, DELETE, OPTIONS")
+          res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, Accept")
+          res.setHeader("Access-Control-Max-Age", "86400")
         }
-        res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, PUT, DELETE, OPTIONS")
-        res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, Accept")
-        res.setHeader("Access-Control-Max-Age", "86400")
 
         const ctx = { method, path, tokens, query, headers: req.headers }
         ctx.req = req
