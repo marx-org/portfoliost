@@ -96,39 +96,43 @@ async function addToWatchlist(): Promise<void> {
 
 <template>
   <div>
-    <div class="mb-6 flex flex-wrap items-center gap-3">
-      <router-link :to="backTarget" class="btn-ghost" data-testid="research-back">&larr; Go back</router-link>
-      <TickerBadge
-        size="lg"
-        title-as="h1"
-        testid="research-ticker"
-        :symbol="routeSymbol"
-        :name="profile?.name"
-        :country-code="profile?.countryCode"
-        :asset-type="profile?.assetType"
-      />
-      <button
-        type="button"
-        class="btn-secondary ml-auto text-sm"
-        :disabled="watchlistBusy || inWatchlist"
-        @click="addToWatchlist"
-      >
-        {{ inWatchlist ? "In Watchlist" : "Add to Watchlist" }}
-      </button>
-      <button class="btn-ghost" @click="showSearch = true">Search for a stock... &#8984;K</button>
+    <div class="page-header">
+      <div class="flex flex-wrap items-center gap-3">
+        <router-link :to="backTarget" class="btn-ghost" data-testid="research-back">&larr; Go back</router-link>
+        <TickerBadge
+          size="lg"
+          title-as="h1"
+          testid="research-ticker"
+          :symbol="routeSymbol"
+          :name="profile?.name"
+          :country-code="profile?.countryCode"
+          :asset-type="profile?.assetType"
+        />
+      </div>
+      <div class="page-actions">
+        <button
+          type="button"
+          class="btn-secondary text-sm"
+          :disabled="watchlistBusy || inWatchlist"
+          @click="addToWatchlist"
+        >
+          {{ inWatchlist ? "In Watchlist" : "Add to Watchlist" }}
+        </button>
+        <button class="btn-ghost" @click="showSearch = true">Search for a stock... &#8984;K</button>
+      </div>
     </div>
 
-    <p v-if="watchlistStatus" class="mb-4 rounded-lg bg-blue-50 dark:bg-blue-500/10 px-3 py-2 text-sm text-blue-700 dark:text-blue-400">{{ watchlistStatus }}</p>
+    <p v-if="watchlistStatus" class="mb-4 rounded-lg bg-accent-soft px-3 py-2 text-sm text-accent-text">{{ watchlistStatus }}</p>
 
     <RecentSearchesBar class="mb-6" :active-symbol="routeSymbol" @select="goToSymbol" />
 
-    <nav aria-label="Research tabs" class="mb-6 flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-slate-700/60">
+    <nav aria-label="Research tabs" class="tab-nav mb-6">
       <router-link
         v-for="tab in tabs"
         :key="tab.name"
         :to="{ name: tab.name, params: { symbol: routeSymbol }, query: preservedQuery }"
-        class="whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100"
-        :class="route.name === tab.name ? 'border-blue-600 text-blue-700 dark:text-blue-400' : 'border-transparent'"
+        class="tab-link"
+        :class="route.name === tab.name ? 'tab-link--active' : ''"
       >
         {{ tab.label }}
       </router-link>

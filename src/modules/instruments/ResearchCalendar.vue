@@ -54,7 +54,7 @@ function dateLabel(d: string): string {
     <template v-if="!loading && !error && data">
       <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div class="card p-6">
-          <h2 class="mb-3 text-base font-semibold">Upcoming Earnings</h2>
+          <h2 class="card-title mb-3">Upcoming Earnings</h2>
           <ul v-if="upcomingEarnings.length" class="space-y-2 text-sm">
             <li v-for="e in upcomingEarnings" :key="e.date" class="flex items-center justify-between gap-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 px-3 py-2">
               <div>
@@ -68,7 +68,7 @@ function dateLabel(d: string): string {
         </div>
 
         <div class="card p-6">
-          <h2 class="mb-3 text-base font-semibold">Upcoming Ex-Dividend</h2>
+          <h2 class="card-title mb-3">Upcoming Ex-Dividend</h2>
           <ul v-if="upcomingEx.length" class="space-y-2 text-sm">
             <li v-for="e in upcomingEx" :key="e.date" class="flex items-center justify-between gap-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 px-3 py-2">
               <div>
@@ -85,7 +85,7 @@ function dateLabel(d: string): string {
              card mirrors its siblings (always visible, empty state when no
              dividend payment falls within the upcoming window). -->
         <div class="card p-6">
-          <h2 class="mb-3 text-base font-semibold">Upcoming Dividend</h2>
+          <h2 class="card-title mb-3">Upcoming Dividend</h2>
           <ul v-if="upcomingDivs.length" class="space-y-2 text-sm">
             <li v-for="e in upcomingDivs" :key="e.date" class="flex items-center justify-between gap-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 px-3 py-2">
               <div>
@@ -100,7 +100,7 @@ function dateLabel(d: string): string {
       </div>
 
       <div v-if="pastEarnings.length" class="card p-6">
-        <h2 class="mb-3 text-base font-semibold">Past Earnings</h2>
+        <h2 class="card-title mb-3">Past Earnings</h2>
         <div class="overflow-x-auto">
           <table class="w-full min-w-[560px] text-sm">
             <thead>

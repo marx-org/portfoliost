@@ -38,7 +38,7 @@ const rows = computed(() =>
     <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
     <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading comparison...</p>
 
-    <h2 class="mb-3 text-base font-semibold">Compare {{ symbol }} with peers</h2>
+    <h2 class="card-title mb-3">Compare {{ symbol }} with peers</h2>
     <div v-if="!loading && !error && items.length" class="card p-6">
       <div class="overflow-x-auto">
         <table class="w-full min-w-[720px] text-sm">
