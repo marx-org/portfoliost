@@ -17,11 +17,8 @@ const tabs = [
 
 <template>
   <div>
-    <header class="page-header">
-      <div>
-        <p class="page-eyebrow"><span class="signal-dot" /> PORTFOLIOST / ADMIN</p>
-        <h1 class="page-title">Admin</h1>
-      </div>
+    <header class="sr-only">
+      <h1 class="page-title">Admin</h1>
     </header>
 
     <nav aria-label="Admin tabs" class="tab-nav mb-6">
