@@ -58,13 +58,13 @@ const tabs = [
 <template>
 
   <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
-    <nav aria-label="Investment sections" class="flex gap-1 border-b border-slate-200 dark:border-slate-700/60">
+    <nav aria-label="Investment sections" class="tab-nav">
       <router-link
         v-for="tab in tabs"
         :key="tab.label"
         :to="tab.to"
-        class="border-b-2 px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900"
-        :class="tab.match(currentPath) ? 'border-blue-600 text-blue-700' : 'border-transparent'"
+        class="tab-link"
+        :class="tab.match(currentPath) ? 'tab-link--active' : ''"
       >
         {{ tab.label }}
       </router-link>

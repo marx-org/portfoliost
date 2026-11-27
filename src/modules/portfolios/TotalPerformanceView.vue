@@ -168,8 +168,11 @@ onUnmounted(() => stopPolling())
   <div>
     <InvestmentsTabs />
 
-    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-      <h1 class="text-xl font-semibold">Cumulative performance</h1>
+    <div class="page-header">
+      <div>
+        <p class="page-eyebrow"><span class="signal-dot" /> PORTFOLIOS</p>
+        <h1 class="page-title">Cumulative performance</h1>
+      </div>
       <button
         type="button"
         class="btn-secondary text-xs"

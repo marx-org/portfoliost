@@ -237,10 +237,11 @@ onMounted(async () => {
 
 <template>
   <div>
-    <div class="mb-6 flex items-center justify-between">
+    <div class="page-header">
       <div>
-        <h1 class="text-2xl font-semibold">Accounts balance</h1>
-        <p v-if="store.totalMetrics" class="text-sm text-slate-500 dark:text-slate-400">
+        <p class="page-eyebrow"><span class="signal-dot" /> PORTFOLIOS</p>
+        <h1 class="page-title">Accounts balance</h1>
+        <p v-if="store.totalMetrics" class="page-description">
           {{ rows.length }} account{{ rows.length === 1 ? "" : "s" }} &middot; base currency
           {{ store.totalMetrics.baseCurrency }}
         </p>

@@ -161,7 +161,7 @@ test.describe("§143 the two-tab page across viewports", () => {
       const strip = page.getByRole("navigation", { name: "Investment sections" })
       await strip.getByRole("link", { name: "Virtual Portfolios" }).click()
       await expect(page).toHaveURL(/\/en\/investments\/virtual-portfolios/)
-      await expect(strip.getByRole("link", { name: "Virtual Portfolios" })).toHaveClass(/border-blue-600/)
+      await expect(strip.getByRole("link", { name: "Virtual Portfolios" })).toHaveClass(/tab-link--active/)
       await expect(page.getByRole("heading", { name: "Virtual Portfolios" })).toBeVisible()
       await expect(page.getByRole("heading", { name: "Investment Portfolios" })).toHaveCount(0)
 

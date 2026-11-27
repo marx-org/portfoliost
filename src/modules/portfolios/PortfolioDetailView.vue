@@ -157,12 +157,11 @@ async function submitDelete() {
     <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading portfolio...</p>
 
     <template v-if="!loading && !error">
-      <div class="mb-6 flex items-start justify-between gap-4">
+      <div class="page-header">
         <div>
-          <div class="flex items-center gap-3">
-            <h1 class="text-2xl font-semibold">{{ portfolioName }}</h1>
-          </div>
-          <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ description }}</p>
+          <p class="page-eyebrow"><span class="signal-dot" /> PORTFOLIOS</p>
+          <h1 class="page-title">{{ portfolioName }}</h1>
+          <p class="page-description">{{ description }}</p>
         </div>
         <div class="flex gap-2">
           <button type="button" class="btn-secondary text-sm">Share</button>
@@ -193,13 +192,13 @@ async function submitDelete() {
         </div>
       </div>
 
-      <nav aria-label="Portfolio tabs" class="mb-6 flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-slate-700/60">
+      <nav aria-label="Portfolio tabs" class="tab-nav mb-6">
         <router-link
           v-for="tab in tabs"
           :key="tab.name"
           :to="{ name: tab.name, params: { id } }"
-          class="whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100"
-          :class="route.name === tab.name ? 'border-blue-600 text-blue-700 dark:text-blue-400' : 'border-transparent'"
+          class="tab-link"
+          :class="route.name === tab.name ? 'tab-link--active' : ''"
         >
           {{ tab.label }}
         </router-link>

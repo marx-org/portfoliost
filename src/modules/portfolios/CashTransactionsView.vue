@@ -7,9 +7,12 @@ import CashTransactionsTable from "@/components/CashTransactionsTable.vue"
 <template>
 
   <div>
-    <div class="mb-6">
-      <h1 class="text-2xl font-semibold">Transactions</h1>
-      <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">All investing and cash transactions from across your account.</p>
+    <div class="page-header">
+      <div>
+        <p class="page-eyebrow"><span class="signal-dot" /> PORTFOLIOS</p>
+        <h1 class="page-title">Transactions</h1>
+        <p class="page-description">All investing and cash transactions from across your account.</p>
+      </div>
     </div>
 
     <InvestmentsTabs />

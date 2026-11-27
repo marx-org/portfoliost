@@ -26,9 +26,12 @@ onMounted(() => void refresh())
 
 <template>
   <div>
-    <div class="mb-6">
-      <h1 class="text-2xl font-semibold">Consolidated holdings</h1>
-      <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Open positions across your investment portfolios, with closed history available.</p>
+    <div class="page-header">
+      <div>
+        <p class="page-eyebrow"><span class="signal-dot" /> PORTFOLIOS</p>
+        <h1 class="page-title">Consolidated holdings</h1>
+        <p class="page-description">Open positions across your investment portfolios, with closed history available.</p>
+      </div>
     </div>
 
     <InvestmentsTabs />
