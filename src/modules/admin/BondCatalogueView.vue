@@ -54,13 +54,13 @@ const cpiStale = computed(() => cpi.value?.status === "stale" || cpi.value?.stal
 </script>
 
 <template>
-  <div class="mission-control space-y-8">
-    <header class="mission-header">
+  <div class="space-y-8">
+    <header class="page-header">
       <div>
-        <p class="mission-eyebrow"><span class="mission-signal" /> ADMIN / BOND CATALOGUE</p>
-        <h2 class="mission-title">Bond Catalogue</h2>
+        <p class="page-eyebrow"><span class="signal-dot" /> ADMIN / BOND CATALOGUE</p>
+        <h1 class="page-title">Bond Catalogue</h1>
       </div>
-      <div class="mission-actions">
+      <div class="page-actions">
         <button type="button" class="btn-secondary" :disabled="loading" @click="load">
           {{ loading ? "Refreshing…" : "Refresh" }}
         </button>
@@ -71,7 +71,7 @@ const cpiStale = computed(() => cpi.value?.status === "stale" || cpi.value?.stal
     <template v-else>
       <!-- Savings-bond series (openst.bond_series) -->
       <div class="card p-6">
-        <h2 class="mb-1 text-base font-semibold text-text">Savings-Bond Emissions</h2>
+        <h2 class="card-title mb-1">Savings-Bond Emissions</h2>
         <div v-if="bondError" class="text-sm text-danger">{{ bondError }}</div>
         <template v-else>
           <p class="mb-4 text-sm text-muted">
@@ -128,7 +128,7 @@ const cpiStale = computed(() => cpi.value?.status === "stale" || cpi.value?.stal
 
       <!-- 12m CPI (openst.cpi_12m) -->
       <div class="card p-6">
-        <h2 class="mb-1 text-base font-semibold text-text">12-Month CPI</h2>
+        <h2 class="card-title mb-1">12-Month CPI</h2>
         <p class="mb-4 text-sm text-muted">
           Latest <span class="font-semibold">{{ cpi ? cpi.rowCount : 0 }}</span> readings from
           <code class="font-mono text-xs">openst.cpi_12m</code>

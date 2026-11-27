@@ -167,11 +167,11 @@ function displayRef(svc: ServiceVersion) {
 </script>
 
 <template>
-  <div class="mission-control space-y-3">
-    <header class="mission-header">
+  <div class="space-y-3">
+    <header class="page-header">
       <div>
-        <p class="mission-eyebrow"><span class="mission-signal" /> ADMIN / SYSTEM INFO</p>
-        <h2 class="mission-title">System Info</h2>
+        <p class="page-eyebrow"><span class="signal-dot" /> ADMIN / SYSTEM INFO</p>
+        <h1 class="page-title">System Info</h1>
       </div>
     </header>
 

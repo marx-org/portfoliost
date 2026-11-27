@@ -498,11 +498,11 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="mission-control space-y-8">
-    <header class="mission-header">
+  <div class="space-y-8">
+    <header class="page-header">
       <div>
-        <p class="mission-eyebrow"><span class="mission-signal" /> ADMIN / JOBS</p>
-        <h2 class="mission-title">Jobs</h2>
+        <p class="page-eyebrow"><span class="signal-dot" /> ADMIN / JOBS</p>
+        <h1 class="page-title">Jobs</h1>
       </div>
     </header>
 
@@ -512,7 +512,7 @@ onUnmounted(() => {
     <div v-else class="space-y-8">
       <!-- Google Sheets sync (§24.9) -->
       <section>
-        <h2 class="mb-3 text-base font-semibold text-text">Google Sheets</h2>
+        <h2 class="card-title mb-3">Google Sheets</h2>
 
         <div class="space-y-3">
           <div
@@ -626,7 +626,7 @@ onUnmounted(() => {
 
       <!-- Price audit (§72) -->
       <section>
-        <h2 class="mb-3 text-base font-semibold text-text">Data quality</h2>
+        <h2 class="card-title mb-3">Data quality</h2>
 
         <div class="space-y-3">
           <div
@@ -696,7 +696,7 @@ onUnmounted(() => {
       </section>
 
       <section v-for="group in GROUPS" :key="group">
-        <h2 class="mb-3 text-base font-semibold text-text">{{ group }}</h2>
+        <h2 class="card-title mb-3">{{ group }}</h2>
 
         <div class="space-y-3">
           <div

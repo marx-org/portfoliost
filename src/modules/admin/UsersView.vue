@@ -61,10 +61,10 @@ function groupBadgeClass(group: string) {
 
 <template>
   <div class="mission-control">
-    <header class="mission-header">
+    <header class="page-header">
       <div>
-        <p class="mission-eyebrow"><span class="mission-signal" /> ADMIN / USERS</p>
-        <h2 class="mission-title">Users</h2>
+        <p class="page-eyebrow"><span class="signal-dot" /> ADMIN / USERS</p>
+        <h1 class="page-title">Users</h1>
       </div>
     </header>
 
@@ -72,7 +72,7 @@ function groupBadgeClass(group: string) {
     <div v-else-if="error" class="text-sm text-danger">{{ error }}</div>
 
     <div v-else>
-      <div class="mission-toolbar mb-4">
+      <div class="toolbar mb-4">
         <input
           v-model="search"
           placeholder="Filter by name or email..."

@@ -142,14 +142,14 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="mission-control space-y-5" data-testid="listing-overrides-view">
-    <header class="mission-header">
+  <div class="space-y-5" data-testid="listing-overrides-view">
+    <header class="page-header">
       <div>
-        <p class="mission-eyebrow"><span class="mission-signal" /> ADMIN / LISTING OVERRIDES</p>
-        <h2 class="mission-title">Curated Listing Overrides</h2>
-        <p class="mission-description">Reviewed venue facts take precedence without changing upstream reference rows.</p>
+        <p class="page-eyebrow"><span class="signal-dot" /> ADMIN / LISTING OVERRIDES</p>
+        <h1 class="page-title">Curated Listing Overrides</h1>
+        <p class="page-description">Reviewed venue facts take precedence without changing upstream reference rows.</p>
       </div>
-      <div class="mission-actions">
+      <div class="page-actions">
         <button type="button" class="btn-secondary" data-testid="listing-overrides-new" @click="resetForm">New override</button>
       </div>
     </header>
