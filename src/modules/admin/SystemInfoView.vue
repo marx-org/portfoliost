@@ -148,17 +148,17 @@ onMounted(() => {
 onUnmounted(() => clearInterval(timer))
 
 function implBadge(svc: ServiceVersion) {
-  if (svc.impl === "real") return { label: "Deployment", class: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400" }
-  if (svc.impl === "mock") return { label: "Mock", class: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" }
+  if (svc.impl === "real") return { label: "Deployment", class: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300" }
+  if (svc.impl === "mock") return { label: "Mock", class: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300" }
   // A green "Job" badge read as "running". Three of the pfire CronJobs are
   // suspended, and jobshot is a Deployment rather than a schedule — so say
   // which, from the schedule/suspend the endpoint now reports (§80.1).
   if (svc.impl === "job") {
-    if (!svc.schedule) return { label: "Job", class: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" }
-    if (svc.suspended) return { label: "Job · Suspended", class: "bg-slate-200 text-slate-700 dark:bg-slate-600/40 dark:text-slate-300" }
-    return { label: "Job · Scheduled", class: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" }
+    if (!svc.schedule) return { label: "Job", class: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400" }
+    if (svc.suspended) return { label: "Job · Suspended", class: "bg-surface-2 text-muted" }
+    return { label: "Job · Scheduled", class: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400" }
   }
-  return { label: "Unreachable", class: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" }
+  return { label: "Unreachable", class: "bg-danger-soft text-danger-text dark:text-danger" }
 }
 
 function displayRef(svc: ServiceVersion) {
@@ -167,29 +167,36 @@ function displayRef(svc: ServiceVersion) {
 </script>
 
 <template>
-  <div>
-    <div v-if="loading && !services.length" class="text-sm text-slate-500 dark:text-slate-400">Loading...</div>
-    <div v-else-if="error" class="text-sm text-red-600 dark:text-red-400">{{ error }}</div>
+  <div class="mission-control space-y-3">
+    <header class="mission-header">
+      <div>
+        <p class="mission-eyebrow"><span class="mission-signal" /> ADMIN / SYSTEM INFO</p>
+        <h2 class="mission-title">System Info</h2>
+      </div>
+    </header>
+
+    <div v-if="loading && !services.length" class="text-sm text-muted">Loading...</div>
+    <div v-else-if="error" class="text-sm text-danger">{{ error }}</div>
 
     <div v-else class="space-y-3">
       <div
         v-for="svc in services"
         :key="svc.service"
-        class="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
+        class="card flex items-center justify-between p-4"
         :data-testid="`sys-row-${svc.service}`"
       >
         <div>
-          <div class="font-medium text-slate-900 dark:text-slate-100">{{ svc.service }}</div>
-          <div class="text-sm text-slate-500 dark:text-slate-400" :data-testid="`sys-ref-${svc.service}`">
+          <div class="font-medium text-text">{{ svc.service }}</div>
+          <div class="text-sm text-muted" :data-testid="`sys-ref-${svc.service}`">
             {{ displayRef(svc) }}
           </div>
           <div
             v-if="svc.impl === 'job'"
-            class="text-xs text-slate-500 dark:text-slate-400"
+            class="text-xs text-muted"
             :data-testid="`sys-schedule-${svc.service}`"
           >
             <span>{{ formatSchedule(svc.schedule) }}</span>
-            <span v-if="svc.schedule" class="ml-1 font-mono text-slate-400 dark:text-slate-500">({{ svc.schedule }})</span>
+            <span v-if="svc.schedule" class="ml-1 font-mono text-muted">({{ svc.schedule }})</span>
             <span v-if="svc.suspended" class="ml-1 font-semibold">· Suspended</span>
           </div>
         </div>
@@ -202,7 +209,7 @@ function displayRef(svc: ServiceVersion) {
       </div>
     </div>
 
-    <p v-if="fetchedAt" class="mt-4 text-xs text-slate-400 dark:text-slate-500">
+    <p v-if="fetchedAt" class="mt-4 text-xs text-muted">
       Last updated: {{ new Date(fetchedAt).toLocaleTimeString() }}
     </p>
   </div>

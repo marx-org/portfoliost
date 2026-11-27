@@ -124,19 +124,24 @@ const historyCandidates = () => splitCandidates.value.filter(c => c.status !== "
 </script>
 
 <template>
-  <div class="space-y-8">
-    <h1 class="text-xl font-semibold">Market Data</h1>
+  <div class="mission-control space-y-8">
+    <header class="mission-header">
+      <div>
+        <p class="mission-eyebrow"><span class="mission-signal" /> ADMIN / MARKET DATA</p>
+        <h2 class="mission-title">Market Data</h2>
+      </div>
+    </header>
 
-    <div v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading…</div>
-    <div v-else-if="error" class="text-sm text-red-600">{{ error }}</div>
+    <div v-if="loading" class="text-sm text-muted">Loading…</div>
+    <div v-else-if="error" class="text-sm text-danger">{{ error }}</div>
 
     <template v-else>
       <!-- Stooq datasets panel -->
       <div class="card p-6">
-        <h2 class="mb-4 text-base font-semibold">Stooq Datasets</h2>
+        <h2 class="mb-4 text-base font-semibold text-text">Stooq Datasets</h2>
         <table class="w-full text-sm">
           <thead>
-            <tr class="border-b border-slate-200 dark:border-slate-700 text-left text-xs text-slate-500 dark:text-slate-400">
+            <tr class="border-b border-border text-left text-xs text-muted">
               <th class="pb-2 pr-4">Dataset</th>
               <th class="pb-2 pr-4">Latest Date</th>
               <th class="pb-2 pr-4">Imported At</th>
@@ -144,14 +149,14 @@ const historyCandidates = () => splitCandidates.value.filter(c => c.status !== "
             </tr>
           </thead>
           <tbody>
-            <tr v-for="entry in importLog" :key="entry.dataset" class="border-b border-slate-100 dark:border-slate-800">
+            <tr v-for="entry in importLog" :key="entry.dataset" class="border-b border-border">
               <td class="py-2 pr-4 font-mono">{{ entry.dataset }}</td>
               <td class="py-2 pr-4">{{ entry.latestDate ?? '—' }}</td>
               <td class="py-2 pr-4">{{ entry.importedAt ? new Date(entry.importedAt).toLocaleString() : '—' }}</td>
               <td class="py-2">{{ entry.rowsDeleted ?? '—' }}</td>
             </tr>
             <tr v-if="importLog.length === 0">
-              <td colspan="4" class="py-4 text-center text-slate-400 dark:text-slate-500">No import history yet.</td>
+              <td colspan="4" class="py-4 text-center text-muted">No import history yet.</td>
             </tr>
           </tbody>
         </table>
@@ -159,14 +164,14 @@ const historyCandidates = () => splitCandidates.value.filter(c => c.status !== "
 
       <!-- Split candidates panel -->
       <div class="card p-6">
-        <h2 class="mb-4 text-base font-semibold">Split Candidates</h2>
+        <h2 class="mb-4 text-base font-semibold text-text">Split Candidates</h2>
 
-        <div v-if="pendingCandidates().length === 0" class="mb-4 text-sm text-slate-500 dark:text-slate-400">
+        <div v-if="pendingCandidates().length === 0" class="mb-4 text-sm text-muted">
           No pending split candidates.
         </div>
         <table v-else class="mb-6 w-full text-sm">
           <thead>
-            <tr class="border-b border-slate-200 dark:border-slate-700 text-left text-xs text-slate-500 dark:text-slate-400">
+            <tr class="border-b border-border text-left text-xs text-muted">
               <th class="pb-2 pr-4">Symbol</th>
               <th class="pb-2 pr-4">Effective</th>
               <th class="pb-2 pr-4">Detected</th>
@@ -179,7 +184,7 @@ const historyCandidates = () => splitCandidates.value.filter(c => c.status !== "
           </thead>
           <tbody>
             <tr v-for="c in pendingCandidates()" :key="candidateKey(c)"
-                class="border-b border-slate-100 dark:border-slate-800">
+                class="border-b border-border">
               <!-- §85.6 — operational table, so this link navigates away from a
                    half-filled "Apply factor" form. The input state is not
                    persisted today, so nothing is lost; noted here and in the
@@ -219,7 +224,7 @@ const historyCandidates = () => splitCandidates.value.filter(c => c.status !== "
                      :disabled="actionBusy[candidateKey(c)]"
                      @click="dismiss(c)"
                   >Dismiss</button>
-                   <span v-if="actionResult[candidateKey(c)]" class="text-xs text-slate-500">{{ actionResult[candidateKey(c)] }}</span>
+                   <span v-if="actionResult[candidateKey(c)]" class="text-xs text-muted">{{ actionResult[candidateKey(c)] }}</span>
                 </div>
               </td>
             </tr>
@@ -228,12 +233,12 @@ const historyCandidates = () => splitCandidates.value.filter(c => c.status !== "
 
         <!-- History (collapsed) -->
         <details v-if="historyCandidates().length">
-          <summary class="cursor-pointer text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300">
+          <summary class="cursor-pointer text-sm text-muted hover:text-text">
             History ({{ historyCandidates().length }})
           </summary>
-          <table class="mt-3 w-full text-xs text-slate-500 dark:text-slate-400">
+          <table class="mt-3 w-full text-xs text-muted">
             <thead>
-              <tr class="border-b border-slate-200 dark:border-slate-700 text-left">
+              <tr class="border-b border-border text-left">
                 <th class="pb-1 pr-4">Symbol</th>
                 <th class="pb-1 pr-4">Effective</th>
                 <th class="pb-1 pr-4">Detected</th>
@@ -243,7 +248,7 @@ const historyCandidates = () => splitCandidates.value.filter(c => c.status !== "
             </thead>
             <tbody>
                 <tr v-for="c in historyCandidates()" :key="candidateKey(c)"
-                  class="border-b border-slate-100 dark:border-slate-800">
+                  class="border-b border-border">
                 <td class="py-1 pr-4 font-mono">
                   <router-link :to="researchRoute(c.symbol, route.fullPath)" class="inline-block">
                     <TickerBadge size="sm" :symbol="c.symbol" />
@@ -263,19 +268,19 @@ const historyCandidates = () => splitCandidates.value.filter(c => c.status !== "
 
       <!-- Overflow summary -->
       <div class="card p-6">
-        <h2 class="mb-4 text-base font-semibold">Overflow Summary</h2>
+        <h2 class="mb-4 text-base font-semibold text-text">Overflow Summary</h2>
         <template v-if="overflow">
           <p class="mb-3 text-sm">Total rows: <span class="font-semibold">{{ overflow.total.toLocaleString() }}</span></p>
           <table class="w-full text-sm">
             <thead>
-              <tr class="border-b border-slate-200 dark:border-slate-700 text-left text-xs text-slate-500 dark:text-slate-400">
+              <tr class="border-b border-border text-left text-xs text-muted">
                 <th class="pb-2 pr-4">Symbol</th>
                 <th class="pb-2">Rows</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="s in overflow.topSymbols" :key="s.symbol"
-                  class="border-b border-slate-100 dark:border-slate-800">
+                  class="border-b border-border">
                 <td class="py-1 pr-4 font-mono">
                   <router-link :to="researchRoute(s.symbol, route.fullPath)" class="inline-block">
                     <TickerBadge size="sm" :symbol="s.symbol" />
@@ -284,12 +289,12 @@ const historyCandidates = () => splitCandidates.value.filter(c => c.status !== "
                 <td class="py-1">{{ s.rowCount.toLocaleString() }}</td>
               </tr>
               <tr v-if="overflow.topSymbols.length === 0">
-                <td colspan="2" class="py-4 text-center text-slate-400 dark:text-slate-500">No overflow rows.</td>
+                <td colspan="2" class="py-4 text-center text-muted">No overflow rows.</td>
               </tr>
             </tbody>
           </table>
         </template>
-        <p v-else class="text-sm text-slate-400 dark:text-slate-500">Unavailable.</p>
+        <p v-else class="text-sm text-muted">Unavailable.</p>
       </div>
     </template>
   </div>

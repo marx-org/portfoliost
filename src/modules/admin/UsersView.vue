@@ -54,50 +54,59 @@ function sortIcon(field: typeof sortField.value) {
 }
 
 function groupBadgeClass(group: string) {
-  if (group === "portfoliost_admin") return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400"
-  return "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300"
+  if (group === "portfoliost_admin") return "bg-accent-soft text-accent-text"
+  return "bg-surface-2 text-muted"
 }
 </script>
 
 <template>
-  <div>
-    <div v-if="loading && !users.length" class="text-sm text-slate-500 dark:text-slate-400">Loading...</div>
-    <div v-else-if="error" class="text-sm text-red-600 dark:text-red-400">{{ error }}</div>
+  <div class="mission-control">
+    <header class="mission-header">
+      <div>
+        <p class="mission-eyebrow"><span class="mission-signal" /> ADMIN / USERS</p>
+        <h2 class="mission-title">Users</h2>
+      </div>
+    </header>
+
+    <div v-if="loading && !users.length" class="text-sm text-muted">Loading...</div>
+    <div v-else-if="error" class="text-sm text-danger">{{ error }}</div>
 
     <div v-else>
-      <input
-        v-model="search"
-        placeholder="Filter by name or email..."
-        class="input mb-4 w-full max-w-sm"
-      />
+      <div class="mission-toolbar mb-4">
+        <input
+          v-model="search"
+          placeholder="Filter by name or email..."
+          class="input"
+        />
+      </div>
 
-      <div class="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
+      <div class="overflow-x-auto rounded-lg border border-border bg-surface">
         <table class="min-w-full text-sm">
-          <thead class="bg-slate-50 dark:bg-slate-800">
+          <thead class="bg-surface-2">
             <tr>
-              <th class="cursor-pointer px-4 py-2 text-left font-medium text-slate-600 dark:text-slate-300" @click="toggleSort('email')">
+              <th class="cursor-pointer px-4 py-2 text-left font-medium text-muted" @click="toggleSort('email')">
                 Email{{ sortIcon("email") }}
               </th>
-              <th class="cursor-pointer px-4 py-2 text-left font-medium text-slate-600 dark:text-slate-300" @click="toggleSort('firstName')">
+              <th class="cursor-pointer px-4 py-2 text-left font-medium text-muted" @click="toggleSort('firstName')">
                 Name{{ sortIcon("firstName") }}
               </th>
-              <th class="px-4 py-2 text-left font-medium text-slate-600 dark:text-slate-300">UUID</th>
-              <th class="px-4 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Groups</th>
-              <th class="cursor-pointer px-4 py-2 text-left font-medium text-slate-600 dark:text-slate-300" @click="toggleSort('lastLogin')">
+              <th class="px-4 py-2 text-left font-medium text-muted">UUID</th>
+              <th class="px-4 py-2 text-left font-medium text-muted">Groups</th>
+              <th class="cursor-pointer px-4 py-2 text-left font-medium text-muted" @click="toggleSort('lastLogin')">
                 Last Login{{ sortIcon("lastLogin") }}
               </th>
-              <th class="cursor-pointer px-4 py-2 text-left font-medium text-slate-600 dark:text-slate-300" @click="toggleSort('createdAt')">
+              <th class="cursor-pointer px-4 py-2 text-left font-medium text-muted" @click="toggleSort('createdAt')">
                 Created{{ sortIcon("createdAt") }}
               </th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
-            <tr v-for="user in filtered" :key="user.id" class="bg-white dark:bg-slate-900">
-              <td class="px-4 py-2 text-slate-900 dark:text-slate-100">{{ user.email ?? "—" }}</td>
-              <td class="px-4 py-2 text-slate-900 dark:text-slate-100">
+          <tbody class="divide-y divide-border">
+            <tr v-for="user in filtered" :key="user.id" class="bg-surface">
+              <td class="px-4 py-2 text-text">{{ user.email ?? "—" }}</td>
+              <td class="px-4 py-2 text-text">
                 {{ [user.firstName, user.lastName].filter(Boolean).join(" ") || "—" }}
               </td>
-              <td class="max-w-[16rem] truncate px-4 py-2 font-mono text-xs text-slate-500 dark:text-slate-400" :title="user.id">
+              <td class="max-w-[16rem] truncate px-4 py-2 font-mono text-xs text-muted" :title="user.id">
                 {{ user.id }}
               </td>
               <td class="px-4 py-2">
@@ -109,16 +118,16 @@ function groupBadgeClass(group: string) {
                 >
                   {{ group }}
                 </span>
-                <span v-if="!user.groups.length" class="text-slate-400 dark:text-slate-500">—</span>
+                <span v-if="!user.groups.length" class="text-muted">—</span>
               </td>
-              <td class="px-4 py-2 text-slate-500 dark:text-slate-400">{{ user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : "—" }}</td>
-              <td class="px-4 py-2 text-slate-500 dark:text-slate-400">{{ user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "—" }}</td>
+              <td class="px-4 py-2 text-muted">{{ user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : "—" }}</td>
+              <td class="px-4 py-2 text-muted">{{ user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "—" }}</td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <p class="mt-4 text-xs text-slate-400 dark:text-slate-500">{{ filtered.length }} user{{ filtered.length !== 1 ? "s" : "" }}</p>
+      <p class="mt-4 text-xs text-muted">{{ filtered.length }} user{{ filtered.length !== 1 ? "s" : "" }}</p>
     </div>
   </div>
 </template>

@@ -54,29 +54,34 @@ const cpiStale = computed(() => cpi.value?.status === "stale" || cpi.value?.stal
 </script>
 
 <template>
-  <div class="space-y-8">
-    <div class="flex items-center justify-between gap-4">
-      <h1 class="text-xl font-semibold">Bond Catalogue</h1>
-      <button type="button" class="btn-secondary" :disabled="loading" @click="load">
-        {{ loading ? "Refreshing…" : "Refresh" }}
-      </button>
-    </div>
+  <div class="mission-control space-y-8">
+    <header class="mission-header">
+      <div>
+        <p class="mission-eyebrow"><span class="mission-signal" /> ADMIN / BOND CATALOGUE</p>
+        <h2 class="mission-title">Bond Catalogue</h2>
+      </div>
+      <div class="mission-actions">
+        <button type="button" class="btn-secondary" :disabled="loading" @click="load">
+          {{ loading ? "Refreshing…" : "Refresh" }}
+        </button>
+      </div>
+    </header>
 
-    <div v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading…</div>
+    <div v-if="loading" class="text-sm text-muted">Loading…</div>
     <template v-else>
       <!-- Savings-bond series (openst.bond_series) -->
       <div class="card p-6">
-        <h2 class="mb-1 text-base font-semibold">Savings-Bond Emissions</h2>
-        <div v-if="bondError" class="text-sm text-red-600 dark:text-red-400">{{ bondError }}</div>
+        <h2 class="mb-1 text-base font-semibold text-text">Savings-Bond Emissions</h2>
+        <div v-if="bondError" class="text-sm text-danger">{{ bondError }}</div>
         <template v-else>
-          <p class="mb-4 text-sm text-slate-500 dark:text-slate-400">
+          <p class="mb-4 text-sm text-muted">
             <span class="font-semibold">{{ bondCount.toLocaleString() }}</span> emissions in
             <code class="font-mono text-xs">openst.bond_series</code>
           </p>
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
               <thead>
-                <tr class="border-b border-slate-200 dark:border-slate-700 text-left text-xs text-slate-500 dark:text-slate-400">
+                <tr class="border-b border-border text-left text-xs text-muted">
                   <th class="pb-2 pr-4">Symbol</th>
                   <th class="pb-2 pr-4">Name</th>
                   <th class="pb-2 pr-4">Issue</th>
@@ -86,7 +91,7 @@ const cpiStale = computed(() => cpi.value?.status === "stale" || cpi.value?.stal
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="b in bonds" :key="b.symbol" class="border-b border-slate-100 dark:border-slate-800">
+                <tr v-for="b in bonds" :key="b.symbol" class="border-b border-border">
                   <!-- §85.6 — the case the request names explicitly: "bond". These
                        are ROD1033 / NNEP25-style series, not equity tickers, and the
                        bond-profile fallback in portfoliost-instruments is what makes
@@ -111,7 +116,7 @@ const cpiStale = computed(() => cpi.value?.status === "stale" || cpi.value?.stal
                   <td class="py-2">{{ b.margin != null && b.margin !== "" ? Number(b.margin).toFixed(4) : "—" }}</td>
                 </tr>
                 <tr v-if="bonds.length === 0">
-                  <td colspan="6" class="py-4 text-center text-slate-400 dark:text-slate-500">
+                  <td colspan="6" class="py-4 text-center text-muted">
                     No bond series imported yet.
                   </td>
                 </tr>
@@ -123,8 +128,8 @@ const cpiStale = computed(() => cpi.value?.status === "stale" || cpi.value?.stal
 
       <!-- 12m CPI (openst.cpi_12m) -->
       <div class="card p-6">
-        <h2 class="mb-1 text-base font-semibold">12-Month CPI</h2>
-        <p class="mb-4 text-sm text-slate-500 dark:text-slate-400">
+        <h2 class="mb-1 text-base font-semibold text-text">12-Month CPI</h2>
+        <p class="mb-4 text-sm text-muted">
           Latest <span class="font-semibold">{{ cpi ? cpi.rowCount : 0 }}</span> readings from
           <code class="font-mono text-xs">openst.cpi_12m</code>
           <template v-if="cpi?.lastDate">
@@ -132,7 +137,7 @@ const cpiStale = computed(() => cpi.value?.status === "stale" || cpi.value?.stal
             {{ cpi.ageDays ?? "—" }}d ago)
           </template>
         </p>
-        <div v-if="cpiError" class="mb-4 text-sm text-red-600 dark:text-red-400">{{ cpiError }}</div>
+        <div v-if="cpiError" class="mb-4 text-sm text-danger">{{ cpiError }}</div>
         <div
           v-if="cpiStale"
           class="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300"
@@ -143,18 +148,18 @@ const cpiStale = computed(() => cpi.value?.status === "stale" || cpi.value?.stal
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
               <thead>
-                <tr class="border-b border-slate-200 dark:border-slate-700 text-left text-xs text-slate-500 dark:text-slate-400">
+                <tr class="border-b border-border text-left text-xs text-muted">
                   <th class="pb-2 pr-4">Date</th>
                   <th class="pb-2">CPI 12M (%)</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="row in cpi.rows" :key="row.date" class="border-b border-slate-100 dark:border-slate-800">
+                <tr v-for="row in cpi.rows" :key="row.date" class="border-b border-border">
                   <td class="py-1 pr-4 font-mono">{{ row.date }}</td>
                   <td class="py-1">{{ Number(row.value).toFixed(4) }}</td>
                 </tr>
                 <tr v-if="cpi.rows.length === 0">
-                  <td colspan="2" class="py-4 text-center text-slate-400 dark:text-slate-500">
+                  <td colspan="2" class="py-4 text-center text-muted">
                     No CPI data imported yet.
                   </td>
                 </tr>
@@ -162,7 +167,7 @@ const cpiStale = computed(() => cpi.value?.status === "stale" || cpi.value?.stal
             </table>
           </div>
         </template>
-        <p v-else-if="!cpiError" class="text-sm text-slate-400 dark:text-slate-500">Unavailable.</p>
+        <p v-else-if="!cpiError" class="text-sm text-muted">Unavailable.</p>
       </div>
     </template>
   </div>

@@ -142,14 +142,17 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="space-y-5" data-testid="listing-overrides-view">
-    <div class="flex flex-wrap items-end justify-between gap-3">
+  <div class="mission-control space-y-5" data-testid="listing-overrides-view">
+    <header class="mission-header">
       <div>
-        <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-100">Curated Listing Overrides</h2>
-        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Reviewed venue facts take precedence without changing upstream reference rows.</p>
+        <p class="mission-eyebrow"><span class="mission-signal" /> ADMIN / LISTING OVERRIDES</p>
+        <h2 class="mission-title">Curated Listing Overrides</h2>
+        <p class="mission-description">Reviewed venue facts take precedence without changing upstream reference rows.</p>
       </div>
-      <button type="button" class="btn-secondary" data-testid="listing-overrides-new" @click="resetForm">New override</button>
-    </div>
+      <div class="mission-actions">
+        <button type="button" class="btn-secondary" data-testid="listing-overrides-new" @click="resetForm">New override</button>
+      </div>
+    </header>
 
     <form class="card flex flex-wrap items-end gap-3 p-4" @submit.prevent="load">
       <div class="min-w-56 flex-1">
@@ -169,10 +172,10 @@ onMounted(load)
 
     <form class="card space-y-4 p-4" data-testid="listing-overrides-form" @submit.prevent="save">
       <div class="flex items-center justify-between">
-        <h3 class="font-semibold">{{ editingKey ? `Edit ${editingKey}` : "Add override" }}</h3>
+        <h3 class="font-semibold text-text">{{ editingKey ? `Edit ${editingKey}` : "Add override" }}</h3>
         <button v-if="editingKey" type="button" class="btn-ghost text-sm" @click="resetForm">Cancel edit</button>
       </div>
-      <p v-if="formError" class="text-sm text-red-600 dark:text-red-400">{{ formError }}</p>
+      <p v-if="formError" class="text-sm text-danger">{{ formError }}</p>
       <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div><label for="override-ticker" class="label">Ticker</label><input id="override-ticker" v-model="form.ticker" class="input" required data-testid="override-ticker" @blur="refreshPreview" /></div>
         <div><label for="override-exchange" class="label">Venue</label><input id="override-exchange" v-model="form.exchange" class="input" required data-testid="override-exchange" @blur="refreshPreview" /></div>
@@ -183,43 +186,43 @@ onMounted(load)
         <div><label for="override-rationale" class="label">Rationale</label><textarea id="override-rationale" v-model="form.rationale" class="input min-h-20" required data-testid="override-rationale" /></div>
         <div><label for="override-provenance" class="label">Provenance</label><textarea id="override-provenance" v-model="form.provenance" class="input min-h-20" required data-testid="override-provenance" /></div>
       </div>
-      <div v-if="preview" class="rounded border border-slate-200 p-3 text-xs dark:border-slate-700" data-testid="listing-overrides-preview">
-        <div class="font-semibold">Precedence: <span class="text-blue-700 dark:text-blue-300">{{ preview.precedence }}</span></div>
+      <div v-if="preview" class="rounded border border-border p-3 text-xs" data-testid="listing-overrides-preview">
+        <div class="font-semibold">Precedence: <span class="text-accent-text">{{ preview.precedence }}</span></div>
         <div class="mt-1 flex flex-wrap gap-2">
-          <span v-if="preview.upstreamPresent" class="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700">upstream row{{ preview.upstreamCurrency ? ` (${preview.upstreamCurrency})` : "" }}</span>
-          <span v-else class="rounded bg-slate-100 px-1.5 py-0.5 text-slate-600 dark:bg-slate-800 dark:text-slate-300">no upstream row</span>
-          <span v-if="preview.tickerConflict" class="rounded bg-red-50 px-1.5 py-0.5 text-red-700">ticker collision across venues</span>
-          <span v-if="preview.existingOverride" class="rounded bg-blue-50 px-1.5 py-0.5 text-blue-700">existing override ({{ preview.existingOverride.status }})</span>
+          <span v-if="preview.upstreamPresent" class="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">upstream row{{ preview.upstreamCurrency ? ` (${preview.upstreamCurrency})` : "" }}</span>
+          <span v-else class="rounded bg-surface-2 px-1.5 py-0.5 text-muted">no upstream row</span>
+          <span v-if="preview.tickerConflict" class="rounded bg-red-50 px-1.5 py-0.5 text-red-700 dark:bg-red-500/10 dark:text-red-300">ticker collision across venues</span>
+          <span v-if="preview.existingOverride" class="rounded bg-blue-50 px-1.5 py-0.5 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">existing override ({{ preview.existingOverride.status }})</span>
         </div>
-        <p v-if="preview.upstreamPresent" class="mt-1 text-slate-500">Saving replaces the upstream value for this venue; the upstream row itself is left untouched.</p>
+        <p v-if="preview.upstreamPresent" class="mt-1 text-muted">Saving replaces the upstream value for this venue; the upstream row itself is left untouched.</p>
       </div>
       <div class="flex items-center justify-end gap-2">
         <button type="submit" class="btn-primary" :disabled="saving" data-testid="override-save">{{ saving ? "Saving..." : editingKey ? "Save changes" : "Add override" }}</button>
       </div>
     </form>
 
-    <p v-if="error" class="text-sm text-red-600 dark:text-red-400">{{ error }}</p>
-    <div v-if="loading" class="card p-6 text-sm text-slate-500">Loading overrides...</div>
+    <p v-if="error" class="text-sm text-danger">{{ error }}</p>
+    <div v-if="loading" class="card p-6 text-sm text-muted">Loading overrides...</div>
     <div v-else class="card overflow-x-auto">
       <table class="min-w-full text-sm" data-testid="listing-overrides-table">
-        <thead class="bg-slate-50 text-left dark:bg-slate-800"><tr><th class="px-4 py-3">Listing</th><th class="px-4 py-3">Currency</th><th class="px-4 py-3">Status</th><th class="px-4 py-3">Source</th><th class="px-4 py-3 text-right">Actions</th></tr></thead>
+        <thead class="bg-surface-2 text-left"><tr><th class="px-4 py-3">Listing</th><th class="px-4 py-3">Currency</th><th class="px-4 py-3">Status</th><th class="px-4 py-3">Source</th><th class="px-4 py-3 text-right">Actions</th></tr></thead>
         <tbody>
-          <tr v-for="item in items" :key="item.listingKey" class="border-t border-slate-200 dark:border-slate-700">
-            <td class="px-4 py-3"><div class="font-mono font-semibold">{{ item.listingKey }}</div><div class="text-xs text-slate-500">{{ item.assetType }}</div></td>
+          <tr v-for="item in items" :key="item.listingKey" class="border-t border-border">
+            <td class="px-4 py-3"><div class="font-mono font-semibold">{{ item.listingKey }}</div><div class="text-xs text-muted">{{ item.assetType }}</div></td>
             <td class="px-4 py-3">{{ item.quoteCurrency }}</td>
-            <td class="px-4 py-3"><span :class="item.status === 'active' ? 'text-emerald-600' : 'text-slate-500'">{{ item.status }}</span></td>
-            <td class="px-4 py-3"><div class="space-y-1 text-xs"><span class="mr-2 rounded bg-blue-50 px-1.5 py-0.5 text-blue-700">{{ item.precedence }}</span><span v-if="item.upstreamPresent" class="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700">upstream row</span><span v-if="item.tickerConflict" class="ml-1 rounded bg-red-50 px-1.5 py-0.5 text-red-700">ticker collision</span></div></td>
+            <td class="px-4 py-3"><span :class="item.status === 'active' ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted'">{{ item.status }}</span></td>
+            <td class="px-4 py-3"><div class="space-y-1 text-xs"><span class="mr-2 rounded bg-blue-50 px-1.5 py-0.5 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">{{ item.precedence }}</span><span v-if="item.upstreamPresent" class="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">upstream row</span><span v-if="item.tickerConflict" class="ml-1 rounded bg-red-50 px-1.5 py-0.5 text-red-700 dark:bg-red-500/10 dark:text-red-300">ticker collision</span></div></td>
             <td class="px-4 py-3 text-right"><button type="button" class="btn-ghost mr-1 text-xs" @click="edit(item)">Edit</button><button type="button" class="btn-ghost mr-1 text-xs" @click="showHistory(item)">History</button><button type="button" class="btn-danger text-xs" :disabled="item.status === 'disabled'" @click="disable(item)">Disable</button></td>
           </tr>
-          <tr v-if="items.length === 0"><td colspan="5" class="px-4 py-8 text-center text-slate-500">No overrides found.</td></tr>
+          <tr v-if="items.length === 0"><td colspan="5" class="px-4 py-8 text-center text-muted">No overrides found.</td></tr>
         </tbody>
       </table>
     </div>
 
     <section v-if="selectedKey" class="card p-4" data-testid="listing-overrides-history">
-      <div class="mb-3 flex items-center justify-between"><h3 class="font-semibold">History: {{ selectedKey }}</h3><button type="button" class="btn-ghost text-sm" @click="selectedKey = null">Close</button></div>
-      <div v-if="history.length === 0" class="text-sm text-slate-500">No history entries.</div>
-      <ul v-else class="space-y-2 text-sm"><li v-for="entry in history" :key="entry.id" class="border-t border-slate-200 pt-2 dark:border-slate-700"><strong>{{ entry.action }}</strong> by {{ entry.actor }} <span class="text-slate-500">{{ entry.createdAt }}</span><div class="text-xs text-slate-500">{{ JSON.stringify(entry.snapshot) }}</div></li></ul>
+      <div class="mb-3 flex items-center justify-between"><h3 class="font-semibold text-text">History: {{ selectedKey }}</h3><button type="button" class="btn-ghost text-sm" @click="selectedKey = null">Close</button></div>
+      <div v-if="history.length === 0" class="text-sm text-muted">No history entries.</div>
+      <ul v-else class="space-y-2 text-sm"><li v-for="entry in history" :key="entry.id" class="border-t border-border pt-2"><strong>{{ entry.action }}</strong> by {{ entry.actor }} <span class="text-muted">{{ entry.createdAt }}</span><div class="text-xs text-muted">{{ JSON.stringify(entry.snapshot) }}</div></li></ul>
     </section>
   </div>
 </template>
