@@ -1,0 +1,224 @@
+/*
+ * Shared UI primitives — the single design language for every page.
+ *
+ * Token-driven and animation-free: page headers, card titles, stat tiles,
+ * tabs and data tables all resolve from the token layer, so light/dark flips
+ * happen live and nothing here rebuilds per theme. Heavy motion (entrance
+ * staggers, the cinematic stage, canvas atmosphere) lives in the topology
+ * module only — this file is the calm, professional baseline the rest of the
+ * app speaks.
+ */
+
+/* ── Page header ────────────────────────────────────────────────────────────
+   One header idiom for every top-level view: a mono eyebrow with an optional
+   signal dot, a bold tight title, an optional description and an actions row.
+   Replaces the three competing idioms (mission-header / h1+p / TickerBadge). */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin: 8px 0 24px;
+}
+.page-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font: 600 10px/1.5 ui-monospace, monospace;
+  letter-spacing: 0.2em;
+  color: var(--muted);
+}
+.signal-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #38bdf8;
+  box-shadow: 0 0 12px #38bdf880;
+  flex: none;
+}
+.page-title {
+  margin: 0;
+  font-size: clamp(20px, 2.4vw, 30px);
+  line-height: 1.25;
+  letter-spacing: -0.04em;
+  font-weight: 650;
+  color: var(--text);
+}
+.page-title span {
+  color: var(--accent);
+}
+.page-description {
+  font-size: 13px;
+  color: var(--muted);
+}
+.page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+/* ── Card title — one size everywhere ───────────────────────────────────────
+   Every card/section heading is the same 1rem/600/text token. */
+.card-title {
+  font-size: 1rem;
+  line-height: 1.5;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* ── Stat tiles (static; topology re-adds motion) ───────────────────────────
+   A responsive grid of tiles, each with a blurred colour orb keyed off
+   --stat-color and an optional progress track. No entrance animation here. */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.stat-card {
+  position: relative;
+  overflow: hidden;
+  padding: 17px 20px 19px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 13px;
+}
+.stat-card::before {
+  content: '';
+  position: absolute;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  right: -60px;
+  top: -90px;
+  background: var(--stat-color, var(--accent));
+  opacity: 0.1;
+  filter: blur(24px);
+}
+.stat-card__label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font: 500 10px/1.5 ui-monospace, monospace;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+.stat-card__label > span {
+  font-size: 17px;
+  color: var(--stat-color, var(--accent));
+}
+.stat-card p {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  margin: 6px 0 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.stat-card strong {
+  color: var(--text);
+  font-size: 32px;
+  line-height: 1.25;
+  font-weight: 550;
+  letter-spacing: -0.05em;
+  font-variant-numeric: tabular-nums;
+}
+.stat-card small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.stat-card__track {
+  height: 2px;
+  background: var(--border);
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+}
+.stat-card__track i {
+  display: block;
+  height: 100%;
+  background: var(--stat-color, var(--accent));
+}
+
+/* ── Tabs ───────────────────────────────────────────────────────────────────
+   One tab strip: a bottom-border row whose active link is underlined in the
+   accent and tinted with the accent text token. */
+.tab-nav {
+  display: flex;
+  gap: 1px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+}
+.tab-link {
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--muted);
+  transition: color 0.15s, border-color 0.15s;
+}
+.tab-link:hover {
+  color: var(--text);
+}
+.tab-link--active {
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+/* ── Data table ─────────────────────────────────────────────────────────────
+   One table skin: a tinted uppercase header and hairline row dividers, all
+   from tokens. Apply `.data-table` to the <table>. */
+.data-table {
+  width: 100%;
+  font-size: 0.875rem;
+  border-collapse: collapse;
+}
+.data-table thead th {
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: left;
+  padding: 0.625rem 1.25rem;
+  font-weight: 500;
+  border-bottom: 1px solid var(--border);
+}
+.data-table tbody td {
+  padding: 0.625rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+.data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* ── Responsive collapse ─────────────────────────────────────────────────── */
+@media (max-width: 720px) {
+  .page-header {
+    margin-top: 0;
+    gap: 14px;
+  }
+  .stat-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .stat-card {
+    padding: 12px 14px;
+  }
+  .stat-card p {
+    margin: 0;
+  }
+  .stat-card strong {
+    font-size: 25px;
+  }
+  .stat-card__label {
+    float: right;
+    max-width: 45%;
+    text-align: right;
+    gap: 7px;
+  }
+}

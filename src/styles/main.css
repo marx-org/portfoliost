@@ -1,4 +1,5 @@
 @import "./mission-control.css";
+@import "./ui.css";
 @import "tailwindcss";
 @config "../../tailwind.config.js";
 
