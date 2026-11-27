@@ -314,7 +314,7 @@ onMounted(async () => {
             @click="openRow($event, row)"
           >
             <td
-              class="sticky left-0 z-10 min-w-[9rem] bg-surface-2 px-3 py-3.5 font-medium text-text break-words shadow-[-1px_0_0_0_#e2e8f0] group-hover:bg-accent-soft group-focus-within:bg-accent-soft sm:min-w-0 sm:px-5 sm:py-2.5 dark:bg-slate-800 dark:text-slate-100 dark:shadow-[-1px_0_0_0_#334155] dark:group-hover:bg-slate-700 dark:group-focus-within:bg-slate-700"
+              class="sticky left-0 z-10 min-w-[9rem] bg-surface-2 even:bg-surface-2 px-3 py-3.5 font-medium text-text break-words shadow-[-1px_0_0_0_#e2e8f0] group-hover:bg-accent-soft group-focus-within:bg-accent-soft sm:min-w-0 sm:px-5 sm:py-2.5 dark:bg-slate-800 dark:even:bg-slate-800 dark:text-slate-100 dark:shadow-[-1px_0_0_0_#334155] dark:group-hover:bg-slate-700 dark:group-focus-within:bg-slate-700"
               data-testid="accounts-balance-account"
             >
               <router-link
