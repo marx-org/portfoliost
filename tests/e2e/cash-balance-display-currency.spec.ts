@@ -70,6 +70,7 @@ test("investments cash balance renders the converted total for the display curre
 
   try {
     await login(page)
+    await page.goto("/en/investments")
     await expect(page.getByTestId("cash-balance")).toBeVisible({ timeout: 10000 })
 
     const expectTotal = async (display: string) => {

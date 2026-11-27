@@ -29,7 +29,7 @@ async function submit() {
   try {
     await auth.login(email.value, password.value)
     const redirect = typeof router.currentRoute.value.query.redirect === "string" ? router.currentRoute.value.query.redirect : undefined
-    router.push(redirect || { name: "investments" })
+    router.push(redirect || { name: "accounts-balance" })
   } catch {
     // error is stored in auth.error
   }

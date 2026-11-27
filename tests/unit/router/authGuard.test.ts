@@ -83,14 +83,14 @@ describe("authGuard (§36)", () => {
     localStorage.setItem("portfoliost_token", "mock-token")
     mocked.fetchMe.mockResolvedValue(makeMe(["some_other_group"]))
 
-    await expect(authGuard(adminJobs)).resolves.toEqual({ name: "investments" })
+    await expect(authGuard(adminJobs)).resolves.toEqual({ name: "accounts-balance" })
   })
 
   it("bounces a user with no groups at all", async () => {
     localStorage.setItem("portfoliost_token", "mock-token")
     mocked.fetchMe.mockResolvedValue(makeMe())
 
-    await expect(authGuard(adminJobs)).resolves.toEqual({ name: "investments" })
+    await expect(authGuard(adminJobs)).resolves.toEqual({ name: "accounts-balance" })
   })
 
   it("fetches only once when the guard and App.vue both hydrate", async () => {
@@ -141,7 +141,7 @@ describe("authGuard (§36)", () => {
     localStorage.setItem("portfoliost_token", "mock-token")
     const login = target("/login", { public: true }, "login")
 
-    await expect(authGuard(login)).resolves.toEqual({ name: "investments" })
+    await expect(authGuard(login)).resolves.toEqual({ name: "accounts-balance" })
     expect(mocked.fetchMe).not.toHaveBeenCalled()
   })
 })

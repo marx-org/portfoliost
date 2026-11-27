@@ -17,6 +17,7 @@ test("manual refresh is additive: the card button issues POST /recompute?mode=up
   page,
 }) => {
   await login(page)
+  await page.goto("/en/investments")
 
   const button = page.getByTestId("card-refresh").first()
   await expect(button).toBeVisible({ timeout: 30_000 })
@@ -39,6 +40,7 @@ test("manual refresh is additive: the card button issues POST /recompute?mode=up
 
 test("the control is on every card, not only on a failed chart (§76.2)", async ({ page }) => {
   await login(page)
+  await page.goto("/en/investments")
   await page.waitForLoadState("networkidle")
 
   const buttons = page.getByTestId("card-refresh")
@@ -55,6 +57,7 @@ test("the control is on every card, not only on a failed chart (§76.2)", async 
 
 test("the card states the price as-of rather than implying a live number (§76.2)", async ({ page }) => {
   await login(page)
+  await page.goto("/en/investments")
   await page.waitForLoadState("networkidle")
   const asOf = page.getByTestId("card-price-as-of").first()
   await expect(asOf).toBeVisible({ timeout: 30_000 })
