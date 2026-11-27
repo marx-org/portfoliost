@@ -76,16 +76,23 @@ function nextPage() { if (page.value < totalPages.value) { page.value++; load() 
 </script>
 
 <template>
-  <div>
-    <div v-if="loading && !items.length" class="text-sm text-slate-500 dark:text-slate-400">Loading...</div>
-    <div v-else-if="error" class="text-sm text-red-600 dark:text-red-400">{{ error }}</div>
+  <div class="mission-control">
+    <header class="mission-header">
+      <div>
+        <p class="mission-eyebrow"><span class="mission-signal" /> ADMIN / CURRENCY RATES</p>
+        <h2 class="mission-title">Currency Rates</h2>
+      </div>
+    </header>
+
+    <div v-if="loading && !items.length" class="text-sm text-muted">Loading...</div>
+    <div v-else-if="error" class="text-sm text-danger">{{ error }}</div>
 
     <div v-else>
-      <div class="mb-4 flex flex-wrap items-end gap-3">
+      <div class="mission-toolbar mb-4">
         <div>
           <label for="fx-base" class="label">Base currency</label>
-          <div id="fx-base" class="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
-            EUR <span class="text-xs text-slate-400">(fixed)</span>
+          <div id="fx-base" class="flex items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-text">
+            EUR <span class="text-xs text-muted">(fixed)</span>
           </div>
         </div>
         <div>
@@ -111,30 +118,30 @@ function nextPage() { if (page.value < totalPages.value) { page.value++; load() 
         <button type="button" class="btn-secondary text-sm" data-testid="fx-reset" @click="resetFilters">Reset</button>
       </div>
 
-      <div class="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
+      <div class="overflow-x-auto rounded-lg border border-border bg-surface">
         <table class="min-w-full text-sm">
-          <thead class="bg-slate-50 dark:bg-slate-800">
+          <thead class="bg-surface-2">
             <tr>
-              <th class="cursor-pointer px-4 py-2 text-left font-medium text-slate-600 dark:text-slate-300" @click="toggleSort('date')">
+              <th class="cursor-pointer px-4 py-2 text-left font-medium text-muted" @click="toggleSort('date')">
                 Date{{ sortIcon("date") }}
               </th>
-              <th class="cursor-pointer px-4 py-2 text-left font-medium text-slate-600 dark:text-slate-300" @click="toggleSort('base_currency')">
+              <th class="cursor-pointer px-4 py-2 text-left font-medium text-muted" @click="toggleSort('base_currency')">
                 Base{{ sortIcon("base_currency") }}
               </th>
-              <th class="cursor-pointer px-4 py-2 text-left font-medium text-slate-600 dark:text-slate-300" @click="toggleSort('quote_currency')">
+              <th class="cursor-pointer px-4 py-2 text-left font-medium text-muted" @click="toggleSort('quote_currency')">
                 Quote{{ sortIcon("quote_currency") }}
               </th>
-              <th class="cursor-pointer px-4 py-2 text-right font-medium text-slate-600 dark:text-slate-300" @click="toggleSort('rate')">
+              <th class="cursor-pointer px-4 py-2 text-right font-medium text-muted" @click="toggleSort('rate')">
                 Rate{{ sortIcon("rate") }}
               </th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
-            <tr v-for="(item, i) in items" :key="i" class="bg-white dark:bg-slate-900">
-              <td class="px-4 py-2 text-slate-900 dark:text-slate-100">{{ item.date }}</td>
-              <td class="px-4 py-2 text-slate-900 dark:text-slate-100">{{ item.baseCurrency }}</td>
-              <td class="px-4 py-2 text-slate-900 dark:text-slate-100">{{ item.quoteCurrency }}</td>
-              <td class="px-4 py-2 text-right text-slate-900 dark:text-slate-100">{{ item.rate }}</td>
+          <tbody class="divide-y divide-border">
+            <tr v-for="(item, i) in items" :key="i" class="bg-surface">
+              <td class="px-4 py-2 text-text">{{ item.date }}</td>
+              <td class="px-4 py-2 text-text">{{ item.baseCurrency }}</td>
+              <td class="px-4 py-2 text-text">{{ item.quoteCurrency }}</td>
+              <td class="px-4 py-2 text-right text-text">{{ item.rate }}</td>
             </tr>
           </tbody>
         </table>
@@ -142,7 +149,7 @@ function nextPage() { if (page.value < totalPages.value) { page.value++; load() 
 
       <div class="mt-4 flex items-center justify-between">
         <button class="btn-secondary text-sm" :disabled="page <= 1" @click="prevPage">Previous</button>
-        <span class="text-sm text-slate-600 dark:text-slate-300">Page {{ page }} of {{ totalPages }}</span>
+        <span class="text-sm text-muted">Page {{ page }} of {{ totalPages }}</span>
         <button class="btn-secondary text-sm" :disabled="page >= totalPages" @click="nextPage">Next</button>
       </div>
     </div>

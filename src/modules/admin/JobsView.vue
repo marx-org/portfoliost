@@ -388,17 +388,17 @@ async function runCashReconciliation() {
 
 function cashAuditBadge(): { label: string; cls: string } | null {
   const a = cashAudit.value
-  if (a.phase === "running") return { label: "Running", cls: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" }
-  if (a.phase === "succeeded") return { label: "Succeeded", cls: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" }
-  if (a.phase === "failed") return { label: "Failed", cls: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" }
+  if (a.phase === "running") return { label: "Running", cls: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300" }
+  if (a.phase === "succeeded") return { label: "Succeeded", cls: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400" }
+  if (a.phase === "failed") return { label: "Failed", cls: "bg-danger-soft text-danger-text dark:text-danger" }
   return null
 }
 
 function auditBadge(): { label: string; cls: string } | null {
   const a = audit.value
-  if (a.phase === "running")   return { label: "Running",   cls: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" }
-  if (a.phase === "succeeded") return { label: "Succeeded", cls: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" }
-  if (a.phase === "failed")    return { label: "Failed",    cls: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" }
+  if (a.phase === "running")   return { label: "Running",   cls: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300" }
+  if (a.phase === "succeeded") return { label: "Succeeded", cls: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400" }
+  if (a.phase === "failed")    return { label: "Failed",    cls: "bg-danger-soft text-danger-text dark:text-danger" }
   return null
 }
 
@@ -464,12 +464,12 @@ function buttonDisabled(s: DatasetState): boolean {
 function statusBadge(dataset: StooqDataset): { label: string; cls: string } | null {
   const s = states.value[dataset]
   if (s.phase === "uploading") return { label: "Uploading", cls: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400" }
-  if (s.phase === "running")   return { label: "Running",   cls: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" }
-  if (s.phase === "succeeded") return { label: "Succeeded", cls: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" }
-  if (s.phase === "failed")    return { label: "Failed",    cls: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" }
+  if (s.phase === "running")   return { label: "Running",   cls: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300" }
+  if (s.phase === "succeeded") return { label: "Succeeded", cls: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400" }
+  if (s.phase === "failed")    return { label: "Failed",    cls: "bg-danger-soft text-danger-text dark:text-danger" }
   const log = s.log
   if (!log || !log.importedAt) return null
-  return { label: "Succeeded", cls: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" }
+  return { label: "Succeeded", cls: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400" }
 }
 
 function formatDate(iso: string | null | undefined): string {
@@ -479,10 +479,10 @@ function formatDate(iso: string | null | undefined): string {
 
 function sheetsBadge(): { label: string; cls: string } | null {
   const s = sheets.value
-  if (s.phase === "running")   return { label: "Running",   cls: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" }
-  if (s.phase === "succeeded") return { label: "Succeeded", cls: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" }
-  if (s.phase === "failed")    return { label: "Failed",    cls: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" }
-  if (s.log?.startedAt)        return { label: "Succeeded", cls: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" }
+  if (s.phase === "running")   return { label: "Running",   cls: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300" }
+  if (s.phase === "succeeded") return { label: "Succeeded", cls: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400" }
+  if (s.phase === "failed")    return { label: "Failed",    cls: "bg-danger-soft text-danger-text dark:text-danger" }
+  if (s.log?.startedAt)        return { label: "Succeeded", cls: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400" }
   return null
 }
 
@@ -498,25 +498,32 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div>
-    <div v-if="pageLoading" class="text-sm text-slate-500 dark:text-slate-400">Loading…</div>
-    <div v-else-if="pageError" class="text-sm text-red-600 dark:text-red-400">{{ pageError }}</div>
+  <div class="mission-control space-y-8">
+    <header class="mission-header">
+      <div>
+        <p class="mission-eyebrow"><span class="mission-signal" /> ADMIN / JOBS</p>
+        <h2 class="mission-title">Jobs</h2>
+      </div>
+    </header>
+
+    <div v-if="pageLoading" class="text-sm text-muted">Loading…</div>
+    <div v-else-if="pageError" class="text-sm text-danger">{{ pageError }}</div>
 
     <div v-else class="space-y-8">
       <!-- Google Sheets sync (§24.9) -->
       <section>
-        <h2 class="mb-3 text-base font-semibold text-slate-700 dark:text-slate-300">Google Sheets</h2>
+        <h2 class="mb-3 text-base font-semibold text-text">Google Sheets</h2>
 
         <div class="space-y-3">
           <div
-            class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
+            class="card p-4"
             data-testid="job-card-sheets-sync"
           >
             <!-- Header row -->
             <div class="mb-3 flex items-start justify-between gap-4">
               <div>
-                <div class="font-medium text-slate-900 dark:text-slate-100">Transakcje sheet sync</div>
-                <div class="mt-0.5 font-mono text-xs text-slate-400 dark:text-slate-500">
+                <div class="font-medium text-text">Transakcje sheet sync</div>
+                <div class="mt-0.5 font-mono text-xs text-muted">
                   Google Sheets → wallets &amp; portfolios
                 </div>
               </div>
@@ -530,7 +537,7 @@ onUnmounted(() => {
             </div>
 
             <!-- Last run info -->
-            <div class="mb-3 text-xs text-slate-500 dark:text-slate-400">
+            <div class="mb-3 text-xs text-muted">
               <span v-if="sheets.log?.startedAt">
                 Last sync: {{ formatDate(sheets.log.startedAt) }}
                 <template v-if="sheets.log.mode">· {{ sheets.log.mode }}</template>
@@ -541,7 +548,7 @@ onUnmounted(() => {
             <!-- Error message -->
             <div
               v-if="sheets.errorMsg"
-              class="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-700/50 dark:bg-red-900/20 dark:text-red-400"
+              class="mb-3 rounded border border-danger-border bg-danger-soft px-3 py-2 text-xs text-danger-text"
             >
               {{ sheets.errorMsg }}
             </div>
@@ -568,13 +575,13 @@ onUnmounted(() => {
           </div>
 
           <div
-            class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
+            class="card p-4"
             data-testid="job-card-cash-audit"
           >
             <div class="mb-3 flex items-start justify-between gap-4">
               <div>
-                <div class="font-medium text-slate-900 dark:text-slate-100">Cash audit</div>
-                <div class="mt-0.5 font-mono text-xs text-slate-400 dark:text-slate-500">
+                <div class="font-medium text-text">Cash audit</div>
+                <div class="mt-0.5 font-mono text-xs text-muted">
                   dated Gotówka balances vs wallets replay
                 </div>
               </div>
@@ -587,20 +594,20 @@ onUnmounted(() => {
               </span>
             </div>
 
-            <p class="mb-3 text-xs text-slate-500 dark:text-slate-400">
+            <p class="mb-3 text-xs text-muted">
               Read-only audit of every dated sheet snapshot, including the stock-only
               Equate+ cash invariant. Manual timing and FX differences are reported,
               not silently normalized.
             </p>
 
-            <div class="mb-3 text-xs text-slate-500 dark:text-slate-400">
+            <div class="mb-3 text-xs text-muted">
               <span v-if="cashAudit.startedAt">Last run: {{ formatDate(cashAudit.startedAt) }}</span>
               <span v-else>Never run</span>
             </div>
 
             <div
               v-if="cashAudit.errorMsg"
-              class="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-700/50 dark:bg-red-900/20 dark:text-red-400"
+              class="mb-3 rounded border border-danger-border bg-danger-soft px-3 py-2 text-xs text-danger-text"
             >
               {{ cashAudit.errorMsg }}
             </div>
@@ -619,17 +626,17 @@ onUnmounted(() => {
 
       <!-- Price audit (§72) -->
       <section>
-        <h2 class="mb-3 text-base font-semibold text-slate-700 dark:text-slate-300">Data quality</h2>
+        <h2 class="mb-3 text-base font-semibold text-text">Data quality</h2>
 
         <div class="space-y-3">
           <div
-            class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
+            class="card p-4"
             data-testid="job-card-price-audit"
           >
             <div class="mb-3 flex items-start justify-between gap-4">
               <div>
-                <div class="font-medium text-slate-900 dark:text-slate-100">Price audit</div>
-                <div class="mt-0.5 font-mono text-xs text-slate-400 dark:text-slate-500">
+                <div class="font-medium text-text">Price audit</div>
+                <div class="mt-0.5 font-mono text-xs text-muted">
                   every BUY/SELL vs its own close
                 </div>
               </div>
@@ -642,27 +649,27 @@ onUnmounted(() => {
               </span>
             </div>
 
-            <p class="mb-3 text-xs text-slate-500 dark:text-slate-400">
+            <p class="mb-3 text-xs text-muted">
               Reconciles each trade against the instrument's own price bar for that
               day, without converting first. Symbols that do not line up are a wrong
               venue (needs a sheets-sync override) or a wrong currency. Read-only —
               it changes nothing.
             </p>
 
-            <div class="mb-3 text-xs text-slate-500 dark:text-slate-400">
+            <div class="mb-3 text-xs text-muted">
               <span v-if="audit.startedAt">Last run: {{ formatDate(audit.startedAt) }}</span>
               <span v-else>Never run</span>
             </div>
 
             <div
               v-if="audit.errorMsg"
-              class="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-700/50 dark:bg-red-900/20 dark:text-red-400"
+              class="mb-3 rounded border border-danger-border bg-danger-soft px-3 py-2 text-xs text-danger-text"
             >
               {{ audit.errorMsg }}
             </div>
 
             <div class="flex items-center gap-3">
-              <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+              <label class="flex items-center gap-2 text-xs text-muted">
                 Tolerance
                 <input
                   v-model.number="auditTolerance"
@@ -689,20 +696,20 @@ onUnmounted(() => {
       </section>
 
       <section v-for="group in GROUPS" :key="group">
-        <h2 class="mb-3 text-base font-semibold text-slate-700 dark:text-slate-300">{{ group }}</h2>
+        <h2 class="mb-3 text-base font-semibold text-text">{{ group }}</h2>
 
         <div class="space-y-3">
           <div
             v-for="meta in datasetsInGroup(group)"
             :key="meta.id"
-            class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
+            class="card p-4"
             :data-testid="`job-card-${meta.id}`"
           >
             <!-- Header row -->
             <div class="mb-3 flex items-start justify-between gap-4">
               <div>
-                <div class="font-medium text-slate-900 dark:text-slate-100">{{ meta.label }}</div>
-                <div class="mt-0.5 font-mono text-xs text-slate-400 dark:text-slate-500">{{ meta.description }}</div>
+                <div class="font-medium text-text">{{ meta.label }}</div>
+                <div class="mt-0.5 font-mono text-xs text-muted">{{ meta.description }}</div>
               </div>
               <span
                 v-if="statusBadge(meta.id)"
@@ -714,7 +721,7 @@ onUnmounted(() => {
             </div>
 
             <!-- Last run info -->
-            <div class="mb-3 text-xs text-slate-500 dark:text-slate-400">
+            <div class="mb-3 text-xs text-muted">
               <span v-if="states[meta.id].log?.importedAt">
                 Last import: {{ formatDate(states[meta.id].log!.importedAt) }}
                 <template v-if="states[meta.id].log!.latestDate">
@@ -727,7 +734,7 @@ onUnmounted(() => {
             <!-- Error message -->
             <div
               v-if="states[meta.id].errorMsg"
-              class="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-700/50 dark:bg-red-900/20 dark:text-red-400"
+              class="mb-3 rounded border border-danger-border bg-danger-soft px-3 py-2 text-xs text-danger-text"
             >
               {{ states[meta.id].errorMsg }}
             </div>
@@ -735,18 +742,18 @@ onUnmounted(() => {
             <!-- Upload progress bar -->
             <div
               v-if="states[meta.id].phase === 'uploading'"
-              class="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700"
+              class="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-surface-2"
             >
               <div
-                class="h-full rounded-full bg-blue-500 transition-all"
+                class="h-full rounded-full bg-accent transition-all"
                 :style="{ width: `${states[meta.id].uploadProgress}%` }"
               />
             </div>
 
             <!-- File + button row -->
             <div class="flex items-center gap-3">
-              <label class="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded border border-slate-300 bg-slate-50 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-700/50 dark:text-slate-300 dark:hover:bg-slate-700">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <label class="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded border border-border bg-surface-2 px-3 py-1.5 text-sm text-text hover:bg-surface">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                 </svg>
                 <span class="truncate">
