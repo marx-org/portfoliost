@@ -84,15 +84,15 @@ const donutSeries = computed(() => donutRows.value.map((r) => r.value))
       <CollapsibleSection title="Holdings" :testid="`${testid}-table`">
         <table class="w-full text-sm">
           <thead>
-            <tr class="border-b border-slate-100 text-left text-xs uppercase text-slate-500 dark:border-slate-800 dark:text-slate-400">
+            <tr class="border-b border-border text-left text-xs uppercase text-muted dark:border-slate-800 dark:text-muted">
               <th class="px-5 py-2.5 font-medium">Holding</th>
               <th class="px-5 py-2.5 text-right font-medium">Value</th>
               <th class="px-5 py-2.5 text-right font-medium">Weight</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-            <tr v-for="r in sorted" :key="r.key" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-              <td class="px-5 py-3 font-medium text-slate-900 dark:text-slate-100">
+            <tr v-for="r in sorted" :key="r.key" class="hover:bg-surface-2 dark:hover:bg-slate-800/50">
+              <td class="px-5 py-3 font-medium text-text">
                 {{ label(r) }}<span v-if="r.unknown" class="ml-1 text-xs text-amber-600">unknown</span>
               </td>
               <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(r.value, currency) }}</td>
@@ -102,11 +102,11 @@ const donutSeries = computed(() => donutRows.value.map((r) => r.value))
             </tr>
           </tbody>
         </table>
-        <p class="px-5 py-2 text-xs text-slate-500 dark:text-slate-400">
+        <p class="px-5 py-2 text-xs text-muted">
           Top {{ TOP_N }} plus Other in the donut; every holding is in the table. Negative balances are shown here, not in the pie.
         </p>
       </CollapsibleSection>
     </template>
-    <p v-else class="text-sm text-slate-500 dark:text-slate-400">No holdings for this scope.</p>
+    <p v-else class="text-sm text-muted">No holdings for this scope.</p>
   </div>
 </template>

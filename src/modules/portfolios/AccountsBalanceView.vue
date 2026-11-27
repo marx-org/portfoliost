@@ -249,20 +249,20 @@ onMounted(async () => {
       <div class="relative">
         <button type="button" class="btn-secondary text-sm" @click="showCurrencyMenu = !showCurrencyMenu">
           Display currency: {{ displayCurrency }} ({{ currencySymbol(displayCurrency) }})
-          <span class="ml-1 text-xs text-slate-400 dark:text-slate-500">▾</span>
+          <span class="ml-1 text-xs text-muted dark:text-muted">▾</span>
         </button>
         <template v-if="showCurrencyMenu">
           <div class="fixed inset-0 z-20" @click="showCurrencyMenu = false"></div>
           <div
-              class="absolute right-0 z-30 mt-1 w-44 rounded-lg border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700/60 dark:bg-slate-900"
+              class="absolute right-0 z-30 mt-1 w-44 rounded-lg border border-border bg-white py-1 shadow-lg dark:border-slate-700/60 dark:bg-slate-900"
               data-testid="display-currency-menu"
             >
             <button
               v-for="c in currencies"
               :key="c"
               type="button"
-              class="block w-full px-4 py-2 text-left text-sm hover:bg-slate-50"
-              :class="displayCurrency === c ? 'bg-blue-50 text-blue-700' : 'text-slate-700'"
+              class="block w-full px-4 py-2 text-left text-sm hover:bg-surface-2"
+              :class="displayCurrency === c ? 'bg-accent-soft text-accent-text' : 'text-text'"
               @click="setDisplayCurrency(c)"
             >
               {{ c }}
@@ -274,13 +274,13 @@ onMounted(async () => {
 
     <InvestmentsTabs />
 
-    <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-400">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading accounts...</p>
+    <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-danger dark:bg-red-500/10 dark:text-red-400">{{ error }}</p>
+    <p v-if="loading" class="text-sm text-muted">Loading accounts...</p>
 
     <div v-else-if="rows.length" class="card max-h-[70vh] overflow-auto">
       <table class="min-w-full text-xs sm:text-sm" data-testid="accounts-balance">
         <thead>
-          <tr class="border-b border-slate-200 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500 sm:text-xs dark:border-slate-700/60 dark:bg-slate-800 dark:text-slate-400">
+          <tr class="border-b border-border bg-surface-2 text-[10px] uppercase tracking-wide text-muted sm:text-xs dark:border-slate-700/60 dark:bg-slate-800 dark:text-muted">
             <th
               v-for="col in columns"
               :key="col.key"
@@ -289,11 +289,11 @@ onMounted(async () => {
               :class="[
                 col.align,
                 col.key === 'totalValue'
-                  ? 'border-x border-blue-200 bg-blue-100/80 font-bold text-slate-900 dark:border-blue-800 dark:bg-blue-950/60 dark:text-slate-100'
+                  ? 'border-x border-blue-200 bg-accent-soft/80 font-bold text-text dark:border-blue-800 dark:bg-blue-950/60 dark:text-slate-100'
                   : 'font-medium',
-                'sticky top-0 z-20 cursor-pointer select-none hover:text-slate-900 dark:hover:text-slate-100',
+                'sticky top-0 z-20 cursor-pointer select-none hover:text-text dark:hover:text-slate-100',
                 col.key === 'name'
-                  ? 'sticky left-0 top-0 z-30 min-w-[9rem] bg-slate-50 shadow-[-1px_0_0_0_#e2e8f0] sm:min-w-0 dark:bg-slate-800 dark:shadow-[-1px_0_0_0_#334155]'
+                  ? 'sticky left-0 top-0 z-30 min-w-[9rem] bg-surface-2 shadow-[-1px_0_0_0_#e2e8f0] sm:min-w-0 dark:bg-slate-800 dark:shadow-[-1px_0_0_0_#334155]'
                   : '',
               ]"
               :aria-sort="sortKey === col.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined"
@@ -309,12 +309,12 @@ onMounted(async () => {
           <tr
             v-for="row in rows"
             :key="row.id"
-            class="group cursor-pointer border-b border-slate-100 even:bg-slate-50/60 hover:bg-blue-50/70 focus-within:bg-blue-50/70 dark:border-slate-800 dark:even:bg-slate-800/60 dark:hover:bg-slate-700/60 dark:focus-within:bg-slate-700/60"
+            class="group cursor-pointer border-b border-border even:bg-surface-2/60 hover:bg-accent-soft/70 focus-within:bg-accent-soft/70 dark:border-slate-800 dark:even:bg-slate-800/60 dark:hover:bg-slate-700/60 dark:focus-within:bg-slate-700/60"
             data-testid="accounts-balance-row"
             @click="openRow($event, row)"
           >
             <td
-              class="sticky left-0 z-10 min-w-[9rem] bg-slate-100 px-3 py-3.5 font-medium text-slate-900 break-words shadow-[-1px_0_0_0_#e2e8f0] group-hover:bg-blue-100 group-focus-within:bg-blue-100 sm:min-w-0 sm:px-5 sm:py-2.5 dark:bg-slate-800 dark:text-slate-100 dark:shadow-[-1px_0_0_0_#334155] dark:group-hover:bg-slate-700 dark:group-focus-within:bg-slate-700"
+              class="sticky left-0 z-10 min-w-[9rem] bg-surface-2 px-3 py-3.5 font-medium text-text break-words shadow-[-1px_0_0_0_#e2e8f0] group-hover:bg-accent-soft group-focus-within:bg-accent-soft sm:min-w-0 sm:px-5 sm:py-2.5 dark:bg-slate-800 dark:text-slate-100 dark:shadow-[-1px_0_0_0_#334155] dark:group-hover:bg-slate-700 dark:group-focus-within:bg-slate-700"
               data-testid="accounts-balance-account"
             >
               <router-link
@@ -328,45 +328,45 @@ onMounted(async () => {
             <!-- §84 — a negative cash balance keeps its sign. It is a margin
                  balance, not a clamped zero (openapi.yaml:1201). -->
             <td class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right tabular-nums" data-testid="accounts-balance-cash">{{ money(row.cashValue) }}</td>
-            <td class="border-x border-blue-100 bg-blue-50/50 px-3 py-3.5 text-right font-bold tabular-nums dark:border-blue-900 dark:bg-blue-950/30 sm:px-5 sm:py-2.5" data-testid="accounts-balance-total">{{ money(row.totalValue) }}</td>
+            <td class="border-x border-blue-100 bg-accent-soft/50 px-3 py-3.5 text-right font-bold tabular-nums dark:border-blue-900 dark:bg-blue-950/30 sm:px-5 sm:py-2.5" data-testid="accounts-balance-total">{{ money(row.totalValue) }}</td>
             <td class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right tabular-nums" data-testid="accounts-balance-deposits">{{ money(row.capitalBasis) }}</td>
             <td
               class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right font-medium tabular-nums"
-              :class="row.gainLoss >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
+              :class="row.gainLoss >= 0 ? 'text-emerald' : 'text-danger'"
               data-testid="accounts-balance-gain"
             >
               {{ gain(row.gainLoss) }}
             </td>
             <td
               class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right tabular-nums"
-              :class="row.returnPercentage === null ? '' : row.returnPercentage >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
+              :class="row.returnPercentage === null ? '' : row.returnPercentage >= 0 ? 'text-emerald' : 'text-danger'"
               data-testid="accounts-balance-return"
             >
               {{ percent(row.returnPercentage) }}
             </td>
           </tr>
         </tbody>
-        <tfoot class="border-t-2 border-slate-300 text-base dark:border-slate-600">
-          <tr class="bg-slate-100 font-semibold dark:bg-slate-800" data-testid="accounts-balance-totals">
+        <tfoot class="border-t-2 border-border text-base dark:border-slate-600">
+          <tr class="bg-surface-2 font-semibold dark:bg-slate-800" data-testid="accounts-balance-totals">
             <td
-              class="sticky left-0 z-30 bg-slate-100 px-3 py-3.5 sm:px-5 sm:py-2.5 shadow-[-1px_0_0_0_#e2e8f0] dark:bg-slate-800 dark:shadow-[-1px_0_0_0_#334155]"
+              class="sticky left-0 z-30 bg-surface-2 px-3 py-3.5 sm:px-5 sm:py-2.5 shadow-[-1px_0_0_0_#e2e8f0] dark:bg-slate-800 dark:shadow-[-1px_0_0_0_#334155]"
             >
-              <span class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Total</span>
+              <span class="text-xs uppercase tracking-wide text-muted">Total</span>
             </td>
-            <td class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right tabular-nums text-slate-900 dark:text-slate-100" data-testid="accounts-balance-totals-investments">{{ money(totals.instrumentsValue) }}</td>
-            <td class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right tabular-nums text-slate-900 dark:text-slate-100" data-testid="accounts-balance-totals-cash">{{ money(totals.cashValue) }}</td>
-            <td class="border-x border-blue-200 bg-blue-100/60 px-3 py-3.5 text-right font-bold tabular-nums text-slate-900 dark:border-blue-800 dark:bg-blue-950/60 dark:text-slate-100 sm:px-5 sm:py-2.5" data-testid="accounts-balance-totals-total">{{ money(totals.totalValue) }}</td>
-            <td class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right tabular-nums text-slate-900 dark:text-slate-100" data-testid="accounts-balance-totals-deposits">{{ money(totals.capitalBasis) }}</td>
+            <td class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right tabular-nums text-text" data-testid="accounts-balance-totals-investments">{{ money(totals.instrumentsValue) }}</td>
+            <td class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right tabular-nums text-text" data-testid="accounts-balance-totals-cash">{{ money(totals.cashValue) }}</td>
+            <td class="border-x border-blue-200 bg-accent-soft/60 px-3 py-3.5 text-right font-bold tabular-nums text-text dark:border-blue-800 dark:bg-blue-950/60 dark:text-slate-100 sm:px-5 sm:py-2.5" data-testid="accounts-balance-totals-total">{{ money(totals.totalValue) }}</td>
+            <td class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right tabular-nums text-text" data-testid="accounts-balance-totals-deposits">{{ money(totals.capitalBasis) }}</td>
             <td
               class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right tabular-nums"
-              :class="totals.gainLoss >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
+              :class="totals.gainLoss >= 0 ? 'text-emerald' : 'text-danger'"
               data-testid="accounts-balance-totals-gain"
             >
               {{ gain(totals.gainLoss) }}
             </td>
             <td
               class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right tabular-nums"
-              :class="totals.returnPercentage === null ? 'text-slate-900 dark:text-slate-100' : totals.returnPercentage >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
+              :class="totals.returnPercentage === null ? 'text-text' : totals.returnPercentage >= 0 ? 'text-emerald' : 'text-danger'"
               data-testid="accounts-balance-totals-return"
             >
               {{ percent(totals.returnPercentage) }}
@@ -376,6 +376,6 @@ onMounted(async () => {
       </table>
     </div>
 
-    <p v-else-if="!error" class="text-sm text-slate-500 dark:text-slate-400">No accounts yet.</p>
+    <p v-else-if="!error" class="text-sm text-muted">No accounts yet.</p>
   </div>
 </template>

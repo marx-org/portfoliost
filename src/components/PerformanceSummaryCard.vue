@@ -78,7 +78,7 @@ function pct(v: number | null | undefined): string {
 /** Sign colouring for a rate/money tile. Absent stays neutral, never "green 0%". */
 function signClass(v: number | null | undefined): string {
   if (v == null || v === 0) return ""
-  return v > 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+  return v > 0 ? "text-emerald" : "text-danger"
 }
 
 /** Plain-language rendering of the contract's withheld reasons. */
@@ -101,7 +101,7 @@ const xirrWithheld = computed(() => perf.value?.xirrWithheldReason ?? null)
       <h2 class="text-base font-semibold">Performance summary</h2>
       <p
         v-if="fxCaveat"
-        class="rounded-lg bg-slate-50 px-3 py-1.5 text-xs text-slate-500 dark:bg-slate-800/50 dark:text-slate-400"
+        class="rounded-lg bg-surface-2 px-3 py-1.5 text-xs text-muted dark:bg-slate-800/50 dark:text-muted"
         :data-testid="tid('fx-caveat')"
       >
         Constant currency: totals converted at today's rate across the whole history.
@@ -110,31 +110,31 @@ const xirrWithheld = computed(() => perf.value?.xirrWithheldReason ?? null)
 
     <!-- Value -->
     <section class="mb-5" :data-testid="tid('group-value')">
-      <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Value</h3>
+      <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted dark:text-muted">Value</h3>
       <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
-          <dt class="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
+        <div class="rounded-lg bg-surface-2 p-4 dark:bg-slate-800/50">
+          <dt class="flex items-center gap-1 text-sm text-muted">
             Total value
             <InfoTip :text="tips.total_value" :testid="tid('tip-total-value')" />
           </dt>
           <dd class="mt-1 text-xl font-semibold tabular-nums" :data-testid="tid('total-value')">{{ money(perf?.totalValue) }}</dd>
         </div>
-        <div v-if="showInvested" class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
-          <dt class="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
+        <div v-if="showInvested" class="rounded-lg bg-surface-2 p-4 dark:bg-slate-800/50">
+          <dt class="flex items-center gap-1 text-sm text-muted">
             Total invested
             <InfoTip :text="tips.total_invested" :testid="tid('tip-total-invested')" />
           </dt>
           <dd class="mt-1 text-xl font-semibold tabular-nums" :data-testid="tid('total-invested')">{{ money(perf?.capitalBasis) }}</dd>
         </div>
-        <div v-if="instrumentsValue != null" class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
-          <dt class="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
+        <div v-if="instrumentsValue != null" class="rounded-lg bg-surface-2 p-4 dark:bg-slate-800/50">
+          <dt class="flex items-center gap-1 text-sm text-muted">
             Instruments
             <InfoTip :text="tips.instruments" :testid="tid('tip-instruments')" />
           </dt>
           <dd class="mt-1 text-xl font-semibold tabular-nums" :data-testid="tid('instruments')">{{ money(instrumentsValue) }}</dd>
         </div>
-        <div v-if="cashValue != null" class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
-          <dt class="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
+        <div v-if="cashValue != null" class="rounded-lg bg-surface-2 p-4 dark:bg-slate-800/50">
+          <dt class="flex items-center gap-1 text-sm text-muted">
             Cash
             <InfoTip :text="tips.cash" :testid="tid('tip-cash')" />
           </dt>
@@ -145,10 +145,10 @@ const xirrWithheld = computed(() => perf.value?.xirrWithheldReason ?? null)
 
     <!-- Return -->
     <section class="mb-5" :data-testid="tid('group-return')">
-      <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Return</h3>
+      <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted dark:text-muted">Return</h3>
       <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
-          <dt class="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
+        <div class="rounded-lg bg-surface-2 p-4 dark:bg-slate-800/50">
+          <dt class="flex items-center gap-1 text-sm text-muted">
             Net gain
             <InfoTip :text="tips.net_gain" :testid="tid('tip-net-gain')" />
           </dt>
@@ -157,22 +157,22 @@ const xirrWithheld = computed(() => perf.value?.xirrWithheldReason ?? null)
             <span class="text-sm tabular-nums" :class="signClass(perf?.totalReturnPercent)" :data-testid="tid('net-gain-percent')">{{ pct(perf?.totalReturnPercent) }}</span>
           </dd>
         </div>
-        <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
-          <dt class="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
+        <div class="rounded-lg bg-surface-2 p-4 dark:bg-slate-800/50">
+          <dt class="flex items-center gap-1 text-sm text-muted">
             Realized P/L
             <InfoTip :text="tips.realized" :testid="tid('tip-realized')" />
           </dt>
           <dd class="mt-1 text-xl font-semibold tabular-nums" :class="signClass(perf?.realizedGains)" :data-testid="tid('realized')">{{ money(perf?.realizedGains) }}</dd>
         </div>
-        <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
-          <dt class="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
+        <div class="rounded-lg bg-surface-2 p-4 dark:bg-slate-800/50">
+          <dt class="flex items-center gap-1 text-sm text-muted">
             Unrealized P/L
             <InfoTip :text="tips.unrealized" :testid="tid('tip-unrealized')" />
           </dt>
           <dd class="mt-1 text-xl font-semibold tabular-nums" :class="signClass(perf?.unrealizedGains)" :data-testid="tid('unrealized')">{{ money(perf?.unrealizedGains) }}</dd>
         </div>
-        <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
-          <dt class="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
+        <div class="rounded-lg bg-surface-2 p-4 dark:bg-slate-800/50">
+          <dt class="flex items-center gap-1 text-sm text-muted">
             Income
             <InfoTip :text="tips.income" :testid="tid('tip-income')" />
           </dt>
@@ -183,30 +183,30 @@ const xirrWithheld = computed(() => perf.value?.xirrWithheldReason ?? null)
 
     <!-- Rates -->
     <section :data-testid="tid('group-rates')">
-      <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Rates</h3>
+      <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted dark:text-muted">Rates</h3>
       <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
-          <dt class="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
+        <div class="rounded-lg bg-surface-2 p-4 dark:bg-slate-800/50">
+          <dt class="flex items-center gap-1 text-sm text-muted">
             TWR p.a.
             <InfoTip :text="tips.twr" :testid="tid('tip-twr')" />
           </dt>
           <dd class="mt-1 text-xl font-semibold tabular-nums" :class="signClass(twrPa)" :data-testid="tid('twr')">{{ pct(twrPa) }}</dd>
-          <p v-if="twrPa == null" class="mt-1 text-xs text-slate-400 dark:text-slate-500" :data-testid="tid('twr-withheld')">{{ withheldText(twrPaWithheld) }}</p>
+          <p v-if="twrPa == null" class="mt-1 text-xs text-muted dark:text-muted" :data-testid="tid('twr-withheld')">{{ withheldText(twrPaWithheld) }}</p>
         </div>
-        <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
-          <dt class="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
+        <div class="rounded-lg bg-surface-2 p-4 dark:bg-slate-800/50">
+          <dt class="flex items-center gap-1 text-sm text-muted">
             MWR
             <InfoTip :text="tips.mwr" :testid="tid('tip-mwr')" />
           </dt>
           <dd class="mt-1 text-xl font-semibold tabular-nums" :class="signClass(mwr)" :data-testid="tid('mwr')">{{ pct(mwr) }}</dd>
         </div>
-        <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
-          <dt class="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
+        <div class="rounded-lg bg-surface-2 p-4 dark:bg-slate-800/50">
+          <dt class="flex items-center gap-1 text-sm text-muted">
             XIRR
             <InfoTip :text="tips.xirr" :testid="tid('tip-xirr')" />
           </dt>
           <dd class="mt-1 text-xl font-semibold tabular-nums" :class="signClass(xirr)" :data-testid="tid('xirr')">{{ pct(xirr) }}</dd>
-          <p v-if="xirr == null" class="mt-1 text-xs text-slate-400 dark:text-slate-500" :data-testid="tid('xirr-withheld')">{{ withheldText(xirrWithheld) }}</p>
+          <p v-if="xirr == null" class="mt-1 text-xs text-muted dark:text-muted" :data-testid="tid('xirr-withheld')">{{ withheldText(xirrWithheld) }}</p>
         </div>
       </dl>
     </section>

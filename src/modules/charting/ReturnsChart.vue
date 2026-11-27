@@ -76,7 +76,7 @@ function percentAxis(v: number): string {
         <button
           type="button"
           class="btn-ghost text-xs"
-          :class="mode === 'twr' ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900' : ''"
+          :class="mode === 'twr' ? 'bg-slate-800 text-white dark:bg-border dark:text-text' : ''"
           data-testid="charting-quarterly-returns-mode-twr"
           @click="mode = 'twr'"
         >
@@ -85,7 +85,7 @@ function percentAxis(v: number): string {
         <button
           type="button"
           class="btn-ghost text-xs"
-          :class="mode === 'net_gain_change' ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900' : ''"
+          :class="mode === 'net_gain_change' ? 'bg-slate-800 text-white dark:bg-border dark:text-text' : ''"
           data-testid="charting-quarterly-returns-mode-net-gain"
           @click="mode = 'net_gain_change'"
         >
@@ -96,13 +96,13 @@ function percentAxis(v: number): string {
         <h2 class="sr-only">Quarterly Returns — {{ metricLabel }}</h2>
         <component :is="'apexchart'" :options="chartOptions" :series="chartSeries" />
       </div>
-      <p class="text-xs text-slate-500" data-testid="`${testid}-partial`">
+      <p class="text-xs text-muted" data-testid="`${testid}-partial`">
         The current quarter is year-to-date. Undefined (zero/unknown denominator) is shown as —, never 0%.
       </p>
       <CollapsibleSection title="Quarterly Returns" :testid="`${testid}-table`">
         <table class="w-full text-sm">
           <thead>
-            <tr class="border-b border-slate-100 text-left text-xs uppercase text-slate-500 dark:border-slate-800 dark:text-slate-400">
+            <tr class="border-b border-border text-left text-xs uppercase text-muted dark:border-slate-800 dark:text-muted">
               <th class="px-5 py-2.5 font-medium">Quarter</th>
               <th class="px-5 py-2.5 text-right font-medium">Ending value</th>
               <th class="px-5 py-2.5 text-right font-medium">Net contributions</th>
@@ -111,9 +111,9 @@ function percentAxis(v: number): string {
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-            <tr v-for="r in rows" :key="r.quarter" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-              <td class="px-5 py-3 font-medium text-slate-900 dark:text-slate-100">
-                {{ r.quarter }}<span v-if="r.partial" class="ml-1 text-xs text-slate-400">YTD</span>
+            <tr v-for="r in rows" :key="r.quarter" class="hover:bg-surface-2 dark:hover:bg-slate-800/50">
+              <td class="px-5 py-3 font-medium text-text">
+                {{ r.quarter }}<span v-if="r.partial" class="ml-1 text-xs text-muted">YTD</span>
               </td>
               <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(r.endingValue ?? 0, currency) }}</td>
               <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(r.cumulativeNetContributions ?? 0, currency) }}</td>
@@ -122,11 +122,11 @@ function percentAxis(v: number): string {
             </tr>
           </tbody>
         </table>
-        <p class="px-5 py-2 text-xs text-slate-500 dark:text-slate-400">
+        <p class="px-5 py-2 text-xs text-muted">
           TWR is flow-neutral; net-gain change is not volatility and uses cumulative external net contributions, not remaining cost basis.
         </p>
       </CollapsibleSection>
     </template>
-    <p v-else class="text-sm text-slate-500 dark:text-slate-400">No quarterly returns for this scope.</p>
+    <p v-else class="text-sm text-muted">No quarterly returns for this scope.</p>
   </div>
 </template>

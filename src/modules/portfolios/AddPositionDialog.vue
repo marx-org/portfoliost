@@ -516,17 +516,17 @@ import TickerBadge from "@/components/TickerBadge.vue"
           <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="close">✕</button>
         </div>
         <div class="space-y-3">
-          <button type="button" class="block w-full rounded-xl border border-slate-200 p-4 text-left hover:border-blue-400 hover:bg-blue-50/50" data-testid="add-position-instrument" @click="chooseStock">
-            <span class="block font-medium text-slate-900 dark:text-slate-100">Stock, ETF or crypto</span>
-            <span class="block text-sm text-slate-500 dark:text-slate-400">Search by ticker or name</span>
+          <button type="button" class="block w-full rounded-xl border border-border p-4 text-left hover:border-blue-400 hover:bg-accent-soft/50" data-testid="add-position-instrument" @click="chooseStock">
+            <span class="block font-medium text-text">Stock, ETF or crypto</span>
+            <span class="block text-sm text-muted">Search by ticker or name</span>
           </button>
-          <button type="button" class="block w-full rounded-xl border border-slate-200 p-4 text-left hover:border-blue-400 hover:bg-blue-50/50" data-testid="add-position-option" @click="chooseOption">
-            <span class="block font-medium text-slate-900 dark:text-slate-100">Option</span>
-            <span class="block text-sm text-slate-500 dark:text-slate-400">Pick the underlying, then describe the contract</span>
+          <button type="button" class="block w-full rounded-xl border border-border p-4 text-left hover:border-blue-400 hover:bg-accent-soft/50" data-testid="add-position-option" @click="chooseOption">
+            <span class="block font-medium text-text">Option</span>
+            <span class="block text-sm text-muted">Pick the underlying, then describe the contract</span>
           </button>
-          <button type="button" class="block w-full rounded-xl border border-slate-200 p-4 text-left hover:border-blue-400 hover:bg-blue-50/50" data-testid="add-position-cfd" @click="chooseCfd">
-            <span class="block font-medium text-slate-900 dark:text-slate-100">CFD</span>
-            <span class="block text-sm text-slate-500 dark:text-slate-400">A leveraged position, entered by hand</span>
+          <button type="button" class="block w-full rounded-xl border border-border p-4 text-left hover:border-blue-400 hover:bg-accent-soft/50" data-testid="add-position-cfd" @click="chooseCfd">
+            <span class="block font-medium text-text">CFD</span>
+            <span class="block text-sm text-muted">A leveraged position, entered by hand</span>
           </button>
         </div>
       </div>
@@ -559,7 +559,7 @@ import TickerBadge from "@/components/TickerBadge.vue"
           @submit="submitStock"
         >
           <template #footer="{ totalCost }">
-            <label class="mb-3 flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
+            <label class="mb-3 flex items-start gap-2 text-sm text-muted">
               <input
                 id="add-pos-cash-leg"
                 v-model="cashLeg"
@@ -569,12 +569,12 @@ import TickerBadge from "@/components/TickerBadge.vue"
               />
               <span>
                 Also create a cash transaction
-                <span class="block text-xs text-slate-500 dark:text-slate-400">
+                <span class="block text-xs text-muted">
                   A deposit for a buy, a withdrawal for a sell — default from Portfolio settings.
                 </span>
               </span>
             </label>
-            <p v-if="error" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ error }}</p>
+            <p v-if="error" class="mb-3 text-sm text-danger">{{ error }}</p>
             <div class="flex justify-end gap-2">
               <button type="button" class="btn-ghost" @click="close">Cancel</button>
               <button type="submit" class="btn-primary" :disabled="busy || !stockForm.symbol || !Number(stockForm.quantity)">
@@ -599,19 +599,19 @@ import TickerBadge from "@/components/TickerBadge.vue"
           <h3 class="text-base font-semibold">Buy Position</h3>
           <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="close">✕</button>
         </div>
-        <div class="mb-4 flex items-center gap-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50">
+        <div class="mb-4 flex items-center gap-3 rounded-xl bg-surface-2 p-3 dark:bg-slate-800/50">
           <!-- The picker's result carries a name but no country or asset
                class, so the badge shows logo + ticker + name. -->
           <TickerBadge size="lg" :symbol="optionPending?.symbol ?? ''" :name="optionPending?.name" />
         </div>
         <form @submit.prevent="submitOption">
-          <label for="opt-trans-type" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Transaction Type</label>
+          <label for="opt-trans-type" class="mb-1 block text-sm text-muted">Transaction Type</label>
           <select id="opt-trans-type" v-model="optionForm.transactionType" class="input mb-4">
             <option>Buy to Open (new long position)</option>
             <option>Sell to Close (closes position)</option>
           </select>
           <div class="mb-4">
-            <p class="mb-1 text-sm text-slate-600 dark:text-slate-300">Option Type</p>
+            <p class="mb-1 text-sm text-muted">Option Type</p>
             <div class="flex gap-2">
               <button type="button" class="btn-secondary flex-1" :class="optionForm.optionType === 'CALL' ? '!bg-blue-600 !text-white' : ''" @click="optionForm.optionType = 'CALL'">CALL</button>
               <button type="button" class="btn-secondary flex-1" :class="optionForm.optionType === 'PUT' ? '!bg-blue-600 !text-white' : ''" @click="optionForm.optionType = 'PUT'">PUT</button>
@@ -619,31 +619,31 @@ import TickerBadge from "@/components/TickerBadge.vue"
           </div>
           <div class="mb-4 grid grid-cols-2 gap-4">
             <div>
-              <label for="opt-strike" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Strike Price ($)</label>
+              <label for="opt-strike" class="mb-1 block text-sm text-muted">Strike Price ($)</label>
               <input id="opt-strike" v-model="optionForm.strike" type="number" min="0" step="any" class="input" data-testid="add-position-strike" />
             </div>
             <div>
-              <label for="opt-expiry" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Expiration Date</label>
+              <label for="opt-expiry" class="mb-1 block text-sm text-muted">Expiration Date</label>
               <input id="opt-expiry" v-model="optionForm.expirationDate" type="date" class="input" data-testid="add-position-expiration" />
             </div>
           </div>
           <div class="mb-4 grid grid-cols-2 gap-4">
             <div>
-              <label for="opt-contracts" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Contracts</label>
+              <label for="opt-contracts" class="mb-1 block text-sm text-muted">Contracts</label>
               <input id="opt-contracts" v-model="optionForm.contracts" type="number" min="1" step="1" class="input" data-testid="add-position-contracts" />
             </div>
             <div>
-              <label for="opt-shares" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Shares per contract</label>
+              <label for="opt-shares" class="mb-1 block text-sm text-muted">Shares per contract</label>
               <input id="opt-shares" v-model="optionForm.sharesPerContract" type="number" min="1" step="any" class="input" data-testid="add-position-shares-per-contract" />
             </div>
           </div>
           <div class="mb-4 grid grid-cols-2 gap-4">
             <div>
-              <label for="opt-premium" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Premium per share</label>
+              <label for="opt-premium" class="mb-1 block text-sm text-muted">Premium per share</label>
               <input id="opt-premium" v-model="optionForm.premium" type="number" min="0" step="any" class="input" data-testid="add-position-premium" />
             </div>
             <div>
-              <label for="opt-fees" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Transaction Fees</label>
+              <label for="opt-fees" class="mb-1 block text-sm text-muted">Transaction Fees</label>
               <FeeFields
                 v-model:fees="optionForm.fees"
                 v-model:fees-type="optionForm.feesType"
@@ -674,14 +674,14 @@ import TickerBadge from "@/components/TickerBadge.vue"
             v-model:rate="optionForm.feeExchangeRate"
             testid="add-position-opt-fee-fx"
           />
-          <div class="mb-4 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/50">
+          <div class="mb-4 flex items-center justify-between rounded-xl bg-surface-2 px-3 py-2 dark:bg-slate-800/50">
             <div>
-              <p class="text-sm text-slate-600 dark:text-slate-300">Total Cost</p>
-              <p class="text-xs text-slate-400 dark:text-slate-500">Option Symbol (OCC): {{ optionSymbol() }}</p>
+              <p class="text-sm text-muted">Total Cost</p>
+              <p class="text-xs text-muted dark:text-muted">Option Symbol (OCC): {{ optionSymbol() }}</p>
             </div>
-            <span class="text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ formatCurrency(optionTotal, optionForm.feeCurrency) }}</span>
+            <span class="text-sm font-semibold tabular-nums text-text">{{ formatCurrency(optionTotal, optionForm.feeCurrency) }}</span>
           </div>
-          <p v-if="error" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ error }}</p>
+          <p v-if="error" class="mb-3 text-sm text-danger">{{ error }}</p>
           <div class="flex justify-end gap-2">
             <button type="button" class="btn-ghost" @click="close">Cancel</button>
             <button type="submit" class="btn-primary" :disabled="busy || !optionPending || !Number(optionForm.premium)">
@@ -703,26 +703,26 @@ import TickerBadge from "@/components/TickerBadge.vue"
           <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="close">✕</button>
         </div>
         <form @submit.prevent="submitCfd">
-          <label for="cfd-symbol" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Symbol</label>
+          <label for="cfd-symbol" class="mb-1 block text-sm text-muted">Symbol</label>
           <input id="cfd-symbol" v-model="cfdForm.symbol" type="text" placeholder="e.g. US100, GOLD, ORCL.US" required class="input mb-4" data-testid="add-position-symbol" />
-          <label for="cfd-direction" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Direction</label>
+          <label for="cfd-direction" class="mb-1 block text-sm text-muted">Direction</label>
           <select id="cfd-direction" v-model="cfdForm.direction" class="input mb-4">
             <option>Long</option>
             <option>Short</option>
           </select>
           <div class="mb-4 grid grid-cols-2 gap-4">
             <div>
-              <label for="cfd-qty" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Quantity (lots)</label>
+              <label for="cfd-qty" class="mb-1 block text-sm text-muted">Quantity (lots)</label>
               <input id="cfd-qty" v-model="cfdForm.quantity" type="number" min="0.000001" step="any" required class="input" data-testid="add-position-quantity" />
             </div>
             <div>
-              <label for="cfd-price" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Open price</label>
+              <label for="cfd-price" class="mb-1 block text-sm text-muted">Open price</label>
               <input id="cfd-price" v-model="cfdForm.openPrice" type="number" min="0" step="any" required class="input" data-testid="add-position-price" />
             </div>
           </div>
-          <label for="cfd-date" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Open date</label>
+          <label for="cfd-date" class="mb-1 block text-sm text-muted">Open date</label>
           <input id="cfd-date" v-model="cfdForm.openDate" type="date" class="input mb-4" data-testid="add-position-date" />
-          <p v-if="error" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ error }}</p>
+          <p v-if="error" class="mb-3 text-sm text-danger">{{ error }}</p>
           <div class="flex justify-end gap-2">
             <button type="button" class="btn-ghost" @click="close">Cancel</button>
             <button type="submit" class="btn-primary" :disabled="busy || !cfdForm.symbol.trim() || !Number(cfdForm.quantity)">

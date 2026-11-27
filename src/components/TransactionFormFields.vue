@@ -53,7 +53,7 @@ import TickerBadge from "@/components/TickerBadge.vue"
 <template>
   <form @submit.prevent="emit('submit')">
     <div :data-testid="`${testid}-fields`">
-      <div v-if="showHeader !== false" class="mb-4 flex items-center gap-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50">
+      <div v-if="showHeader !== false" class="mb-4 flex items-center gap-3 rounded-xl bg-surface-2 p-3 dark:bg-slate-800/50">
         <!-- §61.9 — the shared identity block. It no longer defaults a missing
              country to "US": `tickerDetails` omits the part it does not know.
              §85.2 — the badge is a research link. Inside a dialog it emits
@@ -75,18 +75,18 @@ import TickerBadge from "@/components/TickerBadge.vue"
         <div class="flex-1">
         </div>
         <div class="text-right">
-          <button v-if="showViewChart !== false" type="button" class="text-xs text-blue-600 hover:underline" @click="emit('view-chart')">View chart</button>
-          <p class="text-sm font-medium tabular-nums text-slate-900 dark:text-slate-100">
-            <span v-if="priceLoading" class="inline-block h-4 w-16 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+          <button v-if="showViewChart !== false" type="button" class="text-xs text-accent-text hover:underline" @click="emit('view-chart')">View chart</button>
+          <p class="text-sm font-medium tabular-nums text-text">
+            <span v-if="priceLoading" class="inline-block h-4 w-16 animate-pulse rounded bg-border dark:bg-slate-700" />
             <template v-else>{{ marketPrice != null ? formatCurrency(marketPrice, txCurrency) : "—" }}</template>
-            <span class="block text-xs font-normal text-slate-400">{{ priceAsOfLabel }}</span>
+            <span class="block text-xs font-normal text-muted">{{ priceAsOfLabel }}</span>
           </p>
         </div>
       </div>
 
       <div v-if="showType" class="mb-4 grid grid-cols-2 gap-4">
         <div>
-          <label :for="`${testid}-date`" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Date</label>
+          <label :for="`${testid}-date`" class="mb-1 block text-sm text-muted">Date</label>
           <input
             :id="`${testid}-date`"
             v-model="model.date"
@@ -97,7 +97,7 @@ import TickerBadge from "@/components/TickerBadge.vue"
           />
         </div>
         <div>
-          <label :for="`${testid}-type`" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Type</label>
+          <label :for="`${testid}-type`" class="mb-1 block text-sm text-muted">Type</label>
           <select :id="`${testid}-type`" v-model="model.type" class="input" :data-testid="`${testid}-type`">
             <option value="BUY">Buy</option>
             <option value="SELL">Sell</option>
@@ -105,7 +105,7 @@ import TickerBadge from "@/components/TickerBadge.vue"
         </div>
       </div>
       <template v-else>
-        <label :for="`${testid}-date`" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Purchase Date</label>
+        <label :for="`${testid}-date`" class="mb-1 block text-sm text-muted">Purchase Date</label>
         <input
           :id="`${testid}-date`"
           v-model="model.date"
@@ -118,7 +118,7 @@ import TickerBadge from "@/components/TickerBadge.vue"
 
       <div class="mb-4 grid grid-cols-2 gap-4">
         <div>
-          <label :for="`${testid}-quantity`" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Quantity</label>
+          <label :for="`${testid}-quantity`" class="mb-1 block text-sm text-muted">Quantity</label>
           <input
             :id="`${testid}-quantity`"
             v-model="model.quantity"
@@ -131,7 +131,7 @@ import TickerBadge from "@/components/TickerBadge.vue"
           />
         </div>
         <div>
-          <label :for="`${testid}-price`" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Price per share ({{ txCurrency }})</label>
+          <label :for="`${testid}-price`" class="mb-1 block text-sm text-muted">Price per share ({{ txCurrency }})</label>
           <input
             :id="`${testid}-price`"
             v-model="model.price"
@@ -146,7 +146,7 @@ import TickerBadge from "@/components/TickerBadge.vue"
         </div>
       </div>
 
-      <label :for="`${testid}-fees`" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Transaction Fees</label>
+      <label :for="`${testid}-fees`" class="mb-1 block text-sm text-muted">Transaction Fees</label>
       <FeeFields
         v-model:fees="model.fees"
         v-model:fees-type="model.feesType"
@@ -180,24 +180,24 @@ import TickerBadge from "@/components/TickerBadge.vue"
         @suggestion="tf.onFeeSuggestion"
       />
 
-      <dl class="mb-4 rounded-lg bg-slate-50 px-3 py-2 text-sm dark:bg-slate-800/50">
+      <dl class="mb-4 rounded-lg bg-surface-2 px-3 py-2 text-sm dark:bg-slate-800/50">
         <div class="flex items-center justify-between">
-          <dt class="text-slate-600 dark:text-slate-300">Shares × Price</dt>
-          <dd class="tabular-nums text-slate-900 dark:text-slate-100">
+          <dt class="text-muted">Shares × Price</dt>
+          <dd class="tabular-nums text-text">
             {{ formatCurrency(tf.positionCostUSD.value, tf.instrCcy.value) }}
             <template v-if="tf.txRateValue.value != null"> ≈ {{ formatCurrency(tf.positionCostConverted.value ?? 0, paymentCurrency ?? "") }}</template>
           </dd>
         </div>
         <div v-if="tf.feeValue.value > 0" class="mt-1 flex items-center justify-between">
-          <dt class="text-slate-600 dark:text-slate-300">Fee ({{ model.feeCurrency }})</dt>
-          <dd class="tabular-nums text-slate-900 dark:text-slate-100">
+          <dt class="text-muted">Fee ({{ model.feeCurrency }})</dt>
+          <dd class="tabular-nums text-text">
             {{ formatCurrency(tf.feeValue.value, model.feeCurrency) }}
             <template v-if="tf.feeRateValue.value != null && model.feeCurrency !== txCurrency"> ≈ {{ formatCurrency(tf.feeInUsd.value ?? 0, txCurrency) }}</template>
           </dd>
         </div>
-        <div class="mt-1 flex items-center justify-between border-t border-slate-200 pt-1 font-medium dark:border-slate-700">
-          <dt class="text-slate-700 dark:text-slate-200">Total Cost</dt>
-          <dd class="tabular-nums text-slate-900 dark:text-slate-100">
+        <div class="mt-1 flex items-center justify-between border-t border-border pt-1 font-medium dark:border-slate-700">
+          <dt class="text-text">Total Cost</dt>
+          <dd class="tabular-nums text-text">
             {{ formatCurrency(tf.totalCost.value, tf.instrCcy.value) }}
             <template v-if="tf.totalCostConverted.value != null"> ≈ {{ formatCurrency(tf.totalCostConverted.value ?? 0, paymentCurrency ?? "") }}</template>
           </dd>

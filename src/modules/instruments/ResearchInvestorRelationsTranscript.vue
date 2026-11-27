@@ -48,63 +48,63 @@ const qaBlocks = computed(() =>
     <div class="flex items-center justify-between gap-3">
       <router-link
         :to="{ name: 'research-ir', params: { symbol: researchSymbol(symbol) } }"
-        class="text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
+        class="text-sm font-medium text-accent-text hover:underline dark:text-blue-400"
       >
         &larr; Investor Relations
       </router-link>
       <span
         v-if="transcript?.time"
-        class="rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-xs font-medium text-slate-600 dark:text-slate-300"
+        class="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted"
       >
         {{ formatDateTime(transcript.time) }}
       </span>
     </div>
 
-    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading document...</p>
+    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-danger">{{ error }}</p>
+    <p v-if="loading" class="text-sm text-muted">Loading document...</p>
 
     <template v-if="!loading && !error && transcript">
       <div class="card p-6">
-        <h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{{ title }}</h2>
-        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ symbol }}</p>
+        <h2 class="text-base font-semibold text-text">{{ title }}</h2>
+        <p class="mt-1 text-xs text-muted">{{ symbol }}</p>
       </div>
 
       <!-- MD&A narrative (SEC) -->
       <div v-if="hasBody" class="card p-6">
-        <h3 class="mb-3 text-sm font-semibold text-slate-900 dark:text-slate-100">Management Discussion &amp; Analysis</h3>
-        <div class="space-y-3 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+        <h3 class="mb-3 text-sm font-semibold text-text">Management Discussion &amp; Analysis</h3>
+        <div class="space-y-3 text-sm leading-relaxed text-text dark:text-slate-300">
           <p v-for="(para, i) in bodyParagraphs" :key="i">{{ para }}</p>
         </div>
-        <p v-if="!bodyText" class="text-sm text-slate-500 dark:text-slate-400">No document text available.</p>
+        <p v-if="!bodyText" class="text-sm text-muted">No document text available.</p>
       </div>
 
       <!-- Q&A earnings-call transcript (mock/legacy shape) -->
       <template v-else-if="hasQa">
         <div v-if="participantNames.length" class="card p-6">
-          <h3 class="mb-3 text-sm font-semibold text-slate-900 dark:text-slate-100">Participants</h3>
+          <h3 class="mb-3 text-sm font-semibold text-text">Participants</h3>
           <div class="flex flex-wrap gap-2">
             <span
               v-for="(name, i) in participantNames"
               :key="i"
-              class="rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-xs text-slate-600 dark:text-slate-300"
+              class="rounded-full bg-surface-2 px-2 py-0.5 text-xs text-muted"
             >
               {{ name }}
             </span>
           </div>
         </div>
         <div v-for="(block, i) in qaBlocks" :key="i" class="card p-6">
-          <p class="mb-2 text-sm font-semibold text-slate-900 dark:text-slate-100">{{ block.name }}</p>
+          <p class="mb-2 text-sm font-semibold text-text">{{ block.name }}</p>
           <div
             v-for="(line, j) in block.speech"
             :key="j"
-            class="mb-2 text-sm leading-relaxed text-slate-700 dark:text-slate-300"
+            class="mb-2 text-sm leading-relaxed text-text dark:text-slate-300"
           >
             {{ line }}
           </div>
         </div>
       </template>
 
-      <p v-else class="text-sm text-slate-500 dark:text-slate-400">No transcript or document text is available for this event.</p>
+      <p v-else class="text-sm text-muted">No transcript or document text is available for this event.</p>
     </template>
   </div>
 </template>

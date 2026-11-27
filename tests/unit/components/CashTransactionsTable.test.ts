@@ -383,7 +383,7 @@ describe("CashTransactionsTable — shared cash table (date column + sorting)", 
     const row = w.find('[data-testid="cash-tx-pt1"]')
     expect(row.text()).toContain("-$50.00")
     expect(row.text()).toContain("Withdrawal")
-    expect(row.find(".text-red-600").exists()).toBe(true)
+    expect(row.find(".text-danger").exists()).toBe(true)
   })
 
   it("parses the global feed's decimal-string amount", async () => {

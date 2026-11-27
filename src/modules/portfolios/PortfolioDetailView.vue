@@ -153,8 +153,8 @@ async function submitDelete() {
   <div>
     <router-link to="/en/investments" class="btn-ghost mb-4">&larr; All portfolios</router-link>
 
-    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading portfolio...</p>
+    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-danger">{{ error }}</p>
+    <p v-if="loading" class="text-sm text-muted">Loading portfolio...</p>
 
     <template v-if="!loading && !error">
       <div class="page-header">
@@ -171,13 +171,13 @@ async function submitDelete() {
             </button>
             <template v-if="showCurrencyMenu">
               <div class="fixed inset-0 z-20" @click="showCurrencyMenu = false"></div>
-              <div class="absolute right-0 z-30 mt-1 w-40 rounded-lg border border-slate-200 dark:border-slate-700/60 bg-white dark:bg-slate-900 py-1 shadow-lg">
+              <div class="absolute right-0 z-30 mt-1 w-40 rounded-lg border border-border bg-white dark:bg-slate-900 py-1 shadow-lg">
                 <button
                   v-for="c in currencies"
                   :key="c"
                   type="button"
-                  class="block w-full px-4 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800/50"
-                  :class="displayCurrency === c ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400' : 'text-slate-700 dark:text-slate-200'"
+                  class="block w-full px-4 py-2 text-left text-sm hover:bg-surface-2 dark:hover:bg-slate-800/50"
+                  :class="displayCurrency === c ? 'bg-accent-soft text-accent-text' : 'text-text'"
                   @click="setDisplayCurrency(c)"
                 >
                   {{ c }}
@@ -229,8 +229,8 @@ async function submitDelete() {
     >
       <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Delete portfolio">
         <h3 class="mb-4 text-base font-semibold">Delete portfolio</h3>
-        <p class="text-sm text-slate-600 dark:text-slate-300">Delete "{{ portfolioName }}" and its positions? This cannot be undone.</p>
-        <p v-if="deleteError" class="mb-3 mt-2 text-sm text-red-600 dark:text-red-400">{{ deleteError }}</p>
+        <p class="text-sm text-muted">Delete "{{ portfolioName }}" and its positions? This cannot be undone.</p>
+        <p v-if="deleteError" class="mb-3 mt-2 text-sm text-danger">{{ deleteError }}</p>
         <div class="mt-4 flex justify-end gap-2">
           <button type="button" class="btn-ghost" @click="showDeleteConfirm = false">Cancel</button>
           <button type="button" class="btn-danger" :disabled="deleteBusy" @click="submitDelete">

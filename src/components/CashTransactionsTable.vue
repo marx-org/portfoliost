@@ -453,17 +453,17 @@ function onPickerSaved() {
 
 <template>
   <div class="card overflow-hidden">
-    <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-700/60 px-5 py-3">
+    <div class="flex items-center justify-between border-b border-border px-5 py-3">
       <div class="flex items-center gap-3">
         <h2 class="text-base font-semibold">Cash transactions</h2>
-        <span v-if="!loading" class="text-sm text-slate-500 dark:text-slate-400">{{ total.toLocaleString() }} total</span>
+        <span v-if="!loading" class="text-sm text-muted">{{ total.toLocaleString() }} total</span>
       </div>
     </div>
 
-    <div class="border-b border-slate-100 dark:border-slate-800 px-5 py-2">
+    <div class="border-b border-border px-5 py-2">
       <div class="flex flex-wrap items-center gap-3">
         <LabelFilterBar v-model="labelFilter" @manage="manageLabelsOpen = true" />
-        <label class="ml-auto flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+        <label class="ml-auto flex items-center gap-2 text-xs text-muted">
           <span class="sr-only">Filter by company name or ticker</span>
           <input
             v-model="searchFilter"
@@ -480,9 +480,9 @@ function onPickerSaved() {
     <!-- §93 — the per-portfolio tab has these buttons; the consolidated feed did
          not, so recording a cash event meant first opening the portfolio. The
          portfolio is named here because the feed spans every one of them. -->
-    <div v-if="mode === 'global'" class="border-b border-slate-100 dark:border-slate-800 px-5 py-2">
+    <div v-if="mode === 'global'" class="border-b border-border px-5 py-2">
       <div class="flex flex-wrap items-center gap-2">
-        <label class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+        <label class="flex items-center gap-2 text-xs text-muted">
           <span class="sr-only">Portfolio to record the cash event into</span>
           <select
             v-model="addPortfolioId"
@@ -501,20 +501,20 @@ function onPickerSaved() {
         <button type="button" class="btn-secondary text-sm" data-testid="cash-add-interest" @click="openAdd('interest')">Interest</button>
         <button type="button" class="btn-secondary text-sm" data-testid="cash-add-fee" @click="openAdd('fee')">Charge</button>
         <button type="button" class="btn-secondary text-sm" data-testid="cash-add-conversion" @click="openAdd('conversion')">Conversion</button>
-        <span v-if="addBusy" class="text-xs text-slate-500 dark:text-slate-400">Loading portfolio cash…</span>
+        <span v-if="addBusy" class="text-xs text-muted">Loading portfolio cash…</span>
       </div>
     </div>
 
-    <p v-if="notice" class="border-b border-slate-100 dark:border-slate-800 px-5 py-3 text-sm text-green-700 dark:text-green-400">{{ notice }}</p>
-    <p v-if="addError" class="border-b border-slate-100 dark:border-slate-800 px-5 py-3 text-sm text-red-700 dark:text-red-400">{{ addError }}</p>
-    <p v-if="error"  class="border-b border-slate-100 dark:border-slate-800 px-5 py-3 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
-    <p v-if="loading" class="px-5 py-6 text-sm text-slate-500 dark:text-slate-400">Loading cash transactions…</p>
+    <p v-if="notice" class="border-b border-border px-5 py-3 text-sm text-emerald">{{ notice }}</p>
+    <p v-if="addError" class="border-b border-border px-5 py-3 text-sm text-danger">{{ addError }}</p>
+    <p v-if="error"  class="border-b border-border px-5 py-3 text-sm text-danger">{{ error }}</p>
+    <p v-if="loading" class="px-5 py-6 text-sm text-muted">Loading cash transactions…</p>
 
     <template v-if="!loading && !error">
       <div v-if="transactions.length" class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead>
-            <tr class="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:text-slate-400">
+            <tr class="border-b border-border text-left text-xs uppercase tracking-wide text-muted dark:border-slate-800 dark:text-muted">
               <template v-for="col in sortableColumns" :key="col.key">
                 <th
                   :data-testid="`table-th-${col.key}`"
@@ -523,7 +523,7 @@ function onPickerSaved() {
                 >
                   <button
                     type="button"
-                    class="inline-flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100"
+                    class="inline-flex items-center gap-1 hover:text-text dark:hover:text-slate-100"
                     @click="toggleSort(col.key)"
                   >
                     {{ col.label }}
@@ -545,43 +545,43 @@ function onPickerSaved() {
             <tr
               v-for="tx in transactions"
               :key="tx.id"
-              class="group hover:bg-slate-50 dark:hover:bg-slate-800/50"
+              class="group hover:bg-surface-2 dark:hover:bg-slate-800/50"
               :data-testid="`cash-tx-${tx.id}`"
             >
               <!-- Date -->
-              <td class="px-5 py-3 whitespace-nowrap text-slate-600 dark:text-slate-300">{{ dateLabel(tx) }}</td>
+              <td class="px-5 py-3 whitespace-nowrap text-muted">{{ dateLabel(tx) }}</td>
 
               <!-- Portfolio (global only) -->
-              <td v-if="mode === 'global'" class="px-5 py-3 text-slate-900 dark:text-slate-100">{{ tx.portfolioName || "—" }}</td>
+              <td v-if="mode === 'global'" class="px-5 py-3 text-text">{{ tx.portfolioName || "—" }}</td>
 
               <!-- Type -->
-              <td class="px-5 py-3 text-slate-600 dark:text-slate-300">{{ typeLabel(tx) }}</td>
+              <td class="px-5 py-3 text-muted">{{ typeLabel(tx) }}</td>
 
               <!-- Amount -->
               <td
                 class="px-5 py-3 text-right font-medium tabular-nums"
-                :class="amountOf(tx) < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-700 dark:text-green-400'"
+                :class="amountOf(tx) < 0 ? 'text-danger' : 'text-emerald'"
               >
                 {{ formatCurrency(amountOf(tx), tx.currency) }}
-                <span v-if="secondLegOf(tx)" class="block text-xs tabular-nums text-slate-500 dark:text-slate-400">
+                <span v-if="secondLegOf(tx)" class="block text-xs tabular-nums text-muted">
                   → {{ formatCurrency(Number(tx.toAmount), secondLegOf(tx)!) }}
                 </span>
               </td>
 
               <!-- Balance (portfolio only) -->
-              <td v-if="mode === 'portfolio'" class="px-5 py-3 text-right tabular-nums text-slate-500 dark:text-slate-400">
+              <td v-if="mode === 'portfolio'" class="px-5 py-3 text-right tabular-nums text-muted">
                 {{ tx.balanceAfter != null ? formatCurrency(tx.balanceAfter, tx.currency) : "—" }}
               </td>
 
               <!-- Description + label chips -->
-              <td class="px-5 py-3 text-slate-600 dark:text-slate-300">
+              <td class="px-5 py-3 text-muted">
                 <div>{{ tx.description || "—" }}</div>
                 <LabelChips v-if="tx.labels?.length" :labels="tx.labels" :max="3" class="mt-1" />
               </td>
 
               <!-- Actions — sticky right, opaque so nothing shows through -->
               <td
-                class="sticky right-0 z-10 bg-white px-5 py-3 shadow-[-1px_0_0_0_#e2e8f0] group-hover:bg-slate-50 dark:bg-slate-900 dark:shadow-[-1px_0_0_0_#334155] dark:group-hover:bg-slate-800"
+                class="sticky right-0 z-10 bg-white px-5 py-3 shadow-[-1px_0_0_0_#e2e8f0] group-hover:bg-surface-2 dark:bg-slate-900 dark:shadow-[-1px_0_0_0_#334155] dark:group-hover:bg-slate-800"
               >
                 <div class="flex justify-end gap-1">
                   <button
@@ -602,7 +602,7 @@ function onPickerSaved() {
                   </button>
                   <button
                     type="button"
-                    class="btn-ghost px-2 py-1 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10"
+                    class="btn-ghost px-2 py-1 text-xs text-danger hover:bg-red-50 dark:hover:bg-red-500/10"
                     aria-label="Delete transaction"
                     @click="openDelete(tx)"
                   >
@@ -614,17 +614,17 @@ function onPickerSaved() {
           </tbody>
         </table>
       </div>
-      <p v-else class="px-5 py-6 text-sm text-slate-500 dark:text-slate-400">
+      <p v-else class="px-5 py-6 text-sm text-muted">
         {{ mode === "global" ? "No cash transactions found." : "No cash transactions yet." }}
       </p>
 
       <!-- Shared full paginator (both modes) -->
-      <div v-if="transactions.length" class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-5 py-3 dark:border-slate-700/60">
-        <p class="text-sm text-slate-500 dark:text-slate-400">
+      <div v-if="transactions.length" class="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3 dark:border-slate-700/60">
+        <p class="text-sm text-muted">
           {{ (page - 1) * pageSize + 1 }}–{{ Math.min(page * pageSize, total) }} of {{ total }}
         </p>
         <div class="flex items-center gap-4">
-          <label class="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+          <label class="flex items-center gap-2 text-sm text-muted">
             Rows per page
             <select class="input py-1" :value="pageSize" @change="onPageSizeChange">
               <option v-for="s in pageSizes" :key="s" :value="s">{{ s }} per page</option>

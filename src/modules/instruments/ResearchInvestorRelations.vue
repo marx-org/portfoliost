@@ -51,8 +51,8 @@ const types = computed(() => {
 
 <template>
   <div class="space-y-4">
-    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading investor relations...</p>
+    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-danger">{{ error }}</p>
+    <p v-if="loading" class="text-sm text-muted">Loading investor relations...</p>
 
     <template v-if="!loading && !error">
       <div class="flex flex-wrap gap-2">
@@ -79,14 +79,14 @@ const types = computed(() => {
       <ul v-if="filtered.length" class="space-y-2">
         <li v-for="event in filtered" :key="event.id" class="card flex items-center gap-4 p-4">
           <div class="min-w-0 flex-1">
-            <p class="text-sm font-medium text-slate-900 dark:text-slate-100">{{ event.title }}</p>
-            <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+            <p class="text-sm font-medium text-text">{{ event.title }}</p>
+            <p class="mt-0.5 text-xs text-muted">
               {{ formatDateTime(event.date) }}
               <template v-if="event.year"> &middot; {{ event.year }}Q{{ event.quarter }}</template>
               <template v-if="event.formType"> &middot; {{ event.formType }}</template>
             </p>
           </div>
-          <span class="shrink-0 rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-xs font-medium text-slate-600 dark:text-slate-300">{{ event.type }}</span>
+          <span class="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted">{{ event.type }}</span>
           <a
             v-if="event.reportUrl"
             :href="event.reportUrl"
@@ -105,7 +105,7 @@ const types = computed(() => {
         </li>
       </ul>
 
-      <p v-else class="text-sm text-slate-500 dark:text-slate-400">No events found.</p>
+      <p v-else class="text-sm text-muted">No events found.</p>
     </template>
   </div>
 </template>

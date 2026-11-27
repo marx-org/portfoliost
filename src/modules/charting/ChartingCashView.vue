@@ -21,13 +21,13 @@ const cumulative = computed(() => data.value?.cumulativeContributions ?? [])
 
 <template>
   <div class="space-y-3" data-testid="charting-cash">
-    <p v-if="loading" class="text-sm text-slate-500">Loading…</p>
-    <p v-else-if="error" class="text-sm text-red-600">Failed to load cash data.</p>
+    <p v-if="loading" class="text-sm text-muted">Loading…</p>
+    <p v-else-if="error" class="text-sm text-danger">Failed to load cash data.</p>
     <template v-else>
       <CashHistoryChart :series="series" :currency="currency" />
       <AnnualContributionsChart :points="contributions" :currency="currency" />
       <CumulativeContributionsChart :series="cumulative" :currency="currency" />
-      <div v-if="data" class="text-xs text-slate-500">Generation {{ data.coverage.generation }} · {{ data.coverage.status }}</div>
+      <div v-if="data" class="text-xs text-muted">Generation {{ data.coverage.generation }} · {{ data.coverage.status }}</div>
     </template>
   </div>
 </template>

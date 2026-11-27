@@ -74,11 +74,11 @@ const totals = computed(() =>
 </script>
 
 <template>
-  <div class="mb-4 flex rounded-lg bg-slate-100 p-0.5 dark:bg-slate-800/60">
+  <div class="mb-4 flex rounded-lg bg-surface-2 p-0.5 dark:bg-slate-800/60">
     <button
       type="button"
       class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors"
-      :class="!perShare ? 'bg-white shadow-sm dark:bg-slate-700' : 'text-slate-500 dark:text-slate-400'"
+      :class="!perShare ? 'bg-white shadow-sm dark:bg-slate-700' : 'text-muted'"
       :data-testid="`${tid}-mode-total`"
       @click="emit('update:perShare', false)"
     >
@@ -87,7 +87,7 @@ const totals = computed(() =>
     <button
       type="button"
       class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors"
-      :class="perShare ? 'bg-white shadow-sm dark:bg-slate-700' : 'text-slate-500 dark:text-slate-400'"
+      :class="perShare ? 'bg-white shadow-sm dark:bg-slate-700' : 'text-muted'"
       :data-testid="`${tid}-mode-pershare`"
       @click="emit('update:perShare', true)"
     >
@@ -100,7 +100,7 @@ const totals = computed(() =>
   <template v-if="!perShare">
     <label class="mb-1.5 block text-sm font-medium" :for="`${tid}-gross`">Gross dividend amount</label>
     <div class="relative mb-4">
-      <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 dark:text-slate-400">{{ ccySymbol }}</span>
+      <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted">{{ ccySymbol }}</span>
       <input
         :id="`${tid}-gross`"
         :value="grossTotal"
@@ -119,7 +119,7 @@ const totals = computed(() =>
     <div>
       <label class="mb-1.5 block text-sm font-medium" :for="`${tid}-gross-pershare`">Dividend per share</label>
       <div class="relative">
-        <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 dark:text-slate-400">{{ ccySymbol }}</span>
+        <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted">{{ ccySymbol }}</span>
         <input
           :id="`${tid}-gross-pershare`"
           :value="perShareGross"
@@ -153,12 +153,12 @@ const totals = computed(() =>
       <label class="mb-1.5 flex items-center gap-1.5 text-sm font-medium" :for="`${tid}-tax`">
         Withholding Tax
         <span
-          class="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-slate-200 text-[10px] font-semibold text-slate-500 dark:bg-slate-700 dark:text-slate-300"
+          class="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-border text-[10px] font-semibold text-muted dark:bg-slate-700 dark:text-slate-300"
           title="Tax withheld at source; subtracted from the gross dividend amount"
         >i</span>
       </label>
       <div class="relative">
-        <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 dark:text-slate-400">{{ ccySymbol }}</span>
+        <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted">{{ ccySymbol }}</span>
         <input
           :id="`${tid}-tax`"
           :value="taxes"
@@ -178,7 +178,7 @@ const totals = computed(() =>
     </div>
   </div>
 
-  <p v-if="totals.taxExceedsGross" class="mb-4 mt-1.5 text-xs text-red-600 dark:text-red-400" :data-testid="`${tid}-tax-error`">
+  <p v-if="totals.taxExceedsGross" class="mb-4 mt-1.5 text-xs text-danger" :data-testid="`${tid}-tax-error`">
     Withholding tax cannot exceed the gross dividend amount
   </p>
 
@@ -195,22 +195,22 @@ const totals = computed(() =>
 
   <slot name="before-summary" />
 
-  <div class="rounded-xl bg-slate-50 p-3 text-sm dark:bg-slate-800/50" :data-testid="`${tid}-summary`">
+  <div class="rounded-xl bg-surface-2 p-3 text-sm dark:bg-slate-800/50" :data-testid="`${tid}-summary`">
     <div class="flex justify-between py-0.5">
-      <span class="text-slate-500 dark:text-slate-400">Gross Dividend</span>
+      <span class="text-muted">Gross Dividend</span>
       <span class="tabular-nums">{{ totals.gross.toFixed(2) }} {{ txCcy }}</span>
     </div>
     <div class="flex justify-between py-0.5">
-      <span class="text-slate-500 dark:text-slate-400">Withholding Tax</span>
-      <span class="tabular-nums text-red-600 dark:text-red-400" :data-testid="`${tid}-tax-total`">
+      <span class="text-muted">Withholding Tax</span>
+      <span class="tabular-nums text-danger" :data-testid="`${tid}-tax-total`">
         -{{ totals.tax.toFixed(2) }} {{ txCcy }}
       </span>
     </div>
-    <div class="mt-1 flex justify-between border-t border-slate-200 pt-1.5 font-semibold dark:border-slate-700/60">
+    <div class="mt-1 flex justify-between border-t border-border pt-1.5 font-semibold dark:border-slate-700/60">
       <span>Net Amount</span>
-      <span class="tabular-nums text-green-600 dark:text-green-400" :data-testid="`${tid}-net`">{{ totals.net.toFixed(2) }} {{ txCcy }}</span>
+      <span class="tabular-nums text-emerald" :data-testid="`${tid}-net`">{{ totals.net.toFixed(2) }} {{ txCcy }}</span>
     </div>
-    <div v-if="convertedCcy" class="flex justify-between py-0.5 text-xs text-slate-500 dark:text-slate-400">
+    <div v-if="convertedCcy" class="flex justify-between py-0.5 text-xs text-muted">
       <span>Net ({{ convertedCcy }})</span>
       <span class="tabular-nums" :data-testid="`${tid}-converted`">
         {{ convertedNet != null ? `${convertedNet.toFixed(2)} ${convertedCcy}` : "—" }}

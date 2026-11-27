@@ -95,16 +95,16 @@ const chartSeries = computed(() => {
 
 <template>
   <div class="space-y-3" data-testid="monthly-income-chart">
-    <p v-if="loading" class="text-sm text-slate-500">Loading…</p>
-    <p v-else-if="error" class="text-sm text-red-600">Failed to load income data.</p>
+    <p v-if="loading" class="text-sm text-muted">Loading…</p>
+    <p v-else-if="error" class="text-sm text-danger">Failed to load income data.</p>
     <template v-else>
       <apexchart v-if="points.length" type="line" :options="chartOptions" :series="chartSeries" :height="340" />
-      <p v-else class="text-sm text-slate-500">No income data for this scope.</p>
+      <p v-else class="text-sm text-muted">No income data for this scope.</p>
       <CollapsibleSection v-if="points.length" title="Monthly income" testid="monthly-income-chart-table">
         <table class="w-full text-sm">
-          <thead><tr class="text-left text-slate-400"><th class="py-1">Month</th><th>Dividends</th><th>Interest</th><th>Options</th><th>Total</th><th>Partial</th></tr></thead>
+          <thead><tr class="text-left text-muted"><th class="py-1">Month</th><th>Dividends</th><th>Interest</th><th>Options</th><th>Total</th><th>Partial</th></tr></thead>
           <tbody>
-            <tr v-for="p in points" :key="p.period" class="border-t border-slate-100 dark:border-slate-800">
+            <tr v-for="p in points" :key="p.period" class="border-t border-border">
               <td class="py-1">{{ p.period }}</td><td>{{ p.dividends }}</td><td>{{ p.interest }}</td><td>{{ p.options }}</td><td>{{ p.total }}</td><td>{{ p.partial ? "yes" : "" }}</td>
             </tr>
           </tbody>

@@ -78,25 +78,25 @@ const chartSeries = computed(() => [
       <CollapsibleSection title="Cost Basis vs Market Value" :testid="`${testid}-table`">
         <table class="w-full text-sm">
           <thead>
-            <tr class="border-b border-slate-100 text-left text-xs uppercase text-slate-500 dark:border-slate-800 dark:text-slate-400">
+            <tr class="border-b border-border text-left text-xs uppercase text-muted dark:border-slate-800 dark:text-muted">
               <th class="px-5 py-2.5 font-medium">Label</th>
               <th class="px-5 py-2.5 text-right font-medium">Cost basis</th>
               <th class="px-5 py-2.5 text-right font-medium">Market value</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-            <tr v-for="r in groups" :key="r.key" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-              <td class="px-5 py-3 font-medium text-slate-900 dark:text-slate-100">{{ label(r) }}</td>
+            <tr v-for="r in groups" :key="r.key" class="hover:bg-surface-2 dark:hover:bg-slate-800/50">
+              <td class="px-5 py-3 font-medium text-text">{{ label(r) }}</td>
               <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(r.costBasis, currency) }}</td>
               <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(r.value, currency) }}</td>
             </tr>
           </tbody>
         </table>
-        <p class="px-5 py-2 text-xs text-slate-500 dark:text-slate-400">
+        <p class="px-5 py-2 text-xs text-muted">
           Labels may overlap, so each row is an independent group and the rows are not a portfolio total.
         </p>
       </CollapsibleSection>
     </template>
-    <p v-else class="text-sm text-slate-500 dark:text-slate-400">No cost-basis data for this scope.</p>
+    <p v-else class="text-sm text-muted">No cost-basis data for this scope.</p>
   </div>
 </template>

@@ -82,6 +82,6 @@ const benchmarkSeries = computed(() =>
       :held-gap-symbols="heldGapSymbols"
       :benchmarks="benchmarkSeries"
     />
-    <p v-else class="text-sm text-slate-500 dark:text-slate-400">No performance data for this scope.</p>
+    <p v-else class="text-sm text-muted">No performance data for this scope.</p>
   </div>
 </template>

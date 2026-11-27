@@ -57,10 +57,10 @@ watch([() => props.rateSource, suggestion], ([mode, sug]) => {
 </script>
 
 <template>
-  <div v-if="needsConversion()" class="mb-4 rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50" :data-testid="`${tid}-section`">
+  <div v-if="needsConversion()" class="mb-4 rounded-xl bg-surface-2 p-3 dark:bg-slate-800/50" :data-testid="`${tid}-section`">
     <div class="flex flex-wrap items-center justify-between gap-2">
-      <span class="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
-        {{ leg }} exchange rate <span class="normal-case text-slate-400">({{ from }} → {{ to }})</span>
+      <span class="text-xs font-medium uppercase tracking-wide text-muted dark:text-muted">
+        {{ leg }} exchange rate <span class="normal-case text-muted">({{ from }} → {{ to }})</span>
       </span>
       <div class="flex gap-1">
         <button
@@ -85,12 +85,12 @@ watch([() => props.rateSource, suggestion], ([mode, sug]) => {
     </div>
     <p
       v-if="rateSource === 'automatic'"
-      class="mt-1.5 text-xs tabular-nums text-slate-500 dark:text-slate-400"
+      class="mt-1.5 text-xs tabular-nums text-muted"
       :data-testid="`${tid}-auto-value`"
     >
       <template v-if="suggestion">
         1 {{ from }} = {{ suggestion.rate.toFixed(4) }} {{ to }}
-        <span class="text-slate-400">· {{ date ? `market rate on ${date}` : `daily rate · ${suggestion.asOf}` }}</span>
+        <span class="text-muted">· {{ date ? `market rate on ${date}` : `daily rate · ${suggestion.asOf}` }}</span>
       </template>
       <template v-else>daily market rate</template>
     </p>
@@ -108,7 +108,7 @@ watch([() => props.rateSource, suggestion], ([mode, sug]) => {
             :data-testid="`${tid}-rate`"
             @input="emit('update:rate', ($event.target as HTMLInputElement).value)"
           />
-          <span class="whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">per 1 {{ from }}</span>
+          <span class="whitespace-nowrap text-xs text-muted">per 1 {{ from }}</span>
         </div>
       </slot>
     </div>

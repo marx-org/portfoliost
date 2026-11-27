@@ -180,7 +180,7 @@ import TickerBadge from "@/components/TickerBadge.vue"
         <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="emit('close')">✕</button>
       </div>
 
-      <div class="mb-4 flex items-center gap-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50">
+      <div class="mb-4 flex items-center gap-3 rounded-xl bg-surface-2 p-3 dark:bg-slate-800/50">
         <!-- §85.2 — emit-then-push, same as the "View chart" button below.
              `goResearch` closes the modal first, so the research page does not
              open underneath a live overlay. `from` is the page behind the
@@ -195,15 +195,15 @@ import TickerBadge from "@/components/TickerBadge.vue"
           @click="goResearch"
         />
         <div class="min-w-0 flex-1">
-          <p v-if="isDividend" class="mt-1 text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500" data-testid="edit-tx-shares-held">
+          <p v-if="isDividend" class="mt-1 text-[11px] uppercase tracking-wide text-muted dark:text-muted" data-testid="edit-tx-shares-held">
             Shares:
-            <span class="font-semibold text-slate-900 dark:text-slate-100">{{ quantityStr }}</span>
+            <span class="font-semibold text-text">{{ quantityStr }}</span>
           </p>
         </div>
         <div v-if="!isDividend" class="shrink-0 text-right">
-          <button type="button" class="text-xs text-blue-600 hover:underline" @click="goResearch">View chart</button>
-          <p class="text-sm font-medium tabular-nums text-slate-900 dark:text-slate-100">{{ formatCurrency(transaction.price, transaction.currency) }}</p>
-          <p class="text-[11px] text-slate-400 dark:text-slate-500">Historical Price ({{ formatDate(transaction.executedAt) }})</p>
+          <button type="button" class="text-xs text-accent-text hover:underline" @click="goResearch">View chart</button>
+          <p class="text-sm font-medium tabular-nums text-text">{{ formatCurrency(transaction.price, transaction.currency) }}</p>
+          <p class="text-[11px] text-muted dark:text-muted">Historical Price ({{ formatDate(transaction.executedAt) }})</p>
         </div>
       </div>
 
@@ -238,21 +238,21 @@ import TickerBadge from "@/components/TickerBadge.vue"
         </template>
 
         <template v-else>
-          <label for="etx-date" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Purchase Date</label>
+          <label for="etx-date" class="mb-1 block text-sm text-muted">Purchase Date</label>
           <input id="etx-date" v-model="executedAt" type="date" required class="input mb-4" />
 
           <div class="mb-4 grid grid-cols-2 gap-4">
             <div>
-              <label for="etx-quantity" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Quantity</label>
+              <label for="etx-quantity" class="mb-1 block text-sm text-muted">Quantity</label>
               <input id="etx-quantity" v-model.number="quantity" type="number" min="0" step="any" required class="input" />
             </div>
             <div>
-              <label for="etx-price" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Price per share ($)</label>
+              <label for="etx-price" class="mb-1 block text-sm text-muted">Price per share ($)</label>
               <input id="etx-price" v-model.number="price" type="number" min="0" step="any" required class="input" />
             </div>
           </div>
 
-          <label for="etx-fees" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Transaction Fees</label>
+          <label for="etx-fees" class="mb-1 block text-sm text-muted">Transaction Fees</label>
           <FeeFields
             v-model:fees="fees"
             v-model:fees-type="feesType"
@@ -282,13 +282,13 @@ import TickerBadge from "@/components/TickerBadge.vue"
             testid="edit-tx-fee-fx"
           />
 
-          <div class="mb-4 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/50">
-            <span class="text-sm text-slate-600 dark:text-slate-300">Total Cost</span>
-            <span class="text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ formatCurrency(totalCost, transaction.currency) }}</span>
+          <div class="mb-4 flex items-center justify-between rounded-xl bg-surface-2 px-3 py-2 dark:bg-slate-800/50">
+            <span class="text-sm text-muted">Total Cost</span>
+            <span class="text-sm font-semibold tabular-nums text-text">{{ formatCurrency(totalCost, transaction.currency) }}</span>
           </div>
         </template>
 
-        <p v-if="error" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ error }}</p>
+        <p v-if="error" class="mb-3 text-sm text-danger">{{ error }}</p>
 
         <div class="flex justify-end gap-2">
           <button type="button" class="btn-ghost" @click="emit('close')">Cancel</button>

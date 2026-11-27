@@ -410,8 +410,8 @@ const totalUnrealizedDisplay = computed(() => (toDisplayRate.value == null ? tot
 
 function gainClass(value: number | undefined): string {
   return (value ?? 0) >= 0
-    ? "text-green-600 dark:text-green-400"
-    : "text-red-600 dark:text-red-400"
+    ? "text-emerald"
+    : "text-danger"
 }
 
 function exportCsv() {
@@ -556,16 +556,16 @@ function onPickerSaved() {
 <template>
   <div class="space-y-4">
     <div class="card overflow-hidden">
-      <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-700/60 px-5 py-3">
+      <div class="flex items-center justify-between border-b border-border px-5 py-3">
         <div class="flex items-center gap-3">
           <h2 class="text-base font-semibold">Positions</h2>
-          <span class="text-sm text-slate-500 dark:text-slate-400">
+          <span class="text-sm text-muted">
             <template v-if="showClosedPositions">{{ openSearched.length }} open · {{ searched.length - openSearched.length }} closed</template>
             <template v-else>{{ openSearched.length }} open</template>
           </span>
         </div>
         <div class="flex items-center gap-2">
-          <label class="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+          <label class="flex items-center gap-1.5 text-xs text-muted">
             Group by
             <select v-model="groupBy" class="input !w-auto !py-1 !text-xs" aria-label="Group by">
               <option v-for="mode in groupModes" :key="mode.value" :value="mode.value">{{ mode.label }}</option>
@@ -578,9 +578,9 @@ function onPickerSaved() {
             </button>
             <template v-if="showCustomize">
               <div class="fixed inset-0 z-20" @click="showCustomize = false"></div>
-              <div class="absolute right-0 z-30 mt-1 w-48 rounded-lg border border-slate-200 dark:border-slate-700/60 bg-white dark:bg-slate-900 p-2 shadow-lg">
-                <p class="px-2 pb-1 text-xs font-medium uppercase text-slate-400 dark:text-slate-500">Columns</p>
-                <label v-for="col in allColumns" :key="col.key" class="flex cursor-pointer items-center gap-2 px-2 py-1.5 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+              <div class="absolute right-0 z-30 mt-1 w-48 rounded-lg border border-border bg-white dark:bg-slate-900 p-2 shadow-lg">
+                <p class="px-2 pb-1 text-xs font-medium uppercase text-muted dark:text-muted">Columns</p>
+                <label v-for="col in allColumns" :key="col.key" class="flex cursor-pointer items-center gap-2 px-2 py-1.5 text-sm text-text hover:bg-surface-2 dark:hover:bg-slate-800/50">
                   <input type="checkbox" class="h-4 w-4" :checked="visibleColumns.includes(col.key)" @change="toggleColumn(col.key)" />
                   {{ col.label }}
                 </label>
@@ -590,20 +590,20 @@ function onPickerSaved() {
         </div>
       </div>
 
-      <div class="border-b border-slate-100 dark:border-slate-800 px-5 py-2">
+      <div class="border-b border-border px-5 py-2">
         <div class="flex flex-wrap items-center gap-3">
           <LabelFilterBar v-model="labelFilter" @manage="manageLabelsOpen = true" />
-          <label class="inline-flex cursor-pointer items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+          <label class="inline-flex cursor-pointer items-center gap-2 text-xs text-muted">
             <input
               v-model="showClosedPositions"
               type="checkbox"
-              class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 dark:border-slate-600"
+              class="h-4 w-4 rounded border-border text-accent-text focus:ring-blue-500 dark:border-slate-600"
               aria-label="Show closed positions"
               data-testid="holdings-closed-filter"
             />
             <span>Show closed positions</span>
           </label>
-          <label class="ml-auto flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+          <label class="ml-auto flex items-center gap-2 text-xs text-muted">
             <span class="sr-only">Filter by company name or ticker</span>
             <input
               v-model="searchFilter"
@@ -617,8 +617,8 @@ function onPickerSaved() {
         </div>
       </div>
 
-      <p v-if="notice" class="border-b border-slate-100 dark:border-slate-800 bg-green-50 dark:bg-green-500/10 px-5 py-2 text-sm text-green-700 dark:text-green-400">{{ notice }}</p>
-      <p v-if="noticeError" class="border-b border-slate-100 dark:border-slate-800 bg-red-50 dark:bg-red-500/10 px-5 py-2 text-sm text-red-700 dark:text-red-400">{{ noticeError }}</p>
+      <p v-if="notice" class="border-b border-border bg-green-50 dark:bg-green-500/10 px-5 py-2 text-sm text-emerald">{{ notice }}</p>
+      <p v-if="noticeError" class="border-b border-border bg-red-50 dark:bg-red-500/10 px-5 py-2 text-sm text-danger">{{ noticeError }}</p>
 
       <div v-if="sorted.length" class="overflow-x-auto" data-testid="holdings-table-wrap">
         <table :class="['w-full table-fixed text-sm', isGlobal ? 'min-w-[1140px]' : '']">
@@ -635,16 +635,16 @@ function onPickerSaved() {
             <col style="width: 56px" />
           </colgroup>
           <thead>
-            <tr class="border-b border-slate-100 dark:border-slate-800 text-left text-xs uppercase text-slate-500 dark:text-slate-400">
+            <tr class="border-b border-border text-left text-xs uppercase text-muted">
               <th
                 v-if="isGlobal"
-                class="px-5 py-2.5 font-medium cursor-pointer select-none hover:text-slate-900 dark:hover:text-slate-100"
+                class="px-5 py-2.5 font-medium cursor-pointer select-none hover:text-text dark:hover:text-slate-100"
                 :aria-sort="sortKey === 'portfolio' ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined"
                 @click="toggleSort('portfolio')"
               >
                 <span class="inline-flex items-center gap-1">
                   Portfolio
-                  <span class="text-[10px] text-slate-400 dark:text-slate-500">{{ sortIndicator("portfolio") }}</span>
+                  <span class="text-[10px] text-muted dark:text-muted">{{ sortIndicator("portfolio") }}</span>
                 </span>
               </th>
               <th
@@ -652,27 +652,27 @@ function onPickerSaved() {
                 :key="col.key"
                 :data-testid="col.key === 'realized' ? 'holdings-column-realized' : undefined"
                 class="py-2.5 font-medium"
-                :class="[col.width ? 'px-3' : 'px-5', col.sortable ? 'cursor-pointer select-none hover:text-slate-900 dark:hover:text-slate-100' : '']"
+                :class="[col.width ? 'px-3' : 'px-5', col.sortable ? 'cursor-pointer select-none hover:text-text dark:hover:text-slate-100' : '']"
                 :aria-sort="sortKey === col.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined"
                 @click="toggleSort(col.key)"
               >
                 <span class="inline-flex items-center gap-1">
                   {{ col.label }}
-                  <span v-if="col.sortable" class="text-[10px] text-slate-400 dark:text-slate-500">{{ sortIndicator(col.key) }}</span>
+                  <span v-if="col.sortable" class="text-[10px] text-muted dark:text-muted">{{ sortIndicator(col.key) }}</span>
                 </span>
               </th>
               <th class="px-5 py-2.5"><span class="sr-only">Position actions</span></th>
             </tr>
           </thead>
           <tbody v-for="g in groups" :key="g.label || 'all'" class="divide-y divide-slate-100 dark:divide-slate-800">
-            <tr v-if="g.label" class="bg-slate-100/70" data-testid="holdings-group-row">
-              <td :colspan="colspan" class="px-5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+            <tr v-if="g.label" class="bg-surface-2/70" data-testid="holdings-group-row">
+              <td :colspan="colspan" class="px-5 py-2 text-xs font-semibold uppercase tracking-wide text-muted">
                 {{ g.label }}
-                <span class="font-normal text-slate-400 dark:text-slate-500">{{ g.items.length }}</span>
+                <span class="font-normal text-muted dark:text-muted">{{ g.items.length }}</span>
               </td>
             </tr>
-            <tr v-for="pos in g.rows" :key="positionKey(pos)" data-testid="holdings-row" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-              <td v-if="isGlobal" class="truncate px-5 py-3 text-slate-700 dark:text-slate-200">{{ pos.portfolioName || pos.portfolioId }}</td>
+            <tr v-for="pos in g.rows" :key="positionKey(pos)" data-testid="holdings-row" class="hover:bg-surface-2 dark:hover:bg-slate-800/50">
+              <td v-if="isGlobal" class="truncate px-5 py-3 text-text">{{ pos.portfolioName || pos.portfolioId }}</td>
               <template v-if="visibleColumns.includes('symbol')">
                 <!-- min-w-0 + overflow-hidden on the td: under table-fixed the
                      column has a definite width, so the TickerBadge's inner
@@ -688,10 +688,10 @@ function onPickerSaved() {
                     <p
                       v-if="optionPositionDetails(pos)"
                       data-testid="holdings-option-details"
-                      class="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400"
+                      class="mt-0.5 truncate text-xs text-muted"
                     >{{ optionPositionDetails(pos) }}</p>
                   </router-link>
-                  <span v-if="!pos.isOpen" class="mt-1 inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                  <span v-if="!pos.isOpen" class="mt-1 inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted dark:bg-slate-700 dark:text-slate-300">
                     Closed<span v-if="pos.closedAt"> · {{ formatDate(pos.closedAt) }}</span>
                   </span>
                   <LabelChips v-if="pos.labels?.length" :labels="pos.labels" :max="4" class="mt-1" />
@@ -721,7 +721,7 @@ function onPickerSaved() {
                   :converted="toDisplay((pos as any).convertedMarketValue)"
                   :display-currency="displayCurrency"
                 />
-                <p class="text-xs text-slate-400 dark:text-slate-500">
+                <p class="text-xs text-muted dark:text-muted">
                   Cost <DualCurrencyCell
                     :primary="pos.totalCostBasis"
                     :primary-currency="pos.instrumentCurrency"
@@ -755,7 +755,7 @@ function onPickerSaved() {
                   <button
                     type="button"
                     aria-label="Position actions"
-                    class="rounded-lg p-1.5 text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200"
+                    class="rounded-lg p-1.5 text-muted dark:text-muted hover:bg-surface-2 dark:hover:bg-slate-800 hover:text-text dark:hover:text-slate-200"
                     @click="toggleActionMenu(pos)"
                   >
                     <svg class="h-4 w-4" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
@@ -766,22 +766,22 @@ function onPickerSaved() {
                   </button>
                   <template v-if="openMenuId === positionKey(pos)">
                     <div class="fixed inset-0 z-20" @click="openMenuId = null"></div>
-                    <div class="absolute right-0 z-30 mt-1 w-44 rounded-lg border border-slate-200 dark:border-slate-700/60 bg-white dark:bg-slate-900 py-1 shadow-lg">
-                       <button v-if="!props.readonly" type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="openAction('buy', pos)">Buy</button>
-                       <button v-if="!props.readonly" type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="openAction('sell', pos)">Sell</button>
-                       <button v-if="!props.readonly" type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="openAction('dividend', pos)">Dividend</button>
-                       <button v-if="!props.readonly" type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="openEditPosition(pos)">Edit position</button>
-                      <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="goResearch(pos)">Research</button>
-                      <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="openChartView(pos)">View chart</button>
-                       <button v-if="!props.readonly" type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="openLabelPicker(pos, $event)">Set labels...</button>
-                       <button v-if="!props.readonly" type="button" class="block w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10" @click="openRemoveConfirm(pos)">Remove position</button>
+                    <div class="absolute right-0 z-30 mt-1 w-44 rounded-lg border border-border bg-white dark:bg-slate-900 py-1 shadow-lg">
+                       <button v-if="!props.readonly" type="button" class="block w-full px-4 py-2 text-left text-sm text-text hover:bg-surface-2 dark:hover:bg-slate-800/50" @click="openAction('buy', pos)">Buy</button>
+                       <button v-if="!props.readonly" type="button" class="block w-full px-4 py-2 text-left text-sm text-text hover:bg-surface-2 dark:hover:bg-slate-800/50" @click="openAction('sell', pos)">Sell</button>
+                       <button v-if="!props.readonly" type="button" class="block w-full px-4 py-2 text-left text-sm text-text hover:bg-surface-2 dark:hover:bg-slate-800/50" @click="openAction('dividend', pos)">Dividend</button>
+                       <button v-if="!props.readonly" type="button" class="block w-full px-4 py-2 text-left text-sm text-text hover:bg-surface-2 dark:hover:bg-slate-800/50" @click="openEditPosition(pos)">Edit position</button>
+                      <button type="button" class="block w-full px-4 py-2 text-left text-sm text-text hover:bg-surface-2 dark:hover:bg-slate-800/50" @click="goResearch(pos)">Research</button>
+                      <button type="button" class="block w-full px-4 py-2 text-left text-sm text-text hover:bg-surface-2 dark:hover:bg-slate-800/50" @click="openChartView(pos)">View chart</button>
+                       <button v-if="!props.readonly" type="button" class="block w-full px-4 py-2 text-left text-sm text-text hover:bg-surface-2 dark:hover:bg-slate-800/50" @click="openLabelPicker(pos, $event)">Set labels...</button>
+                       <button v-if="!props.readonly" type="button" class="block w-full px-4 py-2 text-left text-sm text-danger hover:bg-red-50 dark:hover:bg-red-500/10" @click="openRemoveConfirm(pos)">Remove position</button>
                     </div>
                   </template>
                 </div>
               </td>
             </tr>
-            <tr v-if="g.label" class="border-t border-slate-200 dark:border-slate-700/60 bg-slate-50 dark:bg-slate-800/50 font-medium">
-              <td class="px-5 py-3 text-slate-500 dark:text-slate-400">{{ g.label }} subtotal</td>
+            <tr v-if="g.label" class="border-t border-border bg-surface-2 font-medium">
+              <td class="px-5 py-3 text-muted">{{ g.label }} subtotal</td>
               <td v-if="visibleColumns.includes('quantity')" class="px-3 py-3"></td>
               <td v-if="visibleColumns.includes('avgCost')" class="px-3 py-3"></td>
               <td v-if="visibleColumns.includes('price')" class="px-3 py-3"></td>
@@ -800,7 +800,7 @@ function onPickerSaved() {
             </tr>
           </tbody>
           <tfoot v-if="groupBy === 'none'">
-            <tr class="border-t border-slate-200 dark:border-slate-700/60 bg-slate-50 dark:bg-slate-800/50 font-medium">
+            <tr class="border-t border-border bg-surface-2 font-medium">
               <td v-if="visibleColumns.includes('symbol')" class="px-5 py-3">Total</td>
               <td v-if="visibleColumns.includes('quantity')" class="px-3 py-3"></td>
               <td v-if="visibleColumns.includes('avgCost')" class="px-3 py-3"></td>
@@ -821,7 +821,7 @@ function onPickerSaved() {
           </tfoot>
         </table>
       </div>
-      <p v-else class="px-5 py-6 text-sm text-slate-500 dark:text-slate-400">
+      <p v-else class="px-5 py-6 text-sm text-muted">
         {{ emptyMessage }}
       </p>
 
@@ -829,12 +829,12 @@ function onPickerSaved() {
            range counts the filtered+searched set; the Total row and group
            subtotals above are measured over that same set, so they stay correct
            on every page and while a filter is applied. -->
-      <div v-if="sorted.length" class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 dark:border-slate-700/60 px-5 py-3">
-        <p class="text-sm text-slate-500 dark:text-slate-400">
+      <div v-if="sorted.length" class="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3">
+        <p class="text-sm text-muted">
           {{ (clampedPage - 1) * pageSize + 1 }}–{{ Math.min(clampedPage * pageSize, sorted.length) }} of {{ sorted.length }}
         </p>
         <div class="flex items-center gap-4">
-          <label class="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+          <label class="flex items-center gap-2 text-sm text-muted">
             Rows per page
             <select
               class="input py-1"

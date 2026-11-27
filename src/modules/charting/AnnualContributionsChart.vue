@@ -61,7 +61,7 @@ const chartSeries = computed(() => [
 <template>
   <div class="space-y-3" :data-testid="testid">
     <template v-if="rows.length">
-      <p v-if="hasPartial" class="text-xs text-slate-500" :data-testid="`${testid}-partial`">
+      <p v-if="hasPartial" class="text-xs text-muted" :data-testid="`${testid}-partial`">
         {{ currentYear }} is year-to-date; its total is not a full-year figure.
       </p>
       <p v-if="hasUnknown" class="text-xs text-amber-700" :data-testid="`${testid}-unknown`">
@@ -74,7 +74,7 @@ const chartSeries = computed(() => [
       <CollapsibleSection title="Annual External Contributions" :testid="`${testid}-table`">
         <table class="w-full text-sm">
           <thead>
-            <tr class="border-b border-slate-100 text-left text-xs uppercase text-slate-500 dark:border-slate-800 dark:text-slate-400">
+            <tr class="border-b border-border text-left text-xs uppercase text-muted dark:border-slate-800 dark:text-muted">
               <th class="px-5 py-2.5 font-medium">Year</th>
               <th class="px-5 py-2.5 text-right font-medium">Contributions</th>
               <th class="px-5 py-2.5 text-right font-medium">Withdrawals</th>
@@ -83,10 +83,10 @@ const chartSeries = computed(() => [
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-            <tr v-for="p in rows" :key="p.year" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+            <tr v-for="p in rows" :key="p.year" class="hover:bg-surface-2 dark:hover:bg-slate-800/50">
               <td class="px-5 py-3">
                 {{ p.year }}
-                <span v-if="p.year === currentYear" class="ml-1 text-xs text-slate-400">YTD</span>
+                <span v-if="p.year === currentYear" class="ml-1 text-xs text-muted">YTD</span>
               </td>
               <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(p.contributions ?? 0, currency) }}</td>
               <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(p.withdrawals ?? 0, currency) }}</td>
@@ -95,11 +95,11 @@ const chartSeries = computed(() => [
             </tr>
           </tbody>
         </table>
-        <p class="px-5 py-2 text-xs text-slate-500 dark:text-slate-400">
+        <p class="px-5 py-2 text-xs text-muted">
           Deposits and withdrawals are owner funding. Withdrawals are shown below zero in the chart. Transfers are internal cash/in-kind moves; a one-sided boundary transfer is not owner funding.
         </p>
       </CollapsibleSection>
     </template>
-    <p v-else class="text-sm text-slate-500 dark:text-slate-400">No annual external contributions for this scope.</p>
+    <p v-else class="text-sm text-muted">No annual external contributions for this scope.</p>
   </div>
 </template>

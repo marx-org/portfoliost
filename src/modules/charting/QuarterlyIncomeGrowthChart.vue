@@ -80,20 +80,20 @@ const chartSeries = computed(() => [
 <template>
   <div class="space-y-3" :data-testid="testid">
     <template v-if="selectedYear != null">
-      <p class="text-xs text-slate-500">
+      <p class="text-xs text-muted">
         {{ selectedYear }} vs {{ selectedYear - 1 }} — quarterly receipts, year over year.
       </p>
       <div class="card p-6" :data-testid="`${testid}-chart`">
         <h2 class="sr-only">Quarterly Income Growth</h2>
         <component :is="'apexchart'" :options="chartOptions" :series="chartSeries" />
       </div>
-      <p class="text-xs text-slate-500" :data-testid="`${testid}-partial`">
+      <p class="text-xs text-muted" :data-testid="`${testid}-partial`">
         The current quarter is year-to-date and is compared with the prior full quarter, not a final YoY.
       </p>
       <CollapsibleSection title="Quarterly Income Growth" :testid="`${testid}-table`">
         <table class="w-full text-sm">
           <thead>
-            <tr class="border-b border-slate-100 text-left text-xs uppercase text-slate-500 dark:border-slate-800 dark:text-slate-400">
+            <tr class="border-b border-border text-left text-xs uppercase text-muted dark:border-slate-800 dark:text-muted">
               <th class="px-5 py-2.5 font-medium">Quarter</th>
               <th class="px-5 py-2.5 text-right font-medium">{{ selectedYear }}</th>
               <th class="px-5 py-2.5 text-right font-medium">{{ selectedYear - 1 }}</th>
@@ -101,8 +101,8 @@ const chartSeries = computed(() => [
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-            <tr v-for="r in rows" :key="r.quarter" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-              <td class="px-5 py-3 font-medium text-slate-900 dark:text-slate-100">Q{{ r.quarter.slice(6) }}</td>
+            <tr v-for="r in rows" :key="r.quarter" class="hover:bg-surface-2 dark:hover:bg-slate-800/50">
+              <td class="px-5 py-3 font-medium text-text">Q{{ r.quarter.slice(6) }}</td>
               <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(r.total ?? 0, currency) }}</td>
               <td class="px-5 py-3 text-right tabular-nums">
                 {{ r.priorYearQuarterTotal == null ? "—" : formatCurrency(r.priorYearQuarterTotal, currency) }}
@@ -115,6 +115,6 @@ const chartSeries = computed(() => [
         </table>
       </CollapsibleSection>
     </template>
-    <p v-else class="text-sm text-slate-500 dark:text-slate-400">No year-over-year quarterly income for this scope.</p>
+    <p v-else class="text-sm text-muted">No year-over-year quarterly income for this scope.</p>
   </div>
 </template>

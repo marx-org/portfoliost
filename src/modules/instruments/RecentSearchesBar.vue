@@ -38,9 +38,9 @@ function onSelect(symbol: string) {
       class="shrink-0"
       :class="[
         variant === 'bar'
-          ? 'flex flex-col items-center gap-1 rounded-lg px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800'
+          ? 'flex flex-col items-center gap-1 rounded-lg px-2 py-1.5 hover:bg-surface-2 dark:hover:bg-slate-800'
           : 'btn-secondary text-xs',
-        variant === 'bar' && activeSymbol === symbol ? 'bg-slate-100 dark:bg-slate-800' : '',
+        variant === 'bar' && activeSymbol === symbol ? 'bg-surface-2' : '',
       ]"
       @click="onSelect(symbol)"
     >
@@ -48,8 +48,8 @@ function onSelect(symbol: string) {
         <!-- Deliberate exception to the "/api/logos only in TickerBadge" rule
              (docs/COMPONENTS.md): this bar is a dense symbol-only chip strip,
              and an identity block per chip would triple its height. §61.9. -->
-        <img :src="`/api/logos/${symbol}`" :alt="symbol" class="h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800" />
-        <span class="text-[10px] font-medium text-slate-600 dark:text-slate-300">{{ symbol }}</span>
+        <img :src="`/api/logos/${symbol}`" :alt="symbol" class="h-8 w-8 rounded-full bg-surface-2" />
+        <span class="text-[10px] font-medium text-muted">{{ symbol }}</span>
       </template>
       <template v-else>
         {{ symbol }}

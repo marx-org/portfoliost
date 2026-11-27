@@ -53,20 +53,20 @@ const chartSeries = computed(() => [
 
 <template>
   <div class="space-y-3" data-testid="cumulative-income-chart">
-    <p v-if="opening > 0" class="text-xs text-slate-500" data-testid="cumulative-opening">
+    <p v-if="opening > 0" class="text-xs text-muted" data-testid="cumulative-opening">
       Lifetime before window: {{ formatCurrency(opening, currency) }}
     </p>
     <apexchart v-if="rows.length" type="area" :options="chartOptions" :series="chartSeries" :height="320" />
-    <p v-else class="text-sm text-slate-500">No income data for this scope.</p>
+    <p v-else class="text-sm text-muted">No income data for this scope.</p>
     <CollapsibleSection v-if="rows.length" title="Cumulative income" testid="cumulative-income-chart-table">
       <table class="w-full text-sm">
         <thead>
-          <tr class="text-left text-slate-400">
+          <tr class="text-left text-muted">
             <th class="py-1">Month</th><th>Dividends</th><th>Interest</th><th>Cumulative</th><th>Opening</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="p in rows" :key="p.date" class="border-t border-slate-100 dark:border-slate-800">
+          <tr v-for="p in rows" :key="p.date" class="border-t border-border">
             <td class="py-1">{{ p.date.slice(0, 7) }}</td>
             <td>{{ p.dividends ?? 0 }}</td>
             <td>{{ p.interest ?? 0 }}</td>

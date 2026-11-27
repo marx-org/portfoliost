@@ -50,6 +50,6 @@ defineExpose({ chartOptions })
       </button>
     </div>
     <component :is="'apexchart'" v-if="points.length" :options="chartOptions" :series="chartOptions.series" />
-    <p v-else class="text-sm text-slate-500 dark:text-slate-400">No balance history available.</p>
+    <p v-else class="text-sm text-muted">No balance history available.</p>
   </div>
 </template>

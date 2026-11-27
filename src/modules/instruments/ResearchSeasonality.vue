@@ -51,25 +51,25 @@ const chartOptions = computed(() => withSharedChart({
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
       <h2 class="card-title">Seasonality</h2>
       <div class="flex flex-wrap items-center gap-3 text-xs">
-        <div class="flex overflow-hidden rounded-md border border-slate-300 dark:border-slate-600">
+        <div class="flex overflow-hidden rounded-md border border-border">
           <button
             v-for="y in yearsOptions"
             :key="y"
             type="button"
             class="px-3 py-1.5 font-medium"
-            :class="years === y ? 'bg-slate-800 text-white' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'"
+            :class="years === y ? 'bg-slate-800 text-white' : 'text-muted hover:bg-surface-2 dark:hover:bg-slate-800'"
             @click="years = y"
           >
             {{ y }}Y
           </button>
         </div>
-        <div class="flex overflow-hidden rounded-md border border-slate-300 dark:border-slate-600">
+        <div class="flex overflow-hidden rounded-md border border-border">
           <button
             v-for="m in metricOptions"
             :key="m"
             type="button"
             class="px-3 py-1.5 font-medium capitalize"
-            :class="metric === m ? 'bg-slate-800 text-white' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'"
+            :class="metric === m ? 'bg-slate-800 text-white' : 'text-muted hover:bg-surface-2 dark:hover:bg-slate-800'"
             @click="metric = m"
           >
             {{ m === "avg" ? "Avg" : m === "med" ? "Med" : m === "min" ? "Min" : "Max" }}
@@ -78,14 +78,14 @@ const chartOptions = computed(() => withSharedChart({
       </div>
     </div>
 
-    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading seasonality...</p>
+    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-danger">{{ error }}</p>
+    <p v-if="loading" class="text-sm text-muted">Loading seasonality...</p>
     <component
       :is="'apexchart'"
       v-else-if="monthly.length"
       :options="chartOptions"
       :series="chartOptions.series"
     />
-    <p v-else class="text-sm text-slate-500 dark:text-slate-400">No seasonality data available.</p>
+    <p v-else class="text-sm text-muted">No seasonality data available.</p>
   </div>
 </template>

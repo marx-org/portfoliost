@@ -964,12 +964,12 @@ function downloadCsv(): void {
           v-if="showCurrencySelect"
           v-model="selectedCurrency"
           data-testid="chart-currency-select"
-          class="rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-2 py-0.5 text-xs font-medium text-slate-700 dark:text-slate-200"
+          class="rounded-md border border-border bg-white dark:bg-slate-900 px-2 py-0.5 text-xs font-medium text-text"
         >
           <option v-if="!selectedCurrency" value="" disabled>Select&hellip;</option>
           <option v-for="c in currencyOptions" :key="c.code" :value="c.code">{{ c.code }}</option>
         </select>
-        <span v-else-if="titleCurrency" class="font-normal text-slate-500 dark:text-slate-400">({{ titleCurrency }})</span>
+        <span v-else-if="titleCurrency" class="font-normal text-muted">({{ titleCurrency }})</span>
       </h2>
       <div class="flex items-center gap-2">
         <button
@@ -977,7 +977,7 @@ function downloadCsv(): void {
           :key="t"
           type="button"
           class="rounded px-2 py-1 text-xs font-medium"
-          :class="timeframe === t ? 'bg-blue-600 text-white' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'"
+          :class="timeframe === t ? 'bg-blue-600 text-white' : 'text-muted hover:bg-surface-2 dark:hover:bg-slate-800'"
           @click="timeframe = t"
         >
           {{ t }}
@@ -986,13 +986,13 @@ function downloadCsv(): void {
     </div>
 
     <div class="mb-4 flex flex-wrap items-center gap-3 text-xs">
-      <div class="flex overflow-hidden rounded-md border border-slate-300 dark:border-slate-600">
+      <div class="flex overflow-hidden rounded-md border border-border">
         <button
           v-for="m in modes"
           :key="m"
           type="button"
           class="px-3 py-1.5 font-medium"
-          :class="mode === m ? 'bg-slate-800 text-white' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'"
+          :class="mode === m ? 'bg-slate-800 text-white' : 'text-muted hover:bg-surface-2 dark:hover:bg-slate-800'"
           @click="mode = m"
         >
           <!-- §47.7 — the active "Price" mode renders "Price → %" while a
@@ -1008,21 +1008,21 @@ function downloadCsv(): void {
       <div class="relative">
         <button
           type="button"
-          class="rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+          class="rounded-md border border-border bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-medium text-text hover:bg-surface-2 dark:hover:bg-slate-800/50"
           @click="showCompare = !showCompare"
         >
-          {{ compareLabel }} <span class="text-slate-400 dark:text-slate-500">&#9662;</span>
+          {{ compareLabel }} <span class="text-muted dark:text-muted">&#9662;</span>
         </button>
-        <div v-if="showCompare" class="absolute left-0 z-20 mt-1 w-52 rounded-md border border-slate-200 dark:border-slate-700/60 bg-white dark:bg-slate-900 p-1 shadow-lg">
+        <div v-if="showCompare" class="absolute left-0 z-20 mt-1 w-52 rounded-md border border-border bg-white dark:bg-slate-900 p-1 shadow-lg">
           <button
             v-for="o in compareOptions"
             :key="o.key"
             type="button"
-            class="flex w-full items-center justify-between px-3 py-1.5 text-left text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+            class="flex w-full items-center justify-between px-3 py-1.5 text-left text-xs text-text hover:bg-surface-2 dark:hover:bg-slate-800/50"
             @click="pickCompare(o.key)"
           >
             <span>{{ o.label }}</span>
-            <span v-if="compare === o.key" class="text-blue-600 dark:text-blue-400">&#10003;</span>
+            <span v-if="compare === o.key" class="text-accent-text">&#10003;</span>
           </button>
         </div>
       </div>
@@ -1040,27 +1040,27 @@ function downloadCsv(): void {
       <select
         v-if="!portfolioId && showTransactions"
         v-model="txPortfolioId"
-        class="rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-2 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200"
+        class="rounded-md border border-border bg-white dark:bg-slate-900 px-2 py-1.5 text-xs font-medium text-text"
       >
         <option value="all">All portfolios</option>
         <option v-for="p in portfolioStore.portfolios" :key="p.id" :value="p.id">{{ p.name }}</option>
       </select>
 
       <div v-if="summary" class="ml-auto flex items-center gap-4 text-sm">
-        <span class="text-slate-500 dark:text-slate-400">Total Chg</span>
-        <span class="font-semibold" :class="summary.change >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
+        <span class="text-muted">Total Chg</span>
+        <span class="font-semibold" :class="summary.change >= 0 ? 'text-emerald' : 'text-danger'">
            {{
              mode === "Price" && axisUnit === "price"
                ? formatAmount(summary.change, chartCurrency)
                : `${signed(summary.changePct)}%`
            }}
         </span>
-        <span v-if="mode === 'Price' && axisUnit === 'price'" class="text-xs text-slate-400 dark:text-slate-500">{{ signed(summary.changePct) }}%</span>
-        <span v-if="mode === 'Price' && axisUnit === 'price'" class="text-slate-500 dark:text-slate-400">CAGR</span>
+        <span v-if="mode === 'Price' && axisUnit === 'price'" class="text-xs text-muted dark:text-muted">{{ signed(summary.changePct) }}%</span>
+        <span v-if="mode === 'Price' && axisUnit === 'price'" class="text-muted">CAGR</span>
         <span
           v-if="mode === 'Price' && axisUnit === 'price' && summary.cagr !== null"
           class="font-semibold tabular-nums"
-          :class="summary.cagr >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
+          :class="summary.cagr >= 0 ? 'text-emerald' : 'text-danger'"
         >
           {{ signed(summary.cagr) }}%
         </span>
@@ -1069,13 +1069,13 @@ function downloadCsv(): void {
       <div class="ml-auto flex items-center gap-1">
         <button
           type="button"
-          class="rounded px-2 py-1 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+          class="rounded px-2 py-1 text-xs font-medium text-muted hover:bg-surface-2 dark:hover:bg-slate-800"
           :title="fullscreen ? 'Exit fullscreen' : 'Fullscreen'"
           @click="fullscreen = !fullscreen"
         >
           {{ fullscreen ? "Exit fullscreen" : "Fullscreen" }}
         </button>
-        <button type="button" class="rounded px-2 py-1 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" title="Download CSV" @click="downloadCsv">
+        <button type="button" class="rounded px-2 py-1 text-xs font-medium text-muted hover:bg-surface-2 dark:hover:bg-slate-800" title="Download CSV" @click="downloadCsv">
           Download
         </button>
       </div>
@@ -1088,12 +1088,12 @@ function downloadCsv(): void {
       <span>{{ error || "Full history unavailable — showing recent prices." }} <button type="button" class="font-semibold underline underline-offset-2 hover:opacity-80" @click="load(compare)">Retry</button></span>
       <button type="button" class="text-amber-500 hover:opacity-70" aria-label="Dismiss" @click="historyFailed = false">&times;</button>
     </div>
-    <p v-else-if="showingPartial" class="mb-3 text-sm text-slate-500 dark:text-slate-400">Showing recent prices — full history loading&hellip;</p>
-    <p v-else-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading price history...</p>
+    <p v-else-if="showingPartial" class="mb-3 text-sm text-muted">Showing recent prices — full history loading&hellip;</p>
+    <p v-else-if="loading" class="text-sm text-muted">Loading price history...</p>
 
-    <p v-if="showTransactions && transactionsError" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ transactionsError }}</p>
-    <p v-if="showTransactions && transactionsLoading" class="text-sm text-slate-500 dark:text-slate-400">Loading transactions...</p>
-    <p v-if="showTransactions && !transactionsLoading && hasMoreTransactions" class="text-sm text-slate-500 dark:text-slate-400">
+    <p v-if="showTransactions && transactionsError" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-danger">{{ transactionsError }}</p>
+    <p v-if="showTransactions && transactionsLoading" class="text-sm text-muted">Loading transactions...</p>
+    <p v-if="showTransactions && !transactionsLoading && hasMoreTransactions" class="text-sm text-muted">
       Showing first {{ maxTxs }} transactions &mdash; some may be missing.
     </p>
 
@@ -1103,7 +1103,7 @@ function downloadCsv(): void {
         <button type="button" class="btn-secondary text-sm" @click="fullscreen = false">Close</button>
       </div>
       <p v-if="crossCurrencyNote" class="mb-2 text-xs font-medium text-amber-600 dark:text-amber-400">{{ crossCurrencyNote }}</p>
-      <p v-if="fxCaveatNote" class="mb-2 text-xs font-medium text-slate-500 dark:text-slate-400">{{ fxCaveatNote }}</p>
+      <p v-if="fxCaveatNote" class="mb-2 text-xs font-medium text-muted">{{ fxCaveatNote }}</p>
       <component
         :key="`fs-${chartKey}`"
         :is="'apexchart'"
@@ -1114,7 +1114,7 @@ function downloadCsv(): void {
     </div>
     <template v-else>
       <p v-if="crossCurrencyNote" class="mb-2 text-xs font-medium text-amber-600 dark:text-amber-400">{{ crossCurrencyNote }}</p>
-      <p v-if="fxCaveatNote" class="mb-2 text-xs font-medium text-slate-500 dark:text-slate-400">{{ fxCaveatNote }}</p>
+      <p v-if="fxCaveatNote" class="mb-2 text-xs font-medium text-muted">{{ fxCaveatNote }}</p>
       <!-- §47.6 — fixed-height wrapper (matches the chart's `height: 380` option)
            so the plot box is stable and the card does not reflow when the
            cross-currency note / loading notice / summary appear. -->
@@ -1126,7 +1126,7 @@ function downloadCsv(): void {
           :options="chartOptions"
           :series="series.data"
         />
-        <p v-else class="flex h-full items-center justify-center text-sm text-slate-500 dark:text-slate-400">No price history available.</p>
+        <p v-else class="flex h-full items-center justify-center text-sm text-muted">No price history available.</p>
       </div>
     </template>
 
@@ -1136,16 +1136,16 @@ function downloadCsv(): void {
     <div
       v-if="selectedTransactions.length"
       data-testid="chart-tx-details"
-      class="mt-3 flex items-start justify-between gap-3 rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-800/50"
+      class="mt-3 flex items-start justify-between gap-3 rounded-lg bg-surface-2 p-3 text-sm dark:bg-slate-800/50"
     >
       <div class="min-w-0">
-        <div class="mb-1 font-semibold text-slate-700 dark:text-slate-200">{{ selectedMarker?.barDate }}</div>
+        <div class="mb-1 font-semibold text-text">{{ selectedMarker?.barDate }}</div>
         <div
           v-for="tx in selectedTransactions"
           :key="tx.id"
-          class="flex flex-wrap gap-x-3 text-slate-600 dark:text-slate-300"
+          class="flex flex-wrap gap-x-3 text-muted"
         >
-          <span :class="txType(tx) === 'BUY' ? 'font-medium text-green-600 dark:text-green-400' : 'font-medium text-red-600 dark:text-red-400'">
+          <span :class="txType(tx) === 'BUY' ? 'font-medium text-emerald' : 'font-medium text-danger'">
             {{ txType(tx) === "BUY" ? "Buy" : "Sell" }}
           </span>
           <span>{{ accountOf(tx) }}</span>

@@ -234,14 +234,14 @@ function groupSubtotal(items: Tx[]): number {
 
 function typeClass(type: string): string {
   const t = type.toUpperCase()
-  if (t === "BUY")      return "bg-green-50 dark:bg-green-500/15 text-green-700 dark:text-green-400"
-  if (t === "SELL")     return "bg-red-50 dark:bg-red-500/15 text-red-600 dark:text-red-400"
-  if (t === "DIVIDEND") return "bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400"
+  if (t === "BUY")      return "bg-green-50 dark:bg-green-500/15 text-emerald"
+  if (t === "SELL")     return "bg-red-50 dark:bg-red-500/15 text-danger"
+  if (t === "DIVIDEND") return "bg-accent-soft dark:bg-accent-soft0/15 text-accent-text"
   // Custody changed hands. Violet rather than green/red so it is never read as a
   // trade: nothing was bought, nothing was sold, and no cash moved.
   if (t === "TRANSFER_OUT") return "bg-violet-50 dark:bg-violet-500/15 text-violet-700 dark:text-violet-400"
   if (t === "TRANSFER_IN")  return "bg-teal-50 dark:bg-teal-500/15 text-teal-700 dark:text-teal-400"
-  return "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+  return "bg-surface-2 text-muted dark:text-muted"
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -322,12 +322,12 @@ const colCount = computed(() =>
 <template>
   <div class="card overflow-hidden">
     <!-- Header -->
-    <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-700/60 px-5 py-3">
+    <div class="flex items-center justify-between border-b border-border px-5 py-3">
       <div class="flex items-center gap-3">
         <h2 class="text-base font-semibold">{{ mode === "global" ? "All transactions" : "Transactions" }}</h2>
-        <span v-if="!loading" class="text-sm text-slate-500 dark:text-slate-400">{{ total.toLocaleString() }} total</span>
+        <span v-if="!loading" class="text-sm text-muted">{{ total.toLocaleString() }} total</span>
       </div>
-      <label class="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+      <label class="flex items-center gap-1.5 text-xs text-muted">
         Group by
         <select v-model="groupBy" class="input !w-auto !py-1 !text-xs" aria-label="Group by">
           <option v-for="m in groupModes" :key="m.value" :value="m.value">{{ m.label }}</option>
@@ -335,10 +335,10 @@ const colCount = computed(() =>
       </label>
     </div>
 
-    <div class="border-b border-slate-100 dark:border-slate-800 px-5 py-2">
+    <div class="border-b border-border px-5 py-2">
       <div class="flex flex-wrap items-center gap-3">
         <LabelFilterBar v-model="labelFilter" @manage="manageLabelsOpen = true" />
-        <label class="ml-auto flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+        <label class="ml-auto flex items-center gap-2 text-xs text-muted">
           <span class="sr-only">Filter by company name or ticker</span>
           <input
             v-model="searchFilter"
@@ -353,15 +353,15 @@ const colCount = computed(() =>
     </div>
 
     <!-- Notices -->
-    <p v-if="notice" class="border-b border-slate-100 dark:border-slate-800 px-5 py-3 text-sm text-green-700 dark:text-green-400">{{ notice }}</p>
-    <p v-if="error"  class="border-b border-slate-100 dark:border-slate-800 px-5 py-3 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
-    <p v-if="loading" class="px-5 py-6 text-sm text-slate-500 dark:text-slate-400">Loading transactions…</p>
+    <p v-if="notice" class="border-b border-border px-5 py-3 text-sm text-emerald">{{ notice }}</p>
+    <p v-if="error"  class="border-b border-border px-5 py-3 text-sm text-danger">{{ error }}</p>
+    <p v-if="loading" class="px-5 py-6 text-sm text-muted">Loading transactions…</p>
 
     <template v-if="!loading && !error">
       <div v-if="transactions.length" class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead>
-            <tr class="border-b border-slate-100 dark:border-slate-800 text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            <tr class="border-b border-border text-left text-xs uppercase tracking-wide text-muted">
               <template v-for="col in sortableColumns" :key="col.key">
                 <th
                   v-if="col.key === 'amount' && hasTaxRows"
@@ -375,7 +375,7 @@ const colCount = computed(() =>
                 >
                   <button
                     type="button"
-                    class="inline-flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100"
+                    class="inline-flex items-center gap-1 hover:text-text dark:hover:text-slate-100"
                     @click="toggleSort(col.key)"
                   >
                     {{ col.label }}
@@ -401,17 +401,17 @@ const colCount = computed(() =>
 
           <tbody v-for="g in groups" :key="g.label || 'all'" class="divide-y divide-slate-100 dark:divide-slate-800">
             <!-- Group header row -->
-            <tr v-if="g.label" class="bg-slate-100/70 dark:bg-slate-800/40" data-testid="transactions-group-row">
-              <td :colspan="colCount" class="px-5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+            <tr v-if="g.label" class="bg-surface-2/70 dark:bg-slate-800/40" data-testid="transactions-group-row">
+              <td :colspan="colCount" class="px-5 py-2 text-xs font-semibold uppercase tracking-wide text-muted">
                 {{ g.label }}
-                <span class="ml-1 font-normal text-slate-400 dark:text-slate-500">{{ g.items.length }}</span>
+                <span class="ml-1 font-normal text-muted dark:text-muted">{{ g.items.length }}</span>
               </td>
             </tr>
 
             <!-- Data rows -->
-            <tr v-for="tx in g.items" :key="tx.id" class="group hover:bg-slate-50 dark:hover:bg-slate-800/50">
+            <tr v-for="tx in g.items" :key="tx.id" class="group hover:bg-surface-2 dark:hover:bg-slate-800/50">
               <!-- Date -->
-              <td class="px-5 py-3 whitespace-nowrap text-slate-600 dark:text-slate-300">
+              <td class="px-5 py-3 whitespace-nowrap text-muted">
                 {{ mode === "global" ? formatDateTime(tx.executedAt) : formatDate(tx.executedAt) }}
               </td>
 
@@ -438,7 +438,7 @@ const colCount = computed(() =>
               </td>
 
               <!-- Portfolio (global only) -->
-              <td v-if="mode === 'global'" class="px-5 py-3 text-slate-600 dark:text-slate-300">
+              <td v-if="mode === 'global'" class="px-5 py-3 text-muted">
                 {{ tx.portfolioName || "—" }}
               </td>
 
@@ -456,7 +456,7 @@ const colCount = computed(() =>
               </td>
 
               <!-- Fees -->
-              <td class="px-5 py-3 text-right text-slate-600 tabular-nums dark:text-slate-300">
+              <td class="px-5 py-3 text-right text-muted tabular-nums dark:text-slate-300">
                 <FeeCell
                   :fees="tx.fees"
                   :fee-currency="tx.feeCurrency"
@@ -477,7 +477,7 @@ const colCount = computed(() =>
                     :display-currency="tx.displayCurrency"
                   />
                 </template>
-                <span v-else class="text-slate-400">—</span>
+                <span v-else class="text-muted">—</span>
               </td>
 
               <!-- Amount. A transfer shows the quantity that changed custody, never a cash
@@ -487,7 +487,7 @@ const colCount = computed(() =>
                 class="px-5 py-3 text-right font-medium tabular-nums"
                 :class="isTransfer(tx.type)
                   ? 'text-violet-600 dark:text-violet-400'
-                  : amountOf(tx) < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-700 dark:text-green-400'"
+                  : amountOf(tx) < 0 ? 'text-danger' : 'text-emerald'"
               >
                 <span
                   v-if="isTransfer(tx.type)"
@@ -504,13 +504,13 @@ const colCount = computed(() =>
               </td>
 
               <!-- Instrument currency badge (global only) -->
-              <td v-if="mode === 'global'" class="px-5 py-3 text-xs text-slate-400 dark:text-slate-500">
+              <td v-if="mode === 'global'" class="px-5 py-3 text-xs text-muted dark:text-muted">
                 {{ tx.instrumentCurrency }}
               </td>
 
               <!-- Actions — sticky right, opaque so nothing shows through -->
               <td
-                class="sticky right-0 z-10 bg-white px-5 py-3 shadow-[-1px_0_0_0_#e2e8f0] group-hover:bg-slate-50 dark:bg-slate-900 dark:shadow-[-1px_0_0_0_#334155] dark:group-hover:bg-slate-800"
+                class="sticky right-0 z-10 bg-white px-5 py-3 shadow-[-1px_0_0_0_#e2e8f0] group-hover:bg-surface-2 dark:bg-slate-900 dark:shadow-[-1px_0_0_0_#334155] dark:group-hover:bg-slate-800"
               >
                 <div class="flex justify-end gap-1">
                   <button v-if="!props.readonly" type="button" class="btn-ghost px-2 py-1 text-xs" aria-label="Edit transaction" @click="openEdit(tx)">Edit</button>
@@ -518,7 +518,7 @@ const colCount = computed(() =>
                   <button
                     v-if="!props.readonly"
                     type="button"
-                    class="btn-ghost px-2 py-1 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10"
+                    class="btn-ghost px-2 py-1 text-xs text-danger hover:bg-red-50 dark:hover:bg-red-500/10"
                     aria-label="Delete transaction"
                     @click="openDelete(tx)"
                   >Delete</button>
@@ -527,31 +527,31 @@ const colCount = computed(() =>
             </tr>
 
             <!-- Group subtotal -->
-            <tr v-if="g.label" class="border-t border-slate-200 dark:border-slate-700/60 bg-slate-50 dark:bg-slate-800/50 font-medium">
-              <td class="px-5 py-3 text-slate-500 dark:text-slate-400" :colspan="(mode === 'global' ? 7 : 6) + (hasTaxRows ? 1 : 0)">{{ g.label }} subtotal</td>
+            <tr v-if="g.label" class="border-t border-border bg-surface-2 font-medium">
+              <td class="px-5 py-3 text-muted" :colspan="(mode === 'global' ? 7 : 6) + (hasTaxRows ? 1 : 0)">{{ g.label }} subtotal</td>
               <td
                 class="px-5 py-3 text-right font-medium tabular-nums"
-                :class="groupSubtotal(g.items) < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-700 dark:text-green-400'"
+                :class="groupSubtotal(g.items) < 0 ? 'text-danger' : 'text-emerald'"
               >
                 {{ formatCurrency(groupSubtotal(g.items), g.items[0]?.displayCurrency) }}
               </td>
               <td v-if="mode === 'global'" class="px-5 py-3"></td>
               <td
-                class="sticky right-0 z-10 bg-slate-50 px-5 py-3 shadow-[-1px_0_0_0_#e2e8f0] dark:bg-slate-800 dark:shadow-[-1px_0_0_0_#334155]"
+                class="sticky right-0 z-10 bg-surface-2 px-5 py-3 shadow-[-1px_0_0_0_#e2e8f0] dark:bg-slate-800 dark:shadow-[-1px_0_0_0_#334155]"
               ></td>
             </tr>
           </tbody>
         </table>
       </div>
-      <p v-else class="px-5 py-6 text-sm text-slate-500 dark:text-slate-400">No transactions found.</p>
+      <p v-else class="px-5 py-6 text-sm text-muted">No transactions found.</p>
 
       <!-- Shared full paginator (both modes) -->
-      <div v-if="transactions.length" class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 dark:border-slate-700/60 px-5 py-3">
-        <p class="text-sm text-slate-500 dark:text-slate-400">
+      <div v-if="transactions.length" class="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3">
+        <p class="text-sm text-muted">
           {{ (page - 1) * pageSize + 1 }}–{{ Math.min(page * pageSize, total) }} of {{ total }}
         </p>
         <div class="flex items-center gap-4">
-          <label class="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+          <label class="flex items-center gap-2 text-sm text-muted">
             Rows per page
             <select class="input py-1" :value="pageSize" @change="onPageSizeChange">
               <option v-for="s in pageSizes" :key="s" :value="s">{{ s }} per page</option>

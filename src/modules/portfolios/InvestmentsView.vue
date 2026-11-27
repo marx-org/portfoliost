@@ -216,28 +216,28 @@ async function submitCreate() {
       </div>
       <div class="flex items-center gap-2">
         <div v-if="portfolioTab !== 'virtual'" class="card flex items-center gap-2 px-3 py-1.5">
-          <span class="text-xs text-slate-500 dark:text-slate-400">Cash balance</span>
-          <span class="text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100" data-testid="cash-balance">
+          <span class="text-xs text-muted">Cash balance</span>
+          <span class="text-sm font-semibold tabular-nums text-text" data-testid="cash-balance">
             {{ formatCurrency(cashTotal, displayCurrency) }}
           </span>
-          <span v-for="c in cashBreakdown" :key="c.currency" class="text-xs text-slate-500 dark:text-slate-400">
+          <span v-for="c in cashBreakdown" :key="c.currency" class="text-xs text-muted">
             {{ c.currency }} {{ formatPercent(c.pct, 0) }}
           </span>
         </div>
         <div class="relative">
           <button type="button" class="btn-secondary text-sm" @click="showCurrencyMenu = !showCurrencyMenu">
             Display currency: {{ displayCurrency }} ({{ currencySymbol(displayCurrency) }})
-            <span class="ml-1 text-xs text-slate-400 dark:text-slate-500">▾</span>
+            <span class="ml-1 text-xs text-muted dark:text-muted">▾</span>
           </button>
           <template v-if="showCurrencyMenu">
             <div class="fixed inset-0 z-20" @click="showCurrencyMenu = false"></div>
-            <div class="absolute right-0 z-30 mt-1 w-44 rounded-lg border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700/60 dark:bg-slate-900">
+            <div class="absolute right-0 z-30 mt-1 w-44 rounded-lg border border-border bg-white py-1 shadow-lg dark:border-slate-700/60 dark:bg-slate-900">
               <button
                 v-for="c in currencies"
                 :key="c"
                 type="button"
-                class="block w-full px-4 py-2 text-left text-sm hover:bg-slate-50"
-                :class="displayCurrency === c ? 'bg-blue-50 text-blue-700' : 'text-slate-700'"
+                class="block w-full px-4 py-2 text-left text-sm hover:bg-surface-2"
+                :class="displayCurrency === c ? 'bg-accent-soft text-accent-text' : 'text-text'"
                 @click="setDisplayCurrency(c)"
               >
                 {{ c }}
@@ -273,8 +273,8 @@ async function submitCreate() {
 
     <InvestmentsTabs />
 
-    <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-400">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading portfolios...</p>
+    <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-danger dark:bg-red-500/10 dark:text-red-400">{{ error }}</p>
+    <p v-if="loading" class="text-sm text-muted">Loading portfolios...</p>
 
     <template v-if="store.totalMetrics && portfolioTab !== 'virtual'">
       <!-- §68 — cash is a first-class citizen. Four tiles, each labelled with what
@@ -302,7 +302,7 @@ async function submitCreate() {
     <div v-if="portfolioTab !== 'virtual'" class="card mb-6 flex flex-wrap items-center justify-between gap-3 p-6">
       <div>
         <h2 class="card-title">Portfolio performance</h2>
-        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+        <p class="mt-1 text-sm text-muted">
           Value, returns and drawdown across all {{ store.portfolios.length }} portfolios.
         </p>
       </div>
@@ -314,13 +314,13 @@ async function submitCreate() {
     <section v-if="!loading" class="mb-10">
       <div class="mb-4 flex items-center justify-between">
         <h2 class="card-title">{{ portfolioTab === "virtual" ? "Virtual Portfolios" : "Investment Portfolios" }}</h2>
-        <span v-if="visiblePortfolios.length" class="text-sm text-slate-500 dark:text-slate-400">{{ visiblePortfolios.length }}</span>
+        <span v-if="visiblePortfolios.length" class="text-sm text-muted">{{ visiblePortfolios.length }}</span>
       </div>
 
       <div v-if="visiblePortfolios.length" class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         <PortfolioCard v-for="p in visiblePortfolios" :key="p.id" :portfolio="p" :freshness="freshnessById.get(p.id)" :value="valuesById.get(p.id)" @add-position="openAddPosition(p.id)" />
       </div>
-      <p v-else-if="!error" class="text-sm text-slate-500 dark:text-slate-400">No {{ portfolioTab === 'virtual' ? 'virtual' : 'investment' }} portfolios yet.</p>
+      <p v-else-if="!error" class="text-sm text-muted">No {{ portfolioTab === 'virtual' ? 'virtual' : 'investment' }} portfolios yet.</p>
 
       <div class="mt-4">
         <button type="button" class="btn-secondary text-sm" @click="showCreate = true">Create Investment Portfolio</button>
@@ -332,9 +332,9 @@ async function submitCreate() {
         <div>
           <h2 class="card-title">Cash</h2>
           <div class="mt-0.5 flex items-center gap-3 text-sm">
-            <span class="text-slate-500 dark:text-slate-400">Total Balance</span>
+            <span class="text-muted">Total Balance</span>
             <span class="font-semibold tabular-nums" data-testid="cash-total-balance">{{ formatCurrency(cashTotal, displayCurrency) }}</span>
-            <span v-for="c in cashBreakdown" :key="c.currency" class="text-xs text-slate-500 dark:text-slate-400">
+            <span v-for="c in cashBreakdown" :key="c.currency" class="text-xs text-muted">
               {{ c.currency }} {{ formatPercent(c.pct, 0) }}
             </span>
           </div>
@@ -350,31 +350,31 @@ async function submitCreate() {
       <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Create portfolio">
         <h3 class="mb-4 text-base font-semibold">Create a portfolio</h3>
         <form @submit.prevent="submitCreate">
-          <label for="portfolio-name" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Name</label>
+          <label for="portfolio-name" class="mb-1 block text-sm text-muted">Name</label>
           <input id="portfolio-name" v-model="newPortfolio.name" type="text" required class="input mb-4" placeholder="e.g. Long-term growth" />
-          <label for="portfolio-description" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Description</label>
+          <label for="portfolio-description" class="mb-1 block text-sm text-muted">Description</label>
           <textarea id="portfolio-description" v-model="newPortfolio.description" rows="2" class="input mb-4" placeholder="Optional"></textarea>
-          <label class="mb-4 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+          <label class="mb-4 flex items-center gap-2 text-sm text-muted">
             <input v-model="newPortfolio.isVirtual" type="checkbox" data-testid="portfolio-virtual" @change="onVirtualChanged" />
             Virtual portfolio
           </label>
           <div v-if="newPortfolio.isVirtual" class="mb-4">
-            <label for="portfolio-label" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Instrument label *</label>
+            <label for="portfolio-label" class="mb-1 block text-sm text-muted">Instrument label *</label>
             <select id="portfolio-label" v-model="newPortfolio.labelId" class="input" required>
               <option value="" disabled>Select a label</option>
               <option v-for="label in labelsStore.labels" :key="label.id" :value="label.id">{{ label.name }}</option>
             </select>
-            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Instruments carrying this label and their transactions appear in the portfolio.</p>
+            <p class="mt-1 text-xs text-muted">Instruments carrying this label and their transactions appear in the portfolio.</p>
           </div>
           <div class="mb-4">
             <div>
-              <label for="portfolio-currency" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Currency</label>
+              <label for="portfolio-currency" class="mb-1 block text-sm text-muted">Currency</label>
               <select id="portfolio-currency" v-model="newPortfolio.currency" class="input">
                 <option v-for="c in currencies" :key="c" :value="c">{{ c }}</option>
               </select>
             </div>
           </div>
-          <p v-if="createError" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ createError }}</p>
+          <p v-if="createError" class="mb-3 text-sm text-danger">{{ createError }}</p>
           <div class="flex justify-end gap-2">
             <button type="button" class="btn-ghost" @click="showCreate = false">Cancel</button>
             <button type="submit" class="btn-primary" :disabled="creating || !newPortfolio.name.trim() || (newPortfolio.isVirtual && !newPortfolio.labelId)">

@@ -130,7 +130,7 @@ describe("TransactionsTable — §49.5 dividend tax column + notes", () => {
       totalPages: 1,
     } as never)
     const wrapper = await mountTable()
-    expect(wrapper.find("span.bg-blue-50").exists()).toBe(true)
+    expect(wrapper.find("span.bg-accent-soft").exists()).toBe(true)
   })
 
   it("renders the notes tooltip marker only when notes exist", async () => {

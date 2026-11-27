@@ -48,37 +48,37 @@ function dateLabel(d: string): string {
 
 <template>
   <div class="space-y-6">
-    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading calendar...</p>
+    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-danger">{{ error }}</p>
+    <p v-if="loading" class="text-sm text-muted">Loading calendar...</p>
 
     <template v-if="!loading && !error && data">
       <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div class="card p-6">
           <h2 class="card-title mb-3">Upcoming Earnings</h2>
           <ul v-if="upcomingEarnings.length" class="space-y-2 text-sm">
-            <li v-for="e in upcomingEarnings" :key="e.date" class="flex items-center justify-between gap-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 px-3 py-2">
+            <li v-for="e in upcomingEarnings" :key="e.date" class="flex items-center justify-between gap-3 rounded-lg bg-surface-2 px-3 py-2">
               <div>
                 <p class="font-medium">{{ e.title ?? `Q${e.quarter} ${e.year} Earnings Call` }}</p>
-                <p class="text-xs text-slate-500 dark:text-slate-400">{{ dateLabel(e.date) }}</p>
+                <p class="text-xs text-muted">{{ dateLabel(e.date) }}</p>
               </div>
-              <span class="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-400">Q{{ e.quarter }}</span>
+              <span class="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent-text">Q{{ e.quarter }}</span>
             </li>
           </ul>
-          <p v-else class="text-sm text-slate-500 dark:text-slate-400">No upcoming earnings.</p>
+          <p v-else class="text-sm text-muted">No upcoming earnings.</p>
         </div>
 
         <div class="card p-6">
           <h2 class="card-title mb-3">Upcoming Ex-Dividend</h2>
           <ul v-if="upcomingEx.length" class="space-y-2 text-sm">
-            <li v-for="e in upcomingEx" :key="e.date" class="flex items-center justify-between gap-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 px-3 py-2">
+            <li v-for="e in upcomingEx" :key="e.date" class="flex items-center justify-between gap-3 rounded-lg bg-surface-2 px-3 py-2">
               <div>
                 <p class="font-medium">{{ e.title ?? "Ex-Dividend" }}</p>
-                <p class="text-xs text-slate-500 dark:text-slate-400">{{ dateLabel(e.date) }}</p>
+                <p class="text-xs text-muted">{{ dateLabel(e.date) }}</p>
               </div>
-              <span class="font-semibold text-green-700 dark:text-green-400">{{ formatAmount(e.amount, instrCcy) }}</span>
+              <span class="font-semibold text-emerald">{{ formatAmount(e.amount, instrCcy) }}</span>
             </li>
           </ul>
-          <p v-else class="text-sm text-slate-500 dark:text-slate-400">No upcoming ex-dividend dates.</p>
+          <p v-else class="text-sm text-muted">No upcoming ex-dividend dates.</p>
         </div>
 
         <!-- §49.6/49.9 — payment dates ride the calendar dividend rows; the
@@ -87,15 +87,15 @@ function dateLabel(d: string): string {
         <div class="card p-6">
           <h2 class="card-title mb-3">Upcoming Dividend</h2>
           <ul v-if="upcomingDivs.length" class="space-y-2 text-sm">
-            <li v-for="e in upcomingDivs" :key="e.date" class="flex items-center justify-between gap-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 px-3 py-2">
+            <li v-for="e in upcomingDivs" :key="e.date" class="flex items-center justify-between gap-3 rounded-lg bg-surface-2 px-3 py-2">
               <div>
                 <p class="font-medium">{{ e.title ?? "Dividend" }}</p>
-                <p class="text-xs text-slate-500 dark:text-slate-400">{{ dateLabel(e.date) }}</p>
+                <p class="text-xs text-muted">{{ dateLabel(e.date) }}</p>
               </div>
-              <span class="font-semibold text-green-700 dark:text-green-400">{{ formatAmount(e.amount, instrCcy) }}</span>
+              <span class="font-semibold text-emerald">{{ formatAmount(e.amount, instrCcy) }}</span>
             </li>
           </ul>
-          <p v-else class="text-sm text-slate-500 dark:text-slate-400">No upcoming dividends.</p>
+          <p v-else class="text-sm text-muted">No upcoming dividends.</p>
         </div>
       </div>
 
@@ -104,14 +104,14 @@ function dateLabel(d: string): string {
         <div class="overflow-x-auto">
           <table class="w-full min-w-[560px] text-sm">
             <thead>
-              <tr class="border-b border-slate-200 dark:border-slate-700/60 text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <tr class="border-b border-border text-left text-xs uppercase tracking-wide text-muted">
                 <th class="py-2 pr-3">Date</th>
                 <th class="py-2 pr-3">Event</th>
                 <th class="py-2 pr-3 text-right">Quarter</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="e in pastEarnings" :key="e.date" class="border-b border-slate-100 dark:border-slate-800">
+              <tr v-for="e in pastEarnings" :key="e.date" class="border-b border-border">
                 <td class="py-2 pr-3">{{ dateLabel(e.date) }}</td>
                 <td class="py-2 pr-3">{{ e.title ?? `Q${e.quarter} ${e.year} Earnings Call` }}</td>
                 <td class="py-2 pr-3 text-right">Q{{ e.quarter }}</td>

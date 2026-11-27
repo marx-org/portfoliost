@@ -81,21 +81,21 @@ const chartSeries = computed(() => [
         <h2 class="sr-only">Dividend Payers by Month — {{ selectedYear }}</h2>
         <component :is="'apexchart'" :options="chartOptions" :series="chartSeries" />
       </div>
-      <p v-if="hasPartial" class="text-xs text-slate-500" :data-testid="`${testid}-partial`">
+      <p v-if="hasPartial" class="text-xs text-muted" :data-testid="`${testid}-partial`">
         {{ selectedYear }} is in progress; the current and later months are year-to-date, not a full-year forecast.
       </p>
       <CollapsibleSection title="Dividend Payers" :testid="`${testid}-table`">
         <table class="w-full text-sm">
           <thead>
-            <tr class="border-b border-slate-100 text-left text-xs uppercase text-slate-500 dark:border-slate-800 dark:text-slate-400">
+            <tr class="border-b border-border text-left text-xs uppercase text-muted dark:border-slate-800 dark:text-muted">
               <th class="px-5 py-2.5 font-medium">Month</th>
               <th class="px-5 py-2.5 text-right font-medium">Payers</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-            <tr v-for="m in yearRows" :key="m.month" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-              <td class="px-5 py-3 font-medium text-slate-900 dark:text-slate-100">
-                {{ MONTHS[m.month - 1] }}<span v-if="m.partial" class="ml-1 text-xs text-slate-400">YTD</span>
+            <tr v-for="m in yearRows" :key="m.month" class="hover:bg-surface-2 dark:hover:bg-slate-800/50">
+              <td class="px-5 py-3 font-medium text-text">
+                {{ MONTHS[m.month - 1] }}<span v-if="m.partial" class="ml-1 text-xs text-muted">YTD</span>
               </td>
               <td class="px-5 py-3 text-right tabular-nums">{{ m.count }}</td>
             </tr>
@@ -103,6 +103,6 @@ const chartSeries = computed(() => [
         </table>
       </CollapsibleSection>
     </template>
-    <p v-else class="text-sm text-slate-500 dark:text-slate-400">No dividend-payer data for this scope.</p>
+    <p v-else class="text-sm text-muted">No dividend-payer data for this scope.</p>
   </div>
 </template>
