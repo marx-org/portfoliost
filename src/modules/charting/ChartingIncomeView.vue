@@ -22,6 +22,13 @@ const currency = computed(() => data.value?.currency ?? "")
 
 <template>
   <div class="space-y-3" data-testid="charting-income">
+  <div class="page-header" data-testid="charting-income">
+    <div>
+      <p class="page-eyebrow"><span class="signal-dot" /> CHARTING</p>
+      <h1 class="page-title">Income</h1>
+    </div>
+  </div>
+
     <p v-if="loading" class="text-sm text-muted">Loading…</p>
     <p v-else-if="error" class="text-sm text-danger">Failed to load income data.</p>
     <template v-else>

@@ -64,6 +64,13 @@ const hasSlices = computed(
 
 <template>
   <div class="space-y-3" data-testid="charting-allocation">
+  <div class="page-header" data-testid="charting-allocation">
+    <div>
+      <p class="page-eyebrow"><span class="signal-dot" /> CHARTING</p>
+      <h1 class="page-title">Allocation</h1>
+    </div>
+  </div>
+
     <p v-if="loading" class="text-sm text-muted">Loading…</p>
     <p v-else-if="error" class="text-sm text-danger">Failed to load allocation data.</p>
     <template v-else>

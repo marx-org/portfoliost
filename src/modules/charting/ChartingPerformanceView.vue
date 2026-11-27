@@ -39,6 +39,13 @@ const benchmarkOptions = [
 
 <template>
   <div class="space-y-3" data-testid="charting-performance">
+  <div class="page-header" data-testid="charting-performance">
+    <div>
+      <p class="page-eyebrow"><span class="signal-dot" /> CHARTING</p>
+      <h1 class="page-title">Performance</h1>
+    </div>
+  </div>
+
     <p v-if="loading" class="text-sm text-muted">Loading…</p>
     <p v-else-if="error" class="text-sm text-danger">Failed to load performance data.</p>
     <template v-else>
