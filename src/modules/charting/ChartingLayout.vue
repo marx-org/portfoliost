@@ -145,12 +145,12 @@ function onDateChange(which: "from" | "to", event: Event) {
 
     <!-- Scope toolbar -->
     <div class="toolbar" data-testid="charting-toolbar">
-      <div class="flex items-center gap-1 rounded border border-slate-300 p-0.5 dark:border-slate-600" data-testid="charting-kind-switch">
-        <span class="px-1 text-xs font-medium uppercase text-slate-400 dark:text-slate-500">Portfolios</span>
+      <div class="flex items-center gap-1 rounded border border-border p-0.5 dark:border-slate-600" data-testid="charting-kind-switch">
+        <span class="px-1 text-xs font-medium uppercase text-muted dark:text-muted">Portfolios</span>
         <button
           type="button"
           class="rounded px-2 py-0.5 text-xs"
-          :class="kind === 'normal' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'"
+          :class="kind === 'normal' ? 'bg-blue-600 text-white' : 'text-muted hover:bg-surface-2 dark:text-slate-300 dark:hover:bg-slate-800'"
           @click="scope.setKind('normal')"
         >
           Normal
@@ -158,21 +158,21 @@ function onDateChange(which: "from" | "to", event: Event) {
         <button
           type="button"
           class="rounded px-2 py-0.5 text-xs"
-          :class="kind === 'virtual' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'"
+          :class="kind === 'virtual' ? 'bg-blue-600 text-white' : 'text-muted hover:bg-surface-2 dark:text-slate-300 dark:hover:bg-slate-800'"
           @click="scope.setKind('virtual')"
         >
           Virtual
         </button>
       </div>
       <div class="flex flex-wrap items-center gap-2">
-        <span class="text-xs font-medium uppercase text-slate-400 dark:text-slate-500">Accounts</span>
-        <span v-if="allAccounts" class="text-xs text-slate-500">All</span>
+        <span class="text-xs font-medium uppercase text-muted dark:text-muted">Accounts</span>
+        <span v-if="allAccounts" class="text-xs text-muted">All</span>
         <button
           v-for="p in visibleAccounts"
           :key="p.id"
           type="button"
           class="rounded border px-2 py-0.5 text-xs"
-          :class="selectedAccountIds.includes(p.id) ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 'border-slate-300 dark:border-slate-600'"
+          :class="selectedAccountIds.includes(p.id) ? 'border-blue-500 bg-accent-soft text-accent-text dark:bg-blue-900/30 dark:text-blue-300' : 'border-border'"
           @click="toggleAccount(p.id)"
         >
           {{ p.name }}
@@ -182,9 +182,9 @@ function onDateChange(which: "from" | "to", event: Event) {
            label filter only applies to normal accounts. -->
       <template v-if="kind === 'normal'">
         <label-filter-bar :model-value="selectedLabelIds" @update:model-value="scope.setLabels" />
-        <span v-if="allLabels" class="text-xs text-slate-500">All labels</span>
+        <span v-if="allLabels" class="text-xs text-muted">All labels</span>
       </template>
-      <label class="flex items-center gap-1 text-xs font-medium uppercase text-slate-400 dark:text-slate-500" for="charting-currency">
+      <label class="flex items-center gap-1 text-xs font-medium uppercase text-muted dark:text-muted" for="charting-currency">
         Currency
         <select
           id="charting-currency"
@@ -202,14 +202,14 @@ function onDateChange(which: "from" | "to", event: Event) {
           :key="r.key"
           type="button"
           class="btn-secondary text-xs"
-          :class="activeRange === r.key ? 'border-blue-600 bg-blue-50 text-blue-700 dark:border-blue-600 dark:bg-blue-500/10 dark:text-blue-400' : ''"
+          :class="activeRange === r.key ? 'border-blue-600 bg-accent-soft text-accent-text dark:border-blue-600 dark:bg-accent-soft0/10 dark:text-blue-400' : ''"
           :aria-pressed="activeRange === r.key"
           :data-testid="`charting-range-${r.key.toLowerCase()}`"
           @click="setRange(r.key)"
         >
           {{ r.label }}
         </button>
-        <label class="ml-1 text-xs font-medium uppercase text-slate-400 dark:text-slate-500" for="charting-date-from">From</label>
+        <label class="ml-1 text-xs font-medium uppercase text-muted dark:text-muted" for="charting-date-from">From</label>
         <input
           id="charting-date-from"
           type="date"
@@ -218,7 +218,7 @@ function onDateChange(which: "from" | "to", event: Event) {
           data-testid="charting-date-from"
           @change="onDateChange('from', $event)"
         />
-        <label class="text-xs font-medium uppercase text-slate-400 dark:text-slate-500" for="charting-date-to">To</label>
+        <label class="text-xs font-medium uppercase text-muted dark:text-muted" for="charting-date-to">To</label>
         <input
           id="charting-date-to"
           type="date"

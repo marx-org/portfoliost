@@ -25,7 +25,7 @@ function toggle(id: string) {
 
 <template>
   <div class="flex flex-wrap items-center gap-2" data-testid="label-filter-bar">
-    <span class="text-xs font-medium uppercase text-slate-400 dark:text-slate-500">Labels</span>
+    <span class="text-xs font-medium uppercase text-muted dark:text-muted">Labels</span>
     <LabelBadge
       v-for="l in labels"
       :key="l.id"
@@ -36,7 +36,7 @@ function toggle(id: string) {
     />
     <button
       type="button"
-      class="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 underline"
+      class="text-xs text-accent-text hover:text-accent-text dark:hover:text-blue-300 underline"
       @click="emit('manage')"
     >
       Manage labels

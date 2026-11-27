@@ -92,8 +92,8 @@ function onModalDone() {
 
 <template>
   <div class="space-y-6">
-    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading cash...</p>
+    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-danger">{{ error }}</p>
+    <p v-if="loading" class="text-sm text-muted">Loading cash...</p>
 
     <template v-if="!loading && cash">
       <!-- Balance block + actions -->
@@ -101,7 +101,7 @@ function onModalDone() {
         <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 class="text-lg font-semibold">Cash Balance</h2>
-            <p class="text-sm tabular-nums text-slate-600 dark:text-slate-300" data-testid="cash-tab-total">
+            <p class="text-sm tabular-nums text-muted" data-testid="cash-tab-total">
               {{ formatCurrency(cash.total, baseCurrency) }}
             </p>
           </div>
@@ -140,8 +140,8 @@ function onModalDone() {
             class="flex items-center justify-between py-2"
             :data-testid="`cash-balance-${b.currency}`"
           >
-            <span class="text-sm text-slate-600 dark:text-slate-300">{{ b.currency }}</span>
-            <span class="text-sm font-medium tabular-nums text-slate-900 dark:text-slate-100" :class="b.balance < 0 ? 'text-amber-700 dark:text-amber-400' : ''">
+            <span class="text-sm text-muted">{{ b.currency }}</span>
+            <span class="text-sm font-medium tabular-nums text-text" :class="b.balance < 0 ? 'text-amber-700 dark:text-amber-400' : ''">
               {{ formatCurrency(b.balance, b.currency) }}
             </span>
           </div>

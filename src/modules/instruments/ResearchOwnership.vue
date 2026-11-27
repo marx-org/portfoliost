@@ -50,8 +50,8 @@ function amount(v: number): string {
 
 <template>
   <div class="space-y-6">
-    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading ownership...</p>
+    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-danger">{{ error }}</p>
+    <p v-if="loading" class="text-sm text-muted">Loading ownership...</p>
 
     <template v-if="!loading && !error && data">
       <div class="card p-6">
@@ -60,7 +60,7 @@ function amount(v: number): string {
         <div class="mt-3 overflow-x-auto">
           <table class="w-full min-w-[640px] text-sm">
             <thead>
-              <tr class="border-b border-slate-200 dark:border-slate-700/60 text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <tr class="border-b border-border text-left text-xs uppercase tracking-wide text-muted">
                 <th class="py-2 pr-3">Period</th>
                 <th class="py-2 pr-3 text-right">Holding %</th>
                 <th class="py-2 pr-3 text-right">Holders</th>
@@ -69,7 +69,7 @@ function amount(v: number): string {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="r in institutional" :key="r.date" class="border-b border-slate-100 dark:border-slate-800">
+              <tr v-for="r in institutional" :key="r.date" class="border-b border-border">
                 <td class="py-2 pr-3 font-medium">{{ r.date }}</td>
                 <td class="py-2 pr-3 text-right">{{ formatNumber(r.holdingPercentage) }}%</td>
                 <td class="py-2 pr-3 text-right">{{ formatNumber(r.holdersCount, 0) }}</td>
@@ -87,7 +87,7 @@ function amount(v: number): string {
         <div class="mt-3 overflow-x-auto">
           <table class="w-full min-w-[640px] text-sm">
             <thead>
-              <tr class="border-b border-slate-200 dark:border-slate-700/60 text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <tr class="border-b border-border text-left text-xs uppercase tracking-wide text-muted">
                 <th class="py-2 pr-3">Period</th>
                 <th class="py-2 pr-3 text-right">Holding %</th>
                 <th class="py-2 pr-3 text-right">Holders</th>
@@ -96,7 +96,7 @@ function amount(v: number): string {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="r in mutualFund" :key="r.date" class="border-b border-slate-100 dark:border-slate-800">
+              <tr v-for="r in mutualFund" :key="r.date" class="border-b border-border">
                 <td class="py-2 pr-3 font-medium">{{ r.date }}</td>
                 <td class="py-2 pr-3 text-right">{{ formatNumber(r.holdingPercentage) }}%</td>
                 <td class="py-2 pr-3 text-right">{{ formatNumber(r.holdersCount, 0) }}</td>
@@ -113,7 +113,7 @@ function amount(v: number): string {
         <div class="overflow-x-auto">
           <table class="w-full min-w-[640px] text-sm">
             <thead>
-              <tr class="border-b border-slate-200 dark:border-slate-700/60 text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <tr class="border-b border-border text-left text-xs uppercase tracking-wide text-muted">
                 <th class="py-2 pr-3">Period</th>
                 <th class="py-2 pr-3 text-right">Holding %</th>
                 <th class="py-2 pr-3 text-right">Holders</th>
@@ -122,7 +122,7 @@ function amount(v: number): string {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="r in insider" :key="r.date" class="border-b border-slate-100 dark:border-slate-800">
+              <tr v-for="r in insider" :key="r.date" class="border-b border-border">
                 <td class="py-2 pr-3 font-medium">{{ r.date }}</td>
                 <td class="py-2 pr-3 text-right">{{ formatNumber(r.holdingPercentage) }}%</td>
                 <td class="py-2 pr-3 text-right">{{ formatNumber(r.holdersCount, 0) }}</td>
@@ -139,7 +139,7 @@ function amount(v: number): string {
         <div class="overflow-x-auto">
           <table class="w-full min-w-[720px] text-sm">
             <thead>
-              <tr class="border-b border-slate-200 dark:border-slate-700/60 text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <tr class="border-b border-border text-left text-xs uppercase tracking-wide text-muted">
                 <th class="py-2 pr-3">Insider</th>
                 <th class="py-2 pr-3">Date</th>
                 <th class="py-2 pr-3">Code</th>
@@ -150,7 +150,7 @@ function amount(v: number): string {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(t, i) in transactions" :key="i" class="border-b border-slate-100 dark:border-slate-800">
+              <tr v-for="(t, i) in transactions" :key="i" class="border-b border-border">
                 <td class="py-2 pr-3 font-medium">{{ t.title }}</td>
                 <td class="py-2 pr-3">{{ t.transactionDate }}</td>
                 <td class="py-2 pr-3">{{ t.transactionCode }}</td>

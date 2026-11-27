@@ -12,7 +12,7 @@ defineProps<{ text: string; testid?: string }>()
 <template>
   <span class="group/tip relative inline-flex">
     <span
-      class="cursor-help text-slate-400 outline-none focus:text-slate-600 dark:focus:text-slate-200"
+      class="cursor-help text-muted outline-none focus:text-muted dark:focus:text-slate-200"
       tabindex="0"
       role="note"
       :aria-label="text"

@@ -128,15 +128,15 @@ import TickerBadge from "@/components/TickerBadge.vue"
     @click.self="emit('close')"
   >
     <div class="card w-full max-w-md" role="dialog" aria-modal="true" aria-label="Record Dividend">
-      <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-700/60">
+      <div class="flex items-center justify-between border-b border-border px-5 py-4 dark:border-slate-700/60">
         <h2 class="text-base font-semibold" data-testid="dividend-title">Record dividend</h2>
-        <button type="button" class="btn-ghost px-2 text-slate-400" aria-label="Close modal" @click="emit('close')">
+        <button type="button" class="btn-ghost px-2 text-muted" aria-label="Close modal" @click="emit('close')">
           &times;
         </button>
       </div>
 
       <div class="p-5">
-        <div class="mb-4 rounded-xl border border-slate-200 p-3 dark:border-slate-700/60">
+        <div class="mb-4 rounded-xl border border-border p-3 dark:border-slate-700/60">
           <div class="flex items-center gap-3">
             <!-- §85.2 — the only research affordance in this dialog. -->
             <TickerBadge
@@ -149,9 +149,9 @@ import TickerBadge from "@/components/TickerBadge.vue"
               @click="goResearch"
             />
           </div>
-          <p class="mt-2 text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500" data-testid="dividend-shares-held">
+          <p class="mt-2 text-[11px] uppercase tracking-wide text-muted dark:text-muted" data-testid="dividend-shares-held">
             Shares held:
-            <span class="font-semibold text-slate-900 dark:text-slate-100">{{ position.quantity }}</span>
+            <span class="font-semibold text-text">{{ position.quantity }}</span>
           </p>
         </div>
         <DividendFields
@@ -183,10 +183,10 @@ import TickerBadge from "@/components/TickerBadge.vue"
           </template>
         </DividendFields>
 
-        <p v-if="error" class="mt-3 text-sm text-red-600 dark:text-red-400">{{ error }}</p>
+        <p v-if="error" class="mt-3 text-sm text-danger">{{ error }}</p>
       </div>
 
-      <div class="flex justify-end gap-2 border-t border-slate-200 px-5 py-4 dark:border-slate-700/60">
+      <div class="flex justify-end gap-2 border-t border-border px-5 py-4 dark:border-slate-700/60">
         <button type="button" class="btn-ghost" @click="emit('close')">Cancel</button>
         <button
           type="button"

@@ -64,7 +64,7 @@ function onKeydown(e: KeyboardEvent) {
       @keydown.esc="onKeydown"
     >
       <div class="card w-full max-w-lg overflow-hidden" role="dialog" aria-modal="true" aria-label="Search for Instruments">
-        <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-700/60 px-4 py-3">
+        <div class="flex items-center justify-between border-b border-border px-4 py-3">
           <h3 class="text-base font-semibold">{{ title }}</h3>
           <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="emit('close')">✕</button>
         </div>
@@ -79,19 +79,19 @@ function onKeydown(e: KeyboardEvent) {
           />
 
           <div v-if="query.trim().length < 1" class="mt-4">
-            <p class="text-sm text-slate-500 dark:text-slate-400">Recent searches</p>
+            <p class="text-sm text-muted">Recent searches</p>
             <RecentSearchesBar variant="chips" class="mt-2" @select="openResult" />
           </div>
 
-          <div v-else-if="store.searching" class="mt-4 text-sm text-slate-500 dark:text-slate-400">Searching...</div>
+          <div v-else-if="store.searching" class="mt-4 text-sm text-muted">Searching...</div>
 
-          <div v-else-if="store.searchError" class="mt-4 text-sm text-red-600 dark:text-red-400">{{ store.searchError }}</div>
+          <div v-else-if="store.searchError" class="mt-4 text-sm text-danger">{{ store.searchError }}</div>
 
           <ul v-else-if="store.searchResults.length" class="mt-2 max-h-72 divide-y divide-slate-100 dark:divide-slate-800 overflow-y-auto">
             <li v-for="result in renderedResults" :key="result.symbol">
               <button
                 type="button"
-                class="flex w-full items-center gap-3 px-2 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                class="flex w-full items-center gap-3 px-2 py-2.5 text-left hover:bg-surface-2 dark:hover:bg-slate-800/50"
                 @click="openResult(result.symbol, result.name)"
               >
                 <span class="flex-1">
@@ -101,16 +101,16 @@ function onKeydown(e: KeyboardEvent) {
                     :country-code="result.countryCode"
                     :asset-type="result.type"
                   />
-                  <span v-if="result.exchange" class="block text-[10px] text-slate-400 dark:text-slate-500">{{ result.exchange }}</span>
+                  <span v-if="result.exchange" class="block text-[10px] text-muted dark:text-muted">{{ result.exchange }}</span>
                 </span>
               </button>
             </li>
           </ul>
-          <p v-if="hiddenCount > 0" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+          <p v-if="hiddenCount > 0" class="mt-2 text-xs text-muted">
             Showing first {{ renderedResults.length }} of {{ store.searchResults.length }} results — refine your search to narrow it down.
           </p>
 
-          <p v-if="!store.searchResults.length && !store.searching && !store.searchError" class="mt-4 text-sm text-slate-500 dark:text-slate-400">
+          <p v-if="!store.searchResults.length && !store.searching && !store.searchError" class="mt-4 text-sm text-muted">
             No results
           </p>
 

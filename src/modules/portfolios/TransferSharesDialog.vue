@@ -158,18 +158,18 @@ async function submit() {
         <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="emit('close')">✕</button>
       </div>
 
-      <p class="mb-4 rounded-lg bg-slate-50 dark:bg-slate-800/50 px-3 py-2 text-sm text-slate-700 dark:text-slate-200">
+      <p class="mb-4 rounded-lg bg-surface-2 px-3 py-2 text-sm text-text">
         An in-kind transfer, not a sale. The shares keep their original cost basis, no cash moves, and nothing is realised — each lot that leaves gets its own matching row in the destination.
       </p>
 
       <form class="grid grid-cols-1 gap-4 sm:grid-cols-2" data-testid="ts-form" @submit.prevent="submit">
         <div class="sm:col-span-2">
-          <label for="ts-search" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Filter holdings</label>
+          <label for="ts-search" class="mb-1 block text-sm text-muted">Filter holdings</label>
           <input id="ts-search" v-model="search" type="search" class="input" placeholder="Symbol or name" data-testid="ts-search" />
         </div>
 
         <div>
-          <label for="ts-instrument" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Instrument *</label>
+          <label for="ts-instrument" class="mb-1 block text-sm text-muted">Instrument *</label>
           <select id="ts-instrument" v-model="symbol" class="input" required data-testid="ts-instrument">
             <option value="" disabled>
               {{ positionsLoading ? "Loading positions…" : filteredPositions.length === 0 ? "No holdings match" : "Select a holding" }}
@@ -181,9 +181,9 @@ async function submit() {
         </div>
 
         <div>
-          <label for="ts-quantity" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">
+          <label for="ts-quantity" class="mb-1 block text-sm text-muted">
             Quantity *
-            <span v-if="selected" class="text-slate-500 dark:text-slate-400">(max {{ formatNumber(maxQuantity, 2) }})</span>
+            <span v-if="selected" class="text-muted">(max {{ formatNumber(maxQuantity, 2) }})</span>
           </label>
           <input
             id="ts-quantity"
@@ -198,7 +198,7 @@ async function submit() {
         </div>
 
         <div>
-          <label for="ts-to-portfolio" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">To portfolio *</label>
+          <label for="ts-to-portfolio" class="mb-1 block text-sm text-muted">To portfolio *</label>
           <select id="ts-to-portfolio" v-model="toPortfolioId" class="input" required data-testid="ts-to-portfolio">
             <option value="" disabled>Select destination portfolio</option>
             <option v-for="p in targetPortfolios" :key="p.id" :value="p.id">{{ p.name }}</option>
@@ -206,19 +206,19 @@ async function submit() {
         </div>
 
         <div>
-          <label for="ts-date" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Date</label>
+          <label for="ts-date" class="mb-1 block text-sm text-muted">Date</label>
           <input id="ts-date" v-model="date" type="date" class="input" data-testid="ts-date" />
         </div>
 
         <div class="sm:col-span-2">
-          <label for="ts-notes" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Note</label>
+          <label for="ts-notes" class="mb-1 block text-sm text-muted">Note</label>
           <input id="ts-notes" v-model="notes" type="text" class="input" maxlength="2000" data-testid="ts-notes" />
         </div>
 
-        <p v-if="overMax" class="text-sm text-red-600 dark:text-red-400 sm:col-span-2" data-testid="ts-over-max">
+        <p v-if="overMax" class="text-sm text-danger sm:col-span-2" data-testid="ts-over-max">
           Only {{ formatNumber(maxQuantity, 2) }} of {{ symbol }} are open in this portfolio.
         </p>
-        <p v-if="error" class="text-sm text-red-600 dark:text-red-400 sm:col-span-2">{{ error }}</p>
+        <p v-if="error" class="text-sm text-danger sm:col-span-2">{{ error }}</p>
         <p v-if="moved" class="text-sm text-emerald-700 dark:text-emerald-300 sm:col-span-2" data-testid="ts-result">
           Moved {{ formatNumber(moved.quantity, 2) }} of {{ moved.legs[0]?.instrumentSymbol }} in
           {{ moved.legs.length / 2 }} lot{{ moved.legs.length / 2 === 1 ? "" : "s" }}.

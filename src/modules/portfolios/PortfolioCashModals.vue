@@ -475,21 +475,21 @@ const amountLabel = computed(() => {
       <div class="mb-4 flex items-center justify-between">
         <h3 class="text-base font-semibold">
           {{ title }}
-          <span v-if="portfolioName" class="block text-xs font-normal text-slate-500 dark:text-slate-400" data-testid="pc-portfolio-name">{{ portfolioName }}</span>
+          <span v-if="portfolioName" class="block text-xs font-normal text-muted" data-testid="pc-portfolio-name">{{ portfolioName }}</span>
         </h3>
         <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="emit('close')">✕</button>
       </div>
 
       <form class="grid grid-cols-1 gap-4 sm:grid-cols-2" data-testid="pc-form" @submit.prevent="submit">
         <template v-if="action === 'withdraw'">
-          <p class="rounded-lg bg-slate-50 dark:bg-slate-800/50 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 sm:col-span-2">
+          <p class="rounded-lg bg-surface-2 px-3 py-2 text-sm text-text sm:col-span-2">
             Available in {{ currency || baseCurrency }}: {{ formatCurrency(availableBalance, currency || baseCurrency) }}
           </p>
         </template>
 
         <template v-if="action === 'transfer' && !isEdit">
           <div>
-            <label for="pc-to-portfolio" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">To Portfolio *</label>
+            <label for="pc-to-portfolio" class="mb-1 block text-sm text-muted">To Portfolio *</label>
             <select id="pc-to-portfolio" v-model="toPortfolioId" class="input" required data-testid="pc-to-portfolio">
               <option value="" disabled>Select destination portfolio</option>
               <option v-for="p in targetPortfolios" :key="p.id" :value="p.id">{{ p.name }}</option>
@@ -498,7 +498,7 @@ const amountLabel = computed(() => {
         </template>
 
         <div>
-          <label for="pc-currency" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Currency</label>
+          <label for="pc-currency" class="mb-1 block text-sm text-muted">Currency</label>
           <select
             id="pc-currency"
             v-model="currency"
@@ -516,31 +516,31 @@ const amountLabel = computed(() => {
         </p>
 
         <div>
-          <label for="pc-amount" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">{{ amountLabel }}</label>
+          <label for="pc-amount" class="mb-1 block text-sm text-muted">{{ amountLabel }}</label>
           <div class="flex gap-2">
-            <div class="flex min-w-0 flex-1 items-center rounded-lg border border-slate-300 dark:border-slate-600 focus-within:border-blue-500">
-              <span class="pl-3 text-sm text-slate-500 dark:text-slate-400">{{ currency }}</span>
+            <div class="flex min-w-0 flex-1 items-center rounded-lg border border-border focus-within:border-blue-500">
+              <span class="pl-3 text-sm text-muted">{{ currency }}</span>
               <input id="pc-amount" v-model.number="amount" type="number" :min="action === 'interest' ? undefined : 0" step="0.01" required class="input !rounded-l-none !border-0 !ring-0 focus:ring-0" placeholder="Enter amount" data-testid="pc-amount" />
             </div>
             <button v-if="action === 'transfer' && !isEdit" type="button" class="btn-secondary shrink-0 text-sm" @click="transferAll">Transfer All</button>
           </div>
-          <p v-if="action === 'interest'" class="mt-1 text-xs text-slate-500 dark:text-slate-400">Positive = credited, negative = charged.</p>
-          <p v-else-if="action === 'conversion'" class="mt-1 text-xs text-slate-500 dark:text-slate-400">The leg handed over. A broker's own conversion residual is booked with no second leg.</p>
-          <p v-else class="mt-1 text-xs text-slate-500 dark:text-slate-400">Available: {{ formatCurrency(availableBalance, currency) }}</p>
+          <p v-if="action === 'interest'" class="mt-1 text-xs text-muted">Positive = credited, negative = charged.</p>
+          <p v-else-if="action === 'conversion'" class="mt-1 text-xs text-muted">The leg handed over. A broker's own conversion residual is booked with no second leg.</p>
+          <p v-else class="mt-1 text-xs text-muted">Available: {{ formatCurrency(availableBalance, currency) }}</p>
         </div>
 
         <template v-if="action === 'conversion'">
           <div>
-            <label for="pc-to-currency" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Received currency</label>
+            <label for="pc-to-currency" class="mb-1 block text-sm text-muted">Received currency</label>
             <select id="pc-to-currency" v-model="toCurrency" class="input" data-testid="pc-to-currency">
               <option v-for="c in receivedOptions" :key="c" :value="c">{{ c }}</option>
             </select>
-            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Same as the first currency = a correction of one balance, not an exchange.</p>
+            <p class="mt-1 text-xs text-muted">Same as the first currency = a correction of one balance, not an exchange.</p>
           </div>
           <div>
-            <label for="pc-to-amount" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Amount received</label>
-            <div class="flex min-w-0 items-center rounded-lg border border-slate-300 dark:border-slate-600 focus-within:border-blue-500">
-              <span class="pl-3 text-sm text-slate-500 dark:text-slate-400">{{ receivedCurrency }}</span>
+            <label for="pc-to-amount" class="mb-1 block text-sm text-muted">Amount received</label>
+            <div class="flex min-w-0 items-center rounded-lg border border-border focus-within:border-blue-500">
+              <span class="pl-3 text-sm text-muted">{{ receivedCurrency }}</span>
               <input id="pc-to-amount" v-model.number="toAmount" type="number" min="0" step="0.01" class="input !rounded-l-none !border-0 !ring-0 focus:ring-0" placeholder="0.00" data-testid="pc-to-amount" />
             </div>
           </div>
@@ -551,7 +551,7 @@ const amountLabel = computed(() => {
         </template>
 
         <div>
-          <label for="pc-date" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Transaction Date</label>
+          <label for="pc-date" class="mb-1 block text-sm text-muted">Transaction Date</label>
           <input id="pc-date" v-model="transactionDate" type="date" class="input" data-testid="pc-date" />
         </div>
 
@@ -572,7 +572,7 @@ const amountLabel = computed(() => {
             <template v-if="action === 'transfer'" #manual>
               <div class="space-y-3">
                 <div>
-                  <label for="pc-target-rate" class="mb-1 block text-xs text-slate-500 dark:text-slate-400">
+                  <label for="pc-target-rate" class="mb-1 block text-xs text-muted">
                     Custom rate ({{ targetCurrency }} per {{ currency }})
                   </label>
                   <input
@@ -587,7 +587,7 @@ const amountLabel = computed(() => {
                   />
                 </div>
                 <div>
-                  <label for="pc-target-amount" class="mb-1 block text-xs text-slate-500 dark:text-slate-400">
+                  <label for="pc-target-amount" class="mb-1 block text-xs text-muted">
                     Target amount in {{ targetCurrency }} (optional)
                   </label>
                   <input
@@ -607,7 +607,7 @@ const amountLabel = computed(() => {
         </template>
 
         <div class="sm:col-span-2">
-          <label for="pc-description" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Description (Optional)</label>
+          <label for="pc-description" class="mb-1 block text-sm text-muted">Description (Optional)</label>
           <input
             id="pc-description"
             v-model="description"
@@ -619,7 +619,7 @@ const amountLabel = computed(() => {
         </div>
 
         <div v-if="action !== 'interest'" class="sm:col-span-2">
-          <label for="pc-fees" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">{{ action === 'conversion' ? "Conversion charge (Optional)" : "Fees (Optional)" }}</label>
+          <label for="pc-fees" class="mb-1 block text-sm text-muted">{{ action === 'conversion' ? "Conversion charge (Optional)" : "Fees (Optional)" }}</label>
           <FeeFields v-model:fees="fees" v-model:fees-type="feesType" v-model:fee-currency="feeCurrency" testid="pc" input-id="pc-fees" />
 
           <FxRateFields
@@ -638,9 +638,9 @@ const amountLabel = computed(() => {
           />
         </div>
 
-        <div class="rounded-lg bg-slate-50 dark:bg-slate-800/50 px-3 py-2 text-sm sm:col-span-2">
-          <p class="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">Transaction Confirmation</p>
-          <dl class="mt-1 space-y-0.5 tabular-nums text-slate-600 dark:text-slate-300">
+        <div class="rounded-lg bg-surface-2 px-3 py-2 text-sm sm:col-span-2">
+          <p class="text-xs font-medium uppercase tracking-wide text-muted dark:text-muted">Transaction Confirmation</p>
+          <dl class="mt-1 space-y-0.5 tabular-nums text-muted">
             <div class="flex justify-between gap-3">
               <dt>{{ action === "transfer" ? "Transfer amount" : action === "conversion" ? "Leg handed over" : "Amount" }}</dt>
               <dd>{{ formatCurrency(amount || 0, currency) }}</dd>
@@ -659,15 +659,15 @@ const amountLabel = computed(() => {
                 </template>
               </dd>
             </div>
-            <div v-if="action === 'deposit' && netCredited != null" class="flex justify-between gap-3 border-t border-slate-200 pt-0.5 font-semibold text-slate-900 dark:text-slate-100 dark:border-slate-700">
+            <div v-if="action === 'deposit' && netCredited != null" class="flex justify-between gap-3 border-t border-border pt-0.5 font-semibold text-text dark:border-slate-700">
               <dt>Total credited (net)</dt>
               <dd>{{ formatCurrency(netCredited, currency) }}</dd>
             </div>
-            <div v-if="action === 'conversion' && receivedCurrency === currency" class="flex justify-between gap-3 border-t border-slate-200 pt-0.5 font-semibold text-slate-900 dark:text-slate-100 dark:border-slate-700">
+            <div v-if="action === 'conversion' && receivedCurrency === currency" class="flex justify-between gap-3 border-t border-border pt-0.5 font-semibold text-text dark:border-slate-700">
               <dt>Balance correction</dt>
               <dd>{{ formatCurrency(netEffect, currency) }}</dd>
             </div>
-            <div v-if="action !== 'deposit' && action !== 'conversion'" class="flex justify-between gap-3 border-t border-slate-200 pt-0.5 font-semibold text-slate-900 dark:text-slate-100 dark:border-slate-700">
+            <div v-if="action !== 'deposit' && action !== 'conversion'" class="flex justify-between gap-3 border-t border-border pt-0.5 font-semibold text-text dark:border-slate-700">
               <dt>Total debited</dt>
               <dd>{{ formatCurrency(totalDebited, currency) }}</dd>
             </div>
@@ -676,7 +676,7 @@ const amountLabel = computed(() => {
               <dd>
                 <template v-if="targetAmountValue != null">{{ formatCurrency(targetAmountValue, targetCurrency || "") }}</template>
                 <template v-else>—</template>
-                <span class="text-xs text-slate-400">{{ transferRateValue != null ? `@ ${transferRateValue.toFixed(4)}` : "· rate pending" }}</span>
+                <span class="text-xs text-muted">{{ transferRateValue != null ? `@ ${transferRateValue.toFixed(4)}` : "· rate pending" }}</span>
               </dd>
             </div>
             <div v-if="action !== 'deposit' && action !== 'conversion'" class="flex justify-between gap-3">
@@ -686,7 +686,7 @@ const amountLabel = computed(() => {
           </dl>
         </div>
 
-        <p v-if="error" class="text-sm text-red-600 dark:text-red-400 sm:col-span-2">{{ error }}</p>
+        <p v-if="error" class="text-sm text-danger sm:col-span-2">{{ error }}</p>
 
         <div class="flex justify-end gap-2 sm:col-span-2">
           <button type="button" class="btn-ghost" @click="emit('close')">Cancel</button>

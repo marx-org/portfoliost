@@ -101,7 +101,7 @@ const donutSeries = computed(() => sectorSlices.value.map((s) => s.value))
       <div v-if="showSectorDonut" class="card p-6" :data-testid="`${testid}-donut`">
         <h2 class="mb-2 text-base font-semibold">By Sector</h2>
         <component :is="'apexchart'" v-if="donutSeries.length" :options="donutOptions" :series="donutSeries" />
-        <p v-else class="text-sm text-slate-500 dark:text-slate-400">No allocation data.</p>
+        <p v-else class="text-sm text-muted">No allocation data.</p>
       </div>
       <component
         :is="collapsibleTables ? CollapsibleSection : 'div'"
@@ -109,20 +109,20 @@ const donutSeries = computed(() => sectorSlices.value.map((s) => s.value))
         :data-testid="`${testid}-by-sector`"
         :title="collapsibleTables ? 'Sector Weights' : undefined"
       >
-        <div v-if="!collapsibleTables" class="border-b border-slate-200 dark:border-slate-700/60 px-5 py-3">
+        <div v-if="!collapsibleTables" class="border-b border-border px-5 py-3">
           <h2 class="text-base font-semibold">Sector Weights</h2>
         </div>
         <table class="w-full text-sm">
           <thead>
-            <tr class="border-b border-slate-100 dark:border-slate-800 text-left text-xs uppercase text-slate-500 dark:text-slate-400">
+            <tr class="border-b border-border text-left text-xs uppercase text-muted">
               <th class="px-5 py-2.5 font-medium">Sector</th>
               <th class="px-5 py-2.5 text-right font-medium">Value</th>
               <th class="px-5 py-2.5 text-right font-medium">Weight</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-            <tr v-for="s in sectorSlices" :key="s.key" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-              <td class="px-5 py-3 font-medium text-slate-900 dark:text-slate-100">{{ label(s) }}</td>
+            <tr v-for="s in sectorSlices" :key="s.key" class="hover:bg-surface-2 dark:hover:bg-slate-800/50">
+              <td class="px-5 py-3 font-medium text-text">{{ label(s) }}</td>
               <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(s.value, rowCurrency(s)) }}</td>
               <td class="px-5 py-3 text-right tabular-nums">{{ formatPercent(percent(s, sectorSlices)) }}</td>
             </tr>
@@ -138,13 +138,13 @@ const donutSeries = computed(() => sectorSlices.value.map((s) => s.value))
         :data-testid="`${testid}-by-asset-type`"
         :title="collapsibleTables ? 'By Asset Type' : undefined"
       >
-        <div v-if="!collapsibleTables" class="border-b border-slate-200 dark:border-slate-700/60 px-5 py-3">
+        <div v-if="!collapsibleTables" class="border-b border-border px-5 py-3">
           <h2 class="text-base font-semibold">By Asset Type</h2>
         </div>
         <table class="w-full text-sm">
           <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-            <tr v-for="s in assetSlices" :key="s.key" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-              <td class="px-5 py-3 font-medium text-slate-900 dark:text-slate-100">{{ label(s) }}</td>
+            <tr v-for="s in assetSlices" :key="s.key" class="hover:bg-surface-2 dark:hover:bg-slate-800/50">
+              <td class="px-5 py-3 font-medium text-text">{{ label(s) }}</td>
               <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(s.value, rowCurrency(s)) }}</td>
               <td class="px-5 py-3 text-right tabular-nums">{{ formatPercent(percent(s, assetSlices)) }}</td>
             </tr>
@@ -157,13 +157,13 @@ const donutSeries = computed(() => sectorSlices.value.map((s) => s.value))
         :data-testid="`${testid}-by-currency`"
         :title="collapsibleTables ? 'By Currency' : undefined"
       >
-        <div v-if="!collapsibleTables" class="border-b border-slate-200 dark:border-slate-700/60 px-5 py-3">
+        <div v-if="!collapsibleTables" class="border-b border-border px-5 py-3">
           <h2 class="text-base font-semibold">By Currency</h2>
         </div>
         <table class="w-full text-sm">
           <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-            <tr v-for="s in currencySlices" :key="s.key" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-              <td class="px-5 py-3 font-medium text-slate-900 dark:text-slate-100">{{ label(s) }}</td>
+            <tr v-for="s in currencySlices" :key="s.key" class="hover:bg-surface-2 dark:hover:bg-slate-800/50">
+              <td class="px-5 py-3 font-medium text-text">{{ label(s) }}</td>
               <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(s.value, rowCurrency(s)) }}</td>
               <td class="px-5 py-3 text-right tabular-nums">{{ formatPercent(percent(s, currencySlices)) }}</td>
             </tr>

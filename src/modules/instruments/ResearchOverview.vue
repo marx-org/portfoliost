@@ -230,7 +230,7 @@ const targetSpread = computed(() => {
 
 <template>
   <div class="space-y-6">
-    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
+    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-danger">{{ error }}</p>
     <div v-if="limitedCoverage && !error" class="mb-4 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
       <svg class="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
         <path fill-rule="evenodd" d="M18 10A8 8 0 1 1 2 10a8 8 0 0 1 16 0Zm-8-4a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 6Zm0 8a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z" clip-rule="evenodd" />
@@ -240,7 +240,7 @@ const targetSpread = computed(() => {
         Market data for this listing is not covered by our data providers yet<template v-if="profile"> — basic instrument facts below come from the ticker reference database</template>.
       </span>
     </div>
-    <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading research data...</p>
+    <p v-if="loading" class="text-sm text-muted">Loading research data...</p>
 
     <template v-if="!loading && !error">
       <div class="flex items-start gap-3">
@@ -256,7 +256,7 @@ const targetSpread = computed(() => {
           />
             <p v-if="quote?.currentPrice" class="flex flex-wrap items-center gap-2 text-sm">
               <span class="font-semibold">{{ formatAmount(quote.currentPrice, instrCcy) }}</span>
-              <span :class="quote.change >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'" class="ml-0">
+              <span :class="quote.change >= 0 ? 'text-emerald' : 'text-danger'" class="ml-0">
                 {{ quote.change >= 0 ? "+" : "" }}{{ formatAmount(quote.change, instrCcy) }} ({{ formatPercent(quote.percentChange) }})
               </span>
               <CurrencyWarningBadge :source="currencySource" :currency="instrCcy" />
@@ -266,11 +266,11 @@ const targetSpread = computed(() => {
 
       <div v-if="descriptionParagraphs.length" class="card p-6">
         <h2 class="card-title mb-3">About {{ profile?.name ?? symbol }}</h2>
-        <p v-for="(p, i) in visibleParagraphs" :key="i" class="mb-3 text-sm leading-relaxed text-slate-700 dark:text-slate-200 last:mb-0">{{ p }}</p>
+        <p v-for="(p, i) in visibleParagraphs" :key="i" class="mb-3 text-sm leading-relaxed text-text last:mb-0">{{ p }}</p>
         <button
           v-if="descriptionParagraphs.length > 1"
           type="button"
-          class="mt-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
+          class="mt-2 text-sm font-medium text-accent-text hover:underline"
           @click="showFullDescription = !showFullDescription"
         >
           {{ showFullDescription ? "Show less" : "Show more" }}
@@ -280,27 +280,27 @@ const targetSpread = computed(() => {
       <div v-if="priceTarget" class="card p-6">
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 class="card-title">Analyst Price Target</h2>
-          <span class="text-xs text-slate-500 dark:text-slate-400">{{ priceTarget.numberAnalysts }} analysts · {{ priceTarget.lastUpdated }}</span>
+          <span class="text-xs text-muted">{{ priceTarget.numberAnalysts }} analysts · {{ priceTarget.lastUpdated }}</span>
         </div>
         <div class="flex flex-wrap gap-6 text-sm">
           <div>
-            <p class="text-slate-500 dark:text-slate-400">Low</p>
+            <p class="text-muted">Low</p>
              <p class="font-semibold">{{ formatAmount(priceTarget.targetLow, instrCcy) }}</p>
           </div>
            <div>
-             <p class="text-slate-500 dark:text-slate-400">Mean</p>
+             <p class="text-muted">Mean</p>
              <p class="font-semibold">{{ formatAmount(priceTarget.targetMean, instrCcy) }}</p>
           </div>
            <div>
-             <p class="text-slate-500 dark:text-slate-400">Median</p>
+             <p class="text-muted">Median</p>
              <p class="font-semibold">{{ formatAmount(priceTarget.targetMedian, instrCcy) }}</p>
           </div>
            <div>
-             <p class="text-slate-500 dark:text-slate-400">High</p>
+             <p class="text-muted">High</p>
              <p class="font-semibold">{{ formatAmount(priceTarget.targetHigh, instrCcy) }}</p>
           </div>
         </div>
-        <div class="relative mt-4 h-2 rounded-full bg-slate-200 dark:bg-slate-700/70">
+        <div class="relative mt-4 h-2 rounded-full bg-border">
           <div class="absolute inset-y-0 rounded-full bg-blue-200" :style="{ left: '0%', width: '100%' }"></div>
           <div
             class="absolute top-1/2 h-3.5 w-1 -translate-y-1/2 rounded bg-slate-700"
@@ -308,7 +308,7 @@ const targetSpread = computed(() => {
             :title="`Current ${formatAmount(targetSpread.current, instrCcy)}`"
           ></div>
         </div>
-        <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">Current price: {{ formatAmount(targetSpread.current, instrCcy) }}</p>
+        <p class="mt-2 text-xs text-muted">Current price: {{ formatAmount(targetSpread.current, instrCcy) }}</p>
       </div>
 
       <!-- §86 — the heading and the card wrapper live in the component, so the
@@ -319,8 +319,8 @@ const targetSpread = computed(() => {
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 class="card-title">Latest Earnings Call</h2>
-            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">{{ latestEarningsCall.title }}</p>
-            <p class="text-xs text-slate-500 dark:text-slate-400">{{ latestEarningsCall.date }}</p>
+            <p class="mt-1 text-sm text-muted">{{ latestEarningsCall.title }}</p>
+            <p class="text-xs text-muted">{{ latestEarningsCall.date }}</p>
           </div>
           <router-link
             :to="{
@@ -339,13 +339,13 @@ const targetSpread = computed(() => {
         <div class="card p-6">
           <div class="mb-3 flex items-center justify-between">
             <h2 class="card-title">EPS Surprises - {{ symbol }}</h2>
-            <select v-model="epsMode" aria-label="EPS timeframe" class="rounded-md border border-slate-300 dark:border-slate-600 px-2 py-1 text-xs" @change="applyEpsMode(epsMode)">
+            <select v-model="epsMode" aria-label="EPS timeframe" class="rounded-md border border-border px-2 py-1 text-xs" @change="applyEpsMode(epsMode)">
               <option value="annual">Annual</option>
               <option value="quarterly">5Q</option>
             </select>
           </div>
           <component :is="'apexchart'" v-if="epsSurprises.length" :options="epsChartOptions" :series="epsChartOptions.series" />
-          <p v-else class="text-sm text-slate-500 dark:text-slate-400">No earnings data available.</p>
+          <p v-else class="text-sm text-muted">No earnings data available.</p>
         </div>
       </div>
 

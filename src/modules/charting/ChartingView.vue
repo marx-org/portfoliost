@@ -158,7 +158,7 @@ onMounted(async () => {
         <span
           v-for="symbol in selected"
           :key="symbol"
-          class="inline-flex items-center gap-2 rounded-full border border-slate-200 dark:border-slate-700/60 bg-slate-50 dark:bg-slate-800/50 py-1 pl-3 pr-1 text-sm font-medium text-slate-800 dark:text-slate-200"
+          class="inline-flex items-center gap-2 rounded-full border border-border bg-surface-2 py-1 pl-3 pr-1 text-sm font-medium text-text"
           data-testid="stock-chip"
         >
           <!-- §85.4 — the symbol + name become a link. The pill and the sibling
@@ -169,11 +169,11 @@ onMounted(async () => {
                inside a rounded-full chip is not example-service's geometry. -->
           <router-link :to="researchRoute(symbol, route.fullPath)" class="min-w-0 truncate hover:underline">
             {{ symbol }}
-            <span class="text-xs font-normal text-slate-500 dark:text-slate-400">{{ nameOf(symbol) }}</span>
+            <span class="text-xs font-normal text-muted">{{ nameOf(symbol) }}</span>
           </router-link>
           <button
             type="button"
-            class="flex h-5 w-5 items-center justify-center rounded-full text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700/70 hover:text-slate-700 dark:hover:text-slate-200"
+            class="flex h-5 w-5 items-center justify-center rounded-full text-muted dark:text-muted hover:bg-border dark:hover:bg-slate-700/70 hover:text-text dark:hover:text-slate-200"
             :aria-label="`Remove ${symbol}`"
             data-testid="remove-stock"
             @click="removeStock(symbol)"
@@ -182,7 +182,7 @@ onMounted(async () => {
           </button>
         </span>
       </div>
-      <p v-else class="text-sm text-slate-500 dark:text-slate-400">
+      <p v-else class="text-sm text-muted">
         No stocks added yet. Add at least two stocks to build a comparison chart.
       </p>
     </div>
@@ -194,12 +194,12 @@ onMounted(async () => {
           v-for="preset in presets"
           :key="preset.name"
           type="button"
-          class="rounded-lg border border-slate-200 dark:border-slate-700/60 px-3 py-2 text-left text-xs hover:border-blue-300 hover:bg-blue-50 dark:hover:bg-blue-500/10"
+          class="rounded-lg border border-border px-3 py-2 text-left text-xs hover:border-accent hover:bg-accent-soft dark:hover:bg-accent-soft0/10"
           :data-testid="`preset-${preset.name.toLowerCase().replace(/\s+/g, '-')}`"
           @click="applyPreset(preset)"
         >
-          <span class="block font-semibold text-slate-800 dark:text-slate-200">{{ preset.name }}</span>
-          <span v-if="preset.description" class="block text-slate-500 dark:text-slate-400">{{ preset.description }}</span>
+          <span class="block font-semibold text-text">{{ preset.name }}</span>
+          <span v-if="preset.description" class="block text-muted">{{ preset.description }}</span>
         </button>
       </div>
     </div>
@@ -207,7 +207,7 @@ onMounted(async () => {
     <div class="card p-6">
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 class="card-title">Fundamentals comparison</h2>
-        <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+        <label class="flex items-center gap-2 text-xs text-muted">
           Metric
           <select v-model="metric" class="input w-auto" data-testid="metric-picker">
             <option v-for="m in COMPARE_METRICS" :key="m.key" :value="m.key">{{ m.label }}</option>
@@ -215,10 +215,10 @@ onMounted(async () => {
         </label>
       </div>
 
-      <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
-      <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading comparison...</p>
+      <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-danger">{{ error }}</p>
+      <p v-if="loading" class="text-sm text-muted">Loading comparison...</p>
 
-      <div v-else-if="selected.length < 2" class="rounded-lg bg-slate-50 dark:bg-slate-800/50 px-3 py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+      <div v-else-if="selected.length < 2" class="rounded-lg bg-surface-2 px-3 py-8 text-center text-sm text-muted">
         Add at least two stocks to see the comparison chart.
       </div>
 
@@ -228,7 +228,7 @@ onMounted(async () => {
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
             <thead>
-            <tr class="border-b border-slate-200 dark:border-slate-700/60 text-left text-xs tracking-wide text-slate-500 dark:text-slate-400">
+            <tr class="border-b border-border text-left text-xs tracking-wide text-muted">
               <!-- §85.4 — `uppercase` moved off the row: it is right for the
                    "Stock" label and wrong for a company name, which is the same
                    correction ResearchCompare.vue:48-51 already documents.
@@ -247,9 +247,9 @@ onMounted(async () => {
             </tr>
             </thead>
             <tbody>
-              <tr class="border-b border-slate-100 dark:border-slate-800">
-                <td class="py-2 pr-3 text-slate-600 dark:text-slate-300">{{ metricDef.label }}</td>
-                <td v-for="r in items" :key="r.symbol" class="px-3 py-2 text-right font-medium text-slate-800 dark:text-slate-200">
+              <tr class="border-b border-border">
+                <td class="py-2 pr-3 text-muted">{{ metricDef.label }}</td>
+                <td v-for="r in items" :key="r.symbol" class="px-3 py-2 text-right font-medium text-text">
                   {{ metricDef.fmt(r) }}
                 </td>
               </tr>

@@ -291,7 +291,7 @@ const perf = computed(() => props.analytics?.performance ?? null)
 /** Sign colouring for a rate/money tile. Absent stays neutral, never "green 0%". */
 function signClass(value: number | null): string {
   if (value == null || value === 0) return ""
-  return value > 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+  return value > 0 ? "text-emerald" : "text-danger"
 }
 
 // ---------------------------------------------------------------------------
@@ -566,7 +566,7 @@ const unrankedSummary = computed(() =>
 )
 
 function gainClass(value: number | undefined): string {
-  return (value ?? 0) >= 0 ? "text-green-600" : "text-red-600"
+  return (value ?? 0) >= 0 ? "text-emerald" : "text-danger"
 }
 </script>
 
@@ -591,7 +591,7 @@ function gainClass(value: number | undefined): string {
             :key="tf.value"
             type="button"
             class="btn-secondary text-xs"
-            :class="props.timeframe === tf.value ? 'border-blue-600 bg-blue-50 text-blue-700 dark:border-blue-600 dark:bg-blue-500/10 dark:text-blue-400' : ''"
+            :class="props.timeframe === tf.value ? 'border-blue-600 bg-accent-soft text-accent-text dark:border-blue-600 dark:bg-accent-soft0/10 dark:text-blue-400' : ''"
             :aria-pressed="props.timeframe === tf.value"
             :disabled="props.loading"
             @click="emit('update:timeframe', tf.value)"
@@ -621,21 +621,21 @@ function gainClass(value: number | undefined): string {
     <div class="card p-6">
       <div class="mb-3 flex items-center justify-between">
         <h2 class="text-base font-semibold">Drawdown</h2>
-        <button type="button" class="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline" @click="showCustomTimeframe = !showCustomTimeframe">
+        <button type="button" class="text-sm font-medium text-accent-text hover:underline" @click="showCustomTimeframe = !showCustomTimeframe">
           {{ showCustomTimeframe ? "Hide custom timeframe" : "Add custom timeframe" }}
         </button>
       </div>
       <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div class="rounded-lg bg-slate-50 dark:bg-slate-800/50 p-4">
-          <dt class="text-sm text-slate-500 dark:text-slate-400">Max Drawdown</dt>
-          <dd class="mt-1 text-xl font-semibold tabular-nums text-red-600 dark:text-red-400" :data-testid="tid('performance-max-drawdown')">{{ formatPercent(maxDrawdownPercent, 2, true) }}</dd>
+        <div class="rounded-lg bg-surface-2 p-4">
+          <dt class="text-sm text-muted">Max Drawdown</dt>
+          <dd class="mt-1 text-xl font-semibold tabular-nums text-danger" :data-testid="tid('performance-max-drawdown')">{{ formatPercent(maxDrawdownPercent, 2, true) }}</dd>
         </div>
-        <div class="rounded-lg bg-slate-50 dark:bg-slate-800/50 p-4">
-          <dt class="text-sm text-slate-500 dark:text-slate-400">Current Drawdown</dt>
-          <dd class="mt-1 text-xl font-semibold tabular-nums text-red-600 dark:text-red-400" :data-testid="tid('performance-current-drawdown')">{{ formatPercent(currentDrawdownPercent, 2, true) }}</dd>
+        <div class="rounded-lg bg-surface-2 p-4">
+          <dt class="text-sm text-muted">Current Drawdown</dt>
+          <dd class="mt-1 text-xl font-semibold tabular-nums text-danger" :data-testid="tid('performance-current-drawdown')">{{ formatPercent(currentDrawdownPercent, 2, true) }}</dd>
         </div>
       </dl>
-      <p v-if="showCustomTimeframe" class="mt-3 text-sm text-slate-500 dark:text-slate-400">
+      <p v-if="showCustomTimeframe" class="mt-3 text-sm text-muted">
         Custom timeframe support is coming soon. Pick one of the built-in ranges above instead.
       </p>
     </div>
@@ -647,7 +647,7 @@ function gainClass(value: number | undefined): string {
           <button
             type="button"
             class="btn-secondary text-xs"
-            :class="activeReturnsMode === 'monthly' ? 'border-blue-600 bg-blue-50 text-blue-700 dark:border-blue-600 dark:bg-blue-500/10 dark:text-blue-400' : ''"
+            :class="activeReturnsMode === 'monthly' ? 'border-blue-600 bg-accent-soft text-accent-text dark:border-blue-600 dark:bg-accent-soft0/10 dark:text-blue-400' : ''"
             :aria-pressed="activeReturnsMode === 'monthly'"
             :data-testid="tid('perf-returns-mode-monthly')"
             @click="returnsMode = 'monthly'"
@@ -657,7 +657,7 @@ function gainClass(value: number | undefined): string {
           <button
             type="button"
             class="btn-secondary text-xs"
-            :class="activeReturnsMode === 'yearly' ? 'border-blue-600 bg-blue-50 text-blue-700 dark:border-blue-600 dark:bg-blue-500/10 dark:text-blue-400' : ''"
+            :class="activeReturnsMode === 'yearly' ? 'border-blue-600 bg-accent-soft text-accent-text dark:border-blue-600 dark:bg-accent-soft0/10 dark:text-blue-400' : ''"
             :aria-pressed="activeReturnsMode === 'yearly'"
             :disabled="!yearlyAvailable"
             :data-testid="tid('perf-returns-mode-yearly')"
@@ -675,13 +675,13 @@ function gainClass(value: number | undefined): string {
         :series="monthlySeries"
         height="220"
       />
-      <p v-else-if="activeReturnsMode === 'monthly'" class="text-sm text-slate-500 dark:text-slate-400">No monthly data available.</p>
+      <p v-else-if="activeReturnsMode === 'monthly'" class="text-sm text-muted">No monthly data available.</p>
 
       <div v-else :data-testid="tid('perf-returns-yearly')">
-        <p v-if="!yearlyRows.length" class="text-sm text-slate-500 dark:text-slate-400">No yearly data available.</p>
+        <p v-if="!yearlyRows.length" class="text-sm text-muted">No yearly data available.</p>
         <table v-else class="w-full text-sm">
           <thead>
-            <tr class="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500 dark:border-slate-700 dark:text-slate-400">
+            <tr class="border-b border-border text-left text-xs uppercase tracking-wide text-muted dark:border-slate-700 dark:text-muted">
               <th scope="col" class="py-2 pr-3 font-medium">Year</th>
               <th scope="col" class="py-2 pr-3 text-right font-medium">TWR %</th>
               <th scope="col" :class="benchmarkSymbol ? 'py-2 pr-3' : 'py-2'" class="text-right font-medium">Gain</th>
@@ -697,30 +697,30 @@ function gainClass(value: number | undefined): string {
             <tr
               v-for="row in yearlyRows"
               :key="row.year"
-              class="border-b border-slate-100 dark:border-slate-800"
+              class="border-b border-border"
               :data-testid="`${tid('perf-returns-yearly-row')}-${row.year}`"
             >
-              <td class="py-2 pr-3 tabular-nums">{{ row.year }}<span v-if="row.isYtd" class="ml-1 text-xs text-slate-400 dark:text-slate-500">YTD</span></td>
+              <td class="py-2 pr-3 tabular-nums">{{ row.year }}<span v-if="row.isYtd" class="ml-1 text-xs text-muted dark:text-muted">YTD</span></td>
               <td class="py-2 pr-3 text-right tabular-nums" :class="signClass(row.twrPercent)" :data-testid="`${tid('perf-returns-yearly-twr')}-${row.year}`">{{ formatPercent(row.twrPercent, 2, true) }}</td>
               <td :class="[benchmarkSymbol ? 'pr-3' : '', 'py-2 text-right tabular-nums', signClass(row.gain)]" :data-testid="`${tid('perf-returns-yearly-gain')}-${row.year}`">{{ formatSignedCurrency(convert(row.gain), chartCcy) }}</td>
               <td v-if="benchmarkSymbol" class="py-2 pl-3 text-right tabular-nums" :class="signClass(excessPercent(row))" :data-testid="`${tid('perf-returns-yearly-excess')}-${row.year}`">{{ formatPercent(excessPercent(row), 2, true) }}</td>
             </tr>
           </tbody>
           <tfoot>
-            <tr class="border-t-2 border-slate-200 dark:border-slate-700" :data-testid="tid('perf-returns-yearly-total')">
+            <tr class="border-t-2 border-border dark:border-slate-700" :data-testid="tid('perf-returns-yearly-total')">
               <td class="py-2 pr-3 font-medium">Σ</td>
               <td class="py-2 pr-3 text-right tabular-nums font-medium" :data-testid="tid('perf-returns-yearly-total-product')">× {{ yearlyTotalsRow.compounded.toFixed(4) }}</td>
               <td :class="benchmarkSymbol ? 'py-2 pr-3' : 'py-2'" class="text-right tabular-nums font-medium" :data-testid="tid('perf-returns-yearly-total-gain')">{{ formatSignedCurrency(yearlyTotalsGain, chartCcy) }}</td>
-              <td v-if="benchmarkSymbol" class="py-2 pl-3 text-right text-xs text-slate-400 dark:text-slate-500" :data-testid="tid('perf-returns-yearly-excess-total')">no total</td>
+              <td v-if="benchmarkSymbol" class="py-2 pl-3 text-right text-xs text-muted dark:text-muted" :data-testid="tid('perf-returns-yearly-excess-total')">no total</td>
             </tr>
           </tfoot>
         </table>
-        <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+        <p class="mt-2 text-xs text-muted">
           Σ shows the compounded product, not the sum of yearly percentages.
         </p>
       </div>
 
-      <p v-if="!yearlyAvailable" class="mt-2 text-xs text-slate-500 dark:text-slate-400" :data-testid="tid('perf-returns-yearly-hint')">
+      <p v-if="!yearlyAvailable" class="mt-2 text-xs text-muted" :data-testid="tid('perf-returns-yearly-hint')">
         Yearly is available on the ALL timeframe only — a shorter window holds no full calendar year.
       </p>
     </div>
@@ -743,7 +743,7 @@ function gainClass(value: number | undefined): string {
     <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
       <div class="card p-6">
         <h2 class="mb-3 text-base font-semibold">Top Performers</h2>
-        <p v-if="!performers.top.length" class="text-sm text-slate-500 dark:text-slate-400">No open positions.</p>
+        <p v-if="!performers.top.length" class="text-sm text-muted">No open positions.</p>
         <ul v-else class="divide-y divide-slate-100 dark:divide-slate-800">
           <li
             v-for="p in performers.top"
@@ -766,7 +766,7 @@ function gainClass(value: number | undefined): string {
                    so the per-portfolio tab (whose whole page is that portfolio)
                    renders exactly what it always did. On the aggregate it is the
                    answer to "I hold this in two places — which one is this?" -->
-              <p v-if="p.portfolioName" class="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400" :data-testid="tid(`perf-performer-portfolio-${p.id}`)">
+              <p v-if="p.portfolioName" class="mt-0.5 truncate text-xs text-muted" :data-testid="tid(`perf-performer-portfolio-${p.id}`)">
                 {{ p.portfolioName }}
               </p>
             </div>
@@ -783,7 +783,7 @@ function gainClass(value: number | undefined): string {
 
       <div class="card p-6">
         <h2 class="mb-3 text-base font-semibold">Bottom Performers</h2>
-        <p v-if="!performers.bottom.length" class="text-sm text-slate-500 dark:text-slate-400">No open positions.</p>
+        <p v-if="!performers.bottom.length" class="text-sm text-muted">No open positions.</p>
         <ul v-else class="divide-y divide-slate-100 dark:divide-slate-800">
           <li
             v-for="p in performers.bottom"
@@ -802,7 +802,7 @@ function gainClass(value: number | undefined): string {
                   :asset-type="p.assetType"
                 />
               </router-link>
-              <p v-if="p.portfolioName" class="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400" :data-testid="tid(`perf-performer-portfolio-${p.id}`)">
+              <p v-if="p.portfolioName" class="mt-0.5 truncate text-xs text-muted" :data-testid="tid(`perf-performer-portfolio-${p.id}`)">
                 {{ p.portfolioName }}
               </p>
             </div>
@@ -829,10 +829,10 @@ function gainClass(value: number | undefined): string {
       <div class="space-y-5">
         <div>
           <div class="mb-2 flex items-center justify-between">
-            <p class="text-sm font-medium text-slate-700 dark:text-slate-300">Benchmarks</p>
+            <p class="text-sm font-medium text-text dark:text-slate-300">Benchmarks</p>
             <button
               type="button"
-              class="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
+              class="text-sm font-medium text-accent-text hover:underline"
               :data-testid="tid('perf-controls-add-benchmark')"
               @click="showAddBenchmark = true"
             >
@@ -840,14 +840,14 @@ function gainClass(value: number | undefined): string {
             </button>
           </div>
           <div class="space-y-2">
-            <label v-for="opt in benchmarkOptions" :key="opt.symbol" class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+            <label v-for="opt in benchmarkOptions" :key="opt.symbol" class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-surface-2 dark:hover:bg-slate-800/50">
               <input
                 type="checkbox"
-                class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                class="h-4 w-4 rounded border-border text-accent-text focus:ring-blue-500"
                 :checked="draftBenchmarks.includes(opt.symbol)"
                 @change="toggleDraftBenchmark(opt.symbol)"
               />
-              <span class="text-sm text-slate-800 dark:text-slate-200">{{ opt.name }}</span>
+              <span class="text-sm text-text">{{ opt.name }}</span>
               <!-- §85.3 — this row is a <label> wrapping the row's checkbox, so a
                    plain link would toggle the benchmark as a side effect of
                    navigating. `.prevent.stop` keeps the click off the label.
@@ -856,28 +856,28 @@ function gainClass(value: number | undefined): string {
                    the badge belongs on this right-hand chip, not on the name. -->
               <router-link
                 :to="researchRoute(opt.symbol, route.fullPath)"
-                class="ml-auto text-xs text-slate-400"
+                class="ml-auto text-xs text-muted"
                 @click.prevent.stop
               >{{ opt.symbol }}</router-link>
             </label>
           </div>
           <div v-if="customDraftBenchmarks.length" class="mt-2 space-y-1">
-            <p class="text-xs font-medium text-slate-500 dark:text-slate-400">Custom</p>
-            <div v-for="sym in customDraftBenchmarks" :key="sym" class="flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+            <p class="text-xs font-medium text-muted">Custom</p>
+            <div v-for="sym in customDraftBenchmarks" :key="sym" class="flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-surface-2 dark:hover:bg-slate-800/50">
               <!-- §85.3 — no checkbox on this row, only a sibling Remove button,
                    so this is a clean wrap with no propagation to stop. -->
-              <router-link :to="researchRoute(sym, route.fullPath)" class="text-sm text-slate-800 dark:text-slate-200">{{ sym }}</router-link>
-              <button type="button" class="ml-2 text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300" aria-label="Remove benchmark" @click="removeDraftBenchmark(sym)">Remove</button>
+              <router-link :to="researchRoute(sym, route.fullPath)" class="text-sm text-text">{{ sym }}</router-link>
+              <button type="button" class="ml-2 text-xs text-red-500 hover:text-danger dark:hover:text-red-300" aria-label="Remove benchmark" @click="removeDraftBenchmark(sym)">Remove</button>
             </div>
           </div>
-          <p class="mt-3 text-xs text-slate-500 dark:text-slate-400" :data-testid="tid('perf-controls-benchmarks')">
+          <p class="mt-3 text-xs text-muted" :data-testid="tid('perf-controls-benchmarks')">
             Selected: {{ draftBenchmarks.length ? draftBenchmarks.join(", ") : "None" }}
           </p>
         </div>
 
         <div>
-          <p class="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">Positions</p>
-          <div class="rounded-lg bg-slate-50 dark:bg-slate-800/50 px-3 py-2 text-sm text-slate-700 dark:text-slate-300">
+          <p class="mb-2 text-sm font-medium text-text dark:text-slate-300">Positions</p>
+          <div class="rounded-lg bg-surface-2 px-3 py-2 text-sm text-text dark:text-slate-300">
             {{ props.positions.length ? `${props.positions.length} selected` : "All selected" }}
           </div>
         </div>

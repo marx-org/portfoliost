@@ -49,24 +49,24 @@ const chartSeries = computed(() => [
 <template>
   <div class="space-y-3" :data-testid="`annual-income-average-${unit}`">
     <h2 class="sr-only">{{ titleText }}</h2>
-    <p class="text-xs text-slate-500">
+    <p class="text-xs text-muted">
       Annual-equivalent received income per {{ per }} (the year's total ÷ {{ divisor }}). Not a forecast.
     </p>
-    <p v-if="hasPartial" class="text-xs text-slate-500" data-testid="annual-average-partial">
+    <p v-if="hasPartial" class="text-xs text-muted" data-testid="annual-average-partial">
       The current year is year-to-date, not a projected full year.
     </p>
     <apexchart v-if="rows.length" type="bar" :options="chartOptions" :series="chartSeries" :height="300" />
-    <p v-else class="text-sm text-slate-500">No income data for this scope.</p>
+    <p v-else class="text-sm text-muted">No income data for this scope.</p>
     <CollapsibleSection v-if="rows.length" :title="`Annual-equivalent per ${per}`" :testid="`annual-income-average-${unit}-table`">
       <table class="w-full text-sm">
         <thead>
-          <tr class="text-left text-slate-400">
+          <tr class="text-left text-muted">
             <th class="py-1">Year</th><th>Basis</th><th>Divisor</th><th>Per {{ per }}</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="p in rows" :key="p.year" class="border-t border-slate-100 dark:border-slate-800">
-            <td class="py-1">{{ p.year }}<span v-if="p.partial" class="ml-1 text-xs text-slate-400">YTD</span></td>
+          <tr v-for="p in rows" :key="p.year" class="border-t border-border">
+            <td class="py-1">{{ p.year }}<span v-if="p.partial" class="ml-1 text-xs text-muted">YTD</span></td>
             <td>{{ p.basis }}</td>
             <td>{{ p.divisor }}</td>
             <td>{{ p.amount ?? 0 }}</td>

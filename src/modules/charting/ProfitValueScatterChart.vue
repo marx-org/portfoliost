@@ -149,7 +149,7 @@ const chartSeries = computed(() => [
       <CollapsibleSection title="Holdings" :testid="`${testid}-table`">
         <table class="w-full text-sm">
           <thead>
-            <tr class="border-b border-slate-100 text-left text-xs uppercase text-slate-500 dark:border-slate-800 dark:text-slate-400">
+            <tr class="border-b border-border text-left text-xs uppercase text-muted dark:border-slate-800 dark:text-muted">
               <th class="px-5 py-2.5 font-medium">Holding</th>
               <th class="px-5 py-2.5 text-right font-medium">Market value</th>
               <th class="px-5 py-2.5 text-right font-medium">Total profit</th>
@@ -159,12 +159,12 @@ const chartSeries = computed(() => [
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-            <tr v-for="p in sorted" :key="p.symbol" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-              <td class="px-5 py-3 font-medium text-slate-900 dark:text-slate-100">
+            <tr v-for="p in sorted" :key="p.symbol" class="hover:bg-surface-2 dark:hover:bg-slate-800/50">
+              <td class="px-5 py-3 font-medium text-text">
                 {{ label(p) }}
-                <span class="ml-1 text-xs font-normal text-slate-400">{{ displaySymbol(p) }}</span>
-                <span v-if="p.assetType && p.assetType !== 'STOCK'" class="ml-1 text-xs text-slate-400">{{ p.assetType }}</span>
-                <span v-if="(p.accounts ?? []).length" class="block text-xs font-normal text-slate-400">{{ (p.accounts ?? []).join(", ") }}</span>
+                <span class="ml-1 text-xs font-normal text-muted">{{ displaySymbol(p) }}</span>
+                <span v-if="p.assetType && p.assetType !== 'STOCK'" class="ml-1 text-xs text-muted">{{ p.assetType }}</span>
+                <span v-if="(p.accounts ?? []).length" class="block text-xs font-normal text-muted">{{ (p.accounts ?? []).join(", ") }}</span>
               </td>
               <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(p.marketValue, currency) }}</td>
               <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(p.totalProfit, currency) }}</td>
@@ -176,6 +176,6 @@ const chartSeries = computed(() => [
         </table>
       </CollapsibleSection>
     </template>
-    <p v-else class="text-sm text-slate-500 dark:text-slate-400">No holdings for this scope.</p>
+    <p v-else class="text-sm text-muted">No holdings for this scope.</p>
   </div>
 </template>

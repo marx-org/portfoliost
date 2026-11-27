@@ -329,7 +329,7 @@ const chartKey = computed(
 defineExpose({ chartKey })
 
 function returnClassFor(returnPercentage: number | undefined | null): string {
-  return (returnPercentage ?? 0) >= 0 ? "text-green-600" : "text-red-600"
+  return (returnPercentage ?? 0) >= 0 ? "text-emerald" : "text-danger"
 }
 
 function goToDetail() {
@@ -418,18 +418,18 @@ async function exportPositions(format: "csv" | "xml" | "json") {
       <div>
         <router-link
           :to="{ name: 'portfolio-detail', params: { id: portfolio.id } }"
-          class="truncate font-semibold text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 hover:underline"
+          class="truncate font-semibold text-text hover:text-accent-text dark:hover:text-blue-400 hover:underline"
         >
           {{ portfolio.name }}
         </router-link>
-        <p class="text-xs text-slate-500 dark:text-slate-400">{{ portfolio.description || "No description" }}</p>
+        <p class="text-xs text-muted">{{ portfolio.description || "No description" }}</p>
       </div>
       <div class="flex items-center gap-2" @click.stop>
         <div class="relative">
           <button
             type="button"
             aria-label="Portfolio actions"
-            class="rounded-lg p-1.5 text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200"
+            class="rounded-lg p-1.5 text-muted dark:text-muted hover:bg-surface-2 dark:hover:bg-slate-800 hover:text-text dark:hover:text-slate-200"
             @click="openMenu = !openMenu"
           >
             <svg class="h-4 w-4" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
@@ -440,30 +440,30 @@ async function exportPositions(format: "csv" | "xml" | "json") {
           </button>
           <template v-if="openMenu">
             <div class="fixed inset-0 z-20" @click="openMenu = false"></div>
-            <div class="absolute right-0 z-30 mt-1 w-48 rounded-lg border border-slate-200 dark:border-slate-700/60 bg-white dark:bg-slate-900 py-1 shadow-lg">
-              <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="openRename">Edit</button>
-              <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="exportPositions('csv')">Export as CSV</button>
-              <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="exportPositions('xml')">Export as XML</button>
-              <button type="button" class="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50" @click="exportPositions('json')">Export as JSON</button>
-              <button type="button" class="block w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10" @click="openDelete">Delete</button>
+            <div class="absolute right-0 z-30 mt-1 w-48 rounded-lg border border-border bg-white dark:bg-slate-900 py-1 shadow-lg">
+              <button type="button" class="block w-full px-4 py-2 text-left text-sm text-text hover:bg-surface-2 dark:hover:bg-slate-800/50" @click="openRename">Edit</button>
+              <button type="button" class="block w-full px-4 py-2 text-left text-sm text-text hover:bg-surface-2 dark:hover:bg-slate-800/50" @click="exportPositions('csv')">Export as CSV</button>
+              <button type="button" class="block w-full px-4 py-2 text-left text-sm text-text hover:bg-surface-2 dark:hover:bg-slate-800/50" @click="exportPositions('xml')">Export as XML</button>
+              <button type="button" class="block w-full px-4 py-2 text-left text-sm text-text hover:bg-surface-2 dark:hover:bg-slate-800/50" @click="exportPositions('json')">Export as JSON</button>
+              <button type="button" class="block w-full px-4 py-2 text-left text-sm text-danger hover:bg-red-50 dark:hover:bg-red-500/10" @click="openDelete">Delete</button>
             </div>
           </template>
         </div>
       </div>
     </div>
 
-    <p v-if="notice" class="mt-3 rounded-lg bg-green-50 dark:bg-green-500/10 px-3 py-2 text-sm text-green-700 dark:text-green-400">{{ notice }}</p>
+    <p v-if="notice" class="mt-3 rounded-lg bg-green-50 dark:bg-green-500/10 px-3 py-2 text-sm text-emerald">{{ notice }}</p>
 
     <div class="mt-4">
       <div class="mb-1 flex items-center justify-between">
-        <span class="text-xs text-slate-500 dark:text-slate-400">Performance</span>
+        <span class="text-xs text-muted">Performance</span>
         <div class="flex gap-1" @click.stop>
           <button
             v-for="tf in timeframes"
             :key="tf.value"
             type="button"
-            class="rounded px-1.5 py-0.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-            :class="timeframe === tf.value ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400' : ''"
+            class="rounded px-1.5 py-0.5 text-xs font-medium text-muted hover:bg-surface-2 dark:hover:bg-slate-800"
+            :class="timeframe === tf.value ? 'bg-accent-soft text-accent-text' : ''"
             :disabled="chartLoading"
             @click="changeTimeframe(tf.value)"
           >
@@ -480,7 +480,7 @@ async function exportPositions(format: "csv" | "xml" | "json") {
           :series="sparkOptions.series"
         />
         <div v-else-if="backfillFailed" class="flex h-[90px] flex-col items-center justify-center gap-1.5" @click.stop>
-          <p class="text-xs text-slate-400 dark:text-slate-500">Chart unavailable</p>
+          <p class="text-xs text-muted dark:text-muted">Chart unavailable</p>
           <button
             type="button"
             class="btn-secondary text-xs"
@@ -491,20 +491,20 @@ async function exportPositions(format: "csv" | "xml" | "json") {
             {{ recomputeBusy ? "Recomputing..." : "Recompute" }}
           </button>
         </div>
-        <p v-else-if="chartError" class="py-6 text-center text-xs text-slate-400 dark:text-slate-500">Chart unavailable</p>
+        <p v-else-if="chartError" class="py-6 text-center text-xs text-muted dark:text-muted">Chart unavailable</p>
         <div v-else-if="chartLoading || backfillPending" class="flex h-[90px] items-center justify-center">
-          <p class="text-xs text-slate-400 dark:text-slate-500">Loading chart...</p>
+          <p class="text-xs text-muted dark:text-muted">Loading chart...</p>
         </div>
         <!-- §53.7 — backfill complete but the window is empty (e.g. fully
              liquidated portfolio): must not sit on "Loading chart…" forever. -->
         <div v-else class="flex h-[90px] items-center justify-center" data-testid="card-chart-empty">
-          <p class="text-xs text-slate-400 dark:text-slate-500">No data</p>
+          <p class="text-xs text-muted dark:text-muted">No data</p>
         </div>
         <div v-if="chartLoading && series.length" class="absolute inset-0 flex items-center justify-center rounded bg-white/70 dark:bg-slate-900/70">
-          <span class="text-xs font-medium text-slate-500 dark:text-slate-400">Refreshing...</span>
+          <span class="text-xs font-medium text-muted">Refreshing...</span>
         </div>
       </div>
-      <p v-if="backfillPending" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+      <p v-if="backfillPending" class="mt-1 text-xs text-muted">
         Historical data is loading, chart will update in a moment.
       </p>
       <!-- §63.8 — the LATEST value is a partial sum when a held position has no
@@ -516,7 +516,7 @@ async function exportPositions(format: "csv" | "xml" | "json") {
       <p v-if="heldChartGap && heldChartGap.length" class="mt-1 text-xs font-medium text-amber-600 dark:text-amber-400" data-testid="card-chart-gap-warning">
         Value excludes {{ heldChartGap.length }} position{{ heldChartGap.length === 1 ? "" : "s" }} without price history<span v-if="unpricedAmountLabel"> &mdash; {{ unpricedAmountLabel }} withheld</span>.
       </p>
-      <p v-if="historyChartGap && historyChartGap.length" class="mt-1 text-xs text-slate-500 dark:text-slate-400" data-testid="card-chart-history-gap-note">
+      <p v-if="historyChartGap && historyChartGap.length" class="mt-1 text-xs text-muted" data-testid="card-chart-history-gap-note">
         <!--
           §78.5 — the AMOUNT and the COUNT are two claims about two different
           windows, so they never share a sentence.
@@ -543,19 +543,19 @@ async function exportPositions(format: "csv" | "xml" | "json") {
 
     <div class="mt-4 grid grid-cols-3 gap-2 text-sm">
       <div>
-        <p class="text-xs text-slate-500 dark:text-slate-400">Value</p>
+        <p class="text-xs text-muted">Value</p>
         <p class="font-medium tabular-nums" data-testid="card-value">{{ formatCurrency(convert(cardValue?.totalValue), displayCurrencyOr()) }}</p>
       </div>
       <div>
-        <p class="text-xs text-slate-500 dark:text-slate-400">Invested</p>
+        <p class="text-xs text-muted">Invested</p>
         <p class="font-medium tabular-nums" data-testid="card-invested">{{ formatCurrency(convert(cardValue?.capitalBasis), displayCurrencyOr()) }}</p>
       </div>
       <div>
-        <p class="text-xs text-slate-500 dark:text-slate-400">Return</p>
+        <p class="text-xs text-muted">Return</p>
         <p class="font-medium tabular-nums" data-testid="card-return" :class="returnClassFor(cardValue?.returnPercentage)">{{ formatPercent(cardValue?.returnPercentage) }}</p>
       </div>
     </div>
-    <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+    <p class="mt-2 text-xs text-muted">
       {{ portfolio.metrics?.openPositions ?? 0 }} open positions &middot; {{ formatNumber(portfolio.metrics?.unrealizedGainLoss) }} unrealized
     </p>
 
@@ -570,7 +570,7 @@ async function exportPositions(format: "csv" | "xml" | "json") {
     <div class="mt-2 flex items-center justify-between gap-2" @click.stop>
       <span
         v-if="priceAsOfLabel"
-        class="text-xs text-slate-400 dark:text-slate-500"
+        class="text-xs text-muted dark:text-muted"
         data-testid="card-price-as-of"
       >
         Prices as of {{ priceAsOfLabel }}
@@ -609,12 +609,12 @@ async function exportPositions(format: "csv" | "xml" | "json") {
       <template v-if="freshness.fallback"> Some prices are not live.</template>
     </p>
 
-    <div v-if="portfolio.cash" class="mt-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 p-4" @click.stop data-testid="card-cash-group">
+    <div v-if="portfolio.cash" class="mt-4 rounded-xl bg-surface-2 p-4" @click.stop data-testid="card-cash-group">
       <div class="flex items-center justify-between">
-        <span class="text-xs text-slate-500 dark:text-slate-400">Cash</span>
+        <span class="text-xs text-muted">Cash</span>
         <router-link
           :to="tabPath('cash')"
-          class="text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400"
+          class="text-sm font-semibold tabular-nums text-text hover:text-accent-text dark:hover:text-blue-400"
           data-testid="card-cash-balance"
         >
           {{ formatCurrency(portfolio.cash.total, portfolio.cash.baseCurrency) }}
@@ -625,25 +625,25 @@ async function exportPositions(format: "csv" | "xml" | "json") {
            components now come from the aggregate breakdown row, so the split is
            the same pair of numbers the headline sums and cannot drift from the
            Value printed above it. -->
-      <div class="mt-1.5 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+      <div class="mt-1.5 flex items-center justify-between text-xs text-muted">
         <span>Instruments</span>
         <span class="tabular-nums" data-testid="card-instruments-value">
           {{ formatCurrency(convert(cardValue?.instrumentsValue), displayCurrencyOr()) }}
         </span>
       </div>
       <div class="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
-        <span v-for="b in portfolio.cash.balances" :key="b.currency" class="text-xs text-slate-500 dark:text-slate-400" :data-testid="`card-cash-${b.currency}`">
+        <span v-for="b in portfolio.cash.balances" :key="b.currency" class="text-xs text-muted" :data-testid="`card-cash-${b.currency}`">
           {{ b.currency }} {{ formatCurrency(b.balance, b.currency) }}
         </span>
       </div>
     </div>
 
-    <div class="mt-4 flex items-center justify-between gap-2 border-t border-slate-100 dark:border-slate-800 pt-3" @click.stop>
-       <button v-if="!portfolio.isVirtual" type="button" class="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline" data-testid="card-add-position" @click="emit('add-position')">Add Position</button>
+    <div class="mt-4 flex items-center justify-between gap-2 border-t border-border pt-3" @click.stop>
+       <button v-if="!portfolio.isVirtual" type="button" class="text-sm font-medium text-accent-text hover:underline" data-testid="card-add-position" @click="emit('add-position')">Add Position</button>
       <div class="flex gap-3 text-sm">
-        <router-link :to="tabPath('performance')" class="text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400">Analytics</router-link>
-        <router-link :to="tabPath('news')" class="text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400">News</router-link>
-        <router-link :to="tabPath('calendar')" class="text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400">Calendar</router-link>
+        <router-link :to="tabPath('performance')" class="text-muted hover:text-accent-text dark:hover:text-blue-400">Analytics</router-link>
+        <router-link :to="tabPath('news')" class="text-muted hover:text-accent-text dark:hover:text-blue-400">News</router-link>
+        <router-link :to="tabPath('calendar')" class="text-muted hover:text-accent-text dark:hover:text-blue-400">Calendar</router-link>
       </div>
     </div>
 
@@ -669,8 +669,8 @@ async function exportPositions(format: "csv" | "xml" | "json") {
     >
       <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Delete portfolio" @click.stop>
         <h3 class="mb-4 text-base font-semibold">Delete portfolio</h3>
-        <p class="text-sm text-slate-600 dark:text-slate-300">Delete "{{ portfolio.name }}" and its positions? This cannot be undone.</p>
-        <p v-if="deleteError" class="mb-3 mt-2 text-sm text-red-600 dark:text-red-400">{{ deleteError }}</p>
+        <p class="text-sm text-muted">Delete "{{ portfolio.name }}" and its positions? This cannot be undone.</p>
+        <p v-if="deleteError" class="mb-3 mt-2 text-sm text-danger">{{ deleteError }}</p>
         <div class="mt-4 flex justify-end gap-2">
           <button type="button" class="btn-ghost" @click="showDeleteConfirm = false">Cancel</button>
           <button type="button" class="btn-primary bg-red-600" :disabled="deleteBusy" @click="submitDelete">

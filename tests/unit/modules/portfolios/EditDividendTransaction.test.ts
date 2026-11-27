@@ -129,7 +129,7 @@ describe("EditTransactionModal — dividend parity via DividendFields (§50.8)",
     expect((btn.element as HTMLButtonElement).disabled).toBe(true)
     expect(wrapper.find('[data-testid="edit-tx-tax-total"]').text()).toBe("-3.00 USD")
     expect(wrapper.find('[data-testid="edit-tx-net"]').text()).toBe("-1.00 USD")
-    expect(wrapper.find('[data-testid="edit-tx-net"]').classes().join(" ")).toContain("text-green-600")
+    expect(wrapper.find('[data-testid="edit-tx-net"]').classes().join(" ")).toContain("text-emerald")
   })
 
   it("BUY layout keeps Quantity/Price/Fees and shows no dividend fields", async () => {

@@ -39,10 +39,10 @@ const benchmarkOptions = [
 
 <template>
   <div class="space-y-3" data-testid="charting-performance">
-    <p v-if="loading" class="text-sm text-slate-500">Loading…</p>
-    <p v-else-if="error" class="text-sm text-red-600">Failed to load performance data.</p>
+    <p v-if="loading" class="text-sm text-muted">Loading…</p>
+    <p v-else-if="error" class="text-sm text-danger">Failed to load performance data.</p>
     <template v-else>
-      <div class="flex flex-wrap items-center gap-3 text-xs text-slate-600 dark:text-slate-300" data-testid="charting-benchmark-bar">
+      <div class="flex flex-wrap items-center gap-3 text-xs text-muted" data-testid="charting-benchmark-bar">
         <span class="font-medium">Benchmarks</span>
         <label v-for="b in benchmarkOptions" :key="b.symbol" class="inline-flex items-center gap-1">
           <input
@@ -71,8 +71,8 @@ const benchmarkOptions = [
         :points="data.scatter"
         :currency="currency"
       />
-      <p v-else class="text-sm text-slate-500">No performance data for this scope.</p>
-      <div v-if="data" class="text-xs text-slate-500">Generation {{ data.coverage.generation }} · {{ data.coverage.status }}</div>
+      <p v-else class="text-sm text-muted">No performance data for this scope.</p>
+      <div v-if="data" class="text-xs text-muted">Generation {{ data.coverage.generation }} · {{ data.coverage.status }}</div>
     </template>
   </div>
 </template>

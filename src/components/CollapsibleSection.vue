@@ -32,15 +32,15 @@ const open = ref(false)
   >
     <button
       type="button"
-      class="flex w-full items-center justify-between gap-2 px-5 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50"
-      :class="open ? 'border-b border-slate-200 dark:border-slate-700/60' : ''"
+      class="flex w-full items-center justify-between gap-2 px-5 py-3 text-left hover:bg-surface-2 dark:hover:bg-slate-800/50"
+      :class="open ? 'border-b border-border' : ''"
       :data-testid="props.testid ? `${props.testid}-toggle` : undefined"
       :aria-expanded="open"
       @click="open = !open"
     >
       <span class="text-base font-semibold">{{ props.title }}</span>
       <svg
-        class="h-4 w-4 shrink-0 text-slate-400 transition-transform"
+        class="h-4 w-4 shrink-0 text-muted transition-transform"
         :class="{ 'rotate-180': open }"
         viewBox="0 0 20 20"
         fill="currentColor"

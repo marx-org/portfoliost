@@ -153,9 +153,9 @@ function typeLabel(type: EventType): string {
 }
 
 function chipClass(type: EventType): string {
-  if (type === "earnings") return "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400"
+  if (type === "earnings") return "bg-accent-soft text-accent-text dark:bg-accent-soft0/10 dark:text-blue-400"
   if (type === "exDividend") return "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400"
-  return "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400"
+  return "bg-green-50 text-emerald dark:bg-green-500/10 dark:text-green-400"
 }
 
 function chipText(c: Chip): string {
@@ -166,15 +166,15 @@ function chipText(c: Chip): string {
 
 <template>
   <div class="space-y-6">
-    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading calendar...</p>
+    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-danger">{{ error }}</p>
+    <p v-if="loading" class="text-sm text-muted">Loading calendar...</p>
 
     <div v-if="!loading && !error" class="card overflow-hidden">
-      <div class="flex flex-wrap items-center gap-3 border-b border-slate-200 dark:border-slate-700/60 px-5 py-3">
+      <div class="flex flex-wrap items-center gap-3 border-b border-border px-5 py-3">
         <h2 class="text-base font-semibold">Calendar</h2>
         <div class="flex items-center gap-1">
           <button type="button" class="btn-ghost px-2" data-testid="pf-cal-prev-month" aria-label="Previous month" @click="shiftMonth(-1)">‹</button>
-          <span class="min-w-32 text-center text-sm font-medium text-slate-700 dark:text-slate-200" data-testid="pf-cal-month">{{ monthLabel }}</span>
+          <span class="min-w-32 text-center text-sm font-medium text-text" data-testid="pf-cal-month">{{ monthLabel }}</span>
           <button type="button" class="btn-ghost px-2" data-testid="pf-cal-next-month" aria-label="Next month" @click="shiftMonth(1)">›</button>
         </div>
         <div class="ml-auto flex items-center gap-2">
@@ -193,7 +193,7 @@ function chipText(c: Chip): string {
           <div
             v-for="dow in ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']"
             :key="dow"
-            class="pb-1 text-center text-xs font-medium uppercase text-slate-500 dark:text-slate-400"
+            class="pb-1 text-center text-xs font-medium uppercase text-muted"
           >
             {{ dow }}
           </div>
@@ -201,14 +201,14 @@ function chipText(c: Chip): string {
             v-for="cell in cells"
             :key="cell.iso"
             data-testid="pf-cal-day"
-            class="min-h-16 rounded-lg border border-slate-100 dark:border-slate-800 p-1"
+            class="min-h-16 rounded-lg border border-border p-1"
           >
             <span
               class="mb-1 inline-flex h-6 w-6 items-center justify-center rounded-full text-xs tabular-nums"
               :class="[
                 cell.inMonth
-                  ? 'text-slate-700 dark:text-slate-200'
-                  : 'text-slate-300 dark:text-slate-600',
+                  ? 'text-text'
+                  : 'text-slate-300 dark:text-muted',
                 cell.isToday ? 'bg-blue-600 font-semibold text-white' : '',
               ]"
             >
@@ -226,14 +226,14 @@ function chipText(c: Chip): string {
               </router-link>
               <span
                 v-if="cell.chips.length > MAX_CHIPS_PER_DAY"
-                class="block px-1 text-xs text-slate-400 dark:text-slate-500"
+                class="block px-1 text-xs text-muted dark:text-muted"
               >
                 +{{ cell.chips.length - MAX_CHIPS_PER_DAY }} more
               </span>
             </div>
           </div>
         </div>
-        <p v-if="!monthHasEvents" class="mt-3 text-sm text-slate-500 dark:text-slate-400">No events in this month.</p>
+        <p v-if="!monthHasEvents" class="mt-3 text-sm text-muted">No events in this month.</p>
       </div>
     </div>
   </div>

@@ -157,10 +157,10 @@ describe("RecordDividendDialog (§49.4)", () => {
     await wrapper.find('[data-testid="dividend-tax"]').setValue("30")
     const taxRow = wrapper.find('[data-testid="dividend-tax-total"]')
     expect(taxRow.text()).toBe("-30.00 USD")
-    expect(taxRow.classes().join(" ")).toContain("text-red-600")
+    expect(taxRow.classes().join(" ")).toContain("text-danger")
     const netRow = wrapper.find('[data-testid="dividend-net"]')
     expect(netRow.text()).toBe("170.00 USD")
-    expect(netRow.classes().join(" ")).toContain("text-green-600")
+    expect(netRow.classes().join(" ")).toContain("text-emerald")
   })
 
   it("per-share mode — gross = quantity × per share; submit posts per-share math", async () => {

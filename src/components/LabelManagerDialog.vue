@@ -112,8 +112,8 @@ async function confirmDelete() {
         </div>
 
         <!-- Create form -->
-        <div class="mb-4 rounded-lg border border-slate-200 dark:border-slate-700/60 p-3">
-          <p class="mb-2 text-xs font-medium uppercase text-slate-400 dark:text-slate-500">New label</p>
+        <div class="mb-4 rounded-lg border border-border p-3">
+          <p class="mb-2 text-xs font-medium uppercase text-muted dark:text-muted">New label</p>
           <form class="flex items-end gap-3" @submit.prevent="handleCreate">
             <label class="flex-1">
               <span class="label">Name</span>
@@ -136,18 +136,18 @@ async function confirmDelete() {
           </form>
         </div>
 
-        <p v-if="error" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ error }}</p>
+        <p v-if="error" class="mb-3 text-sm text-danger">{{ error }}</p>
 
         <!-- Label list -->
         <div class="max-h-72 space-y-1 overflow-y-auto">
-          <div v-if="!labels.length" class="py-4 text-center text-sm text-slate-400 dark:text-slate-500">No labels yet.</div>
-          <div v-for="label in labels" :key="label.id" class="group flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+          <div v-if="!labels.length" class="py-4 text-center text-sm text-muted dark:text-muted">No labels yet.</div>
+          <div v-for="label in labels" :key="label.id" class="group flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-surface-2 dark:hover:bg-slate-800/50">
             <!-- View mode -->
             <template v-if="editingId !== label.id">
               <span class="h-3 w-3 rounded-full flex-shrink-0" :style="{ backgroundColor: labelColors(label.color).bg, border: '1px solid ' + labelColors(label.color).text }" />
-              <span class="flex-1 truncate text-sm text-slate-700 dark:text-slate-200">{{ label.name }}</span>
+              <span class="flex-1 truncate text-sm text-text">{{ label.name }}</span>
               <button type="button" class="btn-ghost px-2 py-1 text-xs opacity-0 group-hover:opacity-100" @click="startEdit(label)">Edit</button>
-              <button type="button" class="btn-ghost px-2 py-1 text-xs text-red-600 opacity-0 group-hover:opacity-100" @click="startDelete(label.id)">Delete</button>
+              <button type="button" class="btn-ghost px-2 py-1 text-xs text-danger opacity-0 group-hover:opacity-100" @click="startDelete(label.id)">Delete</button>
             </template>
             <!-- Edit mode -->
             <template v-else>
@@ -162,7 +162,7 @@ async function confirmDelete() {
                   @click="editingColor = hex"
                 />
               </div>
-              <button type="button" class="btn-ghost px-2 py-1 text-xs text-green-600" :disabled="busy" @click="saveEdit">Save</button>
+              <button type="button" class="btn-ghost px-2 py-1 text-xs text-emerald" :disabled="busy" @click="saveEdit">Save</button>
               <button type="button" class="btn-ghost px-2 py-1 text-xs" @click="editingId = null">Cancel</button>
             </template>
           </div>
@@ -173,7 +173,7 @@ async function confirmDelete() {
           <div v-if="deleteId" class="fixed inset-0 z-60 flex items-center justify-center bg-slate-900/40 p-4" @click.self="deleteId = null">
             <div class="card w-full max-w-sm p-6" role="dialog" aria-label="Delete label">
               <h4 class="mb-2 text-sm font-semibold">Delete label?</h4>
-              <p class="mb-4 text-sm text-slate-600 dark:text-slate-300">
+              <p class="mb-4 text-sm text-muted">
                 This label will be removed from all positions and transactions. This cannot be undone.
               </p>
               <div class="flex justify-end gap-2">

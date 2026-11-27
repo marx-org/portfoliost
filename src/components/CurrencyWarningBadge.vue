@@ -15,7 +15,7 @@ const isEstimated = computed(() => props.source === "estimated")
   <span
     v-if="isUnknown"
     data-testid="currency-warning"
-    class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-500/15 dark:text-red-400"
+    class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-danger dark:bg-red-500/15 dark:text-red-400"
   >
     Currency unknown
   </span>

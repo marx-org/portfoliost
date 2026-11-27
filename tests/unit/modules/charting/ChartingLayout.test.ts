@@ -145,13 +145,13 @@ describe("ChartingLayout", () => {
     expect(route().query.from).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     expect(route().query.to).toBeUndefined()
     // The chosen range is highlighted.
-    expect(buttonByText(wrapper, "1M").classes()).toContain("bg-blue-50")
+    expect(buttonByText(wrapper, "1M").classes()).toContain("bg-accent-soft")
 
     // ALL clears the window.
     await buttonByText(wrapper, "ALL").trigger("click")
     expect(route().query.from).toBeUndefined()
     expect(route().query.to).toBeUndefined()
-    expect(buttonByText(wrapper, "ALL").classes()).toContain("bg-blue-50")
+    expect(buttonByText(wrapper, "ALL").classes()).toContain("bg-accent-soft")
   })
 
   it("reset returns to normal and clears the kind", async () => {

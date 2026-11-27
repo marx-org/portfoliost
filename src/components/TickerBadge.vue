@@ -117,15 +117,15 @@ const tickerClass = computed(
       :alt="symbol"
       loading="lazy"
       class="shrink-0 rounded-[9px] object-contain"
-      :class="[logoClass, 'bg-slate-100 dark:bg-slate-800']"
+      :class="[logoClass, 'bg-surface-2']"
     />
     <div class="min-w-0">
-      <div class="flex min-w-0 items-baseline gap-1.5 text-slate-900 dark:text-slate-100" :class="align === 'right' ? 'justify-end' : ''">
+      <div class="flex min-w-0 items-baseline gap-1.5 text-text" :class="align === 'right' ? 'justify-end' : ''">
         <component :is="titleAs" :class="tickerClass">{{ symbol }}</component>
         <span
           v-if="details"
           :data-testid="`${tid}-details`"
-          class="truncate text-[11px] font-medium text-slate-400 dark:text-slate-500"
+          class="truncate text-[11px] font-medium text-muted dark:text-muted"
         >
           {{ details }}
         </span>
@@ -133,7 +133,7 @@ const tickerClass = computed(
       <p
         v-if="name"
         :data-testid="`${tid}-name`"
-        class="truncate text-xs text-slate-500 dark:text-slate-400"
+        class="truncate text-xs text-muted"
       >
         {{ name }}
       </p>

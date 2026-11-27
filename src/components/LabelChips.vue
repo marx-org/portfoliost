@@ -15,7 +15,7 @@ const overflowTitle = computed(() => props.labels.map((l) => l.name).join(", "))
     <LabelBadge v-for="l in visible" :key="l.id" :label="l" @click="emit('badgeClick', l)" />
     <span
       v-if="overflow.length"
-      class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+      class="inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted dark:bg-slate-800 dark:text-slate-300"
     >
       +{{ overflow.length }}
     </span>

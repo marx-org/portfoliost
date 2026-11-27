@@ -40,7 +40,7 @@ const showConverted = computed(
     </span>
     <span
       v-if="showConverted"
-      class="tabular-nums text-[11px] text-slate-400 dark:text-slate-500"
+      class="tabular-nums text-[11px] text-muted dark:text-muted"
     >
       {{ formatCurrency(convertedFees, displayCcy) }}
     </span>

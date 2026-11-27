@@ -30,7 +30,7 @@ const tid = props.testid ?? "fee-fields"
 <template>
   <div>
     <div class="mb-1 flex gap-2">
-      <div class="flex flex-1 items-center rounded-lg border border-slate-300 focus-within:border-blue-500 dark:border-slate-600">
+      <div class="flex flex-1 items-center rounded-lg border border-border focus-within:border-blue-500 dark:border-slate-600">
         <template v-if="feesType === 'fixed'">
           <CurrencySelect
             :model-value="feeCurrency"
@@ -40,7 +40,7 @@ const tid = props.testid ?? "fee-fields"
             @update:model-value="(v: string) => { if (v) { emit('update:feeCurrency', v); emit('feeCurrencyChange') } }"
           />
         </template>
-        <span v-else class="pl-3 text-sm text-slate-500 dark:text-slate-400">%</span>
+        <span v-else class="pl-3 text-sm text-muted">%</span>
         <input
           :id="inputId"
           :value="fees"
@@ -56,7 +56,7 @@ const tid = props.testid ?? "fee-fields"
       <button
         type="button"
         class="btn-secondary shrink-0 text-sm"
-        :class="feesType === 'pct' ? 'bg-slate-200 text-slate-900 dark:!bg-slate-600 dark:text-white' : ''"
+        :class="feesType === 'pct' ? 'bg-border text-text dark:!bg-slate-600 dark:text-white' : ''"
         :data-testid="`${tid}-fees-toggle`"
         @click="toggleType"
       >

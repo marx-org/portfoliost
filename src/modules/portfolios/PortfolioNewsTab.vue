@@ -41,16 +41,16 @@ onMounted(async () => {
 })
 
 function toneClass(tone: string | undefined): string {
-  if (tone === "positive") return "bg-green-50 text-green-700"
-  if (tone === "negative") return "bg-red-50 text-red-700"
-  return "bg-slate-100 text-slate-600"
+  if (tone === "positive") return "bg-green-50 text-emerald"
+  if (tone === "negative") return "bg-red-50 text-danger"
+  return "bg-surface-2 text-muted"
 }
 </script>
 
 <template>
   <div class="space-y-6">
-    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading news...</p>
+    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-danger">{{ error }}</p>
+    <p v-if="loading" class="text-sm text-muted">Loading news...</p>
 
     <template v-if="!loading && !error">
       <div v-if="data?.pagination?.total_count" class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -73,13 +73,13 @@ function toneClass(tone: string | undefined): string {
               {{ (a.sentiment as Record<string, string>).tone }}
             </span>
           </div>
-          <a :href="(a.article as Record<string, unknown>)?.url as string" target="_blank" rel="noopener" class="font-medium leading-snug text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 hover:underline">
+          <a :href="(a.article as Record<string, unknown>)?.url as string" target="_blank" rel="noopener" class="font-medium leading-snug text-text hover:text-accent-text dark:hover:text-blue-400 hover:underline">
             {{ (a.article as Record<string, unknown>)?.title }}
           </a>
-          <p class="mt-auto pt-3 text-xs text-slate-500 dark:text-slate-400">{{ new Date(String(a.published_at)).toLocaleDateString() }}</p>
+          <p class="mt-auto pt-3 text-xs text-muted">{{ new Date(String(a.published_at)).toLocaleDateString() }}</p>
         </article>
       </div>
-      <p v-else class="card p-6 text-sm text-slate-500 dark:text-slate-400">No news for held stocks.</p>
+      <p v-else class="card p-6 text-sm text-muted">No news for held stocks.</p>
     </template>
   </div>
 </template>

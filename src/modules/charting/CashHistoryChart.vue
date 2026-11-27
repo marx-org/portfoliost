@@ -72,23 +72,23 @@ function latest(s: CashSeries): Point | undefined {
       <CollapsibleSection title="Cash Balances" :testid="`${testid}-table`">
         <table class="w-full text-sm">
           <thead>
-            <tr class="border-b border-slate-100 text-left text-xs uppercase text-slate-500 dark:border-slate-800 dark:text-slate-400">
+            <tr class="border-b border-border text-left text-xs uppercase text-muted dark:border-slate-800 dark:text-muted">
               <th class="px-5 py-2.5 font-medium">Account</th>
               <th class="px-5 py-2.5 text-right font-medium">Latest balance</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-            <tr v-for="s in rows" :key="s.key" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-              <td class="px-5 py-3 font-medium text-slate-900 dark:text-slate-100">{{ s.label }}</td>
+            <tr v-for="s in rows" :key="s.key" class="hover:bg-surface-2 dark:hover:bg-slate-800/50">
+              <td class="px-5 py-3 font-medium text-text">{{ s.label }}</td>
               <td class="px-5 py-3 text-right tabular-nums">{{ formatCurrency(latest(s)?.balance ?? 0, currency) }}</td>
             </tr>
           </tbody>
         </table>
-        <p class="px-5 py-2 text-xs text-slate-500 dark:text-slate-400">
+        <p class="px-5 py-2 text-xs text-muted">
           Balances are in {{ currency }}. Negative cash is shown, not clamped. Internal transfers cancel in the total.
         </p>
       </CollapsibleSection>
     </template>
-    <p v-else class="text-sm text-slate-500 dark:text-slate-400">No cash history for this scope.</p>
+    <p v-else class="text-sm text-muted">No cash history for this scope.</p>
   </div>
 </template>

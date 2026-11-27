@@ -133,19 +133,19 @@ function onChange(row: CategoryRow, event: Event) {
 <template>
   <div class="space-y-3" data-testid="charting-categories">
     <div class="flex flex-wrap items-center justify-between gap-2">
-      <p class="text-sm text-slate-500">
+      <p class="text-sm text-muted">
         One category per stock, shared across every account that holds it. Options are never classified as the equity.
       </p>
       <button type="button" class="btn-secondary text-xs" :disabled="loading" @click="load">Refresh</button>
     </div>
 
-    <p v-if="loading && !displayRows.length" class="text-sm text-slate-500">Loading…</p>
-    <p v-else-if="error" class="text-sm text-red-600">{{ error }}</p>
-    <p v-else-if="!displayRows.length" class="text-sm text-slate-500">No stocks to classify for this scope.</p>
+    <p v-if="loading && !displayRows.length" class="text-sm text-muted">Loading…</p>
+    <p v-else-if="error" class="text-sm text-danger">{{ error }}</p>
+    <p v-else-if="!displayRows.length" class="text-sm text-muted">No stocks to classify for this scope.</p>
 
     <table v-else class="w-full text-sm">
       <thead>
-        <tr class="text-left text-slate-400">
+        <tr class="text-left text-muted">
           <th class="py-1">Symbol</th><th>Name</th><th>Currency</th><th>Category</th><th>Updated</th>
         </tr>
       </thead>
@@ -153,7 +153,7 @@ function onChange(row: CategoryRow, event: Event) {
         <tr
           v-for="row in displayRows"
           :key="key(row.symbol, row.instrumentCurrency)"
-          class="border-t border-slate-100 dark:border-slate-800"
+          class="border-t border-border"
           :data-symbol="row.symbol"
           :data-currency="row.instrumentCurrency"
         >
@@ -171,7 +171,7 @@ function onChange(row: CategoryRow, event: Event) {
               <option v-for="o in CATEGORY_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
             </select>
           </td>
-          <td class="text-slate-500">{{ row.updatedAt ? row.updatedAt.slice(0, 10) : "—" }}</td>
+          <td class="text-muted">{{ row.updatedAt ? row.updatedAt.slice(0, 10) : "—" }}</td>
         </tr>
       </tbody>
     </table>

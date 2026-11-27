@@ -301,12 +301,12 @@ function goResearch() {
         <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="close">✕</button>
       </div>
 
-      <p v-if="error" class="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-400">{{ error }}</p>
+      <p v-if="error" class="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-danger dark:bg-red-500/10 dark:text-red-400">{{ error }}</p>
 
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead>
-            <tr class="border-b border-slate-100 text-left text-xs uppercase text-slate-500 dark:border-slate-800 dark:text-slate-400">
+            <tr class="border-b border-border text-left text-xs uppercase text-muted dark:border-slate-800 dark:text-muted">
               <th class="px-3 py-2 font-medium">Date</th>
               <th class="px-3 py-2 font-medium">Type</th>
               <th class="px-3 py-2 font-medium">Qty</th>
@@ -317,29 +317,29 @@ function goResearch() {
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-            <tr v-if="loading"><td colspan="8" class="px-3 py-4 text-center text-slate-500 dark:text-slate-400">Loading...</td></tr>
+            <tr v-if="loading"><td colspan="8" class="px-3 py-4 text-center text-muted">Loading...</td></tr>
             <tr v-for="tx in transactions" :key="tx.id">
               <td class="px-3 py-2">
-                <span class="text-sm text-slate-700 dark:text-slate-200">{{ fmtDate(tx.executedAt) }}</span>
+                <span class="text-sm text-text">{{ fmtDate(tx.executedAt) }}</span>
               </td>
-              <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ typeLabel(tx.type) }}</td>
-              <td class="px-3 py-2 tabular-nums text-slate-900 dark:text-slate-100">{{ tx.quantity }}</td>
-              <td class="px-3 py-2 tabular-nums text-slate-900 dark:text-slate-100">{{ formatCurrency(tx.price, tx.currency || "") }}</td>
-              <td class="px-3 py-2 tabular-nums text-slate-900 dark:text-slate-100">{{ formatCurrency(tx.fees ?? 0, tx.feeCurrency || tx.currency || "") }}</td>
-              <td class="px-3 py-2 text-right font-medium tabular-nums text-slate-900 dark:text-slate-100">{{ totalFor(tx) }}</td>
+              <td class="px-3 py-2 text-text">{{ typeLabel(tx.type) }}</td>
+              <td class="px-3 py-2 tabular-nums text-text">{{ tx.quantity }}</td>
+              <td class="px-3 py-2 tabular-nums text-text">{{ formatCurrency(tx.price, tx.currency || "") }}</td>
+              <td class="px-3 py-2 tabular-nums text-text">{{ formatCurrency(tx.fees ?? 0, tx.feeCurrency || tx.currency || "") }}</td>
+              <td class="px-3 py-2 text-right font-medium tabular-nums text-text">{{ totalFor(tx) }}</td>
               <td class="px-3 py-2 text-right">
-                <button v-if="!isSynthetic(tx)" type="button" class="text-xs text-blue-600 hover:underline" @click="openEditModal(tx)">Edit</button>
+                <button v-if="!isSynthetic(tx)" type="button" class="text-xs text-accent-text hover:underline" @click="openEditModal(tx)">Edit</button>
               </td>
               <td class="px-3 py-2 text-right">
-                <button v-if="!isSynthetic(tx)" type="button" class="text-xs text-red-600 hover:underline" aria-label="Delete Transaction" @click="removeRow(tx)">Delete</button>
+                <button v-if="!isSynthetic(tx)" type="button" class="text-xs text-danger hover:underline" aria-label="Delete Transaction" @click="removeRow(tx)">Delete</button>
               </td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <div class="mt-4 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-        <h4 class="mb-3 text-sm font-medium text-slate-700 dark:text-slate-300">Add Transaction</h4>
+      <div class="mt-4 rounded-xl border border-border bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+        <h4 class="mb-3 text-sm font-medium text-text dark:text-slate-300">Add Transaction</h4>
         <TransactionFormFields
           :symbol="position.symbol"
           :name="position.companyName ?? ''"

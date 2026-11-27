@@ -82,7 +82,7 @@ const hasSomethingToSay = computed(
     <h2 class="card-title mb-3">Key Facts</h2>
     <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
       <template v-for="row in identityRows" :key="`id-${row.label}`">
-        <dt class="text-slate-500 dark:text-slate-400">{{ row.label }}</dt>
+        <dt class="text-muted">{{ row.label }}</dt>
         <dd v-if="row.label === 'Country'" class="flex items-center gap-1.5">
           <img
             v-if="countryFlag"
@@ -97,7 +97,7 @@ const hasSomethingToSay = computed(
         <dd v-else>{{ row.value }}</dd>
       </template>
       <template v-for="row in classRowsResolved" :key="`kf-${row.label}`">
-        <dt class="text-slate-500 dark:text-slate-400">{{ row.label }}</dt>
+        <dt class="text-muted">{{ row.label }}</dt>
         <dd>{{ row.value }}</dd>
       </template>
     </dl>
@@ -106,7 +106,7 @@ const hasSomethingToSay = computed(
       :href="profile.weburl ?? undefined"
       target="_blank"
       rel="noopener"
-      class="mt-3 inline-block text-sm text-blue-600 dark:text-blue-400 hover:underline"
+      class="mt-3 inline-block text-sm text-accent-text hover:underline"
     >
       {{ weburlLabel }}
     </a>

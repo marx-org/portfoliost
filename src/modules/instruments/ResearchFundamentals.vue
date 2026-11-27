@@ -81,8 +81,8 @@ const trendChartOptions = computed(() => withSharedChart({
 
 <template>
   <div class="space-y-6">
-    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-slate-500 dark:text-slate-400">Loading fundamentals...</p>
+    <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-danger">{{ error }}</p>
+    <p v-if="loading" class="text-sm text-muted">Loading fundamentals...</p>
 
     <template v-if="!loading && !error && data">
       <p
@@ -97,18 +97,18 @@ const trendChartOptions = computed(() => withSharedChart({
       <div class="card p-6">
         <h2 class="card-title mb-4">Revenue vs Net Income - {{ symbol }}</h2>
         <component :is="'apexchart'" v-if="income.length" :options="trendChartOptions" :series="trendChartOptions.series" />
-        <p v-else class="text-sm text-slate-500 dark:text-slate-400">No income data available.</p>
+        <p v-else class="text-sm text-muted">No income data available.</p>
       </div>
 
       <div class="card p-6">
         <div class="mb-3 flex items-baseline justify-between gap-3">
           <h2 class="card-title">Income Statement</h2>
-          <span class="shrink-0 text-xs text-slate-500 dark:text-slate-400" data-testid="fundamentals-currency">{{ currencyLabel }}</span>
+          <span class="shrink-0 text-xs text-muted" data-testid="fundamentals-currency">{{ currencyLabel }}</span>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full min-w-[760px] text-sm">
             <thead>
-              <tr class="border-b border-slate-200 dark:border-slate-700/60 text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <tr class="border-b border-border text-left text-xs uppercase tracking-wide text-muted">
                 <th class="py-2 pr-3">Year</th>
                 <th class="py-2 pr-3 text-right">Revenue</th>
                 <th class="py-2 pr-3 text-right">EBITDA</th>
@@ -122,14 +122,14 @@ const trendChartOptions = computed(() => withSharedChart({
               </tr>
             </thead>
             <tbody>
-              <tr v-for="r in income" :key="r.year" class="border-b border-slate-100 dark:border-slate-800">
+              <tr v-for="r in income" :key="r.year" class="border-b border-border">
                 <td class="py-2 pr-3 font-medium">{{ r.year }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "revenue") }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "ebitda") }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "ebit") }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "netIncome") }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "netIncomeMargin") }}</td>
-                <td class="py-2 pr-3 text-right" :class="r.netIncomeGrowth && r.netIncomeGrowth < 0 ? 'text-red-600 dark:text-red-400' : ''">{{ cell(r, "netIncomeGrowth") }}</td>
+                <td class="py-2 pr-3 text-right" :class="r.netIncomeGrowth && r.netIncomeGrowth < 0 ? 'text-danger' : ''">{{ cell(r, "netIncomeGrowth") }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "earningsPerShare") }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "earningsPerShareGrowth") }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "dilutedSharesOutstanding") }}</td>
@@ -142,12 +142,12 @@ const trendChartOptions = computed(() => withSharedChart({
       <div class="card p-6">
         <div class="mb-3 flex items-baseline justify-between gap-3">
           <h2 class="card-title">Balance Sheet</h2>
-          <span class="shrink-0 text-xs text-slate-500 dark:text-slate-400" data-testid="fundamentals-currency">{{ currencyLabel }}</span>
+          <span class="shrink-0 text-xs text-muted" data-testid="fundamentals-currency">{{ currencyLabel }}</span>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full min-w-[820px] text-sm">
             <thead>
-              <tr class="border-b border-slate-200 dark:border-slate-700/60 text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <tr class="border-b border-border text-left text-xs uppercase tracking-wide text-muted">
                 <th class="py-2 pr-3">Year</th>
                 <th class="py-2 pr-3 text-right">Total Assets</th>
                 <th class="py-2 pr-3 text-right">Total Liabilities</th>
@@ -161,14 +161,14 @@ const trendChartOptions = computed(() => withSharedChart({
               </tr>
             </thead>
             <tbody>
-              <tr v-for="r in balance" :key="r.year" class="border-b border-slate-100 dark:border-slate-800">
+              <tr v-for="r in balance" :key="r.year" class="border-b border-border">
                 <td class="py-2 pr-3 font-medium">{{ r.year }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "totalAssets") }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "totalLiabilities") }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "shareholdersEquity") }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "cashAndShortTermInvestments") }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "totalDebt") }}</td>
-                <td class="py-2 pr-3 text-right" :class="r.netDebt && r.netDebt < 0 ? 'text-green-600 dark:text-green-400' : ''">{{ cell(r, "netDebt") }}</td>
+                <td class="py-2 pr-3 text-right" :class="r.netDebt && r.netDebt < 0 ? 'text-emerald' : ''">{{ cell(r, "netDebt") }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "workingCapital") }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "retainedEarnings") }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "debtEquityRatio") }}</td>
@@ -181,12 +181,12 @@ const trendChartOptions = computed(() => withSharedChart({
       <div class="card p-6">
         <div class="mb-3 flex items-baseline justify-between gap-3">
           <h2 class="card-title">Cash Flow</h2>
-          <span class="shrink-0 text-xs text-slate-500 dark:text-slate-400" data-testid="fundamentals-currency">{{ currencyLabel }}</span>
+          <span class="shrink-0 text-xs text-muted" data-testid="fundamentals-currency">{{ currencyLabel }}</span>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full min-w-[880px] text-sm">
             <thead>
-              <tr class="border-b border-slate-200 dark:border-slate-700/60 text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <tr class="border-b border-border text-left text-xs uppercase tracking-wide text-muted">
                 <th class="py-2 pr-3">Year</th>
                 <th class="py-2 pr-3 text-right">Operating CF</th>
                 <th class="py-2 pr-3 text-right">Investing CF</th>
@@ -200,7 +200,7 @@ const trendChartOptions = computed(() => withSharedChart({
               </tr>
             </thead>
             <tbody>
-              <tr v-for="r in cashFlow" :key="r.year" class="border-b border-slate-100 dark:border-slate-800">
+              <tr v-for="r in cashFlow" :key="r.year" class="border-b border-border">
                 <td class="py-2 pr-3 font-medium">{{ r.year }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "cashFlowFromOperatingActivities") }}</td>
                 <td class="py-2 pr-3 text-right">{{ cell(r, "cashFlowFromInvestingActivities") }}</td>

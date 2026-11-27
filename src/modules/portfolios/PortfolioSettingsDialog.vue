@@ -84,28 +84,28 @@ function submit() {
     <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Rename portfolio">
       <h3 class="mb-4 text-base font-semibold">Portfolio settings</h3>
       <form @submit.prevent="submit">
-        <label for="portfolio-settings-name" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Name</label>
+        <label for="portfolio-settings-name" class="mb-1 block text-sm text-muted">Name</label>
         <input id="portfolio-settings-name" v-model="name" type="text" required class="input mb-4" />
 
-        <label for="portfolio-settings-currency" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Base currency</label>
+        <label for="portfolio-settings-currency" class="mb-1 block text-sm text-muted">Base currency</label>
         <select id="portfolio-settings-currency" v-model="baseCurrency" required class="input mb-4">
           <option v-for="currency in currencies" :key="currency" :value="currency">{{ currency }}</option>
         </select>
 
         <div v-if="props.isVirtual" class="mb-4">
-          <label for="portfolio-settings-label" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Instrument label *</label>
+          <label for="portfolio-settings-label" class="mb-1 block text-sm text-muted">Instrument label *</label>
           <select id="portfolio-settings-label" v-model="labelId" class="input" required>
             <option value="" disabled>Select a label</option>
             <option v-for="label in labelsStore.labels" :key="label.id" :value="label.id">{{ label.name }}</option>
           </select>
         </div>
 
-        <label v-if="props.isVirtual" class="mb-4 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+        <label v-if="props.isVirtual" class="mb-4 flex items-center gap-2 text-sm text-muted">
           <input type="checkbox" checked disabled />
           Virtual portfolio
         </label>
 
-        <label class="mb-4 flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
+        <label class="mb-4 flex items-start gap-2 text-sm text-muted">
            <input
              v-if="!props.isVirtual"
             id="portfolio-settings-cash-leg"
@@ -116,12 +116,12 @@ function submit() {
           />
            <span v-if="!props.isVirtual">
             Generate a cash transaction on buy/sell
-            <span class="block text-xs text-slate-500 dark:text-slate-400">
+            <span class="block text-xs text-muted">
               Pre-ticks the cash checkbox on the buy/sell form. Sheet imports are unaffected.
             </span>
           </span>
         </label>
-        <label v-if="!props.isVirtual" class="mb-4 flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
+        <label v-if="!props.isVirtual" class="mb-4 flex items-start gap-2 text-sm text-muted">
           <input
             id="portfolio-settings-cash-base-only"
             v-model="cashBaseCurrencyOnly"
@@ -131,22 +131,22 @@ function submit() {
           />
           <span>
             Base currency is the only available currency for cash
-            <span class="block text-xs text-slate-500 dark:text-slate-400">
+            <span class="block text-xs text-muted">
               Cash effects are converted into the base currency at the event date. Investment and trade currencies remain unrestricted.
             </span>
           </span>
         </label>
         <div v-if="!props.isVirtual && !cashBaseCurrencyOnly" class="mb-4">
-          <label for="portfolio-settings-cash-currency" class="mb-1 block text-sm text-slate-600 dark:text-slate-300">Cash settlement currency</label>
+          <label for="portfolio-settings-cash-currency" class="mb-1 block text-sm text-muted">Cash settlement currency</label>
           <select id="portfolio-settings-cash-currency" v-model="cashCurrency" class="input" data-testid="cash-settlement-currency">
             <option value="">None — one balance per trade currency</option>
             <option v-for="currency in currencies" :key="currency" :value="currency">{{ currency }}</option>
           </select>
-          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          <p class="mt-1 text-xs text-muted">
             The currency the account actually holds money in. IBKR settles every leg in USD even though the portfolio is displayed in PLN; setting it keeps the ledger from accumulating balances in currencies the account never held.
           </p>
         </div>
-        <p v-if="error" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ error }}</p>
+        <p v-if="error" class="mb-3 text-sm text-danger">{{ error }}</p>
         <div class="flex justify-end gap-2">
           <button type="button" class="btn-ghost" @click="emit('close')">Cancel</button>
           <button type="submit" class="btn-primary" :disabled="busy || !name.trim() || !baseCurrency || (props.isVirtual && !labelId)">

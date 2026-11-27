@@ -174,23 +174,23 @@ async function createAndToggle() {
     <div
       v-if="open && trigger"
       ref="panelEl"
-      class="fixed z-40 w-72 rounded-lg border border-slate-200 dark:border-slate-700/60 bg-white dark:bg-slate-900 p-3 shadow-xl"
+      class="fixed z-40 w-72 rounded-lg border border-border bg-white dark:bg-slate-900 p-3 shadow-xl"
       role="dialog"
       aria-label="Set labels"
       :style="{ top: `${position.top}px`, left: `${position.left}px` }"
     >
-      <p class="mb-2 text-xs font-medium uppercase text-slate-400 dark:text-slate-500">Set labels</p>
-      <p v-if="error" class="mb-2 text-xs text-red-600 dark:text-red-400">{{ error }}</p>
+      <p class="mb-2 text-xs font-medium uppercase text-muted dark:text-muted">Set labels</p>
+      <p v-if="error" class="mb-2 text-xs text-danger">{{ error }}</p>
 
       <div class="max-h-48 space-y-0.5 overflow-y-auto">
         <label
           v-for="label in allLabels"
           :key="label.id"
-          class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-800/50"
+          class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-surface-2 dark:hover:bg-slate-800/50"
         >
           <input
             type="checkbox"
-            class="h-4 w-4 rounded border-slate-300 text-blue-600"
+            class="h-4 w-4 rounded border-border text-accent-text"
             :checked="selectedIds.has(label.id)"
             @change="toggle(label.id)"
           />
@@ -198,22 +198,22 @@ async function createAndToggle() {
             class="h-3 w-3 rounded-full flex-shrink-0"
             :style="{ backgroundColor: labelColors(label.color).bg, border: '1px solid ' + labelColors(label.color).text }"
           />
-          <span class="truncate text-slate-700 dark:text-slate-200">{{ label.name }}</span>
+          <span class="truncate text-text">{{ label.name }}</span>
         </label>
       </div>
-      <p v-if="!allLabels.length" class="py-2 text-xs text-slate-400 dark:text-slate-500">No labels available.</p>
+      <p v-if="!allLabels.length" class="py-2 text-xs text-muted dark:text-muted">No labels available.</p>
 
       <template v-if="!showNewForm">
         <button
           type="button"
-          class="mt-2 w-full rounded-md border border-dashed border-slate-300 dark:border-slate-600 px-2 py-1.5 text-xs text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+          class="mt-2 w-full rounded-md border border-dashed border-border px-2 py-1.5 text-xs text-muted hover:bg-surface-2 dark:hover:bg-slate-800/50"
           @click="showNewForm = true"
         >
           + Create new label
         </button>
       </template>
       <template v-else>
-        <div class="mt-2 rounded-md border border-slate-200 dark:border-slate-700/60 p-2">
+        <div class="mt-2 rounded-md border border-border p-2">
           <input
             v-model="newName"
             type="text"
@@ -245,7 +245,7 @@ async function createAndToggle() {
         </div>
       </template>
 
-      <div class="mt-3 flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800 pt-2">
+      <div class="mt-3 flex justify-end gap-2 border-t border-border pt-2">
         <button type="button" class="btn-ghost text-xs" @click="emit('close')">Cancel</button>
         <button type="button" class="btn-primary text-xs" :disabled="busy" @click="save">
           {{ busy ? "Saving..." : "Save" }}

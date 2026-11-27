@@ -332,13 +332,13 @@ defineExpose({ options, chartOptions, seriesData })
       :class="{ 'pointer-events-none select-none opacity-50': recomputing }"
     >
       <component :is="'apexchart'" :key="chartKey" v-if="timeSeries.length" :options="chartOptions" :series="seriesData" :height="height" />
-      <p v-else class="text-sm text-slate-500 dark:text-slate-400">No analytics available.</p>
+      <p v-else class="text-sm text-muted">No analytics available.</p>
       <div v-if="loading" class="absolute inset-0 flex items-center justify-center rounded-lg bg-white/70 dark:bg-slate-900/70">
-        <span class="text-sm font-medium text-slate-500 dark:text-slate-400">Refreshing...</span>
+        <span class="text-sm font-medium text-muted">Refreshing...</span>
       </div>
       <!-- §63.8 — gray-out overlay while a recompute/backfill is in flight -->
       <div v-if="recomputing" class="absolute inset-0 flex items-center justify-center rounded-lg bg-white/40 dark:bg-slate-900/40">
-        <span class="text-sm font-medium text-slate-500 dark:text-slate-400" data-testid="portfolio-chart-recomputing-overlay">
+        <span class="text-sm font-medium text-muted" data-testid="portfolio-chart-recomputing-overlay">
           Recomputing — please wait…
         </span>
       </div>
@@ -347,7 +347,7 @@ defineExpose({ options, chartOptions, seriesData })
     <p v-if="gapMessage" class="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400" data-testid="portfolio-chart-gap-warning">
       {{ gapMessage }}
     </p>
-    <p v-if="backfillPending" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+    <p v-if="backfillPending" class="mt-2 text-xs text-muted">
       Historical data is loading, chart will update in a moment.
     </p>
   </div>
