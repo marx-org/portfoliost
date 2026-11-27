@@ -17,15 +17,18 @@ const tabs = [
 
 <template>
   <div>
-    <h1 class="mb-6 text-2xl font-bold text-slate-900 dark:text-slate-100">Admin</h1>
+    <header class="mb-6">
+      <p class="text-[10px] font-mono uppercase tracking-[0.2em] text-muted">Portfoliost / Admin</p>
+      <h1 class="mt-1 text-2xl font-bold tracking-tight text-text">Admin</h1>
+    </header>
 
-    <nav aria-label="Admin tabs" class="mb-6 flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-slate-700/60">
+    <nav aria-label="Admin tabs" class="mb-6 flex gap-1 overflow-x-auto border-b border-border">
       <router-link
         v-for="tab in tabs"
         :key="tab.name"
         :to="{ name: tab.name }"
-        class="whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100"
-        :class="route.name === tab.name ? 'border-blue-600 text-blue-700 dark:text-blue-400' : 'border-transparent'"
+        class="whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium transition-colors"
+        :class="route.name === tab.name ? 'border-accent text-accent-text' : 'border-transparent text-muted hover:text-text'"
       >
         {{ tab.label }}
       </router-link>

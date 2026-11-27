@@ -16,6 +16,8 @@
   --muted: #475569;
   --accent: #2563eb;
   --accent-hover: #1d4ed8;
+  --accent-soft: #dbeafe;
+  --accent-text: #1e40af;
   --danger: #dc2626;
   --danger-hover: #b91c1c;
   --danger-soft: #fef2f2;
@@ -36,6 +38,8 @@
   --muted: #94a3b8;
   --accent: #3b82f6;
   --accent-hover: #2563eb;
+  --accent-soft: rgb(59 130 246 / 0.16);
+  --accent-text: #93c5fd;
   --danger: #ef4444;
   --danger-hover: #dc2626;
   --danger-soft: rgb(239 68 68 / 0.10);
@@ -59,6 +63,8 @@
   --color-text: var(--text);
   --color-muted: var(--muted);
   --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-text: var(--accent-text);
   --color-danger: var(--danger);
   --color-emerald: var(--emerald);
   --radius-card: var(--radius);

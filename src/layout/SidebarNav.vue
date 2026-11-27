@@ -114,7 +114,7 @@ function selectTheme(value: ThemePreference) {
   <!-- Mobile hamburger button (only visible on mobile) -->
   <button
     type="button"
-    class="fixed left-4 top-4 z-50 flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 md:hidden"
+    class="fixed left-4 top-4 z-50 flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface text-muted shadow-card transition-colors hover:bg-surface-2 hover:text-text md:hidden"
     aria-label="Toggle menu"
     @click="toggleSidebar"
   >
@@ -141,8 +141,8 @@ function selectTheme(value: ThemePreference) {
     <aside
       v-show="isMobileOpen || true"
       :class="[
-        // Base
-        'flex shrink-0 flex-col border-r border-slate-200 bg-white dark:border-slate-700/60 dark:bg-slate-900',
+        // Base — surface, hairline border, elevation-free shell
+        'flex shrink-0 flex-col border-r border-border bg-surface text-text',
         // Mobile: fixed overlay drawer
         'fixed inset-y-0 left-0 z-40 md:relative md:inset-auto md:z-auto',
         // Width: collapsed = icon-only (w-16), expanded = w-56
@@ -152,24 +152,28 @@ function selectTheme(value: ThemePreference) {
         'transition-[width,transform] duration-200 ease-in-out',
       ]"
     >
-      <!-- Logo + collapse toggle -->
-      <div class="flex items-center border-b border-slate-200 dark:border-slate-700/60" :class="isCollapsed ? 'justify-center py-4' : 'px-4 py-5'">
-        <router-link to="/en/investments/accounts-balance" class="flex items-center gap-2 min-w-0" :title="isCollapsed ? 'Portfoliost' : undefined">
-          <img src="/favicon.svg" alt="Portfoliost" class="h-7 w-7 shrink-0" />
-          <span v-if="!isCollapsed" class="truncate text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-100">Portfoliost</span>
-        </router-link>
+      <!-- Eyebrow + logo + collapse toggle -->
+      <div class="border-b border-border">
+        <p v-if="!isCollapsed" class="px-4 pt-3 text-[10px] font-mono uppercase tracking-[0.2em] text-muted">Workspace</p>
+        <div class="flex items-center px-4 py-3" :class="isCollapsed ? 'justify-center px-2 py-3' : 'justify-between'">
+          <!-- App logo -->
+          <router-link to="/en/investments/accounts-balance" class="flex min-w-0 items-center gap-2" :title="isCollapsed ? 'Portfoliost' : undefined">
+            <img src="/favicon.svg" alt="Portfoliost" class="h-7 w-7 shrink-0" />
+            <span v-if="!isCollapsed" class="truncate text-base font-semibold tracking-tight text-text">Portfoliost</span>
+          </router-link>
 
-        <!-- Collapse toggle (desktop only) -->
-        <button
-          type="button"
-          class="ml-auto hidden shrink-0 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300 md:flex"
-          :aria-label="isCollapsed ? 'Expand menu' : 'Collapse menu'"
-          @click="toggleSidebar"
-        >
-          <svg class="h-4 w-4 transition-transform duration-200" :class="isCollapsed ? 'rotate-180' : ''" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="m15 18-6-6 6-6" />
-          </svg>
-        </button>
+          <!-- Collapse toggle (desktop only) -->
+          <button
+            type="button"
+            class="ml-auto hidden shrink-0 rounded-md p-1 text-muted transition-colors hover:bg-surface-2 hover:text-text md:flex"
+            :aria-label="isCollapsed ? 'Expand menu' : 'Collapse menu'"
+            @click="toggleSidebar"
+          >
+            <svg class="h-4 w-4 transition-transform duration-200" :class="isCollapsed ? 'rotate-180' : ''" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m15 18-6-6 6-6" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <!-- Main nav -->
@@ -178,9 +182,11 @@ function selectTheme(value: ThemePreference) {
           v-for="item in items"
           :key="item.label"
           :to="item.to"
-          class="flex items-center gap-3 rounded-lg px-2 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+          class="flex items-center gap-3 rounded-lg px-2 py-2 text-sm font-medium transition-colors"
           :class="[
-            isActive(item) ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400' : '',
+            isActive(item)
+              ? 'bg-accent-soft text-accent-text'
+              : 'text-muted hover:bg-surface-2 hover:text-text',
             isCollapsed ? 'justify-center' : '',
           ]"
           :title="isCollapsed ? item.label : undefined"
@@ -204,7 +210,7 @@ function selectTheme(value: ThemePreference) {
 
           <span v-if="!isCollapsed" class="min-w-0 truncate">
             {{ item.label }}
-            <span v-if="item.sublabel" class="ml-1 text-xs font-normal text-slate-400 dark:text-slate-500">/ {{ item.sublabel }}</span>
+            <span v-if="item.sublabel" class="ml-1 text-xs font-normal text-muted">/ {{ item.sublabel }}</span>
           </span>
         </router-link>
 
@@ -212,9 +218,11 @@ function selectTheme(value: ThemePreference) {
         <router-link
           v-if="auth.isAdmin"
           to="/en/admin"
-          class="flex items-center gap-3 rounded-lg px-2 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+          class="flex items-center gap-3 rounded-lg px-2 py-2 text-sm font-medium transition-colors"
           :class="[
-            isAdminActive ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400' : '',
+            isAdminActive
+              ? 'bg-accent-soft text-accent-text'
+              : 'text-muted hover:bg-surface-2 hover:text-text',
             isCollapsed ? 'justify-center' : '',
           ]"
           :title="isCollapsed ? 'Admin' : undefined"
@@ -228,13 +236,19 @@ function selectTheme(value: ThemePreference) {
       </nav>
 
       <!-- Bottom section -->
-      <div class="space-y-1 border-t border-slate-200 p-2 dark:border-slate-700/60">
+      <div class="space-y-1 border-t border-border p-2">
+        <p v-if="!isCollapsed" class="px-3 pb-1 pt-2 text-[10px] font-mono uppercase tracking-[0.2em] text-muted">Account</p>
+
         <!-- Theme picker -->
         <div class="relative">
           <button
             type="button"
-            class="btn-ghost w-full dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
-            :class="isCollapsed ? 'justify-center px-2' : 'justify-between'"
+            class="w-full rounded-lg text-left text-sm font-medium transition-colors"
+            :class="[
+              'flex items-center gap-2 px-2 py-2',
+              isCollapsed ? 'justify-center' : 'justify-between',
+              themeOpen ? 'bg-accent-soft text-accent-text' : 'text-muted hover:bg-surface-2 hover:text-text',
+            ]"
             aria-haspopup="listbox"
             :aria-expanded="themeOpen"
             :title="isCollapsed ? `Theme: ${themeLabel}` : undefined"
@@ -252,7 +266,7 @@ function selectTheme(value: ThemePreference) {
               </svg>
               <span v-if="!isCollapsed">Theme</span>
             </span>
-            <span v-if="!isCollapsed" class="flex items-center gap-1 text-xs font-normal text-slate-400 dark:text-slate-500">
+            <span v-if="!isCollapsed" class="flex items-center gap-1 text-xs font-normal text-muted">
               {{ themeLabel }}
               <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="m6 9 6 6 6-6" />
@@ -264,7 +278,7 @@ function selectTheme(value: ThemePreference) {
             v-if="themeOpen"
             role="listbox"
             aria-label="Theme"
-            class="absolute bottom-full left-0 z-50 mb-1 rounded-lg border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-800"
+            class="absolute bottom-full left-0 z-50 mb-1 rounded-xl border border-border bg-surface p-1 shadow-card"
             :class="isCollapsed ? 'w-36' : 'right-0'"
           >
             <button
@@ -273,8 +287,8 @@ function selectTheme(value: ThemePreference) {
               type="button"
               role="option"
               :aria-selected="theme.preference === opt.value"
-              class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-slate-100"
-              :class="{ 'bg-slate-100 text-slate-900 dark:bg-slate-700 dark:text-slate-100': theme.preference === opt.value }"
+              class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors"
+              :class="theme.preference === opt.value ? 'bg-accent-soft text-accent-text' : 'text-muted hover:bg-surface-2 hover:text-text'"
               @click="selectTheme(opt.value)"
             >
               <svg v-if="opt.icon === 'sun'" class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -296,8 +310,8 @@ function selectTheme(value: ThemePreference) {
         <!-- Logout -->
         <button
           type="button"
-          class="btn-ghost w-full dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
-          :class="isCollapsed ? 'justify-center px-2' : 'justify-start'"
+          class="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-2 hover:text-text"
+          :class="isCollapsed ? 'justify-center' : 'justify-start'"
           :title="isCollapsed ? 'Logout' : undefined"
           @click="handleLogout"
         >
@@ -312,8 +326,8 @@ function selectTheme(value: ThemePreference) {
         <!-- Settings -->
         <router-link
           to="/en/settings/profile"
-          class="btn-ghost w-full dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
-          :class="isCollapsed ? 'justify-center px-2' : 'justify-start'"
+          class="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-2 hover:text-text"
+          :class="isCollapsed ? 'justify-center' : 'justify-start'"
           :title="isCollapsed ? 'Settings' : undefined"
         >
           <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -324,7 +338,7 @@ function selectTheme(value: ThemePreference) {
         </router-link>
 
         <!-- User email -->
-        <div v-if="!isCollapsed" class="px-3 py-1 text-xs text-slate-400 dark:text-slate-500 truncate">{{ displayName }}</div>
+        <div v-if="!isCollapsed" class="px-3 pb-1 pt-2 text-xs text-muted truncate">{{ displayName }}</div>
       </div>
     </aside>
   </Transition>
