@@ -234,10 +234,15 @@ function buildChartOptions() {
     },
     // All lines are solid: the legend and stable per-benchmark colors distinguish
     // the series without turning the benchmark into visual noise.
+    // fill.type = "solid" is load-bearing: for line charts ApexCharts uses
+    // fill.fillPath() as the stroke paint (not stroke.fill), so the shared
+    // gradient fill (opacityFrom 0.25 → opacityTo 0) would make every line
+    // fade to invisible. Solid fill → solid stroke.
     stroke: {
       width: [2.5, ...(hasInv ? [1.75] : []), ...ov.map(() => 1.5), ...benchmarks.map(() => 1.75)],
       dashArray: [0, ...(hasInv ? [0] : []), ...ov.map(() => 0), ...benchmarks.map(() => 0)],
     },
+    fill: { type: "solid" as const },
     dataLabels: { enabled: false },
   }
 }

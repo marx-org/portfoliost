@@ -72,7 +72,7 @@ const chartSeries = computed(() => [
   <div class="space-y-3" :data-testid="testid">
     <template v-if="groups.length">
       <div class="card p-6" :data-testid="`${testid}-chart`">
-        <h2 class="mb-2 text-base font-semibold">Cost Basis vs Market Value by Label</h2>
+        <h2 class="sr-only">Cost Basis vs Market Value by Label</h2>
         <component :is="'apexchart'" :options="chartOptions" :series="chartSeries" />
       </div>
       <CollapsibleSection title="Cost Basis vs Market Value" :testid="`${testid}-table`">

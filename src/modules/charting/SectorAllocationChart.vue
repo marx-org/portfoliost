@@ -70,7 +70,7 @@ const chartSeries = computed(() => [{ name: "Market value", data: rows.value.map
   <div class="space-y-3" :data-testid="testid">
     <template v-if="rows.length">
       <div class="card p-6" :data-testid="`${testid}-chart`">
-        <h2 class="mb-2 text-base font-semibold">Sector Weights</h2>
+        <h2 class="sr-only">Sector Weights</h2>
         <component :is="'apexchart'" :options="chartOptions" :series="chartSeries" />
       </div>
       <CollapsibleSection v-if="showTable" title="Sector Weights" :testid="`${testid}-table`">

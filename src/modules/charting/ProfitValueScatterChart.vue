@@ -133,8 +133,8 @@ const chartSeries = computed(() => [
         :class="expanded ? 'fixed inset-4 z-50 overflow-auto' : ''"
         :data-testid="`${testid}-chart`"
       >
+        <h2 class="sr-only">Market Value vs Total Profit</h2>
         <div class="mb-2 flex items-center justify-between gap-3">
-          <h2 class="text-base font-semibold">Market Value vs Total Profit</h2>
           <button
             type="button"
             class="btn-secondary text-xs"

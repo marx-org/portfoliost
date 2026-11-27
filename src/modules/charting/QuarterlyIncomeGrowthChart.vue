@@ -84,7 +84,7 @@ const chartSeries = computed(() => [
         {{ selectedYear }} vs {{ selectedYear - 1 }} — quarterly receipts, year over year.
       </p>
       <div class="card p-6" :data-testid="`${testid}-chart`">
-        <h2 class="mb-2 text-base font-semibold">Quarterly Income Growth</h2>
+        <h2 class="sr-only">Quarterly Income Growth</h2>
         <component :is="'apexchart'" :options="chartOptions" :series="chartSeries" />
       </div>
       <p class="text-xs text-slate-500" :data-testid="`${testid}-partial`">

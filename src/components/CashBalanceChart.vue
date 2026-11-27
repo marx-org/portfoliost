@@ -24,9 +24,11 @@ const chartOptions = computed(() => withSharedChart({
   colors: ["var(--emerald)"],
   series: [{ name: "Balance", data: props.points.map((p) => p.balance) }],
   xaxis: { categories: props.points.map((p) => formatDate(p.date)), labels: { show: false } },
-  stroke: { curve: "smooth" as const, width: 2 },
+  stroke: { curve: "smooth" as const, width: 2, fill: { type: "solid" as const } },
   dataLabels: { enabled: false },
   // Chart-local gradient: slightly taller fade than the shared 0.25/0.
+  // stroke.fill.type = "solid" above prevents the gradient from being used
+  // as the stroke paint (which would make the line fade to invisible).
   fill: { type: "gradient" as const, gradient: { opacityFrom: 0.3, opacityTo: 0 } },
 }))
 

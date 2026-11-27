@@ -906,10 +906,12 @@ const chartOptions = computed(() => withSharedChart({
       formatter: yLabelFormatter,
     },
   },
-  stroke: { curve: "smooth" as const, width: 2 },
+  stroke: { curve: "smooth" as const, width: 2, fill: { type: "solid" as const } },
   dataLabels: { enabled: false },
   // Chart-local gradient identical to the shared one; stated explicitly so the
-  // drawdown mode can be reasoned about standalone.
+  // drawdown mode can be reasoned about standalone. stroke.fill.type = "solid"
+  // above prevents the gradient from being used as the stroke paint (which
+  // would make the line fade to invisible).
   fill: { type: "gradient" as const, gradient: { opacityFrom: 0.25, opacityTo: 0 } },
   legend: { position: "top" as const, horizontalAlign: "right" as const },
   annotations: { points: transactionAnnotations.value, yaxis: fifoReferenceLines.value },

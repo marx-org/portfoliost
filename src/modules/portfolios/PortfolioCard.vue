@@ -309,7 +309,7 @@ const sparkOptions = computed(() => withSharedChart({
   },
   colors: ["var(--accent)"],
   series: [{ name: "Value", data: series.value }],
-  stroke: { curve: "smooth" as const, width: 2 },
+  stroke: { curve: "smooth" as const, width: 2, fill: { type: "solid" as const } },
   dataLabels: { enabled: false },
   fill: { type: "gradient" as const, gradient: { opacityFrom: 0.25, opacityTo: 0 } },
   xaxis: { categories: series.value.map((_, i) => i), labels: { show: false } },

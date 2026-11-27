@@ -38,6 +38,7 @@ const chartOptions = computed(() => withSharedChart({
   },
   dataLabels: { enabled: false },
   stroke: { width: [2, 2, 2, 2.5] },
+  fill: { type: "solid" as const },
   colors: ["var(--accent)", "#0ea5e9", "#8b5cf6", "#f59e0b", "#10b981", "#ef4444", "#64748b"],
   tooltip: { shared: true, y: { formatter: (v: number) => formatCurrency(v, props.currency) } },
   legend: { position: "bottom" as const },
@@ -65,7 +66,7 @@ function latest(s: CashSeries): Point | undefined {
   <div class="space-y-3" :data-testid="testid">
     <template v-if="accounts.length">
       <div class="card p-6" :data-testid="`${testid}-chart`">
-        <h2 class="mb-2 text-base font-semibold">Broker Cash Balances</h2>
+        <h2 class="sr-only">Broker Cash Balances</h2>
         <component :is="'apexchart'" :options="chartOptions" :series="chartSeries" />
       </div>
       <CollapsibleSection title="Cash Balances" :testid="`${testid}-table`">

@@ -78,7 +78,7 @@ const donutSeries = computed(() => donutRows.value.map((r) => r.value))
   <div class="space-y-3" :data-testid="testid">
     <template v-if="sorted.length">
       <div class="card p-6" :data-testid="`${testid}-donut`">
-        <h2 class="mb-2 text-base font-semibold">Current Holdings</h2>
+        <h2 class="sr-only">Current Holdings</h2>
         <component :is="'apexchart'" :options="donutOptions" :series="donutSeries" />
       </div>
       <CollapsibleSection title="Holdings" :testid="`${testid}-table`">

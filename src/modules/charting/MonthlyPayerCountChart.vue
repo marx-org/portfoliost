@@ -78,7 +78,7 @@ const chartSeries = computed(() => [
   <div class="space-y-3" :data-testid="testid">
     <template v-if="selectedYear != null">
       <div class="card p-6" :data-testid="`${testid}-chart`">
-        <h2 class="mb-2 text-base font-semibold">Dividend Payers by Month — {{ selectedYear }}</h2>
+        <h2 class="sr-only">Dividend Payers by Month — {{ selectedYear }}</h2>
         <component :is="'apexchart'" :options="chartOptions" :series="chartSeries" />
       </div>
       <p v-if="hasPartial" class="text-xs text-slate-500" :data-testid="`${testid}-partial`">

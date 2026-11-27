@@ -41,6 +41,7 @@ const chartOptions = computed(() => withSharedChart({
   },
   dataLabels: { enabled: false },
   stroke: { width: [2, 2, 2, 2.5] },
+  fill: { type: "solid" as const },
   colors: ["var(--accent)", "#0ea5e9", "#8b5cf6", "#f59e0b", "#10b981", "#ef4444", "#64748b"],
   tooltip: {
     shared: true,
@@ -75,7 +76,7 @@ function latest(s: ContributionSeries): Point | undefined {
         Some source amounts could not be converted into {{ currency }}; the affected cumulative totals are incomplete.
       </p>
       <div class="card p-6" :data-testid="`${testid}-chart`">
-        <h2 class="mb-2 text-base font-semibold">Cumulative External Contributions</h2>
+        <h2 class="sr-only">Cumulative External Contributions</h2>
         <apexchart :options="chartOptions" :series="chartSeries" />
       </div>
       <CollapsibleSection title="Cumulative Contributions" :testid="`${testid}-table`">

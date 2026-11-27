@@ -64,7 +64,7 @@ const donutSeries = computed(() => rows.value.map((s) => s.value))
   <div class="space-y-3" :data-testid="testid">
     <template v-if="rows.length">
       <div class="card p-6" :data-testid="`${testid}-donut`">
-        <h2 class="mb-2 text-base font-semibold">By Asset Type</h2>
+        <h2 class="sr-only">By Asset Type</h2>
         <component :is="'apexchart'" :options="donutOptions" :series="donutSeries" />
       </div>
       <CollapsibleSection title="Asset-Type Weights" :testid="`${testid}-table`">

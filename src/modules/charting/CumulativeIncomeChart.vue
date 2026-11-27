@@ -39,6 +39,7 @@ const chartOptions = computed(() => withSharedChart({
   // tooltip and table carry the values.
   dataLabels: { enabled: false },
   stroke: { width: 2 },
+  fill: { type: "solid" as const },
   colors: ["var(--emerald)"],
   tooltip: { y: { formatter: (v: number) => formatCurrency(v, props.currency) } },
 }))

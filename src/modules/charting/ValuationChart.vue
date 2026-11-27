@@ -67,7 +67,7 @@ const benchmarkSeries = computed(() =>
 
 <template>
   <div class="space-y-3" data-testid="charting-valuation">
-    <h2 class="text-base font-semibold">Valuation, capital and cumulative income</h2>
+    <h2 class="sr-only">Valuation, capital and cumulative income</h2>
     <PortfolioPerformanceChart
       v-if="timeSeries.length"
       :time-series="timeSeries"

@@ -48,7 +48,7 @@ const chartSeries = computed(() => [
 
 <template>
   <div class="space-y-3" :data-testid="`annual-income-average-${unit}`">
-    <h2 class="text-base font-semibold">{{ titleText }}</h2>
+    <h2 class="sr-only">{{ titleText }}</h2>
     <p class="text-xs text-slate-500">
       Annual-equivalent received income per {{ per }} (the year's total ÷ {{ divisor }}). Not a forecast.
     </p>

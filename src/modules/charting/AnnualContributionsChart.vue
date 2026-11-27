@@ -68,7 +68,7 @@ const chartSeries = computed(() => [
         Some source amounts could not be converted into {{ currency }}; the affected totals are incomplete.
       </p>
       <div class="card p-6">
-        <h2 class="mb-2 text-base font-semibold">Annual External Contributions</h2>
+        <h2 class="sr-only">Annual External Contributions</h2>
         <apexchart type="bar" :options="chartOptions" :series="chartSeries" :height="340" />
       </div>
       <CollapsibleSection title="Annual External Contributions" :testid="`${testid}-table`">

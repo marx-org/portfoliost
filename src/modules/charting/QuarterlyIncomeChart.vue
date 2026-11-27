@@ -71,7 +71,7 @@ const partialLabel = computed(() => {
   <div class="space-y-3" :data-testid="testid">
     <template v-if="rows.length">
       <div class="card p-6" :data-testid="`${testid}-chart`">
-        <h2 class="mb-2 text-base font-semibold">Quarterly Receipts by Year</h2>
+        <h2 class="sr-only">Quarterly Receipts by Year</h2>
         <component :is="'apexchart'" :options="chartOptions" :series="chartSeries" />
       </div>
       <p v-if="partialLabel" class="text-xs text-slate-500" :data-testid="`${testid}-partial`">
