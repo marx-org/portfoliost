@@ -254,9 +254,14 @@ test.describe("§84.10 accounts balance across viewports", () => {
     const alpha = await page.evaluate(() => {
       const el = document.querySelector('[data-testid="accounts-balance-account"]')!
       const color = getComputedStyle(el).backgroundColor
-      const alpha = color.match(/(?:\/|,)\s*([\d.]+)(%)?\s*\)$/)
-      if (!alpha) return color === "transparent" ? 0 : 1
-      return Number(alpha[1]) * (alpha[2] ? 0.01 : 1)
+      if (color === "transparent") return 0
+      // rgba(r,g,b,a) — 4 args; rgb(r,g,b) — 3 args, opaque.
+      const rgba = color.match(/^rgba\(\s*[\d.]+\s*,\s*[\d.]+\s*,\s*[\d.]+\s*,\s*([\d.]+)\s*\)$/)
+      if (rgba) return Number(rgba[1])
+      // color(srgb r g b / a) — modern syntax with slash alpha.
+      const slash = color.match(/\/\s*([\d.]+)\s*\)$/)
+      if (slash) return Number(slash[1])
+      return 1 // plain rgb() — opaque
     })
     expect(alpha).toBe(1)
   })
