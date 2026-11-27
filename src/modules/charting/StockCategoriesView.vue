@@ -132,6 +132,13 @@ function onChange(row: CategoryRow, event: Event) {
 
 <template>
   <div class="space-y-3" data-testid="charting-categories">
+  <div class="page-header" data-testid="charting-categories">
+    <div>
+      <p class="page-eyebrow"><span class="signal-dot" /> CHARTING</p>
+      <h1 class="page-title">Stock categories</h1>
+    </div>
+  </div>
+
     <div class="flex flex-wrap items-center justify-between gap-2">
       <p class="text-sm text-muted">
         One category per stock, shared across every account that holds it. Options are never classified as the equity.
