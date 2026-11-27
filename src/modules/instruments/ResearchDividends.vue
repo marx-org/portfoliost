@@ -4,6 +4,7 @@ import { useRoute } from "vue-router"
 import { getInstrumentDividends } from "@/api/instruments"
 import type { components } from "@/api/types"
 import { formatAmount } from "@/utils/format"
+import { withSharedChart } from "@/utils/chartOptions"
 import CurrencyWarningBadge from "@/components/CurrencyWarningBadge.vue"
 import type { CurrencySource } from "@/utils/instrumentCurrency"
 
@@ -48,9 +49,9 @@ const stats = computed(() => {
   }
 })
 
-const chartOptions = computed(() => ({
+const chartOptions = computed(() => withSharedChart({
   chart: { type: "bar" as const, height: 300, toolbar: { show: false } },
-  colors: ["#16a34a"],
+  colors: ["var(--emerald)"],
   series: [{ name: "Dividend / share", data: history.value.map((r) => r.amount) }],
   xaxis: { categories: history.value.map((r) => String(r.year)) },
   plotOptions: { bar: { columnWidth: "55%", borderRadius: 3 } },
@@ -58,7 +59,7 @@ const chartOptions = computed(() => ({
     enabled: false,
   },
   yaxis: { labels: { formatter: (v: number) => formatAmount(v, instrCcy.value) } },
-  grid: { borderColor: "#e2e8f0" },
+  fill: { type: "solid" as const },
 }))
 
 function dateLabel(d: string): string {

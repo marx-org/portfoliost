@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue"
 import { getInstrumentSeasonality } from "@/api/instruments"
+import { withSharedChart } from "@/utils/chartOptions"
 
 const props = defineProps<{ symbol: string }>()
 
@@ -28,9 +29,9 @@ async function load() {
 
 watch([years, metric], load, { immediate: true })
 
-const chartOptions = computed(() => ({
+const chartOptions = computed(() => withSharedChart({
   chart: { type: "bar" as const, height: 300, toolbar: { show: false } },
-  colors: monthly.value.map((m) => ((m.return_pct ?? 0) >= 0 ? "#16a34a" : "#dc2626")),
+  colors: monthly.value.map((m) => ((m.return_pct ?? 0) >= 0 ? "var(--emerald)" : "var(--danger)")),
   series: [{ name: "Return", data: monthly.value.map((m) => m.return_pct ?? 0) }],
   xaxis: { categories: monthly.value.map((m) => m.month) },
   plotOptions: { bar: { columnWidth: "55%", borderRadius: 3 } },
@@ -41,7 +42,7 @@ const chartOptions = computed(() => ({
     style: { fontSize: "10px" },
   },
   yaxis: { labels: { formatter: (v: number) => `${v.toFixed(1)}%` } },
-  grid: { borderColor: "#e2e8f0" },
+  fill: { type: "solid" as const },
 }))
 </script>
 

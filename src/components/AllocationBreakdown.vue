@@ -29,6 +29,7 @@ export interface AllocationSlice {
  * live in one place — no parallel allocation function.
  */
 import { computed } from "vue"
+import { withSharedChart } from "@/utils/chartOptions"
 import { formatCurrency, formatPercent } from "@/utils/format"
 import CollapsibleSection from "./CollapsibleSection.vue"
 
@@ -79,12 +80,13 @@ const sectorSlices = computed(() => props.bySector ?? [])
 const assetSlices = computed(() => props.byAssetType ?? [])
 const currencySlices = computed(() => props.byCurrency ?? [])
 
-const donutOptions = computed(() => ({
+const donutOptions = computed(() => withSharedChart({
   chart: { type: "donut" as const, height: 320, toolbar: { show: false } },
   labels: sectorSlices.value.map(label),
-  colors: ["#2563eb", "#0ea5e9", "#8b5cf6", "#f59e0b", "#10b981", "#ef4444", "#64748b", "#ec4899"],
+  colors: ["var(--accent)", "#0ea5e9", "#8b5cf6", "#f59e0b", "#10b981", "#ef4444", "#64748b", "#ec4899"],
   legend: { position: "bottom" as const },
   dataLabels: { enabled: false },
+  fill: { type: "solid" as const },
   tooltip: { y: { formatter: (v: number) => formatCurrency(v, props.currency) } },
 }))
 const donutSeries = computed(() => sectorSlices.value.map((s) => s.value))

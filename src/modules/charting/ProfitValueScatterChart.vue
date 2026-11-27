@@ -26,7 +26,7 @@ export interface ProfitValuePoint {
 import { computed, ref } from "vue"
 import { formatCurrency } from "@/utils/format"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
-import { axisTitle, chartTitle } from "./chartFormat"
+import { axisTitle, chartTitle, withSharedChart } from "./chartFormat"
 
 const props = withDefaults(
   defineProps<{
@@ -68,7 +68,7 @@ function displaySymbol(p: ProfitValuePoint): string {
   return p.symbol.includes("|") ? p.symbol.split("|")[1] ?? p.symbol : p.symbol
 }
 
-const chartOptions = computed(() => ({
+const chartOptions = computed(() => withSharedChart({
   chart: {
     type: "scatter" as const,
     // Expandable + zoomable: most holdings crowd into one corner, so the plot
@@ -103,7 +103,8 @@ const chartOptions = computed(() => ({
         .join("<br/>")
     },
   },
-  markers: { size: 6, colors: ["#2563eb"] },
+  markers: { size: 6, colors: ["var(--accent)"] },
+  fill: { type: "solid" as const },
 }))
 const chartSeries = computed(() => [
   { name: "Holdings", data: plotted.value.map((p) => [p.marketValue, p.totalProfit]) },

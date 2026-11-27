@@ -8,6 +8,7 @@ import { useCurrenciesStore, type CurrencyInfo } from "@/stores/currencies"
 import { formatAmount, formatCurrency, formatNumber } from "@/utils/format"
 import { crossCurrencyCaption, needsPercentComparison, percentNormalize } from "@/utils/compareSeries"
 import { currencyQueryParam, fxCaveat } from "@/utils/priceChartFx"
+import { withSharedChart } from "@/utils/chartOptions"
 import type { components } from "../../generated/api-types"
 
 type Transaction = components["schemas"]["Transaction"]
@@ -615,24 +616,24 @@ const fifoReferenceLines = computed(() => {
     const avgCost = totalCost / remainingQty
     lines.push({
       y: avgCost,
-      borderColor: "#2563eb",
+      borderColor: "var(--accent)",
       strokeDashArray: 6,
-      label: { borderColor: "#2563eb", style: { color: "#fff", background: "#2563eb" }, text: `Avg $${avgCost.toFixed(2)}` },
+      label: { borderColor: "var(--accent)", style: { color: "#fff", background: "var(--accent)" }, text: `Avg $${avgCost.toFixed(2)}` },
     })
   }
 
   lines.push({
     y: low,
-    borderColor: "#16a34a",
+    borderColor: "var(--emerald)",
     strokeDashArray: 4,
-    label: { borderColor: "#16a34a", style: { color: "#fff", background: "#16a34a" }, text: `Low $${low.toFixed(2)}` },
+    label: { borderColor: "var(--emerald)", style: { color: "#fff", background: "var(--emerald)" }, text: `Low $${low.toFixed(2)}` },
   })
 
   lines.push({
     y: high,
-    borderColor: "#dc2626",
+    borderColor: "var(--danger)",
     strokeDashArray: 4,
-    label: { borderColor: "#dc2626", style: { color: "#fff", background: "#dc2626" }, text: `High $${high.toFixed(2)}` },
+    label: { borderColor: "var(--danger)", style: { color: "#fff", background: "var(--danger)" }, text: `High $${high.toFixed(2)}` },
   })
 
   return lines
@@ -679,8 +680,8 @@ const barDateTxMap = computed<Map<string, BarTxEntry[]>>(() => {
   return map
 })
 
-const BUY_COLOR = "#16a34a"
-const SELL_COLOR = "#dc2626"
+const BUY_COLOR = "var(--emerald)"
+const SELL_COLOR = "var(--danger)"
 
 /** Prefix of the class ApexCharts copies from `annotations.points[].id` onto the
  * marker node. That class is the way back from the DOM to a trade list — and it
@@ -866,7 +867,7 @@ function tooltipCustom({ series, dataPointIndex, w }: {
   return `<div class="price-chart-tooltip">${lines.join("")}${txHtml}</div>`
 }
 
-const chartOptions = computed(() => ({
+const chartOptions = computed(() => withSharedChart({
   chart: {
     type: "area" as const,
     height: fullscreen.value ? window.innerHeight - 80 : 380,
@@ -875,7 +876,7 @@ const chartOptions = computed(() => ({
     animations: { enabled: true },
     fontFamily: "inherit",
   },
-  colors: mode.value === "Drawdowns" ? ["#dc2626", "#94a3b8"] : ["#2563eb", "#94a3b8"],
+  colors: mode.value === "Drawdowns" ? ["var(--danger)", "var(--muted)"] : ["var(--accent)", "var(--muted)"],
   series: series.value.data,
   xaxis: {
     // A numeric axis is load-bearing for the transaction markers, not a style
@@ -907,10 +908,11 @@ const chartOptions = computed(() => ({
   },
   stroke: { curve: "smooth" as const, width: 2 },
   dataLabels: { enabled: false },
+  // Chart-local gradient identical to the shared one; stated explicitly so the
+  // drawdown mode can be reasoned about standalone.
   fill: { type: "gradient" as const, gradient: { opacityFrom: 0.25, opacityTo: 0 } },
   legend: { position: "top" as const, horizontalAlign: "right" as const },
-  grid: { borderColor: "#e2e8f0" },
-    annotations: { points: transactionAnnotations.value, yaxis: fifoReferenceLines.value },
+  annotations: { points: transactionAnnotations.value, yaxis: fifoReferenceLines.value },
   tooltip: { custom: tooltipCustom },
 }))
 

@@ -241,3 +241,47 @@
 .apexcharts-yaxis-title-text {
   fill: var(--muted);
 }
+
+/*
+ * Gridlines, axis labels and legend text — re-based on the token layer. The
+ * options carry the same `var(--…)` values (grid via `grid.borderColor`, axis
+ * labels via `labels.style.colors`, legend text via `chart.foreColor`); the
+ * rules below are the belt-and-braces that keep the SVG readable even when a
+ * chart forgets one of those keys, and because `var()` resolves live, the whole
+ * layer flips with the theme without rebuilding chart options.
+ */
+.apexcharts-grid line {
+  stroke: var(--border);
+}
+
+.apexcharts-xaxis-label text,
+.apexcharts-yaxis-label text {
+  fill: var(--muted);
+}
+
+/*
+ * Tooltip — the apexcharts.css light/dark theme classes paint the body via
+ * CSS variables (--apx-tt-*). Re-point those variables at our tokens and the
+ * tooltip follows the theme without a per-chart theme option.
+ */
+.apexcharts-tooltip {
+  --apx-tt-bg: var(--surface);
+  --apx-tt-border: var(--border);
+  --apx-tt-color: var(--text);
+  --apx-tt-color-muted: var(--muted);
+}
+
+.apexcharts-tooltip .apexcharts-tooltip-title {
+  color: var(--muted);
+}
+
+/* Legend text comes from `chart.foreColor` (inline style, var(--muted)); the
+   rule below is the belt-and-braces fallback for charts that strip it. */
+.apexcharts-legend-text {
+  color: var(--muted);
+}
+
+/* Toolbar icon buttons stay legible in both themes. */
+.apexcharts-toolbar {
+  color: var(--muted);
+}

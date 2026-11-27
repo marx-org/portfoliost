@@ -11,7 +11,7 @@
  */
 import { computed } from "vue"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
-import { axisTitle, chartTitle } from "./chartFormat"
+import { axisTitle, chartTitle, withSharedChart } from "./chartFormat"
 
 type Month = { year: number; month: number; count: number; symbols?: string[]; partial?: boolean }
 
@@ -46,7 +46,7 @@ const monthData = computed(() =>
   }),
 )
 
-const chartOptions = computed(() => ({
+const chartOptions = computed(() => withSharedChart({
   chart: { type: "bar" as const, height: 300 },
   title: chartTitle(
     selectedYear.value == null
@@ -55,7 +55,8 @@ const chartOptions = computed(() => ({
   ),
   xaxis: { categories: MONTHS, title: axisTitle("Month") },
   yaxis: { title: axisTitle("Payers (count)") },
-  colors: ["#10b981"],
+  colors: ["var(--emerald)"],
+  fill: { type: "solid" as const },
   tooltip: {
     custom: ({ dataPointIndex }: { dataPointIndex: number }) => {
       const d = monthData.value[dataPointIndex]

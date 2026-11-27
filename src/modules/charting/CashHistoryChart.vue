@@ -10,7 +10,7 @@ import { computed } from "vue"
 import type { components } from "@/api/types"
 import { formatCurrency } from "@/utils/format"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
-import { axisCurrency, axisTitle, chartTitle } from "./chartFormat"
+import { axisCurrency, axisTitle, chartTitle, withSharedChart } from "./chartFormat"
 
 type CashSeries = components["schemas"]["ChartCashSeries"]
 type Point = { date: string; balance: number }
@@ -28,7 +28,7 @@ const rows = computed(() => props.series ?? [])
 const accounts = computed(() => rows.value.filter((s) => s.key !== "__total__"))
 const total = computed(() => rows.value.find((s) => s.key === "__total__"))
 
-const chartOptions = computed(() => ({
+const chartOptions = computed(() => withSharedChart({
   chart: { type: "line" as const, height: 340, toolbar: { show: false }, zoom: { enabled: false } },
   title: chartTitle("Broker Cash Balances"),
   xaxis: { type: "datetime" as const, title: axisTitle("Date") },
@@ -38,7 +38,7 @@ const chartOptions = computed(() => ({
   },
   dataLabels: { enabled: false },
   stroke: { width: [2, 2, 2, 2.5] },
-  colors: ["#2563eb", "#0ea5e9", "#8b5cf6", "#f59e0b", "#10b981", "#ef4444", "#64748b"],
+  colors: ["var(--accent)", "#0ea5e9", "#8b5cf6", "#f59e0b", "#10b981", "#ef4444", "#64748b"],
   tooltip: { shared: true, y: { formatter: (v: number) => formatCurrency(v, props.currency) } },
   legend: { position: "bottom" as const },
 }))

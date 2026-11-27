@@ -4,6 +4,7 @@ import { useRoute } from "vue-router"
 import { getInstrumentOwnership } from "@/api/instruments"
 import type { components } from "@/api/types"
 import { formatCompact, formatNumber } from "@/utils/format"
+import { withSharedChart } from "@/utils/chartOptions"
 
 const route = useRoute()
 const symbol = String(route.params.symbol).toUpperCase()
@@ -28,15 +29,16 @@ const insider = computed(() => data.value?.insider ?? [])
 const transactions = computed(() => data.value?.insiderTransactions ?? [])
 
 function holdersChart(rows: components["schemas"]["HoldingGroup"][]) {
-  return {
+  return withSharedChart({
     chart: { type: "bar" as const, height: 200, toolbar: { show: false } },
-    colors: ["#2563eb"],
+    colors: ["var(--accent)"],
     series: [{ name: "Holding %", data: rows.map((r) => r.holdingPercentage) }],
     xaxis: { categories: rows.map((r) => r.date) },
     plotOptions: { bar: { columnWidth: "40%", borderRadius: 3 } },
     dataLabels: { enabled: false },
     yaxis: { labels: { formatter: (v: number) => `${v.toFixed(1)}%` } },
-  }
+    fill: { type: "solid" as const },
+  })
 }
 
 function amount(v: number): string {

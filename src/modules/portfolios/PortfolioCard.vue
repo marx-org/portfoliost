@@ -4,6 +4,7 @@ import { useRouter } from "vue-router"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { deletePortfolio, getPortfolioAnalytics, getPortfolioPositions, recomputePortfolio, updatePortfolio } from "@/api/portfolios"
 import { formatCurrency, formatNumber, formatPercent } from "@/utils/format"
+import { withSharedChart } from "@/utils/chartOptions"
 import { useDisplayConversion } from "@/composables/useDisplayConversion"
 import type { PortfolioAnalyticsTimeframe } from "@/api/portfolios"
 import type { PortfoliosSummaries } from "@/api/types"
@@ -299,14 +300,14 @@ function tabPath(name: string) {
   return { name: `portfolio-${map[name]}` as string, params: { id: props.portfolio.id } }
 }
 
-const sparkOptions = computed(() => ({
+const sparkOptions = computed(() => withSharedChart({
   chart: {
     type: "area" as const,
     height: 90,
     toolbar: { show: false },
     sparkline: { enabled: true },
   },
-  colors: ["#2563eb"],
+  colors: ["var(--accent)"],
   series: [{ name: "Value", data: series.value }],
   stroke: { curve: "smooth" as const, width: 2 },
   dataLabels: { enabled: false },

@@ -6,6 +6,7 @@
  */
 import { computed } from "vue"
 import { formatDate } from "@/utils/format"
+import { withSharedChart } from "@/utils/chartOptions"
 
 const props = withDefaults(
   defineProps<{
@@ -18,13 +19,14 @@ const props = withDefaults(
 
 const emit = defineEmits<{ recompute: [] }>()
 
-const chartOptions = computed(() => ({
+const chartOptions = computed(() => withSharedChart({
   chart: { type: "area" as const, height: props.height, toolbar: { show: false } },
-  colors: ["#16a34a"],
+  colors: ["var(--emerald)"],
   series: [{ name: "Balance", data: props.points.map((p) => p.balance) }],
   xaxis: { categories: props.points.map((p) => formatDate(p.date)), labels: { show: false } },
   stroke: { curve: "smooth" as const, width: 2 },
   dataLabels: { enabled: false },
+  // Chart-local gradient: slightly taller fade than the shared 0.25/0.
   fill: { type: "gradient" as const, gradient: { opacityFrom: 0.3, opacityTo: 0 } },
 }))
 

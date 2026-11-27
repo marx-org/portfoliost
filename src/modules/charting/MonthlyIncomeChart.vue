@@ -14,7 +14,7 @@ import { useChartScope } from "./useChartScope"
 import type { ChartScopeQuery } from "@/api/charting"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
 import { formatCurrency } from "@/utils/format"
-import { axisCurrency, axisTitle, chartTitle } from "./chartFormat"
+import { axisCurrency, axisTitle, chartTitle, withSharedChart } from "./chartFormat"
 
 const props = defineProps<{ scope?: ChartScopeQuery }>()
 
@@ -58,7 +58,7 @@ const trendLine = computed(() =>
   trend.value ? points.value.map((_, i) => Math.round((trend.value!.slope * i + trend.value!.intercept) * 1e8) / 1e8) : [],
 )
 
-const chartOptions = computed(() => ({
+const chartOptions = computed(() => withSharedChart({
   chart: { type: "line", height: 340, stacked: false },
   title: chartTitle("Monthly income"),
   xaxis: {
@@ -77,7 +77,8 @@ const chartOptions = computed(() => ({
     labels: { formatter: (v: number) => axisCurrency(v, currency.value) },
   },
   stroke: { width: [0, 0, 2] },
-  colors: ["#22c55e", "#f59e0b", "#3b82f6"],
+  colors: ["var(--emerald)", "#f59e0b", "var(--accent)"],
+  fill: { type: "solid" as const },
   legend: { position: "top" },
   // Round the tooltip (the trend line and bars otherwise print raw floats).
   tooltip: { y: { formatter: (v: number) => formatCurrency(v, currency.value) } },

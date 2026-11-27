@@ -12,6 +12,7 @@ import KeyFactsCard from "@/modules/instruments/KeyFactsCard.vue"
 import type { InstrumentsMetrics, InstrumentsOverviewMetrics, InstrumentsProfile, IrEventsAapl, QuoteAapl } from "@/api/types"
 import { formatAmount, formatCompact, formatNumber, formatPercent } from "@/utils/format"
 import { researchSymbol } from "@/utils/research"
+import { withSharedChart } from "@/utils/chartOptions"
 import { resolveInstrumentCurrency } from "@/utils/instrumentCurrency"
 
 const route = useRoute()
@@ -202,9 +203,10 @@ const growthStats = computed(() => {
   ]
 })
 
-const epsChartOptions = computed(() => ({
+const epsChartOptions = computed(() => withSharedChart({
   chart: { type: "bar" as const, height: 260, toolbar: { show: false }, stacked: false },
-  colors: ["#2563eb", "#94a3b8"],
+  colors: ["var(--accent)", "var(--muted)"],
+  fill: { type: "solid" as const },
   series: [
     { name: "EPS", data: epsSurprises.value.map((e) => e.eps ?? null) },
     { name: "Estimate", data: epsSurprises.value.map((e) => e.epsEstimate ?? null) },

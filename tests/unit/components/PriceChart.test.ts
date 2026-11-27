@@ -275,7 +275,7 @@ describe("PriceChart", () => {
     // left edge (and then drop the marker once the index passed the width).
     expect(p.x).toBe(1)
     expect(p.marker.offsetY).toBe(0)
-    expect(p.marker.fillColor).toBe("#16a34a")
+    expect(p.marker.fillColor).toBe("var(--emerald)")
   })
 
   it("addresses the x-axis numerically, with dates only as tick labels", async () => {
@@ -321,8 +321,8 @@ describe("PriceChart", () => {
     const opts = (wrapper.vm as unknown as { chartOptions: { annotations: { points: { marker: { fillColor: string; strokeColor: string } }[]; yaxis: { y: number }[] } } }).chartOptions.annotations
     // Both transactions on the same date produce two markers (buys before sells).
     expect(opts.points.length).toBe(2)
-    expect(opts.points[0].marker.fillColor).toBe("#16a34a")
-    expect(opts.points[1].marker.strokeColor).toBe("#dc2626")
+    expect(opts.points[0].marker.fillColor).toBe("var(--emerald)")
+    expect(opts.points[1].marker.strokeColor).toBe("var(--danger)")
     // FIFO on the visible range yields Avg + Low/High lines.
     expect(opts.yaxis.length).toBe(3)
   })
@@ -341,10 +341,10 @@ describe("PriceChart", () => {
     // clutter that was on the plot. The marker alone is the dot.
     for (const p of points) expect(p.label).toBeUndefined()
     // Both sides are solid; only the colour differs.
-    expect(points[0].marker.fillColor).toBe("#16a34a")
-    expect(points[0].marker.strokeColor).toBe("#16a34a")
-    expect(points[1].marker.fillColor).toBe("#dc2626")
-    expect(points[1].marker.strokeColor).toBe("#dc2626")
+    expect(points[0].marker.fillColor).toBe("var(--emerald)")
+    expect(points[0].marker.strokeColor).toBe("var(--emerald)")
+    expect(points[1].marker.fillColor).toBe("var(--danger)")
+    expect(points[1].marker.strokeColor).toBe("var(--danger)")
     // Each dot is addressable: ApexCharts copies `id` onto the node as a class,
     // which is how the click listener finds its way back to the trades.
     expect(points[0].id).toMatch(/^tx-marker-\d{4}-\d{2}-\d{2}-\d$/)
@@ -555,12 +555,12 @@ describe("PriceChart", () => {
     const lines = refLinesOf(wrapper)
     // FIFO: after buying 10@100 + 10@200, selling 5 -> sells 5 of the 100 lot first.
     // remaining: 5@100 + 10@200 = 15 qty, totalCost = 5*100 + 10*200 = 2500, avg = 2500/15 = 166.67
-    const avg = lines.find((l) => l.borderColor === "#2563eb")
+    const avg = lines.find((l) => l.borderColor === "var(--accent)")
     expect(avg).toBeDefined()
     expect(avg!.y).toBeCloseTo(166.67, 1)
     expect(avg!.strokeDashArray).toBe(6)
-    const low = lines.find((l) => l.borderColor === "#16a34a")
-    const high = lines.find((l) => l.borderColor === "#dc2626")
+    const low = lines.find((l) => l.borderColor === "var(--emerald)")
+    const high = lines.find((l) => l.borderColor === "var(--danger)")
     expect(low!.y).toBe(100)
     expect(low!.strokeDashArray).toBe(4)
     expect(high!.y).toBe(200)
@@ -574,10 +574,10 @@ describe("PriceChart", () => {
       { id: "s1", type: "SELL", executedAt: new Date(d[1] * 1000).toISOString(), quantity: 10, price: 150 },
     ])
     const lines = refLinesOf(wrapper)
-    expect(lines.find((l) => l.borderColor === "#2563eb")).toBeUndefined()
-    expect(lines.find((l) => l.borderColor === "#16a34a")!.y).toBe(100)
+    expect(lines.find((l) => l.borderColor === "var(--accent)")).toBeUndefined()
+    expect(lines.find((l) => l.borderColor === "var(--emerald)")!.y).toBe(100)
     // High spans the sell too (150), not just the buy (100).
-    expect(lines.find((l) => l.borderColor === "#dc2626")!.y).toBe(150)
+    expect(lines.find((l) => l.borderColor === "var(--danger)")!.y).toBe(150)
   })
 
   it("ignores transactions from other instruments for reference lines and markers", async () => {
@@ -593,8 +593,8 @@ describe("PriceChart", () => {
 
     const lines = refLinesOf(wrapper)
     // Only the AAPL buy counts -> Low === High === 271.01 (overlap).
-    expect(lines.find((l) => l.borderColor === "#16a34a")!.y).toBe(271.01)
-    expect(lines.find((l) => l.borderColor === "#dc2626")!.y).toBe(271.01)
+    expect(lines.find((l) => l.borderColor === "var(--emerald)")!.y).toBe(271.01)
+    expect(lines.find((l) => l.borderColor === "var(--danger)")!.y).toBe(271.01)
 
     const points = (wrapper.vm as unknown as { chartOptions: { annotations: { points: unknown[] } } }).chartOptions.annotations.points
     expect(points.length).toBe(1)
@@ -634,7 +634,7 @@ describe("PriceChart", () => {
       { id: "s2", type: "SELL", executedAt: new Date(d[3] * 1000).toISOString(), quantity: 4, price: 95 },
     ])
     const lines = refLinesOf(wrapper)
-    const avg = lines.find((l) => l.borderColor === "#2563eb")
+    const avg = lines.find((l) => l.borderColor === "var(--accent)")
     // Lots: 10@50, 10@100. Sell 12 -> drains 10@50 + 2@100 -> remaining 8@100.
     // Sell 4 -> drains 4@100 -> remaining 4@100. totalCost = 4*100 = 400, qty 4, avg = 100.
     expect(avg).toBeDefined()
