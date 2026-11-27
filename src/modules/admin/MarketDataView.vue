@@ -124,11 +124,11 @@ const historyCandidates = () => splitCandidates.value.filter(c => c.status !== "
 </script>
 
 <template>
-  <div class="mission-control space-y-8">
-    <header class="mission-header">
+  <div class="space-y-8">
+    <header class="page-header">
       <div>
-        <p class="mission-eyebrow"><span class="mission-signal" /> ADMIN / MARKET DATA</p>
-        <h2 class="mission-title">Market Data</h2>
+        <p class="page-eyebrow"><span class="signal-dot" /> ADMIN / MARKET DATA</p>
+        <h1 class="page-title">Market Data</h1>
       </div>
     </header>
 
@@ -138,7 +138,7 @@ const historyCandidates = () => splitCandidates.value.filter(c => c.status !== "
     <template v-else>
       <!-- Stooq datasets panel -->
       <div class="card p-6">
-        <h2 class="mb-4 text-base font-semibold text-text">Stooq Datasets</h2>
+        <h2 class="card-title mb-4">Stooq Datasets</h2>
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-border text-left text-xs text-muted">
@@ -164,7 +164,7 @@ const historyCandidates = () => splitCandidates.value.filter(c => c.status !== "
 
       <!-- Split candidates panel -->
       <div class="card p-6">
-        <h2 class="mb-4 text-base font-semibold text-text">Split Candidates</h2>
+        <h2 class="card-title mb-4">Split Candidates</h2>
 
         <div v-if="pendingCandidates().length === 0" class="mb-4 text-sm text-muted">
           No pending split candidates.
@@ -268,7 +268,7 @@ const historyCandidates = () => splitCandidates.value.filter(c => c.status !== "
 
       <!-- Overflow summary -->
       <div class="card p-6">
-        <h2 class="mb-4 text-base font-semibold text-text">Overflow Summary</h2>
+        <h2 class="card-title mb-4">Overflow Summary</h2>
         <template v-if="overflow">
           <p class="mb-3 text-sm">Total rows: <span class="font-semibold">{{ overflow.total.toLocaleString() }}</span></p>
           <table class="w-full text-sm">

@@ -77,10 +77,10 @@ function nextPage() { if (page.value < totalPages.value) { page.value++; load() 
 
 <template>
   <div class="mission-control">
-    <header class="mission-header">
+    <header class="page-header">
       <div>
-        <p class="mission-eyebrow"><span class="mission-signal" /> ADMIN / CURRENCY RATES</p>
-        <h2 class="mission-title">Currency Rates</h2>
+        <p class="page-eyebrow"><span class="signal-dot" /> ADMIN / CURRENCY RATES</p>
+        <h1 class="page-title">Currency Rates</h1>
       </div>
     </header>
 
@@ -88,7 +88,7 @@ function nextPage() { if (page.value < totalPages.value) { page.value++; load() 
     <div v-else-if="error" class="text-sm text-danger">{{ error }}</div>
 
     <div v-else>
-      <div class="mission-toolbar mb-4">
+      <div class="toolbar mb-4">
         <div>
           <label for="fx-base" class="label">Base currency</label>
           <div id="fx-base" class="flex items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-text">
