@@ -122,19 +122,22 @@ onMounted(async () => {
 
 <template>
   <div class="space-y-6">
-    <div>
-      <h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-        Stocks
-        <span class="ml-2 align-middle text-sm font-medium text-slate-500 dark:text-slate-400" data-testid="selected-counter">
-          {{ selected.length }}/{{ MAX_STOCKS }} selected
-        </span>
-      </h1>
-      <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Compare fundamentals across stocks, or start from a popular preset.</p>
+    <div class="page-header">
+      <div>
+        <p class="page-eyebrow"><span class="signal-dot" /> CHARTING</p>
+        <h1 class="page-title">
+          Stocks
+          <span class="ml-2 align-middle text-sm font-medium text-muted" data-testid="selected-counter">
+            {{ selected.length }}/{{ MAX_STOCKS }} selected
+          </span>
+        </h1>
+        <p class="page-description">Compare fundamentals across stocks, or start from a popular preset.</p>
+      </div>
     </div>
 
     <div class="card p-6">
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 class="text-base font-semibold">Stocks to compare</h2>
+        <h2 class="card-title">Stocks to compare</h2>
         <div class="flex items-center gap-2">
           <button v-if="selected.length" type="button" class="btn-ghost text-xs" @click="selected = []">
             Clear
@@ -185,7 +188,7 @@ onMounted(async () => {
     </div>
 
     <div class="card p-6">
-      <h2 class="mb-3 text-base font-semibold">Presets</h2>
+      <h2 class="card-title mb-3">Presets</h2>
       <div class="flex flex-wrap gap-2">
         <button
           v-for="preset in presets"
@@ -203,7 +206,7 @@ onMounted(async () => {
 
     <div class="card p-6">
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 class="text-base font-semibold">Fundamentals comparison</h2>
+        <h2 class="card-title">Fundamentals comparison</h2>
         <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
           Metric
           <select v-model="metric" class="input w-auto" data-testid="metric-picker">

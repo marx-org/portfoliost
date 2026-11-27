@@ -131,21 +131,20 @@ function onDateChange(which: "from" | "to", event: Event) {
 
 <template>
   <div class="space-y-4" data-testid="charting-layout">
-    <div class="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2 dark:border-slate-700">
+    <nav class="tab-nav" data-testid="charting-nav">
       <router-link
         v-for="s in sections"
         :key="s.category"
         :to="{ path: s.to, query: route.query }"
-        class="rounded px-3 py-1 text-sm"
-        :class="active === s.category ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'"
-        data-testid="charting-nav"
+        class="tab-link"
+        :class="active === s.category ? 'tab-link--active' : ''"
       >
         {{ s.label }}
       </router-link>
-    </div>
+    </nav>
 
     <!-- Scope toolbar -->
-    <div class="flex flex-wrap items-center gap-3 rounded border border-slate-200 p-3 dark:border-slate-700" data-testid="charting-toolbar">
+    <div class="toolbar" data-testid="charting-toolbar">
       <div class="flex items-center gap-1 rounded border border-slate-300 p-0.5 dark:border-slate-600" data-testid="charting-kind-switch">
         <span class="px-1 text-xs font-medium uppercase text-slate-400 dark:text-slate-500">Portfolios</span>
         <button
