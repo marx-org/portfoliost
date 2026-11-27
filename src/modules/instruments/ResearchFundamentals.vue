@@ -95,14 +95,14 @@ const trendChartOptions = computed(() => withSharedChart({
       </p>
 
       <div class="card p-6">
-        <h2 class="mb-4 text-base font-semibold">Revenue vs Net Income - {{ symbol }}</h2>
+        <h2 class="card-title mb-4">Revenue vs Net Income - {{ symbol }}</h2>
         <component :is="'apexchart'" v-if="income.length" :options="trendChartOptions" :series="trendChartOptions.series" />
         <p v-else class="text-sm text-slate-500 dark:text-slate-400">No income data available.</p>
       </div>
 
       <div class="card p-6">
         <div class="mb-3 flex items-baseline justify-between gap-3">
-          <h2 class="text-base font-semibold">Income Statement</h2>
+          <h2 class="card-title">Income Statement</h2>
           <span class="shrink-0 text-xs text-slate-500 dark:text-slate-400" data-testid="fundamentals-currency">{{ currencyLabel }}</span>
         </div>
         <div class="overflow-x-auto">
@@ -141,7 +141,7 @@ const trendChartOptions = computed(() => withSharedChart({
 
       <div class="card p-6">
         <div class="mb-3 flex items-baseline justify-between gap-3">
-          <h2 class="text-base font-semibold">Balance Sheet</h2>
+          <h2 class="card-title">Balance Sheet</h2>
           <span class="shrink-0 text-xs text-slate-500 dark:text-slate-400" data-testid="fundamentals-currency">{{ currencyLabel }}</span>
         </div>
         <div class="overflow-x-auto">
@@ -180,7 +180,7 @@ const trendChartOptions = computed(() => withSharedChart({
 
       <div class="card p-6">
         <div class="mb-3 flex items-baseline justify-between gap-3">
-          <h2 class="text-base font-semibold">Cash Flow</h2>
+          <h2 class="card-title">Cash Flow</h2>
           <span class="shrink-0 text-xs text-slate-500 dark:text-slate-400" data-testid="fundamentals-currency">{{ currencyLabel }}</span>
         </div>
         <div class="overflow-x-auto">

@@ -108,7 +108,7 @@ function targetPosition(pt: PriceTarget): { left: string; right: string } {
     <template v-if="data && !loading && !error">
       <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div class="card p-6">
-          <h2 class="mb-4 text-base font-semibold">Price Target</h2>
+          <h2 class="card-title mb-4">Price Target</h2>
           <div class="flex items-end gap-6">
             <div>
               <p class="flex items-center gap-2 text-2xl font-semibold">
@@ -136,7 +136,7 @@ function targetPosition(pt: PriceTarget): { left: string; right: string } {
         </div>
 
         <div class="card p-6">
-          <h2 class="mb-2 text-base font-semibold">Recommendation</h2>
+          <h2 class="card-title mb-2">Recommendation</h2>
           <p v-if="totalRatings" class="text-xs text-slate-500 dark:text-slate-400">{{ totalRatings }} analysts &middot; period {{ data.recommendation.period }}</p>
           <component :is="'apexchart'" :options="recommendationChart" :series="recommendationChart.series" />
         </div>
@@ -144,7 +144,7 @@ function targetPosition(pt: PriceTarget): { left: string; right: string } {
 
       <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div class="card p-6">
-          <h2 class="mb-4 text-base font-semibold">Earnings Estimates</h2>
+          <h2 class="card-title mb-4">Earnings Estimates</h2>
           <table class="w-full text-sm">
             <thead>
               <tr class="text-left text-xs uppercase text-slate-500 dark:text-slate-400">
@@ -175,7 +175,7 @@ function targetPosition(pt: PriceTarget): { left: string; right: string } {
         </div>
 
         <div class="card p-6">
-          <h2 class="mb-4 text-base font-semibold">Revenue Estimates</h2>
+          <h2 class="card-title mb-4">Revenue Estimates</h2>
           <table class="w-full text-sm">
             <thead>
               <tr class="text-left text-xs uppercase text-slate-500 dark:text-slate-400">

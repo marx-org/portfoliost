@@ -79,7 +79,7 @@ const hasSomethingToSay = computed(
 
 <template>
   <div v-if="hasSomethingToSay" class="card p-6" data-testid="key-facts-card">
-    <h2 class="mb-3 text-base font-semibold">Key Facts</h2>
+    <h2 class="card-title mb-3">Key Facts</h2>
     <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
       <template v-for="row in identityRows" :key="`id-${row.label}`">
         <dt class="text-slate-500 dark:text-slate-400">{{ row.label }}</dt>

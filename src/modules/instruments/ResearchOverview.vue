@@ -265,7 +265,7 @@ const targetSpread = computed(() => {
       </div>
 
       <div v-if="descriptionParagraphs.length" class="card p-6">
-        <h2 class="mb-3 text-base font-semibold">About {{ profile?.name ?? symbol }}</h2>
+        <h2 class="card-title mb-3">About {{ profile?.name ?? symbol }}</h2>
         <p v-for="(p, i) in visibleParagraphs" :key="i" class="mb-3 text-sm leading-relaxed text-slate-700 dark:text-slate-200 last:mb-0">{{ p }}</p>
         <button
           v-if="descriptionParagraphs.length > 1"
@@ -279,7 +279,7 @@ const targetSpread = computed(() => {
 
       <div v-if="priceTarget" class="card p-6">
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 class="text-base font-semibold">Analyst Price Target</h2>
+          <h2 class="card-title">Analyst Price Target</h2>
           <span class="text-xs text-slate-500 dark:text-slate-400">{{ priceTarget.numberAnalysts }} analysts · {{ priceTarget.lastUpdated }}</span>
         </div>
         <div class="flex flex-wrap gap-6 text-sm">
@@ -318,7 +318,7 @@ const targetSpread = computed(() => {
       <div v-if="latestEarningsCall" class="card p-6">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 class="text-base font-semibold">Latest Earnings Call</h2>
+            <h2 class="card-title">Latest Earnings Call</h2>
             <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">{{ latestEarningsCall.title }}</p>
             <p class="text-xs text-slate-500 dark:text-slate-400">{{ latestEarningsCall.date }}</p>
           </div>
@@ -338,7 +338,7 @@ const targetSpread = computed(() => {
         <ResearchSeasonality :symbol="symbol" />
         <div class="card p-6">
           <div class="mb-3 flex items-center justify-between">
-            <h2 class="text-base font-semibold">EPS Surprises - {{ symbol }}</h2>
+            <h2 class="card-title">EPS Surprises - {{ symbol }}</h2>
             <select v-model="epsMode" aria-label="EPS timeframe" class="rounded-md border border-slate-300 dark:border-slate-600 px-2 py-1 text-xs" @change="applyEpsMode(epsMode)">
               <option value="annual">Annual</option>
               <option value="quarterly">5Q</option>
@@ -350,7 +350,7 @@ const targetSpread = computed(() => {
       </div>
 
       <div v-if="metrics" class="card p-6">
-        <h2 class="mb-4 text-base font-semibold">Key Statistics</h2>
+        <h2 class="card-title mb-4">Key Statistics</h2>
         <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
           <StatGroup title="Profile" :items="profileStats" />
           <StatGroup title="Margins" :items="marginStats" />

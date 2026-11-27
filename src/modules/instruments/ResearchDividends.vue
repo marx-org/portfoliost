@@ -90,7 +90,7 @@ function dateLabel(d: string): string {
       </div>
 
       <div class="card p-6">
-        <h2 class="mb-3 text-base font-semibold">
+        <h2 class="card-title mb-3">
           Dividends per share - {{ symbol }}
           <CurrencyWarningBadge :source="currencySource" :currency="instrCcy" class="ml-2" />
         </h2>
@@ -99,7 +99,7 @@ function dateLabel(d: string): string {
       </div>
 
       <div class="card p-6">
-        <h2 class="mb-3 text-base font-semibold">Payment History</h2>
+        <h2 class="card-title mb-3">Payment History</h2>
         <div class="overflow-x-auto">
           <table class="w-full min-w-[560px] text-sm">
             <thead>

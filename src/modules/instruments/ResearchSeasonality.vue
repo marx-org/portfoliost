@@ -49,7 +49,7 @@ const chartOptions = computed(() => withSharedChart({
 <template>
   <div class="card p-6">
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-      <h2 class="text-base font-semibold">Seasonality</h2>
+      <h2 class="card-title">Seasonality</h2>
       <div class="flex flex-wrap items-center gap-3 text-xs">
         <div class="flex overflow-hidden rounded-md border border-slate-300 dark:border-slate-600">
           <button

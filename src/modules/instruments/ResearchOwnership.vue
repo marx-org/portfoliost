@@ -55,7 +55,7 @@ function amount(v: number): string {
 
     <template v-if="!loading && !error && data">
       <div class="card p-6">
-        <h2 class="mb-3 text-base font-semibold">Institutional Holders</h2>
+        <h2 class="card-title mb-3">Institutional Holders</h2>
         <component :is="'apexchart'" v-if="institutional.length" :options="holdersChart(institutional)" :series="holdersChart(institutional).series" />
         <div class="mt-3 overflow-x-auto">
           <table class="w-full min-w-[640px] text-sm">
@@ -82,7 +82,7 @@ function amount(v: number): string {
       </div>
 
       <div class="card p-6">
-        <h2 class="mb-3 text-base font-semibold">Mutual Fund Holders</h2>
+        <h2 class="card-title mb-3">Mutual Fund Holders</h2>
         <component :is="'apexchart'" v-if="mutualFund.length" :options="holdersChart(mutualFund)" :series="holdersChart(mutualFund).series" />
         <div class="mt-3 overflow-x-auto">
           <table class="w-full min-w-[640px] text-sm">
@@ -109,7 +109,7 @@ function amount(v: number): string {
       </div>
 
       <div v-if="insider.length" class="card p-6">
-        <h2 class="mb-3 text-base font-semibold">Insider Holders</h2>
+        <h2 class="card-title mb-3">Insider Holders</h2>
         <div class="overflow-x-auto">
           <table class="w-full min-w-[640px] text-sm">
             <thead>
@@ -135,7 +135,7 @@ function amount(v: number): string {
       </div>
 
       <div v-if="transactions.length" class="card p-6">
-        <h2 class="mb-3 text-base font-semibold">Insider Transactions</h2>
+        <h2 class="card-title mb-3">Insider Transactions</h2>
         <div class="overflow-x-auto">
           <table class="w-full min-w-[720px] text-sm">
             <thead>
