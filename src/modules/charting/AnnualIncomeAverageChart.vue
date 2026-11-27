@@ -11,7 +11,7 @@
 import { computed } from "vue"
 import type { components } from "@/api/types"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
-import { axisCurrency, axisTitle, chartTitle, labelCurrency } from "./chartFormat"
+import { axisCurrency, axisTitle, chartTitle, labelCurrency, withSharedChart } from "./chartFormat"
 
 type Point = components["schemas"]["ChartIncomeAveragePoint"]
 
@@ -26,7 +26,7 @@ const titleText = computed(() => `Annual-equivalent Income per ${per.value}`)
 const divisor = computed(() => props.unit === "day" ? 365 : 12)
 const hasPartial = computed(() => rows.value.some((p) => p.partial))
 
-const chartOptions = computed(() => ({
+const chartOptions = computed(() => withSharedChart({
   chart: { type: "bar", height: 300 },
   title: chartTitle(titleText.value),
   xaxis: { categories: rows.value.map((p) => String(p.year)), title: axisTitle("Year") },
@@ -36,6 +36,7 @@ const chartOptions = computed(() => ({
   },
   colors: ["#f59e0b"],
   dataLabels: { enabled: true, formatter: (v: number) => labelCurrency(v, props.currency) },
+  fill: { type: "solid" as const },
   tooltip: {
     y: { formatter: (v: number) => `${v} ${props.currency}/${per.value}`.trim() },
   },

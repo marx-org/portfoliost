@@ -141,6 +141,7 @@ import { researchRoute } from "@/utils/research"
 import type { PortfolioAnalytics, PortfolioPositions } from "@/api/types"
 import type { PortfolioAnalyticsTimeframe } from "@/api/portfolios"
 import { formatPercent, formatSignedCurrency } from "@/utils/format"
+import { withSharedChart } from "@/utils/chartOptions"
 import { currentDrawdownPercent as currentDrawdownPercentOf } from "@/utils/drawdown"
 import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
 import { useDisplayConversion } from "@/composables/useDisplayConversion"
@@ -352,18 +353,19 @@ const monthlySeries = computed(() => [
     data: (perf.value?.monthlyReturns ?? []).map((m) => ({ x: m.month, y: m.returnPercent })),
   },
 ])
-const monthlyOptions = {
+const monthlyOptions = withSharedChart({
   chart: { type: "bar" as const, toolbar: { show: false } },
-  colors: ["#2563eb"],
+  colors: ["var(--accent)"],
   yaxis: {
     labels: { formatter: (v: number) => `${Math.round(v)}%` },
   },
   plotOptions: { bar: { columnWidth: "50%", borderRadius: 3 } },
   dataLabels: { enabled: false },
+  fill: { type: "solid" as const },
   tooltip: {
     y: { formatter: (v: number) => `${v.toFixed(2)}%` },
   },
-}
+})
 
 const performanceSeries = computed(() => perf.value?.timeSeries ?? [])
 

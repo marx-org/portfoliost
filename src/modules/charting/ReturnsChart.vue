@@ -12,7 +12,7 @@
 import { computed, ref } from "vue"
 import { formatCurrency } from "@/utils/format"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
-import { axisTitle, chartTitle } from "./chartFormat"
+import { axisTitle, chartTitle, withSharedChart } from "./chartFormat"
 
 type Point = {
   quarter: string
@@ -37,7 +37,7 @@ const values = computed(() =>
   rows.value.map((r) => (mode.value === "twr" ? r.twr ?? null : r.netGainChange ?? null)),
 )
 
-const chartOptions = computed(() => ({
+const chartOptions = computed(() => withSharedChart({
   chart: { type: "bar" as const, height: 300 },
   title: chartTitle(`Quarterly Returns — ${metricLabel.value}`),
   xaxis: { categories: rows.value.map((r) => r.quarter), title: axisTitle("Quarter") },
@@ -51,7 +51,8 @@ const chartOptions = computed(() => ({
     title: axisTitle("Return (%)"),
     labels: { formatter: percentAxis },
   },
-  colors: ["#2563eb"],
+  colors: ["var(--accent)"],
+  fill: { type: "solid" as const },
   tooltip: {
     y: { formatter: (v: number) => `${v > 0 ? "+" : ""}${v}%` },
   },

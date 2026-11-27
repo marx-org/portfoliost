@@ -4,6 +4,7 @@ import { useRoute } from "vue-router"
 import { getProjections } from "@/api/instruments"
 import CurrencyWarningBadge from "@/components/CurrencyWarningBadge.vue"
 import { formatAmount, formatCompact, formatDate } from "@/utils/format"
+import { withSharedChart } from "@/utils/chartOptions"
 
 interface PriceTarget {
   lastUpdated: string
@@ -81,13 +82,14 @@ const totalRatings = computed(() =>
   recommendationSeries.value.reduce((sum, s) => sum + s.value, 0),
 )
 
-const recommendationChart = computed(() => ({
+const recommendationChart = computed(() => withSharedChart({
   chart: { type: "donut" as const, height: 260, toolbar: { show: false } },
   labels: recommendationSeries.value.map((s) => s.name),
   series: recommendationSeries.value.map((s) => s.value),
-  colors: ["#16a34a", "#22c55e", "#94a3b8", "#f97316", "#ef4444"],
+  colors: ["var(--emerald)", "#22c55e", "var(--muted)", "#f97316", "var(--danger)"],
   legend: { position: "bottom" as const },
   dataLabels: { enabled: false },
+  fill: { type: "solid" as const },
   plotOptions: { pie: { donut: { size: "65%" } } },
 }))
 

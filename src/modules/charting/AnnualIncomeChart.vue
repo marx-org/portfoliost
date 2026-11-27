@@ -13,7 +13,7 @@ import { computed } from "vue"
 import type { components } from "@/api/types"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
 import { formatCurrency, formatPercent } from "@/utils/format"
-import { axisCurrency, axisTitle, chartTitle, labelCurrency, labelPercent } from "./chartFormat"
+import { axisCurrency, axisTitle, chartTitle, labelCurrency, labelPercent, withSharedChart } from "./chartFormat"
 
 type Point = components["schemas"]["ChartIncomeAnnualPoint"]
 
@@ -26,7 +26,7 @@ const rows = computed(() => props.points ?? [])
 const currentYear = new Date().getUTCFullYear()
 const hasCurrentYear = computed(() => rows.value.some((p) => p.year === currentYear))
 
-const chartOptions = computed(() => ({
+const chartOptions = computed(() => withSharedChart({
   chart: { type: "bar", height: 340 },
   title: chartTitle("Annual totals"),
   xaxis: { categories: rows.value.map((p) => String(p.year)), title: axisTitle("Year") },
@@ -44,7 +44,8 @@ const chartOptions = computed(() => ({
     },
   ],
   stroke: { width: [0, 2] },
-  colors: ["#22c55e", "#3b82f6"],
+  colors: ["var(--emerald)", "var(--accent)"],
+  fill: { type: "solid" as const },
   // Series 0 is the income bar (currency), series 1 the YoY line (percent).
   // Both printed raw floats (`5917.36`, `8.38752417`); round them.
   dataLabels: {

@@ -12,7 +12,7 @@ import { computed } from "vue"
 import type { components } from "@/api/types"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
 import { formatCurrency } from "@/utils/format"
-import { axisCurrency, axisTitle, chartTitle } from "./chartFormat"
+import { axisCurrency, axisTitle, chartTitle, withSharedChart } from "./chartFormat"
 
 type Point = components["schemas"]["ChartIncomeCumulativePoint"]
 
@@ -27,7 +27,7 @@ const opening = computed(() => {
   return first && typeof first.openingBalance === "number" ? first.openingBalance : 0
 })
 
-const chartOptions = computed(() => ({
+const chartOptions = computed(() => withSharedChart({
   chart: { type: "area", height: 320 },
   title: chartTitle("Cumulative income"),
   xaxis: { type: "datetime", title: axisTitle("Date") },
@@ -39,7 +39,7 @@ const chartOptions = computed(() => ({
   // tooltip and table carry the values.
   dataLabels: { enabled: false },
   stroke: { width: 2 },
-  colors: ["#22c55e"],
+  colors: ["var(--emerald)"],
   tooltip: { y: { formatter: (v: number) => formatCurrency(v, props.currency) } },
 }))
 const chartSeries = computed(() => [

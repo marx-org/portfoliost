@@ -13,7 +13,7 @@ import { computed } from "vue"
 import type { components } from "@/api/types"
 import { formatCurrency } from "@/utils/format"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
-import { axisCurrency, axisTitle, chartTitle, labelCurrency } from "./chartFormat"
+import { axisCurrency, axisTitle, chartTitle, labelCurrency, withSharedChart } from "./chartFormat"
 
 type Point = components["schemas"]["ChartContributionPoint"]
 
@@ -31,7 +31,7 @@ const currentYear = new Date().getUTCFullYear()
 const hasPartial = computed(() => rows.value.some((p) => p.partial))
 const hasUnknown = computed(() => rows.value.some((p) => p.unknown))
 
-const chartOptions = computed(() => ({
+const chartOptions = computed(() => withSharedChart({
   chart: { type: "bar" as const, height: 340, toolbar: { show: false }, zoom: { enabled: false } },
   title: chartTitle("Annual External Contributions"),
   xaxis: { categories: rows.value.map((p) => String(p.year)), title: axisTitle("Year") },
@@ -41,8 +41,9 @@ const chartOptions = computed(() => ({
   },
   dataLabels: { formatter: (v: number) => labelCurrency(v, props.currency) },
   plotOptions: { bar: { columnWidth: "55%" } },
-  colors: ["#16a34a", "#dc2626", "#2563eb"],
+  colors: ["var(--emerald)", "var(--danger)", "var(--accent)"],
   stroke: { width: [0, 0, 2] },
+  fill: { type: "solid" as const },
   tooltip: {
     shared: true,
     y: { formatter: (v: number | null) => (v == null ? "—" : formatCurrency(v, props.currency)) },

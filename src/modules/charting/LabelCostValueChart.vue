@@ -24,7 +24,7 @@ export interface LabelCostValueRow {
 import { computed } from "vue"
 import { formatCurrency } from "@/utils/format"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
-import { axisCurrency, axisTitle, chartTitle, labelCurrency } from "./chartFormat"
+import { axisCurrency, axisTitle, chartTitle, labelCurrency, withSharedChart } from "./chartFormat"
 
 const props = withDefaults(
   defineProps<{
@@ -43,13 +43,14 @@ function label(row: LabelCostValueRow): string {
   return row.label ?? row.key
 }
 
-const chartOptions = computed(() => ({
+const chartOptions = computed(() => withSharedChart({
   // Horizontal paired bars need vertical room per label; 360 clipped the rows
   // and made the pairs hard to compare.
   chart: { type: "bar" as const, height: 520, toolbar: { show: false } },
   title: chartTitle("Cost Basis vs Market Value by Label"),
   plotOptions: { bar: { horizontal: true, borderRadius: 3 } },
-  colors: ["#94a3b8", "#2563eb"],
+  colors: ["var(--muted)", "var(--accent)"],
+  fill: { type: "solid" as const },
   xaxis: {
     categories: groups.value.map(label),
     title: axisTitle(`Cost basis / market value (${props.currency})`),

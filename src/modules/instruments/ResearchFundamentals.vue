@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue"
+import { withSharedChart } from "@/utils/chartOptions"
 import { useRoute } from "vue-router"
 import { getInstrumentFundamentals } from "@/api/instruments"
 import type { components } from "@/api/types"
@@ -61,9 +62,10 @@ const sourceLabel = computed(() => {
   return named
 })
 
-const trendChartOptions = computed(() => ({
+const trendChartOptions = computed(() => withSharedChart({
   chart: { type: "bar" as const, height: 280, toolbar: { show: false } },
-  colors: ["#2563eb", "#16a34a"],
+  colors: ["var(--accent)", "var(--emerald)"],
+  fill: { type: "solid" as const },
   series: [
     { name: "Revenue", data: income.value.map((r) => r.revenue) },
     { name: "Net Income", data: income.value.map((r) => r.netIncome) },

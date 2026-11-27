@@ -7,7 +7,7 @@
  */
 import { computed } from "vue"
 import { formatCompactCurrency, formatCurrency } from "@/utils/format"
-import { axisTitle, chartTitle } from "@/utils/chartOptions"
+import { axisTitle, chartTitle, withSharedChart } from "@/utils/chartOptions"
 import type { PortfolioAnalytics } from "@/api/types"
 
 interface PerformancePoint {
@@ -71,7 +71,7 @@ const props = withDefaults(
       * portfolio-only recompute control is hidden there. */
      showRecompute?: boolean
   }>(),
-   { benchmarks: () => [], currency: "USD", color: "#3b82f6", backfillPending: false, loading: false, height: 300, title: "", xaxisTitle: "", yaxisTitle: "", recomputing: false, gapSymbols: null, heldGapSymbols: null, showInvested: true, showOverlays: false, showRecompute: true },
+   { benchmarks: () => [], currency: "USD", color: "var(--accent)", backfillPending: false, loading: false, height: 300, title: "", xaxisTitle: "", yaxisTitle: "", recomputing: false, gapSymbols: null, heldGapSymbols: null, showInvested: true, showOverlays: false, showRecompute: true },
 )
 
 const emit = defineEmits<{ recompute: [] }>()
@@ -253,7 +253,7 @@ const chartOptions = computed(() => {
     ...benchmarks.map((b) => b.name || b.symbol || "Benchmark"),
   ].join("|")
   if (chartOptionsCache?.key === key) return chartOptionsCache.value
-  const value = buildChartOptions()
+  const value = withSharedChart(buildChartOptions())
   chartOptionsCache = { key, value }
   return value
 })

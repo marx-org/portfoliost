@@ -20,7 +20,7 @@ export interface StockCategorySlice {
 import { computed } from "vue"
 import { formatCurrency, formatPercent } from "@/utils/format"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
-import { chartTitle } from "./chartFormat"
+import { chartTitle, withSharedChart } from "./chartFormat"
 
 const props = withDefaults(
   defineProps<{
@@ -50,13 +50,14 @@ function percent(s: StockCategorySlice): number {
 // category appears or disappears.
 const COLORS = ["#2563eb", "#0ea5e9", "#8b5cf6", "#f59e0b", "#94a3b8"]
 
-const donutOptions = computed(() => ({
+const donutOptions = computed(() => withSharedChart({
   chart: { type: "donut" as const, height: 320, toolbar: { show: false } },
   title: chartTitle("By Stock Category"),
   labels: rows.value.map(label),
   colors: COLORS,
   legend: { position: "bottom" as const },
   dataLabels: { enabled: false },
+  fill: { type: "solid" as const },
   tooltip: { y: { formatter: (v: number) => formatCurrency(v, props.currency) } },
 }))
 const donutSeries = computed(() => rows.value.map((s) => s.value))

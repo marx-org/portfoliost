@@ -8,7 +8,7 @@ import InstrumentSearchModal from "@/modules/instruments/InstrumentSearchModal.v
 import { COMPARE_METRICS } from "@/modules/instruments/compareMetrics"
 import TickerBadge from "@/components/TickerBadge.vue"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
-import { axisTitle, chartTitle } from "./chartFormat"
+import { axisTitle, chartTitle, withSharedChart } from "./chartFormat"
 
 type ResearchCompare = components["schemas"]["ResearchCompare"]
 
@@ -55,10 +55,10 @@ const chartSeries = computed(() => [
   },
 ])
 
-const chartOptions = computed(() => ({
+const chartOptions = computed(() => withSharedChart({
   chart: { type: "bar" as const, height: 360, toolbar: { show: false } },
   title: chartTitle("Fundamentals comparison"),
-  colors: ["#2563eb"],
+  colors: ["var(--accent)"],
   plotOptions: { bar: { columnWidth: "55%", borderRadius: 3 } },
   dataLabels: {
     enabled: true,
@@ -71,7 +71,7 @@ const chartOptions = computed(() => ({
     title: axisTitle(metricAxisTitle.value),
     labels: { formatter: (v: number) => metricDef.value.chartFmt(v) },
   },
-  grid: { borderColor: "#e2e8f0" },
+  fill: { type: "solid" as const },
 }))
 
 async function loadCompare() {
