@@ -17,16 +17,16 @@ test("investments tabs switch between portfolios, transactions, and watchlists",
   await page.goto("/en/investments")
 
   const tabs = page.getByRole("navigation", { name: "Investment sections" })
-  await expect(tabs.getByRole("link", { name: "Portfolios", exact: true })).toHaveClass(/border-blue-600/)
+  await expect(tabs.getByRole("link", { name: "Portfolios", exact: true })).toHaveClass(/tab-link--active/)
   await expect(page.getByRole("button", { name: "Import from Broker" })).toBeVisible()
 
   await tabs.getByRole("link", { name: "Transactions" }).click()
   await expect(page).toHaveURL(/\/en\/investments\/transactions/)
-  await expect(tabs.getByRole("link", { name: "Transactions" })).toHaveClass(/border-blue-600/)
+  await expect(tabs.getByRole("link", { name: "Transactions" })).toHaveClass(/tab-link--active/)
 
   await tabs.getByRole("link", { name: "Watchlists" }).click()
   await expect(page).toHaveURL(/\/en\/investments\/watchlist/)
-  await expect(tabs.getByRole("link", { name: "Watchlists" })).toHaveClass(/border-blue-600/)
+  await expect(tabs.getByRole("link", { name: "Watchlists" })).toHaveClass(/tab-link--active/)
 })
 
 test("portfolio detail shows tabbed sections and positions", async ({ page }) => {
@@ -37,7 +37,7 @@ test("portfolio detail shows tabbed sections and positions", async ({ page }) =>
   await expect(page.getByRole("heading", { name: "Top10" })).toBeVisible()
 
   const tabs = page.getByRole("navigation", { name: "Portfolio tabs" })
-  await expect(tabs.getByRole("link", { name: "Holdings" })).toHaveClass(/border-blue-600/)
+  await expect(tabs.getByRole("link", { name: "Holdings" })).toHaveClass(/tab-link--active/)
 
   const rows = page.locator("tbody tr")
   await expect(rows.first()).toBeVisible()
@@ -45,7 +45,7 @@ test("portfolio detail shows tabbed sections and positions", async ({ page }) =>
 
   await tabs.getByRole("link", { name: "Performance" }).click()
   await expect(page).toHaveURL(/\/en\/portfolios\/.*\/performance/)
-  await expect(tabs.getByRole("link", { name: "Performance" })).toHaveClass(/border-blue-600/)
+  await expect(tabs.getByRole("link", { name: "Performance" })).toHaveClass(/tab-link--active/)
   await expect(page.getByText("Performance Chart")).toBeVisible()
   await expect(page.getByText("Returns Chart")).toBeVisible()
   await expect(page.getByText("Performance summary")).toBeVisible()
@@ -63,7 +63,7 @@ test("portfolio detail shows tabbed sections and positions", async ({ page }) =>
   for (const [label, url] of sections) {
     await tabs.getByRole("link", { name: label }).click()
     await expect(page).toHaveURL(url)
-    await expect(tabs.getByRole("link", { name: label })).toHaveClass(/border-blue-600/)
+    await expect(tabs.getByRole("link", { name: label })).toHaveClass(/tab-link--active/)
   }
 
   await tabs.getByRole("link", { name: "Holdings" }).click()
@@ -153,7 +153,7 @@ test("cash transactions sub-tab lists cross-portfolio cash rows", async ({ page 
   await page.goto("/en/investments/transactions/cash")
 
   await expect(page.getByRole("heading", { name: "Transactions", exact: true })).toBeVisible()
-  await expect(page.getByRole("link", { name: "Cash Transactions" })).toHaveClass(/border-blue-600/)
+  await expect(page.getByRole("link", { name: "Cash Transactions" })).toHaveClass(/tab-link--active/)
   await expect(page.locator("tbody tr").first()).toBeVisible()
   await expect(page.getByTestId("table-th-portfolioName")).toBeVisible()
   await expect(page.getByTestId("table-th-amount")).toBeVisible()

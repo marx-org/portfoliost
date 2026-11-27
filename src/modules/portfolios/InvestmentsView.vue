@@ -205,10 +205,11 @@ async function submitCreate() {
 <template>
 
   <div>
-    <div class="mb-6 flex items-center justify-between">
+    <div class="page-header">
       <div>
-        <h1 class="text-2xl font-semibold">Portfolios</h1>
-        <p v-if="store.totalMetrics" class="text-sm text-slate-500 dark:text-slate-400">
+        <p class="page-eyebrow"><span class="signal-dot" /> PORTFOLIOS</p>
+        <h1 class="page-title">Portfolios</h1>
+        <p v-if="store.totalMetrics" class="page-description">
           {{ store.portfolios.length }} portfolio{{ store.portfolios.length === 1 ? "" : "s" }} &middot; base currency
           {{ store.totalMetrics.baseCurrency }}
         </p>
@@ -300,7 +301,7 @@ async function submitCreate() {
          drawdown numbers beside it. -->
     <div v-if="portfolioTab !== 'virtual'" class="card mb-6 flex flex-wrap items-center justify-between gap-3 p-6">
       <div>
-        <h2 class="text-base font-semibold">Portfolio performance</h2>
+        <h2 class="card-title">Portfolio performance</h2>
         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
           Value, returns and drawdown across all {{ store.portfolios.length }} portfolios.
         </p>
@@ -312,7 +313,7 @@ async function submitCreate() {
 
     <section v-if="!loading" class="mb-10">
       <div class="mb-4 flex items-center justify-between">
-        <h2 class="text-lg font-semibold">{{ portfolioTab === 'virtual' ? 'Virtual Portfolios' : 'Investment Portfolios' }}</h2>
+        <h2 class="card-title">{{ portfolioTab === "virtual" ? "Virtual Portfolios" : "Investment Portfolios" }}</h2>
         <span v-if="visiblePortfolios.length" class="text-sm text-slate-500 dark:text-slate-400">{{ visiblePortfolios.length }}</span>
       </div>
 
@@ -329,7 +330,7 @@ async function submitCreate() {
     <section v-if="!loading && portfolioTab !== 'virtual'" class="mb-10">
       <div class="mb-4 flex items-center justify-between">
         <div>
-          <h2 class="text-lg font-semibold">Cash</h2>
+          <h2 class="card-title">Cash</h2>
           <div class="mt-0.5 flex items-center gap-3 text-sm">
             <span class="text-slate-500 dark:text-slate-400">Total Balance</span>
             <span class="font-semibold tabular-nums" data-testid="cash-total-balance">{{ formatCurrency(cashTotal, displayCurrency) }}</span>
