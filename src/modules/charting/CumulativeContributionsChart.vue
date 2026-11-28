@@ -9,6 +9,7 @@
  * only: the shared scoped dataset owns the calculation.
  */
 import { computed } from "vue"
+import { useI18n } from "vue-i18n"
 import type { components } from "@/api/types"
 import { formatCurrency } from "@/utils/format"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
@@ -27,16 +28,17 @@ const props = withDefaults(
 )
 
 const rows = computed(() => props.series ?? [])
+const { t } = useI18n()
 const accounts = computed(() => rows.value.filter((s) => s.key !== "__total__"))
 const total = computed(() => rows.value.find((s) => s.key === "__total__"))
 const hasUnknown = computed(() => rows.value.some((s) => s.points.some((p) => p.unknown)))
 
 const chartOptions = computed(() => withSharedChart({
   chart: { type: "line" as const, height: 340, toolbar: { show: false }, zoom: { enabled: false } },
-  title: chartTitle("Cumulative External Contributions"),
-  xaxis: { type: "datetime" as const, title: axisTitle("Date") },
+  title: chartTitle(t("charts.cumulativeExternalContributions")),
+  xaxis: { type: "datetime" as const, title: axisTitle(t("charts.date")) },
   yaxis: {
-    title: axisTitle(`Net funding (${props.currency})`),
+    title: axisTitle(t("charts.netFundingCcy", { ccy: props.currency })),
     labels: { formatter: (v: number) => axisCurrency(v, props.currency) },
   },
   dataLabels: { enabled: false },
@@ -76,10 +78,10 @@ function latest(s: ContributionSeries): Point | undefined {
         Some source amounts could not be converted into {{ currency }}; the affected cumulative totals are incomplete.
       </p>
       <div class="card p-6" :data-testid="`${testid}-chart`">
-        <h2 class="sr-only">Cumulative External Contributions</h2>
+        <h2 class="sr-only">{{ t("charts.cumulativeExternalContributions") }}</h2>
         <apexchart :options="chartOptions" :series="chartSeries" />
       </div>
-      <CollapsibleSection title="Cumulative Contributions" :testid="`${testid}-table`">
+      <CollapsibleSection :title="t('charts.cumulativeContributions')" :testid="`${testid}-table`">
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-border text-left text-xs uppercase text-muted dark:border-slate-800 dark:text-muted">

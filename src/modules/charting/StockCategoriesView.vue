@@ -9,6 +9,7 @@
  * catalogue, no automatic yield/growth rules.
  */
 import { computed, onMounted, ref, watch } from "vue"
+import { useI18n } from "vue-i18n"
 import { getStockChartCategories, setStockChartCategory } from "@/api/charting"
 import type { components } from "@/api/types"
 import { getAllPositions } from "@/api/portfolios"
@@ -17,15 +18,16 @@ import { useChartScope } from "./useChartScope"
 type Assignment = components["schemas"]["StockChartCategoryAssignment"]
 type Category = components["schemas"]["StockChartCategory"]
 
-const CATEGORY_OPTIONS: { value: Category; label: string }[] = [
-  { value: "balanced", label: "Balanced" },
-  { value: "high_yield", label: "High yield" },
-  { value: "high_growth", label: "High growth" },
-  { value: "very_high_growth", label: "Very high growth" },
-  { value: "not_classified", label: "Not classified" },
-]
+const CATEGORY_OPTIONS = computed<{ value: Category; label: string }[]>(() => [
+  { value: "balanced", label: t("charting.catBalanced") },
+  { value: "high_yield", label: t("charting.catHighYield") },
+  { value: "high_growth", label: t("charting.catHighGrowth") },
+  { value: "very_high_growth", label: t("charting.catVeryHighGrowth") },
+  { value: "not_classified", label: t("charting.catNotClassified") },
+])
 
 const scope = useChartScope()
+const { t } = useI18n()
 const assignments = ref<Assignment[]>([])
 const positions = ref<Awaited<ReturnType<typeof getAllPositions>>>([])
 const loading = ref(false)
@@ -134,26 +136,26 @@ function onChange(row: CategoryRow, event: Event) {
   <div class="space-y-3" data-testid="charting-categories">
   <div class="page-header" data-testid="charting-categories">
     <div>
-      <p class="page-eyebrow"><span class="signal-dot" /> CHARTING</p>
-      <h1 class="page-title">Stock categories</h1>
+      <p class="page-eyebrow"><span class="signal-dot" /> {{ t("charting.eyebrow") }}</p>
+      <h1 class="page-title">{{ t("charting.categoriesTitle") }}</h1>
     </div>
   </div>
 
     <div class="flex flex-wrap items-center justify-between gap-2">
       <p class="text-sm text-muted">
-        One category per stock, shared across every account that holds it. Options are never classified as the equity.
+        {{ t("charting.categoriesDescription") }}
       </p>
-      <button type="button" class="btn-secondary text-xs" :disabled="loading" @click="load">Refresh</button>
+      <button type="button" class="btn-secondary text-xs" :disabled="loading" @click="load">{{ t("charting.refresh") }}</button>
     </div>
 
-    <p v-if="loading && !displayRows.length" class="text-sm text-muted">Loading…</p>
+    <p v-if="loading && !displayRows.length" class="text-sm text-muted">{{ t("charting.loading") }}</p>
     <p v-else-if="error" class="text-sm text-danger">{{ error }}</p>
-    <p v-else-if="!displayRows.length" class="text-sm text-muted">No stocks to classify for this scope.</p>
+    <p v-else-if="!displayRows.length" class="text-sm text-muted">{{ t("charting.noStocksToClassify") }}</p>
 
     <table v-else class="w-full text-sm">
       <thead>
         <tr class="text-left text-muted">
-          <th class="py-1">Symbol</th><th>Name</th><th>Currency</th><th>Category</th><th>Updated</th>
+          <th class="py-1">{{ t("charting.colSymbol") }}</th><th>{{ t("charting.colName") }}</th><th>{{ t("charting.colCurrency") }}</th><th>{{ t("charting.colCategory") }}</th><th>{{ t("charting.colUpdated") }}</th>
         </tr>
       </thead>
       <tbody>

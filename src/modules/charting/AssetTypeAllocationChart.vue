@@ -18,6 +18,7 @@ export interface AssetTypeSlice {
  * so it is not part of this position universe.
  */
 import { computed } from "vue"
+import { useI18n } from "vue-i18n"
 import { formatCurrency, formatPercent } from "@/utils/format"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
 import { chartTitle, withSharedChart } from "./chartFormat"
@@ -34,6 +35,7 @@ const props = withDefaults(
 )
 
 const rows = computed(() => props.slices ?? [])
+const { t } = useI18n()
 const total = computed(() => rows.value.reduce((sum, s) => sum + (s.value ?? 0), 0))
 
 function label(s: AssetTypeSlice): string {
@@ -49,7 +51,7 @@ const COLORS = ["#2563eb", "#0ea5e9", "#8b5cf6", "#f59e0b", "#10b981", "#ef4444"
 
 const donutOptions = computed(() => withSharedChart({
   chart: { type: "donut" as const, height: 320, toolbar: { show: false } },
-  title: chartTitle("By Asset Type"),
+  title: chartTitle(t("charts.byAssetType")),
   labels: rows.value.map(label),
   colors: COLORS,
   legend: { position: "bottom" as const },
@@ -64,10 +66,10 @@ const donutSeries = computed(() => rows.value.map((s) => s.value))
   <div class="space-y-3" :data-testid="testid">
     <template v-if="rows.length">
       <div class="card p-6" :data-testid="`${testid}-donut`">
-        <h2 class="sr-only">By Asset Type</h2>
+        <h2 class="sr-only">{{ t("charts.byAssetType") }}</h2>
         <component :is="'apexchart'" :options="donutOptions" :series="donutSeries" />
       </div>
-      <CollapsibleSection title="Asset-Type Weights" :testid="`${testid}-table`">
+      <CollapsibleSection :title="t('charts.assetTypeWeights')" :testid="`${testid}-table`">
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-border text-left text-xs uppercase text-muted dark:border-slate-800 dark:text-muted">
@@ -89,6 +91,6 @@ const donutSeries = computed(() => rows.value.map((s) => s.value))
         </p>
       </CollapsibleSection>
     </template>
-    <p v-else class="text-sm text-muted">No asset-type data for this scope.</p>
+    <p v-else class="text-sm text-muted">{{ t("charts.noAssetTypeData") }}</p>
   </div>
 </template>

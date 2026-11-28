@@ -19,6 +19,7 @@ export interface HoldingSlice {
  * so. Presentation only.
  */
 import { computed } from "vue"
+import { useI18n } from "vue-i18n"
 import { formatCurrency, formatPercent } from "@/utils/format"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
 import { chartTitle, withSharedChart } from "./chartFormat"
@@ -37,6 +38,7 @@ const props = withDefaults(
 )
 
 const sorted = computed(() => [...(props.rows ?? [])].sort((a, b) => (b.value ?? 0) - (a.value ?? 0)))
+const { t } = useI18n()
 const positive = computed(() => sorted.value.filter((r) => (r.value ?? 0) > 0))
 const top = computed(() => positive.value.slice(0, TOP_N))
 const rest = computed(() => positive.value.slice(TOP_N))
@@ -63,7 +65,7 @@ const COLORS = ["#2563eb", "#0ea5e9", "#8b5cf6", "#f59e0b", "#10b981", "#ef4444"
 
 const donutOptions = computed(() => withSharedChart({
   chart: { type: "donut" as const, height: 340, toolbar: { show: false } },
-  title: chartTitle("Current Holdings"),
+  title: chartTitle(t("charts.currentHoldings")),
   labels: donutRows.value.map((r) => r.label),
   colors: COLORS,
   legend: { position: "bottom" as const },
@@ -78,10 +80,10 @@ const donutSeries = computed(() => donutRows.value.map((r) => r.value))
   <div class="space-y-3" :data-testid="testid">
     <template v-if="sorted.length">
       <div class="card p-6" :data-testid="`${testid}-donut`">
-        <h2 class="sr-only">Current Holdings</h2>
+        <h2 class="sr-only">{{ t("charts.currentHoldings") }}</h2>
         <component :is="'apexchart'" :options="donutOptions" :series="donutSeries" />
       </div>
-      <CollapsibleSection title="Holdings" :testid="`${testid}-table`">
+      <CollapsibleSection :title="t('charts.holdings')" :testid="`${testid}-table`">
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-border text-left text-xs uppercase text-muted dark:border-slate-800 dark:text-muted">

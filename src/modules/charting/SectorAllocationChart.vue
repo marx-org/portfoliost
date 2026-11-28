@@ -17,6 +17,7 @@ export interface SectorSlice {
  * exposed, never dropped. Presentation only.
  */
 import { computed } from "vue"
+import { useI18n } from "vue-i18n"
 import { formatCurrency, formatPercent } from "@/utils/format"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
 import { axisTitle, chartTitle, labelCurrency, withSharedChart } from "./chartFormat"
@@ -36,6 +37,7 @@ const props = withDefaults(
 )
 
 const rows = computed(() => props.slices ?? [])
+const { t } = useI18n()
 const total = computed(() => rows.value.reduce((sum, s) => sum + (s.value ?? 0), 0))
 
 function label(s: SectorSlice): string {
@@ -50,15 +52,15 @@ function percent(s: SectorSlice): number {
 const chartOptions = computed(() => withSharedChart({
   // Horizontal bars need vertical room per sector; 360 clipped long lists.
   chart: { type: "bar" as const, height: 420, toolbar: { show: false } },
-  title: chartTitle("Sector Weights"),
+  title: chartTitle(t("charts.sectorWeights")),
   plotOptions: { bar: { horizontal: true, borderRadius: 3 } },
   colors: ["var(--accent)"],
   fill: { type: "solid" as const },
   xaxis: {
     categories: rows.value.map(label),
-    title: axisTitle(`Market value (${props.currency})`),
+    title: axisTitle(t("charts.marketValueCcy", { ccy: props.currency })),
   },
-  yaxis: { title: axisTitle("Sector") },
+  yaxis: { title: axisTitle(t("charts.sector")) },
   // Bars printed raw floats (`544588.17017128`); round to a short currency label.
   dataLabels: { formatter: (v: number) => labelCurrency(v, props.currency) },
   tooltip: { y: { formatter: (v: number) => formatCurrency(v, props.currency) } },
@@ -70,10 +72,10 @@ const chartSeries = computed(() => [{ name: "Market value", data: rows.value.map
   <div class="space-y-3" :data-testid="testid">
     <template v-if="rows.length">
       <div class="card p-6" :data-testid="`${testid}-chart`">
-        <h2 class="sr-only">Sector Weights</h2>
+        <h2 class="sr-only">{{ t("charts.sectorWeights") }}</h2>
         <component :is="'apexchart'" :options="chartOptions" :series="chartSeries" />
       </div>
-      <CollapsibleSection v-if="showTable" title="Sector Weights" :testid="`${testid}-table`">
+      <CollapsibleSection v-if="showTable" :title="t('charts.sectorWeights')" :testid="`${testid}-table`">
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-border text-left text-xs uppercase text-muted dark:border-slate-800 dark:text-muted">
@@ -95,6 +97,6 @@ const chartSeries = computed(() => [{ name: "Market value", data: rows.value.map
         </p>
       </CollapsibleSection>
     </template>
-    <p v-else class="text-sm text-muted">No sector data for this scope.</p>
+    <p v-else class="text-sm text-muted">{{ t("charts.noSectorData") }}</p>
   </div>
 </template>

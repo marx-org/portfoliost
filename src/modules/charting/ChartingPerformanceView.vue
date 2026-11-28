@@ -8,6 +8,7 @@
  * mounted with a fixed scope (the portfolio tab) or read the shared URL scope.
  */
 import { computed, watch } from "vue"
+import { useI18n } from "vue-i18n"
 import { getChartPerformance } from "@/api/charting"
 import type { ChartScopeQuery } from "@/api/charting"
 import ValuationChart from "./ValuationChart.vue"
@@ -19,6 +20,7 @@ import { useChartData } from "./useChartData"
 const props = defineProps<{ scope?: ChartScopeQuery }>()
 
 const scope = useChartScope()
+const { t } = useI18n()
 const { data, loading, error, load } = useChartData(getChartPerformance)
 
 const activeScope = computed<ChartScopeQuery>(() => props.scope ?? scope.scopeQuery.value)
@@ -41,16 +43,16 @@ const benchmarkOptions = [
   <div class="space-y-3" data-testid="charting-performance">
   <div class="page-header" data-testid="charting-performance">
     <div>
-      <p class="page-eyebrow"><span class="signal-dot" /> CHARTING</p>
-      <h1 class="page-title">Performance</h1>
+      <p class="page-eyebrow"><span class="signal-dot" /> {{ t("charting.eyebrow") }}</p>
+      <h1 class="page-title">{{ t("charting.perfTitle") }}</h1>
     </div>
   </div>
 
-    <p v-if="loading" class="text-sm text-muted">Loading…</p>
-    <p v-else-if="error" class="text-sm text-danger">Failed to load performance data.</p>
+    <p v-if="loading" class="text-sm text-muted">{{ t("charting.loading") }}</p>
+    <p v-else-if="error" class="text-sm text-danger">{{ t("charting.perfLoadError") }}</p>
     <template v-else>
       <div class="flex flex-wrap items-center gap-3 text-xs text-muted" data-testid="charting-benchmark-bar">
-        <span class="font-medium">Benchmarks</span>
+        <span class="font-medium">{{ t("charting.benchmarks") }}</span>
         <label v-for="b in benchmarkOptions" :key="b.symbol" class="inline-flex items-center gap-1">
           <input
             type="checkbox"
@@ -78,8 +80,8 @@ const benchmarkOptions = [
         :points="data.scatter"
         :currency="currency"
       />
-      <p v-else class="text-sm text-muted">No performance data for this scope.</p>
-      <div v-if="data" class="text-xs text-muted">Generation {{ data.coverage.generation }} · {{ data.coverage.status }}</div>
+      <p v-else class="text-sm text-muted">{{ t("charting.noPerfData") }}</p>
+      <div v-if="data" class="text-xs text-muted">{{ t("charting.generation", { generation: data.coverage.generation, status: data.coverage.status }) }}</div>
     </template>
   </div>
 </template>

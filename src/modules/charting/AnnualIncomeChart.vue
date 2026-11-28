@@ -10,6 +10,7 @@
  * a fabricated 0%.
  */
 import { computed } from "vue"
+import { useI18n } from "vue-i18n"
 import type { components } from "@/api/types"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
 import { formatCurrency, formatPercent } from "@/utils/format"
@@ -23,23 +24,24 @@ const props = withDefaults(defineProps<{ points?: Point[]; currency?: string }>(
 })
 
 const rows = computed(() => props.points ?? [])
+const { t } = useI18n()
 const currentYear = new Date().getUTCFullYear()
 const hasCurrentYear = computed(() => rows.value.some((p) => p.year === currentYear))
 
 const chartOptions = computed(() => withSharedChart({
   chart: { type: "bar", height: 340 },
-  title: chartTitle("Annual totals"),
-  xaxis: { categories: rows.value.map((p) => String(p.year)), title: axisTitle("Year") },
+  title: chartTitle(t("charts.annualTotals")),
+  xaxis: { categories: rows.value.map((p) => String(p.year)), title: axisTitle(t("charts.year")) },
   yaxis: [
     {
-      seriesName: "Income",
-      title: axisTitle(`Income (${props.currency})`),
+      seriesName: t("charts.incomeSeries"),
+      title: axisTitle(t("charts.incomeCcy", { ccy: props.currency })),
       labels: { formatter: (v: number) => axisCurrency(v, props.currency) },
     },
     {
       opposite: true,
-      seriesName: "YoY %",
-      title: axisTitle("YoY (%)"),
+      seriesName: t("charts.yoySeries"),
+      title: axisTitle(t("charts.yoyPercent")),
       labels: { formatter: (v: number) => `${Number(v.toFixed(1))}%` },
     },
   ],
@@ -71,8 +73,8 @@ const chartSeries = computed(() => [
       {{ currentYear }} is year-to-date; its YoY compares a partial year to the prior full year (not annualised).
     </p>
     <apexchart v-if="rows.length" type="bar" :options="chartOptions" :series="chartSeries" :height="340" />
-    <p v-else class="text-sm text-muted">No income data for this scope.</p>
-    <CollapsibleSection v-if="rows.length" title="Annual totals" testid="annual-income-chart-table">
+    <p v-else class="text-sm text-muted">{{ t("charts.noIncomeData") }}</p>
+    <CollapsibleSection v-if="rows.length" :title="t('charts.annualTotals')" testid="annual-income-chart-table">
       <table class="w-full text-sm">
         <thead>
           <tr class="text-left text-muted">

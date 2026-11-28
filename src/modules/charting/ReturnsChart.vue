@@ -10,6 +10,7 @@
  * denominator is undefined (no bar), never 0 or infinity.
  */
 import { computed, ref } from "vue"
+import { useI18n } from "vue-i18n"
 import { formatCurrency } from "@/utils/format"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
 import { axisTitle, chartTitle, withSharedChart } from "./chartFormat"
@@ -32,15 +33,16 @@ type Mode = "twr" | "net_gain_change"
 const mode = ref<Mode>("twr")
 
 const rows = computed(() => props.points ?? [])
-const metricLabel = computed(() => (mode.value === "twr" ? "TWR" : "Net-gain change / ending value"))
+const { t } = useI18n()
+const metricLabel = computed(() => (mode.value === "twr" ? "TWR" : t("charts.netGainChange")))
 const values = computed(() =>
   rows.value.map((r) => (mode.value === "twr" ? r.twr ?? null : r.netGainChange ?? null)),
 )
 
 const chartOptions = computed(() => withSharedChart({
   chart: { type: "bar" as const, height: 300 },
-  title: chartTitle(`Quarterly Returns — ${metricLabel.value}`),
-  xaxis: { categories: rows.value.map((r) => r.quarter), title: axisTitle("Quarter") },
+  title: chartTitle(t("charts.quarterlyReturnsMetric", { metric: metricLabel.value })),
+  xaxis: { categories: rows.value.map((r) => r.quarter), title: axisTitle(t("charts.quarter")) },
   // ApexCharts prints each bar's raw float by default (`69.72577697`). Keep the
   // labels but round to a short percent (`69.7%`) — the values are already
   // percentages, so the raw float is both noisy and ambiguous about the unit.
@@ -48,7 +50,7 @@ const chartOptions = computed(() => withSharedChart({
   // Axis ticks need the same treatment: without a formatter they render as
   // `80.00000000`, `60.00000000`, … — meaningless trailing zeroes and no unit.
   yaxis: {
-    title: axisTitle("Return (%)"),
+    title: axisTitle(t("charts.returnPercent")),
     labels: { formatter: percentAxis },
   },
   colors: ["var(--accent)"],
@@ -93,13 +95,13 @@ function percentAxis(v: number): string {
         </button>
       </div>
       <div class="card p-6" :data-testid="`${testid}-chart`">
-        <h2 class="sr-only">Quarterly Returns — {{ metricLabel }}</h2>
+        <h2 class="sr-only">{{ t("charts.quarterlyReturnsMetric", { metric: metricLabel }) }}</h2>
         <component :is="'apexchart'" :options="chartOptions" :series="chartSeries" />
       </div>
       <p class="text-xs text-muted" data-testid="`${testid}-partial`">
         The current quarter is year-to-date. Undefined (zero/unknown denominator) is shown as —, never 0%.
       </p>
-      <CollapsibleSection title="Quarterly Returns" :testid="`${testid}-table`">
+      <CollapsibleSection :title="t('charts.quarterlyReturns')" :testid="`${testid}-table`">
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-border text-left text-xs uppercase text-muted dark:border-slate-800 dark:text-muted">

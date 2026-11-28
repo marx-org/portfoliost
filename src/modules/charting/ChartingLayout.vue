@@ -8,6 +8,7 @@
  * across subpages and deep links.
  */
 import { computed, onMounted } from "vue"
+import { useI18n } from "vue-i18n"
 import { useRoute } from "vue-router"
 import { storeToRefs } from "pinia"
 import { usePortfolioStore } from "@/stores/portfolios"
@@ -17,6 +18,7 @@ import LabelFilterBar from "@/components/LabelFilterBar.vue"
 import { useChartScope } from "./useChartScope"
 import type { ChartCategory } from "./registry"
 
+const { t } = useI18n()
 const route = useRoute()
 
 const scope = useChartScope()
@@ -49,13 +51,13 @@ const visibleAccounts = computed(() =>
   accountList.value.filter((p) => (kind.value === "virtual" ? p.isVirtual === true : p.isVirtual !== true)),
 )
 
-const sections: { category: ChartCategory; label: string; to: string }[] = [
-  { category: "performance", label: "Performance", to: "/en/charting/performance" },
-  { category: "income", label: "Income", to: "/en/charting/income" },
-  { category: "allocation", label: "Allocation", to: "/en/charting/allocation" },
-  { category: "cash", label: "Cash & funding", to: "/en/charting/cash" },
-  { category: "categories", label: "Stock categories", to: "/en/charting/stock-categories" },
-]
+const sections = computed<{ category: ChartCategory; label: string; to: string }[]>(() => [
+  { category: "performance", label: t("charting.sectionPerformance"), to: "/en/charting/performance" },
+  { category: "income", label: t("charting.sectionIncome"), to: "/en/charting/income" },
+  { category: "allocation", label: t("charting.sectionAllocation"), to: "/en/charting/allocation" },
+  { category: "cash", label: t("charting.sectionCash"), to: "/en/charting/cash" },
+  { category: "categories", label: t("charting.sectionCategories"), to: "/en/charting/stock-categories" },
+])
 
 const active = computed<ChartCategory>(() => {
   const seg = route.path.split("/").filter(Boolean).pop() ?? ""
@@ -146,14 +148,14 @@ function onDateChange(which: "from" | "to", event: Event) {
     <!-- Scope toolbar -->
     <div class="toolbar" data-testid="charting-toolbar">
       <div class="flex items-center gap-1 rounded border border-border p-0.5 dark:border-slate-600" data-testid="charting-kind-switch">
-        <span class="px-1 text-xs font-medium uppercase text-muted dark:text-muted">Portfolios</span>
+        <span class="px-1 text-xs font-medium uppercase text-muted dark:text-muted">{{ t("charting.portfolios") }}</span>
         <button
           type="button"
           class="rounded px-2 py-0.5 text-xs"
           :class="kind === 'normal' ? 'bg-blue-600 text-white' : 'text-muted hover:bg-surface-2 dark:text-slate-300 dark:hover:bg-slate-800'"
           @click="scope.setKind('normal')"
         >
-          Normal
+          {{ t("charting.normal") }}
         </button>
         <button
           type="button"
@@ -161,12 +163,12 @@ function onDateChange(which: "from" | "to", event: Event) {
           :class="kind === 'virtual' ? 'bg-blue-600 text-white' : 'text-muted hover:bg-surface-2 dark:text-slate-300 dark:hover:bg-slate-800'"
           @click="scope.setKind('virtual')"
         >
-          Virtual
+          {{ t("charting.virtual") }}
         </button>
       </div>
       <div class="flex flex-wrap items-center gap-2">
-        <span class="text-xs font-medium uppercase text-muted dark:text-muted">Accounts</span>
-        <span v-if="allAccounts" class="text-xs text-muted">All</span>
+        <span class="text-xs font-medium uppercase text-muted dark:text-muted">{{ t("charting.accounts") }}</span>
+        <span v-if="allAccounts" class="text-xs text-muted">{{ t("charting.all") }}</span>
         <button
           v-for="p in visibleAccounts"
           :key="p.id"
@@ -182,10 +184,10 @@ function onDateChange(which: "from" | "to", event: Event) {
            label filter only applies to normal accounts. -->
       <template v-if="kind === 'normal'">
         <label-filter-bar :model-value="selectedLabelIds" @update:model-value="scope.setLabels" />
-        <span v-if="allLabels" class="text-xs text-muted">All labels</span>
+        <span v-if="allLabels" class="text-xs text-muted">{{ t("charting.allLabels") }}</span>
       </template>
       <label class="flex items-center gap-1 text-xs font-medium uppercase text-muted dark:text-muted" for="charting-currency">
-        Currency
+        {{ t("charting.currency") }}
         <select
           id="charting-currency"
           class="input h-7 w-24 text-xs"
@@ -209,7 +211,7 @@ function onDateChange(which: "from" | "to", event: Event) {
         >
           {{ r.label }}
         </button>
-        <label class="ml-1 text-xs font-medium uppercase text-muted dark:text-muted" for="charting-date-from">From</label>
+        <label class="ml-1 text-xs font-medium uppercase text-muted dark:text-muted" for="charting-date-from">{{ t("charting.from") }}</label>
         <input
           id="charting-date-from"
           type="date"
@@ -218,7 +220,7 @@ function onDateChange(which: "from" | "to", event: Event) {
           data-testid="charting-date-from"
           @change="onDateChange('from', $event)"
         />
-        <label class="text-xs font-medium uppercase text-muted dark:text-muted" for="charting-date-to">To</label>
+        <label class="text-xs font-medium uppercase text-muted dark:text-muted" for="charting-date-to">{{ t("charting.to") }}</label>
         <input
           id="charting-date-to"
           type="date"
@@ -228,7 +230,7 @@ function onDateChange(which: "from" | "to", event: Event) {
           @change="onDateChange('to', $event)"
         />
       </div>
-      <button type="button" class="btn-ghost text-xs" @click="scope.reset()">Reset</button>
+      <button type="button" class="btn-ghost text-xs" @click="scope.reset()">{{ t("charting.reset") }}</button>
     </div>
 
     <router-view />

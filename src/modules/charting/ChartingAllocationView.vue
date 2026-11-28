@@ -8,6 +8,7 @@
  * URL scope.
  */
 import { computed, watch } from "vue"
+import { useI18n } from "vue-i18n"
 import { getChartAllocation } from "@/api/charting"
 import type { ChartScopeQuery } from "@/api/charting"
 import AllocationBreakdown, { type AllocationSlice } from "@/components/AllocationBreakdown.vue"
@@ -23,6 +24,7 @@ import { useChartData } from "./useChartData"
 const props = defineProps<{ scope?: ChartScopeQuery }>()
 
 const scope = useChartScope()
+const { t } = useI18n()
 const { data, loading, error, load } = useChartData(getChartAllocation)
 
 const activeScope = computed<ChartScopeQuery>(() => props.scope ?? scope.scopeQuery.value)
@@ -66,13 +68,13 @@ const hasSlices = computed(
   <div class="space-y-3" data-testid="charting-allocation">
   <div class="page-header" data-testid="charting-allocation">
     <div>
-      <p class="page-eyebrow"><span class="signal-dot" /> CHARTING</p>
-      <h1 class="page-title">Allocation</h1>
+      <p class="page-eyebrow"><span class="signal-dot" /> {{ t("charting.eyebrow") }}</p>
+      <h1 class="page-title">{{ t("charting.allocationTitle") }}</h1>
     </div>
   </div>
 
-    <p v-if="loading" class="text-sm text-muted">Loading…</p>
-    <p v-else-if="error" class="text-sm text-danger">Failed to load allocation data.</p>
+    <p v-if="loading" class="text-sm text-muted">{{ t("charting.loading") }}</p>
+    <p v-else-if="error" class="text-sm text-danger">{{ t("charting.allocationLoadError") }}</p>
     <template v-else>
       <AllocationBreakdown
         v-if="hasSlices"
@@ -115,8 +117,8 @@ const hasSlices = computed(
         :rows="byCostBasis"
         :currency="baseCurrency"
       />
-      <p v-if="!hasSlices && !byCostBasis.length" class="text-sm text-muted">No allocation data for this scope.</p>
-      <div v-if="data" class="text-xs text-muted">Generation {{ data.coverage.generation }} · {{ data.coverage.status }}</div>
+      <p v-if="!hasSlices && !byCostBasis.length" class="text-sm text-muted">{{ t("charting.noAllocationData") }}</p>
+      <div v-if="data" class="text-xs text-muted">{{ t("charting.generation", { generation: data.coverage.generation, status: data.coverage.status }) }}</div>
     </template>
   </div>
 </template>

@@ -12,18 +12,25 @@
 
 export { axisTitle, chartTitle, withSharedChart } from "@/utils/chartOptions"
 
+import { i18n, type Locale } from "@/i18n"
+
+/** The Intl BCP-47 tag for the active UI locale (en-US / pl-PL). */
+function intlLocale(): string {
+  return i18n.global.locale.value === ("pl" as Locale) ? "pl-PL" : "en-US"
+}
+
 /** Compact currency, keeping at most one decimal and trimming a trailing `.0`. */
 function compactCurrency(value: number | null | undefined, currency: string): string {
   if (value == null || Number.isNaN(value)) return ""
   const ccy = /^[A-Za-z]{3}$/.test(currency ?? "") ? currency.toUpperCase() : null
   const formatted = ccy
-    ? new Intl.NumberFormat("en-US", {
+    ? new Intl.NumberFormat(intlLocale(), {
         style: "currency",
         currency: ccy,
         notation: "compact",
         maximumFractionDigits: 1,
       }).format(value)
-    : new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(value)
+    : new Intl.NumberFormat(intlLocale(), { notation: "compact", maximumFractionDigits: 1 }).format(value)
   // `80.0` / `1.0M` → `80` / `1M`; keep a meaningful decimal (`1.2M`).
   return formatted.replace(/\.0+(?=[^\d]|$)/g, "")
 }
