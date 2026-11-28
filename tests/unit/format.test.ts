@@ -5,9 +5,11 @@ import {
   formatCompactCurrency,
   formatCurrency,
   formatDate,
+  formatNumber,
   formatPercent,
   formatSignedCurrency,
 } from "@/utils/format"
+import { i18n } from "@/i18n"
 
 describe("format", () => {
   it("formats currency with thousands separators", () => {
@@ -87,5 +89,24 @@ describe("format", () => {
     expect(formatDate("2026-08-01T12:00:00.000Z")).toBe("Aug 1, 2026")
     expect(formatDate(Date.UTC(2026, 7, 11, 12))).toBe("Aug 11, 2026")
     expect(formatDate(null)).toBe("—")
+  })
+
+  // Multi-language (Feature #190): when the active locale is pl, every formatter
+  // switches to pl-PL (comma decimals, d.m.yyyy, zł). The default en-US cases
+  // above stay green because en is the default locale.
+  describe("pl-PL locale", () => {
+    it("uses comma decimals and Polish currency/date/compact forms", () => {
+      i18n.global.locale.value = "pl"
+      try {
+        expect(formatNumber(1234.5)).toBe("1234,5")
+        expect(formatCurrency(1234.5, "PLN")).toBe("1234,50\u00A0zł")
+        expect(formatCurrency(1234.5, "USD")).toBe("1234,50\u00A0USD")
+        expect(formatPercent(12.13)).toBe("12,13%")
+        expect(formatCompact(109984.34)).toBe("109,98\u00A0tys.")
+        expect(formatDate("2026-08-01T12:00:00.000Z")).toBe("1 sie 2026")
+      } finally {
+        i18n.global.locale.value = "en"
+      }
+    })
   })
 })
