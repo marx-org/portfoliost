@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue"
+import { useI18n } from "vue-i18n"
 import { useRoute } from "vue-router"
 import { getInvestorRelations } from "@/api/instruments"
 import { formatDateTime } from "@/utils/format"
@@ -21,6 +22,7 @@ interface IrEvent {
 }
 
 const route = useRoute()
+const { t } = useI18n()
 const symbol = String(route.params.symbol).toUpperCase()
 
 const events = ref<IrEvent[]>([])
@@ -52,7 +54,7 @@ const types = computed(() => {
 <template>
   <div class="space-y-4">
     <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-danger">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-muted">Loading investor relations...</p>
+    <p v-if="loading" class="text-sm text-muted">{{ t("research.loadingIr") }}</p>
 
     <template v-if="!loading && !error">
       <div class="flex flex-wrap gap-2">
@@ -62,7 +64,7 @@ const types = computed(() => {
           :class="filter === 'all' ? 'bg-blue-600 text-white' : ''"
           @click="filter = 'all'"
         >
-          All ({{ events.length }})
+          {{ t("research.allCount", { count: events.length }) }}
         </button>
         <button
           v-for="[type, count] in types"
@@ -94,18 +96,18 @@ const types = computed(() => {
             rel="noopener"
             class="btn-ghost shrink-0 text-xs"
           >
-            Filing
+            {{ t("research.filing") }}
           </a>
           <router-link
             :to="{ name: 'research-ir-transcript', params: { symbol: researchSymbol(symbol), eventId: event.id } }"
             class="btn-ghost shrink-0 text-xs"
           >
-            Open
+            {{ t("research.open") }}
           </router-link>
         </li>
       </ul>
 
-      <p v-else class="text-sm text-muted">No events found.</p>
+      <p v-else class="text-sm text-muted">{{ t("research.noEvents") }}</p>
     </template>
   </div>
 </template>

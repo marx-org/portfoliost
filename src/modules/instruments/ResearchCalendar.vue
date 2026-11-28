@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue"
+import { useI18n } from "vue-i18n"
 import { useRoute } from "vue-router"
 import { getInstrumentCalendar } from "@/api/instruments"
 import type { components } from "@/api/types"
 import { formatAmount } from "@/utils/format"
+import { i18n, type Locale } from "@/i18n"
 
+const { t } = useI18n()
 const route = useRoute()
 const symbol = String(route.params.symbol).toUpperCase()
 
@@ -16,7 +19,7 @@ onMounted(async () => {
   try {
     data.value = await getInstrumentCalendar(symbol)
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Failed to load calendar"
+    error.value = err instanceof Error ? err.message : t("research.loadCalendarError")
   } finally {
     loading.value = false
   }
@@ -42,78 +45,78 @@ const upcomingDivs = computed(() => dividends.value.filter((e) => isUpcoming(e.d
 function dateLabel(d: string): string {
   const parts = d.split("-").map((p, i) => (i > 0 ? p.padStart(2, "0") : p))
   const dt = new Date(`${parts.join("-")}T00:00:00`)
-  return dt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+  return dt.toLocaleDateString(i18n.global.locale.value === ("pl" as Locale) ? "pl-PL" : "en-US", { month: "short", day: "numeric", year: "numeric" })
 }
 </script>
 
 <template>
   <div class="space-y-6">
     <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-danger">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-muted">Loading calendar...</p>
+    <p v-if="loading" class="text-sm text-muted">{{ t("research.loadingCalendar") }}</p>
 
     <template v-if="!loading && !error && data">
       <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div class="card p-6">
-          <h2 class="card-title mb-3">Upcoming Earnings</h2>
+          <h2 class="card-title mb-3">{{ t("research.upcomingEarnings") }}</h2>
           <ul v-if="upcomingEarnings.length" class="space-y-2 text-sm">
             <li v-for="e in upcomingEarnings" :key="e.date" class="flex items-center justify-between gap-3 rounded-lg bg-surface-2 px-3 py-2">
               <div>
-                <p class="font-medium">{{ e.title ?? `Q${e.quarter} ${e.year} Earnings Call` }}</p>
+                <p class="font-medium">{{ e.title ?? t("research.earningsCallTitle", { quarter: e.quarter, year: e.year }) }}</p>
                 <p class="text-xs text-muted">{{ dateLabel(e.date) }}</p>
               </div>
               <span class="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent-text">Q{{ e.quarter }}</span>
             </li>
           </ul>
-          <p v-else class="text-sm text-muted">No upcoming earnings.</p>
+          <p v-else class="text-sm text-muted">{{ t("research.noUpcomingEarnings") }}</p>
         </div>
 
         <div class="card p-6">
-          <h2 class="card-title mb-3">Upcoming Ex-Dividend</h2>
+          <h2 class="card-title mb-3">{{ t("research.upcomingExDividend") }}</h2>
           <ul v-if="upcomingEx.length" class="space-y-2 text-sm">
             <li v-for="e in upcomingEx" :key="e.date" class="flex items-center justify-between gap-3 rounded-lg bg-surface-2 px-3 py-2">
               <div>
-                <p class="font-medium">{{ e.title ?? "Ex-Dividend" }}</p>
+                <p class="font-medium">{{ e.title ?? t("research.exDividend") }}</p>
                 <p class="text-xs text-muted">{{ dateLabel(e.date) }}</p>
               </div>
               <span class="font-semibold text-emerald">{{ formatAmount(e.amount, instrCcy) }}</span>
             </li>
           </ul>
-          <p v-else class="text-sm text-muted">No upcoming ex-dividend dates.</p>
+          <p v-else class="text-sm text-muted">{{ t("research.noUpcomingEx") }}</p>
         </div>
 
         <!-- §49.6/49.9 — payment dates ride the calendar dividend rows; the
              card mirrors its siblings (always visible, empty state when no
              dividend payment falls within the upcoming window). -->
         <div class="card p-6">
-          <h2 class="card-title mb-3">Upcoming Dividend</h2>
+          <h2 class="card-title mb-3">{{ t("research.upcomingDividend") }}</h2>
           <ul v-if="upcomingDivs.length" class="space-y-2 text-sm">
             <li v-for="e in upcomingDivs" :key="e.date" class="flex items-center justify-between gap-3 rounded-lg bg-surface-2 px-3 py-2">
               <div>
-                <p class="font-medium">{{ e.title ?? "Dividend" }}</p>
+                <p class="font-medium">{{ e.title ?? t("research.dividend") }}</p>
                 <p class="text-xs text-muted">{{ dateLabel(e.date) }}</p>
               </div>
               <span class="font-semibold text-emerald">{{ formatAmount(e.amount, instrCcy) }}</span>
             </li>
           </ul>
-          <p v-else class="text-sm text-muted">No upcoming dividends.</p>
+          <p v-else class="text-sm text-muted">{{ t("research.noUpcomingDividends") }}</p>
         </div>
       </div>
 
       <div v-if="pastEarnings.length" class="card p-6">
-        <h2 class="card-title mb-3">Past Earnings</h2>
+        <h2 class="card-title mb-3">{{ t("research.pastEarnings") }}</h2>
         <div class="overflow-x-auto">
           <table class="w-full min-w-[560px] text-sm">
             <thead>
               <tr class="border-b border-border text-left text-xs uppercase tracking-wide text-muted">
-                <th class="py-2 pr-3">Date</th>
-                <th class="py-2 pr-3">Event</th>
-                <th class="py-2 pr-3 text-right">Quarter</th>
+                <th class="py-2 pr-3">{{ t("research.date") }}</th>
+                <th class="py-2 pr-3">{{ t("research.event") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.quarter") }}</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="e in pastEarnings" :key="e.date" class="border-b border-border">
                 <td class="py-2 pr-3">{{ dateLabel(e.date) }}</td>
-                <td class="py-2 pr-3">{{ e.title ?? `Q${e.quarter} ${e.year} Earnings Call` }}</td>
+                <td class="py-2 pr-3">{{ e.title ?? t("research.earningsCallTitle", { quarter: e.quarter, year: e.year }) }}</td>
                 <td class="py-2 pr-3 text-right">Q{{ e.quarter }}</td>
               </tr>
             </tbody>

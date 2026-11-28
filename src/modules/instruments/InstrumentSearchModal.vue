@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue"
+import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
 import { useInstrumentsStore } from "@/stores/instruments"
 import { useRecentSearchesStore } from "@/stores/recentSearches"
@@ -9,11 +10,13 @@ import { researchRoute } from "@/utils/research"
 
 const props = withDefaults(defineProps<{ open: boolean; mode?: "navigate" | "add"; title?: string }>(), {
   mode: "navigate",
-  title: "Search for Instruments",
+  title: undefined,
 })
 const emit = defineEmits<{ (e: "close"): void; (e: "add", symbol: string, name: string): void }>()
 
 const store = useInstrumentsStore()
+const { t } = useI18n()
+const title = computed(() => props.title ?? t("research.searchInstruments"))
 const recentSearches = useRecentSearchesStore()
 const route = useRoute()
 const router = useRouter()
@@ -63,10 +66,10 @@ function onKeydown(e: KeyboardEvent) {
       @click.self="emit('close')"
       @keydown.esc="onKeydown"
     >
-      <div class="card w-full max-w-lg overflow-hidden" role="dialog" aria-modal="true" aria-label="Search for Instruments">
+      <div class="card w-full max-w-lg overflow-hidden" role="dialog" aria-modal="true" :aria-label="title">
         <div class="flex items-center justify-between border-b border-border px-4 py-3">
           <h3 class="text-base font-semibold">{{ title }}</h3>
-          <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="emit('close')">✕</button>
+          <button type="button" class="btn-ghost px-2 py-1" :aria-label="t('research.closeModal')" @click="emit('close')">✕</button>
         </div>
 
         <div class="p-4">
@@ -74,16 +77,16 @@ function onKeydown(e: KeyboardEvent) {
             v-model="query"
             type="text"
             class="input"
-            placeholder="Search stocks, ETFs, crypto, or paste an ISIN..."
+            :placeholder="t('research.searchPlaceholder')"
             data-testid="instrument-search"
           />
 
           <div v-if="query.trim().length < 1" class="mt-4">
-            <p class="text-sm text-muted">Recent searches</p>
+            <p class="text-sm text-muted">{{ t("research.recentSearches") }}</p>
             <RecentSearchesBar variant="chips" class="mt-2" @select="openResult" />
           </div>
 
-          <div v-else-if="store.searching" class="mt-4 text-sm text-muted">Searching...</div>
+          <div v-else-if="store.searching" class="mt-4 text-sm text-muted">{{ t("research.searching") }}</div>
 
           <div v-else-if="store.searchError" class="mt-4 text-sm text-danger">{{ store.searchError }}</div>
 
@@ -107,11 +110,11 @@ function onKeydown(e: KeyboardEvent) {
             </li>
           </ul>
           <p v-if="hiddenCount > 0" class="mt-2 text-xs text-muted">
-            Showing first {{ renderedResults.length }} of {{ store.searchResults.length }} results — refine your search to narrow it down.
+            {{ t("research.showingFirst", { shown: renderedResults.length, total: store.searchResults.length }) }}
           </p>
 
           <p v-if="!store.searchResults.length && !store.searching && !store.searchError" class="mt-4 text-sm text-muted">
-            No results
+            {{ t("research.noResults") }}
           </p>
 
         </div>

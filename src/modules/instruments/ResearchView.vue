@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue"
+import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
 import TickerBadge from "@/components/TickerBadge.vue"
 import InstrumentSearchModal from "@/modules/instruments/InstrumentSearchModal.vue"
@@ -12,6 +13,7 @@ import type { InstrumentsProfile } from "@/api/types"
 
 const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
 const routeSymbol = computed(() => String(route.params.symbol).toUpperCase())
 const watchlists = useWatchlistsStore()
 const recentSearches = useRecentSearchesStore()
@@ -20,17 +22,17 @@ const profile = ref<InstrumentsProfile | null>(null)
 const watchlistStatus = ref<string | null>(null)
 const watchlistBusy = ref(false)
 
-const tabs = [
-  { name: "research-overview", label: "Overview" },
-  { name: "research-news", label: "News" },
-  { name: "research-fundamentals", label: "Fundamentals" },
-  { name: "research-ir", label: "Investor Relations" },
-  { name: "research-ownership", label: "Ownership" },
-  { name: "research-projections", label: "Projections" },
-  { name: "research-compare", label: "Compare" },
-  { name: "research-calendar", label: "Calendar" },
-  { name: "research-dividends", label: "Dividends" },
-]
+const tabs = computed(() => [
+  { name: "research-overview", label: t("research.tabOverview") },
+  { name: "research-news", label: t("research.tabNews") },
+  { name: "research-fundamentals", label: t("research.tabFundamentals") },
+  { name: "research-ir", label: t("research.tabIr") },
+  { name: "research-ownership", label: t("research.tabOwnership") },
+  { name: "research-projections", label: t("research.tabProjections") },
+  { name: "research-compare", label: t("research.tabCompare") },
+  { name: "research-calendar", label: t("research.tabCalendar") },
+  { name: "research-dividends", label: t("research.tabDividends") },
+])
 
 const backTarget = computed(() => researchBackTarget(route.query))
 const preservedQuery = computed(() =>
@@ -77,16 +79,16 @@ async function addToWatchlist(): Promise<void> {
       await watchlists.fetchAll()
     }
     if (!watchlists.watchlists.length) {
-      await watchlists.create("My Watchlist")
+      await watchlists.create(t("research.myWatchlist"))
     }
     const target = watchlists.watchlists[0]
     const already = target.items?.some((i) => i.symbol?.toUpperCase() === routeSymbol.value)
     if (!already) {
       await watchlists.addItem(target.id, routeSymbol.value)
     }
-    watchlistStatus.value = `Added ${routeSymbol.value} to ${target.name}`
+    watchlistStatus.value = t("research.addedToWatchlist", { symbol: routeSymbol.value, name: target.name })
   } catch (err) {
-    watchlistStatus.value = err instanceof Error ? err.message : "Failed to add to watchlist"
+    watchlistStatus.value = err instanceof Error ? err.message : t("research.addWatchlistError")
   } finally {
     watchlistBusy.value = false
     setTimeout(() => (watchlistStatus.value = null), 3000)
@@ -98,7 +100,7 @@ async function addToWatchlist(): Promise<void> {
   <div>
     <div class="page-header">
       <div class="flex flex-wrap items-center gap-3">
-        <router-link :to="backTarget" class="btn-ghost" data-testid="research-back">&larr; Go back</router-link>
+        <router-link :to="backTarget" class="btn-ghost" data-testid="research-back">{{ t("research.goBack") }}</router-link>
         <TickerBadge
           size="lg"
           title-as="h1"
@@ -116,9 +118,9 @@ async function addToWatchlist(): Promise<void> {
           :disabled="watchlistBusy || inWatchlist"
           @click="addToWatchlist"
         >
-          {{ inWatchlist ? "In Watchlist" : "Add to Watchlist" }}
+          {{ inWatchlist ? t("research.inWatchlist") : t("research.addToWatchlist") }}
         </button>
-        <button class="btn-ghost" @click="showSearch = true">Search for a stock... &#8984;K</button>
+        <button class="btn-ghost" @click="showSearch = true">{{ t("research.searchStock") }}</button>
       </div>
     </div>
 
@@ -126,7 +128,7 @@ async function addToWatchlist(): Promise<void> {
 
     <RecentSearchesBar class="mb-6" :active-symbol="routeSymbol" @select="goToSymbol" />
 
-    <nav aria-label="Research tabs" class="tab-nav mb-6">
+    <nav :aria-label="t('research.researchTabs')" class="tab-nav mb-6">
       <router-link
         v-for="tab in tabs"
         :key="tab.name"

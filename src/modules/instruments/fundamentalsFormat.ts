@@ -1,4 +1,10 @@
 import { formatCompact } from "@/utils/format"
+import { i18n, type Locale } from "@/i18n"
+
+/** The Intl BCP-47 tag for the active UI locale (en-US / pl-PL). */
+function intlLocale(): string {
+  return i18n.global.locale.value === ("pl" as Locale) ? "pl-PL" : "en-US"
+}
 
 /**
  * §79.1 — the statement columns whose value IS a percentage.
@@ -34,10 +40,10 @@ export function formatFundamentalsCell(row: Record<string, unknown>, key: string
   const v = row[key]
   if (v === null || v === undefined) return "—"
   if (typeof v === "number") {
-    if (isPercentKey(key)) return `${v.toFixed(1)}%`
+    if (isPercentKey(key)) return `${new Intl.NumberFormat(intlLocale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(v)}%`
     if (Math.abs(v) >= 1e6) return formatCompact(v)
-    if (Math.abs(v) >= 1000) return v.toLocaleString("en-US", { maximumFractionDigits: 0 })
-    return v.toFixed(2)
+    if (Math.abs(v) >= 1000) return new Intl.NumberFormat(intlLocale(), { maximumFractionDigits: 0 }).format(v)
+    return new Intl.NumberFormat(intlLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v)
   }
   return String(v)
 }

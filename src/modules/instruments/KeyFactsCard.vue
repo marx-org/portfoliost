@@ -11,6 +11,7 @@
  * identical to the hard-coded card it replaces.
  */
 import { computed } from "vue"
+import { useI18n } from "vue-i18n"
 import {
   DASH,
   KEY_FACT_ROWS,
@@ -22,6 +23,7 @@ import {
 import type { InstrumentsProfile } from "@/api/types"
 
 const props = defineProps<{ profile: InstrumentsProfile }>()
+const { t } = useI18n()
 
 interface ResolvedRow {
   label: string
@@ -79,7 +81,7 @@ const hasSomethingToSay = computed(
 
 <template>
   <div v-if="hasSomethingToSay" class="card p-6" data-testid="key-facts-card">
-    <h2 class="card-title mb-3">Key Facts</h2>
+    <h2 class="card-title mb-3">{{ t("research.keyFacts") }}</h2>
     <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
       <template v-for="row in identityRows" :key="`id-${row.label}`">
         <dt class="text-muted">{{ row.label }}</dt>

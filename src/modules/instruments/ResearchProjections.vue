@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue"
+import { useI18n } from "vue-i18n"
 import { useRoute } from "vue-router"
 import { getProjections } from "@/api/instruments"
 import CurrencyWarningBadge from "@/components/CurrencyWarningBadge.vue"
@@ -39,6 +40,7 @@ interface Projections {
 }
 
 const route = useRoute()
+const { t } = useI18n()
 const symbol = String(route.params.symbol).toUpperCase()
 
 const data = ref<Projections | null>(null)
@@ -60,7 +62,7 @@ onMounted(async () => {
   try {
     data.value = (await getProjections(symbol)) as unknown as Projections
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Failed to load projections"
+    error.value = err instanceof Error ? err.message : t("research.loadProjectionsError")
   } finally {
     loading.value = false
   }
@@ -70,11 +72,11 @@ const recommendationSeries = computed(() => {
   const r = data.value?.recommendation
   if (!r) return []
   return [
-    { name: "Strong Buy", value: r.strongBuy },
-    { name: "Buy", value: r.buy },
-    { name: "Hold", value: r.hold },
-    { name: "Sell", value: r.sell },
-    { name: "Strong Sell", value: r.strongSell },
+    { name: t("research.strongBuy"), value: r.strongBuy },
+    { name: t("research.buy"), value: r.buy },
+    { name: t("research.hold"), value: r.hold },
+    { name: t("research.sell"), value: r.sell },
+    { name: t("research.strongSell"), value: r.strongSell },
   ]
 })
 
@@ -103,23 +105,23 @@ function targetPosition(pt: PriceTarget): { left: string; right: string } {
 <template>
   <div class="space-y-6">
     <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-danger">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-muted">Loading projections...</p>
+    <p v-if="loading" class="text-sm text-muted">{{ t("research.loadingProjections") }}</p>
 
     <template v-if="data && !loading && !error">
       <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div class="card p-6">
-          <h2 class="card-title mb-4">Price Target</h2>
+          <h2 class="card-title mb-4">{{ t("research.priceTarget") }}</h2>
           <div class="flex items-end gap-6">
             <div>
               <p class="flex items-center gap-2 text-2xl font-semibold">
                 {{ formatAmount(data.priceTarget.current, instrCcy) }}
                 <CurrencyWarningBadge :source="currencySource" :currency="instrCcy" />
               </p>
-              <p class="text-xs text-muted">Current price</p>
+              <p class="text-xs text-muted">{{ t("research.currentPrice") }}</p>
             </div>
             <div>
               <p class="text-lg font-medium">{{ formatAmount(data.priceTarget.mean, instrCcy) }}</p>
-              <p class="text-xs text-muted">Mean target</p>
+              <p class="text-xs text-muted">{{ t("research.meanTarget") }}</p>
             </div>
           </div>
           <div class="relative mt-6 h-2 rounded-full bg-border">
@@ -132,27 +134,27 @@ function targetPosition(pt: PriceTarget): { left: string; right: string } {
             <span>{{ formatAmount(data.priceTarget.low, instrCcy) }}</span>
             <span>{{ formatAmount(data.priceTarget.high, instrCcy) }}</span>
           </div>
-          <p class="mt-4 text-xs text-muted">Updated {{ formatDate(data.priceTarget.lastUpdated) }}</p>
+          <p class="mt-4 text-xs text-muted">{{ t("research.updatedOn", { date: formatDate(data.priceTarget.lastUpdated) }) }}</p>
         </div>
 
         <div class="card p-6">
-          <h2 class="card-title mb-2">Recommendation</h2>
-          <p v-if="totalRatings" class="text-xs text-muted">{{ totalRatings }} analysts &middot; period {{ data.recommendation.period }}</p>
+          <h2 class="card-title mb-2">{{ t("research.recommendation") }}</h2>
+          <p v-if="totalRatings" class="text-xs text-muted">{{ t("research.analystsPeriod", { count: totalRatings, period: data.recommendation.period }) }}</p>
           <component :is="'apexchart'" :options="recommendationChart" :series="recommendationChart.series" />
         </div>
       </div>
 
       <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div class="card p-6">
-          <h2 class="card-title mb-4">Earnings Estimates</h2>
+          <h2 class="card-title mb-4">{{ t("research.earningsEstimates") }}</h2>
           <table class="w-full text-sm">
             <thead>
               <tr class="text-left text-xs uppercase text-muted">
-                <th class="pb-2 font-medium">Metric</th>
-                <th class="pb-2 text-right font-medium">Avg</th>
-                <th class="pb-2 text-right font-medium">High</th>
-                <th class="pb-2 text-right font-medium">Mean</th>
-                <th class="pb-2 text-right font-medium">Low</th>
+                <th class="pb-2 font-medium">{{ t("research.metric") }}</th>
+                <th class="pb-2 text-right font-medium">{{ t("research.avg") }}</th>
+                <th class="pb-2 text-right font-medium">{{ t("research.high") }}</th>
+                <th class="pb-2 text-right font-medium">{{ t("research.mean") }}</th>
+                <th class="pb-2 text-right font-medium">{{ t("research.low") }}</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
@@ -175,20 +177,20 @@ function targetPosition(pt: PriceTarget): { left: string; right: string } {
         </div>
 
         <div class="card p-6">
-          <h2 class="card-title mb-4">Revenue Estimates</h2>
+          <h2 class="card-title mb-4">{{ t("research.revenueEstimates") }}</h2>
           <table class="w-full text-sm">
             <thead>
               <tr class="text-left text-xs uppercase text-muted">
-                <th class="pb-2 font-medium">Metric</th>
-                <th class="pb-2 text-right font-medium">Avg</th>
-                <th class="pb-2 text-right font-medium">High</th>
-                <th class="pb-2 text-right font-medium">Mean</th>
-                <th class="pb-2 text-right font-medium">Low</th>
+                <th class="pb-2 font-medium">{{ t("research.metric") }}</th>
+                <th class="pb-2 text-right font-medium">{{ t("research.avg") }}</th>
+                <th class="pb-2 text-right font-medium">{{ t("research.high") }}</th>
+                <th class="pb-2 text-right font-medium">{{ t("research.mean") }}</th>
+                <th class="pb-2 text-right font-medium">{{ t("research.low") }}</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
               <tr>
-                <td class="py-2">Revenue</td>
+                <td class="py-2">{{ t("research.revenue") }}</td>
                 <td class="py-2 text-right tabular-nums">{{ formatCompact(data.revenue.avg) }}</td>
                 <td class="py-2 text-right tabular-nums">{{ formatCompact(data.revenue.high) }}</td>
                 <td class="py-2 text-right tabular-nums">{{ formatCompact(data.revenue.mean) }}</td>

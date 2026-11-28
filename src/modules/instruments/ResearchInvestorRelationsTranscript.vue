@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue"
+import { useI18n } from "vue-i18n"
 import { useRoute } from "vue-router"
 import { getTranscript } from "@/api/instruments"
 import type { components } from "@/api/types"
@@ -9,6 +10,7 @@ import { researchSymbol } from "@/utils/research"
 type IRTranscript = components["schemas"]["IRTranscript"]
 
 const route = useRoute()
+const { t } = useI18n()
 const symbol = String(route.params.symbol).toUpperCase()
 const eventId = String(route.params.eventId)
 
@@ -61,7 +63,7 @@ const qaBlocks = computed(() =>
     </div>
 
     <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-danger">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-muted">Loading document...</p>
+    <p v-if="loading" class="text-sm text-muted">{{ t("research.loadingDocument") }}</p>
 
     <template v-if="!loading && !error && transcript">
       <div class="card p-6">
@@ -71,17 +73,17 @@ const qaBlocks = computed(() =>
 
       <!-- MD&A narrative (SEC) -->
       <div v-if="hasBody" class="card p-6">
-        <h3 class="mb-3 text-sm font-semibold text-text">Management Discussion &amp; Analysis</h3>
+        <h3 class="mb-3 text-sm font-semibold text-text">{{ t("research.managementDiscussion") }}</h3>
         <div class="space-y-3 text-sm leading-relaxed text-text dark:text-slate-300">
           <p v-for="(para, i) in bodyParagraphs" :key="i">{{ para }}</p>
         </div>
-        <p v-if="!bodyText" class="text-sm text-muted">No document text available.</p>
+        <p v-if="!bodyText" class="text-sm text-muted">{{ t("research.noDocumentText") }}</p>
       </div>
 
       <!-- Q&A earnings-call transcript (mock/legacy shape) -->
       <template v-else-if="hasQa">
         <div v-if="participantNames.length" class="card p-6">
-          <h3 class="mb-3 text-sm font-semibold text-text">Participants</h3>
+          <h3 class="mb-3 text-sm font-semibold text-text">{{ t("research.participants") }}</h3>
           <div class="flex flex-wrap gap-2">
             <span
               v-for="(name, i) in participantNames"
@@ -104,7 +106,7 @@ const qaBlocks = computed(() =>
         </div>
       </template>
 
-      <p v-else class="text-sm text-muted">No transcript or document text is available for this event.</p>
+      <p v-else class="text-sm text-muted">{{ t("research.noTranscript") }}</p>
     </template>
   </div>
 </template>
