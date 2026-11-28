@@ -2,11 +2,14 @@
 import { computed, onMounted, ref } from "vue"
 import { useAuthStore } from "@/stores/auth"
 import { useThemeStore, type ThemePreference } from "@/stores/theme"
+import { useLocaleStore } from "@/stores/locale"
+import { SUPPORTED_LOCALES, isLocale, type Locale } from "@/i18n"
 import { changePassword, clearAllData, deleteAccount, getUserProfile, updateUserProfile } from "@/api/users"
 import type { UserProfile } from "@/api/users"
 
 const auth = useAuthStore()
 const theme = useThemeStore()
+const localeStore = useLocaleStore()
 
 const profile = ref<UserProfile | null>(null)
 const loading = ref(true)
@@ -17,13 +20,17 @@ const form = ref({ firstName: "", lastName: "" })
 const saving = ref(false)
 const saveError = ref<string | null>(null)
 
-const languages = [
-  { value: "en", label: "🇺🇸 English" },
-  { value: "de", label: "🇩🇪 Deutsch" },
-  { value: "fr", label: "🇫🇷 Français" },
-  { value: "es", label: "🇪🇸 Español" },
-  { value: "pl", label: "🇵🇱 Polski" },
-]
+const LANGUAGE_LABELS: Record<Locale, string> = {
+  en: "🇺🇸 English",
+  pl: "🇵🇱 Polski",
+}
+
+// Derived from what actually ships, so registering a new locale in
+// SUPPORTED_LOCALES (plus its label) is enough to surface it here.
+const languages: { value: Locale; label: string }[] = SUPPORTED_LOCALES.map((value) => ({
+  value,
+  label: LANGUAGE_LABELS[value],
+}))
 
 const themeOptions: { value: ThemePreference; label: string }[] = [
   { value: "light", label: "Light" },
@@ -83,13 +90,13 @@ async function saveProfile() {
 }
 
 async function changeLanguage(e: Event) {
-  const language = (e.target as HTMLSelectElement).value
-  try {
-    profile.value = await updateUserProfile({ language })
-    notice.value = "Language preference saved"
-  } catch {
-    // keep previous selection
-  }
+  const next = (e.target as HTMLSelectElement).value
+  if (!isLocale(next)) return
+  // The store persists, applies to i18n immediately, and writes through to the
+  // server (UserProfile.language). Update the local profile copy for the UI.
+  localeStore.setLocale(next)
+  if (profile.value) profile.value = { ...profile.value, language: next }
+  notice.value = "Language preference saved"
 }
 
 async function submitPassword() {
@@ -196,7 +203,7 @@ async function confirmDanger() {
       <section class="card p-6">
         <h3 class="text-base font-semibold">Language Preference</h3>
         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Select your preferred language. Changes are applied immediately.</p>
-        <select class="input mt-4 max-w-xs" aria-label="Language preference" :value="profile.language" @change="changeLanguage">
+        <select class="input mt-4 max-w-xs" aria-label="Language preference" :value="localeStore.locale" @change="changeLanguage">
           <option v-for="lang in languages" :key="lang.value" :value="lang.value">{{ lang.label }}</option>
         </select>
       </section>

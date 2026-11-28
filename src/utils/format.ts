@@ -1,3 +1,18 @@
+import { i18n, type Locale } from "@/i18n"
+
+/** The Intl BCP-47 tag for the active UI locale. Polish uses `pl-PL` (comma
+ * decimals, `d.m.yyyy`, `zł`); English uses `en-US`. A single source so every
+ * formatter below localizes consistently and a new locale is one map entry. */
+const INTL_LOCALE: Record<Locale, string> = {
+  en: "en-US",
+  pl: "pl-PL",
+}
+
+function intlLocale(): string {
+  const active = i18n.global.locale.value as Locale
+  return INTL_LOCALE[active] ?? INTL_LOCALE.en
+}
+
 /** §66.2 — a currency is NEVER guessed (plan §66).
  *
  * `currency` is a required parameter on purpose: making it required is what
@@ -12,8 +27,8 @@
 export function formatCurrency(value: number | null | undefined, currency: string | null | undefined): string {
   if (value === null || value === undefined || Number.isNaN(value)) return "—"
   const ccy = normalizeCurrency(currency)
-  if (!ccy) return new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: ccy, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
+  if (!ccy) return new Intl.NumberFormat(intlLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
+  return new Intl.NumberFormat(intlLocale(), { style: "currency", currency: ccy, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
 }
 
 /** An ISO-4217 alphabetic code, upper-cased, or null when it is not one. This is
@@ -40,13 +55,13 @@ export function formatSignedAmount(value: number | null | undefined, currency: s
 
 export function formatNumber(value: number | null | undefined, digits = 2): string {
   if (value === null || value === undefined || Number.isNaN(value)) return "—"
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits: digits }).format(value)
+  return new Intl.NumberFormat(intlLocale(), { maximumFractionDigits: digits }).format(value)
 }
 
 export function formatPercent(value: number | null | undefined, digits = 2, withSign = false): string {
   if (value === null || value === undefined || Number.isNaN(value)) return "—"
   const sign = withSign && value > 0 ? "+" : ""
-  return `${sign}${new Intl.NumberFormat("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value)}%`
+  return `${sign}${new Intl.NumberFormat(intlLocale(), { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value)}%`
 }
 
 export function formatSignedCurrency(value: number | null | undefined, currency: string | null | undefined): string {
@@ -57,24 +72,24 @@ export function formatSignedCurrency(value: number | null | undefined, currency:
 
 export function formatCompact(value: number | null | undefined): string {
   if (value === null || value === undefined || Number.isNaN(value)) return "—"
-  return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 }).format(value)
+  return new Intl.NumberFormat(intlLocale(), { notation: "compact", maximumFractionDigits: 2 }).format(value)
 }
 
 export function formatCompactCurrency(value: number | null | undefined, currency: string | null | undefined): string {
   if (value === null || value === undefined || Number.isNaN(value)) return "—"
   const ccy = normalizeCurrency(currency)
-  if (!ccy) return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(value)
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: ccy, notation: "compact", maximumFractionDigits: 1 }).format(value)
+  if (!ccy) return new Intl.NumberFormat(intlLocale(), { notation: "compact", maximumFractionDigits: 1 }).format(value)
+  return new Intl.NumberFormat(intlLocale(), { style: "currency", currency: ccy, notation: "compact", maximumFractionDigits: 1 }).format(value)
 }
 
 export function formatDate(value: string | number | Date | null | undefined): string {
   if (!value) return "—"
   const d = typeof value === "number" ? new Date(value) : new Date(value)
-  return new Intl.DateTimeFormat("en-US", { year: "numeric", month: "short", day: "numeric" }).format(d)
+  return new Intl.DateTimeFormat(intlLocale(), { year: "numeric", month: "short", day: "numeric" }).format(d)
 }
 
 export function formatDateTime(value: string | number | Date | null | undefined): string {
   if (!value) return "—"
   const d = typeof value === "number" ? new Date(value) : new Date(value)
-  return new Intl.DateTimeFormat("en-US", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(d)
+  return new Intl.DateTimeFormat(intlLocale(), { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(d)
 }
