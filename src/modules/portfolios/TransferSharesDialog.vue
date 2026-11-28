@@ -13,6 +13,7 @@
  * the request.
  */
 import { computed, ref, watch } from "vue"
+import { useI18n } from "vue-i18n"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { getPortfolioPositions, transferPosition } from "@/api/portfolios"
 import { formatNumber } from "@/utils/format"
@@ -23,6 +24,7 @@ type Position = components["schemas"]["Position"]
 const props = defineProps<{ open: boolean; portfolioId: string }>()
 const emit = defineEmits<{ (e: "close"): void; (e: "done"): void }>()
 
+const { t } = useI18n()
 const store = usePortfolioStore()
 
 const positions = ref<Position[]>([])
@@ -84,7 +86,7 @@ watch(
       try {
         await store.fetchAll()
       } catch {
-        error.value = "Could not load your other portfolios"
+        error.value = t("transfer.loadPortfoliosError")
       }
     }
     positionsLoading.value = true
@@ -92,7 +94,7 @@ watch(
       const rows = await getPortfolioPositions(props.portfolioId)
       positions.value = rows.filter((p) => p.isOpen && (p.direction ?? "LONG") === "LONG" && p.quantity > 0)
     } catch (err) {
-      error.value = err instanceof Error ? err.message : "Could not load positions"
+      error.value = err instanceof Error ? err.message : t("transfer.loadPositionsError")
     } finally {
       positionsLoading.value = false
     }
@@ -139,7 +141,7 @@ async function submit() {
       // The move already succeeded; a stale list here must not read as a failure.
     }
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Transfer failed"
+    error.value = err instanceof Error ? err.message : t("transfer.transferError")
   } finally {
     busy.value = false
   }
@@ -152,38 +154,38 @@ async function submit() {
     class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
     @click.self.stop="emit('close')"
   >
-    <div class="card max-h-[85vh] w-full max-w-2xl overflow-y-auto p-6" role="dialog" aria-modal="true" aria-label="Transfer shares">
+    <div class="card max-h-[85vh] w-full max-w-2xl overflow-y-auto p-6" role="dialog" aria-modal="true" :aria-label="t('transfer.aria')">
       <div class="mb-4 flex items-center justify-between">
-        <h3 class="text-base font-semibold">Transfer shares</h3>
-        <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="emit('close')">✕</button>
+        <h3 class="text-base font-semibold">{{ t("transfer.title") }}</h3>
+        <button type="button" class="btn-ghost px-2 py-1" :aria-label="t('transfer.closeModal')" @click="emit('close')">✕</button>
       </div>
 
       <p class="mb-4 rounded-lg bg-surface-2 px-3 py-2 text-sm text-text">
-        An in-kind transfer, not a sale. The shares keep their original cost basis, no cash moves, and nothing is realised — each lot that leaves gets its own matching row in the destination.
+        {{ t("transfer.intro") }}
       </p>
 
       <form class="grid grid-cols-1 gap-4 sm:grid-cols-2" data-testid="ts-form" @submit.prevent="submit">
         <div class="sm:col-span-2">
-          <label for="ts-search" class="mb-1 block text-sm text-muted">Filter holdings</label>
-          <input id="ts-search" v-model="search" type="search" class="input" placeholder="Symbol or name" data-testid="ts-search" />
+          <label for="ts-search" class="mb-1 block text-sm text-muted">{{ t("transfer.filterHoldings") }}</label>
+          <input id="ts-search" v-model="search" type="search" class="input" :placeholder="t('transfer.searchPlaceholder')" data-testid="ts-search" />
         </div>
 
         <div>
-          <label for="ts-instrument" class="mb-1 block text-sm text-muted">Instrument *</label>
+          <label for="ts-instrument" class="mb-1 block text-sm text-muted">{{ t("transfer.instrument") }}</label>
           <select id="ts-instrument" v-model="symbol" class="input" required data-testid="ts-instrument">
             <option value="" disabled>
-              {{ positionsLoading ? "Loading positions…" : filteredPositions.length === 0 ? "No holdings match" : "Select a holding" }}
+              {{ positionsLoading ? t("transfer.loadingPositions") : filteredPositions.length === 0 ? t("transfer.noHoldingsMatch") : t("transfer.selectHolding") }}
             </option>
             <option v-for="p in filteredPositions" :key="p.id" :value="p.symbol">
-              {{ p.symbol }} — {{ formatNumber(p.quantity, 2) }} {{ p.assetType === "OPTION" ? "contracts" : "shares" }}
+              {{ t("transfer.optionRow", { symbol: p.symbol, qty: formatNumber(p.quantity, 2), unit: p.assetType === "OPTION" ? t("transfer.contracts") : t("transfer.shares") }) }}
             </option>
           </select>
         </div>
 
         <div>
           <label for="ts-quantity" class="mb-1 block text-sm text-muted">
-            Quantity *
-            <span v-if="selected" class="text-muted">(max {{ formatNumber(maxQuantity, 2) }})</span>
+            {{ t("transfer.quantity") }}
+            <span v-if="selected" class="text-muted">{{ t("transfer.max", { qty: formatNumber(maxQuantity, 2) }) }}</span>
           </label>
           <input
             id="ts-quantity"
@@ -198,36 +200,35 @@ async function submit() {
         </div>
 
         <div>
-          <label for="ts-to-portfolio" class="mb-1 block text-sm text-muted">To portfolio *</label>
+          <label for="ts-to-portfolio" class="mb-1 block text-sm text-muted">{{ t("transfer.toPortfolio") }}</label>
           <select id="ts-to-portfolio" v-model="toPortfolioId" class="input" required data-testid="ts-to-portfolio">
-            <option value="" disabled>Select destination portfolio</option>
+            <option value="" disabled>{{ t("transfer.selectDestination") }}</option>
             <option v-for="p in targetPortfolios" :key="p.id" :value="p.id">{{ p.name }}</option>
           </select>
         </div>
 
         <div>
-          <label for="ts-date" class="mb-1 block text-sm text-muted">Date</label>
+          <label for="ts-date" class="mb-1 block text-sm text-muted">{{ t("transfer.date") }}</label>
           <input id="ts-date" v-model="date" type="date" class="input" data-testid="ts-date" />
         </div>
 
         <div class="sm:col-span-2">
-          <label for="ts-notes" class="mb-1 block text-sm text-muted">Note</label>
+          <label for="ts-notes" class="mb-1 block text-sm text-muted">{{ t("transfer.note") }}</label>
           <input id="ts-notes" v-model="notes" type="text" class="input" maxlength="2000" data-testid="ts-notes" />
         </div>
 
         <p v-if="overMax" class="text-sm text-danger sm:col-span-2" data-testid="ts-over-max">
-          Only {{ formatNumber(maxQuantity, 2) }} of {{ symbol }} are open in this portfolio.
+          {{ t("transfer.overMax", { qty: formatNumber(maxQuantity, 2), symbol }) }}
         </p>
         <p v-if="error" class="text-sm text-danger sm:col-span-2">{{ error }}</p>
         <p v-if="moved" class="text-sm text-emerald-700 dark:text-emerald-300 sm:col-span-2" data-testid="ts-result">
-          Moved {{ formatNumber(moved.quantity, 2) }} of {{ moved.legs[0]?.instrumentSymbol }} in
-          {{ moved.legs.length / 2 }} lot{{ moved.legs.length / 2 === 1 ? "" : "s" }}.
+          {{ t("transfer.result", { qty: formatNumber(moved.quantity, 2), symbol: moved.legs[0]?.instrumentSymbol, lots: moved.legs.length / 2 }) }}
         </p>
 
         <div class="flex justify-end gap-2 sm:col-span-2">
-          <button type="button" class="btn-ghost" @click="emit('close')">Cancel</button>
+          <button type="button" class="btn-ghost" @click="emit('close')">{{ t("transfer.cancel") }}</button>
           <button type="submit" class="btn-primary" :disabled="!canSubmit" data-testid="ts-submit">
-            {{ busy ? "Transferring…" : "Transfer" }}
+            {{ busy ? t("transfer.transferring") : t("transfer.transfer") }}
           </button>
         </div>
       </form>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue"
+import { useI18n } from "vue-i18n"
 import { useRoute } from "vue-router"
 import { getPortfolioNews } from "@/api/portfolios"
 import { usePortfolioStore } from "@/stores/portfolios"
@@ -8,6 +9,7 @@ import { researchRoute } from "@/utils/research"
 import type { components } from "@/api/types"
 import type { PortfolioPositions } from "@/api/types"
 
+const { t } = useI18n()
 const route = useRoute()
 const id = String(route.params.id)
 const store = usePortfolioStore()
@@ -34,7 +36,7 @@ onMounted(async () => {
   try {
     data.value = await getPortfolioNews(id)
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Failed to load news"
+    error.value = err instanceof Error ? err.message : t("portfolios.loadNewsError")
   } finally {
     loading.value = false
   }
@@ -50,7 +52,7 @@ function toneClass(tone: string | undefined): string {
 <template>
   <div class="space-y-6">
     <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-danger">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-muted">Loading news...</p>
+    <p v-if="loading" class="text-sm text-muted">{{ t("portfolios.loadingNews") }}</p>
 
     <template v-if="!loading && !error">
       <div v-if="data?.pagination?.total_count" class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -79,7 +81,7 @@ function toneClass(tone: string | undefined): string {
           <p class="mt-auto pt-3 text-xs text-muted">{{ new Date(String(a.published_at)).toLocaleDateString() }}</p>
         </article>
       </div>
-      <p v-else class="card p-6 text-sm text-muted">No news for held stocks.</p>
+      <p v-else class="card p-6 text-sm text-muted">{{ t("portfolios.noNews") }}</p>
     </template>
   </div>
 </template>

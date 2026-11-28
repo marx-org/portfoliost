@@ -1,4 +1,11 @@
 import { vi } from "vitest"
+import { config } from "@vue/test-utils"
+import { i18n } from "@/i18n"
+
+// Every component now calls useI18n(), so a mount without the plugin throws
+// "Need to install with app.use". Install it globally for all unit tests rather
+// than editing 20+ per-file mount calls; individual tests can still override.
+config.global.plugins = [i18n]
 
 // A unit test must never depend on a server being up. Without this, a suite
 // passes on a developer machine that happens to run the compose stack and then

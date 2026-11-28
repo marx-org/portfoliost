@@ -29,6 +29,9 @@ export function dividendTotals(
 
 <script setup lang="ts">
 import { computed } from "vue"
+import { useI18n } from "vue-i18n"
+
+const { t } = useI18n()
 
 const props = defineProps<{
   /** transaction currency code (e.g. "USD") — shown in the summary rows */
@@ -82,7 +85,7 @@ const totals = computed(() =>
       :data-testid="`${tid}-mode-total`"
       @click="emit('update:perShare', false)"
     >
-      Total Amount
+      {{ t("fields.totalAmount") }}
     </button>
     <button
       type="button"
@@ -91,14 +94,14 @@ const totals = computed(() =>
       :data-testid="`${tid}-mode-pershare`"
       @click="emit('update:perShare', true)"
     >
-      Per Share
+      {{ t("fields.perShare") }}
     </button>
   </div>
 
   <slot name="after-toggle" />
 
   <template v-if="!perShare">
-    <label class="mb-1.5 block text-sm font-medium" :for="`${tid}-gross`">Gross dividend amount</label>
+    <label class="mb-1.5 block text-sm font-medium" :for="`${tid}-gross`">{{ t("fields.grossDividend") }}</label>
     <div class="relative mb-4">
       <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted">{{ ccySymbol }}</span>
       <input
@@ -117,7 +120,7 @@ const totals = computed(() =>
 
   <div v-else class="mb-4 grid grid-cols-2 gap-3">
     <div>
-      <label class="mb-1.5 block text-sm font-medium" :for="`${tid}-gross-pershare`">Dividend per share</label>
+      <label class="mb-1.5 block text-sm font-medium" :for="`${tid}-gross-pershare`">{{ t("fields.dividendPerShare") }}</label>
       <div class="relative">
         <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted">{{ ccySymbol }}</span>
         <input
@@ -134,7 +137,7 @@ const totals = computed(() =>
       </div>
     </div>
     <div>
-      <label class="mb-1.5 block text-sm font-medium" :for="`${tid}-shares`">Shares receiving dividend</label>
+      <label class="mb-1.5 block text-sm font-medium" :for="`${tid}-shares`">{{ t("fields.sharesReceiving") }}</label>
       <input
         :id="`${tid}-shares`"
         :value="quantity"
@@ -151,10 +154,10 @@ const totals = computed(() =>
   <div class="grid grid-cols-2 gap-3">
     <div>
       <label class="mb-1.5 flex items-center gap-1.5 text-sm font-medium" :for="`${tid}-tax`">
-        Withholding Tax
+        {{ t("fields.withholdingTax") }}
         <span
           class="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-border text-[10px] font-semibold text-muted dark:bg-slate-700 dark:text-slate-300"
-          title="Tax withheld at source; subtracted from the gross dividend amount"
+          :title="t('fields.taxHint')"
         >i</span>
       </label>
       <div class="relative">
@@ -173,21 +176,21 @@ const totals = computed(() =>
       </div>
     </div>
     <div>
-      <label class="mb-1.5 block text-sm font-medium" :for="`${tid}-date`">Date received</label>
+      <label class="mb-1.5 block text-sm font-medium" :for="`${tid}-date`">{{ t("fields.dateReceived") }}</label>
       <input :id="`${tid}-date`" :value="date" type="date" class="input" :data-testid="`${tid}-date`" @input="emit('update:date', ($event.target as HTMLInputElement).value)" />
     </div>
   </div>
 
   <p v-if="totals.taxExceedsGross" class="mb-4 mt-1.5 text-xs text-danger" :data-testid="`${tid}-tax-error`">
-    Withholding tax cannot exceed the gross dividend amount
+    {{ t("fields.taxExceeds") }}
   </p>
 
-  <label class="mb-1.5 mt-4 block text-sm font-medium" :for="`${tid}-notes`">Notes (optional)</label>
+  <label class="mb-1.5 mt-4 block text-sm font-medium" :for="`${tid}-notes`">{{ t("fields.notesOptional") }}</label>
   <textarea
     :id="`${tid}-notes`"
     :value="notes"
     rows="3"
-    placeholder="e.g. Q4 2024 dividend"
+    :placeholder="t('fields.notesPlaceholder')"
     class="input mb-4 resize-y"
     :data-testid="`${tid}-notes`"
     @input="emit('update:notes', ($event.target as HTMLTextAreaElement).value)"
@@ -197,21 +200,21 @@ const totals = computed(() =>
 
   <div class="rounded-xl bg-surface-2 p-3 text-sm dark:bg-slate-800/50" :data-testid="`${tid}-summary`">
     <div class="flex justify-between py-0.5">
-      <span class="text-muted">Gross Dividend</span>
+      <span class="text-muted">{{ t("fields.grossDividendLabel") }}</span>
       <span class="tabular-nums">{{ totals.gross.toFixed(2) }} {{ txCcy }}</span>
     </div>
     <div class="flex justify-between py-0.5">
-      <span class="text-muted">Withholding Tax</span>
+      <span class="text-muted">{{ t("fields.withholdingTaxLabel") }}</span>
       <span class="tabular-nums text-danger" :data-testid="`${tid}-tax-total`">
         -{{ totals.tax.toFixed(2) }} {{ txCcy }}
       </span>
     </div>
     <div class="mt-1 flex justify-between border-t border-border pt-1.5 font-semibold dark:border-slate-700/60">
-      <span>Net Amount</span>
+      <span>{{ t("fields.netAmount") }}</span>
       <span class="tabular-nums text-emerald" :data-testid="`${tid}-net`">{{ totals.net.toFixed(2) }} {{ txCcy }}</span>
     </div>
     <div v-if="convertedCcy" class="flex justify-between py-0.5 text-xs text-muted">
-      <span>Net ({{ convertedCcy }})</span>
+      <span>{{ t("fields.netConverted", { ccy: convertedCcy }) }}</span>
       <span class="tabular-nums" :data-testid="`${tid}-converted`">
         {{ convertedNet != null ? `${convertedNet.toFixed(2)} ${convertedCcy}` : "—" }}
       </span>

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue"
+import { useI18n } from "vue-i18n"
 import { useRouter } from "vue-router"
+import { i18n } from "@/i18n"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { deletePortfolio, getPortfolioAnalytics, getPortfolioPositions, recomputePortfolio, updatePortfolio } from "@/api/portfolios"
 import { formatCurrency, formatNumber, formatPercent } from "@/utils/format"
@@ -36,6 +38,7 @@ const emit = defineEmits<{ (e: "add-position"): void }>()
 
 const store = usePortfolioStore()
 const router = useRouter()
+const { t } = useI18n()
 
 // §66.3 — the amounts are converted into the user's display currency exactly
 // like the headline does, so the cards and the headline are computed the same
@@ -132,7 +135,7 @@ const unpricedPeak = ref<number | null>(null)
  * currency would put a differently-denominated number on the chart it describes.
  */
 const unpricedAmountLabel = computed(() =>
-  unpricedPeak.value == null ? "" : `up to ${formatCurrency(unpricedPeak.value, props.portfolio.baseCurrency)}`,
+  unpricedPeak.value == null ? "" : t("card.upTo", { amount: formatCurrency(unpricedPeak.value, props.portfolio.baseCurrency) }),
 )
 
 const showRename = ref(false)
@@ -250,10 +253,10 @@ async function handleRecompute() {
   if (recomputeBusy.value) return
   recomputeBusy.value = true
   backfillFailed.value = false
-  notice.value = "Refreshing prices…"
+  notice.value = t("card.refreshingPricesNotice")
   try {
     await recomputePortfolio(props.portfolio.id)
-    notice.value = "Refresh requested"
+    notice.value = t("card.refreshRequested")
     await loadChart()
   } catch {
     // network error — stay failed; the user can retry
@@ -276,7 +279,7 @@ const priceAsOfLabel = computed<string | null>(() => {
   if (!raw) return null
   const d = new Date(raw)
   if (Number.isNaN(d.getTime())) return null
-  return d.toLocaleString(undefined, {
+  return d.toLocaleString(i18n.global.locale.value === "pl" ? "pl-PL" : "en-US", {
     day: "2-digit",
     month: "short",
     hour: "2-digit",
@@ -349,9 +352,9 @@ async function submitRename(settings: PortfolioSettingsPayload) {
     await updatePortfolio(props.portfolio.id, settings)
     showRename.value = false
     await store.fetchAll()
-    notice.value = "Portfolio settings saved"
+    notice.value = t("card.settingsSaved")
   } catch (err) {
-    renameError.value = err instanceof Error ? err.message : "Failed to rename portfolio"
+    renameError.value = err instanceof Error ? err.message : t("card.renameError")
   } finally {
     renameBusy.value = false
   }
@@ -370,9 +373,9 @@ async function submitDelete() {
     await deletePortfolio(props.portfolio.id)
     showDeleteConfirm.value = false
     await store.fetchAll()
-    notice.value = `Deleted ${props.portfolio.name}`
+    notice.value = t("card.deleted", { name: props.portfolio.name })
   } catch (err) {
-    deleteError.value = err instanceof Error ? err.message : "Failed to delete portfolio"
+    deleteError.value = err instanceof Error ? err.message : t("card.deleteError")
   } finally {
     deleteBusy.value = false
   }
@@ -403,7 +406,7 @@ async function exportPositions(format: "csv" | "xml" | "json") {
       .join("\n")
     exportFile(`${name}.xml`, `<?xml version="1.0" encoding="UTF-8"?>\n<positions>\n${rows}\n</positions>`, "application/xml")
   } else {
-    const header = "Symbol,Quantity,Avg Cost,Price,Market Value,Unrealized P/L,Weight"
+    const header = [t("tables.col.symbol"), t("tables.col.quantity"), t("tables.col.avgCost"), t("tables.col.price"), t("tables.col.marketValue"), t("tables.col.unrealized"), t("tables.col.weight")].join(",")
     const rows = positions.map((p) =>
       [p.symbol, p.quantity, p.averageCostBasis, p.currentPrice, p.marketValue, p.unrealizedGainLoss, p.percentOfPortfolio].join(","),
     )
@@ -422,13 +425,13 @@ async function exportPositions(format: "csv" | "xml" | "json") {
         >
           {{ portfolio.name }}
         </router-link>
-        <p class="text-xs text-muted">{{ portfolio.description || "No description" }}</p>
+        <p class="text-xs text-muted">{{ portfolio.description || t("card.noDescription") }}</p>
       </div>
       <div class="flex items-center gap-2" @click.stop>
         <div class="relative">
           <button
             type="button"
-            aria-label="Portfolio actions"
+            :aria-label="t('card.actions')"
             class="rounded-lg p-1.5 text-muted dark:text-muted hover:bg-surface-2 dark:hover:bg-slate-800 hover:text-text dark:hover:text-slate-200"
             @click="openMenu = !openMenu"
           >
@@ -441,11 +444,11 @@ async function exportPositions(format: "csv" | "xml" | "json") {
           <template v-if="openMenu">
             <div class="fixed inset-0 z-20" @click="openMenu = false"></div>
             <div class="absolute right-0 z-30 mt-1 w-48 rounded-lg border border-border bg-white dark:bg-slate-900 py-1 shadow-lg">
-              <button type="button" class="block w-full px-4 py-2 text-left text-sm text-text hover:bg-surface-2 dark:hover:bg-slate-800/50" @click="openRename">Edit</button>
-              <button type="button" class="block w-full px-4 py-2 text-left text-sm text-text hover:bg-surface-2 dark:hover:bg-slate-800/50" @click="exportPositions('csv')">Export as CSV</button>
-              <button type="button" class="block w-full px-4 py-2 text-left text-sm text-text hover:bg-surface-2 dark:hover:bg-slate-800/50" @click="exportPositions('xml')">Export as XML</button>
-              <button type="button" class="block w-full px-4 py-2 text-left text-sm text-text hover:bg-surface-2 dark:hover:bg-slate-800/50" @click="exportPositions('json')">Export as JSON</button>
-              <button type="button" class="block w-full px-4 py-2 text-left text-sm text-danger hover:bg-red-50 dark:hover:bg-red-500/10" @click="openDelete">Delete</button>
+              <button type="button" class="block w-full px-4 py-2 text-left text-sm text-text hover:bg-surface-2 dark:hover:bg-slate-800/50" @click="openRename">{{ t("card.edit") }}</button>
+              <button type="button" class="block w-full px-4 py-2 text-left text-sm text-text hover:bg-surface-2 dark:hover:bg-slate-800/50" @click="exportPositions('csv')">{{ t("card.exportCsv") }}</button>
+              <button type="button" class="block w-full px-4 py-2 text-left text-sm text-text hover:bg-surface-2 dark:hover:bg-slate-800/50" @click="exportPositions('xml')">{{ t("card.exportXml") }}</button>
+              <button type="button" class="block w-full px-4 py-2 text-left text-sm text-text hover:bg-surface-2 dark:hover:bg-slate-800/50" @click="exportPositions('json')">{{ t("card.exportJson") }}</button>
+              <button type="button" class="block w-full px-4 py-2 text-left text-sm text-danger hover:bg-red-50 dark:hover:bg-red-500/10" @click="openDelete">{{ t("card.delete") }}</button>
             </div>
           </template>
         </div>
@@ -456,7 +459,7 @@ async function exportPositions(format: "csv" | "xml" | "json") {
 
     <div class="mt-4">
       <div class="mb-1 flex items-center justify-between">
-        <span class="text-xs text-muted">Performance</span>
+        <span class="text-xs text-muted">{{ t("card.performance") }}</span>
         <div class="flex gap-1" @click.stop>
           <button
             v-for="tf in timeframes"
@@ -480,7 +483,7 @@ async function exportPositions(format: "csv" | "xml" | "json") {
           :series="sparkOptions.series"
         />
         <div v-else-if="backfillFailed" class="flex h-[90px] flex-col items-center justify-center gap-1.5" @click.stop>
-          <p class="text-xs text-muted dark:text-muted">Chart unavailable</p>
+          <p class="text-xs text-muted dark:text-muted">{{ t("card.chartUnavailable") }}</p>
           <button
             type="button"
             class="btn-secondary text-xs"
@@ -488,24 +491,24 @@ async function exportPositions(format: "csv" | "xml" | "json") {
             :disabled="recomputeBusy"
             @click="handleRecompute"
           >
-            {{ recomputeBusy ? "Recomputing..." : "Recompute" }}
+            {{ recomputeBusy ? t("card.recomputing") : t("card.recompute") }}
           </button>
         </div>
-        <p v-else-if="chartError" class="py-6 text-center text-xs text-muted dark:text-muted">Chart unavailable</p>
+        <p v-else-if="chartError" class="py-6 text-center text-xs text-muted dark:text-muted">{{ t("card.chartUnavailable") }}</p>
         <div v-else-if="chartLoading || backfillPending" class="flex h-[90px] items-center justify-center">
-          <p class="text-xs text-muted dark:text-muted">Loading chart...</p>
+          <p class="text-xs text-muted dark:text-muted">{{ t("card.loadingChart") }}</p>
         </div>
         <!-- §53.7 — backfill complete but the window is empty (e.g. fully
              liquidated portfolio): must not sit on "Loading chart…" forever. -->
         <div v-else class="flex h-[90px] items-center justify-center" data-testid="card-chart-empty">
-          <p class="text-xs text-muted dark:text-muted">No data</p>
+          <p class="text-xs text-muted dark:text-muted">{{ t("card.noData") }}</p>
         </div>
         <div v-if="chartLoading && series.length" class="absolute inset-0 flex items-center justify-center rounded bg-white/70 dark:bg-slate-900/70">
-          <span class="text-xs font-medium text-muted">Refreshing...</span>
+          <span class="text-xs font-medium text-muted">{{ t("card.refreshing") }}</span>
         </div>
       </div>
       <p v-if="backfillPending" class="mt-1 text-xs text-muted">
-        Historical data is loading, chart will update in a moment.
+        {{ t("card.historyLoading") }}
       </p>
       <!-- §63.8 — the LATEST value is a partial sum when a held position has no
            price history. §72.30 — this is stated only for symbols still held;
@@ -514,7 +517,7 @@ async function exportPositions(format: "csv" | "xml" | "json") {
            have both, and dropping the history note just because an urgent one is
            already on screen hides a real gap for the sake of tidiness. -->
       <p v-if="heldChartGap && heldChartGap.length" class="mt-1 text-xs font-medium text-amber-600 dark:text-amber-400" data-testid="card-chart-gap-warning">
-        Value excludes {{ heldChartGap.length }} position{{ heldChartGap.length === 1 ? "" : "s" }} without price history<span v-if="unpricedAmountLabel"> &mdash; {{ unpricedAmountLabel }} withheld</span>.
+        {{ t("card.valueExcludes", heldChartGap.length) }}<span v-if="unpricedAmountLabel">{{ t("card.withheld", { amount: unpricedAmountLabel }) }}</span>.
       </p>
       <p v-if="historyChartGap && historyChartGap.length" class="mt-1 text-xs text-muted" data-testid="card-chart-history-gap-note">
         <!--
@@ -533,30 +536,30 @@ async function exportPositions(format: "csv" | "xml" | "json") {
           and keeps its original wording.
         -->
         <template v-if="unpricedAmountLabel">
-          {{ unpricedAmountLabel }} of this chart is missing &mdash; those points are partial. Today's value is complete.
+          {{ t("card.historyMissingAmount", { amount: unpricedAmountLabel }) }}
         </template>
         <template v-else>
-          {{ historyChartGap.length }} earlier position{{ historyChartGap.length === 1 ? "" : "s" }} had no price history &mdash; those chart points are partial. Today's value is complete.
+          {{ t("card.historyMissingCount", historyChartGap.length) }}
         </template>
       </p>
     </div>
 
     <div class="mt-4 grid grid-cols-3 gap-2 text-sm">
       <div>
-        <p class="text-xs text-muted">Value</p>
+        <p class="text-xs text-muted">{{ t("card.value") }}</p>
         <p class="font-medium tabular-nums" data-testid="card-value">{{ formatCurrency(convert(cardValue?.totalValue), displayCurrencyOr()) }}</p>
       </div>
       <div>
-        <p class="text-xs text-muted">Invested</p>
+        <p class="text-xs text-muted">{{ t("card.invested") }}</p>
         <p class="font-medium tabular-nums" data-testid="card-invested">{{ formatCurrency(convert(cardValue?.capitalBasis), displayCurrencyOr()) }}</p>
       </div>
       <div>
-        <p class="text-xs text-muted">Return</p>
+        <p class="text-xs text-muted">{{ t("card.return") }}</p>
         <p class="font-medium tabular-nums" data-testid="card-return" :class="returnClassFor(cardValue?.returnPercentage)">{{ formatPercent(cardValue?.returnPercentage) }}</p>
       </div>
     </div>
     <p class="mt-2 text-xs text-muted">
-      {{ portfolio.metrics?.openPositions ?? 0 }} open positions &middot; {{ formatNumber(portfolio.metrics?.unrealizedGainLoss) }} unrealized
+      {{ t("card.openPositions", { count: portfolio.metrics?.openPositions ?? 0, unrealized: formatNumber(portfolio.metrics?.unrealizedGainLoss) }) }}
     </p>
 
     <!-- §76.2 — freshness row + the manual refresh, on EVERY card.
@@ -573,24 +576,24 @@ async function exportPositions(format: "csv" | "xml" | "json") {
         class="text-xs text-muted dark:text-muted"
         data-testid="card-price-as-of"
       >
-        Prices as of {{ priceAsOfLabel }}
+        {{ t("card.pricesAsOf", { date: priceAsOfLabel }) }}
       </span>
       <span
         v-else-if="(portfolio.metrics?.openPositions ?? 0) > 0"
         class="text-xs text-amber-600 dark:text-amber-400"
         data-testid="card-price-as-of-missing"
       >
-        No price timestamp yet
+        {{ t("card.noPriceTimestamp") }}
       </span>
       <button
         type="button"
         class="btn-ghost shrink-0 px-2 py-1 text-xs"
         data-testid="card-refresh"
         :disabled="recomputeBusy"
-        :title="'Re-value this portfolio now (additive — nothing is deleted). The scheduled sync does the same twice a day.'"
+        :title="t('card.refreshTitle')"
         @click="handleRecompute"
       >
-        {{ recomputeBusy ? "Refreshing…" : "Refresh" }}
+        {{ recomputeBusy ? t("card.refreshingPrices") : t("card.refresh") }}
       </button>
     </div>
 
@@ -603,15 +606,14 @@ async function exportPositions(format: "csv" | "xml" | "json") {
       data-testid="card-freshness-note"
     >
       <template v-if="freshness.unpriced > 0">
-        {{ freshness.unpriced }} position{{ freshness.unpriced === 1 ? "" : "s" }} unpriced &mdash;
-        excluded from this value.
+        {{ t("card.unpricedNote", freshness.unpriced) }}
       </template>
-      <template v-if="freshness.fallback"> Some prices are not live.</template>
+      <template v-if="freshness.fallback">{{ t("card.fallbackPrices") }}</template>
     </p>
 
     <div v-if="portfolio.cash" class="mt-4 rounded-xl bg-surface-2 p-4" @click.stop data-testid="card-cash-group">
       <div class="flex items-center justify-between">
-        <span class="text-xs text-muted">Cash</span>
+        <span class="text-xs text-muted">{{ t("card.cash") }}</span>
         <router-link
           :to="tabPath('cash')"
           class="text-sm font-semibold tabular-nums text-text hover:text-accent-text dark:hover:text-blue-400"
@@ -626,7 +628,7 @@ async function exportPositions(format: "csv" | "xml" | "json") {
            the same pair of numbers the headline sums and cannot drift from the
            Value printed above it. -->
       <div class="mt-1.5 flex items-center justify-between text-xs text-muted">
-        <span>Instruments</span>
+        <span>{{ t("card.instruments") }}</span>
         <span class="tabular-nums" data-testid="card-instruments-value">
           {{ formatCurrency(convert(cardValue?.instrumentsValue), displayCurrencyOr()) }}
         </span>
@@ -639,11 +641,11 @@ async function exportPositions(format: "csv" | "xml" | "json") {
     </div>
 
     <div class="mt-4 flex items-center justify-between gap-2 border-t border-border pt-3" @click.stop>
-       <button v-if="!portfolio.isVirtual" type="button" class="text-sm font-medium text-accent-text hover:underline" data-testid="card-add-position" @click="emit('add-position')">Add Position</button>
+       <button v-if="!portfolio.isVirtual" type="button" class="text-sm font-medium text-accent-text hover:underline" data-testid="card-add-position" @click="emit('add-position')">{{ t("card.addPosition") }}</button>
       <div class="flex gap-3 text-sm">
-        <router-link :to="tabPath('performance')" class="text-muted hover:text-accent-text dark:hover:text-blue-400">Analytics</router-link>
-        <router-link :to="tabPath('news')" class="text-muted hover:text-accent-text dark:hover:text-blue-400">News</router-link>
-        <router-link :to="tabPath('calendar')" class="text-muted hover:text-accent-text dark:hover:text-blue-400">Calendar</router-link>
+        <router-link :to="tabPath('performance')" class="text-muted hover:text-accent-text dark:hover:text-blue-400">{{ t("card.analytics") }}</router-link>
+        <router-link :to="tabPath('news')" class="text-muted hover:text-accent-text dark:hover:text-blue-400">{{ t("card.news") }}</router-link>
+        <router-link :to="tabPath('calendar')" class="text-muted hover:text-accent-text dark:hover:text-blue-400">{{ t("card.calendar") }}</router-link>
       </div>
     </div>
 
@@ -667,14 +669,14 @@ async function exportPositions(format: "csv" | "xml" | "json") {
       class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
       @click.self="showDeleteConfirm = false"
     >
-      <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Delete portfolio" @click.stop>
-        <h3 class="mb-4 text-base font-semibold">Delete portfolio</h3>
-        <p class="text-sm text-muted">Delete "{{ portfolio.name }}" and its positions? This cannot be undone.</p>
+      <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" :aria-label="t('card.deleteAria')" @click.stop>
+        <h3 class="mb-4 text-base font-semibold">{{ t("card.deleteTitle") }}</h3>
+        <p class="text-sm text-muted">{{ t("card.deleteBody", { name: portfolio.name }) }}</p>
         <p v-if="deleteError" class="mb-3 mt-2 text-sm text-danger">{{ deleteError }}</p>
         <div class="mt-4 flex justify-end gap-2">
-          <button type="button" class="btn-ghost" @click="showDeleteConfirm = false">Cancel</button>
+          <button type="button" class="btn-ghost" @click="showDeleteConfirm = false">{{ t("card.cancel") }}</button>
           <button type="button" class="btn-primary bg-red-600" :disabled="deleteBusy" @click="submitDelete">
-            {{ deleteBusy ? "Deleting..." : "Delete" }}
+            {{ deleteBusy ? t("card.deleting") : t("card.delete") }}
           </button>
         </div>
       </div>

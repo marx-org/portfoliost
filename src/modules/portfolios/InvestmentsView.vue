@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watchEffect } from "vue"
+import { useI18n } from "vue-i18n"
 import { useRoute } from "vue-router"
+import { i18n } from "@/i18n"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
 import { useDisplayConversion } from "@/composables/useDisplayConversion"
@@ -18,6 +20,7 @@ import PerformanceSummaryCard from "@/components/PerformanceSummaryCard.vue"
 
 const store = usePortfolioStore()
 const route = useRoute()
+const { t } = useI18n()
 const loading = ref(true)
 const error = ref<string | null>(null)
 // §288 — the consolidated performance summary card is fed from the same
@@ -169,7 +172,7 @@ onMounted(async () => {
       .then((a) => { mergedAnalytics.value = a })
       .catch(() => { mergedAnalytics.value = null })
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Failed to load portfolios"
+    error.value = err instanceof Error ? err.message : t("portfolios.loadPortfoliosError")
   } finally {
     loading.value = false
   }
@@ -195,7 +198,7 @@ async function submitCreate() {
     newPortfolio.value = { name: "", description: "", currency: "USD", isVirtual: false, labelId: "" }
     showCreate.value = false
   } catch (err) {
-    createError.value = err instanceof Error ? err.message : "Failed to create portfolio"
+    createError.value = err instanceof Error ? err.message : t("portfolios.createPortfolioError")
   } finally {
     creating.value = false
   }
@@ -207,16 +210,15 @@ async function submitCreate() {
   <div>
     <div class="page-header">
       <div>
-        <p class="page-eyebrow"><span class="signal-dot" /> PORTFOLIOS</p>
-        <h1 class="page-title">Portfolios</h1>
+        <p class="page-eyebrow"><span class="signal-dot" /> {{ t("portfolios.eyebrowPortfolios") }}</p>
+        <h1 class="page-title">{{ t("portfolios.investmentsTitle") }}</h1>
         <p v-if="store.totalMetrics" class="page-description">
-          {{ store.portfolios.length }} portfolio{{ store.portfolios.length === 1 ? "" : "s" }} &middot; base currency
-          {{ store.totalMetrics.baseCurrency }}
+          {{ t("portfolios.investmentsDescription", { count: store.portfolios.length, ccy: store.totalMetrics.baseCurrency }) }}
         </p>
       </div>
       <div class="flex items-center gap-2">
         <div v-if="portfolioTab !== 'virtual'" class="card flex items-center gap-2 px-3 py-1.5">
-          <span class="text-xs text-muted">Cash balance</span>
+          <span class="text-xs text-muted">{{ t("portfolios.cashBalance") }}</span>
           <span class="text-sm font-semibold tabular-nums text-text" data-testid="cash-balance">
             {{ formatCurrency(cashTotal, displayCurrency) }}
           </span>
@@ -226,7 +228,7 @@ async function submitCreate() {
         </div>
         <div class="relative">
           <button type="button" class="btn-secondary text-sm" @click="showCurrencyMenu = !showCurrencyMenu">
-            Display currency: {{ displayCurrency }} ({{ currencySymbol(displayCurrency) }})
+            {{ t("portfolios.displayCurrency", { code: displayCurrency, symbol: currencySymbol(displayCurrency) }) }}
             <span class="ml-1 text-xs text-muted dark:text-muted">▾</span>
           </button>
           <template v-if="showCurrencyMenu">
@@ -257,24 +259,22 @@ async function submitCreate() {
       data-testid="price-freshness-note"
     >
       <template v-if="priceNote.unpriced > 0">
-        <strong>{{ priceNote.unpriced }}</strong> position{{ priceNote.unpriced === 1 ? "" : "s" }}
-        could not be priced and {{ priceNote.unpriced === 1 ? "is" : "are" }} excluded from these
-        figures &mdash; they are <em>not</em> valued at what you paid for them.
+        {{ t("portfolios.unpricedNote", priceNote.unpriced) }}
       </template>
       <template v-if="priceNote.stale && priceNote.asOf">
         <br />
-        Priced as of {{ priceNote.asOf.toLocaleString() }} (the oldest price behind these totals).
+        {{ t("portfolios.pricedAsOf", { date: priceNote.asOf.toLocaleString(i18n.global.locale.value === "pl" ? "pl-PL" : "en-US") }) }}
       </template>
       <template v-if="priceNote.fallback">
         <br />
-        Some prices are carried over from a previous fetch, not live.
+        {{ t("portfolios.fallbackPrices") }}
       </template>
     </p>
 
     <InvestmentsTabs />
 
     <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-danger dark:bg-red-500/10 dark:text-red-400">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-muted">Loading portfolios...</p>
+    <p v-if="loading" class="text-sm text-muted">{{ t("portfolios.loadingPortfolios") }}</p>
 
     <template v-if="store.totalMetrics && portfolioTab !== 'virtual'">
       <!-- §68 — cash is a first-class citizen. Four tiles, each labelled with what
@@ -301,38 +301,38 @@ async function submitCreate() {
          drawdown numbers beside it. -->
     <div v-if="portfolioTab !== 'virtual'" class="card mb-6 flex flex-wrap items-center justify-between gap-3 p-6">
       <div>
-        <h2 class="card-title">Portfolio performance</h2>
+        <h2 class="card-title">{{ t("portfolios.portfolioPerformance") }}</h2>
         <p class="mt-1 text-sm text-muted">
-          Value, returns and drawdown across all {{ store.portfolios.length }} portfolios.
+          {{ t("portfolios.portfolioPerformanceHelp", { count: store.portfolios.length }) }}
         </p>
       </div>
       <router-link to="/en/investments/performance" class="btn-primary text-sm" data-testid="combined-chart-link">
-        Open performance
+        {{ t("portfolios.openPerformance") }}
       </router-link>
     </div>
 
     <section v-if="!loading" class="mb-10">
       <div class="mb-4 flex items-center justify-between">
-        <h2 class="card-title">{{ portfolioTab === "virtual" ? "Virtual Portfolios" : "Investment Portfolios" }}</h2>
+        <h2 class="card-title">{{ portfolioTab === "virtual" ? t("portfolios.virtualPortfoliosHeading") : t("portfolios.investmentPortfoliosHeading") }}</h2>
         <span v-if="visiblePortfolios.length" class="text-sm text-muted">{{ visiblePortfolios.length }}</span>
       </div>
 
       <div v-if="visiblePortfolios.length" class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         <PortfolioCard v-for="p in visiblePortfolios" :key="p.id" :portfolio="p" :freshness="freshnessById.get(p.id)" :value="valuesById.get(p.id)" @add-position="openAddPosition(p.id)" />
       </div>
-      <p v-else-if="!error" class="text-sm text-muted">No {{ portfolioTab === 'virtual' ? 'virtual' : 'investment' }} portfolios yet.</p>
+      <p v-else-if="!error" class="text-sm text-muted">{{ portfolioTab === 'virtual' ? t("portfolios.noVirtualPortfolios") : t("portfolios.noInvestmentPortfolios") }}</p>
 
       <div class="mt-4">
-        <button type="button" class="btn-secondary text-sm" @click="showCreate = true">Create Investment Portfolio</button>
+        <button type="button" class="btn-secondary text-sm" @click="showCreate = true">{{ t("portfolios.createInvestmentPortfolio") }}</button>
       </div>
     </section>
 
     <section v-if="!loading && portfolioTab !== 'virtual'" class="mb-10">
       <div class="mb-4 flex items-center justify-between">
         <div>
-          <h2 class="card-title">Cash</h2>
+          <h2 class="card-title">{{ t("portfolios.cashHeading") }}</h2>
           <div class="mt-0.5 flex items-center gap-3 text-sm">
-            <span class="text-muted">Total Balance</span>
+            <span class="text-muted">{{ t("portfolios.totalBalance") }}</span>
             <span class="font-semibold tabular-nums" data-testid="cash-total-balance">{{ formatCurrency(cashTotal, displayCurrency) }}</span>
             <span v-for="c in cashBreakdown" :key="c.currency" class="text-xs text-muted">
               {{ c.currency }} {{ formatPercent(c.pct, 0) }}
@@ -347,28 +347,28 @@ async function submitCreate() {
       class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
       @click.self="showCreate = false"
     >
-      <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Create portfolio">
-        <h3 class="mb-4 text-base font-semibold">Create a portfolio</h3>
+      <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" :aria-label="t('portfolios.createPortfolioAria')">
+        <h3 class="mb-4 text-base font-semibold">{{ t("portfolios.createPortfolioTitle") }}</h3>
         <form @submit.prevent="submitCreate">
-          <label for="portfolio-name" class="mb-1 block text-sm text-muted">Name</label>
-          <input id="portfolio-name" v-model="newPortfolio.name" type="text" required class="input mb-4" placeholder="e.g. Long-term growth" />
-          <label for="portfolio-description" class="mb-1 block text-sm text-muted">Description</label>
-          <textarea id="portfolio-description" v-model="newPortfolio.description" rows="2" class="input mb-4" placeholder="Optional"></textarea>
+          <label for="portfolio-name" class="mb-1 block text-sm text-muted">{{ t("portfolios.name") }}</label>
+          <input id="portfolio-name" v-model="newPortfolio.name" type="text" required class="input mb-4" :placeholder="t('portfolios.namePlaceholder')" />
+          <label for="portfolio-description" class="mb-1 block text-sm text-muted">{{ t("portfolios.description") }}</label>
+          <textarea id="portfolio-description" v-model="newPortfolio.description" rows="2" class="input mb-4" :placeholder="t('portfolios.descriptionPlaceholder')"></textarea>
           <label class="mb-4 flex items-center gap-2 text-sm text-muted">
             <input v-model="newPortfolio.isVirtual" type="checkbox" data-testid="portfolio-virtual" @change="onVirtualChanged" />
-            Virtual portfolio
+            {{ t("portfolios.virtualPortfolioLabel") }}
           </label>
           <div v-if="newPortfolio.isVirtual" class="mb-4">
-            <label for="portfolio-label" class="mb-1 block text-sm text-muted">Instrument label *</label>
+            <label for="portfolio-label" class="mb-1 block text-sm text-muted">{{ t("portfolios.instrumentLabel") }}</label>
             <select id="portfolio-label" v-model="newPortfolio.labelId" class="input" required>
-              <option value="" disabled>Select a label</option>
+              <option value="" disabled>{{ t("portfolios.selectLabel") }}</option>
               <option v-for="label in labelsStore.labels" :key="label.id" :value="label.id">{{ label.name }}</option>
             </select>
-            <p class="mt-1 text-xs text-muted">Instruments carrying this label and their transactions appear in the portfolio.</p>
+            <p class="mt-1 text-xs text-muted">{{ t("portfolios.instrumentLabelHelp") }}</p>
           </div>
           <div class="mb-4">
             <div>
-              <label for="portfolio-currency" class="mb-1 block text-sm text-muted">Currency</label>
+              <label for="portfolio-currency" class="mb-1 block text-sm text-muted">{{ t("portfolios.currency") }}</label>
               <select id="portfolio-currency" v-model="newPortfolio.currency" class="input">
                 <option v-for="c in currencies" :key="c" :value="c">{{ c }}</option>
               </select>
@@ -376,9 +376,9 @@ async function submitCreate() {
           </div>
           <p v-if="createError" class="mb-3 text-sm text-danger">{{ createError }}</p>
           <div class="flex justify-end gap-2">
-            <button type="button" class="btn-ghost" @click="showCreate = false">Cancel</button>
+            <button type="button" class="btn-ghost" @click="showCreate = false">{{ t("portfolios.cancel") }}</button>
             <button type="submit" class="btn-primary" :disabled="creating || !newPortfolio.name.trim() || (newPortfolio.isVirtual && !newPortfolio.labelId)">
-              {{ creating ? "Creating..." : "Create" }}
+              {{ creating ? t("portfolios.creating") : t("portfolios.create") }}
             </button>
           </div>
         </form>

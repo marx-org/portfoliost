@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue"
+import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
@@ -12,6 +13,7 @@ import PortfolioSettingsDialog, { type PortfolioSettingsPayload } from "@/module
 
 const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
 const store = usePortfolioStore()
 const displayCurrencyStore = useDisplayCurrencyStore()
 const currenciesStore = useCurrenciesStore()
@@ -26,16 +28,16 @@ const currencies = computed(() => currenciesStore.options.map((currency) => curr
 
 const isVirtual = computed(() => Boolean(store.detail?.isVirtual))
 const tabs = computed(() => [
-  { name: "portfolio-holdings", label: "Holdings" },
-  ...(isVirtual.value ? [] : [{ name: "portfolio-cash", label: "Cash" }]),
-  { name: "portfolio-transactions", label: "Transactions" },
-  { name: "portfolio-performance", label: "Performance" },
-  { name: "portfolio-allocation", label: "Allocation" },
-  { name: "portfolio-risk-analysis", label: "Risk Analysis" },
-  { name: "portfolio-dividends", label: "Dividends" },
-  { name: "portfolio-calendar", label: "Calendar" },
-  { name: "portfolio-news", label: "News" },
-  { name: "portfolio-compare", label: "Compare" },
+  { name: "portfolio-holdings", label: t("portfolios.tabHoldings") },
+  ...(isVirtual.value ? [] : [{ name: "portfolio-cash", label: t("portfolios.tabCash") }]),
+  { name: "portfolio-transactions", label: t("portfolios.tabTransactions") },
+  { name: "portfolio-performance", label: t("portfolios.tabPerformance") },
+  { name: "portfolio-allocation", label: t("portfolios.tabAllocation") },
+  { name: "portfolio-risk-analysis", label: t("portfolios.tabRiskAnalysis") },
+  { name: "portfolio-dividends", label: t("portfolios.tabDividends") },
+  { name: "portfolio-calendar", label: t("portfolios.tabCalendar") },
+  { name: "portfolio-news", label: t("portfolios.tabNews") },
+  { name: "portfolio-compare", label: t("portfolios.tabCompare") },
 ])
 
 // §87.5 — the dialog is now "Portfolio settings": the name plus the UI-only
@@ -67,14 +69,14 @@ async function load() {
   try {
     await store.fetchDetail(id)
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Failed to load portfolio"
+    error.value = err instanceof Error ? err.message : t("portfolios.loadPortfolioError")
   } finally {
     loading.value = false
   }
 }
 
-const portfolioName = computed(() => store.detail?.name ?? store.portfolios.find((p) => p.id === id)?.name ?? "Portfolio")
-const description = computed(() => store.detail?.description ?? store.portfolios.find((p) => p.id === id)?.description ?? "No description")
+const portfolioName = computed(() => store.detail?.name ?? store.portfolios.find((p) => p.id === id)?.name ?? t("portfolios.portfoliosTab"))
+const description = computed(() => store.detail?.description ?? store.portfolios.find((p) => p.id === id)?.description ?? t("portfolios.noDescription"))
 
 // §48.6e B3 umbrella (B2 residual, 2026-09-23) — summaryMetrics are
 // denominated in the portfolio baseCurrency (wallets `summary_metrics`);
@@ -93,7 +95,7 @@ async function submitRename(settings: PortfolioSettingsPayload) {
     showRename.value = false
     await Promise.all([store.fetchAll(), store.fetchDetail(id)])
   } catch (err) {
-    renameError.value = err instanceof Error ? err.message : "Failed to rename portfolio"
+    renameError.value = err instanceof Error ? err.message : t("portfolios.renameError")
   } finally {
     renameBusy.value = false
   }
@@ -142,7 +144,7 @@ async function submitDelete() {
     await store.fetchAll()
     router.push({ name: "investments" })
   } catch (err) {
-    deleteError.value = err instanceof Error ? err.message : "Failed to delete portfolio"
+    deleteError.value = err instanceof Error ? err.message : t("portfolios.deleteTitle")
   } finally {
     deleteBusy.value = false
   }
@@ -151,23 +153,23 @@ async function submitDelete() {
 
 <template>
   <div>
-    <router-link to="/en/investments" class="btn-ghost mb-4">&larr; All portfolios</router-link>
+    <router-link to="/en/investments" class="btn-ghost mb-4">{{ t("portfolios.allPortfolios") }}</router-link>
 
     <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-danger">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-muted">Loading portfolio...</p>
+    <p v-if="loading" class="text-sm text-muted">{{ t("portfolios.loadingPortfolio") }}</p>
 
     <template v-if="!loading && !error">
       <div class="page-header">
         <div>
-          <p class="page-eyebrow"><span class="signal-dot" /> PORTFOLIOS</p>
+          <p class="page-eyebrow"><span class="signal-dot" /> {{ t("portfolios.eyebrowPortfolios") }}</p>
           <h1 class="page-title">{{ portfolioName }}</h1>
           <p class="page-description">{{ description }}</p>
         </div>
         <div class="flex gap-2">
-          <button type="button" class="btn-secondary text-sm">Share</button>
+          <button type="button" class="btn-secondary text-sm">{{ t("portfolios.share") }}</button>
           <div class="relative">
             <button type="button" class="btn-secondary text-sm" @click="showCurrencyMenu = !showCurrencyMenu">
-              Display currency: {{ displayCurrency }} ({{ currenciesStore.info(displayCurrency)?.symbol ?? "" }})
+              {{ t("portfolios.displayCurrency", { code: displayCurrency, symbol: currenciesStore.info(displayCurrency)?.symbol ?? "" }) }}
             </button>
             <template v-if="showCurrencyMenu">
               <div class="fixed inset-0 z-20" @click="showCurrencyMenu = false"></div>
@@ -185,14 +187,14 @@ async function submitDelete() {
               </div>
             </template>
           </div>
-          <button type="button" class="btn-secondary text-sm" @click="openRename">Rename</button>
-          <button v-if="!isVirtual" type="button" class="btn-secondary text-sm" data-testid="transfer-shares-button" @click="showTransferShares = true">Transfer shares</button>
-           <button v-if="!isVirtual" type="button" class="btn-primary text-sm" @click="openAddPosition">Add Position</button>
-          <button type="button" class="btn-red-ghost text-sm" @click="openDelete">Delete</button>
+          <button type="button" class="btn-secondary text-sm" @click="openRename">{{ t("portfolios.rename") }}</button>
+          <button v-if="!isVirtual" type="button" class="btn-secondary text-sm" data-testid="transfer-shares-button" @click="showTransferShares = true">{{ t("portfolios.transferShares") }}</button>
+           <button v-if="!isVirtual" type="button" class="btn-primary text-sm" @click="openAddPosition">{{ t("portfolios.addPosition") }}</button>
+          <button type="button" class="btn-red-ghost text-sm" @click="openDelete">{{ t("portfolios.delete") }}</button>
         </div>
       </div>
 
-      <nav aria-label="Portfolio tabs" class="tab-nav mb-6">
+      <nav :aria-label="t('portfolios.portfolioTabs')" class="tab-nav mb-6">
         <router-link
           v-for="tab in tabs"
           :key="tab.name"
@@ -227,14 +229,14 @@ async function submitDelete() {
       class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
       @click.self="showDeleteConfirm = false"
     >
-      <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Delete portfolio">
-        <h3 class="mb-4 text-base font-semibold">Delete portfolio</h3>
-        <p class="text-sm text-muted">Delete "{{ portfolioName }}" and its positions? This cannot be undone.</p>
+      <div class="card w-full max-w-md p-6" role="dialog" aria-modal="true" :aria-label="t('portfolios.deleteAria')">
+        <h3 class="mb-4 text-base font-semibold">{{ t("portfolios.deleteTitle") }}</h3>
+        <p class="text-sm text-muted">{{ t("portfolios.deleteBody", { name: portfolioName }) }}</p>
         <p v-if="deleteError" class="mb-3 mt-2 text-sm text-danger">{{ deleteError }}</p>
         <div class="mt-4 flex justify-end gap-2">
-          <button type="button" class="btn-ghost" @click="showDeleteConfirm = false">Cancel</button>
+          <button type="button" class="btn-ghost" @click="showDeleteConfirm = false">{{ t("portfolios.cancel") }}</button>
           <button type="button" class="btn-danger" :disabled="deleteBusy" @click="submitDelete">
-            {{ deleteBusy ? "Deleting..." : "Delete" }}
+            {{ deleteBusy ? t("portfolios.deleting") : t("portfolios.delete") }}
           </button>
         </div>
       </div>

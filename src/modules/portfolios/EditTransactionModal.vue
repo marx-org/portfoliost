@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue"
+import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
 import { updatePortfolioTransaction } from "@/api/portfolios"
 import { formatCurrency, formatDate } from "@/utils/format"
@@ -43,6 +44,7 @@ const emit = defineEmits<{ (e: "close"): void; (e: "saved"): void }>()
 
 const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
 const currenciesStore = useCurrenciesStore()
 
 const executedAt = ref("")
@@ -121,7 +123,7 @@ function typeLabel(type: string): string {
 async function submit() {
   if (!props.transaction) return
   if (taxExceedsGross.value) {
-    error.value = "Withholding tax cannot exceed the gross dividend amount"
+    error.value = t("editTx.taxExceeds")
     return
   }
   busy.value = true
@@ -153,7 +155,7 @@ async function submit() {
     })
     emit("saved")
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Failed to update transaction"
+    error.value = err instanceof Error ? err.message : t("editTx.updateError")
   } finally {
     busy.value = false
   }
@@ -174,10 +176,10 @@ import TickerBadge from "@/components/TickerBadge.vue"
     class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
     @click.self="emit('close')"
   >
-    <div class="card max-h-[85vh] w-full max-w-md overflow-y-auto p-6" role="dialog" aria-modal="true" aria-label="Edit transaction">
+    <div class="card max-h-[85vh] w-full max-w-md overflow-y-auto p-6" role="dialog" aria-modal="true" :aria-label="t('editTx.aria')">
       <div class="mb-4 flex items-center justify-between">
-        <h3 class="text-base font-semibold">Edit {{ typeLabel(transaction.type) }} Transaction</h3>
-        <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="emit('close')">✕</button>
+        <h3 class="text-base font-semibold">{{ t("editTx.title", { type: typeLabel(transaction.type) }) }}</h3>
+        <button type="button" class="btn-ghost px-2 py-1" :aria-label="t('editTx.closeModal')" @click="emit('close')">✕</button>
       </div>
 
       <div class="mb-4 flex items-center gap-3 rounded-xl bg-surface-2 p-3 dark:bg-slate-800/50">
@@ -196,14 +198,14 @@ import TickerBadge from "@/components/TickerBadge.vue"
         />
         <div class="min-w-0 flex-1">
           <p v-if="isDividend" class="mt-1 text-[11px] uppercase tracking-wide text-muted dark:text-muted" data-testid="edit-tx-shares-held">
-            Shares:
+            {{ t("editTx.shares") }}
             <span class="font-semibold text-text">{{ quantityStr }}</span>
           </p>
         </div>
         <div v-if="!isDividend" class="shrink-0 text-right">
-          <button type="button" class="text-xs text-accent-text hover:underline" @click="goResearch">View chart</button>
+          <button type="button" class="text-xs text-accent-text hover:underline" @click="goResearch">{{ t("editTx.viewChart") }}</button>
           <p class="text-sm font-medium tabular-nums text-text">{{ formatCurrency(transaction.price, transaction.currency) }}</p>
-          <p class="text-[11px] text-muted dark:text-muted">Historical Price ({{ formatDate(transaction.executedAt) }})</p>
+          <p class="text-[11px] text-muted dark:text-muted">{{ t("editTx.historicalPrice", { date: formatDate(transaction.executedAt) }) }}</p>
         </div>
       </div>
 
@@ -225,7 +227,7 @@ import TickerBadge from "@/components/TickerBadge.vue"
           </template>
           <template #before-summary>
               <FxRateFields
-                leg="Transaction"
+                :leg="t('addPosition.legTransaction')"
                 :from="transaction.currency"
                 :to="targetCurrency"
                 :date="executedAt"
@@ -238,21 +240,21 @@ import TickerBadge from "@/components/TickerBadge.vue"
         </template>
 
         <template v-else>
-          <label for="etx-date" class="mb-1 block text-sm text-muted">Purchase Date</label>
+          <label for="etx-date" class="mb-1 block text-sm text-muted">{{ t("editTx.purchaseDate") }}</label>
           <input id="etx-date" v-model="executedAt" type="date" required class="input mb-4" />
 
           <div class="mb-4 grid grid-cols-2 gap-4">
             <div>
-              <label for="etx-quantity" class="mb-1 block text-sm text-muted">Quantity</label>
+              <label for="etx-quantity" class="mb-1 block text-sm text-muted">{{ t("editTx.quantity") }}</label>
               <input id="etx-quantity" v-model.number="quantity" type="number" min="0" step="any" required class="input" />
             </div>
             <div>
-              <label for="etx-price" class="mb-1 block text-sm text-muted">Price per share ($)</label>
+              <label for="etx-price" class="mb-1 block text-sm text-muted">{{ t("editTx.pricePerShare") }}</label>
               <input id="etx-price" v-model.number="price" type="number" min="0" step="any" required class="input" />
             </div>
           </div>
 
-          <label for="etx-fees" class="mb-1 block text-sm text-muted">Transaction Fees</label>
+          <label for="etx-fees" class="mb-1 block text-sm text-muted">{{ t("editTx.transactionFees") }}</label>
           <FeeFields
             v-model:fees="fees"
             v-model:fees-type="feesType"
@@ -262,7 +264,7 @@ import TickerBadge from "@/components/TickerBadge.vue"
           />
 
           <FxRateFields
-            leg="Transaction"
+            :leg="t('addPosition.legTransaction')"
             :from="transaction.currency"
             :to="targetCurrency"
             :date="executedAt"
@@ -272,7 +274,7 @@ import TickerBadge from "@/components/TickerBadge.vue"
           />
 
           <FxRateFields
-            leg="Fee"
+            :leg="t('addPosition.legFee')"
             :from="feeCurrency"
             :to="transaction.currency"
             :date="executedAt"
@@ -283,7 +285,7 @@ import TickerBadge from "@/components/TickerBadge.vue"
           />
 
           <div class="mb-4 flex items-center justify-between rounded-xl bg-surface-2 px-3 py-2 dark:bg-slate-800/50">
-            <span class="text-sm text-muted">Total Cost</span>
+            <span class="text-sm text-muted">{{ t("editTx.totalCost") }}</span>
             <span class="text-sm font-semibold tabular-nums text-text">{{ formatCurrency(totalCost, transaction.currency) }}</span>
           </div>
         </template>
@@ -291,9 +293,9 @@ import TickerBadge from "@/components/TickerBadge.vue"
         <p v-if="error" class="mb-3 text-sm text-danger">{{ error }}</p>
 
         <div class="flex justify-end gap-2">
-          <button type="button" class="btn-ghost" @click="emit('close')">Cancel</button>
+          <button type="button" class="btn-ghost" @click="emit('close')">{{ t("editTx.cancel") }}</button>
           <button type="submit" class="btn-primary" :disabled="busy || taxExceedsGross || (isDividend ? !Number(quantityStr) : !Number(quantity))">
-            {{ busy ? "Saving..." : "Save" }}
+            {{ busy ? t("editTx.saving") : t("editTx.save") }}
           </button>
         </div>
       </form>

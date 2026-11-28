@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue"
+import { useI18n } from "vue-i18n"
 import { useRoute } from "vue-router"
 import { getPortfolioCalendar } from "@/api/portfolios"
 import { formatAmount } from "@/utils/format"
 import { researchRoute } from "@/utils/research"
 import type { components } from "../../../generated/api-types"
+
+const { t, locale } = useI18n()
 
 type CalendarHolding = components["schemas"]["CalendarHolding"]
 type FlatEvent = {
@@ -53,7 +56,7 @@ onMounted(async () => {
   try {
     raw.value = await getPortfolioCalendar(id)
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Failed to load calendar"
+    error.value = err instanceof Error ? err.message : t("portfolios.loadCalendarError")
   } finally {
     loading.value = false
   }
@@ -68,7 +71,7 @@ const todayIso = computed(
 )
 
 const monthLabel = computed(
-  () => new Date(viewYear.value, viewMonth.value, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+  () => new Date(viewYear.value, viewMonth.value, 1).toLocaleDateString(locale.value === "pl" ? "pl-PL" : "en-US", { month: "long", year: "numeric" }),
 )
 
 function fromHoldings(holdings: CalendarHolding[]): Chip[] {
@@ -147,9 +150,9 @@ function goToday(): void {
 }
 
 function typeLabel(type: EventType): string {
-  if (type === "earnings") return "Earnings"
-  if (type === "exDividend") return "Ex-Div"
-  return "Div"
+  if (type === "earnings") return t("portfolios.typeEarnings")
+  if (type === "exDividend") return t("portfolios.typeExDiv")
+  return t("portfolios.typeDiv")
 }
 
 function chipClass(type: EventType): string {
@@ -167,31 +170,31 @@ function chipText(c: Chip): string {
 <template>
   <div class="space-y-6">
     <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-danger">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-muted">Loading calendar...</p>
+    <p v-if="loading" class="text-sm text-muted">{{ t("portfolios.loadingCalendar") }}</p>
 
     <div v-if="!loading && !error" class="card overflow-hidden">
       <div class="flex flex-wrap items-center gap-3 border-b border-border px-5 py-3">
-        <h2 class="text-base font-semibold">Calendar</h2>
+        <h2 class="text-base font-semibold">{{ t("portfolios.calendar") }}</h2>
         <div class="flex items-center gap-1">
-          <button type="button" class="btn-ghost px-2" data-testid="pf-cal-prev-month" aria-label="Previous month" @click="shiftMonth(-1)">‹</button>
+          <button type="button" class="btn-ghost px-2" data-testid="pf-cal-prev-month" :aria-label="t('portfolios.prevMonth')" @click="shiftMonth(-1)">‹</button>
           <span class="min-w-32 text-center text-sm font-medium text-text" data-testid="pf-cal-month">{{ monthLabel }}</span>
-          <button type="button" class="btn-ghost px-2" data-testid="pf-cal-next-month" aria-label="Next month" @click="shiftMonth(1)">›</button>
+          <button type="button" class="btn-ghost px-2" data-testid="pf-cal-next-month" :aria-label="t('portfolios.nextMonth')" @click="shiftMonth(1)">›</button>
         </div>
         <div class="ml-auto flex items-center gap-2">
-          <select v-model="filter" class="input w-40" data-testid="pf-cal-filter" aria-label="Event type">
-            <option value="all">All events</option>
-            <option value="earnings">Earnings</option>
-            <option value="exDividend">Ex-Dividend</option>
-            <option value="dividend">Dividend payment</option>
+          <select v-model="filter" class="input w-40" data-testid="pf-cal-filter" :aria-label="t('portfolios.eventType')">
+            <option value="all">{{ t("portfolios.allEvents") }}</option>
+            <option value="earnings">{{ t("portfolios.earnings") }}</option>
+            <option value="exDividend">{{ t("portfolios.exDividend") }}</option>
+            <option value="dividend">{{ t("portfolios.dividendPayment") }}</option>
           </select>
-          <button type="button" class="btn-secondary" data-testid="pf-cal-today" @click="goToday">Today</button>
+          <button type="button" class="btn-secondary" data-testid="pf-cal-today" @click="goToday">{{ t("portfolios.today") }}</button>
         </div>
       </div>
 
       <div class="p-5">
         <div data-testid="pf-cal-grid" class="grid grid-cols-7 gap-1">
           <div
-            v-for="dow in ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']"
+            v-for="dow in [t('portfolios.dowSun'), t('portfolios.dowMon'), t('portfolios.dowTue'), t('portfolios.dowWed'), t('portfolios.dowThu'), t('portfolios.dowFri'), t('portfolios.dowSat')]"
             :key="dow"
             class="pb-1 text-center text-xs font-medium uppercase text-muted"
           >
@@ -228,12 +231,12 @@ function chipText(c: Chip): string {
                 v-if="cell.chips.length > MAX_CHIPS_PER_DAY"
                 class="block px-1 text-xs text-muted dark:text-muted"
               >
-                +{{ cell.chips.length - MAX_CHIPS_PER_DAY }} more
+                +{{ t("portfolios.moreCount", { count: cell.chips.length - MAX_CHIPS_PER_DAY }) }}
               </span>
             </div>
           </div>
         </div>
-        <p v-if="!monthHasEvents" class="mt-3 text-sm text-muted">No events in this month.</p>
+        <p v-if="!monthHasEvents" class="mt-3 text-sm text-muted">{{ t("portfolios.noEvents") }}</p>
       </div>
     </div>
   </div>

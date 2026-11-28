@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue"
+import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
 import { createPortfolioTransaction } from "@/api/portfolios"
 import { researchRoute } from "@/utils/research"
@@ -8,6 +9,8 @@ import { useCurrenciesStore } from "@/stores/currencies"
 import FxRateFields from "@/components/FxRateFields.vue"
 import DividendFields, { dividendTotals } from "@/components/DividendFields.vue"
 import type { PortfolioPositions } from "@/api/types"
+
+const { t } = useI18n()
 
 const props = defineProps<{
   open: boolean
@@ -100,7 +103,7 @@ async function submit(): Promise<void> {
     emit("saved")
     emit("close")
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Failed to record dividend"
+    error.value = err instanceof Error ? err.message : t("portfolios.recordDividendError")
   } finally {
     busy.value = false
   }
@@ -127,10 +130,10 @@ import TickerBadge from "@/components/TickerBadge.vue"
     class="fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-slate-900/40 p-4 pt-24"
     @click.self="emit('close')"
   >
-    <div class="card w-full max-w-md" role="dialog" aria-modal="true" aria-label="Record Dividend">
+    <div class="card w-full max-w-md" role="dialog" aria-modal="true" :aria-label="t('portfolios.recordDividendAria')">
       <div class="flex items-center justify-between border-b border-border px-5 py-4 dark:border-slate-700/60">
-        <h2 class="text-base font-semibold" data-testid="dividend-title">Record dividend</h2>
-        <button type="button" class="btn-ghost px-2 text-muted" aria-label="Close modal" @click="emit('close')">
+        <h2 class="text-base font-semibold" data-testid="dividend-title">{{ t("portfolios.recordDividend") }}</h2>
+        <button type="button" class="btn-ghost px-2 text-muted" :aria-label="t('addPosition.closeModal')" @click="emit('close')">
           &times;
         </button>
       </div>
@@ -150,7 +153,7 @@ import TickerBadge from "@/components/TickerBadge.vue"
             />
           </div>
           <p class="mt-2 text-[11px] uppercase tracking-wide text-muted dark:text-muted" data-testid="dividend-shares-held">
-            Shares held:
+            {{ t("portfolios.sharesHeld") }}
             <span class="font-semibold text-text">{{ position.quantity }}</span>
           </p>
         </div>
@@ -170,7 +173,7 @@ import TickerBadge from "@/components/TickerBadge.vue"
         >
           <template #before-summary>
             <FxRateFields
-              leg="Transaction"
+              :leg="t('addPosition.legTransaction')"
               :from="txCcy"
               :to="portfolioCcy"
               :hidden="!needsFx"
@@ -187,7 +190,7 @@ import TickerBadge from "@/components/TickerBadge.vue"
       </div>
 
       <div class="flex justify-end gap-2 border-t border-border px-5 py-4 dark:border-slate-700/60">
-        <button type="button" class="btn-ghost" @click="emit('close')">Cancel</button>
+        <button type="button" class="btn-ghost" @click="emit('close')">{{ t("portfolios.cancel") }}</button>
         <button
           type="button"
           class="btn-primary"
@@ -196,7 +199,7 @@ import TickerBadge from "@/components/TickerBadge.vue"
           :data-testid="`dividend-submit`"
           @click="submit"
         >
-          {{ busy ? "Recording..." : totals.gross > 0 ? `Record dividend · ${totals.net.toFixed(2)} ${txCcy}` : "Enter a dividend amount" }}
+          {{ busy ? t("portfolios.recording") : totals.gross > 0 ? t("portfolios.recordDividendAmount", { net: totals.net.toFixed(2), ccy: txCcy }) : t("portfolios.enterDividendAmount") }}
         </button>
       </div>
     </div>

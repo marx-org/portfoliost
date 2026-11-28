@@ -13,6 +13,7 @@
  * `update:timeframe` emit.
  */
 import { computed, onMounted, onUnmounted, ref } from "vue"
+import { useI18n } from "vue-i18n"
 import { usePortfolioStore } from "@/stores/portfolios"
 import {
   getAllPositions,
@@ -25,6 +26,7 @@ import InvestmentsTabs from "@/modules/portfolios/InvestmentsTabs.vue"
 import PerformanceTabContent from "@/components/PerformanceTabContent.vue"
 
 const store = usePortfolioStore()
+const { t } = useI18n()
 
 const analytics = ref<PortfolioAnalytics | null>(null)
 const positions = ref<PortfolioPositions>([])
@@ -170,8 +172,8 @@ onUnmounted(() => stopPolling())
 
     <div class="page-header">
       <div>
-        <p class="page-eyebrow"><span class="signal-dot" /> PORTFOLIOS</p>
-        <h1 class="page-title">Cumulative performance</h1>
+        <p class="page-eyebrow"><span class="signal-dot" /> {{ t("portfolios.eyebrowPortfolios") }}</p>
+        <h1 class="page-title">{{ t("portfolios.cumulativePerformance") }}</h1>
       </div>
       <button
         type="button"
@@ -180,7 +182,7 @@ onUnmounted(() => stopPolling())
         :disabled="busy || loading"
         @click="handleRecompute"
       >
-        {{ busy ? "Recomputing…" : `Recompute all ${store.portfolios.length} portfolios` }}
+        {{ busy ? t("portfolios.recomputing") : t("portfolios.recomputeAll", { count: store.portfolios.length }) }}
       </button>
     </div>
 

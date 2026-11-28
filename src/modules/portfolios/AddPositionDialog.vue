@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue"
+import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
 import { createPortfolioPosition, createPortfolioTransaction, updatePortfolioPosition, removePortfolioPosition } from "@/api/portfolios"
 import { usePortfolioStore } from "@/stores/portfolios"
@@ -28,12 +29,13 @@ const store = usePortfolioStore()
 const currenciesStore = useCurrenciesStore()
 const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
 
 type Step = "chooser" | "stock" | "option" | "cfd"
 const step = ref<Step | null>(null)
 
 const showSearch = ref(false)
-const searchTitle = ref("Search for Instruments")
+const searchTitle = ref(t("addPosition.searchInstruments"))
 let pendingStep: Step = "stock"
 
 const stockForm = ref({
@@ -205,14 +207,14 @@ const targetCurrency = useTargetCurrency(
 
 function chooseStock() {
   pendingStep = "stock"
-  searchTitle.value = "Search for Instruments"
+  searchTitle.value = t("addPosition.searchInstruments")
   step.value = null
   showSearch.value = true
 }
 
 function chooseOption() {
   pendingStep = "option"
-  searchTitle.value = "Pick the underlying"
+  searchTitle.value = t("addPosition.pickUnderlying")
   step.value = null
   showSearch.value = true
 }
@@ -400,7 +402,7 @@ async function submitStock() {
       await store.fetchPositions(props.portfolioId)
     }
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Failed to add position"
+    error.value = err instanceof Error ? err.message : t("addPosition.addPositionError")
   } finally {
     busy.value = false
   }
@@ -446,7 +448,7 @@ async function submitOption() {
     close()
     emit("added")
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Failed to add option"
+    error.value = err instanceof Error ? err.message : t("addPosition.addOptionError")
   } finally {
     busy.value = false
   }
@@ -471,7 +473,7 @@ async function submitCfd() {
     close()
     emit("added")
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Failed to add CFD"
+    error.value = err instanceof Error ? err.message : t("addPosition.addCfdError")
   } finally {
     busy.value = false
   }
@@ -483,6 +485,22 @@ function close() {
   error.value = null
   emit("close")
 }
+
+const stockDialogLabel = computed(() =>
+  positionActionTitle.value ?? t("addPosition.buyPosition"),
+)
+const positionActionTitle = computed(() =>
+  props.positionAction
+    ? `${props.positionAction.kind === "buy" ? t("addPosition.buy") : t("addPosition.sell")} ${props.positionAction.position.symbol}`
+    : null,
+)
+const priceAsOfLabel = computed(() =>
+  priceLoading.value
+    ? t("addPosition.fetchingPrice")
+    : stockForm.value.date >= today()
+      ? t("addPosition.currentPrice")
+      : t("addPosition.closeOn", { date: stockForm.value.date }),
+)
 
 function goResearch() {
   const symbol = stockForm.value.symbol
@@ -510,23 +528,23 @@ import TickerBadge from "@/components/TickerBadge.vue"
       class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
       @click.self="close"
     >
-      <div class="card max-h-[85vh] w-full max-w-md overflow-y-auto p-6" role="dialog" aria-modal="true" aria-label="Add position">
+      <div class="card max-h-[85vh] w-full max-w-md overflow-y-auto p-6" role="dialog" aria-modal="true" :aria-label="t('addPosition.chooserTitle')">
         <div class="mb-4 flex items-center justify-between">
-          <h3 class="text-base font-semibold">Add Position</h3>
-          <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="close">✕</button>
+          <h3 class="text-base font-semibold">{{ t("addPosition.chooserTitle") }}</h3>
+          <button type="button" class="btn-ghost px-2 py-1" :aria-label="t('addPosition.closeModal')" @click="close">✕</button>
         </div>
         <div class="space-y-3">
           <button type="button" class="block w-full rounded-xl border border-border p-4 text-left hover:border-blue-400 hover:bg-accent-soft/50" data-testid="add-position-instrument" @click="chooseStock">
-            <span class="block font-medium text-text">Stock, ETF or crypto</span>
-            <span class="block text-sm text-muted">Search by ticker or name</span>
+            <span class="block font-medium text-text">{{ t("addPosition.stockTitle") }}</span>
+            <span class="block text-sm text-muted">{{ t("addPosition.stockHelp") }}</span>
           </button>
           <button type="button" class="block w-full rounded-xl border border-border p-4 text-left hover:border-blue-400 hover:bg-accent-soft/50" data-testid="add-position-option" @click="chooseOption">
-            <span class="block font-medium text-text">Option</span>
-            <span class="block text-sm text-muted">Pick the underlying, then describe the contract</span>
+            <span class="block font-medium text-text">{{ t("addPosition.optionTitle") }}</span>
+            <span class="block text-sm text-muted">{{ t("addPosition.optionHelp") }}</span>
           </button>
           <button type="button" class="block w-full rounded-xl border border-border p-4 text-left hover:border-blue-400 hover:bg-accent-soft/50" data-testid="add-position-cfd" @click="chooseCfd">
-            <span class="block font-medium text-text">CFD</span>
-            <span class="block text-sm text-muted">A leveraged position, entered by hand</span>
+            <span class="block font-medium text-text">{{ t("addPosition.cfdTitle") }}</span>
+            <span class="block text-sm text-muted">{{ t("addPosition.cfdHelp") }}</span>
           </button>
         </div>
       </div>
@@ -537,10 +555,10 @@ import TickerBadge from "@/components/TickerBadge.vue"
       class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
       @click.self="close"
     >
-      <div class="card max-h-[85vh] w-full max-w-md overflow-y-auto p-6" role="dialog" aria-modal="true" :aria-label="positionAction ? `${positionAction.kind === 'buy' ? 'Buy' : 'Sell'} ${positionAction.position.symbol}` : 'Buy Position'">
+      <div class="card max-h-[85vh] w-full max-w-md overflow-y-auto p-6" role="dialog" aria-modal="true" :aria-label="stockDialogLabel">
         <div class="mb-4 flex items-center justify-between">
-          <h3 class="text-base font-semibold">{{ positionAction ? `${positionAction.kind === 'buy' ? 'Buy' : 'Sell'} ${positionAction.position.symbol}` : 'Buy Position' }}</h3>
-          <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="close">✕</button>
+          <h3 class="text-base font-semibold">{{ stockDialogLabel }}</h3>
+          <button type="button" class="btn-ghost px-2 py-1" :aria-label="t('addPosition.closeModal')" @click="close">✕</button>
         </div>
         <TransactionFormFields
           :symbol="stockForm.symbol"
@@ -549,7 +567,7 @@ import TickerBadge from "@/components/TickerBadge.vue"
           :country="'US'"
           :market-price="marketPrice"
           :price-loading="priceLoading"
-          :price-as-of-label="priceLoading ? 'fetching price…' : stockForm.date >= today() ? 'current price' : `close on ${stockForm.date}`"
+          :price-as-of-label="priceAsOfLabel"
           :target-currency="targetCurrency"
           :tx-currency="TX_CCY"
           :testid="'add-position'"
@@ -568,19 +586,19 @@ import TickerBadge from "@/components/TickerBadge.vue"
                 data-testid="add-position-cash-leg"
               />
               <span>
-                Also create a cash transaction
+                {{ t("addPosition.alsoCashLeg") }}
                 <span class="block text-xs text-muted">
-                  A deposit for a buy, a withdrawal for a sell — default from Portfolio settings.
+                  {{ t("addPosition.cashLegHelp") }}
                 </span>
               </span>
             </label>
             <p v-if="error" class="mb-3 text-sm text-danger">{{ error }}</p>
             <div class="flex justify-end gap-2">
-              <button type="button" class="btn-ghost" @click="close">Cancel</button>
+              <button type="button" class="btn-ghost" @click="close">{{ t("addPosition.cancel") }}</button>
               <button type="submit" class="btn-primary" :disabled="busy || !stockForm.symbol || !Number(stockForm.quantity)">
-                {{ busy ? "Saving..." : positionAction
-                  ? `${positionAction.kind === 'buy' ? 'Buy' : 'Sell'} for ${formatCurrency(totalCost, TX_CCY)}`
-                  : `Buy for ${formatCurrency(totalCost, TX_CCY)}`
+                {{ busy ? t("addPosition.saving") : positionAction
+                  ? t("addPosition.buySellFor", { action: positionAction.kind === 'buy' ? t('addPosition.buy') : t('addPosition.sell'), value: formatCurrency(totalCost, TX_CCY) })
+                  : t("addPosition.buyFor", { value: formatCurrency(totalCost, TX_CCY) })
                 }}
               </button>
             </div>
@@ -594,10 +612,10 @@ import TickerBadge from "@/components/TickerBadge.vue"
       class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
       @click.self="close"
     >
-      <div class="card max-h-[85vh] w-full max-w-md overflow-y-auto p-6" role="dialog" aria-modal="true" aria-label="Buy Position">
+      <div class="card max-h-[85vh] w-full max-w-md overflow-y-auto p-6" role="dialog" aria-modal="true" :aria-label="t('addPosition.buyPosition')">
         <div class="mb-4 flex items-center justify-between">
-          <h3 class="text-base font-semibold">Buy Position</h3>
-          <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="close">✕</button>
+          <h3 class="text-base font-semibold">{{ t("addPosition.buyPosition") }}</h3>
+          <button type="button" class="btn-ghost px-2 py-1" :aria-label="t('addPosition.closeModal')" @click="close">✕</button>
         </div>
         <div class="mb-4 flex items-center gap-3 rounded-xl bg-surface-2 p-3 dark:bg-slate-800/50">
           <!-- The picker's result carries a name but no country or asset
@@ -605,13 +623,13 @@ import TickerBadge from "@/components/TickerBadge.vue"
           <TickerBadge size="lg" :symbol="optionPending?.symbol ?? ''" :name="optionPending?.name" />
         </div>
         <form @submit.prevent="submitOption">
-          <label for="opt-trans-type" class="mb-1 block text-sm text-muted">Transaction Type</label>
+          <label for="opt-trans-type" class="mb-1 block text-sm text-muted">{{ t("addPosition.transactionType") }}</label>
           <select id="opt-trans-type" v-model="optionForm.transactionType" class="input mb-4">
-            <option>Buy to Open (new long position)</option>
-            <option>Sell to Close (closes position)</option>
+            <option :value="t('addPosition.buyToOpen')">{{ t("addPosition.buyToOpen") }}</option>
+            <option :value="t('addPosition.sellToClose')">{{ t("addPosition.sellToClose") }}</option>
           </select>
           <div class="mb-4">
-            <p class="mb-1 text-sm text-muted">Option Type</p>
+            <p class="mb-1 text-sm text-muted">{{ t("addPosition.optionType") }}</p>
             <div class="flex gap-2">
               <button type="button" class="btn-secondary flex-1" :class="optionForm.optionType === 'CALL' ? '!bg-blue-600 !text-white' : ''" @click="optionForm.optionType = 'CALL'">CALL</button>
               <button type="button" class="btn-secondary flex-1" :class="optionForm.optionType === 'PUT' ? '!bg-blue-600 !text-white' : ''" @click="optionForm.optionType = 'PUT'">PUT</button>
@@ -619,31 +637,31 @@ import TickerBadge from "@/components/TickerBadge.vue"
           </div>
           <div class="mb-4 grid grid-cols-2 gap-4">
             <div>
-              <label for="opt-strike" class="mb-1 block text-sm text-muted">Strike Price ($)</label>
+              <label for="opt-strike" class="mb-1 block text-sm text-muted">{{ t("addPosition.strikePrice") }}</label>
               <input id="opt-strike" v-model="optionForm.strike" type="number" min="0" step="any" class="input" data-testid="add-position-strike" />
             </div>
             <div>
-              <label for="opt-expiry" class="mb-1 block text-sm text-muted">Expiration Date</label>
+              <label for="opt-expiry" class="mb-1 block text-sm text-muted">{{ t("addPosition.expirationDate") }}</label>
               <input id="opt-expiry" v-model="optionForm.expirationDate" type="date" class="input" data-testid="add-position-expiration" />
             </div>
           </div>
           <div class="mb-4 grid grid-cols-2 gap-4">
             <div>
-              <label for="opt-contracts" class="mb-1 block text-sm text-muted">Contracts</label>
+              <label for="opt-contracts" class="mb-1 block text-sm text-muted">{{ t("addPosition.contracts") }}</label>
               <input id="opt-contracts" v-model="optionForm.contracts" type="number" min="1" step="1" class="input" data-testid="add-position-contracts" />
             </div>
             <div>
-              <label for="opt-shares" class="mb-1 block text-sm text-muted">Shares per contract</label>
+              <label for="opt-shares" class="mb-1 block text-sm text-muted">{{ t("addPosition.sharesPerContract") }}</label>
               <input id="opt-shares" v-model="optionForm.sharesPerContract" type="number" min="1" step="any" class="input" data-testid="add-position-shares-per-contract" />
             </div>
           </div>
           <div class="mb-4 grid grid-cols-2 gap-4">
             <div>
-              <label for="opt-premium" class="mb-1 block text-sm text-muted">Premium per share</label>
+              <label for="opt-premium" class="mb-1 block text-sm text-muted">{{ t("addPosition.premiumPerShare") }}</label>
               <input id="opt-premium" v-model="optionForm.premium" type="number" min="0" step="any" class="input" data-testid="add-position-premium" />
             </div>
             <div>
-              <label for="opt-fees" class="mb-1 block text-sm text-muted">Transaction Fees</label>
+              <label for="opt-fees" class="mb-1 block text-sm text-muted">{{ t("addPosition.transactionFees") }}</label>
               <FeeFields
                 v-model:fees="optionForm.fees"
                 v-model:fees-type="optionForm.feesType"
@@ -655,7 +673,7 @@ import TickerBadge from "@/components/TickerBadge.vue"
           </div>
 
           <FxRateFields
-            leg="Transaction"
+            :leg="t('addPosition.legTransaction')"
             :from="TX_CCY"
             :to="targetCurrency"
             :date="optionForm.tradeDate"
@@ -665,7 +683,7 @@ import TickerBadge from "@/components/TickerBadge.vue"
           />
 
           <FxRateFields
-            leg="Fee"
+            :leg="t('addPosition.legFee')"
             :from="optionForm.feeCurrency"
             :to="TX_CCY"
             :date="optionForm.tradeDate"
@@ -676,16 +694,16 @@ import TickerBadge from "@/components/TickerBadge.vue"
           />
           <div class="mb-4 flex items-center justify-between rounded-xl bg-surface-2 px-3 py-2 dark:bg-slate-800/50">
             <div>
-              <p class="text-sm text-muted">Total Cost</p>
-              <p class="text-xs text-muted dark:text-muted">Option Symbol (OCC): {{ optionSymbol() }}</p>
+              <p class="text-sm text-muted">{{ t("addPosition.totalCost") }}</p>
+              <p class="text-xs text-muted dark:text-muted">{{ t("addPosition.optionSymbol", { symbol: optionSymbol() }) }}</p>
             </div>
             <span class="text-sm font-semibold tabular-nums text-text">{{ formatCurrency(optionTotal, optionForm.feeCurrency) }}</span>
           </div>
           <p v-if="error" class="mb-3 text-sm text-danger">{{ error }}</p>
           <div class="flex justify-end gap-2">
-            <button type="button" class="btn-ghost" @click="close">Cancel</button>
+            <button type="button" class="btn-ghost" @click="close">{{ t("addPosition.cancel") }}</button>
             <button type="submit" class="btn-primary" :disabled="busy || !optionPending || !Number(optionForm.premium)">
-              {{ busy ? "Adding..." : "Enter a price" }}
+              {{ busy ? t("addPosition.adding") : t("addPosition.enterPrice") }}
             </button>
           </div>
         </form>
@@ -697,36 +715,36 @@ import TickerBadge from "@/components/TickerBadge.vue"
       class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
       @click.self="close"
     >
-      <div class="card max-h-[85vh] w-full max-w-md overflow-y-auto p-6" role="dialog" aria-modal="true" aria-label="Add CFD position">
+      <div class="card max-h-[85vh] w-full max-w-md overflow-y-auto p-6" role="dialog" aria-modal="true" :aria-label="t('addPosition.addCfdPosition')">
         <div class="mb-4 flex items-center justify-between">
-          <h3 class="text-base font-semibold">Add CFD position</h3>
-          <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="close">✕</button>
+          <h3 class="text-base font-semibold">{{ t("addPosition.addCfdPosition") }}</h3>
+          <button type="button" class="btn-ghost px-2 py-1" :aria-label="t('addPosition.closeModal')" @click="close">✕</button>
         </div>
         <form @submit.prevent="submitCfd">
-          <label for="cfd-symbol" class="mb-1 block text-sm text-muted">Symbol</label>
-          <input id="cfd-symbol" v-model="cfdForm.symbol" type="text" placeholder="e.g. US100, GOLD, ORCL.US" required class="input mb-4" data-testid="add-position-symbol" />
-          <label for="cfd-direction" class="mb-1 block text-sm text-muted">Direction</label>
+          <label for="cfd-symbol" class="mb-1 block text-sm text-muted">{{ t("addPosition.symbol") }}</label>
+          <input id="cfd-symbol" v-model="cfdForm.symbol" type="text" :placeholder="t('addPosition.symbolPlaceholder')" required class="input mb-4" data-testid="add-position-symbol" />
+          <label for="cfd-direction" class="mb-1 block text-sm text-muted">{{ t("addPosition.direction") }}</label>
           <select id="cfd-direction" v-model="cfdForm.direction" class="input mb-4">
-            <option>Long</option>
-            <option>Short</option>
+            <option value="Long">{{ t("addPosition.long") }}</option>
+            <option value="Short">{{ t("addPosition.short") }}</option>
           </select>
           <div class="mb-4 grid grid-cols-2 gap-4">
             <div>
-              <label for="cfd-qty" class="mb-1 block text-sm text-muted">Quantity (lots)</label>
+              <label for="cfd-qty" class="mb-1 block text-sm text-muted">{{ t("addPosition.quantityLots") }}</label>
               <input id="cfd-qty" v-model="cfdForm.quantity" type="number" min="0.000001" step="any" required class="input" data-testid="add-position-quantity" />
             </div>
             <div>
-              <label for="cfd-price" class="mb-1 block text-sm text-muted">Open price</label>
+              <label for="cfd-price" class="mb-1 block text-sm text-muted">{{ t("addPosition.openPrice") }}</label>
               <input id="cfd-price" v-model="cfdForm.openPrice" type="number" min="0" step="any" required class="input" data-testid="add-position-price" />
             </div>
           </div>
-          <label for="cfd-date" class="mb-1 block text-sm text-muted">Open date</label>
+          <label for="cfd-date" class="mb-1 block text-sm text-muted">{{ t("addPosition.openDate") }}</label>
           <input id="cfd-date" v-model="cfdForm.openDate" type="date" class="input mb-4" data-testid="add-position-date" />
           <p v-if="error" class="mb-3 text-sm text-danger">{{ error }}</p>
           <div class="flex justify-end gap-2">
-            <button type="button" class="btn-ghost" @click="close">Cancel</button>
+            <button type="button" class="btn-ghost" @click="close">{{ t("addPosition.cancel") }}</button>
             <button type="submit" class="btn-primary" :disabled="busy || !cfdForm.symbol.trim() || !Number(cfdForm.quantity)">
-              {{ busy ? "Adding..." : "Enter a symbol" }}
+              {{ busy ? t("addPosition.adding") : t("addPosition.enterSymbol") }}
             </button>
           </div>
         </form>

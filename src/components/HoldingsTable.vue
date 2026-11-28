@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue"
+import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { useDisplayCurrencyStore } from "@/stores/displayCurrency"
@@ -41,6 +42,7 @@ const props = withDefaults(defineProps<{
 
 const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
 const store = usePortfolioStore()
 const displayCurrencyStore = useDisplayCurrencyStore()
 const { currency: displayCurrency } = storeToRefs(displayCurrencyStore)
@@ -64,12 +66,12 @@ function optionPositionDetails(position: Position): string | null {
   if (direction && optionType) details.push(`${direction} ${optionType}`)
   else if (direction || optionType) details.push(direction || optionType)
   if (position.strikePrice != null) {
-    details.push(`Strike ${formatAmount(position.strikePrice, position.instrumentCurrency)}`)
+    details.push(t("tables.holdings.strike", { value: formatAmount(position.strikePrice, position.instrumentCurrency) }))
   }
-  if (position.expirationDate) details.push(`Exp ${formatDate(position.expirationDate)}`)
+  if (position.expirationDate) details.push(t("tables.holdings.expiration", { date: formatDate(position.expirationDate) }))
   if (position.contractSize != null) details.push(`×${formatNumber(position.contractSize, 0)}`)
 
-  return details.join(" · ") || "Option"
+  return details.join(" · ") || t("tables.holdings.option")
 }
 
 const openMenuId = ref<string | null>(null)
@@ -113,12 +115,12 @@ const groupBy = ref<GroupMode>("none")
 // same owner and the option would be a no-op.
 const groupModes = computed(() => {
   const modes: Array<{ value: GroupMode; label: string }> = [
-    { value: "none", label: "None" },
-    { value: "assetType", label: "Type" },
-    { value: "sector", label: "Sector" },
-    { value: "country", label: "Country" },
+    { value: "none", label: t("tables.groupNone") },
+    { value: "assetType", label: t("tables.groupType") },
+    { value: "sector", label: t("tables.groupSector") },
+    { value: "country", label: t("tables.groupCountry") },
   ]
-  if (isGlobal.value) modes.push({ value: "portfolio", label: "Portfolio" })
+  if (isGlobal.value) modes.push({ value: "portfolio", label: t("tables.groupPortfolio") })
   return modes
 })
 
@@ -127,11 +129,11 @@ function groupValue(pos: Position, mode: GroupMode): string {
     case "assetType":
       return (pos.assetType || "Stock").charAt(0) + (pos.assetType || "Stock").slice(1).toLowerCase()
     case "sector":
-      return pos.sector || "Other"
+      return pos.sector || t("tables.holdings.other")
     case "country":
-      return pos.country || "Other"
+      return pos.country || t("tables.holdings.other")
     case "portfolio":
-      return pos.portfolioName || pos.portfolioId || "Unknown"
+      return pos.portfolioName || pos.portfolioId || t("tables.holdings.unknown")
     default:
       return ""
   }
@@ -186,18 +188,18 @@ interface ColumnDef {
 // value + P/L percent, measured in the browser) plus headroom. The realized
 // column is native-currency only. The consolidated table's minimum width keeps
 // its owner column without squeezing Symbol; portfolio mode fits its viewport.
-const allColumns: ColumnDef[] = [
-  { key: "symbol", label: "Symbol", sortable: true },
-  { key: "quantity", label: "Quantity", sortable: true, width: 100 },
-  { key: "avgCost", label: "Avg Cost", sortable: true, width: 110 },
-  { key: "price", label: "Price", sortable: true, width: 78 },
-  { key: "marketValue", label: "Market Value", sortable: true, width: 148 },
-  { key: "unrealized", label: "Unrealized P/L", sortable: true, width: 146 },
-  { key: "realized", label: "Realized P/L", sortable: true, width: 120 },
-  { key: "weight", label: "% of Portfolio", sortable: true, width: 105 },
-]
+const allColumns = computed<ColumnDef[]>(() => [
+  { key: "symbol", label: t("tables.col.symbol"), sortable: true },
+  { key: "quantity", label: t("tables.col.quantity"), sortable: true, width: 100 },
+  { key: "avgCost", label: t("tables.col.avgCost"), sortable: true, width: 110 },
+  { key: "price", label: t("tables.col.price"), sortable: true, width: 78 },
+  { key: "marketValue", label: t("tables.col.marketValue"), sortable: true, width: 148 },
+  { key: "unrealized", label: t("tables.col.unrealized"), sortable: true, width: 146 },
+  { key: "realized", label: t("tables.col.realized"), sortable: true, width: 120 },
+  { key: "weight", label: t("tables.col.weight"), sortable: true, width: 105 },
+])
 
-const visibleColumns = ref<string[]>(allColumns.map((c) => c.key))
+const visibleColumns = ref<string[]>(allColumns.value.map((c) => c.key))
 
 onMounted(() => {
   if (!isGlobal.value) void store.fetchPositions(id.value, labelFilter.value)
@@ -237,11 +239,11 @@ const searched = computed(() => matchingPositions(positions.value))
 const openSearched = computed(() => matchingPositions(openPositions.value))
 const emptyMessage = computed(() => {
   if (labelFilter.value.length || searchFilter.value.trim() || showClosedPositions.value) {
-    return "No positions match the current filters."
+    return t("tables.holdings.emptyFiltered")
   }
-  if (!labelFilteredPositions.value.length) return "No open positions."
-  if (!openPositions.value.length) return "No open positions. Show closed positions to view history."
-  return "No positions match the current filters."
+  if (!labelFilteredPositions.value.length) return t("tables.holdings.emptyNoOpen")
+  if (!openPositions.value.length) return t("tables.holdings.emptyShowClosed")
+  return t("tables.holdings.emptyFiltered")
 })
 
 // The filtered+searched set in the current sort order. Paging, the totals and
@@ -323,7 +325,7 @@ function pageNumbers(): (number | "…")[] {
 }
 
 function visibleColumnsDef(): ColumnDef[] {
-  return allColumns.filter((c) => visibleColumns.value.includes(c.key))
+  return allColumns.value.filter((c) => visibleColumns.value.includes(c.key))
 }
 
 function toggleColumn(key: string) {
@@ -337,7 +339,7 @@ function toggleColumn(key: string) {
 function toggleSort(key: string) {
   // The Portfolio column is not part of `allColumns` (it only exists in the
   // aggregate table), so it is allowed here rather than through the column list.
-  if (key === "portfolio" ? !isGlobal.value : !allColumns.find((c) => c.key === key)?.sortable) return
+  if (key === "portfolio" ? !isGlobal.value : !allColumns.value.find((c) => c.key === key)?.sortable) return
   if (sortKey.value === key) {
     sortDir.value = sortDir.value === "asc" ? "desc" : "asc"
   } else {
@@ -430,8 +432,11 @@ function exportCsv() {
       ...(showClosedPositions.value ? [p.isOpen ? "Open" : "Closed", p.isOpen ? "" : p.closedAt ?? ""] : []),
     ].join(","),
   )
-  const baseHeader = "Symbol,Quantity,Avg Cost,Price,Market Value,Unrealized P/L,Realized P/L,Weight"
-  const header = showClosedPositions.value ? `${baseHeader},Status,Closed At` : baseHeader
+  const baseHeader = [
+    t("tables.col.symbol"), t("tables.col.quantity"), t("tables.col.avgCost"), t("tables.col.price"),
+    t("tables.col.marketValue"), t("tables.col.unrealized"), t("tables.col.realized"), t("tables.holdings.csvWeight"),
+  ].join(",")
+  const header = showClosedPositions.value ? `${baseHeader},${t("tables.holdings.csvStatus")},${t("tables.holdings.csvClosedAt")}` : baseHeader
   const csv = [header, ...rows].join("\n")
   const blob = new Blob([csv], { type: "text/csv" })
   const url = URL.createObjectURL(blob)
@@ -453,8 +458,13 @@ function toggleActionMenu(position: Position): void {
 }
 
 function onActionSaved() {
-  notice.value = positionAction.value
-    ? `${positionAction.value.kind === "buy" ? "Bought" : positionAction.value.kind === "sell" ? "Sold" : "Recorded dividend for"} ${positionAction.value!.position.symbol}`
+  const a = positionAction.value
+  notice.value = a
+    ? a.kind === "buy"
+      ? t("tables.holdings.bought", { symbol: a.position.symbol })
+      : a.kind === "sell"
+        ? t("tables.holdings.sold", { symbol: a.position.symbol })
+        : t("tables.holdings.recordedDividend", { symbol: a.position.symbol })
     : null
   const ownerId = positionAction.value ? positionAction.value.position.portfolioId : id.value
   positionAction.value = null
@@ -491,13 +501,13 @@ async function openRemoveConfirm(position: Position): Promise<void> {
   try {
     const page = await getPortfolioTransactions(ownerId(position), 1, 1, "date", "desc", position.id)
     if (page.total > 0) {
-      noticeError.value = `Cannot remove ${position.symbol} — it has ${page.total} transaction${page.total === 1 ? "" : "s"}. Delete the transactions first.`
+      noticeError.value = t("tables.holdings.cannotRemove", { symbol: position.symbol, count: page.total })
       return
     }
     removeError.value = null
     removeTarget.value = position
   } catch (err) {
-    noticeError.value = err instanceof Error ? err.message : "Failed to check position transactions"
+    noticeError.value = err instanceof Error ? err.message : t("tables.holdings.checkTransactionsError")
   }
 }
 
@@ -511,9 +521,9 @@ async function confirmRemovePosition(): Promise<void> {
     removeTarget.value = null
     if (isGlobal.value) await props.refresh?.()
     else await store.fetchPositions(id.value)
-    notice.value = `Removed ${target.symbol}`
+    notice.value = t("tables.holdings.removed", { symbol: target.symbol })
   } catch (err) {
-    removeError.value = err instanceof Error ? err.message : "Failed to remove position"
+    removeError.value = err instanceof Error ? err.message : t("tables.holdings.removeError")
   } finally {
     removeBusy.value = false
   }
@@ -558,28 +568,28 @@ function onPickerSaved() {
     <div class="card overflow-hidden">
       <div class="flex items-center justify-between border-b border-border px-5 py-3">
         <div class="flex items-center gap-3">
-          <h2 class="text-base font-semibold">Positions</h2>
+          <h2 class="text-base font-semibold">{{ t("tables.holdings.positions") }}</h2>
           <span class="text-sm text-muted">
-            <template v-if="showClosedPositions">{{ openSearched.length }} open · {{ searched.length - openSearched.length }} closed</template>
-            <template v-else>{{ openSearched.length }} open</template>
+            <template v-if="showClosedPositions">{{ t("tables.holdings.openClosedCount", { open: openSearched.length, closed: searched.length - openSearched.length }) }}</template>
+            <template v-else>{{ t("tables.holdings.openCount", { count: openSearched.length }) }}</template>
           </span>
         </div>
         <div class="flex items-center gap-2">
           <label class="flex items-center gap-1.5 text-xs text-muted">
-            Group by
-            <select v-model="groupBy" class="input !w-auto !py-1 !text-xs" aria-label="Group by">
+            {{ t("tables.groupBy") }}
+            <select v-model="groupBy" class="input !w-auto !py-1 !text-xs" :aria-label="t('tables.groupBy')">
               <option v-for="mode in groupModes" :key="mode.value" :value="mode.value">{{ mode.label }}</option>
             </select>
           </label>
-          <button type="button" class="btn-secondary text-xs" @click="exportCsv">Export</button>
+          <button type="button" class="btn-secondary text-xs" @click="exportCsv">{{ t("tables.export") }}</button>
           <div class="relative">
             <button type="button" class="btn-secondary text-xs" @click="showCustomize = !showCustomize">
-              Customize {{ visibleColumns.length }}
+              {{ t("tables.customize", { count: visibleColumns.length }) }}
             </button>
             <template v-if="showCustomize">
               <div class="fixed inset-0 z-20" @click="showCustomize = false"></div>
               <div class="absolute right-0 z-30 mt-1 w-48 rounded-lg border border-border bg-white dark:bg-slate-900 p-2 shadow-lg">
-                <p class="px-2 pb-1 text-xs font-medium uppercase text-muted dark:text-muted">Columns</p>
+                <p class="px-2 pb-1 text-xs font-medium uppercase text-muted dark:text-muted">{{ t("tables.columns") }}</p>
                 <label v-for="col in allColumns" :key="col.key" class="flex cursor-pointer items-center gap-2 px-2 py-1.5 text-sm text-text hover:bg-surface-2 dark:hover:bg-slate-800/50">
                   <input type="checkbox" class="h-4 w-4" :checked="visibleColumns.includes(col.key)" @change="toggleColumn(col.key)" />
                   {{ col.label }}
@@ -598,19 +608,19 @@ function onPickerSaved() {
               v-model="showClosedPositions"
               type="checkbox"
               class="h-4 w-4 rounded border-border text-accent-text focus:ring-blue-500 dark:border-slate-600"
-              aria-label="Show closed positions"
+              :aria-label="t('tables.holdings.showClosed')"
               data-testid="holdings-closed-filter"
             />
-            <span>Show closed positions</span>
+            <span>{{ t("tables.holdings.showClosed") }}</span>
           </label>
           <label class="ml-auto flex items-center gap-2 text-xs text-muted">
-            <span class="sr-only">Filter by company name or ticker</span>
+            <span class="sr-only">{{ t("tables.filterByCompany") }}</span>
             <input
               v-model="searchFilter"
               class="input !w-56 !py-1.5 !text-xs"
               type="search"
-              placeholder="Company name or ticker"
-              aria-label="Filter by company name or ticker"
+              :placeholder="t('tables.companyNameOrTicker')"
+              :aria-label="t('tables.filterByCompany')"
               data-testid="holdings-search"
             />
           </label>
@@ -643,7 +653,7 @@ function onPickerSaved() {
                 @click="toggleSort('portfolio')"
               >
                 <span class="inline-flex items-center gap-1">
-                  Portfolio
+                  {{ t("tables.col.portfolio") }}
                   <span class="text-[10px] text-muted dark:text-muted">{{ sortIndicator("portfolio") }}</span>
                 </span>
               </th>
@@ -661,7 +671,7 @@ function onPickerSaved() {
                   <span v-if="col.sortable" class="text-[10px] text-muted dark:text-muted">{{ sortIndicator(col.key) }}</span>
                 </span>
               </th>
-              <th class="px-5 py-2.5"><span class="sr-only">Position actions</span></th>
+              <th class="px-5 py-2.5"><span class="sr-only">{{ t("tables.positionActions") }}</span></th>
             </tr>
           </thead>
           <tbody v-for="g in groups" :key="g.label || 'all'" class="divide-y divide-slate-100 dark:divide-slate-800">
@@ -692,7 +702,7 @@ function onPickerSaved() {
                     >{{ optionPositionDetails(pos) }}</p>
                   </router-link>
                   <span v-if="!pos.isOpen" class="mt-1 inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted dark:bg-slate-700 dark:text-slate-300">
-                    Closed<span v-if="pos.closedAt"> · {{ formatDate(pos.closedAt) }}</span>
+                    {{ t("tables.holdings.closed") }}<span v-if="pos.closedAt"> · {{ formatDate(pos.closedAt) }}</span>
                   </span>
                   <LabelChips v-if="pos.labels?.length" :labels="pos.labels" :max="4" class="mt-1" />
                 </td>
@@ -722,7 +732,7 @@ function onPickerSaved() {
                   :display-currency="displayCurrency"
                 />
                 <p class="text-xs text-muted dark:text-muted">
-                  Cost <DualCurrencyCell
+                  {{ t("tables.holdings.cost") }} <DualCurrencyCell
                     :primary="pos.totalCostBasis"
                     :primary-currency="pos.instrumentCurrency"
                     :converted="toDisplay((pos as any).convertedTotalCostBasis)"
@@ -745,7 +755,7 @@ function onPickerSaved() {
               >
                 <span
                   data-testid="holdings-cell-realized"
-                  :aria-label="`Realized P/L ${formatSignedAmount(pos.realizedGainLoss ?? 0, pos.instrumentCurrency)}`"
+                  :aria-label="`${t('tables.col.realized')} ${formatSignedAmount(pos.realizedGainLoss ?? 0, pos.instrumentCurrency)}`"
                   :class="gainClass(pos.realizedGainLoss ?? 0)"
                 >{{ formatSignedAmount(pos.realizedGainLoss ?? 0, pos.instrumentCurrency) }}</span>
               </td>
@@ -754,7 +764,7 @@ function onPickerSaved() {
                 <div class="relative inline-block">
                   <button
                     type="button"
-                    aria-label="Position actions"
+                    :aria-label="t('tables.positionActions')"
                     class="rounded-lg p-1.5 text-muted dark:text-muted hover:bg-surface-2 dark:hover:bg-slate-800 hover:text-text dark:hover:text-slate-200"
                     @click="toggleActionMenu(pos)"
                   >
@@ -767,21 +777,21 @@ function onPickerSaved() {
                   <template v-if="openMenuId === positionKey(pos)">
                     <div class="fixed inset-0 z-20" @click="openMenuId = null"></div>
                     <div class="absolute right-0 z-30 mt-1 w-44 rounded-lg border border-border bg-white dark:bg-slate-900 py-1 shadow-lg">
-                       <button v-if="!props.readonly" type="button" class="block w-full px-4 py-2 text-left text-sm text-text hover:bg-surface-2 dark:hover:bg-slate-800/50" @click="openAction('buy', pos)">Buy</button>
-                       <button v-if="!props.readonly" type="button" class="block w-full px-4 py-2 text-left text-sm text-text hover:bg-surface-2 dark:hover:bg-slate-800/50" @click="openAction('sell', pos)">Sell</button>
-                       <button v-if="!props.readonly" type="button" class="block w-full px-4 py-2 text-left text-sm text-text hover:bg-surface-2 dark:hover:bg-slate-800/50" @click="openAction('dividend', pos)">Dividend</button>
-                       <button v-if="!props.readonly" type="button" class="block w-full px-4 py-2 text-left text-sm text-text hover:bg-surface-2 dark:hover:bg-slate-800/50" @click="openEditPosition(pos)">Edit position</button>
-                      <button type="button" class="block w-full px-4 py-2 text-left text-sm text-text hover:bg-surface-2 dark:hover:bg-slate-800/50" @click="goResearch(pos)">Research</button>
-                      <button type="button" class="block w-full px-4 py-2 text-left text-sm text-text hover:bg-surface-2 dark:hover:bg-slate-800/50" @click="openChartView(pos)">View chart</button>
-                       <button v-if="!props.readonly" type="button" class="block w-full px-4 py-2 text-left text-sm text-text hover:bg-surface-2 dark:hover:bg-slate-800/50" @click="openLabelPicker(pos, $event)">Set labels...</button>
-                       <button v-if="!props.readonly" type="button" class="block w-full px-4 py-2 text-left text-sm text-danger hover:bg-red-50 dark:hover:bg-red-500/10" @click="openRemoveConfirm(pos)">Remove position</button>
+                       <button v-if="!props.readonly" type="button" class="block w-full px-4 py-2 text-left text-sm text-text hover:bg-surface-2 dark:hover:bg-slate-800/50" @click="openAction('buy', pos)">{{ t("tables.holdings.buy") }}</button>
+                       <button v-if="!props.readonly" type="button" class="block w-full px-4 py-2 text-left text-sm text-text hover:bg-surface-2 dark:hover:bg-slate-800/50" @click="openAction('sell', pos)">{{ t("tables.holdings.sell") }}</button>
+                       <button v-if="!props.readonly" type="button" class="block w-full px-4 py-2 text-left text-sm text-text hover:bg-surface-2 dark:hover:bg-slate-800/50" @click="openAction('dividend', pos)">{{ t("tables.holdings.dividend") }}</button>
+                       <button v-if="!props.readonly" type="button" class="block w-full px-4 py-2 text-left text-sm text-text hover:bg-surface-2 dark:hover:bg-slate-800/50" @click="openEditPosition(pos)">{{ t("tables.holdings.editPosition") }}</button>
+                      <button type="button" class="block w-full px-4 py-2 text-left text-sm text-text hover:bg-surface-2 dark:hover:bg-slate-800/50" @click="goResearch(pos)">{{ t("tables.holdings.research") }}</button>
+                      <button type="button" class="block w-full px-4 py-2 text-left text-sm text-text hover:bg-surface-2 dark:hover:bg-slate-800/50" @click="openChartView(pos)">{{ t("tables.holdings.viewChart") }}</button>
+                       <button v-if="!props.readonly" type="button" class="block w-full px-4 py-2 text-left text-sm text-text hover:bg-surface-2 dark:hover:bg-slate-800/50" @click="openLabelPicker(pos, $event)">{{ t("tables.holdings.setLabels") }}</button>
+                       <button v-if="!props.readonly" type="button" class="block w-full px-4 py-2 text-left text-sm text-danger hover:bg-red-50 dark:hover:bg-red-500/10" @click="openRemoveConfirm(pos)">{{ t("tables.holdings.removePosition") }}</button>
                     </div>
                   </template>
                 </div>
               </td>
             </tr>
             <tr v-if="g.label" class="border-t border-border bg-surface-2 font-medium">
-              <td class="px-5 py-3 text-muted">{{ g.label }} subtotal</td>
+              <td class="px-5 py-3 text-muted">{{ t("tables.holdings.subtotal", { label: g.label }) }}</td>
               <td v-if="visibleColumns.includes('quantity')" class="px-3 py-3"></td>
               <td v-if="visibleColumns.includes('avgCost')" class="px-3 py-3"></td>
               <td v-if="visibleColumns.includes('price')" class="px-3 py-3"></td>
@@ -801,7 +811,7 @@ function onPickerSaved() {
           </tbody>
           <tfoot v-if="groupBy === 'none'">
             <tr class="border-t border-border bg-surface-2 font-medium">
-              <td v-if="visibleColumns.includes('symbol')" class="px-5 py-3">Total</td>
+              <td v-if="visibleColumns.includes('symbol')" class="px-5 py-3">{{ t("tables.holdings.total") }}</td>
               <td v-if="visibleColumns.includes('quantity')" class="px-3 py-3"></td>
               <td v-if="visibleColumns.includes('avgCost')" class="px-3 py-3"></td>
               <td v-if="visibleColumns.includes('price')" class="px-3 py-3"></td>
@@ -831,24 +841,24 @@ function onPickerSaved() {
            on every page and while a filter is applied. -->
       <div v-if="sorted.length" class="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3">
         <p class="text-sm text-muted">
-          {{ (clampedPage - 1) * pageSize + 1 }}–{{ Math.min(clampedPage * pageSize, sorted.length) }} of {{ sorted.length }}
+          {{ t("tables.rangeOf", { start: (clampedPage - 1) * pageSize + 1, end: Math.min(clampedPage * pageSize, sorted.length), total: sorted.length }) }}
         </p>
         <div class="flex items-center gap-4">
           <label class="flex items-center gap-2 text-sm text-muted">
-            Rows per page
+            {{ t("tables.rowsPerPage") }}
             <select
               class="input py-1"
               :value="pageSize"
-              aria-label="Rows per page"
+              :aria-label="t('tables.rowsPerPage')"
               data-testid="holdings-page-size"
               @change="onPageSizeChange"
             >
-              <option v-for="s in pageSizes" :key="s" :value="s">{{ s }} per page</option>
+              <option v-for="s in pageSizes" :key="s" :value="s">{{ t("tables.perPage", { count: s }) }}</option>
             </select>
           </label>
-          <nav aria-label="Pagination" class="flex items-center gap-1">
-            <button type="button" class="btn-ghost px-2 py-1 text-xs" aria-label="First page" :disabled="clampedPage <= 1" @click="goToPage(1)">«</button>
-            <button type="button" class="btn-ghost px-2 py-1 text-xs" aria-label="Previous page" :disabled="clampedPage <= 1" @click="goToPage(clampedPage - 1)">‹</button>
+          <nav :aria-label="t('tables.pagination')" class="flex items-center gap-1">
+            <button type="button" class="btn-ghost px-2 py-1 text-xs" :aria-label="t('tables.firstPage')" :disabled="clampedPage <= 1" @click="goToPage(1)">«</button>
+            <button type="button" class="btn-ghost px-2 py-1 text-xs" :aria-label="t('tables.previousPage')" :disabled="clampedPage <= 1" @click="goToPage(clampedPage - 1)">‹</button>
             <button
               v-for="n in pageNumbers()" :key="n" type="button"
               class="btn-ghost px-2 py-1 text-xs"
@@ -857,8 +867,8 @@ function onPickerSaved() {
               :disabled="n === '…'"
               @click="goToPage(Number(n))"
             >{{ n }}</button>
-            <button type="button" class="btn-ghost px-2 py-1 text-xs" aria-label="Next page" :disabled="clampedPage >= totalPages" @click="goToPage(clampedPage + 1)">›</button>
-            <button type="button" class="btn-ghost px-2 py-1 text-xs" aria-label="Last page" :disabled="clampedPage >= totalPages" @click="goToPage(totalPages)">»</button>
+            <button type="button" class="btn-ghost px-2 py-1 text-xs" :aria-label="t('tables.nextPage')" :disabled="clampedPage >= totalPages" @click="goToPage(clampedPage + 1)">›</button>
+            <button type="button" class="btn-ghost px-2 py-1 text-xs" :aria-label="t('tables.lastPage')" :disabled="clampedPage >= totalPages" @click="goToPage(totalPages)">»</button>
           </nav>
         </div>
       </div>
@@ -890,8 +900,8 @@ function onPickerSaved() {
 
     <ConfirmDeleteModal v-if="!props.readonly"
       :open="!!removeTarget"
-      title="Remove position"
-      :message="removeTarget ? `This permanently deletes ${removeTarget.symbol} from this portfolio. This cannot be undone.` : ''"
+      :title="t('tables.holdings.removeTitle')"
+      :message="removeTarget ? t('tables.holdings.removeMessage', { symbol: removeTarget.symbol }) : ''"
       :busy="removeBusy"
       :error="removeError"
       @close="removeTarget = null"
@@ -925,9 +935,9 @@ function onPickerSaved() {
             :asset-type="chartPosition.assetType"
             class="align-middle"
           />
-          <span class="align-middle">{{ chartPosition.symbol }} — {{ chartPosition.companyName }}</span>
+          <span class="align-middle">{{ t("tables.holdings.chartTitle", { symbol: chartPosition.symbol, name: chartPosition.companyName }) }}</span>
         </h2>
-        <button type="button" class="btn-secondary text-sm" @click="chartPosition = null">Close</button>
+        <button type="button" class="btn-secondary text-sm" @click="chartPosition = null">{{ t("tables.holdings.close") }}</button>
       </div>
       <PriceChart
         :symbol="chartPosition.symbol"
