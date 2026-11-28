@@ -12,6 +12,7 @@
  * received; both legs the same currency is a correction of one balance).
  */
 import { computed, ref, watch } from "vue"
+import { useI18n } from "vue-i18n"
 import { usePortfolioStore } from "@/stores/portfolios"
 import { useCurrenciesStore } from "@/stores/currencies"
 import {
@@ -53,6 +54,7 @@ const emit = defineEmits<{ (e: "close"): void; (e: "done"): void }>()
 
 const store = usePortfolioStore()
 const currenciesStore = useCurrenciesStore()
+const { t } = useI18n()
 
 const amount = ref<number>(0)
 const currency = ref("")
@@ -433,35 +435,37 @@ async function submit() {
     }
     emit("done")
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Failed to process cash movement"
+    error.value = err instanceof Error ? err.message : t("cashModal.processError")
   } finally {
     busy.value = false
   }
 }
 
-const ACTION_LABEL: Record<CashAction, string> = {
-  deposit: "Deposit",
-  withdraw: "Withdraw",
-  transfer: "Transfer",
-  interest: "Interest",
-  fee: "Charge",
-  conversion: "Conversion",
+function actionLabel(action: CashAction): string {
+  const labels: Record<CashAction, string> = {
+    deposit: t("cashModal.deposit"),
+    withdraw: t("cashModal.withdraw"),
+    transfer: t("cashModal.transfer"),
+    interest: t("cashModal.interest"),
+    fee: t("cashModal.fee"),
+    conversion: t("cashModal.conversion"),
+  }
+  return labels[action]
 }
 const title = computed(() => {
-  if (isEdit.value) return `Edit ${submitLabel.value}`
-  if (props.action === "deposit") return "Deposit Funds"
-  if (props.action === "withdraw") return "Withdraw Funds"
-  if (props.action === "transfer") return "Transfer Funds"
-  if (props.action === "interest") return "Record Interest"
-  if (props.action === "fee") return "Record Charge"
-  return "Record Conversion"
+  if (isEdit.value) return t("cashModal.editTitle", { label: submitLabel.value })
+  if (props.action === "deposit") return t("cashModal.titleDeposit")
+  if (props.action === "withdraw") return t("cashModal.titleWithdraw")
+  if (props.action === "transfer") return t("cashModal.titleTransfer")
+  if (props.action === "interest") return t("cashModal.titleInterest")
+  if (props.action === "fee") return t("cashModal.titleFee")
+  return t("cashModal.titleConversion")
 })
-const submitLabel = computed(() => ACTION_LABEL[props.action])
+const submitLabel = computed(() => actionLabel(props.action))
 const amountLabel = computed(() => {
-  if (props.action === "conversion") return "Amount handed over *"
-  if (props.action === "fee") return "Charge amount *"
-  if (props.action === "interest") return "Amount *"
-  return "Amount *"
+  if (props.action === "conversion") return t("cashModal.amountHandedOver")
+  if (props.action === "fee") return t("cashModal.chargeAmount")
+  return t("cashModal.amountLabel")
 })
 </script>
 
@@ -471,34 +475,34 @@ const amountLabel = computed(() => {
     class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-24"
     @click.self.stop="emit('close')"
   >
-    <div class="card max-h-[85vh] w-full max-w-2xl overflow-y-auto p-6" role="dialog" aria-modal="true" aria-label="Cash movement">
+    <div class="card max-h-[85vh] w-full max-w-2xl overflow-y-auto p-6" role="dialog" aria-modal="true" :aria-label="t('cashModal.aria')">
       <div class="mb-4 flex items-center justify-between">
         <h3 class="text-base font-semibold">
           {{ title }}
           <span v-if="portfolioName" class="block text-xs font-normal text-muted" data-testid="pc-portfolio-name">{{ portfolioName }}</span>
         </h3>
-        <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="emit('close')">✕</button>
+        <button type="button" class="btn-ghost px-2 py-1" :aria-label="t('cashModal.closeModal')" @click="emit('close')">✕</button>
       </div>
 
       <form class="grid grid-cols-1 gap-4 sm:grid-cols-2" data-testid="pc-form" @submit.prevent="submit">
         <template v-if="action === 'withdraw'">
           <p class="rounded-lg bg-surface-2 px-3 py-2 text-sm text-text sm:col-span-2">
-            Available in {{ currency || baseCurrency }}: {{ formatCurrency(availableBalance, currency || baseCurrency) }}
+            {{ t("cashModal.availableIn", { ccy: currency || baseCurrency, amount: formatCurrency(availableBalance, currency || baseCurrency) }) }}
           </p>
         </template>
 
         <template v-if="action === 'transfer' && !isEdit">
           <div>
-            <label for="pc-to-portfolio" class="mb-1 block text-sm text-muted">To Portfolio *</label>
+            <label for="pc-to-portfolio" class="mb-1 block text-sm text-muted">{{ t("cashModal.toPortfolio") }}</label>
             <select id="pc-to-portfolio" v-model="toPortfolioId" class="input" required data-testid="pc-to-portfolio">
-              <option value="" disabled>Select destination portfolio</option>
+              <option value="" disabled>{{ t("cashModal.selectDestination") }}</option>
               <option v-for="p in targetPortfolios" :key="p.id" :value="p.id">{{ p.name }}</option>
             </select>
           </div>
         </template>
 
         <div>
-          <label for="pc-currency" class="mb-1 block text-sm text-muted">Currency</label>
+          <label for="pc-currency" class="mb-1 block text-sm text-muted">{{ t("cashModal.currency") }}</label>
           <select
             id="pc-currency"
             v-model="currency"
@@ -512,7 +516,7 @@ const amountLabel = computed(() => {
         </div>
 
         <p v-if="isLegacyNonBaseEdit" class="text-sm text-amber-700 dark:text-amber-300 sm:col-span-2">
-          This existing {{ props.editTx?.currency }} cash row is not in {{ baseCurrency }} and cannot be edited under the base-currency-only cash setting.
+          {{ t("cashModal.legacyNonBaseEdit", { ccy: props.editTx?.currency, base: baseCurrency }) }}
         </p>
 
         <div>
@@ -520,44 +524,44 @@ const amountLabel = computed(() => {
           <div class="flex gap-2">
             <div class="flex min-w-0 flex-1 items-center rounded-lg border border-border focus-within:border-blue-500">
               <span class="pl-3 text-sm text-muted">{{ currency }}</span>
-              <input id="pc-amount" v-model.number="amount" type="number" :min="action === 'interest' ? undefined : 0" step="0.01" required class="input !rounded-l-none !border-0 !ring-0 focus:ring-0" placeholder="Enter amount" data-testid="pc-amount" />
+              <input id="pc-amount" v-model.number="amount" type="number" :min="action === 'interest' ? undefined : 0" step="0.01" required class="input !rounded-l-none !border-0 !ring-0 focus:ring-0" :placeholder="t('cashModal.enterAmount')" data-testid="pc-amount" />
             </div>
-            <button v-if="action === 'transfer' && !isEdit" type="button" class="btn-secondary shrink-0 text-sm" @click="transferAll">Transfer All</button>
+            <button v-if="action === 'transfer' && !isEdit" type="button" class="btn-secondary shrink-0 text-sm" @click="transferAll">{{ t("cashModal.transferAll") }}</button>
           </div>
-          <p v-if="action === 'interest'" class="mt-1 text-xs text-muted">Positive = credited, negative = charged.</p>
-          <p v-else-if="action === 'conversion'" class="mt-1 text-xs text-muted">The leg handed over. A broker's own conversion residual is booked with no second leg.</p>
-          <p v-else class="mt-1 text-xs text-muted">Available: {{ formatCurrency(availableBalance, currency) }}</p>
+          <p v-if="action === 'interest'" class="mt-1 text-xs text-muted">{{ t("cashModal.interestHint") }}</p>
+          <p v-else-if="action === 'conversion'" class="mt-1 text-xs text-muted">{{ t("cashModal.conversionHint") }}</p>
+          <p v-else class="mt-1 text-xs text-muted">{{ t("cashModal.available", { amount: formatCurrency(availableBalance, currency) }) }}</p>
         </div>
 
         <template v-if="action === 'conversion'">
           <div>
-            <label for="pc-to-currency" class="mb-1 block text-sm text-muted">Received currency</label>
+            <label for="pc-to-currency" class="mb-1 block text-sm text-muted">{{ t("cashModal.receivedCurrency") }}</label>
             <select id="pc-to-currency" v-model="toCurrency" class="input" data-testid="pc-to-currency">
               <option v-for="c in receivedOptions" :key="c" :value="c">{{ c }}</option>
             </select>
-            <p class="mt-1 text-xs text-muted">Same as the first currency = a correction of one balance, not an exchange.</p>
+            <p class="mt-1 text-xs text-muted">{{ t("cashModal.sameCurrencyCorrection") }}</p>
           </div>
           <div>
-            <label for="pc-to-amount" class="mb-1 block text-sm text-muted">Amount received</label>
+            <label for="pc-to-amount" class="mb-1 block text-sm text-muted">{{ t("cashModal.amountReceived") }}</label>
             <div class="flex min-w-0 items-center rounded-lg border border-border focus-within:border-blue-500">
               <span class="pl-3 text-sm text-muted">{{ receivedCurrency }}</span>
               <input id="pc-to-amount" v-model.number="toAmount" type="number" min="0" step="0.01" class="input !rounded-l-none !border-0 !ring-0 focus:ring-0" placeholder="0.00" data-testid="pc-to-amount" />
             </div>
           </div>
           <p v-if="!conversionLegsValid" class="text-sm text-amber-700 dark:text-amber-300 sm:col-span-2">
-            The charge is in {{ feeCurrency }}, which is neither leg of this conversion ({{ currency }} handed over, {{ receivedCurrency }} received).
-            <template v-if="ledgerCurrency"> A {{ ledgerCurrency }}-settled account also needs one leg in {{ ledgerCurrency }}.</template>
+            {{ t("cashModal.conversionChargeInvalid", { feeCcy: feeCurrency, from: currency, to: receivedCurrency }) }}
+            <template v-if="ledgerCurrency">{{ t("cashModal.settledNeedsLeg", { ledger: ledgerCurrency }) }}</template>
           </p>
         </template>
 
         <div>
-          <label for="pc-date" class="mb-1 block text-sm text-muted">Transaction Date</label>
+          <label for="pc-date" class="mb-1 block text-sm text-muted">{{ t("cashModal.transactionDate") }}</label>
           <input id="pc-date" v-model="transactionDate" type="date" class="input" data-testid="pc-date" />
         </div>
 
         <template v-if="!isEdit && (needsAmountFx || action === 'transfer')">
           <FxRateFields
-            :leg="action === 'transfer' ? 'Transfer' : 'Deposit'"
+            :leg="action === 'transfer' ? t('cashModal.transfer') : t('cashModal.deposit')"
             :from="currency"
             :to="action === 'transfer' ? (targetCurrency ?? baseCurrency) : baseCurrency"
             :date="transactionDate"
@@ -573,7 +577,7 @@ const amountLabel = computed(() => {
               <div class="space-y-3">
                 <div>
                   <label for="pc-target-rate" class="mb-1 block text-xs text-muted">
-                    Custom rate ({{ targetCurrency }} per {{ currency }})
+                    {{ t("cashModal.customRate", { to: targetCurrency, from: currency }) }}
                   </label>
                   <input
                     id="pc-target-rate"
@@ -582,13 +586,13 @@ const amountLabel = computed(() => {
                     min="0"
                     step="any"
                     class="input"
-                    :placeholder="transferSuggestion ? transferSuggestion.rate.toFixed(4) : 'e.g. 4.35'"
+                    :placeholder="transferSuggestion ? transferSuggestion.rate.toFixed(4) : t('fields.ratePlaceholder')"
                     data-testid="pc-target-rate"
                   />
                 </div>
                 <div>
                   <label for="pc-target-amount" class="mb-1 block text-xs text-muted">
-                    Target amount in {{ targetCurrency }} (optional)
+                    {{ t("cashModal.targetAmountOptional", { ccy: targetCurrency }) }}
                   </label>
                   <input
                     id="pc-target-amount"
@@ -597,7 +601,7 @@ const amountLabel = computed(() => {
                     min="0"
                     step="any"
                     class="input"
-                    placeholder="auto"
+                    :placeholder="t('cashModal.auto')"
                     data-testid="pc-target-amount"
                   />
                 </div>
@@ -607,23 +611,23 @@ const amountLabel = computed(() => {
         </template>
 
         <div class="sm:col-span-2">
-          <label for="pc-description" class="mb-1 block text-sm text-muted">Description (Optional)</label>
+          <label for="pc-description" class="mb-1 block text-sm text-muted">{{ t("cashModal.descriptionOptional") }}</label>
           <input
             id="pc-description"
             v-model="description"
             type="text"
             class="input"
             data-testid="pc-description"
-            :placeholder="action === 'withdraw' ? 'e.g., Bill payment' : action === 'deposit' ? 'e.g., Monthly savings' : 'e.g., Rebalance'"
+            :placeholder="action === 'withdraw' ? t('cashModal.descWithdraw') : action === 'deposit' ? t('cashModal.descDeposit') : t('cashModal.descOther')"
           />
         </div>
 
         <div v-if="action !== 'interest'" class="sm:col-span-2">
-          <label for="pc-fees" class="mb-1 block text-sm text-muted">{{ action === 'conversion' ? "Conversion charge (Optional)" : "Fees (Optional)" }}</label>
+          <label for="pc-fees" class="mb-1 block text-sm text-muted">{{ action === 'conversion' ? t("cashModal.conversionChargeOptional") : t("cashModal.feesOptional") }}</label>
           <FeeFields v-model:fees="fees" v-model:fees-type="feesType" v-model:fee-currency="feeCurrency" testid="pc" input-id="pc-fees" />
 
           <FxRateFields
-            leg="Fee"
+            :leg="t('addPosition.legFee')"
             :from="feeCurrency"
             :to="chargeLeg === 'to' ? receivedCurrency : currency"
             :date="transactionDate"
@@ -639,48 +643,48 @@ const amountLabel = computed(() => {
         </div>
 
         <div class="rounded-lg bg-surface-2 px-3 py-2 text-sm sm:col-span-2">
-          <p class="text-xs font-medium uppercase tracking-wide text-muted dark:text-muted">Transaction Confirmation</p>
+          <p class="text-xs font-medium uppercase tracking-wide text-muted dark:text-muted">{{ t("cashModal.confirmation") }}</p>
           <dl class="mt-1 space-y-0.5 tabular-nums text-muted">
             <div class="flex justify-between gap-3">
-              <dt>{{ action === "transfer" ? "Transfer amount" : action === "conversion" ? "Leg handed over" : "Amount" }}</dt>
+              <dt>{{ action === "transfer" ? t("cashModal.transferAmount") : action === "conversion" ? t("cashModal.legHandedOver") : t("cashModal.amount") }}</dt>
               <dd>{{ formatCurrency(amount || 0, currency) }}</dd>
             </div>
             <div v-if="action === 'conversion'" class="flex justify-between gap-3">
-              <dt>Leg received ({{ receivedCurrency }})</dt>
+              <dt>{{ t("cashModal.legReceived", { ccy: receivedCurrency }) }}</dt>
               <dd>{{ formatCurrency(toAmount || 0, receivedCurrency) }}</dd>
             </div>
             <div v-if="feeAmount > 0" class="flex justify-between gap-3">
-              <dt>Fee ({{ feesType === "pct" ? `${fees}%` : feeCurrency }})</dt>
+              <dt>{{ t("cashModal.feeLabel", { ccy: feesType === "pct" ? `${fees}%` : feeCurrency }) }}</dt>
               <dd>
                 {{ formatCurrency(feeAmount, feeCurrency) }}
                 <template v-if="feeCurrency !== currency">
                   <template v-if="feeInCcy != null"> &asymp; {{ formatCurrency(feeInCcy, currency) }}</template>
-                  <template v-else> · rate pending</template>
+                  <template v-else> {{ t("cashModal.ratePending") }}</template>
                 </template>
               </dd>
             </div>
             <div v-if="action === 'deposit' && netCredited != null" class="flex justify-between gap-3 border-t border-border pt-0.5 font-semibold text-text dark:border-slate-700">
-              <dt>Total credited (net)</dt>
+              <dt>{{ t("cashModal.totalCredited") }}</dt>
               <dd>{{ formatCurrency(netCredited, currency) }}</dd>
             </div>
             <div v-if="action === 'conversion' && receivedCurrency === currency" class="flex justify-between gap-3 border-t border-border pt-0.5 font-semibold text-text dark:border-slate-700">
-              <dt>Balance correction</dt>
+              <dt>{{ t("cashModal.balanceCorrection") }}</dt>
               <dd>{{ formatCurrency(netEffect, currency) }}</dd>
             </div>
             <div v-if="action !== 'deposit' && action !== 'conversion'" class="flex justify-between gap-3 border-t border-border pt-0.5 font-semibold text-text dark:border-slate-700">
-              <dt>Total debited</dt>
+              <dt>{{ t("cashModal.totalDebited") }}</dt>
               <dd>{{ formatCurrency(totalDebited, currency) }}</dd>
             </div>
             <div v-if="action === 'transfer' && isTransferCrossCcy" class="flex justify-between gap-3">
-              <dt>Target ({{ targetCurrency }})</dt>
+              <dt>{{ t("cashModal.target", { ccy: targetCurrency }) }}</dt>
               <dd>
                 <template v-if="targetAmountValue != null">{{ formatCurrency(targetAmountValue, targetCurrency || "") }}</template>
                 <template v-else>—</template>
-                <span class="text-xs text-muted">{{ transferRateValue != null ? `@ ${transferRateValue.toFixed(4)}` : "· rate pending" }}</span>
+                <span class="text-xs text-muted">{{ transferRateValue != null ? `@ ${transferRateValue.toFixed(4)}` : t("cashModal.ratePending") }}</span>
               </dd>
             </div>
             <div v-if="action !== 'deposit' && action !== 'conversion'" class="flex justify-between gap-3">
-              <dt>Remaining balance</dt>
+              <dt>{{ t("cashModal.remainingBalance") }}</dt>
               <dd>{{ formatCurrency(remainingBalance, currency) }}</dd>
             </div>
           </dl>
@@ -689,9 +693,9 @@ const amountLabel = computed(() => {
         <p v-if="error" class="text-sm text-danger sm:col-span-2">{{ error }}</p>
 
         <div class="flex justify-end gap-2 sm:col-span-2">
-          <button type="button" class="btn-ghost" @click="emit('close')">Cancel</button>
+          <button type="button" class="btn-ghost" @click="emit('close')">{{ t("cashModal.cancel") }}</button>
           <button type="submit" class="btn-primary capitalize" :disabled="busy || !canSubmit" data-testid="pc-submit">
-            {{ busy ? "Processing..." : submitLabel }}
+            {{ busy ? t("cashModal.processing") : submitLabel }}
           </button>
         </div>
       </form>

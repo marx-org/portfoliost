@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue"
+import { useI18n } from "vue-i18n"
 import { useRoute, useRouter } from "vue-router"
+import { i18n } from "@/i18n"
 import { researchRoute } from "@/utils/research"
 import {
   createPortfolioTransaction,
@@ -27,6 +29,7 @@ const store = usePortfolioStore()
 const currenciesStore = useCurrenciesStore()
 const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
 
 const transactions = ref<Tx[]>([])
 const loading = ref(false)
@@ -124,14 +127,14 @@ async function load() {
       ]
     }
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Failed to load transactions"
+    error.value = err instanceof Error ? err.message : t("editPosition.loadError")
   } finally {
     loading.value = false
   }
 }
 
 function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+  return new Date(iso).toLocaleDateString(i18n.global.locale.value === "pl" ? "pl-PL" : "en-US", { year: "numeric", month: "short", day: "numeric" })
 }
 
 function totalFor(tx: Tx): string {
@@ -185,7 +188,7 @@ async function removeRow(tx: Tx): Promise<void> {
     await deletePortfolioTransaction(props.portfolioId, tx.id)
     transactions.value = transactions.value.filter((t) => t.id !== tx.id)
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Failed to delete transaction"
+    error.value = err instanceof Error ? err.message : t("editPosition.deleteError")
   }
 }
 
@@ -258,7 +261,7 @@ async function addRow(): Promise<void> {
       // Roll back the optimistic row on failure
       const idx = transactions.value.findIndex((t) => t.id === provisionalId)
       if (idx !== -1) transactions.value.splice(idx, 1)
-      error.value = err instanceof Error ? err.message : "Failed to add transaction"
+      error.value = err instanceof Error ? err.message : t("editPosition.addError")
     } finally {
       saving.value = false
     }
@@ -295,10 +298,10 @@ function goResearch() {
 <template>
 
   <div v-if="open && position" class="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-16" @click.self="close">
-    <div class="card max-h-[85vh] w-full max-w-4xl overflow-y-auto p-6" role="dialog" aria-modal="true" :aria-label="`Edit ${position.symbol} position`">
+    <div class="card max-h-[85vh] w-full max-w-4xl overflow-y-auto p-6" role="dialog" aria-modal="true" :aria-label="t('editPosition.aria', { symbol: position.symbol })">
       <div class="mb-4 flex items-center justify-between">
-        <h3 class="text-base font-semibold">Edit {{ position.symbol }} position</h3>
-        <button type="button" class="btn-ghost px-2 py-1" aria-label="Close modal" @click="close">✕</button>
+        <h3 class="text-base font-semibold">{{ t("editPosition.title", { symbol: position.symbol }) }}</h3>
+        <button type="button" class="btn-ghost px-2 py-1" :aria-label="t('editPosition.closeModal')" @click="close">✕</button>
       </div>
 
       <p v-if="error" class="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-danger dark:bg-red-500/10 dark:text-red-400">{{ error }}</p>
@@ -307,17 +310,17 @@ function goResearch() {
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-border text-left text-xs uppercase text-muted dark:border-slate-800 dark:text-muted">
-              <th class="px-3 py-2 font-medium">Date</th>
-              <th class="px-3 py-2 font-medium">Type</th>
-              <th class="px-3 py-2 font-medium">Qty</th>
-              <th class="px-3 py-2 font-medium">Price</th>
-              <th class="px-3 py-2 font-medium">Fees</th>
-              <th class="px-3 py-2 font-medium">Total Cost</th>
+              <th class="px-3 py-2 font-medium">{{ t("editPosition.date") }}</th>
+              <th class="px-3 py-2 font-medium">{{ t("editPosition.type") }}</th>
+              <th class="px-3 py-2 font-medium">{{ t("editPosition.qty") }}</th>
+              <th class="px-3 py-2 font-medium">{{ t("editPosition.price") }}</th>
+              <th class="px-3 py-2 font-medium">{{ t("editPosition.fees") }}</th>
+              <th class="px-3 py-2 font-medium">{{ t("editPosition.totalCost") }}</th>
               <th class="px-3 py-2 text-right" colspan="2"></th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-            <tr v-if="loading"><td colspan="8" class="px-3 py-4 text-center text-muted">Loading...</td></tr>
+            <tr v-if="loading"><td colspan="8" class="px-3 py-4 text-center text-muted">{{ t("editPosition.loading") }}</td></tr>
             <tr v-for="tx in transactions" :key="tx.id">
               <td class="px-3 py-2">
                 <span class="text-sm text-text">{{ fmtDate(tx.executedAt) }}</span>
@@ -328,10 +331,10 @@ function goResearch() {
               <td class="px-3 py-2 tabular-nums text-text">{{ formatCurrency(tx.fees ?? 0, tx.feeCurrency || tx.currency || "") }}</td>
               <td class="px-3 py-2 text-right font-medium tabular-nums text-text">{{ totalFor(tx) }}</td>
               <td class="px-3 py-2 text-right">
-                <button v-if="!isSynthetic(tx)" type="button" class="text-xs text-accent-text hover:underline" @click="openEditModal(tx)">Edit</button>
+                <button v-if="!isSynthetic(tx)" type="button" class="text-xs text-accent-text hover:underline" @click="openEditModal(tx)">{{ t("editPosition.edit") }}</button>
               </td>
               <td class="px-3 py-2 text-right">
-                <button v-if="!isSynthetic(tx)" type="button" class="text-xs text-danger hover:underline" aria-label="Delete Transaction" @click="removeRow(tx)">Delete</button>
+                <button v-if="!isSynthetic(tx)" type="button" class="text-xs text-danger hover:underline" :aria-label="t('editPosition.deleteAria')" @click="removeRow(tx)">{{ t("editPosition.delete") }}</button>
               </td>
             </tr>
           </tbody>
@@ -339,14 +342,14 @@ function goResearch() {
       </div>
 
       <div class="mt-4 rounded-xl border border-border bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-        <h4 class="mb-3 text-sm font-medium text-text dark:text-slate-300">Add Transaction</h4>
+        <h4 class="mb-3 text-sm font-medium text-text dark:text-slate-300">{{ t("editPosition.addTransaction") }}</h4>
         <TransactionFormFields
           :symbol="position.symbol"
           :name="position.companyName ?? ''"
           :asset-type="position.assetType"
           :country="'US'"
           :market-price="position.currentPrice"
-          :price-as-of-label="'current price'"
+          :price-as-of-label="t('editPosition.currentPrice')"
           :target-currency="targetCurrency"
           :tx-currency="position.instrumentCurrency || ''"
           :testid="'edit-position'"
@@ -359,7 +362,7 @@ function goResearch() {
           <template #footer>
             <div class="mt-3 flex items-center justify-end">
               <button type="submit" class="btn-primary !px-4 !py-1.5 text-sm" :disabled="saving || !canAdd">
-                {{ saving ? "Adding..." : "Add Transaction" }}
+                {{ saving ? t("editPosition.adding") : t("editPosition.addTransaction") }}
               </button>
             </div>
           </template>
@@ -367,7 +370,7 @@ function goResearch() {
       </div>
 
       <div class="mt-4 flex justify-end">
-        <button type="button" class="btn-ghost" @click="close">Close</button>
+        <button type="button" class="btn-ghost" @click="close">{{ t("editPosition.close") }}</button>
       </div>
     </div>
   </div>

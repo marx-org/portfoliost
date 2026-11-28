@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue"
+import { useI18n } from "vue-i18n"
 import { useRoute } from "vue-router"
 import { getPortfolioCompare } from "@/api/portfolios"
 import { formatCurrency, formatNumber, formatPercent } from "@/utils/format"
 import { researchRoute } from "@/utils/research"
 import type { components } from "@/api/types"
 
+const { t } = useI18n()
 const route = useRoute()
 const id = String(route.params.id)
 const rows = ref<components["schemas"]["CompareRow"][]>([])
@@ -17,7 +19,7 @@ onMounted(async () => {
     const res = await getPortfolioCompare(id)
     rows.value = res.items ?? []
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Failed to load comparison"
+    error.value = err instanceof Error ? err.message : t("portfolios.loadCompareError")
   } finally {
     loading.value = false
   }
@@ -31,26 +33,26 @@ function num(value: unknown, format: (v: number) => string): string {
 <template>
   <div class="space-y-6">
     <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-danger">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-muted">Loading comparison...</p>
+    <p v-if="loading" class="text-sm text-muted">{{ t("portfolios.loadingCompare") }}</p>
 
     <div v-if="!loading && !error && rows.length" class="card overflow-hidden">
       <div class="border-b border-border px-5 py-3">
-        <h2 class="text-base font-semibold">Held Stocks Comparison</h2>
+        <h2 class="text-base font-semibold">{{ t("portfolios.heldStocksComparison") }}</h2>
       </div>
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-border text-left text-xs uppercase text-muted">
-              <th class="px-5 py-2.5 font-medium">Symbol</th>
-              <th class="px-5 py-2.5 text-right font-medium">Weight</th>
-              <th class="px-5 py-2.5 text-right font-medium">Price</th>
-              <th class="px-5 py-2.5 text-right font-medium">Market Cap</th>
-              <th class="px-5 py-2.5 text-right font-medium">P/E</th>
-              <th class="px-5 py-2.5 text-right font-medium">Fwd P/E</th>
-              <th class="px-5 py-2.5 text-right font-medium">Div Yield</th>
-              <th class="px-5 py-2.5 text-right font-medium">Rev Growth</th>
-              <th class="px-5 py-2.5 text-right font-medium">Net Margin</th>
-              <th class="px-5 py-2.5 text-right font-medium">ROE</th>
+              <th class="px-5 py-2.5 font-medium">{{ t("tables.col.symbol") }}</th>
+              <th class="px-5 py-2.5 text-right font-medium">{{ t("portfolios.weight") }}</th>
+              <th class="px-5 py-2.5 text-right font-medium">{{ t("portfolios.price") }}</th>
+              <th class="px-5 py-2.5 text-right font-medium">{{ t("portfolios.marketCap") }}</th>
+              <th class="px-5 py-2.5 text-right font-medium">{{ t("portfolios.peRatio") }}</th>
+              <th class="px-5 py-2.5 text-right font-medium">{{ t("portfolios.fwdPe") }}</th>
+              <th class="px-5 py-2.5 text-right font-medium">{{ t("portfolios.divYield") }}</th>
+              <th class="px-5 py-2.5 text-right font-medium">{{ t("portfolios.revGrowth") }}</th>
+              <th class="px-5 py-2.5 text-right font-medium">{{ t("portfolios.netMargin") }}</th>
+              <th class="px-5 py-2.5 text-right font-medium">{{ t("portfolios.roe") }}</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
@@ -78,6 +80,6 @@ function num(value: unknown, format: (v: number) => string): string {
         </table>
       </div>
     </div>
-    <p v-else-if="!loading && !error" class="card p-6 text-sm text-muted">No positions to compare.</p>
+    <p v-else-if="!loading && !error" class="card p-6 text-sm text-muted">{{ t("portfolios.noCompare") }}</p>
   </div>
 </template>

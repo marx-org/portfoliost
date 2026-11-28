@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n"
 import CurrencySelect from "@/components/CurrencySelect.vue"
+
+const { t } = useI18n()
 
 const props = defineProps<{
   fees: string | number
@@ -60,7 +63,7 @@ const tid = props.testid ?? "fee-fields"
         :data-testid="`${tid}-fees-toggle`"
         @click="toggleType"
       >
-        {{ feesType === "fixed" ? "Fixed" : "%" }}
+        {{ feesType === "fixed" ? t("fields.fixed") : t("fields.percent") }}
       </button>
     </div>
   </div>

@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { computed } from "vue"
+import { useI18n } from "vue-i18n"
 import FeeFields from "@/components/FeeFields.vue"
 import FxRateFields from "@/components/FxRateFields.vue"
 import { formatCurrency } from "@/utils/format"
 import { useCurrenciesStore } from "@/stores/currencies"
 import { useTransactionForm, type TransactionFormFields } from "@/composables/useTransactionForm"
+
+const { t } = useI18n()
 
 export interface TransactionFormModel extends TransactionFormFields {
   date: string
@@ -75,7 +78,7 @@ import TickerBadge from "@/components/TickerBadge.vue"
         <div class="flex-1">
         </div>
         <div class="text-right">
-          <button v-if="showViewChart !== false" type="button" class="text-xs text-accent-text hover:underline" @click="emit('view-chart')">View chart</button>
+          <button v-if="showViewChart !== false" type="button" class="text-xs text-accent-text hover:underline" @click="emit('view-chart')">{{ t("fields.viewChart") }}</button>
           <p class="text-sm font-medium tabular-nums text-text">
             <span v-if="priceLoading" class="inline-block h-4 w-16 animate-pulse rounded bg-border dark:bg-slate-700" />
             <template v-else>{{ marketPrice != null ? formatCurrency(marketPrice, txCurrency) : "—" }}</template>
@@ -86,7 +89,7 @@ import TickerBadge from "@/components/TickerBadge.vue"
 
       <div v-if="showType" class="mb-4 grid grid-cols-2 gap-4">
         <div>
-          <label :for="`${testid}-date`" class="mb-1 block text-sm text-muted">Date</label>
+          <label :for="`${testid}-date`" class="mb-1 block text-sm text-muted">{{ t("fields.date") }}</label>
           <input
             :id="`${testid}-date`"
             v-model="model.date"
@@ -97,15 +100,15 @@ import TickerBadge from "@/components/TickerBadge.vue"
           />
         </div>
         <div>
-          <label :for="`${testid}-type`" class="mb-1 block text-sm text-muted">Type</label>
+          <label :for="`${testid}-type`" class="mb-1 block text-sm text-muted">{{ t("fields.type") }}</label>
           <select :id="`${testid}-type`" v-model="model.type" class="input" :data-testid="`${testid}-type`">
-            <option value="BUY">Buy</option>
-            <option value="SELL">Sell</option>
+            <option value="BUY">{{ t("tables.holdings.buy") }}</option>
+            <option value="SELL">{{ t("tables.holdings.sell") }}</option>
           </select>
         </div>
       </div>
       <template v-else>
-        <label :for="`${testid}-date`" class="mb-1 block text-sm text-muted">Purchase Date</label>
+        <label :for="`${testid}-date`" class="mb-1 block text-sm text-muted">{{ t("fields.purchaseDate") }}</label>
         <input
           :id="`${testid}-date`"
           v-model="model.date"
@@ -118,7 +121,7 @@ import TickerBadge from "@/components/TickerBadge.vue"
 
       <div class="mb-4 grid grid-cols-2 gap-4">
         <div>
-          <label :for="`${testid}-quantity`" class="mb-1 block text-sm text-muted">Quantity</label>
+          <label :for="`${testid}-quantity`" class="mb-1 block text-sm text-muted">{{ t("fields.quantity") }}</label>
           <input
             :id="`${testid}-quantity`"
             v-model="model.quantity"
@@ -131,7 +134,7 @@ import TickerBadge from "@/components/TickerBadge.vue"
           />
         </div>
         <div>
-          <label :for="`${testid}-price`" class="mb-1 block text-sm text-muted">Price per share ({{ txCurrency }})</label>
+          <label :for="`${testid}-price`" class="mb-1 block text-sm text-muted">{{ t("fields.pricePerShare", { ccy: txCurrency }) }}</label>
           <input
             :id="`${testid}-price`"
             v-model="model.price"
@@ -146,7 +149,7 @@ import TickerBadge from "@/components/TickerBadge.vue"
         </div>
       </div>
 
-      <label :for="`${testid}-fees`" class="mb-1 block text-sm text-muted">Transaction Fees</label>
+      <label :for="`${testid}-fees`" class="mb-1 block text-sm text-muted">{{ t("fields.transactionFees") }}</label>
       <FeeFields
         v-model:fees="model.fees"
         v-model:fees-type="model.feesType"
@@ -157,7 +160,7 @@ import TickerBadge from "@/components/TickerBadge.vue"
       />
 
       <FxRateFields
-        leg="Transaction"
+        :leg="t('addPosition.legTransaction')"
         :from="txCurrency"
         :to="paymentCurrency ?? ''"
         :hidden="!paymentCurrency || paymentCurrency === txCurrency"
@@ -169,7 +172,7 @@ import TickerBadge from "@/components/TickerBadge.vue"
       />
 
       <FxRateFields
-        leg="Fee"
+        :leg="t('addPosition.legFee')"
         :from="model.feeCurrency"
         :to="paymentCurrency ?? ''"
         :date="model.date"
@@ -182,21 +185,21 @@ import TickerBadge from "@/components/TickerBadge.vue"
 
       <dl class="mb-4 rounded-lg bg-surface-2 px-3 py-2 text-sm dark:bg-slate-800/50">
         <div class="flex items-center justify-between">
-          <dt class="text-muted">Shares × Price</dt>
+          <dt class="text-muted">{{ t("fields.sharesTimesPrice") }}</dt>
           <dd class="tabular-nums text-text">
             {{ formatCurrency(tf.positionCostUSD.value, tf.instrCcy.value) }}
             <template v-if="tf.txRateValue.value != null"> ≈ {{ formatCurrency(tf.positionCostConverted.value ?? 0, paymentCurrency ?? "") }}</template>
           </dd>
         </div>
         <div v-if="tf.feeValue.value > 0" class="mt-1 flex items-center justify-between">
-          <dt class="text-muted">Fee ({{ model.feeCurrency }})</dt>
+          <dt class="text-muted">{{ t("fields.feeLabel", { ccy: model.feeCurrency }) }}</dt>
           <dd class="tabular-nums text-text">
             {{ formatCurrency(tf.feeValue.value, model.feeCurrency) }}
             <template v-if="tf.feeRateValue.value != null && model.feeCurrency !== txCurrency"> ≈ {{ formatCurrency(tf.feeInUsd.value ?? 0, txCurrency) }}</template>
           </dd>
         </div>
         <div class="mt-1 flex items-center justify-between border-t border-border pt-1 font-medium dark:border-slate-700">
-          <dt class="text-text">Total Cost</dt>
+          <dt class="text-text">{{ t("fields.totalCost") }}</dt>
           <dd class="tabular-nums text-text">
             {{ formatCurrency(tf.totalCost.value, tf.instrCcy.value) }}
             <template v-if="tf.totalCostConverted.value != null"> ≈ {{ formatCurrency(tf.totalCostConverted.value ?? 0, paymentCurrency ?? "") }}</template>

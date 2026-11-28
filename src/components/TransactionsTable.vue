@@ -12,6 +12,7 @@
  *   portfolio adds: (none — same columns minus Portfolio/Ccy)
  */
 import { computed, onMounted, ref, watch } from "vue"
+import { useI18n } from "vue-i18n"
 import { getAllTransactions, getPortfolioTransactions, deletePortfolioTransaction } from "@/api/portfolios"
 import { formatCurrency, formatDate, formatDateTime, formatNumber } from "@/utils/format"
 import { useRoute } from "vue-router"
@@ -40,6 +41,7 @@ const props = defineProps<{
 }>()
 
 const route = useRoute()
+const { t } = useI18n()
 
 // ── State ────────────────────────────────────────────────────────────────
 
@@ -69,16 +71,16 @@ const pickerTrigger = ref<TriggerRect | null>(null)
 
 const sortableColumns = computed(() => {
   const base = [
-    { key: "date",     label: "Date" },
-    { key: "type",     label: "Type" },
-    { key: "symbol",   label: "Symbol" },
-    { key: "quantity", label: "Qty" },
-    { key: "price",    label: "Price" },
-    { key: "fees",     label: "Fees" },
-    { key: "amount",   label: "Amount" },
+    { key: "date",     label: t("tables.col.date") },
+    { key: "type",     label: t("tables.col.type") },
+    { key: "symbol",   label: t("tables.col.symbol") },
+    { key: "quantity", label: t("tables.col.qty") },
+    { key: "price",    label: t("tables.col.price") },
+    { key: "fees",     label: t("tables.col.fees") },
+    { key: "amount",   label: t("tables.col.amount") },
   ]
   if (props.mode === "global") {
-    base.splice(2, 0, { key: "portfolio", label: "Portfolio" })
+    base.splice(2, 0, { key: "portfolio", label: t("tables.col.portfolio") })
   }
   return base
 })
@@ -87,18 +89,18 @@ const sortableColumns = computed(() => {
 
 type GroupMode = "none" | "assetType" | "sector" | "country"
 const groupBy    = ref<GroupMode>("none")
-const groupModes = [
-  { value: "none"      as GroupMode, label: "None" },
-  { value: "assetType" as GroupMode, label: "Kind of investment" },
-  { value: "sector"    as GroupMode, label: "Sector" },
-  { value: "country"   as GroupMode, label: "Country" },
-]
+const groupModes = computed(() => [
+  { value: "none"      as GroupMode, label: t("tables.groupNone") },
+  { value: "assetType" as GroupMode, label: t("tables.groupKind") },
+  { value: "sector"    as GroupMode, label: t("tables.groupSector") },
+  { value: "country"   as GroupMode, label: t("tables.groupCountry") },
+])
 
 function groupValue(tx: Tx, mode: GroupMode): string {
   switch (mode) {
     case "assetType": return (tx.assetType || "STOCK").charAt(0) + (tx.assetType || "STOCK").slice(1).toLowerCase()
-    case "sector":    return tx.sector  ?? "Other"
-    case "country":   return tx.country ?? "Other"
+    case "sector":    return tx.sector  ?? t("tables.holdings.other")
+    case "country":   return tx.country ?? t("tables.holdings.other")
     default:          return ""
   }
 }
@@ -145,7 +147,7 @@ async function load(targetPage = page.value) {
     page.value         = res.page
     totalPages.value   = res.totalPages
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Failed to load transactions"
+    error.value = err instanceof Error ? err.message : t("tables.transactions.loadError")
   } finally {
     loading.value = false
   }
@@ -244,17 +246,18 @@ function typeClass(type: string): string {
   return "bg-surface-2 text-muted dark:text-muted"
 }
 
-const TYPE_LABELS: Record<string, string> = {
-  BUY: "Buy",
-  SELL: "Sell",
-  DIVIDEND: "Dividend",
-  EXPIRATION: "Expiration",
-  TRANSFER_OUT: "Transfer out",
-  TRANSFER_IN: "Transfer in",
-}
-
 function typeLabel(type: string): string {
-  return TYPE_LABELS[type.toUpperCase()] ?? type.charAt(0) + type.slice(1).toLowerCase()
+  const key = type.toUpperCase()
+  const labels: Record<string, string> = {
+    BUY: t("tables.transactions.type.buy"),
+    SELL: t("tables.transactions.type.sell"),
+    DIVIDEND: t("tables.transactions.type.dividend"),
+    EXPIRATION: t("tables.transactions.type.expiration"),
+    TRANSFER_OUT: t("tables.transactions.type.transferOut"),
+    TRANSFER_IN: t("tables.transactions.type.transferIn"),
+  }
+  if (labels[key]) return labels[key]
+  return type.charAt(0) + type.slice(1).toLowerCase()
 }
 
 // ── Edit / Delete ─────────────────────────────────────────────────────
@@ -269,7 +272,7 @@ function openDelete(tx: Tx) { deleteTarget.value = tx; deleteError.value = null 
 
 function onEditSaved() {
   editing.value = null
-  notice.value  = "Transaction updated"
+  notice.value  = t("tables.transactions.updated")
   load()
 }
 
@@ -281,10 +284,10 @@ async function submitDelete() {
   try {
     await deletePortfolioTransaction(target.portfolioId, target.id)
     deleteTarget.value = null
-    notice.value       = "Transaction deleted"
+    notice.value       = t("tables.transactions.deleted")
     await load()
   } catch (err) {
-    deleteError.value = err instanceof Error ? err.message : "Failed to delete transaction"
+    deleteError.value = err instanceof Error ? err.message : t("tables.transactions.deleteError")
   } finally {
     deleteBusy.value = false
   }
@@ -324,12 +327,12 @@ const colCount = computed(() =>
     <!-- Header -->
     <div class="flex items-center justify-between border-b border-border px-5 py-3">
       <div class="flex items-center gap-3">
-        <h2 class="text-base font-semibold">{{ mode === "global" ? "All transactions" : "Transactions" }}</h2>
-        <span v-if="!loading" class="text-sm text-muted">{{ total.toLocaleString() }} total</span>
+        <h2 class="text-base font-semibold">{{ mode === "global" ? t("tables.transactions.allTitle") : t("tables.transactions.title") }}</h2>
+        <span v-if="!loading" class="text-sm text-muted">{{ t("tables.transactions.total", { count: total.toLocaleString() }) }}</span>
       </div>
       <label class="flex items-center gap-1.5 text-xs text-muted">
-        Group by
-        <select v-model="groupBy" class="input !w-auto !py-1 !text-xs" aria-label="Group by">
+        {{ t("tables.groupBy") }}
+        <select v-model="groupBy" class="input !w-auto !py-1 !text-xs" :aria-label="t('tables.groupBy')">
           <option v-for="m in groupModes" :key="m.value" :value="m.value">{{ m.label }}</option>
         </select>
       </label>
@@ -339,13 +342,13 @@ const colCount = computed(() =>
       <div class="flex flex-wrap items-center gap-3">
         <LabelFilterBar v-model="labelFilter" @manage="manageLabelsOpen = true" />
         <label class="ml-auto flex items-center gap-2 text-xs text-muted">
-          <span class="sr-only">Filter by company name or ticker</span>
+          <span class="sr-only">{{ t("tables.filterByCompany") }}</span>
           <input
             v-model="searchFilter"
             class="input !w-56 !py-1.5 !text-xs"
             type="search"
-            placeholder="Company name or ticker"
-            aria-label="Filter by company name or ticker"
+            :placeholder="t('tables.companyNameOrTicker')"
+            :aria-label="t('tables.filterByCompany')"
             data-testid="transaction-search"
           />
         </label>
@@ -355,7 +358,7 @@ const colCount = computed(() =>
     <!-- Notices -->
     <p v-if="notice" class="border-b border-border px-5 py-3 text-sm text-emerald">{{ notice }}</p>
     <p v-if="error"  class="border-b border-border px-5 py-3 text-sm text-danger">{{ error }}</p>
-    <p v-if="loading" class="px-5 py-6 text-sm text-muted">Loading transactions…</p>
+    <p v-if="loading" class="px-5 py-6 text-sm text-muted">{{ t("tables.transactions.loading") }}</p>
 
     <template v-if="!loading && !error">
       <div v-if="transactions.length" class="overflow-x-auto">
@@ -367,7 +370,7 @@ const colCount = computed(() =>
                   v-if="col.key === 'amount' && hasTaxRows"
                   data-testid="table-th-tax"
                   class="px-5 py-2.5 font-medium text-right"
-                >Tax</th>
+                >{{ t("tables.col.tax") }}</th>
                 <th
                   :data-testid="`table-th-${col.key}`"
                   class="px-5 py-2.5 font-medium"
@@ -384,7 +387,7 @@ const colCount = computed(() =>
                 </th>
               </template>
               <!-- global-only: instrument currency badge -->
-              <th v-if="mode === 'global'" class="px-5 py-2.5 font-medium text-xs">Ccy</th>
+              <th v-if="mode === 'global'" class="px-5 py-2.5 font-medium text-xs">{{ t("tables.col.ccy") }}</th>
               <!--
                 Actions stay pinned to the right edge (example-service parity, §57.2):
                 the global table is 10–11 columns and used to push Edit/Labels/
@@ -395,7 +398,7 @@ const colCount = computed(() =>
               -->
               <th
                 class="sticky right-0 z-30 bg-white px-5 py-2.5 shadow-[-1px_0_0_0_#e2e8f0] dark:bg-slate-900 dark:shadow-[-1px_0_0_0_#334155]"
-              ><span class="sr-only">Actions</span></th>
+              ><span class="sr-only">{{ t("tables.actions") }}</span></th>
             </tr>
           </thead>
 
@@ -433,7 +436,7 @@ const colCount = computed(() =>
                     :asset-type="tx.assetType"
                   />
                 </router-link>
-                <span v-if="txNotes(tx)" class="block text-[11px] font-normal text-amber-600 dark:text-amber-400" :title="txNotes(tx)">note</span>
+                <span v-if="txNotes(tx)" class="block text-[11px] font-normal text-amber-600 dark:text-amber-400" :title="txNotes(tx)">{{ t("tables.transactions.note") }}</span>
                 <LabelChips v-if="tx.labels?.length" :labels="tx.labels" :max="3" class="mt-0.5" />
               </td>
 
@@ -513,22 +516,22 @@ const colCount = computed(() =>
                 class="sticky right-0 z-10 bg-white px-5 py-3 shadow-[-1px_0_0_0_#e2e8f0] group-hover:bg-surface-2 dark:bg-slate-900 dark:shadow-[-1px_0_0_0_#334155] dark:group-hover:bg-slate-800"
               >
                 <div class="flex justify-end gap-1">
-                  <button v-if="!props.readonly" type="button" class="btn-ghost px-2 py-1 text-xs" aria-label="Edit transaction" @click="openEdit(tx)">Edit</button>
-                  <button v-if="!props.readonly" type="button" class="btn-ghost px-2 py-1 text-xs" aria-label="Set labels" @click="openLabelPicker(tx, $event)">Labels</button>
+                  <button v-if="!props.readonly" type="button" class="btn-ghost px-2 py-1 text-xs" :aria-label="t('tables.transactions.editTransaction')" @click="openEdit(tx)">{{ t("tables.transactions.edit") }}</button>
+                  <button v-if="!props.readonly" type="button" class="btn-ghost px-2 py-1 text-xs" :aria-label="t('tables.transactions.setLabels')" @click="openLabelPicker(tx, $event)">{{ t("tables.transactions.labels") }}</button>
                   <button
                     v-if="!props.readonly"
                     type="button"
                     class="btn-ghost px-2 py-1 text-xs text-danger hover:bg-red-50 dark:hover:bg-red-500/10"
-                    aria-label="Delete transaction"
+                    :aria-label="t('tables.transactions.deleteTransaction')"
                     @click="openDelete(tx)"
-                  >Delete</button>
+                  >{{ t("tables.transactions.delete") }}</button>
                 </div>
               </td>
             </tr>
 
             <!-- Group subtotal -->
             <tr v-if="g.label" class="border-t border-border bg-surface-2 font-medium">
-              <td class="px-5 py-3 text-muted" :colspan="(mode === 'global' ? 7 : 6) + (hasTaxRows ? 1 : 0)">{{ g.label }} subtotal</td>
+              <td class="px-5 py-3 text-muted" :colspan="(mode === 'global' ? 7 : 6) + (hasTaxRows ? 1 : 0)">{{ t("tables.holdings.subtotal", { label: g.label }) }}</td>
               <td
                 class="px-5 py-3 text-right font-medium tabular-nums"
                 :class="groupSubtotal(g.items) < 0 ? 'text-danger' : 'text-emerald'"
@@ -543,23 +546,23 @@ const colCount = computed(() =>
           </tbody>
         </table>
       </div>
-      <p v-else class="px-5 py-6 text-sm text-muted">No transactions found.</p>
+      <p v-else class="px-5 py-6 text-sm text-muted">{{ t("tables.transactions.noFound") }}</p>
 
       <!-- Shared full paginator (both modes) -->
       <div v-if="transactions.length" class="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3">
         <p class="text-sm text-muted">
-          {{ (page - 1) * pageSize + 1 }}–{{ Math.min(page * pageSize, total) }} of {{ total }}
+          {{ t("tables.rangeOf", { start: (page - 1) * pageSize + 1, end: Math.min(page * pageSize, total), total }) }}
         </p>
         <div class="flex items-center gap-4">
           <label class="flex items-center gap-2 text-sm text-muted">
-            Rows per page
-            <select class="input py-1" :value="pageSize" @change="onPageSizeChange">
-              <option v-for="s in pageSizes" :key="s" :value="s">{{ s }} per page</option>
+            {{ t("tables.rowsPerPage") }}
+            <select class="input py-1" :value="pageSize" :aria-label="t('tables.rowsPerPage')" @change="onPageSizeChange">
+              <option v-for="s in pageSizes" :key="s" :value="s">{{ t("tables.perPage", { count: s }) }}</option>
             </select>
           </label>
-          <nav aria-label="Pagination" class="flex items-center gap-1">
-            <button type="button" class="btn-ghost px-2 py-1 text-xs" aria-label="First page"    :disabled="page <= 1"           @click="goToPage(1)">«</button>
-            <button type="button" class="btn-ghost px-2 py-1 text-xs" aria-label="Previous page" :disabled="page <= 1"           @click="goToPage(page - 1)">‹</button>
+          <nav :aria-label="t('tables.pagination')" class="flex items-center gap-1">
+            <button type="button" class="btn-ghost px-2 py-1 text-xs" :aria-label="t('tables.firstPage')"    :disabled="page <= 1"           @click="goToPage(1)">«</button>
+            <button type="button" class="btn-ghost px-2 py-1 text-xs" :aria-label="t('tables.previousPage')" :disabled="page <= 1"           @click="goToPage(page - 1)">‹</button>
             <button
               v-for="n in pageNumbers()" :key="n" type="button"
               class="btn-ghost px-2 py-1 text-xs"
@@ -568,8 +571,8 @@ const colCount = computed(() =>
               :disabled="n === '…'"
               @click="goToPage(Number(n))"
             >{{ n }}</button>
-            <button type="button" class="btn-ghost px-2 py-1 text-xs" aria-label="Next page"  :disabled="page >= totalPages" @click="goToPage(page + 1)">›</button>
-            <button type="button" class="btn-ghost px-2 py-1 text-xs" aria-label="Last page"  :disabled="page >= totalPages" @click="goToPage(totalPages)">»</button>
+            <button type="button" class="btn-ghost px-2 py-1 text-xs" :aria-label="t('tables.nextPage')"  :disabled="page >= totalPages" @click="goToPage(page + 1)">›</button>
+            <button type="button" class="btn-ghost px-2 py-1 text-xs" :aria-label="t('tables.lastPage')"  :disabled="page >= totalPages" @click="goToPage(totalPages)">»</button>
           </nav>
         </div>
       </div>
@@ -579,7 +582,7 @@ const colCount = computed(() =>
     <EditTransactionModal v-if="!props.readonly" :open="!!editing" :transaction="editing" @close="editing = null" @saved="onEditSaved" />
     <ConfirmDeleteModal v-if="!props.readonly"
       :open="!!deleteTarget"
-      message="Are you sure you want to delete this transaction? This action cannot be undone."
+      :message="t('tables.transactions.deleteConfirm')"
       :busy="deleteBusy"
       :error="deleteError"
       @close="deleteTarget = null"

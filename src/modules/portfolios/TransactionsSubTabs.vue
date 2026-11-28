@@ -1,26 +1,29 @@
 <script setup lang="ts">
+import { computed } from "vue"
+import { useI18n } from "vue-i18n"
 import { useRoute } from "vue-router"
 
+const { t } = useI18n()
 const route = useRoute()
 
 const currentPath = route?.path ?? (typeof window !== "undefined" ? window.location.pathname : "")
 
-const tabs = [
+const tabs = computed(() => [
   {
-    label: "Portfolio Transactions",
+    label: t("portfolios.portfolioTransactions"),
     to: "/en/investments/transactions",
     match: (path: string) => path === "/en/investments/transactions",
   },
   {
-    label: "Cash Transactions",
+    label: t("portfolios.cashTransactions"),
     to: "/en/investments/transactions/cash",
     match: (path: string) => path.startsWith("/en/investments/transactions/cash"),
   },
-]
+])
 </script>
 
 <template>
-  <nav aria-label="Transaction types" class="tab-nav mb-6">
+  <nav :aria-label="t('portfolios.transactionTypes')" class="tab-nav mb-6">
     <router-link
       v-for="tab in tabs"
       :key="tab.label"

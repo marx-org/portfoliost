@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref, watch } from "vue"
+import { useI18n } from "vue-i18n"
 import { getLatestRate, type LatestRate } from "@/api/fx"
+
+const { t } = useI18n()
 
 const props = defineProps<{
   /** "Transaction" | "Fee" — leg label shown in the header */
@@ -60,7 +63,7 @@ watch([() => props.rateSource, suggestion], ([mode, sug]) => {
   <div v-if="needsConversion()" class="mb-4 rounded-xl bg-surface-2 p-3 dark:bg-slate-800/50" :data-testid="`${tid}-section`">
     <div class="flex flex-wrap items-center justify-between gap-2">
       <span class="text-xs font-medium uppercase tracking-wide text-muted dark:text-muted">
-        {{ leg }} exchange rate <span class="normal-case text-muted">({{ from }} → {{ to }})</span>
+        {{ t("fields.exchangeRate", { leg }) }} <span class="normal-case text-muted">({{ from }} → {{ to }})</span>
       </span>
       <div class="flex gap-1">
         <button
@@ -70,7 +73,7 @@ watch([() => props.rateSource, suggestion], ([mode, sug]) => {
           :data-testid="`${tid}-auto`"
           @click="emit('update:rateSource', 'automatic')"
         >
-          Automatic
+          {{ t("fields.automatic") }}
         </button>
         <button
           type="button"
@@ -79,7 +82,7 @@ watch([() => props.rateSource, suggestion], ([mode, sug]) => {
           :data-testid="`${tid}-manual`"
           @click="emit('update:rateSource', 'manual')"
         >
-          Custom
+          {{ t("fields.custom") }}
         </button>
       </div>
     </div>
@@ -90,9 +93,9 @@ watch([() => props.rateSource, suggestion], ([mode, sug]) => {
     >
       <template v-if="suggestion">
         1 {{ from }} = {{ suggestion.rate.toFixed(4) }} {{ to }}
-        <span class="text-muted">· {{ date ? `market rate on ${date}` : `daily rate · ${suggestion.asOf}` }}</span>
+        <span class="text-muted">· {{ date ? t("fields.marketRateOn", { date }) : t("fields.dailyRate", { asOf: suggestion.asOf }) }}</span>
       </template>
-      <template v-else>daily market rate</template>
+      <template v-else>{{ t("fields.dailyMarketRate") }}</template>
     </p>
     <div v-else class="mt-1.5">
       <slot name="manual" :suggestion="suggestion">
@@ -102,13 +105,13 @@ watch([() => props.rateSource, suggestion], ([mode, sug]) => {
             type="number"
             min="0"
             step="any"
-            :placeholder="suggestion ? suggestion.rate.toFixed(4) : 'e.g. 4.35'"
+            :placeholder="suggestion ? suggestion.rate.toFixed(4) : t('fields.ratePlaceholder')"
             class="input"
-            :aria-label="`Custom ${leg.toLowerCase()} exchange rate (${from} to ${to})`"
+            :aria-label="t('fields.customRateAria', { leg: leg.toLowerCase(), from, to })"
             :data-testid="`${tid}-rate`"
             @input="emit('update:rate', ($event.target as HTMLInputElement).value)"
           />
-          <span class="whitespace-nowrap text-xs text-muted">per 1 {{ from }}</span>
+          <span class="whitespace-nowrap text-xs text-muted">{{ t("fields.perOne", { from }) }}</span>
         </div>
       </slot>
     </div>

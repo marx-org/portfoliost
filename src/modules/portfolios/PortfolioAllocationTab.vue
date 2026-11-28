@@ -8,11 +8,13 @@
  * Allocation page renders. No allocation maths lives here.
  */
 import { computed, onMounted, ref } from "vue"
+import { useI18n } from "vue-i18n"
 import { useRoute } from "vue-router"
 import { getPortfolioAllocation } from "@/api/portfolios"
 import AllocationBreakdown, { type AllocationSlice } from "@/components/AllocationBreakdown.vue"
 import type { components } from "@/api/types"
 
+const { t } = useI18n()
 const route = useRoute()
 const id = String(route.params.id)
 const allocation = ref<components["schemas"]["PortfolioSnapshot"]["allocation"] | null>(null)
@@ -26,7 +28,7 @@ onMounted(async () => {
   try {
     allocation.value = await getPortfolioAllocation(id)
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Failed to load allocation"
+    error.value = err instanceof Error ? err.message : t("portfolios.loadAllocationError")
   } finally {
     loading.value = false
   }
@@ -53,7 +55,7 @@ const byCurrency = computed(() =>
 <template>
   <div class="space-y-6">
     <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-danger">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-muted">Loading allocation...</p>
+    <p v-if="loading" class="text-sm text-muted">{{ t("portfolios.loadingAllocation") }}</p>
 
     <AllocationBreakdown
       v-if="!loading && !error"

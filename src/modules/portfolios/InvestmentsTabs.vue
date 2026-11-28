@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed } from "vue"
+import { useI18n } from "vue-i18n"
 import { useRoute } from "vue-router"
 
+const { t } = useI18n()
 const route = useRoute()
 
 // §143 — `/en/investments` and `/en/investments/virtual-portfolios` render the
@@ -13,52 +15,52 @@ const currentPath = computed(
   () => route?.path ?? (typeof window !== "undefined" ? window.location.pathname : ""),
 )
 
-const tabs = [
+const tabs = computed(() => [
   {
     // §84 — first in the strip, and the landing page `/` points at.
-    label: "Accounts balance",
+    label: t("portfolios.accountsBalance"),
     to: "/en/investments/accounts-balance",
     match: (path: string) => path.startsWith("/en/investments/accounts-balance"),
   },
   {
-    label: "Portfolios",
+    label: t("portfolios.portfoliosTab"),
     to: "/en/investments",
     match: (path: string) => path === "/en/investments",
   },
   {
-    label: "Virtual Portfolios",
+    label: t("portfolios.virtualPortfolios"),
     to: "/en/investments/virtual-portfolios",
     match: (path: string) => path.startsWith("/en/investments/virtual-portfolios"),
   },
   {
-    label: "Consolidated holdings",
+    label: t("portfolios.consolidatedHoldings"),
     to: "/en/investments/holdings",
     match: (path: string) => path.startsWith("/en/investments/holdings"),
   },
   {
     // §83.6 — the cumulative (all-portfolios) performance tab. After Portfolios
     // because it summarises exactly what those cards summarise.
-    label: "Performance",
+    label: t("portfolios.performance"),
     to: "/en/investments/performance",
     match: (path: string) => path.startsWith("/en/investments/performance"),
   },
   {
-    label: "Transactions",
+    label: t("portfolios.transactions"),
     to: "/en/investments/transactions",
     match: (path: string) => path.startsWith("/en/investments/transactions"),
   },
   {
-    label: "Watchlists",
+    label: t("portfolios.watchlists"),
     to: "/en/investments/watchlist",
     match: (path: string) => path.startsWith("/en/investments/watchlist"),
   },
-]
+])
 </script>
 
 <template>
 
   <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
-    <nav aria-label="Investment sections" class="tab-nav">
+    <nav :aria-label="t('portfolios.investmentSections')" class="tab-nav">
       <router-link
         v-for="tab in tabs"
         :key="tab.label"
@@ -69,6 +71,6 @@ const tabs = [
         {{ tab.label }}
       </router-link>
     </nav>
-    <button type="button" class="btn-ghost text-sm" disabled>Import from Broker</button>
+    <button type="button" class="btn-ghost text-sm" disabled>{{ t("portfolios.importFromBroker") }}</button>
   </div>
 </template>

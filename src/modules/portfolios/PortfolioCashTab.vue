@@ -8,6 +8,7 @@
  * balance < 0.
  */
 import { computed, onMounted, ref, watch } from "vue"
+import { useI18n } from "vue-i18n"
 import { useRoute } from "vue-router"
 import {
   getPortfolioCash,
@@ -26,6 +27,7 @@ type PortfolioCash = components["schemas"]["PortfolioCash"]
 const route = useRoute()
 const id = String(route.params.id)
 const store = usePortfolioStore()
+const { t } = useI18n()
 
 const cash = ref<PortfolioCash | null>(null)
 const historyPoints = ref<Array<{ date: string; balance: number }>>([])
@@ -61,7 +63,7 @@ async function load() {
     cash.value = c
     historyPoints.value = (h.data ?? []).map((p) => ({ date: p.date, balance: p.balance }))
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Failed to load cash"
+    error.value = err instanceof Error ? err.message : t("portfolios.loadCashError")
   } finally {
     loading.value = false
   }
@@ -93,14 +95,14 @@ function onModalDone() {
 <template>
   <div class="space-y-6">
     <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-danger">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-muted">Loading cash...</p>
+    <p v-if="loading" class="text-sm text-muted">{{ t("portfolios.loadingCash") }}</p>
 
     <template v-if="!loading && cash">
       <!-- Balance block + actions -->
       <section class="card p-5">
         <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 class="text-lg font-semibold">Cash Balance</h2>
+            <h2 class="text-lg font-semibold">{{ t("portfolios.cashBalance") }}</h2>
             <p class="text-sm tabular-nums text-muted" data-testid="cash-tab-total">
               {{ formatCurrency(cash.total, baseCurrency) }}
             </p>
@@ -110,13 +112,13 @@ function onModalDone() {
                  primary, the rest secondary — the same pattern as the portfolio header
                  (Share/Rename vs Add Position). `btn-ghost` is for secondary affordances
                  (pagination, inline row actions), not for peers of Deposit (#73). -->
-            <button type="button" class="btn-primary text-sm" data-testid="cash-tab-deposit" @click="openModal('deposit')">Deposit</button>
-            <button type="button" class="btn-secondary text-sm" data-testid="cash-tab-withdraw" @click="openModal('withdraw')">Withdraw</button>
-            <button type="button" class="btn-secondary text-sm" data-testid="cash-tab-transfer" @click="openModal('transfer')">Transfer</button>
+            <button type="button" class="btn-primary text-sm" data-testid="cash-tab-deposit" @click="openModal('deposit')">{{ t("tables.cash.deposit") }}</button>
+            <button type="button" class="btn-secondary text-sm" data-testid="cash-tab-withdraw" @click="openModal('withdraw')">{{ t("tables.cash.withdraw") }}</button>
+            <button type="button" class="btn-secondary text-sm" data-testid="cash-tab-transfer" @click="openModal('transfer')">{{ t("tables.cash.transfer") }}</button>
             <!-- #245 — the kinds a broker account has but a trade sheet does not. -->
-            <button type="button" class="btn-secondary text-sm" data-testid="cash-tab-interest" @click="openModal('interest')">Interest</button>
-            <button type="button" class="btn-secondary text-sm" data-testid="cash-tab-fee" @click="openModal('fee')">Charge</button>
-            <button type="button" class="btn-secondary text-sm" data-testid="cash-tab-conversion" @click="openModal('conversion')">Conversion</button>
+            <button type="button" class="btn-secondary text-sm" data-testid="cash-tab-interest" @click="openModal('interest')">{{ t("tables.cash.interest") }}</button>
+            <button type="button" class="btn-secondary text-sm" data-testid="cash-tab-fee" @click="openModal('fee')">{{ t("tables.cash.charge") }}</button>
+            <button type="button" class="btn-secondary text-sm" data-testid="cash-tab-conversion" @click="openModal('conversion')">{{ t("tables.cash.conversion") }}</button>
           </div>
         </div>
 
@@ -126,7 +128,7 @@ function onModalDone() {
           class="mb-4 rounded-lg bg-amber-50 dark:bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-300"
           data-testid="cash-negative-badge"
         >
-          <span class="font-semibold">Negative cash:</span>
+          <span class="font-semibold">{{ t("portfolios.negativeCash") }}</span>
           <span v-for="b in negativeBalances" :key="b.currency" class="ml-1 tabular-nums">
             {{ b.currency }} {{ formatSignedCurrency(b.balance, b.currency) }}
           </span>
@@ -150,7 +152,7 @@ function onModalDone() {
 
       <!-- Balance history chart -->
       <section class="card p-5">
-        <h2 class="mb-4 text-lg font-semibold">Balance History</h2>
+        <h2 class="mb-4 text-lg font-semibold">{{ t("portfolios.balanceHistory") }}</h2>
         <CashBalanceChart
           :points="historyPoints"
           :busy="chartBusy"

@@ -13,6 +13,7 @@
  *   portfolio adds: Balance (the row's own-currency running ledger balance)
  */
 import { computed, onMounted, ref, watch } from "vue"
+import { useI18n } from "vue-i18n"
 import {
   getPortfolioCash,
   getPortfolioCashTransactions,
@@ -83,6 +84,7 @@ const props = defineProps<{
 
 const transactions = ref<Tx[]>([])
 const portfoliosStore = usePortfolioStore()
+const { t } = useI18n()
 const total        = ref(0)
 const page         = ref(1)
 const totalPages   = ref(1)
@@ -167,7 +169,7 @@ const addCashForModal = computed<PortfolioCash>(() =>
 async function openAdd(action: CashAction) {
   const portfolioId = addPortfolioId.value || addPortfolios.value[0]?.id
   if (!portfolioId) {
-    addError.value = "No portfolio to record a cash event into."
+    addError.value = t("tables.cash.noPortfolio")
     return
   }
   addBusy.value = true
@@ -179,7 +181,7 @@ async function openAdd(action: CashAction) {
     addAction.value = action
     addOpen.value = true
   } catch (err) {
-    addError.value = err instanceof Error ? err.message : "Failed to load that portfolio's cash"
+    addError.value = err instanceof Error ? err.message : t("tables.cash.loadPortfolioCashError")
   } finally {
     addBusy.value = false
   }
@@ -187,7 +189,7 @@ async function openAdd(action: CashAction) {
 
 function onAddDone() {
   addOpen.value = false
-  notice.value = "Cash event recorded"
+  notice.value = t("tables.cash.recorded")
   void load()
 }
 
@@ -195,14 +197,14 @@ function onAddDone() {
 
 const sortableColumns = computed(() => {
   const base = [
-    { key: "date",   label: "Date" },
-    { key: "type",   label: "Type" },
-    { key: "amount", label: "Amount" },
+    { key: "date",   label: t("tables.col.date") },
+    { key: "type",   label: t("tables.col.type") },
+    { key: "amount", label: t("tables.col.amount") },
   ]
   if (props.mode === "global") {
-    base.splice(1, 0, { key: "portfolioName", label: "Portfolio" })
+    base.splice(1, 0, { key: "portfolioName", label: t("tables.col.portfolio") })
   } else {
-    base.splice(3, 0, { key: "balance", label: "Balance" })
+    base.splice(3, 0, { key: "balance", label: t("tables.col.balance") })
   }
   return base
 })
@@ -271,7 +273,7 @@ async function load(targetPage = page.value) {
       totalPages.value   = res.totalPages
     }
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Failed to load cash transactions"
+    error.value = err instanceof Error ? err.message : t("tables.cash.loadError")
   } finally {
     loading.value = false
   }
@@ -355,7 +357,17 @@ function dateLabel(tx: Tx): string {
 }
 
 function typeLabel(tx: Tx): string {
-  return tx.displayLabel ?? cashTypeLabel(tx.type)
+  if (tx.displayLabel) return tx.displayLabel
+  const key = String(tx.type).toUpperCase()
+  const labels: Record<string, string> = {
+    DEPOSIT: t("tables.cash.deposit"),
+    WITHDRAWAL: t("tables.cash.withdrawal"),
+    TRANSFER: t("tables.cash.transfer"),
+    INTEREST: t("tables.cash.interest"),
+    FEE: t("tables.cash.fee"),
+    FX_CONVERSION: t("tables.cash.conversion"),
+  }
+  return labels[key] ?? cashTypeLabel(tx.type)
 }
 
 /** The currency of a conversion's second leg, or null when there is none —
@@ -382,7 +394,7 @@ async function openEdit(tx: Tx) {
 function onEditDone() {
   modalOpen.value = false
   editing.value   = null
-  notice.value    = "Transaction updated"
+  notice.value    = t("tables.cash.updated")
   void load()
 }
 
@@ -422,10 +434,10 @@ async function submitDelete() {
   try {
     await deleteCashTransaction(target.id)
     deleteTarget.value = null
-    notice.value       = "Transaction deleted"
+    notice.value       = t("tables.cash.deleted")
     await load()
   } catch (err) {
-    deleteError.value = err instanceof Error ? err.message : "Failed to delete transaction"
+    deleteError.value = err instanceof Error ? err.message : t("tables.cash.deleteError")
   } finally {
     deleteBusy.value = false
   }
@@ -455,8 +467,8 @@ function onPickerSaved() {
   <div class="card overflow-hidden">
     <div class="flex items-center justify-between border-b border-border px-5 py-3">
       <div class="flex items-center gap-3">
-        <h2 class="text-base font-semibold">Cash transactions</h2>
-        <span v-if="!loading" class="text-sm text-muted">{{ total.toLocaleString() }} total</span>
+        <h2 class="text-base font-semibold">{{ t("tables.cash.title") }}</h2>
+        <span v-if="!loading" class="text-sm text-muted">{{ t("tables.cash.total", { count: total.toLocaleString() }) }}</span>
       </div>
     </div>
 
@@ -464,13 +476,13 @@ function onPickerSaved() {
       <div class="flex flex-wrap items-center gap-3">
         <LabelFilterBar v-model="labelFilter" @manage="manageLabelsOpen = true" />
         <label class="ml-auto flex items-center gap-2 text-xs text-muted">
-          <span class="sr-only">Filter by company name or ticker</span>
+          <span class="sr-only">{{ t("tables.cash.filterByCompany") }}</span>
           <input
             v-model="searchFilter"
             class="input !w-56 !py-1.5 !text-xs"
             type="search"
-            placeholder="Company name or ticker"
-            aria-label="Filter by company name or ticker"
+            :placeholder="t('tables.cash.companyNameOrTicker')"
+            :aria-label="t('tables.cash.filterByCompany')"
             data-testid="cash-transaction-search"
           />
         </label>
@@ -483,11 +495,11 @@ function onPickerSaved() {
     <div v-if="mode === 'global'" class="border-b border-border px-5 py-2">
       <div class="flex flex-wrap items-center gap-2">
         <label class="flex items-center gap-2 text-xs text-muted">
-          <span class="sr-only">Portfolio to record the cash event into</span>
+          <span class="sr-only">{{ t("tables.cash.portfolioToRecord") }}</span>
           <select
             v-model="addPortfolioId"
             class="input !w-40 !py-1.5 !text-xs"
-            aria-label="Portfolio to record the cash event into"
+            :aria-label="t('tables.cash.portfolioToRecord')"
             data-testid="cash-add-portfolio"
           >
             <option v-for="portfolio in addPortfolios" :key="portfolio.id" :value="portfolio.id">
@@ -495,20 +507,20 @@ function onPickerSaved() {
             </option>
           </select>
         </label>
-        <button type="button" class="btn-primary text-sm" data-testid="cash-add-deposit" @click="openAdd('deposit')">Deposit</button>
-        <button type="button" class="btn-secondary text-sm" data-testid="cash-add-withdraw" @click="openAdd('withdraw')">Withdraw</button>
-        <button type="button" class="btn-secondary text-sm" data-testid="cash-add-transfer" @click="openAdd('transfer')">Transfer</button>
-        <button type="button" class="btn-secondary text-sm" data-testid="cash-add-interest" @click="openAdd('interest')">Interest</button>
-        <button type="button" class="btn-secondary text-sm" data-testid="cash-add-fee" @click="openAdd('fee')">Charge</button>
-        <button type="button" class="btn-secondary text-sm" data-testid="cash-add-conversion" @click="openAdd('conversion')">Conversion</button>
-        <span v-if="addBusy" class="text-xs text-muted">Loading portfolio cash…</span>
+        <button type="button" class="btn-primary text-sm" data-testid="cash-add-deposit" @click="openAdd('deposit')">{{ t("tables.cash.deposit") }}</button>
+        <button type="button" class="btn-secondary text-sm" data-testid="cash-add-withdraw" @click="openAdd('withdraw')">{{ t("tables.cash.withdraw") }}</button>
+        <button type="button" class="btn-secondary text-sm" data-testid="cash-add-transfer" @click="openAdd('transfer')">{{ t("tables.cash.transfer") }}</button>
+        <button type="button" class="btn-secondary text-sm" data-testid="cash-add-interest" @click="openAdd('interest')">{{ t("tables.cash.interest") }}</button>
+        <button type="button" class="btn-secondary text-sm" data-testid="cash-add-fee" @click="openAdd('fee')">{{ t("tables.cash.charge") }}</button>
+        <button type="button" class="btn-secondary text-sm" data-testid="cash-add-conversion" @click="openAdd('conversion')">{{ t("tables.cash.conversion") }}</button>
+        <span v-if="addBusy" class="text-xs text-muted">{{ t("tables.cash.loadingPortfolioCash") }}</span>
       </div>
     </div>
 
     <p v-if="notice" class="border-b border-border px-5 py-3 text-sm text-emerald">{{ notice }}</p>
     <p v-if="addError" class="border-b border-border px-5 py-3 text-sm text-danger">{{ addError }}</p>
     <p v-if="error"  class="border-b border-border px-5 py-3 text-sm text-danger">{{ error }}</p>
-    <p v-if="loading" class="px-5 py-6 text-sm text-muted">Loading cash transactions…</p>
+    <p v-if="loading" class="px-5 py-6 text-sm text-muted">{{ t("tables.cash.loading") }}</p>
 
     <template v-if="!loading && !error">
       <div v-if="transactions.length" class="overflow-x-auto">
@@ -531,13 +543,13 @@ function onPickerSaved() {
                   </button>
                 </th>
               </template>
-              <th class="px-5 py-2.5 font-medium">Description</th>
+              <th class="px-5 py-2.5 font-medium">{{ t("tables.cash.description") }}</th>
               <!-- Sticky actions — example-service parity (§57.2); 6 columns do not
                    overflow at 1280 today, but this keeps them reachable on a
                    narrow viewport. -->
               <th
                 class="sticky right-0 z-30 bg-white px-5 py-2.5 shadow-[-1px_0_0_0_#e2e8f0] dark:bg-slate-900 dark:shadow-[-1px_0_0_0_#334155]"
-              ><span class="sr-only">Actions</span></th>
+              ><span class="sr-only">{{ t("tables.actions") }}</span></th>
             </tr>
           </thead>
 
@@ -587,26 +599,26 @@ function onPickerSaved() {
                   <button
                     type="button"
                     class="btn-ghost px-2 py-1 text-xs"
-                    aria-label="Set labels"
+                    :aria-label="t('tables.cash.setLabels')"
                     @click="openLabelPicker(tx, $event)"
                   >
-                    Labels
+                    {{ t("tables.cash.labels") }}
                   </button>
                   <button
                     type="button"
                     class="btn-ghost px-2 py-1 text-xs"
-                    aria-label="Edit transaction"
+                    :aria-label="t('tables.cash.editTransaction')"
                     @click="openEdit(tx)"
                   >
-                    Edit
+                    {{ t("tables.cash.edit") }}
                   </button>
                   <button
                     type="button"
                     class="btn-ghost px-2 py-1 text-xs text-danger hover:bg-red-50 dark:hover:bg-red-500/10"
-                    aria-label="Delete transaction"
+                    :aria-label="t('tables.cash.deleteTransaction')"
                     @click="openDelete(tx)"
                   >
-                    Delete
+                    {{ t("tables.cash.delete") }}
                   </button>
                 </div>
               </td>
@@ -615,24 +627,24 @@ function onPickerSaved() {
         </table>
       </div>
       <p v-else class="px-5 py-6 text-sm text-muted">
-        {{ mode === "global" ? "No cash transactions found." : "No cash transactions yet." }}
+        {{ mode === "global" ? t("tables.cash.emptyGlobal") : t("tables.cash.empty") }}
       </p>
 
       <!-- Shared full paginator (both modes) -->
       <div v-if="transactions.length" class="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3 dark:border-slate-700/60">
         <p class="text-sm text-muted">
-          {{ (page - 1) * pageSize + 1 }}–{{ Math.min(page * pageSize, total) }} of {{ total }}
+          {{ t("tables.rangeOf", { start: (page - 1) * pageSize + 1, end: Math.min(page * pageSize, total), total }) }}
         </p>
         <div class="flex items-center gap-4">
           <label class="flex items-center gap-2 text-sm text-muted">
-            Rows per page
-            <select class="input py-1" :value="pageSize" @change="onPageSizeChange">
-              <option v-for="s in pageSizes" :key="s" :value="s">{{ s }} per page</option>
+            {{ t("tables.rowsPerPage") }}
+            <select class="input py-1" :value="pageSize" :aria-label="t('tables.rowsPerPage')" @change="onPageSizeChange">
+              <option v-for="s in pageSizes" :key="s" :value="s">{{ t("tables.perPage", { count: s }) }}</option>
             </select>
           </label>
-          <nav aria-label="Pagination" class="flex items-center gap-1">
-            <button type="button" class="btn-ghost px-2 py-1 text-xs" aria-label="First page"    :disabled="page <= 1"           @click="goToPage(1)">«</button>
-            <button type="button" class="btn-ghost px-2 py-1 text-xs" aria-label="Previous page" :disabled="page <= 1"           @click="goToPage(page - 1)">‹</button>
+          <nav :aria-label="t('tables.pagination')" class="flex items-center gap-1">
+            <button type="button" class="btn-ghost px-2 py-1 text-xs" :aria-label="t('tables.firstPage')"    :disabled="page <= 1"           @click="goToPage(1)">«</button>
+            <button type="button" class="btn-ghost px-2 py-1 text-xs" :aria-label="t('tables.previousPage')" :disabled="page <= 1"           @click="goToPage(page - 1)">‹</button>
             <button
               v-for="n in pageNumbers()" :key="n" type="button"
               class="btn-ghost px-2 py-1 text-xs"
@@ -641,8 +653,8 @@ function onPickerSaved() {
               :disabled="n === '…'"
               @click="goToPage(Number(n))"
             >{{ n }}</button>
-            <button type="button" class="btn-ghost px-2 py-1 text-xs" aria-label="Next page"  :disabled="page >= totalPages"  @click="goToPage(page + 1)">›</button>
-            <button type="button" class="btn-ghost px-2 py-1 text-xs" aria-label="Last page"  :disabled="page >= totalPages"  @click="goToPage(totalPages)">»</button>
+            <button type="button" class="btn-ghost px-2 py-1 text-xs" :aria-label="t('tables.nextPage')"  :disabled="page >= totalPages"  @click="goToPage(page + 1)">›</button>
+            <button type="button" class="btn-ghost px-2 py-1 text-xs" :aria-label="t('tables.lastPage')"  :disabled="page >= totalPages"  @click="goToPage(totalPages)">»</button>
           </nav>
         </div>
       </div>
@@ -675,7 +687,7 @@ function onPickerSaved() {
 
     <ConfirmDeleteModal
       :open="!!deleteTarget"
-      message="Are you sure you want to delete this transaction?"
+      :message="t('tables.cash.deleteConfirm')"
       :busy="deleteBusy"
       :error="deleteError"
       @close="deleteTarget = null"

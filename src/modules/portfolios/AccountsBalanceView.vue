@@ -122,6 +122,7 @@ export function accountsBalanceTotals(rows: AccountsBalanceRow[]): AccountsBalan
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue"
+import { useI18n } from "vue-i18n"
 import { storeToRefs } from "pinia"
 import { useRouter } from "vue-router"
 import { usePortfolioStore } from "@/stores/portfolios"
@@ -131,6 +132,7 @@ import { useCurrenciesStore } from "@/stores/currencies"
 import { formatCurrency, formatPercent, formatSignedCurrency } from "@/utils/format"
 import InvestmentsTabs from "@/modules/portfolios/InvestmentsTabs.vue"
 
+const { t } = useI18n()
 const store = usePortfolioStore()
 const router = useRouter()
 const loading = ref(true)
@@ -158,15 +160,15 @@ function setDisplayCurrency(currency: string) {
 
 // ── Table ──────────────────────────────────────────────────────────────────
 
-const columns: Array<{ key: AccountsBalanceSortKey; label: string; testid: string; align?: string }> = [
-  { key: "name", label: "Account", testid: "account" },
-  { key: "instrumentsValue", label: "Investments", testid: "investments", align: "text-right" },
-  { key: "cashValue", label: "Free cash", testid: "cash", align: "text-right" },
-  { key: "totalValue", label: "Total", testid: "total", align: "text-right" },
-  { key: "capitalBasis", label: "Deposits", testid: "deposits", align: "text-right" },
-  { key: "gainLoss", label: "P/L", testid: "gain", align: "text-right" },
-  { key: "returnPercentage", label: "Return %", testid: "return", align: "text-right" },
-]
+const columns = computed<Array<{ key: AccountsBalanceSortKey; label: string; testid: string; align?: string }>>(() => [
+  { key: "name", label: t("portfolios.colAccount"), testid: "account" },
+  { key: "instrumentsValue", label: t("portfolios.colInvestments"), testid: "investments", align: "text-right" },
+  { key: "cashValue", label: t("portfolios.colFreeCash"), testid: "cash", align: "text-right" },
+  { key: "totalValue", label: t("portfolios.colTotal"), testid: "total", align: "text-right" },
+  { key: "capitalBasis", label: t("portfolios.colDeposits"), testid: "deposits", align: "text-right" },
+  { key: "gainLoss", label: t("portfolios.colPL"), testid: "gain", align: "text-right" },
+  { key: "returnPercentage", label: t("portfolios.colReturn"), testid: "return", align: "text-right" },
+])
 
 // The spreadsheet's row order is Total descending — the biggest account first.
 const sortKey = ref<AccountsBalanceSortKey>("totalValue")
@@ -228,7 +230,7 @@ onMounted(async () => {
   try {
     await store.fetchAll()
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Failed to load accounts"
+    error.value = err instanceof Error ? err.message : t("portfolios.loadAccountsError")
   } finally {
     loading.value = false
   }
@@ -239,16 +241,15 @@ onMounted(async () => {
   <div>
     <div class="page-header">
       <div>
-        <p class="page-eyebrow"><span class="signal-dot" /> PORTFOLIOS</p>
-        <h1 class="page-title">Accounts balance</h1>
+        <p class="page-eyebrow"><span class="signal-dot" /> {{ t("portfolios.eyebrowPortfolios") }}</p>
+        <h1 class="page-title">{{ t("portfolios.accountsBalanceTitle") }}</h1>
         <p v-if="store.totalMetrics" class="page-description">
-          {{ rows.length }} account{{ rows.length === 1 ? "" : "s" }} &middot; base currency
-          {{ store.totalMetrics.baseCurrency }}
+          {{ t("portfolios.accountsDescription", { count: rows.length, ccy: store.totalMetrics.baseCurrency }) }}
         </p>
       </div>
       <div class="relative">
         <button type="button" class="btn-secondary text-sm" @click="showCurrencyMenu = !showCurrencyMenu">
-          Display currency: {{ displayCurrency }} ({{ currencySymbol(displayCurrency) }})
+          {{ t("portfolios.displayCurrency", { code: displayCurrency, symbol: currencySymbol(displayCurrency) }) }}
           <span class="ml-1 text-xs text-muted dark:text-muted">▾</span>
         </button>
         <template v-if="showCurrencyMenu">
@@ -275,7 +276,7 @@ onMounted(async () => {
     <InvestmentsTabs />
 
     <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-danger dark:bg-red-500/10 dark:text-red-400">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-muted">Loading accounts...</p>
+    <p v-if="loading" class="text-sm text-muted">{{ t("portfolios.loadingAccounts") }}</p>
 
     <div v-else-if="rows.length" class="card max-h-[70vh] overflow-auto">
       <table class="min-w-full text-xs sm:text-sm" data-testid="accounts-balance">
@@ -351,7 +352,7 @@ onMounted(async () => {
             <td
               class="sticky left-0 z-30 bg-surface-2 px-3 py-3.5 sm:px-5 sm:py-2.5 shadow-[-1px_0_0_0_#e2e8f0] dark:bg-slate-800 dark:shadow-[-1px_0_0_0_#334155]"
             >
-              <span class="text-xs uppercase tracking-wide text-muted">Total</span>
+              <span class="text-xs uppercase tracking-wide text-muted">{{ t("portfolios.totalLabel") }}</span>
             </td>
             <td class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right tabular-nums text-text" data-testid="accounts-balance-totals-investments">{{ money(totals.instrumentsValue) }}</td>
             <td class="px-3 py-3.5 sm:px-5 sm:py-2.5 text-right tabular-nums text-text" data-testid="accounts-balance-totals-cash">{{ money(totals.cashValue) }}</td>
@@ -376,6 +377,6 @@ onMounted(async () => {
       </table>
     </div>
 
-    <p v-else-if="!error" class="text-sm text-muted">No accounts yet.</p>
+    <p v-else-if="!error" class="text-sm text-muted">{{ t("portfolios.noAccounts") }}</p>
   </div>
 </template>
