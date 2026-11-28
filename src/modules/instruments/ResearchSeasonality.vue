@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue"
+import { useI18n } from "vue-i18n"
 import { getInstrumentSeasonality } from "@/api/instruments"
 import { withSharedChart } from "@/utils/chartOptions"
 
 const props = defineProps<{ symbol: string }>()
+const { t } = useI18n()
 
 const yearsOptions = [3, 5, 10, 20]
 const metricOptions = ["avg", "med", "min", "max"] as const
@@ -49,7 +51,7 @@ const chartOptions = computed(() => withSharedChart({
 <template>
   <div class="card p-6">
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-      <h2 class="card-title">Seasonality</h2>
+      <h2 class="card-title">{{ t("research.seasonality") }}</h2>
       <div class="flex flex-wrap items-center gap-3 text-xs">
         <div class="flex overflow-hidden rounded-md border border-border">
           <button
@@ -79,13 +81,13 @@ const chartOptions = computed(() => withSharedChart({
     </div>
 
     <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-danger">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-muted">Loading seasonality...</p>
+    <p v-if="loading" class="text-sm text-muted">{{ t("research.loadingSeasonality") }}</p>
     <component
       :is="'apexchart'"
       v-else-if="monthly.length"
       :options="chartOptions"
       :series="chartOptions.series"
     />
-    <p v-else class="text-sm text-muted">No seasonality data available.</p>
+    <p v-else class="text-sm text-muted">{{ t("research.noSeasonality") }}</p>
   </div>
 </template>

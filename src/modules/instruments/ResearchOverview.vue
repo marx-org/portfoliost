@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue"
+import { useI18n } from "vue-i18n"
 import { useRoute } from "vue-router"
 import * as instrumentsApi from "@/api/instruments"
 import { ApiError } from "@/api/client"
@@ -16,6 +17,7 @@ import { withSharedChart } from "@/utils/chartOptions"
 import { resolveInstrumentCurrency } from "@/utils/instrumentCurrency"
 
 const route = useRoute()
+const { t } = useI18n()
 const symbol = String(route.params.symbol).toUpperCase()
 
 const profile = ref<InstrumentsProfile | null>(null)
@@ -63,7 +65,7 @@ onMounted(async () => {
     if (notFound) {
       limitedCoverage.value = true
     } else {
-      error.value = p.reason instanceof Error ? p.reason.message : "Failed to load research data"
+      error.value = p.reason instanceof Error ? p.reason.message : t("research.loadResearchError")
     }
   } else {
     // Provider tier has no market data for this market (e.g. WSE) — identity
@@ -112,11 +114,11 @@ const profileStats = computed(() => {
   const o = overview.value
   if (!o) return []
   return [
-    stat("Market Cap", formatCompact(o.marketCap)),
-    stat("EV", formatCompact(o.enterpriseValue)),
-    stat("Shares Out", formatCompact(o.sharesOutstanding)),
-    stat("Revenue", formatCompact(o.revenue)),
-    stat("Employees", formatCompact(o.employees)),
+    stat(t("research.statMarketCap"), formatCompact(o.marketCap)),
+    stat(t("research.statEv"), formatCompact(o.enterpriseValue)),
+    stat(t("research.statSharesOut"), formatCompact(o.sharesOutstanding)),
+    stat(t("research.statRevenue"), formatCompact(o.revenue)),
+    stat(t("research.statEmployees"), formatCompact(o.employees)),
   ]
 })
 
@@ -125,10 +127,10 @@ const marginStats = computed(() => {
   const margins = m?.margins
   if (!m || !margins) return []
   return [
-    stat("Gross", formatPercent(margins.grossMargin)),
-    stat("EBITDA", formatPercent(margins.ebitdaMargin)),
-    stat("Operating", formatPercent(margins.operatingMargin)),
-    stat("Net", formatPercent(margins.netProfitMargin)),
+    stat(t("research.statGross"), formatPercent(margins.grossMargin)),
+    stat(t("research.statEbitda"), formatPercent(margins.ebitdaMargin)),
+    stat(t("research.statOperating"), formatPercent(margins.operatingMargin)),
+    stat(t("research.statNet"), formatPercent(margins.netProfitMargin)),
   ]
 })
 
@@ -136,9 +138,9 @@ const returnStats = computed(() => {
   const ce = metrics.value?.capitalEfficiency
   if (!ce) return []
   return [
-    stat("ROA", formatPercent(ce.returnOnAssets)),
-    stat("ROTA", formatPercent(ce.returnOnTotalAssets)),
-    stat("ROE", formatPercent(ce.returnOnEquity)),
+    stat(t("research.statRoa"), formatPercent(ce.returnOnAssets)),
+    stat(t("research.statRota"), formatPercent(ce.returnOnTotalAssets)),
+    stat(t("research.statRoe"), formatPercent(ce.returnOnEquity)),
   ]
 })
 
@@ -146,13 +148,13 @@ const valuationStats = computed(() => {
   const tv = metrics.value?.trailingValuation
   if (!tv) return []
   return [
-    stat("P/E", formatNumber(tv.peRatio)),
-    stat("P/B", formatNumber(tv.pbRatio)),
-    stat("P/FCF", formatNumber(tv.priceToFcf)),
-    stat("EV/Sales", formatNumber(tv.evToSales)),
-    stat("EV/EBITDA", formatNumber(tv.evToEBITDA)),
-    stat("EV/Gross Profit", formatNumber(tv.evToGrossProfit)),
-    stat("Div Yield", formatPercent(tv.dividendYield)),
+    stat(t("research.statPe"), formatNumber(tv.peRatio)),
+    stat(t("research.statPb"), formatNumber(tv.pbRatio)),
+    stat(t("research.statPfcf"), formatNumber(tv.priceToFcf)),
+    stat(t("research.statEvsales"), formatNumber(tv.evToSales)),
+    stat(t("research.statEvebitda"), formatNumber(tv.evToEBITDA)),
+    stat(t("research.statEvgrossprofit"), formatNumber(tv.evToGrossProfit)),
+    stat(t("research.statDivYield"), formatPercent(tv.dividendYield)),
   ]
 })
 
@@ -160,8 +162,8 @@ const valuationNtmStats = computed(() => {
   const tv = metrics.value?.trailingValuation
   if (!tv) return []
   return [
-    stat("PEG", formatNumber(tv.pegRatio)),
-    stat("Price Target", formatAmount(tv.priceTarget, instrCcy.value)),
+    stat(t("research.statPeg"), formatNumber(tv.pegRatio)),
+    stat(t("research.statPriceTarget"), formatAmount(tv.priceTarget, instrCcy.value)),
   ]
 })
 
@@ -170,10 +172,10 @@ const healthStats = computed(() => {
   const fh = metrics.value?.financialHealth
   if (!o) return []
   return [
-    stat("Cash", formatCompact(o.cash)),
-    stat("Net Debt", formatCompact(o.netDebt)),
-    stat("Current Ratio", formatNumber(fh?.currentRatio)),
-    stat("Quick Ratio", formatNumber(fh?.quickRatio)),
+    stat(t("research.statCash"), formatCompact(o.cash)),
+    stat(t("research.statNetDebt"), formatCompact(o.netDebt)),
+    stat(t("research.statCurrentRatio"), formatNumber(fh?.currentRatio)),
+    stat(t("research.statQuickRatio"), formatNumber(fh?.quickRatio)),
   ]
 })
 
@@ -181,10 +183,10 @@ const dividendStats = computed(() => {
   const tv = metrics.value?.trailingValuation
   if (!tv) return []
   return [
-    stat("Yield", formatPercent(tv.dividendYield)),
-    stat("Payout Ratio", formatPercent(tv.payoutRatio)),
-    stat("DPS", formatAmount(tv.dividendPerShare, instrCcy.value)),
-    stat("DPS Growth 5Yr", formatPercent(tv.dpsGrowth5yr)),
+    stat(t("research.statYield"), formatPercent(tv.dividendYield)),
+    stat(t("research.statPayoutRatio"), formatPercent(tv.payoutRatio)),
+    stat(t("research.statDps"), formatAmount(tv.dividendPerShare, instrCcy.value)),
+    stat(t("research.statDpsGrowth5y"), formatPercent(tv.dpsGrowth5yr)),
   ]
 })
 
@@ -192,14 +194,14 @@ const growthStats = computed(() => {
   const o = overview.value
   if (!o) return []
   return [
-    stat("Rev 3Yr", formatPercent(o.revenueGrowth3yr)),
-    stat("Rev 5Yr", formatPercent(o.revenueGrowth5yr)),
-    stat("Rev 10Yr", formatPercent(o.revenueGrowth10yr)),
-    stat("EPS 3Yr", formatPercent(o.epsGrowth3yr)),
-    stat("EPS 5Yr", formatPercent(o.epsGrowth5yr)),
-    stat("EPS 10Yr", formatPercent(o.epsGrowth10yr)),
-    stat("Rev Fwd", formatPercent(o.revenueGrowthFwd)),
-    stat("EPS Fwd", formatPercent(o.epsGrowthFwd)),
+    stat(t("research.statRev3y"), formatPercent(o.revenueGrowth3yr)),
+    stat(t("research.statRev5y"), formatPercent(o.revenueGrowth5yr)),
+    stat(t("research.statRev10y"), formatPercent(o.revenueGrowth10yr)),
+    stat(t("research.statEps3y"), formatPercent(o.epsGrowth3yr)),
+    stat(t("research.statEps5y"), formatPercent(o.epsGrowth5yr)),
+    stat(t("research.statEps10y"), formatPercent(o.epsGrowth10yr)),
+    stat(t("research.statRevFwd"), formatPercent(o.revenueGrowthFwd)),
+    stat(t("research.statEpsFwd"), formatPercent(o.epsGrowthFwd)),
   ]
 })
 
@@ -236,11 +238,11 @@ const targetSpread = computed(() => {
         <path fill-rule="evenodd" d="M18 10A8 8 0 1 1 2 10a8 8 0 0 1 16 0Zm-8-4a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 6Zm0 8a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z" clip-rule="evenodd" />
       </svg>
       <span>
-        <span class="font-medium">Limited data availability.</span>
-        Market data for this listing is not covered by our data providers yet<template v-if="profile"> — basic instrument facts below come from the ticker reference database</template>.
+        <span class="font-medium">{{ t("research.limitedData") }}</span>
+        {{ t("research.limitedDataBody") }}<template v-if="profile">{{ t("research.limitedDataFacts") }}</template>.
       </span>
     </div>
-    <p v-if="loading" class="text-sm text-muted">Loading research data...</p>
+    <p v-if="loading" class="text-sm text-muted">{{ t("research.loadingResearch") }}</p>
 
     <template v-if="!loading && !error">
       <div class="flex items-start gap-3">
@@ -265,7 +267,7 @@ const targetSpread = computed(() => {
       </div>
 
       <div v-if="descriptionParagraphs.length" class="card p-6">
-        <h2 class="card-title mb-3">About {{ profile?.name ?? symbol }}</h2>
+        <h2 class="card-title mb-3">{{ t("research.aboutName", { name: profile?.name ?? symbol }) }}</h2>
         <p v-for="(p, i) in visibleParagraphs" :key="i" class="mb-3 text-sm leading-relaxed text-text last:mb-0">{{ p }}</p>
         <button
           v-if="descriptionParagraphs.length > 1"
@@ -273,30 +275,30 @@ const targetSpread = computed(() => {
           class="mt-2 text-sm font-medium text-accent-text hover:underline"
           @click="showFullDescription = !showFullDescription"
         >
-          {{ showFullDescription ? "Show less" : "Show more" }}
+          {{ showFullDescription ? t("research.showLess") : t("research.showMore") }}
         </button>
       </div>
 
       <div v-if="priceTarget" class="card p-6">
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 class="card-title">Analyst Price Target</h2>
-          <span class="text-xs text-muted">{{ priceTarget.numberAnalysts }} analysts · {{ priceTarget.lastUpdated }}</span>
+          <h2 class="card-title">{{ t("research.analystPriceTarget") }}</h2>
+          <span class="text-xs text-muted">{{ t("research.analystsCount", { count: priceTarget.numberAnalysts, date: priceTarget.lastUpdated }) }}</span>
         </div>
         <div class="flex flex-wrap gap-6 text-sm">
           <div>
-            <p class="text-muted">Low</p>
+            <p class="text-muted">{{ t("research.low") }}</p>
              <p class="font-semibold">{{ formatAmount(priceTarget.targetLow, instrCcy) }}</p>
           </div>
            <div>
-             <p class="text-muted">Mean</p>
+             <p class="text-muted">{{ t("research.mean") }}</p>
              <p class="font-semibold">{{ formatAmount(priceTarget.targetMean, instrCcy) }}</p>
           </div>
            <div>
-             <p class="text-muted">Median</p>
+             <p class="text-muted">{{ t("research.median") }}</p>
              <p class="font-semibold">{{ formatAmount(priceTarget.targetMedian, instrCcy) }}</p>
           </div>
            <div>
-             <p class="text-muted">High</p>
+             <p class="text-muted">{{ t("research.high") }}</p>
              <p class="font-semibold">{{ formatAmount(priceTarget.targetHigh, instrCcy) }}</p>
           </div>
         </div>
@@ -305,10 +307,10 @@ const targetSpread = computed(() => {
           <div
             class="absolute top-1/2 h-3.5 w-1 -translate-y-1/2 rounded bg-slate-700"
             :style="{ left: `calc(${targetSpread.pct}% - 2px)` }"
-            :title="`Current ${formatAmount(targetSpread.current, instrCcy)}`"
+            :title="t('research.currentPriceTitle', { value: formatAmount(targetSpread.current, instrCcy) })"
           ></div>
         </div>
-        <p class="mt-2 text-xs text-muted">Current price: {{ formatAmount(targetSpread.current, instrCcy) }}</p>
+        <p class="mt-2 text-xs text-muted">{{ t("research.currentPriceLabel", { value: formatAmount(targetSpread.current, instrCcy) }) }}</p>
       </div>
 
       <!-- §86 — the heading and the card wrapper live in the component, so the
@@ -318,7 +320,7 @@ const targetSpread = computed(() => {
       <div v-if="latestEarningsCall" class="card p-6">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 class="card-title">Latest Earnings Call</h2>
+            <h2 class="card-title">{{ t("research.latestEarningsCall") }}</h2>
             <p class="mt-1 text-sm text-muted">{{ latestEarningsCall.title }}</p>
             <p class="text-xs text-muted">{{ latestEarningsCall.date }}</p>
           </div>
@@ -329,7 +331,7 @@ const targetSpread = computed(() => {
             }"
             class="btn-secondary text-sm"
           >
-            Open transcript
+            {{ t("research.openTranscript") }}
           </router-link>
         </div>
       </div>
@@ -338,28 +340,28 @@ const targetSpread = computed(() => {
         <ResearchSeasonality :symbol="symbol" />
         <div class="card p-6">
           <div class="mb-3 flex items-center justify-between">
-            <h2 class="card-title">EPS Surprises - {{ symbol }}</h2>
-            <select v-model="epsMode" aria-label="EPS timeframe" class="rounded-md border border-border px-2 py-1 text-xs" @change="applyEpsMode(epsMode)">
-              <option value="annual">Annual</option>
-              <option value="quarterly">5Q</option>
+            <h2 class="card-title">{{ t("research.epsSurprises", { symbol }) }}</h2>
+            <select v-model="epsMode" :aria-label="t('research.epsTimeframe')" class="rounded-md border border-border px-2 py-1 text-xs" @change="applyEpsMode(epsMode)">
+              <option value="annual">{{ t("research.annual") }}</option>
+              <option value="quarterly">{{ t("research.fiveQ") }}</option>
             </select>
           </div>
           <component :is="'apexchart'" v-if="epsSurprises.length" :options="epsChartOptions" :series="epsChartOptions.series" />
-          <p v-else class="text-sm text-muted">No earnings data available.</p>
+          <p v-else class="text-sm text-muted">{{ t("research.noEarningsData") }}</p>
         </div>
       </div>
 
       <div v-if="metrics" class="card p-6">
-        <h2 class="card-title mb-4">Key Statistics</h2>
+        <h2 class="card-title mb-4">{{ t("research.keyStatistics") }}</h2>
         <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-          <StatGroup title="Profile" :items="profileStats" />
-          <StatGroup title="Margins" :items="marginStats" />
-          <StatGroup title="Returns (TTM)" :items="returnStats" />
-          <StatGroup title="Valuation (TTM)" :items="valuationStats" />
-          <StatGroup title="Valuation (NTM)" :items="valuationNtmStats" />
-          <StatGroup title="Financial Health" :items="healthStats" />
-          <StatGroup title="Dividends" :items="dividendStats" />
-          <StatGroup title="Growth (CAGR)" :items="growthStats" />
+          <StatGroup :title="t('research.groupProfile')" :items="profileStats" />
+          <StatGroup :title="t('research.groupMargins')" :items="marginStats" />
+          <StatGroup :title="t('research.groupReturns')" :items="returnStats" />
+          <StatGroup :title="t('research.groupValuationTtm')" :items="valuationStats" />
+          <StatGroup :title="t('research.groupValuationNtm')" :items="valuationNtmStats" />
+          <StatGroup :title="t('research.groupFinancialHealth')" :items="healthStats" />
+          <StatGroup :title="t('research.groupDividends')" :items="dividendStats" />
+          <StatGroup :title="t('research.groupGrowth')" :items="growthStats" />
         </div>
       </div>
 

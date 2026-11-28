@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue"
+import { useI18n } from "vue-i18n"
 import { useRecentSearchesStore } from "@/stores/recentSearches"
 
 withDefaults(defineProps<{ variant?: "bar" | "chips"; activeSymbol?: string }>(), {
@@ -8,6 +9,7 @@ withDefaults(defineProps<{ variant?: "bar" | "chips"; activeSymbol?: string }>()
 })
 
 const emit = defineEmits<{ (e: "select", symbol: string): void }>()
+const { t } = useI18n()
 
 const recentSearches = useRecentSearchesStore()
 
@@ -26,7 +28,7 @@ function onSelect(symbol: string) {
   <div
     v-if="symbols.length"
     role="navigation"
-    aria-label="Recent searches"
+    :aria-label="t('research.recentSearches')"
     :data-testid="`recent-searches-${variant}`"
     :class="variant === 'bar' ? 'flex items-center gap-1 overflow-x-auto' : 'flex flex-wrap gap-2'"
   >

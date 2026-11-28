@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue"
+import { useI18n } from "vue-i18n"
 import { useRoute } from "vue-router"
 import { getInstrumentOwnership } from "@/api/instruments"
 import type { components } from "@/api/types"
@@ -7,6 +8,7 @@ import { formatCompact, formatNumber } from "@/utils/format"
 import { withSharedChart } from "@/utils/chartOptions"
 
 const route = useRoute()
+const { t } = useI18n()
 const symbol = String(route.params.symbol).toUpperCase()
 
 const data = ref<components["schemas"]["OwnershipData"] | null>(null)
@@ -17,7 +19,7 @@ onMounted(async () => {
   try {
     data.value = await getInstrumentOwnership(symbol)
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Failed to load ownership"
+    error.value = err instanceof Error ? err.message : t("research.loadOwnershipError")
   } finally {
     loading.value = false
   }
@@ -32,7 +34,7 @@ function holdersChart(rows: components["schemas"]["HoldingGroup"][]) {
   return withSharedChart({
     chart: { type: "bar" as const, height: 200, toolbar: { show: false } },
     colors: ["var(--accent)"],
-    series: [{ name: "Holding %", data: rows.map((r) => r.holdingPercentage) }],
+    series: [{ name: t("research.holdingPct"), data: rows.map((r) => r.holdingPercentage) }],
     xaxis: { categories: rows.map((r) => r.date) },
     plotOptions: { bar: { columnWidth: "40%", borderRadius: 3 } },
     dataLabels: { enabled: false },
@@ -51,21 +53,21 @@ function amount(v: number): string {
 <template>
   <div class="space-y-6">
     <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-danger">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-muted">Loading ownership...</p>
+    <p v-if="loading" class="text-sm text-muted">{{ t("research.loadingOwnership") }}</p>
 
     <template v-if="!loading && !error && data">
       <div class="card p-6">
-        <h2 class="card-title mb-3">Institutional Holders</h2>
+        <h2 class="card-title mb-3">{{ t("research.institutionalHolders") }}</h2>
         <component :is="'apexchart'" v-if="institutional.length" :options="holdersChart(institutional)" :series="holdersChart(institutional).series" />
         <div class="mt-3 overflow-x-auto">
           <table class="w-full min-w-[640px] text-sm">
             <thead>
               <tr class="border-b border-border text-left text-xs uppercase tracking-wide text-muted">
-                <th class="py-2 pr-3">Period</th>
-                <th class="py-2 pr-3 text-right">Holding %</th>
-                <th class="py-2 pr-3 text-right">Holders</th>
-                <th class="py-2 pr-3 text-right">Positions (shares)</th>
-                <th class="py-2 pr-3 text-right">Position Value</th>
+                <th class="py-2 pr-3">{{ t("research.period") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.holdingPct") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.holders") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.positionsShares") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.positionValue") }}</th>
               </tr>
             </thead>
             <tbody>
@@ -82,17 +84,17 @@ function amount(v: number): string {
       </div>
 
       <div class="card p-6">
-        <h2 class="card-title mb-3">Mutual Fund Holders</h2>
+        <h2 class="card-title mb-3">{{ t("research.mutualFundHolders") }}</h2>
         <component :is="'apexchart'" v-if="mutualFund.length" :options="holdersChart(mutualFund)" :series="holdersChart(mutualFund).series" />
         <div class="mt-3 overflow-x-auto">
           <table class="w-full min-w-[640px] text-sm">
             <thead>
               <tr class="border-b border-border text-left text-xs uppercase tracking-wide text-muted">
-                <th class="py-2 pr-3">Period</th>
-                <th class="py-2 pr-3 text-right">Holding %</th>
-                <th class="py-2 pr-3 text-right">Holders</th>
-                <th class="py-2 pr-3 text-right">Positions (shares)</th>
-                <th class="py-2 pr-3 text-right">Position Value</th>
+                <th class="py-2 pr-3">{{ t("research.period") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.holdingPct") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.holders") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.positionsShares") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.positionValue") }}</th>
               </tr>
             </thead>
             <tbody>
@@ -109,16 +111,16 @@ function amount(v: number): string {
       </div>
 
       <div v-if="insider.length" class="card p-6">
-        <h2 class="card-title mb-3">Insider Holders</h2>
+        <h2 class="card-title mb-3">{{ t("research.insiderHolders") }}</h2>
         <div class="overflow-x-auto">
           <table class="w-full min-w-[640px] text-sm">
             <thead>
               <tr class="border-b border-border text-left text-xs uppercase tracking-wide text-muted">
-                <th class="py-2 pr-3">Period</th>
-                <th class="py-2 pr-3 text-right">Holding %</th>
-                <th class="py-2 pr-3 text-right">Holders</th>
-                <th class="py-2 pr-3 text-right">Positions (shares)</th>
-                <th class="py-2 pr-3 text-right">Position Value</th>
+                <th class="py-2 pr-3">{{ t("research.period") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.holdingPct") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.holders") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.positionsShares") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.positionValue") }}</th>
               </tr>
             </thead>
             <tbody>
@@ -135,29 +137,29 @@ function amount(v: number): string {
       </div>
 
       <div v-if="transactions.length" class="card p-6">
-        <h2 class="card-title mb-3">Insider Transactions</h2>
+        <h2 class="card-title mb-3">{{ t("research.insiderTransactions") }}</h2>
         <div class="overflow-x-auto">
           <table class="w-full min-w-[720px] text-sm">
             <thead>
               <tr class="border-b border-border text-left text-xs uppercase tracking-wide text-muted">
-                <th class="py-2 pr-3">Insider</th>
-                <th class="py-2 pr-3">Date</th>
-                <th class="py-2 pr-3">Code</th>
-                <th class="py-2 pr-3">Type</th>
-                <th class="py-2 pr-3 text-right">Amount</th>
-                <th class="py-2 pr-3 text-right">Value</th>
-                <th class="py-2 pr-3">Filed</th>
+                <th class="py-2 pr-3">{{ t("research.insider") }}</th>
+                <th class="py-2 pr-3">{{ t("research.date") }}</th>
+                <th class="py-2 pr-3">{{ t("research.code") }}</th>
+                <th class="py-2 pr-3">{{ t("research.type") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.amount") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.value") }}</th>
+                <th class="py-2 pr-3">{{ t("research.filed") }}</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(t, i) in transactions" :key="i" class="border-b border-border">
-                <td class="py-2 pr-3 font-medium">{{ t.title }}</td>
-                <td class="py-2 pr-3">{{ t.transactionDate }}</td>
-                <td class="py-2 pr-3">{{ t.transactionCode }}</td>
-                <td class="py-2 pr-3">{{ t.transactionText }}</td>
-                <td class="py-2 pr-3 text-right">{{ formatNumber(t.transactionAmount ?? 0, 0) }}</td>
-                <td class="py-2 pr-3 text-right">{{ amount(t.transactionValue ?? 0) }}</td>
-                <td class="py-2 pr-3">{{ t.filingDate }}</td>
+              <tr v-for="(tx, i) in transactions" :key="i" class="border-b border-border">
+                <td class="py-2 pr-3 font-medium">{{ tx.title }}</td>
+                <td class="py-2 pr-3">{{ tx.transactionDate }}</td>
+                <td class="py-2 pr-3">{{ tx.transactionCode }}</td>
+                <td class="py-2 pr-3">{{ tx.transactionText }}</td>
+                <td class="py-2 pr-3 text-right">{{ formatNumber(tx.transactionAmount ?? 0, 0) }}</td>
+                <td class="py-2 pr-3 text-right">{{ amount(tx.transactionValue ?? 0) }}</td>
+                <td class="py-2 pr-3">{{ tx.filingDate }}</td>
               </tr>
             </tbody>
           </table>

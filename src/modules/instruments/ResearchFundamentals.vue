@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue"
+import { useI18n } from "vue-i18n"
 import { withSharedChart } from "@/utils/chartOptions"
 import { useRoute } from "vue-router"
 import { getInstrumentFundamentals } from "@/api/instruments"
@@ -8,6 +9,7 @@ import { formatCompact } from "@/utils/format"
 import { formatFundamentalsCell as cell } from "./fundamentalsFormat"
 
 const route = useRoute()
+const { t } = useI18n()
 const symbol = String(route.params.symbol).toUpperCase()
 
 const data = ref<components["schemas"]["FundamentalsData"] | null>(null)
@@ -18,7 +20,7 @@ onMounted(async () => {
   try {
     data.value = await getInstrumentFundamentals(symbol)
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Failed to load fundamentals"
+    error.value = err instanceof Error ? err.message : t("research.loadFundamentalsError")
   } finally {
     loading.value = false
   }
@@ -43,8 +45,8 @@ const cashFlow = computed(() => data.value?.financialHighlights.cashFlow ?? [])
  */
 const currencyLabel = computed(() => {
   const ccy = data.value?.currency
-  if (!ccy) return "Currency unknown"
-  if (data.value?.currencySource === "estimated") return `${ccy} (estimated)`
+  if (!ccy) return t("research.currencyUnknown")
+  if (data.value?.currencySource === "estimated") return t("research.currencyEstimated", { ccy })
   if (data.value?.currencySource === "provider") return ccy
   return ccy
 })
@@ -67,8 +69,8 @@ const trendChartOptions = computed(() => withSharedChart({
   colors: ["var(--accent)", "var(--emerald)"],
   fill: { type: "solid" as const },
   series: [
-    { name: "Revenue", data: income.value.map((r) => r.revenue) },
-    { name: "Net Income", data: income.value.map((r) => r.netIncome) },
+    { name: t("research.revenue"), data: income.value.map((r) => r.revenue) },
+    { name: t("research.netIncome"), data: income.value.map((r) => r.netIncome) },
   ],
   xaxis: { categories: income.value.map((r) => String(r.year)) },
   plotOptions: { bar: { columnWidth: "45%", borderRadius: 3 } },
@@ -82,7 +84,7 @@ const trendChartOptions = computed(() => withSharedChart({
 <template>
   <div class="space-y-6">
     <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-danger">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-muted">Loading fundamentals...</p>
+    <p v-if="loading" class="text-sm text-muted">{{ t("research.loadingFundamentals") }}</p>
 
     <template v-if="!loading && !error && data">
       <p
@@ -90,35 +92,34 @@ const trendChartOptions = computed(() => withSharedChart({
         class="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-300"
         data-testid="fundamentals-mixed-sources"
       >
-        These statements come from more than one provider ({{ sourceLabel.join(", ") }}), so they may
-        not share a currency or a basis.
+        {{ t("research.mixedSources", { sources: sourceLabel.join(", ") }) }}
       </p>
 
       <div class="card p-6">
-        <h2 class="card-title mb-4">Revenue vs Net Income - {{ symbol }}</h2>
+        <h2 class="card-title mb-4">{{ t("research.revenueVsNetIncome", { symbol }) }}</h2>
         <component :is="'apexchart'" v-if="income.length" :options="trendChartOptions" :series="trendChartOptions.series" />
-        <p v-else class="text-sm text-muted">No income data available.</p>
+        <p v-else class="text-sm text-muted">{{ t("research.noIncomeData") }}</p>
       </div>
 
       <div class="card p-6">
         <div class="mb-3 flex items-baseline justify-between gap-3">
-          <h2 class="card-title">Income Statement</h2>
+          <h2 class="card-title">{{ t("research.incomeStatement") }}</h2>
           <span class="shrink-0 text-xs text-muted" data-testid="fundamentals-currency">{{ currencyLabel }}</span>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full min-w-[760px] text-sm">
             <thead>
               <tr class="border-b border-border text-left text-xs uppercase tracking-wide text-muted">
-                <th class="py-2 pr-3">Year</th>
-                <th class="py-2 pr-3 text-right">Revenue</th>
-                <th class="py-2 pr-3 text-right">EBITDA</th>
-                <th class="py-2 pr-3 text-right">EBIT</th>
-                <th class="py-2 pr-3 text-right">Net Income</th>
-                <th class="py-2 pr-3 text-right">Net Margin</th>
-                <th class="py-2 pr-3 text-right">NI Growth</th>
-                <th class="py-2 pr-3 text-right">EPS</th>
-                <th class="py-2 pr-3 text-right">EPS Growth</th>
-                <th class="py-2 pr-3 text-right">Shares (diluted)</th>
+                <th class="py-2 pr-3">{{ t("research.year") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.revenue") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.ebitda") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.ebit") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.netIncome") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.netMargin") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.niGrowth") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.eps") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.epsGrowth") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.sharesDiluted") }}</th>
               </tr>
             </thead>
             <tbody>
@@ -141,23 +142,23 @@ const trendChartOptions = computed(() => withSharedChart({
 
       <div class="card p-6">
         <div class="mb-3 flex items-baseline justify-between gap-3">
-          <h2 class="card-title">Balance Sheet</h2>
+          <h2 class="card-title">{{ t("research.balanceSheet") }}</h2>
           <span class="shrink-0 text-xs text-muted" data-testid="fundamentals-currency">{{ currencyLabel }}</span>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full min-w-[820px] text-sm">
             <thead>
               <tr class="border-b border-border text-left text-xs uppercase tracking-wide text-muted">
-                <th class="py-2 pr-3">Year</th>
-                <th class="py-2 pr-3 text-right">Total Assets</th>
-                <th class="py-2 pr-3 text-right">Total Liabilities</th>
-                <th class="py-2 pr-3 text-right">Equity</th>
-                <th class="py-2 pr-3 text-right">Cash & ST Inv</th>
-                <th class="py-2 pr-3 text-right">Total Debt</th>
-                <th class="py-2 pr-3 text-right">Net Debt</th>
-                <th class="py-2 pr-3 text-right">Working Capital</th>
-                <th class="py-2 pr-3 text-right">Retained Earnings</th>
-                <th class="py-2 pr-3 text-right">Debt/Equity</th>
+                <th class="py-2 pr-3">{{ t("research.year") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.totalAssets") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.totalLiabilities") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.equity") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.cashStInv") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.totalDebt") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.netDebt") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.workingCapital") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.retainedEarnings") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.debtEquity") }}</th>
               </tr>
             </thead>
             <tbody>
@@ -180,23 +181,23 @@ const trendChartOptions = computed(() => withSharedChart({
 
       <div class="card p-6">
         <div class="mb-3 flex items-baseline justify-between gap-3">
-          <h2 class="card-title">Cash Flow</h2>
+          <h2 class="card-title">{{ t("research.cashFlow") }}</h2>
           <span class="shrink-0 text-xs text-muted" data-testid="fundamentals-currency">{{ currencyLabel }}</span>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full min-w-[880px] text-sm">
             <thead>
               <tr class="border-b border-border text-left text-xs uppercase tracking-wide text-muted">
-                <th class="py-2 pr-3">Year</th>
-                <th class="py-2 pr-3 text-right">Operating CF</th>
-                <th class="py-2 pr-3 text-right">Investing CF</th>
-                <th class="py-2 pr-3 text-right">Financing CF</th>
-                <th class="py-2 pr-3 text-right">Free Cash Flow</th>
-                <th class="py-2 pr-3 text-right">FCF Growth</th>
-                <th class="py-2 pr-3 text-right">FCF / Share</th>
-                <th class="py-2 pr-3 text-right">CapEx</th>
-                <th class="py-2 pr-3 text-right">Depreciation</th>
-                <th class="py-2 pr-3 text-right">Dividends Paid</th>
+                <th class="py-2 pr-3">{{ t("research.year") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.operatingCF") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.investingCF") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.financingCF") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.freeCashFlow") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.fcfGrowth") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.fcfShare") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.capex") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.depreciation") }}</th>
+                <th class="py-2 pr-3 text-right">{{ t("research.dividendsPaid") }}</th>
               </tr>
             </thead>
             <tbody>

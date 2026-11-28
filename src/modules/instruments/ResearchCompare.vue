@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue"
+import { useI18n } from "vue-i18n"
 import { useRoute } from "vue-router"
 import { getInstrumentPeers } from "@/api/instruments"
 import type { components } from "@/api/types"
@@ -8,6 +9,7 @@ import { researchRoute } from "@/utils/research"
 import { COMPARE_METRICS } from "./compareMetrics"
 
 const route = useRoute()
+const { t } = useI18n()
 const routeSymbol = String(route.params.symbol).toUpperCase()
 const symbol = routeSymbol
 
@@ -36,15 +38,15 @@ const rows = computed(() =>
 <template>
   <div class="space-y-6">
     <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-danger">{{ error }}</p>
-    <p v-if="loading" class="text-sm text-muted">Loading comparison...</p>
+    <p v-if="loading" class="text-sm text-muted">{{ t("research.loadingComparison") }}</p>
 
-    <h2 class="card-title mb-3">Compare {{ symbol }} with peers</h2>
+    <h2 class="card-title mb-3">{{ t("research.compareWithPeers", { symbol }) }}</h2>
     <div v-if="!loading && !error && items.length" class="card p-6">
       <div class="overflow-x-auto">
         <table class="w-full min-w-[720px] text-sm">
           <thead>
             <tr class="border-b border-border text-left text-xs uppercase tracking-wide text-muted">
-              <th class="py-2 pr-3">Metric</th>
+              <th class="py-2 pr-3">{{ t("research.metricCol") }}</th>
               <th v-for="r in items" :key="r.symbol" class="px-3 py-2 text-right">
                 <!-- The primary column keeps its blue highlight; the badge
                      supplies the rest of the identity block. `normal-case`
