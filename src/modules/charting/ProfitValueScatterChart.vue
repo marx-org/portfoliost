@@ -24,6 +24,7 @@ export interface ProfitValuePoint {
  * toggled into the plot. Presentation only.
  */
 import { computed, ref } from "vue"
+import { useI18n } from "vue-i18n"
 import { formatCurrency } from "@/utils/format"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
 import { axisTitle, chartTitle, withSharedChart } from "./chartFormat"
@@ -38,6 +39,7 @@ const props = withDefaults(
 )
 
 const search = ref("")
+const { t } = useI18n()
 const showZero = ref(false)
 const expanded = ref(false)
 type SortKey = "marketValue" | "totalProfit"
@@ -77,13 +79,13 @@ const chartOptions = computed(() => withSharedChart({
     toolbar: { show: true, autoSelected: "zoom" },
     zoom: { enabled: true, type: "xy" as const },
   },
-  title: chartTitle("Market Value vs Total Profit"),
+  title: chartTitle(t("charts.marketValueVsProfit")),
   xaxis: {
-    title: axisTitle(`Market value (${props.currency})`),
+    title: axisTitle(t("charts.marketValueCcy", { ccy: props.currency })),
     labels: { formatter: (v: number) => formatCurrency(v, props.currency) },
   },
   yaxis: {
-    title: axisTitle(`Total profit (${props.currency})`),
+    title: axisTitle(t("charts.totalProfitCcy", { ccy: props.currency })),
     labels: { formatter: (v: number) => formatCurrency(v, props.currency) },
   },
   tooltip: {
@@ -133,7 +135,7 @@ const chartSeries = computed(() => [
         :class="expanded ? 'fixed inset-4 z-50 overflow-auto' : ''"
         :data-testid="`${testid}-chart`"
       >
-        <h2 class="sr-only">Market Value vs Total Profit</h2>
+        <h2 class="sr-only">{{ t("charts.marketValueVsProfit") }}</h2>
         <div class="mb-2 flex items-center justify-between gap-3">
           <button
             type="button"
@@ -146,7 +148,7 @@ const chartSeries = computed(() => [
         </div>
         <component :is="'apexchart'" :options="chartOptions" :series="chartSeries" />
       </div>
-      <CollapsibleSection title="Holdings" :testid="`${testid}-table`">
+      <CollapsibleSection :title="t('charts.holdings')" :testid="`${testid}-table`">
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-border text-left text-xs uppercase text-muted dark:border-slate-800 dark:text-muted">

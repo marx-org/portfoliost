@@ -10,7 +10,10 @@
  * engine. Overlays are components of value, never added to it.
  */
 import { computed } from "vue"
+import { useI18n } from "vue-i18n"
 import PortfolioPerformanceChart from "@/components/PortfolioPerformanceChart.vue"
+
+const { t } = useI18n()
 
 type Point = {
   date?: string
@@ -67,21 +70,21 @@ const benchmarkSeries = computed(() =>
 
 <template>
   <div class="space-y-3" data-testid="charting-valuation">
-    <h2 class="sr-only">Valuation, capital and cumulative income</h2>
+    <h2 class="sr-only">{{ t("charts.valuationTitle") }}</h2>
     <PortfolioPerformanceChart
       v-if="timeSeries.length"
       :time-series="timeSeries"
       :currency="currency"
       :height="height"
-      title="Valuation, capital and cumulative income"
-      xaxis-title="Date"
-      :yaxis-title="`Value (${currency})`"
+      :title="t('charts.valuationTitle')"
+      :xaxis-title="t('charts.date')"
+      :yaxis-title="t('charts.valueCcy', { ccy: currency })"
       :show-overlays="true"
       :show-recompute="false"
       :gap-symbols="gapSymbols"
       :held-gap-symbols="heldGapSymbols"
       :benchmarks="benchmarkSeries"
     />
-    <p v-else class="text-sm text-muted">No performance data for this scope.</p>
+    <p v-else class="text-sm text-muted">{{ t("charting.noPerfData") }}</p>
   </div>
 </template>

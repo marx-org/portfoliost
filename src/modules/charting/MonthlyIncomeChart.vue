@@ -8,6 +8,7 @@
  * table carries the exact amounts, kind and month for tooltips/inspection.
  */
 import { computed, watch } from "vue"
+import { useI18n } from "vue-i18n"
 import { getChartIncome } from "@/api/charting"
 import { useChartData } from "./useChartData"
 import { useChartScope } from "./useChartScope"
@@ -20,6 +21,7 @@ const props = defineProps<{ scope?: ChartScopeQuery }>()
 
 const scope = useChartScope()
 const { data, loading, error, load } = useChartData(getChartIncome)
+const { t } = useI18n()
 
 // The view may be mounted with a fixed scope (account tab) or read the shared
 // URL scope. Watch whichever applies.
@@ -60,10 +62,10 @@ const trendLine = computed(() =>
 
 const chartOptions = computed(() => withSharedChart({
   chart: { type: "line", height: 340, stacked: false },
-  title: chartTitle("Monthly income"),
+  title: chartTitle(t("charts.monthlyIncome")),
   xaxis: {
     categories: categories.value,
-    title: axisTitle("Month"),
+    title: axisTitle(t("charts.month")),
     // ~91 monthly categories collide even rotated. Blank all but every Nth label
     // so ~12 evenly spaced dates remain; the tooltip still uses the exact month.
     labels: {
@@ -73,7 +75,7 @@ const chartOptions = computed(() => withSharedChart({
     },
   },
   yaxis: {
-    title: axisTitle(`Income (${currency.value})`),
+    title: axisTitle(t("charts.incomeCcy", { ccy: currency.value })),
     labels: { formatter: (v: number) => axisCurrency(v, currency.value) },
   },
   stroke: { width: [0, 0, 2] },
@@ -99,8 +101,8 @@ const chartSeries = computed(() => {
     <p v-else-if="error" class="text-sm text-danger">Failed to load income data.</p>
     <template v-else>
       <apexchart v-if="points.length" type="line" :options="chartOptions" :series="chartSeries" :height="340" />
-      <p v-else class="text-sm text-muted">No income data for this scope.</p>
-      <CollapsibleSection v-if="points.length" title="Monthly income" testid="monthly-income-chart-table">
+      <p v-else class="text-sm text-muted">{{ t("charts.noIncomeData") }}</p>
+      <CollapsibleSection v-if="points.length" :title="t('charts.monthlyIncome')" testid="monthly-income-chart-table">
         <table class="w-full text-sm">
           <thead><tr class="text-left text-muted"><th class="py-1">Month</th><th>Dividends</th><th>Interest</th><th>Options</th><th>Total</th><th>Partial</th></tr></thead>
           <tbody>

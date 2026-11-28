@@ -9,6 +9,7 @@
  * quarter is marked year-to-date. Presentation only.
  */
 import { computed } from "vue"
+import { useI18n } from "vue-i18n"
 import { formatCurrency } from "@/utils/format"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
 import { axisCurrency, axisTitle, chartTitle, labelCurrency, withSharedChart } from "./chartFormat"
@@ -27,6 +28,7 @@ const props = withDefaults(
 )
 
 const rows = computed(() => props.points ?? [])
+const { t } = useI18n()
 const years = computed(() => [...new Set(rows.value.map((p) => Number(p.quarter.slice(0, 4))))].sort((a, b) => a - b))
 const now = computed(() => new Date())
 const currentQuarter = computed(
@@ -41,10 +43,10 @@ function pointFor(year: number, q: number): Point | undefined {
 const categories = ["Q1", "Q2", "Q3", "Q4"]
 const chartOptions = computed(() => withSharedChart({
   chart: { type: "bar" as const, height: 340, toolbar: { show: false } },
-  title: chartTitle("Quarterly Receipts by Year"),
-  xaxis: { categories, title: axisTitle("Quarter") },
+  title: chartTitle(t("charts.quarterlyReceiptsByYear")),
+  xaxis: { categories, title: axisTitle(t("charts.quarter")) },
   yaxis: {
-    title: axisTitle(`Receipts (${props.currency})`),
+    title: axisTitle(t("charts.receiptsCcy", { ccy: props.currency })),
     labels: { formatter: (v: number) => axisCurrency(v, props.currency) },
   },
   colors: ["var(--accent)", "#0ea5e9", "#8b5cf6", "#f59e0b", "#10b981"],
@@ -71,13 +73,13 @@ const partialLabel = computed(() => {
   <div class="space-y-3" :data-testid="testid">
     <template v-if="rows.length">
       <div class="card p-6" :data-testid="`${testid}-chart`">
-        <h2 class="sr-only">Quarterly Receipts by Year</h2>
+        <h2 class="sr-only">{{ t("charts.quarterlyReceiptsByYear") }}</h2>
         <component :is="'apexchart'" :options="chartOptions" :series="chartSeries" />
       </div>
       <p v-if="partialLabel" class="text-xs text-muted" :data-testid="`${testid}-partial`">
         {{ partialLabel }} is year-to-date, not a full-quarter forecast.
       </p>
-      <CollapsibleSection title="Quarterly Receipts" :testid="`${testid}-table`">
+      <CollapsibleSection :title="t('charts.quarterlyReceipts')" :testid="`${testid}-table`">
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-border text-left text-xs uppercase text-muted dark:border-slate-800 dark:text-muted">

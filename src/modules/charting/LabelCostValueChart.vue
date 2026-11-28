@@ -22,6 +22,7 @@ export interface LabelCostValueRow {
  * the "cost basis, not deposits" definition live in wallets.
  */
 import { computed } from "vue"
+import { useI18n } from "vue-i18n"
 import { formatCurrency } from "@/utils/format"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
 import { axisCurrency, axisTitle, chartTitle, labelCurrency, withSharedChart } from "./chartFormat"
@@ -38,6 +39,7 @@ const props = withDefaults(
 )
 
 const groups = computed(() => props.rows ?? [])
+const { t } = useI18n()
 
 function label(row: LabelCostValueRow): string {
   return row.label ?? row.key
@@ -47,16 +49,16 @@ const chartOptions = computed(() => withSharedChart({
   // Horizontal paired bars need vertical room per label; 360 clipped the rows
   // and made the pairs hard to compare.
   chart: { type: "bar" as const, height: 520, toolbar: { show: false } },
-  title: chartTitle("Cost Basis vs Market Value by Label"),
+  title: chartTitle(t("charts.costBasisByLabel")),
   plotOptions: { bar: { horizontal: true, borderRadius: 3 } },
   colors: ["var(--muted)", "var(--accent)"],
   fill: { type: "solid" as const },
   xaxis: {
     categories: groups.value.map(label),
-    title: axisTitle(`Cost basis / market value (${props.currency})`),
+    title: axisTitle(t("charts.costBasisMarketCcy", { ccy: props.currency })),
     labels: { formatter: (v: number) => axisCurrency(v, props.currency) },
   },
-  yaxis: { title: axisTitle("Label") },
+  yaxis: { title: axisTitle(t("charts.label")) },
   // Bars printed raw floats (`4938.454218`); round to a short currency label.
   dataLabels: { formatter: (v: number) => labelCurrency(v, props.currency) },
   tooltip: { y: { formatter: (v: number) => formatCurrency(v, props.currency) } },
@@ -72,10 +74,10 @@ const chartSeries = computed(() => [
   <div class="space-y-3" :data-testid="testid">
     <template v-if="groups.length">
       <div class="card p-6" :data-testid="`${testid}-chart`">
-        <h2 class="sr-only">Cost Basis vs Market Value by Label</h2>
+        <h2 class="sr-only">{{ t("charts.costBasisByLabel") }}</h2>
         <component :is="'apexchart'" :options="chartOptions" :series="chartSeries" />
       </div>
-      <CollapsibleSection title="Cost Basis vs Market Value" :testid="`${testid}-table`">
+      <CollapsibleSection :title="t('charts.costBasisVsMarket')" :testid="`${testid}-table`">
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-border text-left text-xs uppercase text-muted dark:border-slate-800 dark:text-muted">
@@ -97,6 +99,6 @@ const chartSeries = computed(() => [
         </p>
       </CollapsibleSection>
     </template>
-    <p v-else class="text-sm text-muted">No cost-basis data for this scope.</p>
+    <p v-else class="text-sm text-muted">{{ t("charts.noCostBasisData") }}</p>
   </div>
 </template>

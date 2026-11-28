@@ -7,6 +7,7 @@
  * kept. Presentation only.
  */
 import { computed } from "vue"
+import { useI18n } from "vue-i18n"
 import type { components } from "@/api/types"
 import { formatCurrency } from "@/utils/format"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
@@ -25,15 +26,16 @@ const props = withDefaults(
 )
 
 const rows = computed(() => props.series ?? [])
+const { t } = useI18n()
 const accounts = computed(() => rows.value.filter((s) => s.key !== "__total__"))
 const total = computed(() => rows.value.find((s) => s.key === "__total__"))
 
 const chartOptions = computed(() => withSharedChart({
   chart: { type: "line" as const, height: 340, toolbar: { show: false }, zoom: { enabled: false } },
-  title: chartTitle("Broker Cash Balances"),
-  xaxis: { type: "datetime" as const, title: axisTitle("Date") },
+  title: chartTitle(t("charts.brokerCashBalances")),
+  xaxis: { type: "datetime" as const, title: axisTitle(t("charts.date")) },
   yaxis: {
-    title: axisTitle(`Cash balance (${props.currency})`),
+    title: axisTitle(t("charts.cashBalanceCcy", { ccy: props.currency })),
     labels: { formatter: (v: number) => axisCurrency(v, props.currency) },
   },
   dataLabels: { enabled: false },
@@ -66,10 +68,10 @@ function latest(s: CashSeries): Point | undefined {
   <div class="space-y-3" :data-testid="testid">
     <template v-if="accounts.length">
       <div class="card p-6" :data-testid="`${testid}-chart`">
-        <h2 class="sr-only">Broker Cash Balances</h2>
+        <h2 class="sr-only">{{ t("charts.brokerCashBalances") }}</h2>
         <component :is="'apexchart'" :options="chartOptions" :series="chartSeries" />
       </div>
-      <CollapsibleSection title="Cash Balances" :testid="`${testid}-table`">
+      <CollapsibleSection :title="t('charts.cashBalances')" :testid="`${testid}-table`">
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-border text-left text-xs uppercase text-muted dark:border-slate-800 dark:text-muted">

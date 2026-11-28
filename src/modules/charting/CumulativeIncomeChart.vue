@@ -9,6 +9,7 @@
  * the first point is the true cumulative, not just the in-window sum.
  */
 import { computed } from "vue"
+import { useI18n } from "vue-i18n"
 import type { components } from "@/api/types"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
 import { formatCurrency } from "@/utils/format"
@@ -22,6 +23,7 @@ const props = withDefaults(defineProps<{ points?: Point[]; currency?: string }>(
 })
 
 const rows = computed(() => props.points ?? [])
+const { t } = useI18n()
 const opening = computed(() => {
   const first = rows.value[0]
   return first && typeof first.openingBalance === "number" ? first.openingBalance : 0
@@ -29,10 +31,10 @@ const opening = computed(() => {
 
 const chartOptions = computed(() => withSharedChart({
   chart: { type: "area", height: 320 },
-  title: chartTitle("Cumulative income"),
-  xaxis: { type: "datetime", title: axisTitle("Date") },
+  title: chartTitle(t("charts.cumulativeIncome")),
+  xaxis: { type: "datetime", title: axisTitle(t("charts.date")) },
   yaxis: {
-    title: axisTitle(`Cumulative income (${props.currency})`),
+    title: axisTitle(t("charts.cumulativeIncomeCcy", { ccy: props.currency })),
     labels: { formatter: (v: number) => axisCurrency(v, props.currency) },
   },
   // A 90-point area chart cannot carry per-point labels legibly; the axis,
@@ -57,8 +59,8 @@ const chartSeries = computed(() => [
       Lifetime before window: {{ formatCurrency(opening, currency) }}
     </p>
     <apexchart v-if="rows.length" type="area" :options="chartOptions" :series="chartSeries" :height="320" />
-    <p v-else class="text-sm text-muted">No income data for this scope.</p>
-    <CollapsibleSection v-if="rows.length" title="Cumulative income" testid="cumulative-income-chart-table">
+    <p v-else class="text-sm text-muted">{{ t("charts.noIncomeData") }}</p>
+    <CollapsibleSection v-if="rows.length" :title="t('charts.cumulativeIncome')" testid="cumulative-income-chart-table">
       <table class="w-full text-sm">
         <thead>
           <tr class="text-left text-muted">

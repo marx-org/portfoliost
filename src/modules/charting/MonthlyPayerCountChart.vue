@@ -10,6 +10,7 @@
  * calendar.
  */
 import { computed } from "vue"
+import { useI18n } from "vue-i18n"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
 import { axisTitle, chartTitle, withSharedChart } from "./chartFormat"
 
@@ -23,6 +24,7 @@ const props = withDefaults(
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 const rows = computed(() => props.months ?? [])
+const { t } = useI18n()
 const selectedYear = computed<number | null>(() => {
   const years = rows.value.map((m) => m.year)
   return years.length ? Math.max(...years) : null
@@ -50,11 +52,11 @@ const chartOptions = computed(() => withSharedChart({
   chart: { type: "bar" as const, height: 300 },
   title: chartTitle(
     selectedYear.value == null
-      ? "Dividend Payers by Month"
-      : `Dividend Payers by Month — ${selectedYear.value}`,
+      ? t("charts.dividendPayersByMonth")
+      : t("charts.dividendPayersByMonthYear", { year: selectedYear.value }),
   ),
-  xaxis: { categories: MONTHS, title: axisTitle("Month") },
-  yaxis: { title: axisTitle("Payers (count)") },
+  xaxis: { categories: MONTHS, title: axisTitle(t("charts.month")) },
+  yaxis: { title: axisTitle(t("charts.payersCount")) },
   colors: ["var(--emerald)"],
   fill: { type: "solid" as const },
   tooltip: {
@@ -78,13 +80,13 @@ const chartSeries = computed(() => [
   <div class="space-y-3" :data-testid="testid">
     <template v-if="selectedYear != null">
       <div class="card p-6" :data-testid="`${testid}-chart`">
-        <h2 class="sr-only">Dividend Payers by Month — {{ selectedYear }}</h2>
+        <h2 class="sr-only">{{ selectedYear == null ? t("charts.dividendPayersByMonth") : t("charts.dividendPayersByMonthYear", { year: selectedYear }) }}</h2>
         <component :is="'apexchart'" :options="chartOptions" :series="chartSeries" />
       </div>
       <p v-if="hasPartial" class="text-xs text-muted" :data-testid="`${testid}-partial`">
         {{ selectedYear }} is in progress; the current and later months are year-to-date, not a full-year forecast.
       </p>
-      <CollapsibleSection title="Dividend Payers" :testid="`${testid}-table`">
+      <CollapsibleSection :title="t('charts.dividendPayers')" :testid="`${testid}-table`">
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-border text-left text-xs uppercase text-muted dark:border-slate-800 dark:text-muted">
@@ -103,6 +105,6 @@ const chartSeries = computed(() => [
         </table>
       </CollapsibleSection>
     </template>
-    <p v-else class="text-sm text-muted">No dividend-payer data for this scope.</p>
+    <p v-else class="text-sm text-muted">{{ t("charts.noDividendPayerData") }}</p>
   </div>
 </template>

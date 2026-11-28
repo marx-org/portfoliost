@@ -9,6 +9,7 @@
  * elapsed time. The current year is marked partial (YTD).
  */
 import { computed } from "vue"
+import { useI18n } from "vue-i18n"
 import type { components } from "@/api/types"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
 import { axisCurrency, axisTitle, chartTitle, labelCurrency, withSharedChart } from "./chartFormat"
@@ -21,17 +22,19 @@ const props = withDefaults(
 )
 
 const rows = computed(() => props.points ?? [])
+const { t } = useI18n()
 const per = computed(() => (props.unit === "day" ? "day" : "month"))
-const titleText = computed(() => `Annual-equivalent Income per ${per.value}`)
+const perLabel = computed(() => (props.unit === "day" ? t("charts.perDay") : t("charts.perMonth")))
+const titleText = computed(() => t("charts.annualEquivIncomePer", { per: perLabel.value }))
 const divisor = computed(() => props.unit === "day" ? 365 : 12)
 const hasPartial = computed(() => rows.value.some((p) => p.partial))
 
 const chartOptions = computed(() => withSharedChart({
   chart: { type: "bar", height: 300 },
   title: chartTitle(titleText.value),
-  xaxis: { categories: rows.value.map((p) => String(p.year)), title: axisTitle("Year") },
+  xaxis: { categories: rows.value.map((p) => String(p.year)), title: axisTitle(t("charts.year")) },
   yaxis: {
-    title: axisTitle(`Income (${props.currency}/${per.value})`),
+    title: axisTitle(t("charts.incomePerCcy", { ccy: props.currency, per: perLabel.value })),
     labels: { formatter: (v: number) => axisCurrency(v, props.currency) },
   },
   colors: ["#f59e0b"],
@@ -56,8 +59,8 @@ const chartSeries = computed(() => [
       The current year is year-to-date, not a projected full year.
     </p>
     <apexchart v-if="rows.length" type="bar" :options="chartOptions" :series="chartSeries" :height="300" />
-    <p v-else class="text-sm text-muted">No income data for this scope.</p>
-    <CollapsibleSection v-if="rows.length" :title="`Annual-equivalent per ${per}`" :testid="`annual-income-average-${unit}-table`">
+    <p v-else class="text-sm text-muted">{{ t("charts.noIncomeData") }}</p>
+    <CollapsibleSection v-if="rows.length" :title="t('charts.annualEquivPer', { per: perLabel })" :testid="`annual-income-average-${unit}-table`">
       <table class="w-full text-sm">
         <thead>
           <tr class="text-left text-muted">

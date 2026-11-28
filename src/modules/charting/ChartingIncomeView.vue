@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /** Charting → Income (feature #253, sub-issues #256–#265). */
 import { computed, watch } from "vue"
+import { useI18n } from "vue-i18n"
 import { getChartIncome } from "@/api/charting"
 import { useChartScope } from "./useChartScope"
 import { useChartData } from "./useChartData"
@@ -13,6 +14,7 @@ import QuarterlyIncomeGrowthChart from "./QuarterlyIncomeGrowthChart.vue"
 import MonthlyPayerCountChart from "./MonthlyPayerCountChart.vue"
 
 const scope = useChartScope()
+const { t } = useI18n()
 const { data, loading, error, load } = useChartData(getChartIncome)
 
 watch(scope.scopeQuery, (q) => void load(q), { immediate: true })
@@ -24,25 +26,25 @@ const currency = computed(() => data.value?.currency ?? "")
   <div class="space-y-3" data-testid="charting-income">
   <div class="page-header" data-testid="charting-income">
     <div>
-      <p class="page-eyebrow"><span class="signal-dot" /> CHARTING</p>
-      <h1 class="page-title">Income</h1>
+      <p class="page-eyebrow"><span class="signal-dot" /> {{ t("charting.eyebrow") }}</p>
+      <h1 class="page-title">{{ t("charting.incomeTitle") }}</h1>
     </div>
   </div>
 
-    <p v-if="loading" class="text-sm text-muted">Loading…</p>
-    <p v-else-if="error" class="text-sm text-danger">Failed to load income data.</p>
+    <p v-if="loading" class="text-sm text-muted">{{ t("charting.loading") }}</p>
+    <p v-else-if="error" class="text-sm text-danger">{{ t("charting.incomeLoadError") }}</p>
     <template v-else>
       <MonthlyIncomeChart />
       <CumulativeIncomeChart :points="data?.cumulative ?? []" :currency="currency" />
-      <h3 class="text-sm font-medium text-muted">Annual totals</h3>
+      <h3 class="text-sm font-medium text-muted">{{ t("charting.annualTotals") }}</h3>
       <AnnualIncomeChart :points="data?.annual ?? []" :currency="currency" />
-      <h3 class="text-sm font-medium text-muted">Quarterly receipts</h3>
+      <h3 class="text-sm font-medium text-muted">{{ t("charting.quarterlyReceipts") }}</h3>
       <QuarterlyIncomeChart :points="data?.quarterly ?? []" :currency="currency" />
-      <h3 class="text-sm font-medium text-muted">Quarterly year-over-year growth</h3>
+      <h3 class="text-sm font-medium text-muted">{{ t("charting.quarterlyYoY") }}</h3>
       <QuarterlyIncomeGrowthChart :points="data?.quarterly ?? []" :currency="currency" />
-      <h3 class="text-sm font-medium text-muted">Dividend-payer coverage</h3>
+      <h3 class="text-sm font-medium text-muted">{{ t("charting.payerCoverage") }}</h3>
       <MonthlyPayerCountChart :months="data?.payerCoverage ?? []" />
-      <h3 class="text-sm font-medium text-muted">Annual-equivalent averages</h3>
+      <h3 class="text-sm font-medium text-muted">{{ t("charting.annualAverages") }}</h3>
       <AnnualIncomeAverageChart :points="data?.dailyAverageByYear ?? []" unit="day" :currency="currency" />
       <AnnualIncomeAverageChart :points="data?.monthlyAverageByYear ?? []" unit="month" :currency="currency" />
     </template>

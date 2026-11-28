@@ -10,6 +10,7 @@
  * dataset owns the calculation.
  */
 import { computed } from "vue"
+import { useI18n } from "vue-i18n"
 import type { components } from "@/api/types"
 import { formatCurrency } from "@/utils/format"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
@@ -26,6 +27,8 @@ const props = withDefaults(
   { points: () => [], currency: "", testid: "charting-annual-contributions" },
 )
 
+const { t } = useI18n()
+
 const rows = computed(() => props.points ?? [])
 const currentYear = new Date().getUTCFullYear()
 const hasPartial = computed(() => rows.value.some((p) => p.partial))
@@ -33,10 +36,10 @@ const hasUnknown = computed(() => rows.value.some((p) => p.unknown))
 
 const chartOptions = computed(() => withSharedChart({
   chart: { type: "bar" as const, height: 340, toolbar: { show: false }, zoom: { enabled: false } },
-  title: chartTitle("Annual External Contributions"),
-  xaxis: { categories: rows.value.map((p) => String(p.year)), title: axisTitle("Year") },
+  title: chartTitle(t("charts.annualExternalContributions")),
+  xaxis: { categories: rows.value.map((p) => String(p.year)), title: axisTitle(t("charts.year")) },
   yaxis: {
-    title: axisTitle(`External funding (${props.currency})`),
+    title: axisTitle(t("charts.externalFunding", { ccy: props.currency })),
     labels: { formatter: (v: number) => axisCurrency(v, props.currency) },
   },
   dataLabels: { formatter: (v: number) => labelCurrency(v, props.currency) },
@@ -71,7 +74,7 @@ const chartSeries = computed(() => [
         <h2 class="sr-only">Annual External Contributions</h2>
         <apexchart type="bar" :options="chartOptions" :series="chartSeries" :height="340" />
       </div>
-      <CollapsibleSection title="Annual External Contributions" :testid="`${testid}-table`">
+      <CollapsibleSection :title="t('charts.annualExternalContributions')" :testid="`${testid}-table`">
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-border text-left text-xs uppercase text-muted dark:border-slate-800 dark:text-muted">

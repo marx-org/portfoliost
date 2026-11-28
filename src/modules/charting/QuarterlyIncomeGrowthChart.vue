@@ -9,6 +9,7 @@
  * Presentation only — the growth math lives in wallets.
  */
 import { computed } from "vue"
+import { useI18n } from "vue-i18n"
 import { formatCurrency, formatPercent } from "@/utils/format"
 import CollapsibleSection from "@/components/CollapsibleSection.vue"
 import { axisPercent, axisTitle, chartTitle, withSharedChart } from "./chartFormat"
@@ -35,6 +36,8 @@ const selectedYear = computed<number | null>(() => {
   return years.length ? Math.max(...years) : null
 })
 
+const { t } = useI18n()
+
 const rows = computed(() =>
   selectedYear.value == null
     ? []
@@ -47,10 +50,10 @@ const rows = computed(() =>
 const categories = ["Q1", "Q2", "Q3", "Q4"]
 const chartOptions = computed(() => withSharedChart({
   chart: { type: "bar" as const, height: 300, toolbar: { show: false } },
-  title: chartTitle("Quarterly Income Growth"),
-  xaxis: { categories, title: axisTitle("Quarter") },
+  title: chartTitle(t("charts.quarterlyIncomeGrowth")),
+  xaxis: { categories, title: axisTitle(t("charts.quarter")) },
   yaxis: {
-    title: axisTitle("YoY change (%)"),
+    title: axisTitle(t("charts.yoyChangePercent")),
     labels: { formatter: axisPercent },
   },
   plotOptions: { bar: { distributed: true } },
@@ -84,13 +87,13 @@ const chartSeries = computed(() => [
         {{ selectedYear }} vs {{ selectedYear - 1 }} — quarterly receipts, year over year.
       </p>
       <div class="card p-6" :data-testid="`${testid}-chart`">
-        <h2 class="sr-only">Quarterly Income Growth</h2>
+        <h2 class="sr-only">{{ t("charts.quarterlyIncomeGrowth") }}</h2>
         <component :is="'apexchart'" :options="chartOptions" :series="chartSeries" />
       </div>
       <p class="text-xs text-muted" :data-testid="`${testid}-partial`">
         The current quarter is year-to-date and is compared with the prior full quarter, not a final YoY.
       </p>
-      <CollapsibleSection title="Quarterly Income Growth" :testid="`${testid}-table`">
+      <CollapsibleSection :title="t('charts.quarterlyIncomeGrowth')" :testid="`${testid}-table`">
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-border text-left text-xs uppercase text-muted dark:border-slate-800 dark:text-muted">

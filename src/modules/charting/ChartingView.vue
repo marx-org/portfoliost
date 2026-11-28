@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue"
+import { useI18n } from "vue-i18n"
 import { useRoute } from "vue-router"
 import { getChartingCompare, getChartingPresets, type ChartingPreset } from "@/api/charting"
 import { researchRoute } from "@/utils/research"
@@ -22,6 +23,7 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 const showSearch = ref(false)
 const route = useRoute()
+const { t } = useI18n()
 
 const metricDef = computed(() => COMPARE_METRICS.find((m) => m.key === metric.value) ?? COMPARE_METRICS[0])
 
@@ -57,7 +59,7 @@ const chartSeries = computed(() => [
 
 const chartOptions = computed(() => withSharedChart({
   chart: { type: "bar" as const, height: 360, toolbar: { show: false } },
-  title: chartTitle("Fundamentals comparison"),
+  title: chartTitle(t("charting.compareChartTitle")),
   colors: ["var(--accent)"],
   plotOptions: { bar: { columnWidth: "55%", borderRadius: 3 } },
   dataLabels: {
@@ -66,7 +68,7 @@ const chartOptions = computed(() => withSharedChart({
     offsetY: -6,
     style: { fontSize: "10px" },
   },
-  xaxis: { categories: items.value.map((r) => r.symbol), title: axisTitle("Stock") },
+  xaxis: { categories: items.value.map((r) => r.symbol), title: axisTitle(t("charting.compareAxisStock")) },
   yaxis: {
     title: axisTitle(metricAxisTitle.value),
     labels: { formatter: (v: number) => metricDef.value.chartFmt(v) },
@@ -86,7 +88,7 @@ async function loadCompare() {
     const res = await getChartingCompare(selected.value)
     items.value = res
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Failed to load comparison"
+    error.value = err instanceof Error ? err.message : t("charting.loadCompareError")
     items.value = []
   } finally {
     loading.value = false
@@ -124,23 +126,23 @@ onMounted(async () => {
   <div class="space-y-6">
     <div class="page-header">
       <div>
-        <p class="page-eyebrow"><span class="signal-dot" /> CHARTING</p>
+        <p class="page-eyebrow"><span class="signal-dot" /> {{ t("charting.eyebrow") }}</p>
         <h1 class="page-title">
-          Stocks
+          {{ t("charting.stocks") }}
           <span class="ml-2 align-middle text-sm font-medium text-muted" data-testid="selected-counter">
-            {{ selected.length }}/{{ MAX_STOCKS }} selected
+            {{ t("charting.selectedCount", { count: selected.length, max: MAX_STOCKS }) }}
           </span>
         </h1>
-        <p class="page-description">Compare fundamentals across stocks, or start from a popular preset.</p>
+        <p class="page-description">{{ t("charting.stocksDescription") }}</p>
       </div>
     </div>
 
     <div class="card p-6">
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 class="card-title">Stocks to compare</h2>
+        <h2 class="card-title">{{ t("charting.stocksToCompare") }}</h2>
         <div class="flex items-center gap-2">
           <button v-if="selected.length" type="button" class="btn-ghost text-xs" @click="selected = []">
-            Clear
+            {{ t("charting.clear") }}
           </button>
           <button
             type="button"
@@ -149,7 +151,7 @@ onMounted(async () => {
             data-testid="add-stock"
             @click="showSearch = true"
           >
-            + Add stock
+            {{ t("charting.addStock") }}
           </button>
         </div>
       </div>
@@ -174,7 +176,7 @@ onMounted(async () => {
           <button
             type="button"
             class="flex h-5 w-5 items-center justify-center rounded-full text-muted dark:text-muted hover:bg-border dark:hover:bg-slate-700/70 hover:text-text dark:hover:text-slate-200"
-            :aria-label="`Remove ${symbol}`"
+            :aria-label="t('charting.removeSymbol', { symbol })"
             data-testid="remove-stock"
             @click="removeStock(symbol)"
           >
@@ -183,12 +185,12 @@ onMounted(async () => {
         </span>
       </div>
       <p v-else class="text-sm text-muted">
-        No stocks added yet. Add at least two stocks to build a comparison chart.
+        {{ t("charting.noStocks") }}
       </p>
     </div>
 
     <div class="card p-6">
-      <h2 class="card-title mb-3">Presets</h2>
+      <h2 class="card-title mb-3">{{ t("charting.presets") }}</h2>
       <div class="flex flex-wrap gap-2">
         <button
           v-for="preset in presets"
@@ -206,9 +208,9 @@ onMounted(async () => {
 
     <div class="card p-6">
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 class="card-title">Fundamentals comparison</h2>
+        <h2 class="card-title">{{ t("charting.fundamentalsComparison") }}</h2>
         <label class="flex items-center gap-2 text-xs text-muted">
-          Metric
+          {{ t("charting.metric") }}
           <select v-model="metric" class="input w-auto" data-testid="metric-picker">
             <option v-for="m in COMPARE_METRICS" :key="m.key" :value="m.key">{{ m.label }}</option>
           </select>
@@ -216,15 +218,15 @@ onMounted(async () => {
       </div>
 
       <p v-if="error" class="rounded-lg bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-danger">{{ error }}</p>
-      <p v-if="loading" class="text-sm text-muted">Loading comparison...</p>
+      <p v-if="loading" class="text-sm text-muted">{{ t("charting.loadingCompare") }}</p>
 
       <div v-else-if="selected.length < 2" class="rounded-lg bg-surface-2 px-3 py-8 text-center text-sm text-muted">
-        Add at least two stocks to see the comparison chart.
+        {{ t("charting.addTwoStocks") }}
       </div>
 
       <div v-else-if="items.length" data-testid="compare-chart">
         <component :is="'apexchart'" :options="chartOptions" :series="chartSeries" />
-        <CollapsibleSection variant="plain" title="Fundamentals comparison" testid="charting-compare-table" class="mt-4">
+        <CollapsibleSection variant="plain" :title="t('charting.fundamentalsComparison')" testid="charting-compare-table" class="mt-4">
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
             <thead>
@@ -233,7 +235,7 @@ onMounted(async () => {
                    "Stock" label and wrong for a company name, which is the same
                    correction ResearchCompare.vue:48-51 already documents.
                    `r.symbol` is optional, so the v-if guards the nullable case. -->
-              <th class="py-2 pr-3 uppercase">Stock</th>
+              <th class="py-2 pr-3 uppercase">{{ t("charting.stockCol") }}</th>
               <th v-for="r in items" :key="r.symbol ?? r.name" class="px-3 py-2 text-right normal-case tracking-normal">
                 <router-link
                   v-if="r.symbol"
@@ -260,6 +262,6 @@ onMounted(async () => {
       </div>
     </div>
 
-    <InstrumentSearchModal :open="showSearch" mode="add" title="Add Stock to Chart" @close="showSearch = false" @add="addStock" />
+    <InstrumentSearchModal :open="showSearch" mode="add" :title="t('charting.addStockToChart')" @close="showSearch = false" @add="addStock" />
   </div>
 </template>
