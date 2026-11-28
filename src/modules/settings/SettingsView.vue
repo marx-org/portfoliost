@@ -1,25 +1,29 @@
 <script setup lang="ts">
-const nav = [
-  { label: "Profile", to: { name: "settings-profile" } },
-  { label: "Shared Portfolios", to: { name: "settings-shared-portfolios" } },
-  { label: "Broker Connections", to: { name: "settings-broker-connections" } },
-]
+import { computed } from "vue"
+import { useI18n } from "vue-i18n"
+const { t } = useI18n()
 
-const footer = [
-  { label: "Terms", href: "https://example-service.ai/terms" },
-  { label: "Privacy", href: "https://example-service.ai/privacy" },
-  { label: "Roadmap", href: "https://example-service.ai/roadmap" },
-]
+const nav = computed(() => [
+  { label: t("settings.nav.profile"), to: { name: "settings-profile" } },
+  { label: t("settings.nav.sharedPortfolios"), to: { name: "settings-shared-portfolios" } },
+  { label: t("settings.nav.brokerConnections"), to: { name: "settings-broker-connections" } },
+])
+
+const footer = computed(() => [
+  { label: t("settings.footer.terms"), href: "https://example-service.ai/terms" },
+  { label: t("settings.footer.privacy"), href: "https://example-service.ai/privacy" },
+  { label: t("settings.footer.roadmap"), href: "https://example-service.ai/roadmap" },
+])
 </script>
 
 <template>
 
   <div>
-    <h1 class="text-2xl font-semibold">Settings</h1>
+    <h1 class="text-2xl font-semibold">{{ t("settings.title") }}</h1>
 
     <div class="mt-6 flex flex-col gap-8 md:flex-row">
       <div class="w-full shrink-0 md:w-52">
-        <nav aria-label="Settings" class="flex flex-col gap-1">
+        <nav :aria-label="t('settings.navLabel')" class="flex flex-col gap-1">
           <router-link
             v-for="item in nav"
             :key="item.label"

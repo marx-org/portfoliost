@@ -2,6 +2,7 @@ import { flushPromises, mount } from "@vue/test-utils"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import PublicPortfolioView from "@/modules/settings/PublicPortfolioView.vue"
 import * as portfoliosApi from "@/api/portfolios"
+import { i18n } from "@/i18n"
 
 // §85.5 — the share page's holdings table rendered each symbol as bare text,
 // which made it the one surface where a visitor could see a ticker and do
@@ -45,6 +46,7 @@ async function mountView(share = SHARE) {
   mocked.getPublicPortfolioShare.mockResolvedValue(share)
   const wrapper = mount(PublicPortfolioView, {
     global: {
+      plugins: [i18n],
       stubs: {
         RouterLink: {
           props: ["to"],

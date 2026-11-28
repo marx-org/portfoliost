@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted } from "vue"
+import { useI18n } from "vue-i18n"
 import { useRouter } from "vue-router"
 import { useAuthStore } from "@/stores/auth"
 import { useThemeStore, type ThemePreference } from "@/stores/theme"
 import { researchSymbol } from "@/utils/research"
 
+const { t } = useI18n()
 const router = useRouter()
 const auth = useAuthStore()
 const theme = useThemeStore()
@@ -49,10 +51,10 @@ function onKeydown(e: KeyboardEvent) {
 onMounted(() => window.addEventListener("keydown", onKeydown))
 onUnmounted(() => window.removeEventListener("keydown", onKeydown))
 
-const items = [
+const items = computed(() => [
   {
-    label: "Portfolios",
-    sublabel: "Watchlists",
+    label: t("shell.nav.portfolios"),
+    sublabel: t("shell.nav.watchlists"),
     // §84 — the section's landing tab is Accounts balance, so the sidebar item
     // opens that, not the Portfolios grid. The grid stays one click away on the
     // tab strip.
@@ -60,16 +62,16 @@ const items = [
     icon: "briefcase",
   },
   {
-    label: "Research",
+    label: t("shell.nav.research"),
     to: { name: "research-overview", params: { symbol: researchSymbol("AAPL") } },
     icon: "search",
   },
   {
-    label: "Charting",
+    label: t("shell.nav.charting"),
     to: "/en/charting",
     icon: "chart",
   },
-]
+])
 
 function isActive(item: { to: unknown; label: string }): boolean {
   if (typeof item.to === "string") {
@@ -99,13 +101,13 @@ function isActive(item: { to: unknown; label: string }): boolean {
 const isAdminActive = computed(() => router.currentRoute.value.path.startsWith("/en/admin"))
 
 const themeOpen = ref(false)
-const themeOptions: { value: ThemePreference; label: string; icon: string }[] = [
-  { value: "light", label: "Light", icon: "sun" },
-  { value: "dark", label: "Dark", icon: "moon" },
-  { value: "system", label: "System", icon: "monitor" },
-]
+const themeOptions = computed<{ value: ThemePreference; label: string; icon: string }[]>(() => [
+  { value: "light", label: t("shell.themeOptions.light"), icon: "sun" },
+  { value: "dark", label: t("shell.themeOptions.dark"), icon: "moon" },
+  { value: "system", label: t("shell.themeOptions.system"), icon: "monitor" },
+])
 
-const themeLabel = computed(() => themeOptions.find((o) => o.value === theme.preference)?.label ?? "Light")
+const themeLabel = computed(() => themeOptions.value.find((o) => o.value === theme.preference)?.label ?? t("shell.themeOptions.light"))
 
 function selectTheme(value: ThemePreference) {
   theme.setPreference(value)
@@ -118,7 +120,7 @@ function selectTheme(value: ThemePreference) {
   <button
     type="button"
     class="fixed left-4 top-4 z-50 flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface text-muted shadow-card transition-colors hover:bg-surface-2 hover:text-text md:hidden"
-    aria-label="Toggle menu"
+    :aria-label="t('shell.toggleMenu')"
     @click="toggleSidebar"
   >
     <svg v-if="!isMobileOpen" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -157,19 +159,19 @@ function selectTheme(value: ThemePreference) {
     >
       <!-- Eyebrow + logo + collapse toggle -->
       <div class="border-b border-border">
-        <p v-if="!isCollapsed" class="px-4 pt-3 text-[10px] font-mono uppercase tracking-[0.2em] text-muted">Workspace</p>
+        <p v-if="!isCollapsed" class="px-4 pt-3 text-[10px] font-mono uppercase tracking-[0.2em] text-muted">{{ t("shell.workspace") }}</p>
         <div class="flex items-center px-4 py-3" :class="isCollapsed ? 'justify-center px-2 py-3' : 'justify-between'">
           <!-- App logo -->
-          <router-link to="/en/investments/accounts-balance" class="flex min-w-0 items-center gap-2" :title="isCollapsed ? 'Portfoliost' : undefined">
-            <img src="/favicon.svg" alt="Portfoliost" class="h-7 w-7 shrink-0" />
-            <span v-if="!isCollapsed" class="truncate text-base font-semibold tracking-tight text-text">Portfoliost</span>
+          <router-link to="/en/investments/accounts-balance" class="flex min-w-0 items-center gap-2" :title="isCollapsed ? t('shell.portfoliost') : undefined">
+            <img src="/favicon.svg" :alt="t('shell.portfoliost')" class="h-7 w-7 shrink-0" />
+            <span v-if="!isCollapsed" class="truncate text-base font-semibold tracking-tight text-text">{{ t("shell.portfoliost") }}</span>
           </router-link>
 
           <!-- Collapse toggle (desktop only) -->
           <button
             type="button"
             class="ml-auto hidden shrink-0 rounded-md p-1 text-muted transition-colors hover:bg-surface-2 hover:text-text md:flex"
-            :aria-label="isCollapsed ? 'Expand menu' : 'Collapse menu'"
+            :aria-label="isCollapsed ? t('shell.expandMenu') : t('shell.collapseMenu')"
             @click="toggleSidebar"
           >
             <svg class="h-4 w-4 transition-transform duration-200" :class="isCollapsed ? 'rotate-180' : ''" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -180,7 +182,7 @@ function selectTheme(value: ThemePreference) {
       </div>
 
       <!-- Main nav -->
-      <nav aria-label="Main navigation" class="flex-1 space-y-1 overflow-y-auto px-2 py-3">
+      <nav :aria-label="t('shell.mainNavigation')" class="flex-1 space-y-1 overflow-y-auto px-2 py-3">
         <router-link
           v-for="item in items"
           :key="item.label"
@@ -228,19 +230,19 @@ function selectTheme(value: ThemePreference) {
               : 'text-muted hover:bg-surface-2 hover:text-text',
             isCollapsed ? 'justify-center' : '',
           ]"
-          :title="isCollapsed ? 'Admin' : undefined"
+          :title="isCollapsed ? t('shell.admin') : undefined"
         >
           <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
             <circle cx="12" cy="12" r="3" />
           </svg>
-          <span v-if="!isCollapsed">Admin</span>
+          <span v-if="!isCollapsed">{{ t("shell.admin") }}</span>
         </router-link>
       </nav>
 
       <!-- Bottom section -->
       <div class="space-y-1 border-t border-border p-2">
-        <p v-if="!isCollapsed" class="px-3 pb-1 pt-2 text-[10px] font-mono uppercase tracking-[0.2em] text-muted">Account</p>
+        <p v-if="!isCollapsed" class="px-3 pb-1 pt-2 text-[10px] font-mono uppercase tracking-[0.2em] text-muted">{{ t("shell.account") }}</p>
 
         <!-- Theme picker -->
         <div class="relative">
@@ -254,7 +256,7 @@ function selectTheme(value: ThemePreference) {
             ]"
             aria-haspopup="listbox"
             :aria-expanded="themeOpen"
-            :title="isCollapsed ? `Theme: ${themeLabel}` : undefined"
+            :title="isCollapsed ? `${t('shell.theme')}: ${themeLabel}` : undefined"
             @click="themeOpen = !themeOpen"
           >
             <span class="flex items-center gap-2">
@@ -267,7 +269,7 @@ function selectTheme(value: ThemePreference) {
                 <circle cx="12" cy="12" r="4" />
                 <path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32 1.41-1.41" />
               </svg>
-              <span v-if="!isCollapsed">Theme</span>
+              <span v-if="!isCollapsed">{{ t("shell.theme") }}</span>
             </span>
             <span v-if="!isCollapsed" class="flex items-center gap-1 text-xs font-normal text-muted">
               {{ themeLabel }}
@@ -280,7 +282,7 @@ function selectTheme(value: ThemePreference) {
           <div
             v-if="themeOpen"
             role="listbox"
-            aria-label="Theme"
+            :aria-label="t('shell.theme')"
             class="absolute bottom-full left-0 z-50 mb-1 rounded-xl border border-border bg-surface p-1 shadow-card"
             :class="isCollapsed ? 'w-36' : 'right-0'"
           >
@@ -315,7 +317,7 @@ function selectTheme(value: ThemePreference) {
           type="button"
           class="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-2 hover:text-text"
           :class="isCollapsed ? 'justify-center' : 'justify-start'"
-          :title="isCollapsed ? 'Logout' : undefined"
+          :title="isCollapsed ? t('shell.logout') : undefined"
           @click="handleLogout"
         >
           <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -323,7 +325,7 @@ function selectTheme(value: ThemePreference) {
             <polyline points="16 17 21 12 16 7" />
             <line x1="21" y1="12" x2="9" y2="12" />
           </svg>
-          <span v-if="!isCollapsed">Logout</span>
+          <span v-if="!isCollapsed">{{ t("shell.logout") }}</span>
         </button>
 
         <!-- Settings -->
@@ -331,13 +333,13 @@ function selectTheme(value: ThemePreference) {
           to="/en/settings/profile"
           class="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-2 hover:text-text"
           :class="isCollapsed ? 'justify-center' : 'justify-start'"
-          :title="isCollapsed ? 'Settings' : undefined"
+          :title="isCollapsed ? t('shell.settings') : undefined"
         >
           <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
             <circle cx="12" cy="12" r="3" />
           </svg>
-          <span v-if="!isCollapsed">Settings</span>
+          <span v-if="!isCollapsed">{{ t("shell.settings") }}</span>
         </router-link>
 
         <!-- User email -->
